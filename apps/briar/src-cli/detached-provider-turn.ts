@@ -1,8 +1,14 @@
 import { Buffer } from "node:buffer";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
-import { createInterface } from "node:readline";
+import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
+import { RunnerToParentSchema } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
+import {
+  decodeSidecarRunnerOutput,
+  encodeSidecarApprovalResponse,
+  encodeSidecarRunRequest,
+} from "../src-agent/sidecar-protocol";
 import type { JsonSchema } from "../src/lib/project-llm";
 import { agentProviderBinaryName } from "../src/lib/agent-provider";
 import {
@@ -222,6 +228,7 @@ async function executeDetachedProviderTurn(
   skillCatalog: DetachedAgentSkillCatalog | null,
   diagnose: DiagnosticEmitter,
 ) {
+  const maxSidecarFrameBytes = 16 * 1024 * 1024;
   const runnerRequest = detachedProviderRequest({
     agent: input.agent,
     prompt: input.prompt,
@@ -237,8 +244,8 @@ async function executeDetachedProviderTurn(
     outputSchema: input.outputSchema ?? null,
     agentBinary,
   }).request;
-  const requestLine = `${JSON.stringify(runnerRequest)}\n`;
-  const requestBytes = Buffer.byteLength(requestLine, "utf8");
+  const requestFrame = encodeSidecarRunRequest(runnerRequest);
+  const requestBytes = requestFrame.byteLength;
   diagnose("runner.spawn_start", {
     runnerPath,
     workspacePath: input.workspacePath,
@@ -270,6 +277,7 @@ async function executeDetachedProviderTurn(
   let stderr = "";
   let runnerError: string | null = null;
   let completed = false;
+  let terminalOutputSeen = false;
   let resultText: string | null = null;
   let conversationId = input.conversationId ?? null;
   let outputCount = 0;
@@ -313,7 +321,7 @@ async function executeDetachedProviderTurn(
       runnerPid: child.pid ?? null,
       requestBytes,
     });
-    const accepted = child.stdin.write(requestLine, () => {
+    const accepted = child.stdin.write(requestFrame, () => {
       diagnose("runner.stdin_write_complete", {
         runnerPid: child.pid ?? null,
         requestBytes,
@@ -329,33 +337,26 @@ async function executeDetachedProviderTurn(
         diagnose("runner.stdin_drain", { runnerPid: child.pid ?? null });
       });
     }
-    const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
-    for await (const line of lines) {
-      if (!line.trim()) continue;
-      let payload: unknown = line;
-      try {
-        payload = JSON.parse(line);
-      } catch {
-        // Preserve plain provider output for caller diagnostics.
+    for await (const message of sizeDelimitedDecodeStream(
+      RunnerToParentSchema,
+      child.stdout,
+      { readMaxBytes: maxSidecarFrameBytes },
+    )) {
+      if (terminalOutputSeen) {
+        throw new Error("Agent runner emitted output after a terminal frame");
       }
+      const payload = decodeSidecarRunnerOutput(message);
+      const serializedPayload = JSON.stringify(payload);
       outputCount += 1;
-      const payloadType =
-        payload && typeof payload === "object" && "type" in payload
-          ? String((payload as { type?: unknown }).type ?? "unknown")
-          : "text";
+      const payloadType = payload.type;
       diagnose("runner.stdout_payload", {
         runnerPid: child.pid ?? null,
         outputNumber: outputCount,
         payloadType,
-        bytes: Buffer.byteLength(line, "utf8"),
-        ...(payloadType === "error" &&
-        payload &&
-        typeof payload === "object" &&
-        "message" in payload
+        bytes: Buffer.byteLength(serializedPayload, "utf8"),
+        ...(payloadType === "error"
           ? {
-              error: redactDiagnosticText(
-                (payload as { message?: unknown }).message,
-              ),
+              error: redactDiagnosticText(payload.message),
             }
           : {}),
       });
@@ -366,41 +367,27 @@ async function executeDetachedProviderTurn(
       }
       const candidate = issueReplyTextFromPayload(payload);
       if (candidate) resultText = candidate;
-      if (
-        payload &&
-        typeof payload === "object" &&
-        "type" in payload &&
-        (payload as { type?: string }).type === "approval" &&
-        "id" in payload &&
-        typeof payload.id === "string"
-      ) {
+      if (payload.type === "approval") {
         child.stdin.write(
-          `${JSON.stringify({
-            type: "approvalResponse",
-            id: payload.id,
-            approved: runnerRequest.sandboxMode !== "readOnly",
-          })}\n`,
+          encodeSidecarApprovalResponse(
+            payload.id,
+            runnerRequest.sandboxMode !== "readOnly",
+          ),
         );
       }
-      if (
-        payload &&
-        typeof payload === "object" &&
-        "type" in payload &&
-        (payload as { type?: string }).type === "error"
-      ) {
-        runnerError = String(
-          (payload as { message?: unknown }).message ?? "Agent failed",
-        );
+      if (payload.type === "error") {
+        runnerError = payload.message || "Agent failed";
+        terminalOutputSeen = true;
       }
-      if (
-        payload &&
-        typeof payload === "object" &&
-        "type" in payload &&
-        (payload as { type?: string }).type === "result"
-      ) {
+      if (payload.type === "result") {
         completed = true;
+        terminalOutputSeen = true;
       }
-      await input.onPayload?.(payload, line);
+      if (payload.type === "blocked") terminalOutputSeen = true;
+      await input.onPayload?.(payload, serializedPayload);
+    }
+    if (!terminalOutputSeen) {
+      throw new Error("Agent runner stdout closed before terminal output");
     }
     const exitCode = await exitPromise;
     if (runnerStderrBuffer.trim()) {

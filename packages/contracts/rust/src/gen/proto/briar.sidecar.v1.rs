@@ -1740,8 +1740,8 @@ pub struct RunRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub provider_binary_path: ::buffa::alloc::string::String,
-    /// SHA-256 of the agent-runner descriptor closure used to generate both
-    /// endpoints (runner.proto plus its transitive imports).
+    /// SHA-256 of the canonical compiled Briar descriptor image used to generate
+    /// both endpoints.
     /// A runner must reject an empty or mismatched fingerprint; there is no
     /// protocol negotiation or legacy fallback between co-shipped binaries.
     ///
@@ -3505,15 +3505,15 @@ pub struct RunBlocked {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub message: ::buffa::alloc::string::String,
+    /// Provider-specific block diagnostics may name an upstream model provider,
+    /// not one of Briar's configured runner providers.
+    ///
     /// Field 3: `provider`
     #[serde(
         rename = "provider",
-        with = "::buffa::json_helpers::opt_enum",
         skip_serializing_if = "::core::option::Option::is_none"
     )]
-    pub provider: ::core::option::Option<
-        ::buffa::EnumValue<super::super::types::v1::AgentProvider>,
-    >,
+    pub provider: ::core::option::Option<::buffa::alloc::string::String>,
     /// Field 4: `server_names`
     #[serde(
         rename = "serverNames",
@@ -3569,7 +3569,7 @@ impl RunBlocked {
     ///Sets [`Self::provider`] to `Some(value)`, consuming and returning `self`.
     pub fn with_provider(
         mut self,
-        value: impl Into<::buffa::EnumValue<super::super::types::v1::AgentProvider>>,
+        value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.provider = Some(value.into());
         self
@@ -3612,7 +3612,7 @@ impl ::buffa::Message for RunBlocked {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.message) as u64;
         }
         if let Some(ref v) = self.provider {
-            size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         for v in &self.server_names {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
@@ -3648,7 +3648,7 @@ impl ::buffa::Message for RunBlocked {
             ::buffa::types::put_string_field(2u32, &self.message, buf);
         }
         if let Some(ref v) = self.provider {
-            ::buffa::types::put_int32_field(3u32, v.to_i32(), buf);
+            ::buffa::types::put_string_field(3u32, v, buf);
         }
         for v in &self.server_names {
             ::buffa::types::put_string_field(4u32, v, buf);
@@ -3696,11 +3696,14 @@ impl ::buffa::Message for RunBlocked {
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
+                    ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                self.provider = ::core::option::Option::Some(
-                    ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
-                );
+                ::buffa::types::merge_string(
+                    self
+                        .provider
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
             }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -5049,8 +5052,8 @@ pub mod __buffa {
             ///
             /// Field 14: `provider_binary_path`
             pub provider_binary_path: &'a str,
-            /// SHA-256 of the agent-runner descriptor closure used to generate both
-            /// endpoints (runner.proto plus its transitive imports).
+            /// SHA-256 of the canonical compiled Briar descriptor image used to generate
+            /// both endpoints.
             /// A runner must reject an empty or mismatched fingerprint; there is no
             /// protocol negotiation or legacy fallback between co-shipped binaries.
             ///
@@ -5733,8 +5736,8 @@ pub mod __buffa {
             pub fn provider_binary_path(&self) -> &'_ str {
                 self.0.reborrow().provider_binary_path
             }
-            /// SHA-256 of the agent-runner descriptor closure used to generate both
-            /// endpoints (runner.proto plus its transitive imports).
+            /// SHA-256 of the canonical compiled Briar descriptor image used to generate
+            /// both endpoints.
             /// A runner must reject an empty or mismatched fingerprint; there is no
             /// protocol negotiation or legacy fallback between co-shipped binaries.
             ///
@@ -8083,10 +8086,11 @@ pub mod __buffa {
             pub reason: ::buffa::EnumValue<super::super::BlockReason>,
             /// Field 2: `message`
             pub message: &'a str,
+            /// Provider-specific block diagnostics may name an upstream model provider,
+            /// not one of Briar's configured runner providers.
+            ///
             /// Field 3: `provider`
-            pub provider: ::core::option::Option<
-                ::buffa::EnumValue<super::super::super::super::types::v1::AgentProvider>,
-            >,
+            pub provider: ::core::option::Option<&'a str>,
             /// Field 4: `server_names`
             pub server_names: ::buffa::RepeatedView<'a, &'a str>,
             /// Field 5: `next_retry_at`
@@ -8148,13 +8152,9 @@ pub mod __buffa {
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Varint,
+                            ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.provider = Some(
-                            ::buffa::EnumValue::from(
-                                ::buffa::types::decode_int32(&mut cur)?,
-                            ),
-                        );
+                        view.provider = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -8226,7 +8226,7 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::RunBlocked {
                     reason: self.reason,
                     message: self.message.to_string(),
-                    provider: self.provider,
+                    provider: self.provider.map(|s| s.to_string()),
                     server_names: self
                         .server_names
                         .iter()
@@ -8268,7 +8268,7 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.message) as u64;
                 }
                 if let Some(ref v) = self.provider {
-                    size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
                 for v in &self.server_names {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
@@ -8305,7 +8305,7 @@ pub mod __buffa {
                     ::buffa::types::put_string_field(2u32, &self.message, buf);
                 }
                 if let Some(ref v) = self.provider {
-                    ::buffa::types::put_int32_field(3u32, v.to_i32(), buf);
+                    ::buffa::types::put_string_field(3u32, v, buf);
                 }
                 for v in &self.server_names {
                     ::buffa::types::put_string_field(4u32, v, buf);
@@ -8348,7 +8348,7 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.message) {
                     __map.serialize_entry("message", self.message)?;
                 }
-                if let ::core::option::Option::Some(ref __v) = self.provider {
+                if let ::core::option::Option::Some(__v) = self.provider {
                     __map.serialize_entry("provider", __v)?;
                 }
                 if !self.server_names.is_empty() {
@@ -8472,13 +8472,12 @@ pub mod __buffa {
             pub fn message(&self) -> &'_ str {
                 self.0.reborrow().message
             }
+            /// Provider-specific block diagnostics may name an upstream model provider,
+            /// not one of Briar's configured runner providers.
+            ///
             /// Field 3: `provider`
             #[must_use]
-            pub fn provider(
-                &self,
-            ) -> ::core::option::Option<
-                ::buffa::EnumValue<super::super::super::super::types::v1::AgentProvider>,
-            > {
+            pub fn provider(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().provider
             }
             /// Field 4: `server_names`

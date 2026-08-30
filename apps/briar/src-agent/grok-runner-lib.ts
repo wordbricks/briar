@@ -39,7 +39,6 @@ export type {
 export const GrokRunnerRequest = Schema.Struct({
   ...commonRunnerRequestFields,
   effort: Schema.optional(Schema.NullOr(Schema.String)),
-  grokBinary: Schema.String,
 });
 
 export type GrokRunnerRequest = typeof GrokRunnerRequest.Type;

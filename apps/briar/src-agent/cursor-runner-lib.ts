@@ -24,7 +24,6 @@ import {
 export const CursorRunnerRequest = Schema.Struct({
   ...commonRunnerRequestFields,
   effort: Schema.optional(Schema.NullOr(Schema.String)),
-  cursorBinary: Schema.String,
 });
 
 export type CursorRunnerRequest = typeof CursorRunnerRequest.Type;
@@ -56,7 +55,6 @@ function asStandardAcpRequest(
   return {
     ...request,
     message,
-    grokBinary: request.cursorBinary,
   };
 }
 

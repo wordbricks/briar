@@ -10,7 +10,6 @@ pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
     request_name: "Claude Agent",
     executable: SidecarExecutableConfig {
         name: "claude",
-        request_key: "claudeBinary",
         home_candidates: &[".local/bin/claude", ".bun/bin/claude"],
         absolute_candidates: &["/opt/homebrew/bin/claude", "/usr/local/bin/claude"],
         missing_error:

@@ -15,7 +15,6 @@ import {
 export const AgyRunnerRequest = Schema.Struct({
   ...commonRunnerRequestFields,
   effort: Schema.optional(Schema.NullOr(Schema.String)),
-  agyBinary: Schema.String,
 });
 
 export type AgyRunnerRequest = typeof AgyRunnerRequest.Type;

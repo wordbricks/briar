@@ -306,13 +306,13 @@ async function main(runnerIo: OpenCodeRunnerIo) {
   const request = await requestPromise;
   emitRunnerDiagnostic("runner.request_received", {
     workspaceRoot: request.workspaceRoot,
-    opencodeBinary: request.opencodeBinary,
+    opencodeBinary: request.providerBinaryPath,
     model: request.model ?? null,
     sandboxMode: request.sandboxMode,
     attachmentCount: request.attachments?.length ?? 0,
   });
   const server = await OpenCodeServer.start(
-    request.opencodeBinary,
+    request.providerBinaryPath,
     request.workspaceRoot,
     process.env,
     request.sandboxMode === "readOnly",

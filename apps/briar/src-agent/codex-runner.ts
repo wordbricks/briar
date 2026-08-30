@@ -75,7 +75,7 @@ async function runCodexAttempt(
   emittedSessions: Set<string>,
 ): Promise<CodexAttemptResult> {
   const child = spawn(
-    request.codexBinary,
+    request.providerBinaryPath,
     codexAppServerArgs(request, process.env.BRIAR_BROWSER_AUTOMATION_PROVIDER),
     {
       cwd: request.workspaceRoot,

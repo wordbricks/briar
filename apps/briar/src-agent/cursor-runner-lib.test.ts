@@ -18,7 +18,7 @@ const request: CursorRunnerRequest = {
   approvalPolicy: "never",
   sandboxMode: "workspaceWrite",
   networkAccess: true,
-  cursorBinary: "/usr/local/bin/cursor-agent",
+  providerBinaryPath: "/usr/local/bin/cursor-agent",
 };
 
 describe("Cursor runner helpers", () => {

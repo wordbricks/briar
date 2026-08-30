@@ -1,4 +1,8 @@
-use serde::{Deserialize, Serialize};
+use briar_contracts::{
+    proto::briar::{sidecar::v1 as sidecar_proto, types::v1 as types_proto},
+    CONTRACTS_DESCRIPTOR_FINGERPRINT,
+};
+use buffa::{DecodeOptions, Message};
 use serde_json::{json, Value};
 use std::{
     ffi::OsStr,
@@ -9,20 +13,21 @@ use std::{
     thread,
 };
 
+const MAX_SIDECAR_FRAME_BYTES: usize = 16 * 1024 * 1024;
+
 #[cfg(test)]
 use crate::host::LocalRunner;
 use crate::host::{CommandRunner, CommandSpec};
 
 use super::{
     AgentBackend, AgentEvent, AgentEventDirection, AgentEventSink, AgentProviderEvent,
-    AgentProviderKind, ApprovalPolicy, BundledRunnerFile, ChatExecution, ModelEffort,
-    ProjectLlmRequest, ProjectLlmResponse, SandboxMode,
+    AgentProviderKind, ApprovalPolicy, BundledRunnerFile, ChatExecution, ProjectLlmRequest,
+    ProjectLlmResponse, SandboxMode,
 };
 
 #[derive(Clone, Copy)]
 pub(super) struct SidecarExecutableConfig {
     pub(super) name: &'static str,
-    pub(super) request_key: &'static str,
     pub(super) home_candidates: &'static [&'static str],
     pub(super) absolute_candidates: &'static [&'static str],
     pub(super) missing_error: &'static str,
@@ -192,30 +197,30 @@ fn prepare_chat<'a>(
     })
 }
 
-fn serialize_request(
-    config: SidecarProviderConfig,
-    request: &impl Serialize,
-) -> Result<Value, String> {
-    serde_json::to_value(request)
-        .map_err(|error| format!("{} 요청을 만들지 못했습니다: {error}", config.request_name))
+fn proto_approval_policy(policy: ApprovalPolicy) -> sidecar_proto::ApprovalPolicy {
+    match policy {
+        ApprovalPolicy::Untrusted => sidecar_proto::ApprovalPolicy::Untrusted,
+        ApprovalPolicy::OnRequest => sidecar_proto::ApprovalPolicy::OnRequest,
+        ApprovalPolicy::Never => sidecar_proto::ApprovalPolicy::Never,
+    }
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SidecarRunnerRequest<'a> {
-    r#type: &'static str,
-    message: &'a str,
-    workspace_root: &'a str,
-    conversation_id: Option<&'a str>,
-    instructions: Option<&'a str>,
-    output_schema: Option<&'a Value>,
-    model: Option<&'a str>,
-    effort: Option<ModelEffort>,
-    approval_policy: ApprovalPolicy,
-    sandbox_mode: SandboxMode,
-    network_access: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    additional_directories: Option<&'a [String]>,
+fn proto_sandbox_mode(mode: SandboxMode) -> sidecar_proto::SandboxMode {
+    match mode {
+        SandboxMode::ReadOnly => sidecar_proto::SandboxMode::ReadOnly,
+        SandboxMode::WorkspaceWrite => sidecar_proto::SandboxMode::WorkspaceWrite,
+        SandboxMode::DangerFullAccess => sidecar_proto::SandboxMode::DangerFullAccess,
+    }
+}
+
+fn proto_json_schema(value: &Value) -> Result<sidecar_proto::JsonSchema, String> {
+    let wrapped = match value {
+        Value::Bool(value) => json!({ "boolean": value }),
+        Value::Object(_) => json!({ "object": value }),
+        _ => return Err("Agent output schema must be an object or boolean.".to_string()),
+    };
+    serde_json::from_value(wrapped)
+        .map_err(|error| format!("Agent output schema를 protobuf로 만들지 못했습니다: {error}"))
 }
 
 fn runner_request(
@@ -224,69 +229,41 @@ fn runner_request(
     prepared: &PreparedSidecarChat<'_>,
     execution: &ChatExecution,
     request: &ProjectLlmRequest,
-) -> Result<Value, String> {
-    let runner_request = SidecarRunnerRequest {
-        r#type: "run",
-        message: prepared.message,
-        workspace_root: &prepared.workspace,
-        conversation_id: prepared.conversation_id,
-        instructions: request.instructions.as_deref(),
-        output_schema: request.output_schema.as_ref(),
-        model: execution.model.as_deref(),
-        effort: execution.effort.clone(),
-        approval_policy: execution.approval_policy,
-        sandbox_mode: execution.sandbox_mode,
+) -> Result<sidecar_proto::ParentToRunner, String> {
+    let output_schema = request
+        .output_schema
+        .as_ref()
+        .map(proto_json_schema)
+        .transpose()?;
+    let run = sidecar_proto::RunRequest {
+        message: prepared.message.to_string(),
+        workspace_root: prepared.workspace.clone(),
+        conversation_id: prepared.conversation_id.map(str::to_string),
+        instructions: request.instructions.clone(),
+        output_schema: output_schema.into(),
+        model: execution.model.clone(),
+        effort: execution
+            .effort
+            .as_ref()
+            .map(|effort| effort.as_str().to_string()),
+        approval_policy: proto_approval_policy(execution.approval_policy).into(),
+        sandbox_mode: proto_sandbox_mode(execution.sandbox_mode).into(),
         network_access: execution.network_access,
-        additional_directories: config
-            .forwards_additional_directories
-            .then_some(execution.workspace_write_roots.as_slice()),
+        attachments: Vec::new(),
+        additional_directories: if config.forwards_additional_directories {
+            execution.workspace_write_roots.clone()
+        } else {
+            Vec::new()
+        },
+        external_tools: None,
+        provider_binary_path: runtime.provider_binary.clone(),
+        protocol_fingerprint: CONTRACTS_DESCRIPTOR_FINGERPRINT.to_vec(),
+        ..Default::default()
     };
-    let mut raw_request = serialize_request(config, &runner_request)?;
-    raw_request
-        .as_object_mut()
-        .expect("sidecar runner request should serialize as an object")
-        .insert(
-            config.executable.request_key.to_string(),
-            Value::String(runtime.provider_binary.clone()),
-        );
-    Ok(raw_request)
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
-enum SidecarRunnerMessage {
-    Session {
-        #[serde(rename = "sessionId")]
-        session_id: String,
-    },
-    Event {
-        raw: Value,
-        event: Option<AgentEvent>,
-    },
-    Approval {
-        id: String,
-        #[serde(rename = "toolName")]
-        tool_name: String,
-        input: Value,
-        title: Option<String>,
-    },
-    Result {
-        #[serde(rename = "sessionId")]
-        session_id: String,
-        message: String,
-    },
-    Blocked {
-        reason: String,
-        message: String,
-        provider: Option<String>,
-        #[serde(rename = "nextRetryAt")]
-        next_retry_at: Option<String>,
-        #[serde(rename = "statusCode")]
-        status_code: Option<u16>,
-    },
-    Error {
-        message: String,
-    },
+    Ok(sidecar_proto::ParentToRunner {
+        payload: Some(sidecar_proto::parent_to_runner::Payload::Run(Box::new(run))),
+        ..Default::default()
+    })
 }
 
 struct SidecarConnection {
@@ -346,27 +323,42 @@ impl SidecarConnection {
         })
     }
 
-    fn send(&mut self, message: &Value) -> Result<(), String> {
-        serde_json::to_writer(&mut self.stdin, message)
-            .map_err(|error| format!("{} 요청을 만들지 못했습니다: {error}", self.runner_name))?;
+    fn send(&mut self, message: &sidecar_proto::ParentToRunner) -> Result<(), String> {
+        let mut frame = Vec::new();
+        message
+            .try_encode_length_delimited(&mut frame)
+            .map_err(|error| format!("{} 요청이 너무 큽니다: {error}", self.runner_name))?;
+        if frame.len() > MAX_SIDECAR_FRAME_BYTES {
+            return Err(format!(
+                "{} 요청이 최대 protobuf frame 크기를 초과했습니다.",
+                self.runner_name
+            ));
+        }
         self.stdin
-            .write_all(b"\n")
+            .write_all(&frame)
             .and_then(|_| self.stdin.flush())
             .map_err(|error| format!("{}에 요청을 보내지 못했습니다: {error}", self.runner_name))
     }
 
-    fn read(&mut self) -> Result<Option<SidecarRunnerMessage>, String> {
-        let mut line = String::new();
-        let bytes = self
+    fn read(&mut self) -> Result<Option<sidecar_proto::RunnerToParent>, String> {
+        if self
             .stdout
-            .read_line(&mut line)
-            .map_err(|error| format!("{} 응답을 읽지 못했습니다: {error}", self.runner_name))?;
-        if bytes == 0 {
+            .fill_buf()
+            .map_err(|error| format!("{} 응답을 읽지 못했습니다: {error}", self.runner_name))?
+            .is_empty()
+        {
             return Ok(None);
         }
-        serde_json::from_str(&line)
+        DecodeOptions::new()
+            .with_max_message_size(MAX_SIDECAR_FRAME_BYTES)
+            .decode_length_delimited_reader(&mut self.stdout)
             .map(Some)
-            .map_err(|error| format!("{}가 잘못된 응답을 보냈습니다: {error}", self.runner_name))
+            .map_err(|error| {
+                format!(
+                    "{}가 잘못된 protobuf 응답을 보냈습니다: {error}",
+                    self.runner_name
+                )
+            })
     }
 
     fn exit_error(&mut self) -> String {
@@ -400,6 +392,104 @@ impl Drop for SidecarConnection {
     }
 }
 
+fn agent_activity_kind(
+    kind: buffa::EnumValue<types_proto::AgentActivityKind>,
+) -> Result<super::AgentActivityKind, String> {
+    match kind.as_known() {
+        Some(types_proto::AgentActivityKind::Command) => Ok(super::AgentActivityKind::Command),
+        Some(types_proto::AgentActivityKind::FileChange) => {
+            Ok(super::AgentActivityKind::FileChange)
+        }
+        Some(types_proto::AgentActivityKind::WebSearch) => Ok(super::AgentActivityKind::WebSearch),
+        Some(types_proto::AgentActivityKind::Tool) => Ok(super::AgentActivityKind::Tool),
+        _ => Err("Runner가 알 수 없는 agent activity kind를 보냈습니다.".to_string()),
+    }
+}
+
+fn agent_activity_status(
+    status: buffa::EnumValue<types_proto::AgentActivityStatus>,
+) -> Result<super::AgentActivityStatus, String> {
+    match status.as_known() {
+        Some(types_proto::AgentActivityStatus::Completed) => {
+            Ok(super::AgentActivityStatus::Completed)
+        }
+        Some(types_proto::AgentActivityStatus::Failed) => Ok(super::AgentActivityStatus::Failed),
+        Some(types_proto::AgentActivityStatus::Cancelled) => {
+            Ok(super::AgentActivityStatus::Cancelled)
+        }
+        _ => Err("Runner가 알 수 없는 agent activity status를 보냈습니다.".to_string()),
+    }
+}
+
+fn agent_event(event: types_proto::NormalizedAgentEvent) -> Result<AgentEvent, String> {
+    use types_proto::normalized_agent_event::Event;
+
+    match event
+        .event
+        .ok_or_else(|| "Runner normalized event payload가 비어 있습니다.".to_string())?
+    {
+        Event::ConversationStarted(value) => Ok(AgentEvent::ConversationStarted {
+            conversation_id: value.conversation_id,
+        }),
+        Event::MessageStarted(value) => Ok(AgentEvent::MessageStarted {
+            id: value.id,
+            phase: value.phase,
+            text: value.text,
+        }),
+        Event::MessageDelta(value) => Ok(AgentEvent::MessageDelta {
+            id: value.id,
+            delta: value.delta,
+        }),
+        Event::MessageCompleted(value) => Ok(AgentEvent::MessageCompleted {
+            id: value.id,
+            phase: value.phase,
+            text: value.text,
+        }),
+        Event::ActivityStarted(value) => Ok(AgentEvent::ActivityStarted {
+            id: value.id,
+            kind: agent_activity_kind(value.kind)?,
+            title: value.title,
+            text: value.text,
+        }),
+        Event::ActivityDelta(value) => Ok(AgentEvent::ActivityDelta {
+            id: value.id,
+            delta: value.delta,
+        }),
+        Event::ActivityCompleted(value) => Ok(AgentEvent::ActivityCompleted {
+            id: value.id,
+            kind: agent_activity_kind(value.kind)?,
+            title: value.title,
+            text: value.text,
+            status: agent_activity_status(value.status)?,
+        }),
+        Event::TurnCompleted(value) => Ok(AgentEvent::TurnCompleted {
+            status: value.status,
+        }),
+    }
+}
+
+fn event_direction(
+    direction: buffa::EnumValue<sidecar_proto::EventDirection>,
+) -> Result<AgentEventDirection, String> {
+    match direction.as_known() {
+        Some(sidecar_proto::EventDirection::Client) => Ok(AgentEventDirection::Client),
+        Some(sidecar_proto::EventDirection::Server) => Ok(AgentEventDirection::Server),
+        _ => Err("Runner가 알 수 없는 event direction을 보냈습니다.".to_string()),
+    }
+}
+
+fn block_reason(
+    reason: buffa::EnumValue<sidecar_proto::BlockReason>,
+) -> Result<&'static str, String> {
+    match reason.as_known() {
+        Some(sidecar_proto::BlockReason::McpAuthRequired) => Ok("mcp_auth_required"),
+        Some(sidecar_proto::BlockReason::UsageExhausted) => Ok("usage_exhausted"),
+        Some(sidecar_proto::BlockReason::UpstreamOverloaded) => Ok("upstream_overloaded"),
+        Some(sidecar_proto::BlockReason::FreeTierLimit) => Ok("free_tier_limit"),
+        _ => Err("Runner가 알 수 없는 block reason을 보냈습니다.".to_string()),
+    }
+}
+
 struct SidecarChatExecution<'a> {
     environment: &'a [(String, String)],
     event_sink: Option<&'a AgentEventSink>,
@@ -415,13 +505,13 @@ fn chat(
     approve: &dyn Fn(&str, &Value) -> bool,
 ) -> Result<ProjectLlmResponse, String> {
     let prepared = prepare_chat(runtime, config, project_id, workspace_root, &request)?;
-    let raw_request = runner_request(runtime, config, &prepared, &execution, &request)?;
+    let runner_request = runner_request(runtime, config, &prepared, &execution, &request)?;
     run_chat(
         runtime,
         config,
         project_id,
         prepared,
-        raw_request,
+        runner_request,
         SidecarChatExecution {
             environment: &execution.environment,
             event_sink: execution.event_sink.as_ref(),
@@ -435,10 +525,21 @@ fn run_chat(
     config: SidecarProviderConfig,
     project_id: &str,
     prepared: PreparedSidecarChat<'_>,
-    raw_request: Value,
+    runner_request: sidecar_proto::ParentToRunner,
     execution: SidecarChatExecution<'_>,
     approve: &dyn Fn(&str, &Value) -> bool,
 ) -> Result<ProjectLlmResponse, String> {
+    let raw_request = match runner_request.payload.as_ref() {
+        Some(sidecar_proto::parent_to_runner::Payload::Run(request)) => {
+            serde_json::to_value(request.as_ref()).map_err(|error| {
+                format!(
+                    "{} 요청을 기록하지 못했습니다: {error}",
+                    config.request_name
+                )
+            })?
+        }
+        _ => return Err("Sidecar run request payload가 비어 있습니다.".to_string()),
+    };
     if let Some(event_sink) = execution.event_sink {
         event_sink(AgentProviderEvent {
             provider: config.provider,
@@ -454,93 +555,145 @@ fn run_chat(
         &prepared.workspace_root,
         execution.environment,
     )?;
-    connection.send(&raw_request)?;
+    connection.send(&runner_request)?;
     loop {
         match connection.read()? {
-            Some(SidecarRunnerMessage::Session { session_id }) => {
-                if session_id.trim().is_empty() {
-                    return Err(config.empty_session_error.to_string());
+            Some(message) => match message
+                .payload
+                .ok_or_else(|| format!("{}가 빈 protobuf 응답을 보냈습니다.", config.runner_name))?
+            {
+                sidecar_proto::runner_to_parent::Payload::SessionStarted(session) => {
+                    if session.session_id.trim().is_empty() {
+                        return Err(config.empty_session_error.to_string());
+                    }
+                    if let Some(event_sink) = execution.event_sink {
+                        let conversation_id =
+                            encode_conversation_id(config, project_id, &session.session_id);
+                        event_sink(AgentProviderEvent {
+                            provider: config.provider,
+                            direction: AgentEventDirection::Server,
+                            raw: json!({
+                                "type": "conversationStarted",
+                                "conversationId": conversation_id.clone(),
+                            }),
+                            event: Some(AgentEvent::ConversationStarted { conversation_id }),
+                        })?;
+                    }
                 }
-                if let Some(event_sink) = execution.event_sink {
-                    let conversation_id = encode_conversation_id(config, project_id, &session_id);
-                    event_sink(AgentProviderEvent {
-                        provider: config.provider,
-                        direction: AgentEventDirection::Server,
-                        raw: json!({
-                            "type": "conversationStarted",
-                            "conversationId": conversation_id.clone(),
-                        }),
-                        event: Some(AgentEvent::ConversationStarted { conversation_id }),
+                sidecar_proto::runner_to_parent::Payload::Event(event) => {
+                    let raw = event
+                        .raw
+                        .into_option()
+                        .map(serde_json::to_value)
+                        .transpose()
+                        .map_err(|error| {
+                            format!("{} event를 읽지 못했습니다: {error}", config.runner_name)
+                        })?
+                        .unwrap_or(Value::Null);
+                    let normalized = event
+                        .normalized
+                        .into_option()
+                        .map(agent_event)
+                        .transpose()?;
+                    let direction = event_direction(event.direction)?;
+                    if let Some(event_sink) = execution.event_sink {
+                        event_sink(AgentProviderEvent {
+                            provider: config.provider,
+                            direction,
+                            raw,
+                            event: normalized,
+                        })?;
+                    }
+                }
+                sidecar_proto::runner_to_parent::Payload::Approval(approval) => {
+                    if approval.id.trim().is_empty() {
+                        return Err(format!(
+                            "{}가 ID 없는 approval을 보냈습니다.",
+                            config.runner_name
+                        ));
+                    }
+                    let mut approval_input = approval
+                        .input
+                        .into_option()
+                        .map(serde_json::to_value)
+                        .transpose()
+                        .map_err(|error| {
+                            format!(
+                                "{} approval 입력을 읽지 못했습니다: {error}",
+                                config.runner_name
+                            )
+                        })?
+                        .unwrap_or_else(|| json!({}));
+                    if let Some(title) = approval.title {
+                        approval_input["reason"] = Value::String(title);
+                    }
+                    let approved = approve(&approval.tool_name, &approval_input);
+                    connection.send(&sidecar_proto::ParentToRunner {
+                        payload: Some(sidecar_proto::parent_to_runner::Payload::ApprovalResponse(
+                            Box::new(sidecar_proto::ApprovalResponse {
+                                id: approval.id,
+                                approved,
+                                ..Default::default()
+                            }),
+                        )),
+                        ..Default::default()
                     })?;
                 }
-            }
-            Some(SidecarRunnerMessage::Event { raw, event }) => {
-                if let Some(event_sink) = execution.event_sink {
-                    event_sink(AgentProviderEvent {
-                        provider: config.provider,
-                        direction: AgentEventDirection::Server,
-                        raw,
-                        event,
-                    })?;
+                sidecar_proto::runner_to_parent::Payload::Result(result) => {
+                    if result.session_id.trim().is_empty() {
+                        return Err(config.missing_session_error.to_string());
+                    }
+                    return Ok(ProjectLlmResponse {
+                        conversation_id: encode_conversation_id(
+                            config,
+                            project_id,
+                            &result.session_id,
+                        ),
+                        message: result.message,
+                        workspace_root: prepared.workspace,
+                    });
                 }
-            }
-            Some(SidecarRunnerMessage::Approval {
-                id,
-                tool_name,
-                input,
-                title,
-            }) => {
-                let mut approval_input = input;
-                if let Some(title) = title {
-                    approval_input["reason"] = Value::String(title);
+                sidecar_proto::runner_to_parent::Payload::Blocked(blocked) => {
+                    let mut details = vec![format!("reason={}", block_reason(blocked.reason)?)];
+                    if let Some(provider) = blocked.provider {
+                        details.push(format!("provider={provider}"));
+                    }
+                    if !blocked.server_names.is_empty() {
+                        details.push(format!("serverNames={}", blocked.server_names.join(",")));
+                    }
+                    if let Some(next_retry_at) = blocked.next_retry_at.into_option() {
+                        let timestamp = serde_json::to_value(next_retry_at).map_err(|error| {
+                            format!(
+                                "{} retry timestamp를 읽지 못했습니다: {error}",
+                                config.runner_name
+                            )
+                        })?;
+                        if let Some(timestamp) = timestamp.as_str() {
+                            details.push(format!("nextRetryAt={timestamp}"));
+                        }
+                    }
+                    if let Some(status_code) = blocked.status_code {
+                        details.push(format!("statusCode={status_code}"));
+                    }
+                    return Err(format!(
+                        "{}: {} ({})",
+                        config.blocked_prefix,
+                        blocked.message,
+                        details.join(", ")
+                    ));
                 }
-                let approved = approve(&tool_name, &approval_input);
-                connection.send(&json!({
-                    "type": "approvalResponse",
-                    "id": id,
-                    "approved": approved
-                }))?;
-            }
-            Some(SidecarRunnerMessage::Result {
-                session_id,
-                message,
-            }) => {
-                if session_id.trim().is_empty() {
-                    return Err(config.missing_session_error.to_string());
+                sidecar_proto::runner_to_parent::Payload::Error(error) => {
+                    let code = error
+                        .code
+                        .as_known()
+                        .map(|code| format!("{code:?}"))
+                        .unwrap_or_else(|| format!("unknown({})", error.code.to_i32()));
+                    return Err(format!(
+                        "{}: {} (code={code})",
+                        config.request_failure_prefix, error.message
+                    ));
                 }
-                return Ok(ProjectLlmResponse {
-                    conversation_id: encode_conversation_id(config, project_id, &session_id),
-                    message,
-                    workspace_root: prepared.workspace,
-                });
-            }
-            Some(SidecarRunnerMessage::Blocked {
-                reason,
-                message,
-                provider,
-                next_retry_at,
-                status_code,
-            }) => {
-                let mut details = vec![format!("reason={reason}")];
-                if let Some(provider) = provider.filter(|value| !value.trim().is_empty()) {
-                    details.push(format!("provider={provider}"));
-                }
-                if let Some(next_retry_at) = next_retry_at.filter(|value| !value.trim().is_empty())
-                {
-                    details.push(format!("nextRetryAt={next_retry_at}"));
-                }
-                if let Some(status_code) = status_code {
-                    details.push(format!("statusCode={status_code}"));
-                }
-                return Err(format!(
-                    "{}: {message} ({})",
-                    config.blocked_prefix,
-                    details.join(", ")
-                ));
-            }
-            Some(SidecarRunnerMessage::Error { message }) => {
-                return Err(format!("{}: {message}", config.request_failure_prefix));
-            }
+            },
             None => return Err(connection.exit_error()),
         }
     }
@@ -573,7 +726,7 @@ fn decode_conversation_id<'a>(
 mod tests {
     use super::*;
     use crate::{
-        agent::{agy, claude, cursor, grok, opencode},
+        agent::{agy, claude, cursor, grok, opencode, ModelEffort},
         host::CommandOutput,
     };
     use std::fs;
@@ -614,7 +767,7 @@ mod tests {
     }
 
     #[test]
-    fn serializes_each_provider_request_contract() {
+    fn encodes_the_generated_run_request_and_descriptor_fingerprint() {
         let directory = tempfile::tempdir().expect("temp directory should exist");
         let runner = directory.path().join("runner.js");
         fs::write(&runner, "").expect("runner should be written");
@@ -633,70 +786,47 @@ mod tests {
         let mut execution = execution(None);
         execution.workspace_write_roots = vec!["/tmp/auto-hunt".to_string()];
 
-        for config in provider_configs() {
-            let prepared = prepare_chat(&runtime, config, "project-1", directory.path(), &request)
-                .expect("chat should prepare");
-            let raw = runner_request(&runtime, config, &prepared, &execution, &request)
-                .expect("request should serialize");
+        let prepared = prepare_chat(
+            &runtime,
+            claude::CONFIG,
+            "project-1",
+            directory.path(),
+            &request,
+        )
+        .expect("chat should prepare");
+        let envelope = runner_request(&runtime, claude::CONFIG, &prepared, &execution, &request)
+            .expect("request should serialize");
+        let run = match envelope.payload {
+            Some(sidecar_proto::parent_to_runner::Payload::Run(run)) => run,
+            _ => panic!("run payload should exist"),
+        };
 
-            assert_eq!(raw["type"], "run");
-            assert_eq!(raw["message"], "Fix it");
-            assert_eq!(raw["workspaceRoot"], prepared.workspace);
-            assert!(raw["conversationId"].is_null());
-            assert_eq!(raw["instructions"], "Be careful");
-            assert_eq!(raw["outputSchema"], json!({"type": "object"}));
-            assert_eq!(raw["model"], "test-model");
-            assert_eq!(raw["effort"], "high");
-            assert_eq!(raw["approvalPolicy"], "on-request");
-            assert_eq!(raw["sandboxMode"], "workspaceWrite");
-            assert_eq!(raw["networkAccess"], true);
-            assert_eq!(raw[config.executable.request_key], "/provider/bin");
-
-            for key in [
-                "claudeBinary",
-                "cursorBinary",
-                "grokBinary",
-                "agyBinary",
-                "opencodeBinary",
-            ] {
-                assert_eq!(
-                    raw.get(key).is_some(),
-                    key == config.executable.request_key,
-                    "unexpected executable key for {}",
-                    config.executable.name
-                );
-            }
-            if config.forwards_additional_directories {
-                assert_eq!(raw["additionalDirectories"], json!(["/tmp/auto-hunt"]));
-            } else {
-                assert!(raw.get("additionalDirectories").is_none());
-            }
-        }
+        assert_eq!(run.message, "Fix it");
+        assert_eq!(run.workspace_root, prepared.workspace);
+        assert_eq!(run.instructions.as_deref(), Some("Be careful"));
+        assert_eq!(run.model.as_deref(), Some("test-model"));
+        assert_eq!(run.effort.as_deref(), Some("high"));
+        assert_eq!(
+            run.approval_policy.as_known(),
+            Some(sidecar_proto::ApprovalPolicy::OnRequest)
+        );
+        assert_eq!(
+            run.sandbox_mode.as_known(),
+            Some(sidecar_proto::SandboxMode::WorkspaceWrite)
+        );
+        assert!(run.network_access);
+        assert_eq!(run.provider_binary_path, "/provider/bin");
+        assert_eq!(run.additional_directories, ["/tmp/auto-hunt"]);
+        assert_eq!(run.protocol_fingerprint, CONTRACTS_DESCRIPTOR_FINGERPRINT);
     }
 
     #[test]
-    fn keeps_empty_additional_directories_for_claude_only() {
-        let directory = tempfile::tempdir().expect("temp directory should exist");
-        let runner = directory.path().join("runner.js");
-        fs::write(&runner, "").expect("runner should be written");
-        let runtime = SidecarRuntime::for_test(
-            PathBuf::from("/bin/sh"),
-            PathBuf::from("/provider/bin"),
-            runner,
-        );
-        let request = request();
-        let execution = execution(None);
-
+    fn only_claude_forwards_additional_directories() {
         for config in provider_configs() {
-            let prepared = prepare_chat(&runtime, config, "project-1", directory.path(), &request)
-                .expect("chat should prepare");
-            let raw = runner_request(&runtime, config, &prepared, &execution, &request)
-                .expect("request should serialize");
-            if config.provider == AgentProviderKind::Claude {
-                assert_eq!(raw["additionalDirectories"], json!([]));
-            } else {
-                assert!(raw.get("additionalDirectories").is_none());
-            }
+            assert_eq!(
+                config.forwards_additional_directories,
+                config.provider == AgentProviderKind::Claude,
+            );
         }
     }
 
@@ -897,29 +1027,80 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
     #[test]
     fn runs_the_shared_sidecar_and_maps_events_and_approvals() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let directory = tempfile::tempdir().expect("temp directory should exist");
-        let runner = directory.path().join("fake-runner.sh");
+        let app_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("Tauri crate should be inside the Briar app");
+        let directory = tempfile::Builder::new()
+            .prefix(".sidecar-protobuf-test-")
+            .tempdir_in(app_root)
+            .expect("temp directory should exist");
+        let runner = directory.path().join("fake-runner.ts");
         fs::write(
             &runner,
-            r#"#!/bin/sh
-read request
-echo '{"type":"session","sessionId":"session-1"}'
-echo '{"type":"event","raw":{"type":"assistant"},"event":{"type":"messageCompleted","id":"message-1","phase":"commentary","text":"working"}}'
-echo '{"type":"approval","id":"1","toolName":"Bash","input":{"command":"bun test"},"title":"Run tests"}'
-read approval
-echo '{"type":"result","sessionId":"session-1","message":"done"}'
+            r#"import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
+import { ParentToRunnerSchema } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
+import {
+  decodeSidecarRunRequest,
+  encodeSidecarRunnerOutput,
+} from "../src-agent/sidecar-protocol";
+
+let runReceived = false;
+for await (const message of sizeDelimitedDecodeStream(
+  ParentToRunnerSchema,
+  process.stdin,
+  { readMaxBytes: 16 * 1024 * 1024 },
+)) {
+  if (!runReceived) {
+    const request = decodeSidecarRunRequest(message);
+    if (request.providerBinaryPath !== "/usr/bin/true") {
+      throw new Error(`unexpected provider binary: ${request.providerBinaryPath}`);
+    }
+    runReceived = true;
+    process.stdout.write(encodeSidecarRunnerOutput({
+      type: "session",
+      sessionId: "session-1",
+    }));
+    process.stdout.write(encodeSidecarRunnerOutput({
+      type: "event",
+      direction: "server",
+      raw: { type: "assistant" },
+      event: {
+        type: "messageCompleted",
+        id: "message-1",
+        phase: "commentary",
+        text: "working",
+      },
+    }));
+    process.stdout.write(encodeSidecarRunnerOutput({
+      type: "approval",
+      id: "approval-1",
+      toolName: "Bash",
+      input: { command: "bun test" },
+      title: "Run tests",
+    }));
+    continue;
+  }
+  if (
+    message.payload.case !== "approvalResponse" ||
+    message.payload.value.id !== "approval-1" ||
+    !message.payload.value.approved
+  ) {
+    throw new Error("expected an approved response");
+  }
+  process.stdout.write(encodeSidecarRunnerOutput({
+    type: "result",
+    sessionId: "session-1",
+    message: "done",
+  }));
+  break;
+}
 "#,
         )
         .expect("runner should be written");
-        fs::set_permissions(&runner, fs::Permissions::from_mode(0o700))
-            .expect("runner should be executable");
         let runtime = SidecarRuntime::for_test(
-            PathBuf::from("/bin/sh"),
+            which::which("bun").expect("Bun should be installed for the cross-language test"),
             PathBuf::from("/usr/bin/true"),
             runner,
         );
@@ -954,7 +1135,7 @@ echo '{"type":"result","sessionId":"session-1","message":"done"}'
         assert_eq!(events.len(), 3);
         assert_eq!(events[0].provider, AgentProviderKind::Opencode);
         assert_eq!(events[0].raw["effort"], "high");
-        assert_eq!(events[0].raw["opencodeBinary"], "/usr/bin/true");
+        assert_eq!(events[0].raw["providerBinaryPath"], "/usr/bin/true");
         assert!(events[0].raw.get("additionalDirectories").is_none());
         assert!(matches!(
             events[1].event,
@@ -965,46 +1146,6 @@ echo '{"type":"result","sessionId":"session-1","message":"done"}'
             events[2].event,
             Some(AgentEvent::MessageCompleted { .. })
         ));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn reports_blocked_output_without_treating_it_as_malformed_json() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let directory = tempfile::tempdir().expect("temp directory should exist");
-        let runner = directory.path().join("blocked-runner.sh");
-        fs::write(
-            &runner,
-            r#"#!/bin/sh
-read request
-echo '{"type":"blocked","reason":"free_tier_limit","provider":"opencode","message":"Subscribe to continue.","nextRetryAt":"2026-08-11T00:00:00Z"}'
-"#,
-        )
-        .expect("runner should be written");
-        fs::set_permissions(&runner, fs::Permissions::from_mode(0o700))
-            .expect("runner should be executable");
-        let runtime = SidecarRuntime::for_test(
-            PathBuf::from("/bin/sh"),
-            PathBuf::from("/usr/bin/true"),
-            runner,
-        );
-        let execution = execution(None);
-        let error = chat(
-            &runtime,
-            TEST_CONFIG,
-            "project-1",
-            directory.path(),
-            execution,
-            request(),
-            &|_, _| false,
-        )
-        .expect_err("blocked sidecar output should stop the request");
-
-        assert!(error.contains("OpenCode 요청이 차단되었습니다"));
-        assert!(error.contains("reason=free_tier_limit"));
-        assert!(error.contains("nextRetryAt=2026-08-11T00:00:00Z"));
-        assert!(!error.contains("잘못된 응답"));
     }
 
     #[test]

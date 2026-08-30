@@ -22,7 +22,6 @@ export const CodexRunnerRequest = Schema.Struct({
   ...commonRunnerRequestFields,
   effort: Schema.optional(Schema.NullOr(Schema.String)),
   externalTools: Schema.optional(Schema.Boolean),
-  codexBinary: Schema.String,
 });
 
 export type CodexRunnerRequest = typeof CodexRunnerRequest.Type;

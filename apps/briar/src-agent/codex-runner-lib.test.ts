@@ -27,7 +27,7 @@ const request: CodexRunnerRequest = {
   approvalPolicy: "never",
   sandboxMode: "workspaceWrite",
   networkAccess: true,
-  codexBinary: "/usr/local/bin/codex",
+  providerBinaryPath: "/usr/local/bin/codex",
 };
 
 describe("Codex App Server runner", () => {

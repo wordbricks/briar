@@ -158,7 +158,7 @@ async function main(runnerIo: CursorRunnerIo) {
 
   const readOnly = request.sandboxMode === "readOnly";
   const spawnSpec = cursorAgentSpawnSpec({
-    binary: request.cursorBinary,
+    binary: request.providerBinaryPath,
     workspaceRoot: request.workspaceRoot,
     environment: process.env,
     readOnly,

@@ -10,7 +10,6 @@ pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
     request_name: "Antigravity",
     executable: SidecarExecutableConfig {
         name: "agy",
-        request_key: "agyBinary",
         home_candidates: &[".local/bin/agy", ".gemini/antigravity-cli/bin/agy"],
         absolute_candidates: &["/opt/homebrew/bin/agy", "/usr/local/bin/agy"],
         missing_error:

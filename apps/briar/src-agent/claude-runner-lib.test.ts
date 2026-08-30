@@ -22,7 +22,7 @@ const request: ClaudeRunnerRequest = {
   approvalPolicy: "never",
   sandboxMode: "readOnly",
   networkAccess: false,
-  claudeBinary: "/usr/local/bin/claude",
+  providerBinaryPath: "/usr/local/bin/claude",
 };
 
 describe("Claude runner", () => {

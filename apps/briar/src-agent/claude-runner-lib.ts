@@ -32,7 +32,6 @@ export const ClaudeRunnerRequest = Schema.Struct({
   additionalDirectories: Schema.optional(
     Schema.mutable(Schema.Array(Schema.String)),
   ),
-  claudeBinary: Schema.String,
 });
 
 export type ClaudeRunnerRequest = typeof ClaudeRunnerRequest.Type;
@@ -156,7 +155,7 @@ export function claudeOptions(
     ...(request.effort
       ? { effort: request.effort as Options["effort"] }
       : {}),
-    pathToClaudeCodeExecutable: request.claudeBinary,
+    pathToClaudeCodeExecutable: request.providerBinaryPath,
     systemPrompt: {
       type: "preset",
       preset: "claude_code",

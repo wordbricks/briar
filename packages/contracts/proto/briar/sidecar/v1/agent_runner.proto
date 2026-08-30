@@ -3,7 +3,6 @@ syntax = "proto3";
 package briar.sidecar.v1;
 
 import "briar/types/v1/agent_event.proto";
-import "briar/types/v1/provider.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -90,8 +89,8 @@ message RunRequest {
   // shapes whose only structural difference was the executable field name.
   string provider_binary_path = 14;
 
-  // SHA-256 of the agent-runner descriptor closure used to generate both
-  // endpoints (runner.proto plus its transitive imports).
+  // SHA-256 of the canonical compiled Briar descriptor image used to generate
+  // both endpoints.
   // A runner must reject an empty or mismatched fingerprint; there is no
   // protocol negotiation or legacy fallback between co-shipped binaries.
   bytes protocol_fingerprint = 15;
@@ -142,7 +141,9 @@ message RunResult {
 message RunBlocked {
   BlockReason reason = 1;
   string message = 2;
-  optional briar.types.v1.AgentProvider provider = 3;
+  // Provider-specific block diagnostics may name an upstream model provider,
+  // not one of Briar's configured runner providers.
+  optional string provider = 3;
   repeated string server_names = 4;
   optional google.protobuf.Timestamp next_retry_at = 5;
   optional uint32 status_code = 6;

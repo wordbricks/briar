@@ -10,7 +10,6 @@ pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
     request_name: "Cursor Agent",
     executable: SidecarExecutableConfig {
         name: "cursor-agent",
-        request_key: "cursorBinary",
         home_candidates: &[".local/bin/cursor-agent", ".cursor/bin/cursor-agent"],
         absolute_candidates: &["/opt/homebrew/bin/cursor-agent", "/usr/local/bin/cursor-agent"],
         missing_error:

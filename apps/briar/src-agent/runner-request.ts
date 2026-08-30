@@ -31,6 +31,7 @@ export const commonRunnerRequestFields = {
     "dangerFullAccess",
   ]),
   networkAccess: Schema.Boolean,
+  providerBinaryPath: Schema.String,
   attachments: Schema.optional(
     Schema.mutable(Schema.Array(AgentImageAttachment)),
   ),

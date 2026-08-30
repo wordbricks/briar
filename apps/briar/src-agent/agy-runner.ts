@@ -22,13 +22,13 @@ import {
 function agySpawnSpec(request: AgyRunnerRequest) {
   const args = agyArgs(request);
   if (request.sandboxMode !== "readOnly") {
-    return { command: request.agyBinary, arguments: args };
+    return { command: request.providerBinaryPath, arguments: args };
   }
   const stateRoot = process.env.HOME;
   if (!stateRoot) throw new Error("Antigravity read-only state is not isolated.");
   return readOnlySeatbeltSpawnSpec({
     providerName: "Antigravity",
-    binary: request.agyBinary,
+    binary: request.providerBinaryPath,
     arguments: args,
     workspaceRoot: request.workspaceRoot,
     stateRoot,

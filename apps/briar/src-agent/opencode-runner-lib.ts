@@ -25,7 +25,6 @@ export type {
 export const OpenCodeRunnerRequest = Schema.Struct({
   ...commonRunnerRequestFields,
   effort: Schema.optional(Schema.NullOr(Schema.String)),
-  opencodeBinary: Schema.String,
 });
 
 export type OpenCodeRunnerRequest = typeof OpenCodeRunnerRequest.Type;

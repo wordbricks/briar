@@ -19,7 +19,7 @@ const request = (overrides: Partial<AgyRunnerRequest> = {}): AgyRunnerRequest =>
   approvalPolicy: "never",
   sandboxMode: "workspaceWrite",
   networkAccess: false,
-  agyBinary: "/bin/agy",
+  providerBinaryPath: "/bin/agy",
   ...overrides,
 });
 

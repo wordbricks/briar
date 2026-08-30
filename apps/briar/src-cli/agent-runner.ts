@@ -1449,7 +1449,7 @@ export function detachedProviderRequest(input: {
     kind: "runner" as const,
     arguments: [] as string[],
     request: {
-      type: "run",
+      type: "run" as const,
       message: input.prompt,
       workspaceRoot: input.workspacePath,
       conversationId: input.conversationId ?? null,
@@ -1462,33 +1462,25 @@ export function detachedProviderRequest(input: {
       outputSchema: input.outputSchema ?? null,
       model: input.agent.model,
       effort: input.agent.effort,
-      approvalPolicy: "never",
+      approvalPolicy: "never" as const,
       sandboxMode: input.readOnly
-        ? "readOnly"
+        ? "readOnly" as const
         : input.fullAccess
-          ? "dangerFullAccess"
-          : "workspaceWrite",
+          ? "dangerFullAccess" as const
+          : "workspaceWrite" as const,
       // Read-only conversational turns must also be side-effect free outside
       // the filesystem. Provider transport runs in the runner process; this
       // flag governs network-capable model tools inside its sandbox.
       networkAccess: !input.readOnly,
+      providerBinaryPath: input.agentBinary,
       ...(input.attachments?.length
         ? { attachments: input.attachments }
         : {}),
       ...(input.agent.provider === "codex"
         ? {
-            codexBinary: input.agentBinary,
             externalTools: !input.readOnly,
           }
-        : input.agent.provider === "claude"
-          ? { claudeBinary: input.agentBinary }
-          : input.agent.provider === "cursor"
-            ? { cursorBinary: input.agentBinary }
-          : input.agent.provider === "grok"
-            ? { grokBinary: input.agentBinary }
-            : input.agent.provider === "agy"
-              ? { agyBinary: input.agentBinary }
-              : { opencodeBinary: input.agentBinary }),
+        : {}),
     },
   };
 }

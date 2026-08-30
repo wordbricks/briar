@@ -318,7 +318,7 @@ describe("detached Agent runner", () => {
     expect(launch.request).toMatchObject({
       conversationId: null,
       sandboxMode: "workspaceWrite",
-      codexBinary: "/bin/codex",
+      providerBinaryPath: "/bin/codex",
       model: "gpt-5",
       effort: "high",
     });
@@ -857,7 +857,7 @@ describe("detached Agent runner", () => {
       approvalPolicy: "never",
       effort: "high",
       sandboxMode: "dangerFullAccess",
-      claudeBinary: "/bin/claude",
+      providerBinaryPath: "/bin/claude",
     });
   });
 
@@ -950,7 +950,7 @@ describe("detached Agent runner", () => {
       sandboxMode: "dangerFullAccess",
       networkAccess: true,
       externalTools: true,
-      codexBinary: "/bin/codex",
+      providerBinaryPath: "/bin/codex",
     });
   });
 

@@ -1,10 +1,17 @@
+import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
+import { RunnerToParentSchema } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { describe, expect, it } from "vitest";
+import {
+  decodeSidecarRunnerOutput,
+  encodeSidecarRunRequest,
+  type SidecarRunRequest,
+} from "./sidecar-protocol";
 
-const runnerRequest = {
+const runnerRequest: Omit<SidecarRunRequest, "providerBinaryPath"> = {
   type: "run",
   message: "Review the repository without using Figma.",
   workspaceRoot: process.cwd(),
@@ -101,19 +108,26 @@ async function runScenario(scenario: "invalid" | "optional" | "required") {
     env: { ...process.env, FAKE_CODEX_SCENARIO: scenario },
     stdio: ["pipe", "pipe", "pipe"],
   });
-  let stdout = "";
   let stderr = "";
-  child.stdout.setEncoding("utf8");
   child.stderr.setEncoding("utf8");
-  child.stdout.on("data", (chunk: string) => {
-    stdout += chunk;
-  });
+  const outputPromise = (async () => {
+    const payloads = [];
+    for await (const message of sizeDelimitedDecodeStream(
+      RunnerToParentSchema,
+      child.stdout,
+      { readMaxBytes: 16 * 1024 * 1024 },
+    )) {
+      payloads.push(decodeSidecarRunnerOutput(message));
+    }
+    return payloads;
+  })();
   child.stderr.on("data", (chunk: string) => {
     stderr += chunk;
   });
-  child.stdin.write(
-    `${JSON.stringify({ ...runnerRequest, codexBinary: fakeCodex })}\n`,
-  );
+  child.stdin.write(encodeSidecarRunRequest({
+    ...runnerRequest,
+    providerBinaryPath: fakeCodex,
+  }));
 
   const timeout = setTimeout(() => child.kill("SIGKILL"), 10_000);
   try {
@@ -124,10 +138,7 @@ async function runScenario(scenario: "invalid" | "optional" | "required") {
     if (exitCode !== 0 && stderr) {
       throw new Error(`Codex runner failed: ${stderr}`);
     }
-    const payloads = stdout
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    const payloads = await outputPromise;
     return { exitCode, payloads };
   } finally {
     clearTimeout(timeout);

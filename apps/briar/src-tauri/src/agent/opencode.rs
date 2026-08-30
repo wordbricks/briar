@@ -10,7 +10,6 @@ pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
     request_name: "OpenCode",
     executable: SidecarExecutableConfig {
         name: "opencode",
-        request_key: "opencodeBinary",
         home_candidates: &[
             ".opencode/bin/opencode",
             ".local/bin/opencode",

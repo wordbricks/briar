@@ -10,7 +10,6 @@ pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
     request_name: "Grok Agent",
     executable: SidecarExecutableConfig {
         name: "grok",
-        request_key: "grokBinary",
         home_candidates: &[".local/bin/grok", ".grok/bin/grok", ".bun/bin/grok"],
         absolute_candidates: &["/opt/homebrew/bin/grok", "/usr/local/bin/grok"],
         missing_error:

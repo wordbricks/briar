@@ -200,7 +200,7 @@ async function main(runnerIo: GrokRunnerIo) {
   }
 
   const connection = new GrokAcpConnection(
-    request.grokBinary,
+    request.providerBinaryPath,
     request.workspaceRoot,
     process.env,
     request.sandboxMode === "readOnly",

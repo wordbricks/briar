@@ -23,7 +23,7 @@ const request = (overrides: Partial<OpenCodeRunnerRequest> = {}): OpenCodeRunner
   approvalPolicy: "on-request",
   sandboxMode: "workspaceWrite",
   networkAccess: false,
-  opencodeBinary: "/bin/opencode",
+  providerBinaryPath: "/bin/opencode",
   ...overrides,
 });
 

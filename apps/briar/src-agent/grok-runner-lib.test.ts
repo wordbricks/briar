@@ -30,7 +30,7 @@ const request: GrokRunnerRequest = {
   approvalPolicy: "never",
   sandboxMode: "readOnly",
   networkAccess: false,
-  grokBinary: "/usr/local/bin/grok",
+  providerBinaryPath: "/usr/local/bin/grok",
 };
 
 describe("Grok runner", () => {
