@@ -47,8 +47,12 @@ bun run ios:bootstrap
 bun run mobile:ci
 ```
 
-The bootstrap installs the configured iOS Simulator runtime only when it is
-missing, then idempotently creates the default iPhone and iPad destinations.
+The bootstrap first installs the current Xcode-compatible iOS Platform Support
+when it is missing, then installs the configured Simulator runtime if needed
+and idempotently creates the default iPhone and iPad destinations. Platform
+Support readiness is checked through an actual Xcode Simulator destination;
+the presence of a same-version runtime alone is insufficient because Xcode can
+reject prerelease or otherwise incompatible runtime builds.
 `bun run mobile:ci` then:
 
 - checks generated Companion OpenAPI/Swift artifacts and exercises the canonical Worker route and client decoders;

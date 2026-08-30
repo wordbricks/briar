@@ -75,6 +75,19 @@ runtime_is_available() {
   [[ "$runtimes" == *"$ios_runtime_identifier"* ]]
 }
 
+platform_support_is_available() {
+  (
+    cd "$workspace_root"
+    "$xcodebuild_bin" \
+      -project "$swift_project" \
+      -scheme "$swift_dev_scheme" \
+      -configuration 'Dev Debug' \
+      -destination "$generic_simulator_destination" \
+      CODE_SIGNING_ALLOWED=NO \
+      -showBuildSettings >/dev/null 2>&1
+  )
+}
+
 device_type_is_available() {
   local device_type="$1"
   local device_types
@@ -116,6 +129,9 @@ ensure_device() {
 }
 
 require_runtime() {
+  platform_support_is_available ||
+    fail "The selected Xcode has no compatible iOS Platform Support. Run: bun run ios:bootstrap"
+
   runtime_is_available ||
     fail "iOS $ios_runtime_version Simulator runtime is unavailable. Run: bun run ios:bootstrap"
 }
@@ -135,10 +151,22 @@ bootstrap() {
   log "Using developer directory: $DEVELOPER_DIR"
   "$xcodebuild_bin" -version
 
+  if platform_support_is_available; then
+    log "Xcode-compatible iOS Platform Support is already available."
+  else
+    log "Downloading and installing the current Xcode-compatible iOS Platform Support."
+    "$xcodebuild_bin" \
+      -downloadPlatform iOS \
+      -architectureVariant arm64
+
+    platform_support_is_available ||
+      fail "Xcode completed the download, but compatible iOS Platform Support is unavailable."
+  fi
+
   if runtime_is_available; then
     log "Simulator runtime already available: iOS $ios_runtime_version"
   else
-    log "Downloading and installing the iOS $ios_runtime_version Simulator runtime."
+    log "Downloading and installing the requested iOS $ios_runtime_version Simulator runtime."
     "$xcodebuild_bin" \
       -downloadPlatform iOS \
       -buildVersion "$ios_runtime_version" \
