@@ -467,7 +467,7 @@ fn run_evidence_json(value: app_proto::RunEvidence) -> Result<serde_json::Value,
 }
 
 fn run_evidence_result(
-    value: worker_proto::ListRunEvidenceResponse,
+    value: app_proto::ListRunEvidenceResponse,
     expected_run_id: &str,
 ) -> Result<Vec<serde_json::Value>, String> {
     if value.run_id != expected_run_id {
@@ -505,7 +505,7 @@ impl AutoHuntEvidenceCapture<'_> {
                 if !output.success() {
                     return Err(output.failure_message());
                 }
-                let response = serde_json::from_str::<worker_proto::ListRunEvidenceResponse>(
+                let response = serde_json::from_str::<app_proto::ListRunEvidenceResponse>(
                     output.stdout.trim(),
                 )
                 .map_err(|error| format!("run evidence ProtoJSON을 읽지 못했습니다: {error}"))?;

@@ -60,6 +60,7 @@ import {
   scheduleProjectRealtimePublish,
 } from "./realtime-scheduling";
 import { RequestDecodeError, decodeRequestSync } from "./request-schema";
+import { runEvidenceResponseMessage } from "./run-evidence-connect";
 import { listProjectRunEvidence } from "./run-evidence-routes";
 import { UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
@@ -902,7 +903,7 @@ export const createAppIssueService = (
       runId: canonicalUuid(request.runId),
       userId: session.user.id,
     });
-    return responseMessage(IssueService.method.listRunEvidence.output, result);
+    return runEvidenceResponseMessage(result);
   }),
 
   acceptIssueReworkProposal: (request) => rpc(async () => {

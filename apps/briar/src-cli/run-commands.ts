@@ -6,7 +6,7 @@ import {
 import { toJsonString } from "@bufbuild/protobuf";
 import {
   ListRunEvidenceResponseSchema,
-} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+} from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { decodeStructuredAgentResult } from "../src/lib/agent-result";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {

@@ -1,11 +1,11 @@
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError, type HandlerContext } from "@connectrpc/connect";
 import {
+  ListRunEvidenceRequestSchema,
   RunEvidence_Status,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import {
   ClaimIssueRequestSchema,
-  ListRunEvidenceRequestSchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { describe, expect, it, vi } from "vitest";
 import {
