@@ -3,10 +3,12 @@ import {
   IssueChangedField as ProtoIssueChangedField,
   IssueService,
   MoveRunResponse_Outcome as ProtoMoveOutcome,
+  ReworkRunResponse_Outcome as ProtoReworkOutcome,
   ResumeRunResponse_Outcome as ProtoResumeOutcome,
   RunEvidence_Status as ProtoRunEvidenceStatus,
   SetIssueDependencyResponse_Outcome as ProtoDependencyOutcome,
   TransferIssueResponse_Outcome as ProtoTransferOutcome,
+  UnassignRunResponse_Outcome as ProtoUnassignOutcome,
   type CreateIssueResponse as CreateIssueResponseMessage,
   type IssueAgentReply as IssueAgentReplyMessage,
   type IssueCreateProposal as IssueCreateProposalMessage,
@@ -15,15 +17,15 @@ import {
   type IssueUpdateProposal as IssueUpdateProposalMessage,
   type RunEvidence as RunEvidenceMessage,
   type SyncIssueMessagesResponse as SyncIssueMessagesResponseMessage,
+  type ReworkRunResponse as ReworkRunResponseMessage,
+  type UnassignRunResponse as UnassignRunResponseMessage,
+  type UpdateIssueMessageResponse as UpdateIssueMessageResponseMessage,
   type UpdateIssueResponse as UpdateIssueResponseMessage,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import {
   IssueDifficulty as ProtoIssueDifficulty,
   RunStatus as ProtoRunStatus,
 } from "@briar/contracts/gen/briar/app/v1/common_pb";
-import {
-  WorkflowCheckpoint_Position as ProtoCheckpointPosition,
-} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import type { AutoHuntSession } from "../../hooks/useAutoHuntSessions";
 import type {
   AgentSkillExecutionApprovalInput,
@@ -77,6 +79,10 @@ import {
   safeNumber,
 } from "./mappers";
 import { appCallOptions, appRpc, appTransport } from "./core";
+import {
+  workflowCheckpointFromProto,
+  workflowCheckpointToProto,
+} from "./project-configuration-mappers";
 
 const issueClient = appTransport
   ? createClient(IssueService, appTransport)
@@ -125,17 +131,6 @@ const issueDifficultyToProto = (
   }
 };
 
-const checkpointPositionToProto = (
-  position: AutoHuntWorkflowCheckpoint["position"],
-): ProtoCheckpointPosition => {
-  switch (position) {
-    case "before":
-      return ProtoCheckpointPosition.BEFORE;
-    case "after":
-      return ProtoCheckpointPosition.AFTER;
-  }
-};
-
 export const issueMutationTransport = (
   attachments: readonly File[],
 ): "connect" | "multipart" =>
@@ -158,11 +153,7 @@ export const createIssueRequestFromInput = (
   preferredModel: input.preferredModel ?? undefined,
   preferredEffort: input.preferredEffort ?? undefined,
   fullAuto: input.fullAuto ?? false,
-  checkpoints: (input.checkpoints ?? []).map((checkpoint) => ({
-    key: checkpoint.key,
-    stage: checkpoint.stage,
-    position: checkpointPositionToProto(checkpoint.position),
-  })),
+  checkpoints: (input.checkpoints ?? []).map(workflowCheckpointToProto),
   attachmentReferences: input.attachmentReferences ?? [],
 });
 
@@ -446,6 +437,29 @@ export async function updateIssueExecutionPreferences(
   });
 }
 
+export async function updateIssueCheckpoints(
+  token: string,
+  projectId: string,
+  runId: string,
+  checkpoints: AutoHuntWorkflowCheckpoint[],
+) {
+  const client = requireIssueClient();
+  return appRpc(async () => {
+    const response = await client.updateIssueCheckpoints(
+      {
+        projectId,
+        runId,
+        checkpoints: checkpoints.map(workflowCheckpointToProto),
+      },
+      appCallOptions(token),
+    );
+    return {
+      runId: response.runId,
+      checkpoints: response.checkpoints.map(workflowCheckpointFromProto),
+    };
+  });
+}
+
 const setIssueDependency = async (
   token: string,
   projectId: string,
@@ -699,6 +713,101 @@ export async function resumeHuntRun(
       terminalReviewOnly: response.terminalReviewOnly,
     };
   });
+}
+
+export type HuntReworkResult = {
+  runId: string;
+  outcome: "reworked" | "already_reworked";
+  attempt: number;
+  revision: number;
+  workflowStage: string;
+};
+
+export const reworkRunResultFromMessage = (
+  response: ReworkRunResponseMessage,
+): HuntReworkResult => {
+  const outcome = (() => {
+    switch (response.outcome) {
+      case ProtoReworkOutcome.REWORKED:
+        return "reworked" as const;
+      case ProtoReworkOutcome.ALREADY_REWORKED:
+        return "already_reworked" as const;
+      default:
+        throw new Error(`Unknown rework outcome: ${response.outcome}`);
+    }
+  })();
+  return {
+    runId: response.runId,
+    outcome,
+    attempt: response.attempt,
+    revision: response.revision,
+    workflowStage: response.workflowStage,
+  };
+};
+
+export async function reworkPausedHuntRun(
+  token: string,
+  projectId: string,
+  runId: string,
+  input: {
+    workflowStage: string;
+    reason: string;
+    checkpoint: {
+      key: string;
+      attempt: number;
+      revision: number;
+    };
+  },
+  requestId: string = crypto.randomUUID(),
+): Promise<HuntReworkResult> {
+  const client = requireIssueClient();
+  return appRpc(async () => reworkRunResultFromMessage(
+    await client.reworkRun(
+      {
+        projectId,
+        runId,
+        requestId,
+        workflowStage: input.workflowStage,
+        reason: input.reason,
+        checkpoint: {
+          key: input.checkpoint.key,
+          attempt: input.checkpoint.attempt,
+          revision: input.checkpoint.revision,
+        },
+      },
+      appCallOptions(token),
+    ),
+  ));
+}
+
+export const unassignRunResultFromMessage = (
+  response: UnassignRunResponseMessage,
+) => {
+  const outcome = (() => {
+    switch (response.outcome) {
+      case ProtoUnassignOutcome.UNASSIGNED:
+        return "unassigned" as const;
+      case ProtoUnassignOutcome.NOT_ASSIGNED:
+        return "not_assigned" as const;
+      default:
+        throw new Error(`Unknown unassign outcome: ${response.outcome}`);
+    }
+  })();
+  return { runId: response.runId, outcome };
+};
+
+export async function unassignHuntRun(
+  token: string,
+  projectId: string,
+  runId: string,
+) {
+  const client = requireIssueClient();
+  return appRpc(async () => unassignRunResultFromMessage(
+    await client.unassignRun(
+      { projectId, runId, requestId: crypto.randomUUID() },
+      appCallOptions(token),
+    ),
+  ));
 }
 
 export type HuntDispatchResult = ReturnType<typeof dispatchFromMessage>;
@@ -1039,6 +1148,54 @@ export async function createIssueMessage(
       agentReplies: response.agentReplies.map(issueAgentReplyFromMessage),
     };
   });
+}
+
+export const updatedIssueMessageFromMessage = (
+  response: UpdateIssueMessageResponseMessage,
+) => issueMessageFromMessage(requiredMessage(
+  response.message,
+  "updateIssueMessage.message",
+));
+
+export async function editIssueMessage(
+  token: string,
+  projectId: string,
+  runId: string,
+  messageId: string,
+  input: {
+    body: string;
+    mentionedUserIds?: string[];
+  },
+) {
+  const client = requireIssueClient();
+  return appRpc(async () => updatedIssueMessageFromMessage(
+    await client.updateIssueMessage(
+      {
+        projectId,
+        runId,
+        messageId,
+        body: input.body,
+        mentionedUserIds: input.mentionedUserIds ?? [],
+      },
+      appCallOptions(token),
+    ),
+  ));
+}
+
+export async function deleteIssueMessage(
+  token: string,
+  projectId: string,
+  runId: string,
+  messageId: string,
+) {
+  const client = requireIssueClient();
+  const response = await appRpc(() => client.deleteIssueMessage(
+    { projectId, runId, messageId },
+    appCallOptions(token),
+  ));
+  if (!response.deleted) {
+    throw new Error("Issue message deletion was not confirmed");
+  }
 }
 
 export async function loadIssueAgentReply(

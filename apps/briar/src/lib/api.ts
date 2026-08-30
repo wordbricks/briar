@@ -117,7 +117,10 @@ export {
   createIssue,
   createIssueMessage,
   deleteIssue,
+  deleteIssueMessage,
   dispatchHuntRun,
+  editIssueMessage,
+  type HuntReworkResult,
   loadIssueAgentReply,
   loadIssueConversationDelta,
   loadIssueConversationSnapshot,
@@ -125,6 +128,7 @@ export {
   loadRunEvidence,
   moveHuntRun,
   removeIssueDependency,
+  reworkPausedHuntRun,
   resumeHuntRun,
   retryHuntRun,
   transferIssue,
@@ -135,8 +139,10 @@ export {
   type HuntResumeResult,
   type TransferIssueResult,
   updateIssue,
+  updateIssueCheckpoints,
   updateIssueExecutionPreferences,
   updateIssueSubscription,
+  unassignHuntRun,
 } from "./app-rpc/issue";
 export {
   applyForManagedComputer,
@@ -163,7 +169,6 @@ export {
 import {
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
-  type AutoHuntWorkflowCheckpoint,
 } from "./auto-hunt-contract";
 import type { AgentProvider } from "./agent-provider";
 import type { InboxMessage } from "../hooks/useInbox";
@@ -185,7 +190,6 @@ import type {
   ProjectExecutionWorkerPolicy,
   HuntEvent,
   IssueAttachment,
-  IssueMessage,
   Project,
   ProjectSettings,
   RunEvidenceImage,
@@ -554,21 +558,6 @@ export async function loadChannelLinkPreview(
   );
 }
 
-export async function updateIssueCheckpoints(
-  token: string,
-  projectId: string,
-  runId: string,
-  checkpoints: AutoHuntWorkflowCheckpoint[],
-) {
-  return request<{
-    runId: string;
-    checkpoints: AutoHuntWorkflowCheckpoint[];
-  }>(`/projects/${projectId}/runs/${runId}/checkpoints`, token, {
-    method: "PUT",
-    body: JSON.stringify({ checkpoints }),
-  });
-}
-
 export async function loadIssueAttachment(
   token: string,
   attachment: IssueAttachment,
@@ -604,87 +593,6 @@ export async function loadRunEvidenceImage(
     throw new Error(`증빙 이미지를 열 수 없습니다. (${response.status})`);
   }
   return response.blob();
-}
-
-export async function editIssueMessage(
-  token: string,
-  projectId: string,
-  runId: string,
-  messageId: string,
-  input: {
-    body: string;
-    mentionedUserIds?: string[];
-  },
-) {
-  const result = await request<{ message: IssueMessage }>(
-    `/projects/${projectId}/runs/${runId}/messages/${messageId}`,
-    token,
-    { method: "PATCH", body: JSON.stringify(input) },
-  );
-  return result.message;
-}
-
-export async function deleteIssueMessage(
-  token: string,
-  projectId: string,
-  runId: string,
-  messageId: string,
-) {
-  await request<null>(
-    `/projects/${projectId}/runs/${runId}/messages/${messageId}`,
-    token,
-    { method: "DELETE" },
-  );
-}
-
-export type HuntReworkResult = {
-  runId: string;
-  outcome: "reworked" | "already_reworked";
-  attempt: number;
-  revision: number;
-  workflowStage: string;
-};
-
-export async function reworkPausedHuntRun(
-  token: string,
-  projectId: string,
-  runId: string,
-  input: {
-    workflowStage: string;
-    reason: string;
-    checkpoint: {
-      key: string;
-      attempt: number;
-      revision: number;
-    };
-  },
-  requestId: string = crypto.randomUUID(),
-) {
-  return request<HuntReworkResult>(
-    `/projects/${projectId}/runs/${runId}/rework`,
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        requestId,
-        workflowStage: input.workflowStage,
-        reason: input.reason,
-        checkpointKey: input.checkpoint.key,
-        attempt: input.checkpoint.attempt,
-        revision: input.checkpoint.revision,
-      }),
-    },
-  );
-}
-
-export async function unassignHuntRun(token: string, projectId: string, runId: string) {
-  return request<{
-    runId: string;
-    outcome: "unassigned" | "not_assigned";
-  }>(`/projects/${projectId}/runs/${runId}/unassign`, token, {
-    method: "POST",
-    body: JSON.stringify({ requestId: crypto.randomUUID() }),
-  });
 }
 
 export type ProjectGithubCredential = {

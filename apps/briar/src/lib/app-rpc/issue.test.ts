@@ -5,7 +5,12 @@ import {
   IssueChangedField,
   IssueMessageSchema,
   IssueUpdateProposalSchema,
+  ReworkRunResponse_Outcome,
+  ReworkRunResponseSchema,
   SyncIssueMessagesResponseSchema,
+  UnassignRunResponse_Outcome,
+  UnassignRunResponseSchema,
+  UpdateIssueMessageResponseSchema,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import {
   ProposalStatus,
@@ -18,7 +23,10 @@ import {
   issueConversationDeltaFromMessage,
   issueMessageFromMessage,
   issueMutationTransport,
+  reworkRunResultFromMessage,
+  unassignRunResultFromMessage,
   updateIssueRequestFromInput,
+  updatedIssueMessageFromMessage,
 } from "./issue";
 import { apiErrorFromConnect } from "./core";
 
@@ -166,5 +174,24 @@ describe("Issue Connect boundary", () => {
       clientMessageId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       attachmentReferences: ["message-ref"],
     });
+  });
+
+  it("rejects unspecified control outcomes and a missing edited message", () => {
+    expect(reworkRunResultFromMessage(create(ReworkRunResponseSchema, {
+      outcome: ReworkRunResponse_Outcome.ALREADY_REWORKED,
+    })).outcome).toBe("already_reworked");
+    expect(unassignRunResultFromMessage(create(UnassignRunResponseSchema, {
+      outcome: UnassignRunResponse_Outcome.NOT_ASSIGNED,
+    })).outcome).toBe("not_assigned");
+
+    expect(() => reworkRunResultFromMessage(
+      create(ReworkRunResponseSchema),
+    )).toThrow("Unknown rework outcome");
+    expect(() => unassignRunResultFromMessage(
+      create(UnassignRunResponseSchema),
+    )).toThrow("Unknown unassign outcome");
+    expect(() => updatedIssueMessageFromMessage(
+      create(UpdateIssueMessageResponseSchema),
+    )).toThrow("updateIssueMessage.message is missing");
   });
 });
