@@ -60,6 +60,15 @@ service WorkerExecutionService {
   rpc ReportIssueExecutionTelemetry(ReportIssueExecutionTelemetryRequest) returns (ReportIssueExecutionTelemetryResponse);
   rpc RecordRunEvent(RecordRunEventRequest) returns (RecordRunEventResponse);
   rpc TransitionWorkflowStage(TransitionWorkflowStageRequest) returns (TransitionWorkflowStageResponse);
+  // Shared intentionally with IssueService so run control has one wire DTO.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  rpc RetryRun(briar.app.v1.RetryRunRequest) returns (briar.app.v1.RetryRunResponse);
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  rpc CancelRun(briar.app.v1.CancelRunRequest) returns (briar.app.v1.CancelRunResponse);
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  rpc ResumeRun(briar.app.v1.ResumeRunRequest) returns (briar.app.v1.ResumeRunResponse);
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  rpc ReworkRun(briar.app.v1.ReworkRunRequest) returns (briar.app.v1.ReworkRunResponse);
 }
 
 message ClaimIssueRequest {

@@ -2951,6 +2951,9 @@ export const IssueService: GenService<{
     output: typeof MoveRunResponseSchema;
   },
   /**
+   * Shared intentionally with WorkerExecutionService so run control has one DTO.
+   * buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+   *
    * @generated from rpc briar.app.v1.IssueService.RetryRun
    */
   retryRun: {
@@ -2959,6 +2962,8 @@ export const IssueService: GenService<{
     output: typeof RetryRunResponseSchema;
   },
   /**
+   * buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+   *
    * @generated from rpc briar.app.v1.IssueService.CancelRun
    */
   cancelRun: {
@@ -2967,6 +2972,8 @@ export const IssueService: GenService<{
     output: typeof CancelRunResponseSchema;
   },
   /**
+   * buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+   *
    * @generated from rpc briar.app.v1.IssueService.ResumeRun
    */
   resumeRun: {
@@ -2975,6 +2982,8 @@ export const IssueService: GenService<{
     output: typeof ResumeRunResponseSchema;
   },
   /**
+   * buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+   *
    * @generated from rpc briar.app.v1.IssueService.ReworkRun
    */
   reworkRun: {

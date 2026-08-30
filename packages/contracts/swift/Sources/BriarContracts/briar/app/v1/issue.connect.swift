@@ -38,15 +38,20 @@ public protocol BriarAPI_IssueServiceClientInterface: Sendable {
     @available(iOS 13, *)
     func `moveRun`(request: BriarAPI_MoveRunRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_MoveRunResponse>
 
+    /// Shared intentionally with WorkerExecutionService so run control has one DTO.
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
     @available(iOS 13, *)
     func `retryRun`(request: BriarAPI_RetryRunRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_RetryRunResponse>
 
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
     @available(iOS 13, *)
     func `cancelRun`(request: BriarAPI_CancelRunRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CancelRunResponse>
 
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
     @available(iOS 13, *)
     func `resumeRun`(request: BriarAPI_ResumeRunRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ResumeRunResponse>
 
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
     @available(iOS 13, *)
     func `reworkRun`(request: BriarAPI_ReworkRunRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ReworkRunResponse>
 

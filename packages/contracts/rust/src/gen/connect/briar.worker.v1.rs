@@ -230,6 +230,38 @@ pub type OwnedTransitionWorkflowStageResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<RetryRunRequestView<'static>>`.
+pub type OwnedRetryRunRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RetryRunRequestView<'static>,
+>;
+///Shorthand for `OwnedView<RetryRunResponseView<'static>>`.
+pub type OwnedRetryRunResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RetryRunResponseView<'static>,
+>;
+///Shorthand for `OwnedView<CancelRunRequestView<'static>>`.
+pub type OwnedCancelRunRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CancelRunRequestView<'static>,
+>;
+///Shorthand for `OwnedView<CancelRunResponseView<'static>>`.
+pub type OwnedCancelRunResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CancelRunResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ResumeRunRequestView<'static>>`.
+pub type OwnedResumeRunRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ResumeRunRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ResumeRunResponseView<'static>>`.
+pub type OwnedResumeRunResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ResumeRunResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ReworkRunRequestView<'static>>`.
+pub type OwnedReworkRunRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ReworkRunRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ReworkRunResponseView<'static>>`.
+pub type OwnedReworkRunResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ReworkRunResponseView<'static>,
+>;
 impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::ClaimWorkResponse>
 for crate::proto::briar::worker::v1::__buffa::view::ClaimWorkResponseView<'_> {
     fn encode(
@@ -4075,6 +4107,30 @@ pub const WORKER_EXECUTION_SERVICE_TRANSITION_WORKFLOW_STAGE_SPEC: ::connectrpc:
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RetryRun` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_EXECUTION_SERVICE_RETRY_RUN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerExecutionService/RetryRun",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CancelRun` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_EXECUTION_SERVICE_CANCEL_RUN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerExecutionService/CancelRun",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ResumeRun` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_EXECUTION_SERVICE_RESUME_RUN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerExecutionService/ResumeRun",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ReworkRun` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_EXECUTION_SERVICE_REWORK_RUN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerExecutionService/ReworkRun",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Execution-credential operations shared by the interactive CLI and the
 /// desktop-hosted Auto Hunt runtime.
 ///
@@ -4263,6 +4319,99 @@ pub trait WorkerExecutionService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::worker::v1::TransitionWorkflowStageResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Shared intentionally with IssueService so run control has one wire DTO.
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn retry_run<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::RetryRunRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::RetryRunResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn cancel_run<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::CancelRunRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::CancelRunResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn resume_run<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ResumeRunRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ResumeRunResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn rework_run<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ReworkRunRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ReworkRunResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -4472,6 +4621,122 @@ impl<S: WorkerExecutionService> WorkerExecutionServiceExt for S {
                 },
             )
             .with_spec(WORKER_EXECUTION_SERVICE_TRANSITION_WORKFLOW_STAGE_SPEC)
+            .route_view(
+                WORKER_EXECUTION_SERVICE_SERVICE_NAME,
+                "RetryRun",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::RetryRunRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::RetryRunRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.retry_run(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::RetryRunResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_EXECUTION_SERVICE_RETRY_RUN_SPEC)
+            .route_view(
+                WORKER_EXECUTION_SERVICE_SERVICE_NAME,
+                "CancelRun",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::CancelRunRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::CancelRunRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.cancel_run(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::CancelRunResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_EXECUTION_SERVICE_CANCEL_RUN_SPEC)
+            .route_view(
+                WORKER_EXECUTION_SERVICE_SERVICE_NAME,
+                "ResumeRun",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ResumeRunRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ResumeRunRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.resume_run(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ResumeRunResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_EXECUTION_SERVICE_RESUME_RUN_SPEC)
+            .route_view(
+                WORKER_EXECUTION_SERVICE_SERVICE_NAME,
+                "ReworkRun",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ReworkRunRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ReworkRunRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.rework_run(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ReworkRunResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_EXECUTION_SERVICE_REWORK_RUN_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -4569,6 +4834,30 @@ for WorkerExecutionServiceServer<T> {
                         .with_spec(
                             WORKER_EXECUTION_SERVICE_TRANSITION_WORKFLOW_STAGE_SPEC,
                         ),
+                )
+            }
+            "RetryRun" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_EXECUTION_SERVICE_RETRY_RUN_SPEC),
+                )
+            }
+            "CancelRun" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_EXECUTION_SERVICE_CANCEL_RUN_SPEC),
+                )
+            }
+            "ResumeRun" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_EXECUTION_SERVICE_RESUME_RUN_SPEC),
+                )
+            }
+            "ReworkRun" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_EXECUTION_SERVICE_REWORK_RUN_SPEC),
                 )
             }
             _ => None,
@@ -4716,6 +5005,92 @@ for WorkerExecutionServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::worker::v1::TransitionWorkflowStageResponse,
+                        >(format)
+                })
+            }
+            "RetryRun" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::RetryRunRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::RetryRunRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::RetryRunRequest,
+                    >::from_parts(&req, &body);
+                    svc.retry_run(ctx, req)
+                        .await?
+                        .encode::<crate::proto::briar::app::v1::RetryRunResponse>(format)
+                })
+            }
+            "CancelRun" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::CancelRunRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::CancelRunRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::CancelRunRequest,
+                    >::from_parts(&req, &body);
+                    svc.cancel_run(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::CancelRunResponse,
+                        >(format)
+                })
+            }
+            "ResumeRun" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ResumeRunRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ResumeRunRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ResumeRunRequest,
+                    >::from_parts(&req, &body);
+                    svc.resume_run(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ResumeRunResponse,
+                        >(format)
+                })
+            }
+            "ReworkRun" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ReworkRunRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ReworkRunRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ReworkRunRequest,
+                    >::from_parts(&req, &body);
+                    svc.rework_run(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ReworkRunResponse,
                         >(format)
                 })
             }
@@ -5116,6 +5491,186 @@ where
                 &self.transport,
                 &self.config,
                 WORKER_EXECUTION_SERVICE_TRANSITION_WORKFLOW_STAGE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RetryRun RPC. Sends a request to /briar.worker.v1.WorkerExecutionService/RetryRun.
+    pub async fn retry_run(
+        &self,
+        request: crate::proto::briar::app::v1::RetryRunRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RetryRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.retry_run_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RetryRun RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn retry_run_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::RetryRunRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RetryRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_EXECUTION_SERVICE_RETRY_RUN_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CancelRun RPC. Sends a request to /briar.worker.v1.WorkerExecutionService/CancelRun.
+    pub async fn cancel_run(
+        &self,
+        request: crate::proto::briar::app::v1::CancelRunRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CancelRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.cancel_run_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CancelRun RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn cancel_run_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::CancelRunRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CancelRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_EXECUTION_SERVICE_CANCEL_RUN_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ResumeRun RPC. Sends a request to /briar.worker.v1.WorkerExecutionService/ResumeRun.
+    pub async fn resume_run(
+        &self,
+        request: crate::proto::briar::app::v1::ResumeRunRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ResumeRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.resume_run_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ResumeRun RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn resume_run_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ResumeRunRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ResumeRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_EXECUTION_SERVICE_RESUME_RUN_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ReworkRun RPC. Sends a request to /briar.worker.v1.WorkerExecutionService/ReworkRun.
+    pub async fn rework_run(
+        &self,
+        request: crate::proto::briar::app::v1::ReworkRunRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ReworkRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.rework_run_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ReworkRun RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn rework_run_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ReworkRunRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ReworkRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_EXECUTION_SERVICE_REWORK_RUN_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

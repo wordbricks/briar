@@ -21,9 +21,14 @@ service IssueService {
   rpc UpdateIssueCheckpoints(UpdateIssueCheckpointsRequest) returns (UpdateIssueCheckpointsResponse);
   rpc SetIssueDependency(SetIssueDependencyRequest) returns (SetIssueDependencyResponse);
   rpc MoveRun(MoveRunRequest) returns (MoveRunResponse);
+  // Shared intentionally with WorkerExecutionService so run control has one DTO.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
   rpc RetryRun(RetryRunRequest) returns (RetryRunResponse);
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
   rpc CancelRun(CancelRunRequest) returns (CancelRunResponse);
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
   rpc ResumeRun(ResumeRunRequest) returns (ResumeRunResponse);
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
   rpc ReworkRun(ReworkRunRequest) returns (ReworkRunResponse);
   rpc UnassignRun(UnassignRunRequest) returns (UnassignRunResponse);
   rpc DispatchRun(DispatchRunRequest) returns (DispatchRunResponse);
