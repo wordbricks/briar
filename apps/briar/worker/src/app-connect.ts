@@ -122,6 +122,7 @@ export async function handleAppConnectRequest(
     request: input.request,
     db: input.env.DB,
     env: input.env,
+    context: input.context,
     archivesBucket: input.env.ARCHIVES,
     requireRunExecutionProject: input.requireRunExecutionProject,
   });

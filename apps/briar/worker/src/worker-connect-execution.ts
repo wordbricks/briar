@@ -2,9 +2,14 @@ import { create } from "@bufbuild/protobuf";
 import {
   AppendTranscriptEventsResponseSchema,
   ClaimIssueResponseSchema,
+  RecordRunEventResponseSchema,
   ReportIssueExecutionTelemetryResponseSchema,
+  TransitionWorkflowStageResponse_Outcome,
+  TransitionWorkflowStageResponseSchema,
   WorkerExecutionService,
+  WorkflowStageLifecycleCheckpointSchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import { WorkflowCheckpoint_Position } from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
 import { withConnectErrors } from "./app-connect-errors";
 import { HttpError } from "./http-response";
@@ -12,6 +17,10 @@ import { claimNextQueueWork } from "./queue-claim-routes";
 import { decodeRequestSync } from "./request-schema";
 import { runEvidenceResponseMessage } from "./run-evidence-connect";
 import { listRunEvidenceForProject } from "./run-evidence-routes";
+import {
+  scheduleInboxRealtimeFlush,
+  scheduleProjectRealtimePublish,
+} from "./realtime-scheduling";
 import { UuidString } from "./schema-codecs";
 import { workerIssueClaimMessage } from "./worker-connect-mappers";
 import {
@@ -31,6 +40,16 @@ import {
   requireAgentProject,
   requireWorkerProjectBinding,
 } from "./worker-route-auth";
+import {
+  recordWorkerRunEventApplication,
+  transitionWorkerWorkflowStageApplication,
+  type WorkerRunExecutionPrincipal,
+} from "./worker-run-execution-application";
+import {
+  workerRunEvent,
+  workerRunStatusMessage,
+  workflowStageTransition,
+} from "./worker-run-execution-mappers";
 
 export type IssueClaimAuthorization = {
   readonly projectId: string;
@@ -41,6 +60,7 @@ export type WorkerConnectExecutionInput = {
   readonly request: Request;
   readonly db: D1Database;
   readonly env: Env;
+  readonly context?: ExecutionContext;
   readonly archivesBucket: R2Bucket;
   readonly requireRunExecutionProject: (runId: string) => Promise<string>;
 };
@@ -82,6 +102,10 @@ export type WorkerExecutionServices = {
   readonly requireWorkerProjectBinding: typeof requireWorkerProjectBinding;
   readonly appendTranscript: typeof appendTranscriptEventsApplication;
   readonly reportTelemetry: typeof reportIssueExecutionTelemetryApplication;
+  readonly requireAgentProject: typeof requireAgentProject;
+  readonly recordRunEvent: typeof recordWorkerRunEventApplication;
+  readonly transitionWorkflowStage:
+    typeof transitionWorkerWorkflowStageApplication;
 };
 
 const workerExecutionServices: WorkerExecutionServices = {
@@ -91,6 +115,9 @@ const workerExecutionServices: WorkerExecutionServices = {
   requireWorkerProjectBinding,
   appendTranscript: appendTranscriptEventsApplication,
   reportTelemetry: reportIssueExecutionTelemetryApplication,
+  requireAgentProject,
+  recordRunEvent: recordWorkerRunEventApplication,
+  transitionWorkflowStage: transitionWorkerWorkflowStageApplication,
 };
 
 const canonicalUuid = decodeRequestSync(UuidString);
@@ -115,6 +142,62 @@ const transcriptIdentity = (
     workId: canonicalUuid(work.workId).toLowerCase(),
     runId: canonicalUuid(work.runId).toLowerCase(),
   };
+};
+
+const executionPrincipal = (
+  authorization: IssueClaimAuthorization,
+): WorkerRunExecutionPrincipal => authorization.authenticatedWorker
+  ? { kind: "worker", worker: authorization.authenticatedWorker }
+  : { kind: "agent" };
+
+const workflowStageOutcome = (
+  value: Awaited<
+    ReturnType<typeof transitionWorkerWorkflowStageApplication>
+  >["outcome"],
+) => {
+  switch (value) {
+    case "started":
+      return TransitionWorkflowStageResponse_Outcome.STARTED;
+    case "completed":
+      return TransitionWorkflowStageResponse_Outcome.COMPLETED;
+    case "already_started":
+      return TransitionWorkflowStageResponse_Outcome.ALREADY_STARTED;
+    case "already_completed":
+      return TransitionWorkflowStageResponse_Outcome.ALREADY_COMPLETED;
+    case "paused":
+      return TransitionWorkflowStageResponse_Outcome.PAUSED;
+    case "not_found":
+      throw new HttpError(500, "Stage transition returned a missing run");
+  }
+};
+
+const checkpointPosition = (value: "before" | "after") =>
+  value === "before"
+    ? WorkflowCheckpoint_Position.BEFORE
+    : WorkflowCheckpoint_Position.AFTER;
+
+const requiredPositiveResult = (
+  value: number | null,
+  field: string,
+) => {
+  if (value === null || value < 1) {
+    throw new HttpError(500, `Stage transition omitted ${field}`);
+  }
+  return value;
+};
+
+const scheduleRunMutation = (input: WorkerConnectExecutionInput, projectId: string) => {
+  scheduleProjectRealtimePublish(
+    input.env,
+    input.db,
+    projectId,
+    input.context,
+  );
+  // scheduleProjectRealtimePublish includes the inbox flush when project
+  // realtime is enabled. Preserve the legacy fallback for push-only setups.
+  if (!input.env.CHANNEL_REALTIME) {
+    scheduleInboxRealtimeFlush(input.env, input.db, input.context);
+  }
 };
 
 export function createWorkerExecutionService(
@@ -218,6 +301,79 @@ export function createWorkerExecutionService(
           costObservationsStored: result.costStored,
         });
       }),
+    recordRunEvent: (request) => withConnectErrors(async () => {
+      const projectId = canonicalUuid(request.projectId).toLowerCase();
+      const principal = request.target.case === "sourceIdentity"
+        ? await services.requireAgentProject(input.db, input.request)
+            .then((authenticatedProjectId) => {
+              if (authenticatedProjectId !== projectId) {
+                throw new HttpError(404, "Project not found");
+              }
+              return { kind: "agent" } as const;
+            })
+        : executionPrincipal(await services.authorizeIssueClaim({
+            db: input.db,
+            request: input.request,
+            projectId,
+          }).then((authorization) => {
+            if (authorization.projectId !== projectId) {
+              throw new HttpError(404, "Project not found");
+            }
+            return authorization;
+          }));
+      const mapped = workerRunEvent(request);
+      const result = await services.recordRunEvent({
+        db: input.db,
+        projectId,
+        principal,
+        ...mapped,
+      });
+      scheduleRunMutation(input, projectId);
+      return create(RecordRunEventResponseSchema, {
+        runId: result.runId,
+        status: workerRunStatusMessage(result.status),
+        workflowStage: result.workflowStage ?? undefined,
+      });
+    }),
+    transitionWorkflowStage: (request) => withConnectErrors(async () => {
+      const projectId = canonicalUuid(request.projectId).toLowerCase();
+      const authorization = await services.authorizeIssueClaim({
+        db: input.db,
+        request: input.request,
+        projectId,
+      });
+      if (authorization.projectId !== projectId) {
+        throw new HttpError(404, "Project not found");
+      }
+      const transition = workflowStageTransition(request);
+      const principal = executionPrincipal(authorization);
+      const result = await services.transitionWorkflowStage({
+        db: input.db,
+        projectId,
+        principal,
+        transition,
+        actor: principal.kind === "worker"
+          ? `briar-worker:${principal.worker.binding.id}`
+          : "briar-workflow",
+      });
+      scheduleRunMutation(input, projectId);
+      return create(TransitionWorkflowStageResponseSchema, {
+        runId: transition.work.runId,
+        requestId: transition.requestId,
+        outcome: workflowStageOutcome(result.outcome),
+        attempt: requiredPositiveResult(result.attempt, "attempt"),
+        revision: requiredPositiveResult(result.revision, "revision"),
+        stage: result.stage,
+        checkpoint: result.checkpoint
+          ? create(WorkflowStageLifecycleCheckpointSchema, {
+              key: result.checkpoint.key,
+              stage: result.checkpoint.stage,
+              position: checkpointPosition(result.checkpoint.position),
+              revision: result.checkpoint.revision,
+            })
+          : undefined,
+      });
+    }),
   };
 }
 
