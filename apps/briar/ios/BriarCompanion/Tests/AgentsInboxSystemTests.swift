@@ -1,3 +1,7 @@
+import BriarContracts
+import BriarContractsMocks
+import Connect
+import SwiftProtobuf
 import XCTest
 import UserNotifications
 @testable import BriarCompanion
@@ -124,8 +128,12 @@ final class AgentsInboxSystemTests: XCTestCase {
             createdAt: createdAt,
             updatedAt: createdAt
         )
-        let api = AgentExecutionAPIRecorder(projectID: projectID)
-        let store = AgentsStore(api: api)
+        let services = AgentTestServices(projectID: projectID)
+        let store = AgentsStore(
+            api: AgentHTTPStub(),
+            agentService: services.agent,
+            issueService: services.issue
+        )
         store.select(projectID: projectID, token: "token", locale: "ko")
 
         let session = try await store.run(
@@ -137,7 +145,7 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(session.agentId, agentID)
         XCTAssertEqual(session.request, skill.instructions)
 
-        let directTaskRequests = await api.directTaskRequests()
+        let directTaskRequests = await services.scenario.directTaskRequests()
         let taskRequest = try XCTUnwrap(directTaskRequests.first)
         XCTAssertEqual(taskRequest.agentID, agentID)
         XCTAssertEqual(taskRequest.skillID, skillID)
@@ -149,12 +157,14 @@ final class AgentsInboxSystemTests: XCTestCase {
     func testApprovedSkillSessionMaterializesImmediatelyForTheSelectedProject() async {
         let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
         let otherProjectID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
-        let api = AgentExecutionAPIRecorder(projectID: projectID)
-        let store = AgentsStore(api: api)
+        let services = AgentTestServices(projectID: projectID)
+        let store = AgentsStore(
+            api: AgentHTTPStub(),
+            agentService: services.agent,
+            issueService: services.issue
+        )
         store.select(projectID: projectID, token: "token", locale: "ko")
-        while (await api.requests()).count < 2 {
-            await Task.yield()
-        }
+        await services.scenario.waitForSessionListStarts(1)
         while store.isRefreshing {
             await Task.yield()
         }
@@ -276,17 +286,22 @@ final class AgentsInboxSystemTests: XCTestCase {
             ],
             updatedAt: completedAt
         )
-        let api = AgentExecutionAPIRecorder(
+        let services = AgentTestServices(
             projectID: projectID,
             sessionSnapshots: [[], [completed]],
             suspendFirstSessionList: true
         )
-        let store = AgentsStore(api: api, pollInterval: .seconds(3_600))
+        let store = AgentsStore(
+            api: AgentHTTPStub(),
+            agentService: services.agent,
+            issueService: services.issue,
+            pollInterval: .seconds(3_600)
+        )
         store.select(projectID: projectID, token: "token", locale: "ko")
-        await api.waitForSessionListStarts(1)
+        await services.scenario.waitForSessionListStarts(1)
 
         store.materialize(materialized)
-        await api.releaseSessionList()
+        await services.scenario.releaseSessionList()
         for _ in 0..<100 where store.isRefreshing {
             try? await Task.sleep(for: .milliseconds(10))
         }
@@ -345,8 +360,12 @@ final class AgentsInboxSystemTests: XCTestCase {
             createdAt: createdAt,
             updatedAt: createdAt
         )
-        let api = AgentExecutionAPIRecorder(projectID: projectID, suspendDirectTasks: true)
-        let store = AgentsStore(api: api)
+        let services = AgentTestServices(projectID: projectID, suspendDirectTasks: true)
+        let store = AgentsStore(
+            api: AgentHTTPStub(),
+            agentService: services.agent,
+            issueService: services.issue
+        )
         store.select(projectID: projectID, token: "token", locale: "ko")
 
         let firstRun = Task {
@@ -357,7 +376,7 @@ final class AgentsInboxSystemTests: XCTestCase {
                 workerID: "worker-claude"
             )
         }
-        await api.waitForDirectTaskStarts(1)
+        await services.scenario.waitForDirectTaskStarts(1)
         XCTAssertTrue(store.executingAgentIDs.contains(agentID))
 
         let secondRun = Task {
@@ -368,18 +387,18 @@ final class AgentsInboxSystemTests: XCTestCase {
                 workerID: "worker-claude"
             )
         }
-        await api.waitForDirectTaskStarts(2)
+        await services.scenario.waitForDirectTaskStarts(2)
 
-        let requests = await api.directTaskRequests()
+        let requests = await services.scenario.directTaskRequests()
         XCTAssertEqual(requests.count, 2)
         let requestIDs = requests.map(\.requestID)
         XCTAssertEqual(Set(requestIDs).count, 2)
 
-        await api.releaseDirectTask()
+        await services.scenario.releaseDirectTask()
         _ = try await firstRun.value
         XCTAssertTrue(store.executingAgentIDs.contains(agentID))
 
-        await api.releaseDirectTask()
+        await services.scenario.releaseDirectTask()
         _ = try await secondRun.value
         XCTAssertFalse(store.executingAgentIDs.contains(agentID))
         XCTAssertEqual(store.sessions.count, 2)
@@ -489,8 +508,12 @@ final class AgentsInboxSystemTests: XCTestCase {
         let agentID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
         let skillID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
         let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
-        let api = AgentExecutionAPIRecorder(projectID: projectID)
-        let store = AgentsStore(api: api)
+        let services = AgentTestServices(projectID: projectID)
+        let store = AgentsStore(
+            api: AgentHTTPStub(),
+            agentService: services.agent,
+            issueService: services.issue
+        )
         store.select(projectID: projectID, token: "token", locale: "ko")
         await store.refresh()
 
@@ -541,21 +564,15 @@ final class AgentsInboxSystemTests: XCTestCase {
         let dispatchID = try await store.run(agent: agent, runs: [run], maxIssues: 1)
         XCTAssertFalse(dispatchID.isEmpty)
 
-        let requests = await api.requests()
-        let dispatch = try XCTUnwrap(requests.first {
-            $0.method == "POST" && $0.path.hasSuffix("/runs/\(runID.uuidString.lowercased())/dispatch")
-        })
-        let dispatchBody = try XCTUnwrap(dispatch.body)
-        let dispatchObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: dispatchBody) as? [String: Any]
-        )
-        XCTAssertEqual((dispatchObject["agentId"] as? String)?.lowercased(), agentID.uuidString.lowercased())
-        XCTAssertEqual(dispatchObject["provider"] as? String, "claude")
-        XCTAssertEqual(dispatchObject["model"] as? String, "opus")
-        XCTAssertEqual(dispatchObject["effort"] as? String, "medium")
-        XCTAssertEqual(dispatchObject["persistPreferences"] as? Bool, true)
-        XCTAssertNil(dispatchObject["workerId"])
-        let putSessionRequestCount = await api.putSessionRequestCount()
+        let requests = await services.scenario.dispatchRequests()
+        let dispatch = try XCTUnwrap(requests.first { $0.runID == runID })
+        XCTAssertEqual(UUID(uuidString: dispatch.dispatch.agentID), agentID)
+        XCTAssertEqual(dispatch.dispatch.provider, .claude)
+        XCTAssertEqual(dispatch.dispatch.model, "opus")
+        XCTAssertEqual(dispatch.dispatch.effort, "medium")
+        XCTAssertTrue(dispatch.dispatch.persistPreferences)
+        XCTAssertFalse(dispatch.dispatch.hasWorkerID)
+        let putSessionRequestCount = await services.scenario.putSessionRequestCount()
         XCTAssertEqual(putSessionRequestCount, 1)
     }
 
@@ -1302,13 +1319,96 @@ final class AgentsInboxSystemTests: XCTestCase {
     }
 }
 
-private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
-    struct Request: Sendable {
-        let path: String
-        let method: String
-        let body: Data?
+private struct AgentHTTPStub: MobileAPIClientProtocol {}
+
+private final class AgentTestServices: @unchecked Sendable {
+    let scenario: AgentExecutionScenario
+    let agent: BriarAPI_AgentServiceClientMock
+    let issue: BriarAPI_IssueServiceClientMock
+
+    init(
+        projectID: UUID,
+        suspendDirectTasks: Bool = false,
+        sessionSnapshots: [[ProjectAgentSession]] = [[]],
+        suspendFirstSessionList: Bool = false
+    ) {
+        let scenario = AgentExecutionScenario(
+            projectID: projectID,
+            suspendDirectTasks: suspendDirectTasks,
+            sessionSnapshots: sessionSnapshots,
+            suspendFirstSessionList: suspendFirstSessionList
+        )
+        self.scenario = scenario
+        agent = AgentServiceScenarioMock(scenario: scenario)
+        issue = IssueServiceScenarioMock(scenario: scenario)
+    }
+}
+
+private final class AgentServiceScenarioMock: BriarAPI_AgentServiceClientMock,
+    @unchecked Sendable
+{
+    private let scenario: AgentExecutionScenario
+
+    init(scenario: AgentExecutionScenario) {
+        self.scenario = scenario
+        super.init()
     }
 
+    override func listProjectAgents(
+        request: BriarAPI_ListProjectAgentsRequest,
+        headers: Connect.Headers = [:]
+    ) async -> ResponseMessage<BriarAPI_ListProjectAgentsResponse> {
+        .init(result: .success(await scenario.listProjectAgents(request)))
+    }
+
+    override func listProjectAgentSessions(
+        request: BriarAPI_ListProjectAgentSessionsRequest,
+        headers: Connect.Headers = [:]
+    ) async -> ResponseMessage<BriarAPI_ListProjectAgentSessionsResponse> {
+        .init(result: .success(await scenario.listProjectAgentSessions(request)))
+    }
+
+    override func putProjectAgentSession(
+        request: BriarAPI_PutProjectAgentSessionRequest,
+        headers: Connect.Headers = [:]
+    ) async -> ResponseMessage<BriarAPI_PutProjectAgentSessionResponse> {
+        .init(result: .success(await scenario.putProjectAgentSession(request)))
+    }
+
+    override func runProjectAgentTask(
+        request: BriarAPI_RunProjectAgentTaskRequest,
+        headers: Connect.Headers = [:]
+    ) async -> ResponseMessage<BriarAPI_RunProjectAgentTaskResponse> {
+        .init(result: .success(await scenario.runProjectAgentTask(request)))
+    }
+}
+
+private final class IssueServiceScenarioMock: BriarAPI_IssueServiceClientMock,
+    @unchecked Sendable
+{
+    private let scenario: AgentExecutionScenario
+
+    init(scenario: AgentExecutionScenario) {
+        self.scenario = scenario
+        super.init()
+    }
+
+    override func dispatchRun(
+        request: BriarAPI_DispatchRunRequest,
+        headers: Connect.Headers = [:]
+    ) async -> ResponseMessage<BriarAPI_DispatchRunResponse> {
+        .init(result: .success(await scenario.dispatchRun(request)))
+    }
+
+    override func reassignRun(
+        request: BriarAPI_ReassignRunRequest,
+        headers: Connect.Headers = [:]
+    ) async -> ResponseMessage<BriarAPI_ReassignRunResponse> {
+        .init(result: .success(await scenario.reassignRun(request)))
+    }
+}
+
+private actor AgentExecutionScenario {
     struct DirectTaskRequest: Sendable {
         let projectID: UUID
         let agentID: UUID
@@ -1318,11 +1418,18 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
         let requestID: UUID
     }
 
+    struct DispatchRequest: Sendable {
+        let projectID: UUID
+        let runID: UUID
+        let dispatch: BriarAPI_DispatchRunInput
+        let reassign: Bool
+    }
+
     private let projectID: UUID
     private let suspendDirectTasks: Bool
     private let suspendFirstSessionList: Bool
-    private var recorded: [Request] = []
     private var recordedDirectTasks: [DirectTaskRequest] = []
+    private var recordedDispatches: [DispatchRequest] = []
     private var putSessionRequests = 0
     private var sessionSnapshots: [[ProjectAgentSession]]
     private var sessionListStartCount = 0
@@ -1350,18 +1457,21 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
         self.suspendFirstSessionList = suspendFirstSessionList
     }
 
-    func requests() -> [Request] { recorded }
     func directTaskRequests() -> [DirectTaskRequest] { recordedDirectTasks }
+    func dispatchRequests() -> [DispatchRequest] { recordedDispatches }
     func putSessionRequestCount() -> Int { putSessionRequests }
 
-    func listProjectAgents(projectID: UUID, token: String) async throws -> [ProjectAgent] {
-        []
+    func listProjectAgents(
+        _ request: BriarAPI_ListProjectAgentsRequest
+    ) -> BriarAPI_ListProjectAgentsResponse {
+        precondition(request.projectID == projectID.uuidString.lowercased())
+        return .init()
     }
 
     func listProjectAgentSessions(
-        projectID: UUID,
-        token: String
-    ) async throws -> [ProjectAgentSession] {
+        _ request: BriarAPI_ListProjectAgentSessionsRequest
+    ) async -> BriarAPI_ListProjectAgentSessionsResponse {
+        precondition(request.projectID == projectID.uuidString.lowercased())
         let snapshot = sessionSnapshots.isEmpty ? [] : sessionSnapshots.removeFirst()
         sessionListStartCount += 1
         let waiters = sessionListStartWaiters.filter {
@@ -1376,33 +1486,34 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
                 sessionListReleases.append(continuation)
             }
         }
-        return snapshot
+        var response = BriarAPI_ListProjectAgentSessionsResponse()
+        response.sessions = snapshot.map(wireSession)
+        return response
     }
 
     func putProjectAgentSession(
-        _ session: ProjectAgentSession,
-        projectID: UUID,
-        token: String
-    ) async throws -> ProjectAgentSession {
+        _ request: BriarAPI_PutProjectAgentSessionRequest
+    ) -> BriarAPI_PutProjectAgentSessionResponse {
+        precondition(request.projectID == projectID.uuidString.lowercased())
         putSessionRequests += 1
-        return session
+        var response = BriarAPI_PutProjectAgentSessionResponse()
+        response.session = wireSession(request)
+        return response
     }
 
     func runProjectAgentTask(
-        projectID: UUID,
-        agentID: UUID,
-        skillID: UUID,
-        request: String,
-        workerID: String,
-        requestID: UUID,
-        token: String
-    ) async throws -> ProjectAgentSession {
+        _ request: BriarAPI_RunProjectAgentTaskRequest
+    ) async -> BriarAPI_RunProjectAgentTaskResponse {
+        precondition(request.projectID == projectID.uuidString.lowercased())
+        let agentID = UUID(uuidString: request.agentID)!
+        let skillID = UUID(uuidString: request.skillID)!
+        let requestID = UUID(uuidString: request.requestID)!
         recordedDirectTasks.append(DirectTaskRequest(
             projectID: projectID,
             agentID: agentID,
             skillID: skillID,
-            request: request,
-            workerID: workerID,
+            request: request.request,
+            workerID: request.workerID,
             requestID: requestID
         ))
         if suspendDirectTasks {
@@ -1419,35 +1530,56 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
             }
         }
         let startedAt = Date(timeIntervalSince1970: 1_786_310_400)
-        return ProjectAgentSession(
-            id: requestID.uuidString.lowercased(),
-            projectId: projectID,
-            dispatchGroupId: requestID.uuidString.lowercased(),
-            agentId: agentID,
-            skillId: skillID,
-            sessionType: .task,
-            trigger: .manual,
-            scheduleId: nil,
-            scheduleRunId: nil,
-            parentSessionId: nil,
-            request: request,
-            status: .running,
-            issues: [],
-            startedAt: startedAt,
-            completedAt: nil,
-            conversationId: nil,
-            workspaceRoot: nil,
-            requestedWorkerId: workerID,
-            workerId: workerID,
-            summary: nil,
-            error: nil,
-            events: [.init(
-                id: "event-\(requestID.uuidString.lowercased())",
-                type: .started,
-                occurredAt: startedAt
-            )],
-            updatedAt: startedAt
+        var session = BriarAPI_ProjectAgentSession()
+        session.id = request.requestID
+        session.projectID = request.projectID
+        session.dispatchGroupID = request.requestID
+        session.agentID = request.agentID
+        session.skillID = request.skillID
+        session.sessionType = .task
+        session.trigger = .manual
+        session.request = request.request
+        session.status = .running
+        session.startedAt = .init(date: startedAt)
+        session.requestedWorkerID = request.workerID
+        session.workerID = request.workerID
+        var event = BriarAPI_ProjectAgentSessionEvent()
+        event.id = "event-\(request.requestID)"
+        event.type = .started
+        event.occurredAt = .init(date: startedAt)
+        session.events = [event]
+        session.updatedAt = .init(date: startedAt)
+        var response = BriarAPI_RunProjectAgentTaskResponse()
+        response.session = session
+        return response
+    }
+
+    func dispatchRun(
+        _ request: BriarAPI_DispatchRunRequest
+    ) -> BriarAPI_DispatchRunResponse {
+        let dispatch = recordDispatch(
+            projectID: request.projectID,
+            runID: request.runID,
+            dispatch: request.dispatch,
+            reassign: false
         )
+        var response = BriarAPI_DispatchRunResponse()
+        response.dispatch = dispatch
+        return response
+    }
+
+    func reassignRun(
+        _ request: BriarAPI_ReassignRunRequest
+    ) -> BriarAPI_ReassignRunResponse {
+        let dispatch = recordDispatch(
+            projectID: request.projectID,
+            runID: request.runID,
+            dispatch: request.dispatch,
+            reassign: true
+        )
+        var response = BriarAPI_ReassignRunResponse()
+        response.dispatch = dispatch
+        return response
     }
 
     func waitForSessionListStarts(_ count: Int) async {
@@ -1474,70 +1606,112 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
         directTaskReleases.removeFirst().resume()
     }
 
-    func send<Response: Decodable & Sendable>(
-        _ path: String,
-        method: String,
-        token: String?,
-        body: (any Encodable & Sendable)?,
-        as responseType: Response.Type
-    ) async throws -> Response {
-        let bodyData = try body.map {
-            try JSONEncoder.mobileContract.encode(AgentTestAnyEncodable($0))
+    private func recordDispatch(
+        projectID projectIDString: String,
+        runID runIDString: String,
+        dispatch: BriarAPI_DispatchRunInput,
+        reassign: Bool
+    ) -> BriarAPI_IssueExecutionDispatch {
+        let projectID = UUID(uuidString: projectIDString)!
+        let runID = UUID(uuidString: runIDString)!
+        precondition(projectID == self.projectID)
+        recordedDispatches.append(.init(
+            projectID: projectID,
+            runID: runID,
+            dispatch: dispatch,
+            reassign: reassign
+        ))
+        var response = BriarAPI_IssueExecutionDispatch()
+        response.runID = runIDString
+        if dispatch.hasAgentID { response.agentID = dispatch.agentID }
+        response.provider = dispatch.provider
+        if dispatch.hasModel { response.model = dispatch.model }
+        if dispatch.hasEffort { response.effort = dispatch.effort }
+        if dispatch.hasWorkerID { response.requestedWorkerID = dispatch.workerID }
+        response.requestedByUserID = "fixture-user"
+        response.dispatchMode = dispatch.hasWorkerID ? .specific : .any
+        response.dispatchedAt = .init(date: Date(timeIntervalSince1970: 1_786_310_400))
+        response.outcome = .dispatched
+        return response
+    }
+
+    private func wireSession(
+        _ request: BriarAPI_PutProjectAgentSessionRequest
+    ) -> BriarAPI_ProjectAgentSession {
+        var message = BriarAPI_ProjectAgentSession()
+        message.id = request.sessionID
+        message.projectID = request.projectID
+        message.dispatchGroupID = request.dispatchGroupID
+        if request.hasAgentID { message.agentID = request.agentID }
+        if request.hasAgentName { message.agentName = request.agentName }
+        if request.hasSkillID { message.skillID = request.skillID }
+        message.sessionType = request.sessionType
+        if request.hasTrigger { message.trigger = request.trigger }
+        if request.hasRequest { message.request = request.request }
+        message.status = request.status
+        message.startedAt = request.startedAt
+        if request.hasCompletedAt { message.completedAt = request.completedAt }
+        if request.hasRequestedWorkerID { message.requestedWorkerID = request.requestedWorkerID }
+        if request.hasWorkerID { message.workerID = request.workerID }
+        if request.hasSummary { message.summary = request.summary }
+        if request.hasError { message.error = request.error }
+        message.events = request.events
+        message.updatedAt = request.updatedAt
+        return message
+    }
+
+    private func wireSession(
+        _ session: ProjectAgentSession
+    ) -> BriarAPI_ProjectAgentSession {
+        var message = BriarAPI_ProjectAgentSession()
+        message.id = session.id
+        message.projectID = session.projectId.uuidString.lowercased()
+        if let value = session.dispatchGroupId { message.dispatchGroupID = value }
+        if let value = session.agentId { message.agentID = value.uuidString.lowercased() }
+        if let value = session.agentName { message.agentName = value }
+        if let value = session.skillId { message.skillID = value.uuidString.lowercased() }
+        if let value = session.sessionType {
+            message.sessionType = value == .task ? .task : .dispatch
         }
-        recorded.append(Request(path: path, method: method, body: bodyData))
-
-        if path.hasSuffix("/dispatch") {
-            let runID = path.split(separator: "/").dropLast().last.map(String.init) ?? ""
-            return try response(
-                [
-                    "runId": runID,
-                    "agentId": NSNull(),
-                    "provider": "claude",
-                    "model": "opus",
-                    "effort": "medium",
-                    "requestedWorkerId": NSNull(),
-                    "requestedByUserId": "fixture-user",
-                    "dispatchMode": "any",
-                    "dispatchedAt": "2026-08-08T00:00:00.000Z",
-                    "outcome": "dispatched",
-                ],
-                as: responseType
-            )
+        if let value = session.trigger {
+            message.trigger = value == .manual ? .manual : .scheduled
         }
-        throw MobileAPIError.invalidRequest
-    }
-
-    func upload<Response: Decodable & Sendable>(
-        _ path: String,
-        fields: [String: String],
-        files: [MultipartFile],
-        token: String,
-        as responseType: Response.Type
-    ) async throws -> Response {
-        throw MobileAPIError.invalidRequest
-    }
-
-    func download(_ path: String, token: String, to destination: URL) async throws -> URL {
-        throw MobileAPIError.invalidDownload
-    }
-
-    private func response<Response: Decodable & Sendable>(
-        _ object: Any,
-        as responseType: Response.Type
-    ) throws -> Response {
-        let data = try JSONSerialization.data(withJSONObject: object)
-        return try JSONDecoder.mobileContract.decode(responseType, from: data)
-    }
-}
-
-private struct AgentTestAnyEncodable: Encodable {
-    let value: any Encodable
-
-    init(_ value: any Encodable) {
-        self.value = value
-    }
-
-    func encode(to encoder: Encoder) throws {
-        try value.encode(to: encoder)
+        if let value = session.scheduleId { message.scheduleID = value }
+        if let value = session.scheduleRunId { message.scheduleRunID = value }
+        if let value = session.parentSessionId { message.parentSessionID = value }
+        if let value = session.request { message.request = value }
+        switch session.status {
+        case .running: message.status = .running
+        case .completed: message.status = .completed
+        case .failed: message.status = .failed
+        case .skipped: message.status = .skipped
+        case .interrupted: message.status = .interrupted
+        }
+        message.startedAt = .init(date: session.startedAt)
+        if let value = session.completedAt { message.completedAt = .init(date: value) }
+        if let value = session.conversationId { message.conversationID = value }
+        if let value = session.requestedWorkerId { message.requestedWorkerID = value }
+        if let value = session.workerId { message.workerID = value }
+        if let value = session.requestedByUserId { message.requestedByUserID = value }
+        if let value = session.summary { message.summary = value }
+        if let value = session.error { message.error = value }
+        let sessionEvents: [ProjectAgentSession.Event] = session.events ?? []
+        message.events = sessionEvents.map { value in
+            var event = BriarAPI_ProjectAgentSessionEvent()
+            event.id = value.id
+            switch value.type {
+            case .started: event.type = .started
+            case .completed: event.type = .completed
+            case .failed: event.type = .failed
+            case .skipped: event.type = .skipped
+            case .interrupted: event.type = .interrupted
+            case .stopped: event.type = .stopped
+            }
+            event.occurredAt = .init(date: value.occurredAt)
+            return event
+        }
+        if let value = session.updatedAt { message.updatedAt = .init(date: value) }
+        message.archived = session.archived ?? false
+        return message
     }
 }

@@ -1,3 +1,4 @@
+import BriarContracts
 import Foundation
 
 enum AgentsStoreError: LocalizedError, Equatable {
@@ -28,6 +29,10 @@ final class AgentsStore: ObservableObject {
     }
 
     private let api: any MobileAPIClientProtocol
+    private let injectedAgentService: (any BriarAPI_AgentServiceClientInterface)?
+    private let injectedIssueService: (any BriarAPI_IssueServiceClientInterface)?
+    private var agentService: (any BriarAPI_AgentServiceClientInterface)?
+    private var issueService: (any BriarAPI_IssueServiceClientInterface)?
     private let pollInterval: Duration
     private var projectID: UUID?
     private var token: String?
@@ -39,8 +44,17 @@ final class AgentsStore: ObservableObject {
     private var sessionMutationRevision = 0
     private var pollingTask: Task<Void, Never>?
 
-    init(api: any MobileAPIClientProtocol, pollInterval: Duration = .seconds(15)) {
+    init(
+        api: any MobileAPIClientProtocol,
+        agentService: (any BriarAPI_AgentServiceClientInterface)? = nil,
+        issueService: (any BriarAPI_IssueServiceClientInterface)? = nil,
+        pollInterval: Duration = .seconds(15)
+    ) {
         self.api = api
+        injectedAgentService = agentService
+        injectedIssueService = issueService
+        self.agentService = agentService
+        self.issueService = issueService
         self.pollInterval = pollInterval
     }
 
@@ -50,6 +64,12 @@ final class AgentsStore: ObservableObject {
         self.projectID = projectID
         self.token = token
         self.locale = locale
+        let services = token.flatMap { token in
+            (api as? any AuthenticatedMobileServicesFactory)?
+                .authenticatedServices(token: token)
+        }
+        agentService = injectedAgentService ?? services?.agent
+        issueService = injectedIssueService ?? services?.issue
         generation += 1
         sessionMutationRevision &+= 1
         pollingTask?.cancel()
@@ -74,12 +94,24 @@ final class AgentsStore: ObservableObject {
             }
         }
         do {
-            async let agentsResponse = api.listProjectAgents(projectID: projectID, token: token)
-            async let sessionsResponse = api.listProjectAgentSessions(
-                projectID: projectID,
-                token: token
+            let agent = try agentClient()
+            var agentsRequest = BriarAPI_ListProjectAgentsRequest()
+            agentsRequest.projectID = projectID.uuidString.lowercased()
+            async let agentsResponse = agent.listProjectAgents(
+                request: agentsRequest,
+                headers: [:]
             )
-            let (loadedAgents, loadedSessions) = try await (agentsResponse, sessionsResponse)
+            var sessionsRequest = BriarAPI_ListProjectAgentSessionsRequest()
+            sessionsRequest.projectID = projectID.uuidString.lowercased()
+            async let sessionsResponse = agent.listProjectAgentSessions(
+                request: sessionsRequest,
+                headers: [:]
+            )
+            let responses = await (agentsResponse, sessionsResponse)
+            let loadedAgents = try responses.0.briarValue().agents.map(ProjectAgent.init(connectMessage:))
+            let loadedSessions = try responses.1.briarValue().sessions.map(
+                ProjectAgentSession.init(connectMessage:)
+            )
             guard generation == self.generation else { return }
             agents = loadedAgents.sorted {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
@@ -126,15 +158,20 @@ final class AgentsStore: ObservableObject {
 
         executionError = nil
         do {
-            let session = try await api.runProjectAgentTask(
-                projectID: projectID,
-                agentID: agent.id,
-                skillID: skill.id,
-                request: request,
-                workerID: workerID,
-                requestID: UUID(),
-                token: token
+            var rpcRequest = BriarAPI_RunProjectAgentTaskRequest()
+            rpcRequest.projectID = projectID.uuidString.lowercased()
+            rpcRequest.agentID = agent.id.uuidString.lowercased()
+            rpcRequest.skillID = skill.id.uuidString.lowercased()
+            rpcRequest.request = request
+            rpcRequest.workerID = workerID
+            rpcRequest.requestID = UUID().uuidString.lowercased()
+            let response = try await agentClient().runProjectAgentTask(
+                request: rpcRequest,
+                headers: [:]
             )
+            let message = try response.briarValue()
+            guard message.hasSession else { throw MobileAPIError.invalidResponse }
+            let session = try ProjectAgentSession(connectMessage: message.session)
             insertOrReplace(session)
             errorMessage = nil
             return session
@@ -205,17 +242,14 @@ final class AgentsStore: ObservableObject {
         do {
             // Persist the running aggregate before dispatching so the session is
             // still visible if the app is backgrounded during a network request.
-            _ = try await syncSession(pendingSession, projectID: projectID, token: token)
+            _ = try await syncSession(pendingSession, projectID: projectID)
             for run in candidates {
                 let provider = run.preferredProvider ?? agent.provider
                 let model = run.preferredModel ?? (run.preferredProvider == nil ? agent.model : nil)
                 let effort = run.preferredModel != nil
                     ? run.preferredEffort
                     : (run.preferredProvider == nil ? agent.effort : nil)
-                _ = try await api.dispatchRun(
-                    projectID: projectID,
-                    runID: run.id,
-                    request: DispatchRunRequest(
+                let dispatch = issueDispatchMessage(DispatchRunRequest(
                         agentId: agent.id,
                         provider: provider,
                         model: model,
@@ -223,10 +257,32 @@ final class AgentsStore: ObservableObject {
                         persistPreferences: true,
                         workerId: nil,
                         requestId: UUID()
-                    ),
-                    reassign: run.dispatchedAt != nil || run.workerId != nil,
-                    token: token
-                )
+                    ))
+                let response: BriarAPI_IssueExecutionDispatch
+                if run.dispatchedAt != nil || run.workerId != nil {
+                    var request = BriarAPI_ReassignRunRequest()
+                    request.projectID = projectID.uuidString.lowercased()
+                    request.runID = run.id.uuidString.lowercased()
+                    request.dispatch = dispatch
+                    let message = try await issueClient().reassignRun(
+                        request: request,
+                        headers: [:]
+                    ).briarValue()
+                    guard message.hasDispatch else { throw MobileAPIError.invalidResponse }
+                    response = message.dispatch
+                } else {
+                    var request = BriarAPI_DispatchRunRequest()
+                    request.projectID = projectID.uuidString.lowercased()
+                    request.runID = run.id.uuidString.lowercased()
+                    request.dispatch = dispatch
+                    let message = try await issueClient().dispatchRun(
+                        request: request,
+                        headers: [:]
+                    ).briarValue()
+                    guard message.hasDispatch else { throw MobileAPIError.invalidResponse }
+                    response = message.dispatch
+                }
+                _ = try DispatchRunResponse(connectMessage: response)
             }
             await refresh()
             return dispatchID
@@ -248,7 +304,7 @@ final class AgentsStore: ObservableObject {
                 updatedAt: failedAt
             )
             insertOrReplace(failedSession)
-            _ = try? await syncSession(failedSession, projectID: projectID, token: token)
+            _ = try? await syncSession(failedSession, projectID: projectID)
             executionError = CompanionStore.message(for: error)
             throw error
         }
@@ -310,7 +366,7 @@ final class AgentsStore: ObservableObject {
                 updatedAt: now
             )
             insertOrReplace(next)
-            _ = try? await syncSession(next, projectID: projectID, token: token)
+            _ = try? await syncSession(next, projectID: projectID)
         }
     }
 
@@ -546,14 +602,26 @@ final class AgentsStore: ObservableObject {
 
     private func syncSession(
         _ session: ProjectAgentSession,
-        projectID: UUID,
-        token: String
+        projectID: UUID
     ) async throws -> ProjectAgentSession {
-        try await api.putProjectAgentSession(
-            session,
-            projectID: projectID,
-            token: token
+        let response = try await agentClient().putProjectAgentSession(
+            request: try session.putConnectRequest(projectID: projectID),
+            headers: [:]
         )
+        let message = try response.briarValue()
+        guard message.hasSession else { throw MobileAPIError.invalidResponse }
+        return try ProjectAgentSession(connectMessage: message.session)
+            .preservingLocalFields(from: session)
+    }
+
+    private func agentClient() throws -> any BriarAPI_AgentServiceClientInterface {
+        guard let agentService else { throw MobileAPIError.invalidRequest }
+        return agentService
+    }
+
+    private func issueClient() throws -> any BriarAPI_IssueServiceClientInterface {
+        guard let issueService else { throw MobileAPIError.invalidRequest }
+        return issueService
     }
 
     private func startPolling() {
