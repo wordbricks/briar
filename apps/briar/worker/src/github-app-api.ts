@@ -262,7 +262,7 @@ const pullRequestJson = (
   pullRequestNodeId: input.node_id,
   pullRequestNumber: input.number,
   url: input.html_url,
-  state: input.merged ? "merged" : input.state,
+  state: input.merged ? ("merged" as const) : input.state,
   draft: input.draft,
   merged: input.merged,
   body: input.body ?? "",
