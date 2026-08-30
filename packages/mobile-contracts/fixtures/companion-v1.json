@@ -51,6 +51,40 @@
         "error_description": "Authorization is still pending"
       }
     },
+    "putMobilePushRegistration": {
+      "method": "PUT",
+      "path": "/inbox/push-registration",
+      "status": 200,
+      "request": {
+        "platform": "apns",
+        "token": "fixture-apns-device-token-placeholder",
+        "environment": "production",
+        "topic": "app.briar.companion",
+        "locale": "ko",
+        "preferences": {
+          "playSound": true,
+          "urgent": true,
+          "actionRequired": true,
+          "important": true,
+          "activity": false
+        }
+      },
+      "response": {
+        "registered": true
+      }
+    },
+    "deleteMobilePushRegistration": {
+      "method": "DELETE",
+      "path": "/inbox/push-registration",
+      "status": 200,
+      "request": {
+        "platform": "apns",
+        "token": "fixture-apns-device-token-placeholder"
+      },
+      "response": {
+        "deleted": true
+      }
+    },
     "getCurrentUser": {
       "method": "GET",
       "path": "/me",

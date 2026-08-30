@@ -18,6 +18,8 @@ import {
 } from "./db";
 import {
   decodeMobileCurrentUserResponse,
+  decodeMobilePushRegistrationDeleteRequest,
+  decodeMobilePushRegistrationRequest,
 } from "./mobile-contract";
 import {
   deleteInboxReadState,
@@ -29,6 +31,10 @@ import { responseWithPostCommitCleanup } from "./post-commit-cleanup";
 import { readJson } from "./request-readers";
 import { requireSession } from "./session-auth";
 import { processSlackRevocationQueue } from "./slack-revocations";
+import {
+  deleteMobilePushRegistration,
+  upsertMobilePushRegistration,
+} from "./mobile-push-repository";
 
 const accountDeletionFreshAgeMs = 24 * 60 * 60 * 1_000;
 
@@ -68,6 +74,36 @@ export async function handleAccountRoute(
   if (pathname === "/me" && request.method === "GET") {
     const session = await requireSession(auth, request);
     return json(decodeMobileCurrentUserResponse({ user: session.user }));
+  }
+
+  if (pathname === "/inbox/push-registration" && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const input = decodeMobilePushRegistrationRequest(await readJson(request));
+    await upsertMobilePushRegistration(
+      db,
+      session.user.id,
+      input,
+      new Date().toISOString(),
+    );
+    return json({ registered: true });
+  }
+
+  if (
+    pathname === "/inbox/push-registration" &&
+    request.method === "DELETE"
+  ) {
+    const session = await requireSession(auth, request);
+    const input = decodeMobilePushRegistrationDeleteRequest(
+      await readJson(request),
+    );
+    return json({
+      deleted: await deleteMobilePushRegistration(
+        db,
+        session.user.id,
+        input.platform,
+        input.token,
+      ),
+    });
   }
 
   if (pathname === "/inbox/read-states" && request.method === "GET") {

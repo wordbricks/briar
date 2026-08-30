@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct BriarCompanionApp: App {
+    @UIApplicationDelegateAdaptor(InboxPushAppDelegate.self) private var appDelegate
+
     var body: some Scene {
         WindowGroup {
             if ProcessInfo.processInfo.arguments.contains("--ui-testing") {
