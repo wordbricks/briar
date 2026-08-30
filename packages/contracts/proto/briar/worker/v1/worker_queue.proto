@@ -1,0 +1,528 @@
+syntax = "proto3";
+
+package briar.worker.v1;
+
+import "briar/types/v1/provider.proto";
+import "briar/types/v1/workflow.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// The machine Worker queue control plane. Large result uploads, transcripts,
+// evidence, and provider-specific execution endpoints intentionally remain
+// outside this service because they have different lifecycle and transport
+// requirements.
+service WorkerQueueService {
+  rpc ClaimWork(ClaimWorkRequest) returns (ClaimWorkResponse);
+  rpc RenewWorkLease(RenewWorkLeaseRequest) returns (RenewWorkLeaseResponse);
+  rpc HandoffWork(HandoffWorkRequest) returns (HandoffWorkResponse);
+}
+
+message ClaimWorkRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  string claimed_by = 3;
+  // Reply jobs do not consume a regular execution slot. A saturated Worker
+  // uses this flag to avoid claiming issue, task, or merge-batch work.
+  bool replies_only = 4;
+}
+
+message ClaimWorkResponse {
+  optional ClaimedWork work = 1;
+  optional uint32 retry_after_ms = 2;
+}
+
+message ClaimedWork {
+  oneof work {
+    ClaimedIssue issue = 1;
+    ClaimedIssueReply issue_reply = 2;
+    ClaimedChannelReply channel_reply = 3;
+    ClaimedProjectAgentTask project_agent_task = 4;
+    ClaimedMergeBatch merge_batch = 5;
+  }
+}
+
+message RenewWorkLeaseRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+}
+
+message WorkClaimIdentity {
+  string work_id = 1;
+  string run_id = 2;
+  string claim_token = 3;
+
+  oneof work {
+    IssueClaimIdentity issue = 10;
+    IssueReplyClaimIdentity issue_reply = 11;
+    ChannelReplyClaimIdentity channel_reply = 12;
+    ProjectAgentTaskClaimIdentity project_agent_task = 13;
+    MergeBatchClaimIdentity merge_batch = 14;
+  }
+}
+
+message IssueClaimIdentity {}
+message IssueReplyClaimIdentity {}
+message ProjectAgentTaskClaimIdentity {}
+message MergeBatchClaimIdentity {}
+
+message ChannelReplyClaimIdentity {
+  string organization_id = 1;
+}
+
+message RenewWorkLeaseResponse {
+  google.protobuf.Timestamp lease_expires_at = 1;
+  oneof work {
+    IssueLeaseRenewal issue = 10;
+    IssueReplyLeaseRenewal issue_reply = 11;
+    ChannelReplyLeaseRenewal channel_reply = 12;
+    ProjectAgentTaskLeaseRenewal project_agent_task = 13;
+    MergeBatchLeaseRenewal merge_batch = 14;
+  }
+}
+
+message IssueLeaseRenewal {}
+message ProjectAgentTaskLeaseRenewal {}
+
+message IssueReplyLeaseRenewal {
+  optional ChannelActivityCredential activity = 1;
+}
+
+message ChannelReplyLeaseRenewal {
+  optional google.protobuf.Timestamp retained_until = 1;
+  optional ChannelActivityCredential activity = 2;
+}
+
+message MergeBatchLeaseRenewal {
+  string batch_id = 1;
+}
+
+message HandoffWorkRequest {
+  string request_id = 1;
+  string project_id = 2;
+  string worker_id = 3;
+  WorkClaimIdentity work = 4;
+  WorkerExecutionCheckpoint checkpoint = 5;
+}
+
+message WorkerExecutionCheckpoint {
+  optional string conversation_id = 1;
+  optional string workspace_path = 2;
+}
+
+message HandoffWorkResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_RELEASED = 1;
+    OUTCOME_ALREADY_RELEASED = 2;
+  }
+
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_DRAINING = 1;
+    STATE_READY = 2;
+  }
+
+  Outcome outcome = 1;
+  string request_id = 2;
+  State state = 3;
+  uint32 active_work_count = 4;
+  bool ready = 5;
+}
+
+message ClaimedHandoffContext {
+  enum WorkKind {
+    WORK_KIND_UNSPECIFIED = 0;
+    WORK_KIND_ISSUE = 1;
+    WORK_KIND_ISSUE_REPLY = 2;
+    WORK_KIND_CHANNEL_REPLY = 3;
+    WORK_KIND_PROJECT_AGENT_TASK = 4;
+  }
+
+  string request_id = 1;
+  WorkKind work_kind = 2;
+  string work_id = 3;
+  optional string run_id = 4;
+  optional string conversation_id = 5;
+  optional string workspace_path = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message QueuedAttachment {
+  string id = 1;
+  string filename = 2;
+  string content_type = 3;
+  uint32 byte_size = 4;
+  string url = 5;
+}
+
+message QueuedIssueMessage {
+  message Author {
+    optional string id = 1;
+    string name = 2;
+    optional string image = 3;
+    optional briar.types.v1.AgentProvider provider = 4;
+  }
+
+  string id = 1;
+  string run_id = 2;
+  optional string parent_message_id = 3;
+  string body = 4;
+  repeated QueuedAttachment attachments = 5;
+  Author author = 6;
+  uint32 reply_count = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message ResumeContext {
+  string checkpoint_key = 1;
+  briar.types.v1.WorkflowCheckpoint.Position position = 2;
+  uint32 revision = 3;
+  bool terminal_review_only = 4;
+}
+
+message DetachedExecution {
+  briar.types.v1.AgentProvider provider = 1;
+  optional string model = 2;
+  optional string effort = 3;
+}
+
+enum AgentSkillKind {
+  AGENT_SKILL_KIND_UNSPECIFIED = 0;
+  AGENT_SKILL_KIND_ISSUE_PROCESSING = 1;
+  AGENT_SKILL_KIND_CUSTOM = 2;
+}
+
+enum AgentSkillExecutionMode {
+  AGENT_SKILL_EXECUTION_MODE_UNSPECIFIED = 0;
+  AGENT_SKILL_EXECUTION_MODE_CONVERSATION = 1;
+  AGENT_SKILL_EXECUTION_MODE_TASK = 2;
+}
+
+enum AgentSkillApprovalPolicy {
+  AGENT_SKILL_APPROVAL_POLICY_UNSPECIFIED = 0;
+  AGENT_SKILL_APPROVAL_POLICY_INVOKE_IS_CONSENT = 1;
+  AGENT_SKILL_APPROVAL_POLICY_EXPLICIT = 2;
+}
+
+message DetachedAgentSkill {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string body = 4;
+  briar.types.v1.AgentProvider provider = 5;
+  optional string model = 6;
+  optional string effort = 7;
+  AgentSkillKind kind = 8;
+  AgentSkillExecutionMode execution_mode = 9;
+  AgentSkillApprovalPolicy approval_policy = 10;
+  uint32 position = 11;
+}
+
+message DetachedAgentClaim {
+  string id = 1;
+  string name = 2;
+  briar.types.v1.AgentProvider provider = 3;
+  optional string model = 4;
+  optional string effort = 5;
+  string responsibility = 6;
+  string skill = 7;
+  repeated DetachedAgentSkill skills = 8;
+}
+
+message DetachedAgentSkillExecutionTarget {
+  string project_id = 1;
+  string agent_id = 2;
+  string skill_id = 3;
+  string skill_name = 4;
+  string request = 5;
+  AgentSkillExecutionMode execution_mode = 6;
+  AgentSkillApprovalPolicy approval_policy = 7;
+  bool approved = 8;
+}
+
+enum AutoHuntSource {
+  AUTO_HUNT_SOURCE_UNSPECIFIED = 0;
+  AUTO_HUNT_SOURCE_ISSUE = 1;
+  AUTO_HUNT_SOURCE_ERROR = 2;
+  AUTO_HUNT_SOURCE_FEEDBACK = 3;
+}
+
+message ClaimedIssue {
+  optional string execution_id = 1;
+  string run_id = 2;
+  uint32 run_number = 3;
+  uint32 current_attempt = 4;
+  uint32 current_revision = 5;
+  AutoHuntSource source = 6;
+  string source_key = 7;
+  string title = 8;
+  optional string description = 9;
+  optional uint32 priority = 10;
+  string repository = 11;
+  optional google.protobuf.Timestamp source_created_at = 12;
+  optional string created_by_user_id = 13;
+  optional google.protobuf.Struct context = 14;
+  optional string review_feedback = 15;
+  briar.types.v1.AutoHuntWorkflow workflow = 16;
+  optional string workflow_stage = 17;
+  optional string start_stage = 18;
+  optional ResumeContext resume_context = 19;
+  repeated QueuedAttachment attachments = 20;
+  repeated QueuedIssueMessage messages = 21;
+  string claim_token = 22;
+  string claimed_by = 23;
+  google.protobuf.Timestamp claimed_at = 24;
+  google.protobuf.Timestamp lease_expires_at = 25;
+  uint32 claim_attempts = 26;
+  optional ClaimedHandoffContext handoff_context = 27;
+  optional DetachedExecution execution = 28;
+  optional DetachedAgentClaim agent = 29;
+  optional DetachedAgentSkill active_skill = 30;
+}
+
+message ClaimedProjectAgentTask {
+  string work_id = 1;
+  string run_id = 2;
+  string source_key = 3;
+  string title = 4;
+  string claim_token = 5;
+  uint32 claim_attempts = 6;
+  google.protobuf.Timestamp claimed_at = 7;
+  google.protobuf.Timestamp lease_expires_at = 8;
+  string request = 9;
+  DetachedAgentClaim agent = 10;
+  optional DetachedAgentSkill active_skill = 11;
+  optional ClaimedHandoffContext handoff_context = 12;
+}
+
+message ChannelActivityCredential {
+  string token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message ClaimedIssueReply {
+  message Snapshot {
+    google.protobuf.Struct run = 1;
+    repeated QueuedIssueMessage messages = 2;
+    repeated google.protobuf.Struct agent_transcript = 3;
+    repeated google.protobuf.Struct evidence = 4;
+  }
+
+  string work_id = 1;
+  string run_id = 2;
+  string source_key = 3;
+  string title = 4;
+  string trigger_message_id = 5;
+  string parent_message_id = 6;
+  briar.types.v1.AgentProvider provider = 7;
+  optional string model = 8;
+  optional string effort = 9;
+  optional DetachedAgentClaim agent = 10;
+  optional DetachedAgentSkill active_skill = 11;
+  optional DetachedAgentSkillExecutionTarget skill_execution_target = 12;
+  optional string branch = 13;
+  optional bool requires_preferred_worker = 14;
+  string claim_token = 15;
+  google.protobuf.Timestamp claimed_at = 16;
+  google.protobuf.Timestamp lease_expires_at = 17;
+  optional ChannelActivityCredential activity = 18;
+  optional ClaimedHandoffContext handoff_context = 19;
+  Snapshot snapshot = 20;
+}
+
+message ChannelReplyScope {
+  message Organization {
+    string organization_id = 1;
+  }
+
+  message Project {
+    string organization_id = 1;
+    string project_id = 2;
+  }
+
+  oneof scope {
+    Organization organization = 1;
+    Project project = 2;
+  }
+}
+
+message OrganizationAgentContextDescriptor {
+  uint32 schema_version = 1;
+  google.protobuf.Timestamp snapshot_at = 2;
+}
+
+message ClaimedChannelDelegation {
+  string delegated_by_reply_id = 1;
+  string delegated_by_agent_id = 2;
+  string delegated_by_agent_name = 3;
+  string request = 4;
+}
+
+message ChannelDelegationTarget {
+  message Skill {
+    string id = 1;
+    string name = 2;
+  }
+
+  string agent_id = 1;
+  string agent_name = 2;
+  string project_id = 3;
+  string project_name = 4;
+  string responsibility = 5;
+  repeated Skill skills = 6;
+}
+
+enum ChannelReplySessionClaimReason {
+  CHANNEL_REPLY_SESSION_CLAIM_REASON_UNSPECIFIED = 0;
+  CHANNEL_REPLY_SESSION_CLAIM_REASON_SESSION_CREATED = 1;
+  CHANNEL_REPLY_SESSION_CLAIM_REASON_WORKER_REUSED = 2;
+  CHANNEL_REPLY_SESSION_CLAIM_REASON_WORKER_REUSED_RUNTIME_CHANGED = 3;
+  CHANNEL_REPLY_SESSION_CLAIM_REASON_WORKER_FAILOVER_LEASE_EXPIRED = 4;
+  CHANNEL_REPLY_SESSION_CLAIM_REASON_WORKER_FAILOVER_UNAVAILABLE_OR_INCOMPATIBLE = 5;
+  CHANNEL_REPLY_SESSION_CLAIM_REASON_TTL_EXPIRED_REACTIVATED = 6;
+}
+
+message ChannelReplySession {
+  string id = 1;
+  string thread_id = 2;
+  optional string conversation_id = 3;
+  google.protobuf.Timestamp retained_until = 4;
+  ChannelReplySessionClaimReason claim_reason = 5;
+}
+
+message ClaimedChannelReply {
+  string work_id = 1;
+  string channel_id = 2;
+  ChannelReplyScope scope = 3;
+  string run_id = 4;
+  string source_key = 5;
+  string title = 6;
+  string trigger_message_id = 7;
+  string parent_message_id = 8;
+  briar.types.v1.AgentProvider provider = 9;
+  optional string model = 10;
+  optional string effort = 11;
+  optional DetachedAgentClaim agent = 12;
+  optional DetachedAgentSkill active_skill = 13;
+  optional DetachedAgentSkillExecutionTarget skill_execution_target = 14;
+  string claim_token = 15;
+  google.protobuf.Timestamp claimed_at = 16;
+  google.protobuf.Timestamp lease_expires_at = 17;
+  optional ChannelActivityCredential activity = 18;
+  optional OrganizationAgentContextDescriptor organization_context = 19;
+  optional ClaimedChannelDelegation delegation = 20;
+  repeated ChannelDelegationTarget delegation_targets = 21;
+  optional ChannelReplySession session = 22;
+  optional ClaimedHandoffContext handoff_context = 23;
+  google.protobuf.Struct snapshot = 24;
+}
+
+enum MergeBatchPhase {
+  MERGE_BATCH_PHASE_UNSPECIFIED = 0;
+  MERGE_BATCH_PHASE_ENQUEUE = 1;
+  MERGE_BATCH_PHASE_TAIL_AUTHORITY = 2;
+  MERGE_BATCH_PHASE_VALIDATE = 3;
+  MERGE_BATCH_PHASE_PUBLISH = 4;
+  MERGE_BATCH_PHASE_DRAIN = 5;
+}
+
+enum MergeBatchState {
+  MERGE_BATCH_STATE_UNSPECIFIED = 0;
+  MERGE_BATCH_STATE_FROZEN = 1;
+  MERGE_BATCH_STATE_ENQUEUEING = 2;
+  MERGE_BATCH_STATE_WAITING_TAIL = 3;
+  MERGE_BATCH_STATE_VALIDATING = 4;
+  MERGE_BATCH_STATE_PUBLISHING = 5;
+  MERGE_BATCH_STATE_DRAINING = 6;
+}
+
+enum MergeBatchMemberState {
+  MERGE_BATCH_MEMBER_STATE_UNSPECIFIED = 0;
+  MERGE_BATCH_MEMBER_STATE_READY = 1;
+  MERGE_BATCH_MEMBER_STATE_FROZEN = 2;
+  MERGE_BATCH_MEMBER_STATE_ENQUEUED = 3;
+  MERGE_BATCH_MEMBER_STATE_MERGED = 4;
+  MERGE_BATCH_MEMBER_STATE_DEQUEUED = 5;
+  MERGE_BATCH_MEMBER_STATE_FAILED = 6;
+}
+
+enum MergeBatchValidationFailureCode {
+  MERGE_BATCH_VALIDATION_FAILURE_CODE_UNSPECIFIED = 0;
+  MERGE_BATCH_VALIDATION_FAILURE_CODE_CI_FAILED = 1;
+  MERGE_BATCH_VALIDATION_FAILURE_CODE_OUTPUT_LIMIT = 2;
+}
+
+message MergeBatchValidationResult {
+  string context = 1;
+  bool passed = 2;
+  uint32 exit_code = 3;
+  optional MergeBatchValidationFailureCode failure_code = 4;
+  string log = 5;
+  string log_sha256 = 6;
+  bool log_truncated = 7;
+}
+
+message MergeBatchValidationResults {
+  repeated MergeBatchValidationResult results = 1;
+}
+
+message MergeBatch {
+  string id = 1;
+  MergeBatchState state = 2;
+  optional string final_delivery_id = 3;
+  optional string merge_group_ref = 4;
+  optional string merge_group_sha = 5;
+  optional string merge_group_base_sha = 6;
+  optional MergeBatchValidationResults validation_results = 7;
+  optional google.protobuf.Timestamp validated_at = 8;
+  optional google.protobuf.Timestamp published_at = 9;
+  optional string failure_code = 10;
+  optional string failure_detail = 11;
+}
+
+message MergeBatchMember {
+  string id = 1;
+  uint32 ordinal = 2;
+  string run_id = 3;
+  uint32 attempt = 4;
+  uint32 revision = 5;
+  uint64 pull_request_id = 6;
+  string pull_request_node_id = 7;
+  uint32 pull_request_number = 8;
+  string pull_request_url = 9;
+  string head_sha = 10;
+  string base_sha = 11;
+  optional string queue_entry_id = 12;
+  MergeBatchMemberState state = 13;
+}
+
+message PendingMergeGroupHead {
+  string delivery_id = 1;
+  string head_ref = 2;
+  string head_sha = 3;
+  string base_sha = 4;
+  uint32 tail_pull_request_number = 5;
+  google.protobuf.Timestamp received_at = 6;
+}
+
+message ClaimedMergeBatch {
+  string work_id = 1;
+  string run_id = 2;
+  string source_key = 3;
+  string title = 4;
+  string project_id = 5;
+  uint64 repository_id = 6;
+  string repository = 7;
+  string base_branch = 8;
+  repeated string validation_commands = 9;
+  MergeBatchPhase phase = 10;
+  string claim_token = 11;
+  google.protobuf.Timestamp claimed_at = 12;
+  google.protobuf.Timestamp lease_expires_at = 13;
+  uint32 claim_attempts = 14;
+  MergeBatch batch = 15;
+  repeated MergeBatchMember members = 16;
+  repeated PendingMergeGroupHead pending_heads = 17;
+}

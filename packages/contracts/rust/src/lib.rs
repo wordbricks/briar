@@ -46,6 +46,15 @@ pub mod proto {
                 ));
             }
         }
+
+        pub mod worker {
+            pub mod v1 {
+                include!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/src/gen/proto/briar.worker.v1.rs"
+                ));
+            }
+        }
     }
 }
 
@@ -56,6 +65,15 @@ pub mod connect {
                 include!(concat!(
                     env!("CARGO_MANIFEST_DIR"),
                     "/src/gen/connect/briar.app.v1.rs"
+                ));
+            }
+        }
+
+        pub mod worker {
+            pub mod v1 {
+                include!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/src/gen/connect/briar.worker.v1.rs"
                 ));
             }
         }
@@ -78,6 +96,10 @@ mod tests {
         assert_eq!(
             connect::briar::app::v1::PROJECT_SERVICE_SERVICE_NAME,
             "briar.app.v1.ProjectService"
+        );
+        assert_eq!(
+            connect::briar::worker::v1::WORKER_QUEUE_SERVICE_SERVICE_NAME,
+            "briar.worker.v1.WorkerQueueService"
         );
     }
 }

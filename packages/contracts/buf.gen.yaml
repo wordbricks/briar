@@ -31,6 +31,7 @@ plugins:
     out: packages/contracts/rust/src/gen/connect
     types:
       - briar.app.v1
+      - briar.worker.v1
     opt:
       - file_per_package
       - buffa_module=crate::proto
