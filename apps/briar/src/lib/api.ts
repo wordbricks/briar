@@ -166,6 +166,11 @@ export {
   loadRunCostEstimate,
   loadStatusTrayRuns,
 } from "./app-rpc/reporting";
+export {
+  loadMergeQueueProfile,
+  loadMergeQueueStatus,
+  updateMergeQueueProfile,
+} from "./app-rpc/merge-queue";
 import {
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
@@ -185,8 +190,6 @@ import type {
 import type {
   DashboardPayload,
   DashboardDeltaPayload,
-  MergeQueueProfile,
-  MergeQueueStatus,
   ProjectExecutionWorkerPolicy,
   HuntEvent,
   IssueAttachment,
@@ -611,38 +614,6 @@ export async function createProjectGithubCredential(
     `/projects/${projectId}/github/credentials`,
     token,
     { method: "POST" },
-  );
-}
-
-export async function loadMergeQueueProfile(
-  token: string,
-  projectId: string,
-) {
-  return request<{ profile: MergeQueueProfile | null }>(
-    `/projects/${projectId}/merge-queue-profile`,
-    token,
-  );
-}
-
-export async function loadMergeQueueStatus(
-  token: string,
-  projectId: string,
-) {
-  return request<{ status: MergeQueueStatus; generatedAt: string }>(
-    `/projects/${projectId}/merge-queue-status`,
-    token,
-  );
-}
-
-export async function updateMergeQueueProfile(
-  token: string,
-  projectId: string,
-  input: { enabled: boolean; readinessStageId: string },
-) {
-  return request<{ profile: MergeQueueProfile }>(
-    `/projects/${projectId}/merge-queue-profile`,
-    token,
-    { method: "PUT", body: JSON.stringify(input) },
   );
 }
 
