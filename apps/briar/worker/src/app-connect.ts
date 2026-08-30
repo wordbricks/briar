@@ -8,6 +8,7 @@ import { registerAppChannelService } from "./app-connect-channel";
 import { registerAppDashboardService } from "./app-connect-dashboard";
 import { registerAppInboxService } from "./app-connect-inbox";
 import { registerAppIssueService } from "./app-connect-issue";
+import { registerAppRealtimeService } from "./app-connect-realtime";
 import {
   appConnectProjectServices,
   type AppConnectProjectServices,
@@ -73,6 +74,10 @@ export async function handleAppConnectRequest(
     attachmentsBucket: input.env.ATTACHMENTS,
     env: input.env,
     context: input.context,
+  });
+  registerAppRealtimeService(router, {
+    ...sharedInput,
+    signingSecret: input.env.BETTER_AUTH_SECRET,
   });
   registerWorkerQueueService(router, {
     request: input.request,

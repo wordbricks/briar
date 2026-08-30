@@ -201,7 +201,6 @@ async function route(
 
   const realtimeResponse = await handleRealtimeRoute({
     request,
-    auth,
     db,
     env,
   });
