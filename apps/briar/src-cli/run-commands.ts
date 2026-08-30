@@ -4,9 +4,14 @@ import {
   resolve,
 } from "node:path";
 import { toJsonString } from "@bufbuild/protobuf";
+import { createClient } from "@connectrpc/connect";
 import {
+  CreateIssueResponseSchema,
+  IssueService,
   ListRunEvidenceResponseSchema,
+  SetIssueDependencyResponseSchema,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
+import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import { decodeStructuredAgentResult } from "../src/lib/agent-result";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {
@@ -42,6 +47,10 @@ import {
 import {
   createAuthenticatedWorkerExecutionClient,
 } from "./worker-queue-client";
+import {
+  appConnectCallOptions,
+  appConnectTransport,
+} from "./app-connect-client";
 
 async function optionalText(valueFlag: string, fileFlag: string) {
   const path = value(fileFlag);
@@ -60,19 +69,22 @@ async function createIssueCommand() {
     priority: priorityValue === undefined ? null : Number(priorityValue),
     status: value("--status") ?? "queued",
   });
-  const result = await request<{
-    runId: string;
-    sourceKey: string;
-    stage: "queued";
-    status: "backlog" | "queued";
-    attachments: unknown[];
-  }>(
-    config.apiUrl,
-    `/projects/${encodeURIComponent(project.id)}/issues`,
-    config.userToken,
-    { method: "POST", body: JSON.stringify(input) },
+  const result = await createClient(
+    IssueService,
+    appConnectTransport(config.apiUrl),
+  ).createIssue(
+    {
+      projectId: project.id,
+      title: input.title,
+      description: input.description ?? undefined,
+      priority: input.priority ?? undefined,
+      status: input.status === "backlog"
+        ? RunStatus.BACKLOG
+        : RunStatus.QUEUED,
+    },
+    appConnectCallOptions(config.userToken),
   );
-  console.log(JSON.stringify(result));
+  console.log(toJsonString(CreateIssueResponseSchema, result));
 }
 
 async function changeIssueDependencyCommand(action: "add" | "remove") {
@@ -81,27 +93,19 @@ async function changeIssueDependencyCommand(action: "add" | "remove") {
   const project = await currentProject(config);
   const dependentRunId = decodeUuid(required("--dependent-run"));
   const prerequisiteRunId = decodeUuid(required("--prerequisite-run"));
-  const path =
-    `/projects/${encodeURIComponent(project.id)}` +
-    `/runs/${encodeURIComponent(dependentRunId)}` +
-    `/dependencies/${encodeURIComponent(prerequisiteRunId)}`;
-
-  if (action === "add") {
-    const result = await request<{
-      prerequisiteRunId: string;
-      dependentRunId: string;
-      outcome: "created" | "already_exists";
-    }>(config.apiUrl, path, config.userToken, { method: "PUT" });
-    console.log(JSON.stringify(result));
-    return;
-  }
-
-  await request<void>(config.apiUrl, path, config.userToken, {
-    method: "DELETE",
-  });
-  console.log(
-    JSON.stringify({ dependentRunId, prerequisiteRunId, outcome: "removed" }),
+  const result = await createClient(
+    IssueService,
+    appConnectTransport(config.apiUrl),
+  ).setIssueDependency(
+    {
+      projectId: project.id,
+      runId: dependentRunId,
+      prerequisiteRunId,
+      enabled: action === "add",
+    },
+    appConnectCallOptions(config.userToken),
   );
+  console.log(toJsonString(SetIssueDependencyResponseSchema, result));
 }
 
 const channelMessagesUsage = `Usage: briar channel messages --channel-id <uuid>
