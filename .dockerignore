@@ -14,8 +14,6 @@
 !apps/landing
 !apps/landing/package.json
 !packages
-!packages/mobile-contracts
-!packages/mobile-contracts/package.json
 !containers
 !containers/merge-group-ci
 !containers/merge-group-ci/Dockerfile

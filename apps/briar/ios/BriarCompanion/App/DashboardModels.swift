@@ -784,9 +784,9 @@ struct IssueExecutionProposal: Codable, Equatable, Hashable, Identifiable, Senda
         runId = try container.decode(UUID.self, forKey: .runId)
         title = try container.decode(String.self, forKey: .title)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
-        // These nullable fields are nevertheless required by the canonical
-        // server snapshot. `decode(Optional.self)` accepts JSON null but rejects
-        // a missing key, matching the strict mobile Zod/OpenAPI contract.
+        // These nullable fields are nevertheless required by this Codable
+        // snapshot. `decode(Optional.self)` accepts JSON null but rejects a
+        // missing key.
         acceptedAt = try container.decode(Date?.self, forKey: .acceptedAt)
         requestedProvider = try container.decode(
             AgentProvider?.self,
