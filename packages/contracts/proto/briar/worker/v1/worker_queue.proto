@@ -187,6 +187,34 @@ message RecordRunEventResponse {
   optional string workflow_stage = 3;
 }
 
+// Metadata envelope for POST /runs/{run_id}/evidence. The HTTP transport is
+// multipart/form-data with exactly one application/protobuf `request` part;
+// image bytes use separate `images` parts.
+message RecordRunEvidenceRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string evidence_key = 3;
+  string stage = 4;
+  string type = 5;
+  briar.app.v1.RunEvidence.Status status = 6;
+  google.protobuf.Timestamp observed_at = 7;
+  string actor = 8;
+  optional string detail = 9;
+  optional string command = 10;
+  optional string url = 11;
+  optional google.protobuf.Struct metadata = 12;
+}
+
+message RecordRunEvidenceResponse {
+  string run_id = 1;
+  uint32 attempt = 2;
+  string evidence_key = 3;
+  string stage = 4;
+  string type = 5;
+  briar.app.v1.RunEvidence.Status status = 6;
+  repeated briar.app.v1.RunEvidenceImage images = 7;
+}
+
 message TransitionWorkflowStageRequest {
   enum Action {
     ACTION_UNSPECIFIED = 0;
