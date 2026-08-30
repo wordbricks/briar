@@ -41,6 +41,7 @@ for (const key of [
   "CODEX_CLI_VERSION",
   "CLAUDE_CODE_VERSION",
   "AGENT_BROWSER_VERSION",
+  "VELEN_CLI_VERSION",
   "OPENCODE_CLI_VERSION",
   "OPENCODE_CLI_LINUX_X64_SHA256",
   "GROK_CLI_VERSION",
@@ -66,6 +67,7 @@ const providerPackage = await Bun.file(
 const expectedDependencies = {
   "@openai/codex": lock.CODEX_CLI_VERSION,
   "@anthropic-ai/claude-code": lock.CLAUDE_CODE_VERSION,
+  "@wordbricks/velen": lock.VELEN_CLI_VERSION,
   "agent-browser": lock.AGENT_BROWSER_VERSION,
 };
 if (providerPackage.packageManager !== `bun@${lock.BUN_VERSION}`) {
@@ -190,7 +192,10 @@ const browserHelperPath = join(image, "briar-open-browser");
 const browserHelper = await text(browserHelperPath);
 for (const required of [
   "/usr/bin/nohup /usr/bin/setsid --fork",
-  '/usr/bin/google-chrome-stable --new-window "$url"',
+  "/usr/bin/google-chrome-stable",
+  "--no-first-run",
+  "--no-default-browser-check",
+  '--new-window "$url"',
   '</dev/null >/dev/null 2>&1 &',
 ]) {
   if (!browserHelper.includes(required)) {
@@ -211,6 +216,9 @@ if (!installer.includes("--frozen-lockfile --production --ignore-scripts")) {
 if (!installer.includes("agent-browser/bin/agent-browser-linux-x64")) {
   fail("agent-browser must install its pinned Linux native binary directly");
 }
+if (!installer.includes("for binary in codex claude velen")) {
+  fail("image installer must expose the pinned Velen CLI");
+}
 if (
   !installer.includes('"$source_dir/briar-open-browser"') ||
   !installer.includes("/opt/briar/bin/briar-open-browser")
@@ -225,6 +233,7 @@ for (const required of [
   'chown -h briar:briar "$user_toolchain"',
   'initial_release="/opt/briar/releases/$briar_version"',
   "ln -s /opt/briar/current/bin/briar /opt/briar/bin/briar",
+  "/home/briar/.codex /home/briar/.codex/log",
   "/home/briar/.codex/skills",
 ]) {
   if (!installer.includes(required)) {
@@ -401,6 +410,25 @@ for (const required of [
     fail(`image verifier omits managed-user Rust check: ${required}`);
   }
 }
+for (const required of [
+  "sudo -u briar -H bash -lc '/opt/briar/bin/codex --version' 2>&1",
+  'grep -Fq "could not create PATH aliases"',
+  "test -w /home/briar/.codex",
+  "test -w /home/briar/.codex/log",
+]) {
+  if (!verifier.includes(required)) {
+    fail(`image verifier omits managed-user Codex check: ${required}`);
+  }
+}
+for (const required of [
+  '/opt/briar/bin/velen --version | grep -Fq "$VELEN_CLI_VERSION"',
+  "briar codex claude agent-browser velen opencode",
+  ".runtime.velen == $velenVersion",
+]) {
+  if (!verifier.includes(required)) {
+    fail(`image verifier omits Velen CLI check: ${required}`);
+  }
+}
 for (const forbidden of [
   "/home/admin/.ssh",
   "/root/.aws",
@@ -440,6 +468,19 @@ for (const required of [
   if (!service.includes(required)) fail(`managed worker unit omits ${required}`);
 }
 if (service.includes("briar_worker_")) fail("managed worker unit embeds a token");
+const remoteSessionAgentService = await text(
+  join(image, "briar-remote-session-agent.service"),
+);
+for (const required of [
+  "User=briar",
+  "Group=briar",
+  "Environment=PATH=/opt/briar/bin:",
+  "ExecStart=/opt/briar/bin/bun /opt/briar/bin/briar-remote-session-agent.js",
+]) {
+  if (!remoteSessionAgentService.includes(required)) {
+    fail(`managed remote session agent unit omits ${required}`);
+  }
+}
 for (const unitName of [
   "briar-managed-enroll.service",
   "briar-managed-runtime-updater.service",

@@ -1,13 +1,20 @@
-// Built in parts so secret scanners do not treat the UI preference prefix as a credential.
-const storageKeyPrefix = ["briar", "settings", "kanbanColumnCollapse", "v1"].join(
-  ".",
-);
+export type KanbanColumnPreference = "collapse" | "hide";
 
-export function kanbanCollapsedColumnsStorageKey(
+const storageKeyNames = {
+  collapse: "kanbanColumnCollapse",
+  hide: "kanbanColumnHide",
+} satisfies Record<KanbanColumnPreference, string>;
+
+export function kanbanColumnPreferenceStorageKey(
+  preference: KanbanColumnPreference,
   userId: string,
   projectId: string,
 ) {
-  return `${storageKeyPrefix}:${encodeURIComponent(userId)}:${encodeURIComponent(projectId)}`;
+  // Built in parts so secret scanners do not treat the UI preference prefix as a credential.
+  const prefix = ["briar", "settings", storageKeyNames[preference], "v1"].join(
+    ".",
+  );
+  return `${prefix}:${encodeURIComponent(userId)}:${encodeURIComponent(projectId)}`;
 }
 
 function normalizeColumnIds(value: unknown): string[] {
@@ -22,7 +29,8 @@ function normalizeColumnIds(value: unknown): string[] {
   return [...unique].sort();
 }
 
-export function readKanbanCollapsedColumnIds(
+export function readKanbanColumnIds(
+  preference: KanbanColumnPreference,
   userId: string | null | undefined,
   projectId: string | null | undefined,
 ): string[] {
@@ -30,7 +38,7 @@ export function readKanbanCollapsedColumnIds(
   if (typeof window === "undefined") return [];
   try {
     const stored = window.localStorage.getItem(
-      kanbanCollapsedColumnsStorageKey(userId, projectId),
+      kanbanColumnPreferenceStorageKey(preference, userId, projectId),
     );
     if (stored === null) return [];
     return normalizeColumnIds(JSON.parse(stored) as unknown);
@@ -39,7 +47,8 @@ export function readKanbanCollapsedColumnIds(
   }
 }
 
-export function writeKanbanCollapsedColumnIds(
+export function writeKanbanColumnIds(
+  preference: KanbanColumnPreference,
   userId: string | null | undefined,
   projectId: string | null | undefined,
   columnIds: Iterable<string>,
@@ -48,22 +57,26 @@ export function writeKanbanCollapsedColumnIds(
   if (typeof window === "undefined") return;
   try {
     const next = normalizeColumnIds([...columnIds]);
-    const key = kanbanCollapsedColumnsStorageKey(userId, projectId);
+    const key = kanbanColumnPreferenceStorageKey(
+      preference,
+      userId,
+      projectId,
+    );
     if (next.length === 0) {
       window.localStorage.removeItem(key);
       return;
     }
     window.localStorage.setItem(key, JSON.stringify(next));
   } catch {
-    // Keep the in-session collapse state when storage is unavailable.
+    // Keep the in-session preference state when storage is unavailable.
   }
 }
 
-export function toggleKanbanCollapsedColumnId(
-  collapsedColumnIds: Iterable<string>,
+export function toggleKanbanColumnId(
+  columnIds: Iterable<string>,
   columnId: string,
 ): string[] {
-  const next = new Set(normalizeColumnIds([...collapsedColumnIds]));
+  const next = new Set(normalizeColumnIds([...columnIds]));
   if (next.has(columnId)) {
     next.delete(columnId);
   } else {

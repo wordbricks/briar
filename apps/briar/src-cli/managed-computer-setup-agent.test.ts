@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  authenticationFailureMessage,
   cleanManagedSetupOutput,
   githubSetupChallenge,
   managedComputerProviderAuthCommand,
@@ -37,11 +38,11 @@ describe("managed computer setup provider adapters", () => {
     });
     expect(providerSetupChallenge(
       "codex",
-      "\u001b[32mVisit https://auth.openai.com/activate and enter WXYZ-1234\u001b[0m",
+      "\u001b[32mOpen https://auth.openai.com/codex/device and enter WXYZ-12345\u001b[0m",
     )).toEqual({
       kind: "device_code",
-      verificationUri: "https://auth.openai.com/activate",
-      userCode: "WXYZ-1234",
+      verificationUri: "https://auth.openai.com/codex/device",
+      userCode: "WXYZ-12345",
     });
     expect(cleanManagedSetupOutput("\u001b[31msecret\u001b[0m")).toBe("secret");
   });
@@ -58,5 +59,17 @@ describe("managed computer setup provider adapters", () => {
       kind: "api_key",
       verificationUri: "https://opencode.ai/auth",
     });
+  });
+
+  it("classifies safe authentication errors without forwarding command output", () => {
+    expect(authenticationFailureMessage(
+      "sh: 1: codex: not found\nsecret WXYZ-12345",
+    )).toBe("Authentication command is not available on this computer");
+    expect(authenticationFailureMessage(
+      "Error logging in with device code: Permission denied (os error 13)",
+    )).toBe("Authentication credential storage is not writable");
+    expect(authenticationFailureMessage("provider secret output")).toBe(
+      "Authentication command failed",
+    );
   });
 });

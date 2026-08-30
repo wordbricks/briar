@@ -368,6 +368,40 @@ final class CompanionNavigationModel: ObservableObject {
         }
     }
 
+    func openRemoteNotification(_ target: RemotePushNotificationTarget) {
+        switch target.kind {
+        case .issue:
+            guard let runID = UUID(uuidString: target.targetId) else { return }
+            open(.issue(projectID: target.projectId, runID: runID))
+        case .conversation:
+            guard let runID = UUID(uuidString: target.targetId) else { return }
+            issuePreparationRevision &+= 1
+            preparingIssue = false
+            stage(
+                .issue(projectID: target.projectId, runID: runID),
+                issueDetailTab: .conversation
+            )
+        case .session:
+            open(.session(projectID: target.projectId, sessionID: target.targetId))
+        case .channel:
+            guard let channelID = UUID(uuidString: target.targetId),
+                  let messageID = target.channelMessageId,
+                  let rootMessageID = target.rootMessageId else { return }
+            issuePreparationRevision &+= 1
+            preparingIssue = false
+            pendingIssueID = nil
+            pendingIssueDetailTab = nil
+            pendingSessionID = nil
+            pendingProjectID = target.projectId
+            pendingChannelID = channelID
+            pendingChannelMessageID = messageID
+            pendingChannelRootMessageID = rootMessageID
+            pendingChannelThread = nil
+            selectedTab = .home
+            pathChannelToken &+= 1
+        }
+    }
+
     func consumePendingIssue() -> UUID? {
         defer {
             pendingIssueID = nil

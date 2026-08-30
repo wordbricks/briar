@@ -474,6 +474,71 @@ describe("HuntBoard", () => {
     expect(container.querySelector("[data-kanban-hidden-columns]")).toBeNull();
     await cleanup();
   });
+  it("restores separate column preferences while companion ignores them", async () => {
+    window.localStorage.clear();
+    const userId = "user-restore-1";
+    const projectId = demoDashboard.project.id;
+    window.localStorage.setItem(
+      `briar.settings.kanbanColumnHide.v1:${encodeURIComponent(userId)}:${encodeURIComponent(projectId)}`,
+      JSON.stringify(["stage:analyzing"]),
+    );
+    window.localStorage.setItem(
+      `briar.settings.kanbanColumnCollapse.v1:${encodeURIComponent(userId)}:${encodeURIComponent(projectId)}`,
+      JSON.stringify(["stage:implementing"]),
+    );
+    const desktop = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      desktop.root,
+      <HuntDashboard
+        {...dashboardProps}
+        currentUserId={userId}
+        dashboard={demoDashboard}
+      />,
+    );
+    expect(
+      desktop.container.querySelector('[data-kanban-column-id="stage:analyzing"]'),
+    ).toBeNull();
+    expect(
+      desktop.container
+        .querySelector('[data-kanban-column-id="stage:implementing"]')
+        ?.getAttribute("data-kanban-column-collapsed"),
+    ).toBe("true");
+    expect(
+      desktop.container
+        .querySelector<HTMLButtonElement>('button[aria-label="구현 열 펼치기"]')
+        ?.getAttribute("aria-expanded"),
+    ).toBe("false");
+    await desktop.cleanup();
+
+    const companion = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      companion.root,
+      <HuntDashboard
+        {...dashboardProps}
+        companionMode
+        currentUserId={userId}
+        dashboard={demoDashboard}
+      />,
+    );
+    expect(
+      companion.container.querySelector('[data-kanban-column-id="companion-tasks"]'),
+    ).not.toBeNull();
+    expect(
+      companion.container
+        .querySelector('[data-kanban-column-id="companion-tasks"]')
+        ?.getAttribute("data-kanban-column-collapsed"),
+    ).toBe("false");
+    expect(companion.container.querySelectorAll(".kanban-card")).toHaveLength(
+      demoDashboard.runs.length,
+    );
+    expect(companion.container.querySelector(".kanban-column-collapse")).toBeNull();
+    await companion.cleanup();
+    window.localStorage.clear();
+  });
   it("switches between kanban and list views while preserving issue navigation", async () => {
     const { cleanup, container, root } = createReactTestRoot();
     await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={demoDashboard} />);

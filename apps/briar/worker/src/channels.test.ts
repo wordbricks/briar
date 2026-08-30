@@ -3514,6 +3514,28 @@ describe("organization channels", () => {
       mentionedAgentIds: [],
       createdAt: at(21),
     });
+    const recentDmMessageIds = Array.from(
+      { length: 11 },
+      (_, index) =>
+        `ae000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+    );
+    for (const [index, id] of recentDmMessageIds.entries()) {
+      await createChannelMessage(db, {
+        id,
+        channelId: createdBody.channel.id,
+        parentMessageId: null,
+        authorUserId: ownerId,
+        authorAgentId: null,
+        authorAgentName: null,
+        authorAgentProvider: null,
+        body: `Recent direct-message context ${index + 1}`,
+        mentionedUserIds: [],
+        mentionedAgentIds: [],
+        createdAt: new Date(
+          Date.parse(claimedAt) - (recentDmMessageIds.length - index) * 60_000,
+        ).toISOString(),
+      });
+    }
     const dmTimeline = await getOrganizationChannelDetail({
       db,
       organizationId,
@@ -3579,11 +3601,19 @@ describe("organization channels", () => {
       authenticatedWorker,
     });
     expect(dmClaimPayload?.workId).toBe(dmReplyJob!.id);
-    expect(dmClaimPayload!.snapshot.messages.map((item) => item.id)).toEqual(
-      expect.arrayContaining([earlierDmMessageId, messageBody.message.id]),
-    );
-    expect(dmClaimPayload!.snapshot.messages.map((item) => item.id))
-      .not.toContain(earlierDmThreadReplyId);
+    expect(dmClaimPayload!.snapshot.messages.map((item) => item.id)).toEqual([
+      ...recentDmMessageIds.slice(-9),
+      messageBody.message.id,
+    ]);
+    const excludedDmMessageIds = [
+      earlierDmMessageId,
+      earlierDmThreadReplyId,
+      ...recentDmMessageIds.slice(0, 2),
+    ];
+    for (const excludedMessageId of excludedDmMessageIds) {
+      expect(dmClaimPayload!.snapshot.messages.map((item) => item.id))
+        .not.toContain(excludedMessageId);
+    }
     expect(dmClaimPayload!.snapshot.messages.every(
       (item) => item.parentMessageId === null,
     )).toBe(true);

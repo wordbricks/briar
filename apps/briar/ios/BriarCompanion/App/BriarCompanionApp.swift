@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct BriarCompanionApp: App {
+    @UIApplicationDelegateAdaptor(InboxPushAppDelegate.self) private var appDelegate
+
     var body: some Scene {
         WindowGroup {
             #if BRIAR_UI_TEST_SUPPORT

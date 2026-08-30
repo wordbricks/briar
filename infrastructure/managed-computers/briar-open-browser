@@ -16,5 +16,8 @@ case "$url" in
 esac
 
 /usr/bin/nohup /usr/bin/setsid --fork \
-  /usr/bin/google-chrome-stable --new-window "$url" \
+  /usr/bin/google-chrome-stable \
+  --no-first-run \
+  --no-default-browser-check \
+  --new-window "$url" \
   </dev/null >/dev/null 2>&1 &

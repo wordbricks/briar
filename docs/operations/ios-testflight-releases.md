@@ -25,6 +25,11 @@ certificate and password. The certificate must belong to team `QFJZ2V3829`.
 The command imports it into an ephemeral keychain, restores the user's original
 keychain search list, and deletes the temporary keychain on every exit.
 
+Configure and verify APNs before distributing a build by following
+[Mobile push notifications](mobile-push-notifications.md). The active App Store
+provisioning profile must include the Push Notifications capability, and the
+terminated-app delivery check must run on a physical device.
+
 ## Internal TestFlight candidate
 
 Use a monotonically increasing App Store build number. The command decrypts the

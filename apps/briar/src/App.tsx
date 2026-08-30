@@ -626,6 +626,7 @@ export function App({
     viewingChannelThreadRootMessageId,
     viewingIssueConversationRunId,
     inbox.initialSyncComplete,
+    briar.token,
   );
   useEffect(() => {
     if (projectWindowProjectId) return;

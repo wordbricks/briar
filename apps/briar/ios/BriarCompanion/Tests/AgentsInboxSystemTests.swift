@@ -3,6 +3,7 @@ import BriarContractsMocks
 import Connect
 import SwiftProtobuf
 import XCTest
+import UIKit
 import UserNotifications
 @testable import BriarCompanion
 
@@ -29,13 +30,39 @@ final class AgentsInboxSystemTests: XCTestCase {
     }
 
     @MainActor
-    func testLocalNotificationsRegisterForegroundPresentationDelegate() {
-        let service = LocalNotificationService()
+    func testAppDelegateOwnsForegroundAndRemoteNotificationDelivery() {
+        let delegate = InboxPushAppDelegate()
 
-        XCTAssertTrue(
-            UNUserNotificationCenter.current().delegate is InboxNotificationForegroundDelegate
+        XCTAssertTrue(delegate.application(UIApplication.shared, didFinishLaunchingWithOptions: nil))
+        XCTAssertTrue(UNUserNotificationCenter.current().delegate === delegate)
+    }
+
+    @MainActor
+    func testRemoteNotificationTargetParsesAndOpensConversation() throws {
+        let projectID = try XCTUnwrap(
+            UUID(uuidString: "22222222-2222-4222-8222-222222222222")
         )
-        _ = service
+        let runID = try XCTUnwrap(
+            UUID(uuidString: "11111111-1111-4111-8111-111111111111")
+        )
+        let target = try XCTUnwrap(RemotePushNotificationTarget.parse(userInfo: [
+            "briarInboxTarget": [
+                "messageId": "conversation:33333333-3333-4333-8333-333333333333",
+                "messageVersion": "33333333-3333-4333-8333-333333333333",
+                "notificationId": "conversation-thread:\(projectID):\(runID):root",
+                "projectId": projectID.uuidString.lowercased(),
+                "targetId": runID.uuidString.lowercased(),
+                "kind": "conversation",
+                "conversationMessageId": "33333333-3333-4333-8333-333333333333",
+            ],
+        ]))
+
+        let navigation = CompanionNavigationModel()
+        navigation.openRemoteNotification(target)
+        XCTAssertEqual(navigation.selectedTab, .tasks)
+        XCTAssertEqual(navigation.pendingProjectID, projectID)
+        XCTAssertEqual(navigation.pendingIssueID, runID)
+        XCTAssertEqual(navigation.pendingIssueDetailTab, .conversation)
     }
 
     @MainActor

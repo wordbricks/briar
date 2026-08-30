@@ -142,10 +142,21 @@ type SetupChallenge = Pick<
 
 const ansiPattern = /\u001b(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\u001b\\))/gu;
 const urlPattern = /https:\/\/[^\s<>"']+/giu;
-const deviceCodePattern = /\b[A-Z0-9]{4}(?:-[A-Z0-9]{4}){1,3}\b/u;
+const deviceCodePattern = /\b[A-Z0-9]{4,5}(?:-[A-Z0-9]{4,5}){1,3}\b/u;
 
 export function cleanManagedSetupOutput(output: string) {
   return output.replace(ansiPattern, "").replaceAll("\r", "\n");
+}
+
+export function authenticationFailureMessage(output: string) {
+  const cleaned = cleanManagedSetupOutput(output);
+  if (/(?:command not found|:\s*not found\b)/iu.test(cleaned)) {
+    return "Authentication command is not available on this computer";
+  }
+  if (/(?:permission denied|os error 13)/iu.test(cleaned)) {
+    return "Authentication credential storage is not writable";
+  }
+  return "Authentication command failed";
 }
 
 function firstUrl(output: string, hosts: readonly string[]) {
@@ -495,7 +506,9 @@ async function runAuthentication(
       waitForAbort(input.signal),
     ]);
     if (first.type === "exit") {
-      if (first.code !== 0) throw new Error("Authentication command failed");
+      if (first.code !== 0) {
+        throw new Error(authenticationFailureMessage(output));
+      }
       return;
     }
     dependencies.emit({
@@ -518,14 +531,16 @@ async function runAuthentication(
         waitForAbort(input.signal),
       ]);
       if (next.type === "input") processHandle.write(`${next.value}\n`);
-      else if (next.code !== 0) throw new Error("Authentication command failed");
+      else if (next.code !== 0) {
+        throw new Error(authenticationFailureMessage(output));
+      }
       else return;
     }
     const code = await Promise.race([
       processHandle.exited,
       waitForAbort(input.signal),
     ]);
-    if (code !== 0) throw new Error("Authentication command failed");
+    if (code !== 0) throw new Error(authenticationFailureMessage(output));
   } finally {
     processHandle.kill();
   }

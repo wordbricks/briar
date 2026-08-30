@@ -36,6 +36,8 @@ import {
   createIssueActivityPublishToken,
 } from "./channel-activity-ticket";
 import { HttpError } from "./http-response";
+import { mobilePushProvidersConfigured } from "./mobile-push-provider";
+import { flushMobilePushOutbox } from "./mobile-push-service";
 
 type ActivityReplyIdentity = {
   id: string;
@@ -129,6 +131,18 @@ export async function flushOrganizationInboxRealtimeOutbox(
   env: Env,
   db: D1Database,
 ) {
+  if (mobilePushProvidersConfigured(env)) {
+    try {
+      await flushMobilePushOutbox(env, db);
+    } catch (error) {
+      // Remote push retries from its own outbox and must never prevent the
+      // existing websocket fan-out from advancing.
+      console.error(JSON.stringify({
+        message: "Mobile push outbox flush failed",
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    }
+  }
   if (!env.CHANNEL_REALTIME) return;
   const pending = await listOrganizationInboxRealtimeOutbox(db);
   for (const row of pending) {
@@ -157,7 +171,7 @@ export function scheduleInboxRealtimeFlush(
   db: D1Database,
   context?: ExecutionContext,
 ) {
-  if (!env.CHANNEL_REALTIME) return;
+  if (!env.CHANNEL_REALTIME && !mobilePushProvidersConfigured(env)) return;
   const flush = flushOrganizationInboxRealtimeOutbox(env, db).catch((error) => {
     console.error(JSON.stringify({
       message: "Inbox realtime outbox flush failed",

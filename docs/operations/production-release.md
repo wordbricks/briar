@@ -52,6 +52,8 @@ Set these non-secret values in the checked-in `config/release.env`:
 - `BRIAR_UPDATER_PUBLIC_KEY` — base64-encoded `.pub` file emitted by the Tauri
   signer
 - `CLOUDFLARE_ACCOUNT_ID`
+- the Android Firebase application identifiers documented in
+  [Mobile push notifications](mobile-push-notifications.md)
 
 Worker deployment uses a separate credential. Dotenvx commits only ciphertext
 and writes the matching private decryption key to the ignored `.env.keys` file

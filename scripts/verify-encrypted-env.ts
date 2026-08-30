@@ -32,6 +32,11 @@ export const encryptedEnvPolicies = {
       "GITHUB_CALLBACK_ORIGIN",
       "GITHUB_WEBHOOK_SECRET",
       "MANAGED_COMPUTER_AWS_SESSION_TOKEN",
+      "APNS_KEY_ID",
+      "APNS_PRIVATE_KEY",
+      "FIREBASE_PROJECT_ID",
+      "FIREBASE_CLIENT_EMAIL",
+      "FIREBASE_PRIVATE_KEY",
     ],
   },
   ".env.release": {

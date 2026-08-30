@@ -13,6 +13,14 @@ val tauriProperties = Properties().apply {
     }
 }
 
+fun firebaseSetting(name: String): String =
+    providers.gradleProperty(name)
+        .orElse(providers.environmentVariable(name))
+        .getOrElse("")
+
+fun quotedBuildConfig(value: String): String =
+    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
 android {
     compileSdk = 36
     namespace = "app.briar.companion"
@@ -23,6 +31,26 @@ android {
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+        buildConfigField(
+            "String",
+            "BRIAR_FIREBASE_APPLICATION_ID",
+            quotedBuildConfig(firebaseSetting("BRIAR_FIREBASE_ANDROID_APPLICATION_ID")),
+        )
+        buildConfigField(
+            "String",
+            "BRIAR_FIREBASE_API_KEY",
+            quotedBuildConfig(firebaseSetting("BRIAR_FIREBASE_ANDROID_API_KEY")),
+        )
+        buildConfigField(
+            "String",
+            "BRIAR_FIREBASE_PROJECT_ID",
+            quotedBuildConfig(firebaseSetting("FIREBASE_PROJECT_ID")),
+        )
+        buildConfigField(
+            "String",
+            "BRIAR_FIREBASE_SENDER_ID",
+            quotedBuildConfig(firebaseSetting("BRIAR_FIREBASE_MESSAGING_SENDER_ID")),
+        )
     }
     buildTypes {
         getByName("debug") {
@@ -59,6 +87,8 @@ rust {
 }
 
 dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:34.18.0"))
+    implementation("com.google.firebase:firebase-messaging")
     implementation("me.leolin:ShortcutBadger:1.1.22@aar")
     implementation("androidx.browser:browser:1.9.0")
     implementation("androidx.webkit:webkit:1.14.0")

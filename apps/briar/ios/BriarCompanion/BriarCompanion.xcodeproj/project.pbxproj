@@ -65,7 +65,9 @@
 		6FBF07710D1E55F5F140DD52 /* ConversationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46BD848F54967DE5872E25CD /* ConversationViews.swift */; };
 		700870393EE374CAF1ABB7E9 /* IssueWriteViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A110B2A438D4543375A7231 /* IssueWriteViews.swift */; };
 		734B87FE5D6A7DF134A53FA9 /* InboxModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10A04D41AB039273FA6B91E /* InboxModels.swift */; };
+		74B130C1F14FD69784F54B06 /* RemotePushNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEEA34E5BB158CB079EEBFC7 /* RemotePushNotifications.swift */; };
 		75B4AE1DD56B75DD66212E13 /* Connect in Frameworks */ = {isa = PBXBuildFile; productRef = 6C702308DEFB985EF50F387B /* Connect */; };
+		79316553BBC89E224B19BE93 /* RemotePushNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEEA34E5BB158CB079EEBFC7 /* RemotePushNotifications.swift */; };
 		7A0253B6871F1B82E3B8AD5E /* ProjectIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50DB71AFF1E7CA7B051BEEB /* ProjectIconView.swift */; };
 		7D68B3A5B1EE04012E57D3C7 /* ChannelsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F137DEE3E6FF7F8A153AC8F6 /* ChannelsStore.swift */; };
 		7FA4DFE333AD914AB05B9787 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 0C9F9A781BCDCC2070FBFE96 /* SwiftProtobuf */; };
@@ -290,6 +292,7 @@
 		66C0B2EFCEE4C98F323991B1 /* project.mock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = project.mock.swift; sourceTree = "<group>"; };
 		69E1F9AD7F6FE98A0C76ACD0 /* ConversationPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationPresentationTests.swift; sourceTree = "<group>"; };
 		6B5F0E3F338DC5E3C1A397CA /* CompanionReadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionReadTests.swift; sourceTree = "<group>"; };
+		6BF8ED41E9C44416BF188F7C /* BriarCompanion.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BriarCompanion.entitlements; sourceTree = "<group>"; };
 		6C163E49260290ADF3D883BD /* organization.mock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = organization.mock.swift; sourceTree = "<group>"; };
 		6FBA9292CA9378FF75B69804 /* account.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = account.pb.swift; sourceTree = "<group>"; };
 		71138859189D1A26707616E6 /* AttachmentPreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentPreviewTests.swift; sourceTree = "<group>"; };
@@ -342,6 +345,7 @@
 		E80FCA400D10FEE6AF26FBAA /* InboxViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxViews.swift; sourceTree = "<group>"; };
 		E824C71CF3A757A4B40140EE /* SelectableText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectableText.swift; sourceTree = "<group>"; };
 		EC3D59F8A1B18D2394FD88C9 /* BriarContracts.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BriarContracts.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		EEEA34E5BB158CB079EEBFC7 /* RemotePushNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemotePushNotifications.swift; sourceTree = "<group>"; };
 		F06BC7D3CCF449905C3520FB /* channel.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = channel.connect.swift; sourceTree = "<group>"; };
 		F10A04D41AB039273FA6B91E /* InboxModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxModels.swift; sourceTree = "<group>"; };
 		F137DEE3E6FF7F8A153AC8F6 /* ChannelsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelsStore.swift; sourceTree = "<group>"; };
@@ -527,6 +531,7 @@
 				3A1B95F49B19C05E7C2C20F0 /* ProfileImage.swift */,
 				C50DB71AFF1E7CA7B051BEEB /* ProjectIconView.swift */,
 				78BCFF20096EA979837ADEBC /* RealtimeConnect.swift */,
+				EEEA34E5BB158CB079EEBFC7 /* RemotePushNotifications.swift */,
 				E824C71CF3A757A4B40140EE /* SelectableText.swift */,
 				0C3D7B1D017C131E8DD36044 /* SessionStore.swift */,
 			);
@@ -616,6 +621,7 @@
 		9D4A6C7F1410E81881538C5D /* UITestSupport */ = {
 			isa = PBXGroup;
 			children = (
+				6BF8ED41E9C44416BF188F7C /* BriarCompanion.entitlements */,
 				233573EB5589EBF9DE724279 /* UITestCompanionFlow.swift */,
 			);
 			path = UITestSupport;
@@ -945,6 +951,7 @@
 				BEC056CE4861F51B5A287BF6 /* ProfileImage.swift in Sources */,
 				7A0253B6871F1B82E3B8AD5E /* ProjectIconView.swift in Sources */,
 				D11D46C02042A874F43EEFD8 /* RealtimeConnect.swift in Sources */,
+				79316553BBC89E224B19BE93 /* RemotePushNotifications.swift in Sources */,
 				A4142A5A077B1E5302037B68 /* SelectableText.swift in Sources */,
 				644BE98D813E3EB74141AA5E /* SessionStore.swift in Sources */,
 				9855A8195A6A253247277F80 /* UITestCompanionFlow.swift in Sources */,
@@ -1054,6 +1061,7 @@
 				EECEC6D146D6DF1526985D0A /* ProfileImage.swift in Sources */,
 				6822A46895420B4D8D2B0AE0 /* ProjectIconView.swift in Sources */,
 				465B8DE2CA09602F8373770E /* RealtimeConnect.swift in Sources */,
+				74B130C1F14FD69784F54B06 /* RemotePushNotifications.swift in Sources */,
 				AEB95933E31042AD6B98B29D /* SelectableText.swift in Sources */,
 				EE5D250A1092057DAB5C1206 /* SessionStore.swift in Sources */,
 			);
@@ -1109,6 +1117,7 @@
 					AppIconGreen,
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				BRIAR_APNS_ENVIRONMENT = development;
 				BRIAR_DISPLAY_NAME = "Briar Native Dev";
 				CODE_SIGN_ENTITLEMENTS = App/BriarCompanion.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -1158,7 +1167,7 @@
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				BRIAR_DISPLAY_NAME = "Briar Native UI Tests";
-				CODE_SIGN_ENTITLEMENTS = App/BriarCompanion.entitlements;
+				CODE_SIGN_ENTITLEMENTS = UITestSupport/BriarCompanion.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = "";
@@ -1447,6 +1456,7 @@
 					AppIconGreen,
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				BRIAR_APNS_ENVIRONMENT = development;
 				BRIAR_DISPLAY_NAME = "Briar Native Dev";
 				CODE_SIGN_ENTITLEMENTS = App/BriarCompanion.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -1473,7 +1483,7 @@
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				BRIAR_DISPLAY_NAME = "Briar Native UI Tests";
-				CODE_SIGN_ENTITLEMENTS = App/BriarCompanion.entitlements;
+				CODE_SIGN_ENTITLEMENTS = UITestSupport/BriarCompanion.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = "";
@@ -1498,6 +1508,7 @@
 					AppIconGreen,
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				BRIAR_APNS_ENVIRONMENT = production;
 				BRIAR_DISPLAY_NAME = "Briar Companion";
 				CODE_SIGN_ENTITLEMENTS = App/BriarCompanion.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -1524,7 +1535,7 @@
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				BRIAR_DISPLAY_NAME = "Briar Native UI Tests";
-				CODE_SIGN_ENTITLEMENTS = App/BriarCompanion.entitlements;
+				CODE_SIGN_ENTITLEMENTS = UITestSupport/BriarCompanion.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = "";

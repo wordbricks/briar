@@ -14,6 +14,8 @@ import {
   type InboxNotificationPermissionStatus,
   type InboxNotificationTarget,
 } from "../generated/tauri";
+import { request } from "./api/request";
+import { inboxSessionMessageVersion } from "./inbox-session-version";
 
 export const inboxNotificationCategories = [
   "urgent",
@@ -28,6 +30,11 @@ const storageKey = "briar.settings.inbox-notifications.v1";
 const soundStorageKey = "briar.settings.inbox-notification-sound.v1";
 const targetStorageKey = "briar.inbox.notification-targets.v1";
 const browserOpenEvent = "briar:inbox-notification-open";
+const preferencesChangedEvent = "briar:inbox-notification-preferences-changed";
+const androidRemoteOpenEvent = "briar-remote-notification-open";
+const androidPushTokenEvent = "briar-remote-push-token";
+const androidRemoteReceiptStorageKey = "briar.remote-push-receipts.v1";
+const androidRemoteReceiptLifetimeMs = 7 * 24 * 60 * 60 * 1_000;
 
 type StoredInboxNotificationTarget = InboxNotificationTarget & {
   storedAt: number;
@@ -87,6 +94,7 @@ export function writeInboxNotificationPreferences(
 ) {
   try {
     window.localStorage.setItem(storageKey, JSON.stringify(preferences));
+    window.dispatchEvent(new Event(preferencesChangedEvent));
   } catch {
     // Keep the preference in the mounted settings screen when storage is unavailable.
   }
@@ -104,6 +112,7 @@ export function readInboxNotificationSoundPreference() {
 export function writeInboxNotificationSoundPreference(enabled: boolean) {
   try {
     window.localStorage.setItem(soundStorageKey, String(enabled));
+    window.dispatchEvent(new Event(preferencesChangedEvent));
   } catch {
     // Keep the preference in the mounted settings screen when storage is unavailable.
   }
@@ -189,6 +198,39 @@ function inboxNotificationTargetFrom(
       : {}),
     ...(typeof target.rootMessageId === "string"
       ? { rootMessageId: target.rootMessageId }
+      : {}),
+  };
+}
+
+type AndroidRemoteNotificationOpen = {
+  target: InboxNotificationTarget;
+  messageVersion?: string;
+  notificationId?: string;
+};
+
+function androidRemoteNotificationOpenFrom(
+  value: unknown,
+): AndroidRemoteNotificationOpen | null {
+  const target = inboxNotificationTargetFrom(value);
+  if (!target || !value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const metadata = value as Record<string, unknown>;
+  if (
+    (metadata.messageVersion !== undefined &&
+      typeof metadata.messageVersion !== "string") ||
+    (metadata.notificationId !== undefined &&
+      typeof metadata.notificationId !== "string")
+  ) {
+    return null;
+  }
+  return {
+    target,
+    ...(typeof metadata.messageVersion === "string"
+      ? { messageVersion: metadata.messageVersion }
+      : {}),
+    ...(typeof metadata.notificationId === "string"
+      ? { notificationId: metadata.notificationId }
       : {}),
   };
 }
@@ -332,12 +374,40 @@ export async function listenForInboxNotificationClicks(
       });
     }
 
+    const handleRemoteOpen = (event: Event) => {
+      const open = androidRemoteNotificationOpenFrom(
+        (event as CustomEvent<unknown>).detail,
+      );
+      if (open) {
+        recordAndroidRemoteNotificationReceipt(open);
+        onOpen(open.target);
+      }
+      androidPushBridge()?.drainOpen();
+    };
+    window.addEventListener(androidRemoteOpenEvent, handleRemoteOpen);
+    const pendingRemoteOpen = androidPushBridge()?.drainOpen();
+    if (pendingRemoteOpen) {
+      try {
+        const open = androidRemoteNotificationOpenFrom(
+          JSON.parse(pendingRemoteOpen),
+        );
+        if (open) {
+          recordAndroidRemoteNotificationReceipt(open);
+          onOpen(open.target);
+        }
+      } catch {
+        // Ignore a malformed native payload; the Inbox remains available.
+      }
+    }
     const { onAction } = await import("@tauri-apps/plugin-notification");
     const listener = await onAction((payload) => {
       const target = targetFromNotificationAction(payload);
       if (target) onOpen(target);
     });
-    return () => listener.unregister();
+    return () => {
+      window.removeEventListener(androidRemoteOpenEvent, handleRemoteOpen);
+      listener.unregister();
+    };
   }
 
   const handleOpen = (event: Event) => {
@@ -349,6 +419,131 @@ export async function listenForInboxNotificationClicks(
   window.addEventListener(browserOpenEvent, handleOpen);
   return () => window.removeEventListener(browserOpenEvent, handleOpen);
 }
+
+type AndroidPushBridge = {
+  token: () => string;
+  configured: () => boolean;
+  topic: () => string;
+  drainOpen: () => string;
+  hasActiveInboxNotification: (identity: string) => boolean;
+};
+
+function readAndroidRemoteNotificationReceipts() {
+  try {
+    const parsed: unknown = JSON.parse(
+      window.localStorage.getItem(androidRemoteReceiptStorageKey) ?? "{}",
+    );
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const cutoff = Date.now() - androidRemoteReceiptLifetimeMs;
+    return Object.fromEntries(Object.entries(parsed).filter(
+      (entry): entry is [string, number] =>
+        typeof entry[1] === "number" && entry[1] >= cutoff,
+    ));
+  } catch {
+    return {};
+  }
+}
+
+function recordAndroidRemoteNotificationReceipt(
+  open: AndroidRemoteNotificationOpen,
+) {
+  if (!open.notificationId || !open.messageVersion) return;
+  try {
+    const receipts = readAndroidRemoteNotificationReceipts();
+    receipts[`${open.notificationId}\u0000${open.messageVersion}`] = Date.now();
+    window.localStorage.setItem(
+      androidRemoteReceiptStorageKey,
+      JSON.stringify(receipts),
+    );
+  } catch {
+    // The active OS notification remains the short-lived duplicate guard.
+  }
+}
+
+function androidRemoteNotificationAlreadyHandled(message: InboxMessage) {
+  const identity = inboxNotificationIdentity(message);
+  const version = message.kind === "session"
+    ? inboxSessionMessageVersion(message.status, message.occurredAt)
+    : message.version;
+  if (readAndroidRemoteNotificationReceipts()[`${identity}\u0000${version}`]) {
+    return true;
+  }
+  try {
+    return androidPushBridge()?.hasActiveInboxNotification(identity) ?? false;
+  } catch {
+    return false;
+  }
+}
+
+function androidPushBridge(): AndroidPushBridge | null {
+  if (getMobilePlatform() !== "android" || typeof window === "undefined") {
+    return null;
+  }
+  const bridge = (window as typeof window & {
+    BriarAndroidPush?: AndroidPushBridge;
+  }).BriarAndroidPush;
+  return bridge?.configured() ? bridge : null;
+}
+
+function pushLocale(): "ko" | "en" | "zh" {
+  const language = document.documentElement.lang.toLowerCase();
+  if (language.startsWith("zh")) return "zh";
+  if (language.startsWith("en")) return "en";
+  return "ko";
+}
+
+// Transitional HTTP bridge until AccountService owns mobile push registration.
+export async function synchronizeAndroidPushRegistration(
+  sessionToken: string,
+) {
+  const bridge = androidPushBridge();
+  const token = bridge?.token().trim();
+  const topic = bridge?.topic().trim();
+  if (!bridge || !token || !topic) return false;
+  const preferences = readInboxNotificationPreferences();
+  await request<{ registered: boolean }>(
+    "/inbox/push-registration",
+    sessionToken,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        platform: "fcm",
+        token,
+        environment: "production",
+        topic,
+        locale: pushLocale(),
+        preferences: {
+          playSound: readInboxNotificationSoundPreference(),
+          urgent: preferences.urgent,
+          actionRequired: preferences.action_required,
+          important: preferences.important,
+          activity: preferences.activity,
+        },
+      }),
+    },
+  );
+  return true;
+}
+
+export async function deleteAndroidPushRegistration(sessionToken: string) {
+  const bridge = androidPushBridge();
+  const token = bridge?.token().trim();
+  if (!bridge || !token) return false;
+  await request<{ deleted: boolean }>(
+    "/inbox/push-registration",
+    sessionToken,
+    {
+      method: "DELETE",
+      body: JSON.stringify({ platform: "fcm", token }),
+    },
+  );
+  return true;
+}
+
+export const androidPushRegistrationEvents = {
+  preferencesChanged: preferencesChangedEvent,
+  tokenChanged: androidPushTokenEvent,
+} as const;
 
 export async function requestInboxNotificationPermission() {
   if (isTauriRuntime()) {
@@ -519,6 +714,10 @@ export async function sendInboxNotification(
     const id = inboxNotificationId(inboxNotificationIdentity(message));
     storeNotificationTarget(id, target);
     const mobilePlatform = getMobilePlatform();
+    if (
+      mobilePlatform === "android" &&
+      androidRemoteNotificationAlreadyHandled(message)
+    ) return false;
     const channelId = playSound
       ? "briar-inbox-sound-v1"
       : "briar-inbox-silent-v1";

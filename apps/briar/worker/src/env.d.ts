@@ -1,4 +1,13 @@
 interface Env {
+  /** Apple Developer team that owns the Companion bundle identifier. */
+  APNS_TEAM_ID?: string;
+  /** APNs token key identifier and unencrypted PKCS#8 key supplied as Worker secrets. */
+  APNS_KEY_ID?: string;
+  APNS_PRIVATE_KEY?: string;
+  /** Firebase service-account fields supplied together for Android push. */
+  FIREBASE_PROJECT_ID?: string;
+  FIREBASE_CLIENT_EMAIL?: string;
+  FIREBASE_PRIVATE_KEY?: string;
   /** Optional until a GitHub App webhook is configured for this deployment. */
   GITHUB_WEBHOOK_SECRET?: string;
   /** GitHub App OAuth client ID (not the numeric App ID). */

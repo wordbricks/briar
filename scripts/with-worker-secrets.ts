@@ -30,6 +30,8 @@ const OPTIONAL_SECRET_GROUPS = [
     "SLACK_TOKEN_ENCRYPTION_KEY",
   ],
   ["MANAGED_COMPUTER_AWS_SESSION_TOKEN"],
+  ["APNS_KEY_ID", "APNS_PRIVATE_KEY"],
+  ["FIREBASE_PROJECT_ID", "FIREBASE_CLIENT_EMAIL", "FIREBASE_PRIVATE_KEY"],
 ] as const;
 
 function readSecrets(): Record<string, string> {

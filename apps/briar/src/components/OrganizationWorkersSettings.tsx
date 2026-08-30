@@ -155,6 +155,12 @@ export function OrganizationWorkersSettings({
   const currentDevice = workers.find(
     (worker) => worker.deviceId === currentDeviceId,
   );
+  const boundProjectIdsByDeviceId = Object.fromEntries(
+    workers.map((worker) => [
+      worker.deviceId,
+      worker.bindings.map((binding) => binding.projectId),
+    ]),
+  );
   const statusByProjectId = new Map(
     localStatuses.map((status) => [status.projectId, status]),
   );
@@ -293,9 +299,12 @@ export function OrganizationWorkersSettings({
       ) : null}
 
       <ManagedComputersCard
+        boundProjectIdsByDeviceId={boundProjectIdsByDeviceId}
         organizationId={organization.id}
+        onProjectConnected={() => void refresh()}
         projects={organizationProjects}
         token={token}
+        workerBindingsLoaded={!loading}
       />
 
       <section className="mb-8 w-full max-w-[820px] overflow-hidden rounded-xl border border-border bg-card shadow-xs">
@@ -671,24 +680,35 @@ export function OrganizationWorkersSettings({
                             className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-border/80 bg-muted/30 px-3 py-2.5"
                             key={binding.id}
                           >
-                            <div className="flex min-w-0 items-center gap-2.5">
-                              <Typography
-                                as="strong"
-                                className="truncate"
-                                variant="bodySm"
-                              >
-                                {binding.projectName}
-                              </Typography>
-                              <span
-                                aria-hidden="true"
-                                className="h-3.5 w-px shrink-0 bg-border"
-                              />
-                              <WorkerProviderIcons
-                                providers={
-                                  binding.providers ?? [binding.agentProvider]
-                                }
-                                size={14}
-                              />
+                            <div className="grid min-w-0 gap-1">
+                              <div className="flex min-w-0 items-center gap-2.5">
+                                <Typography
+                                  as="strong"
+                                  className="truncate"
+                                  variant="bodySm"
+                                >
+                                  {binding.projectName}
+                                </Typography>
+                                <span
+                                  aria-hidden="true"
+                                  className="h-3.5 w-px shrink-0 bg-border"
+                                />
+                                <WorkerProviderIcons
+                                  providers={
+                                    binding.providers ?? [binding.agentProvider]
+                                  }
+                                  size={14}
+                                />
+                              </div>
+                              {binding.readinessDetail ? (
+                                <Typography
+                                  className="break-words"
+                                  tone="muted"
+                                  variant="micro"
+                                >
+                                  {binding.readinessDetail}
+                                </Typography>
+                              ) : null}
                             </div>
                             <Badge
                               className="shrink-0"

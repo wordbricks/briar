@@ -34,6 +34,9 @@ import {
 import { latestExecutionWorkerUpdateHandoff } from "./worker-update-repository";
 import type { AuthenticatedWorkerProject } from "./worker-route-auth";
 
+const DM_REPLY_CONTEXT_MESSAGE_LIMIT = 10;
+const DM_REPLY_CONTEXT_MAX_AGE_MS = 5 * 24 * 60 * 60 * 1_000;
+
 export type AuthenticatedChannelWorkerProject = AuthenticatedWorkerProject;
 
 export type ClaimNextChannelReplyWorkInput = {
@@ -123,7 +126,19 @@ export async function claimNextChannelReplyWork(
           job.channel_id,
           contextParentMessageId,
         )
-      : await listChannelRootMessages(db, job.channel_id);
+      : await listChannelRootMessages(
+          db,
+          job.channel_id,
+          channel.kind === "dm"
+            ? {
+                limit: DM_REPLY_CONTEXT_MESSAGE_LIMIT,
+                createdAfter: new Date(
+                  Date.parse(job.claimed_at ?? observedAt) -
+                    DM_REPLY_CONTEXT_MAX_AGE_MS,
+                ).toISOString(),
+              }
+            : {},
+        );
     if (job.project_id !== liveAgent.project_id) {
       throw new HttpError(409, "Reply job no longer matches its Agent scope");
     }

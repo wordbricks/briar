@@ -75,25 +75,30 @@ targets:
       configs:
         Dev Debug:
           BRIAR_DISPLAY_NAME: Briar Native Dev
+          BRIAR_APNS_ENVIRONMENT: development
           DEVELOPMENT_TEAM: ""
           PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion.native.dev
         Dev Release:
           BRIAR_DISPLAY_NAME: Briar Native Dev
+          BRIAR_APNS_ENVIRONMENT: development
           DEVELOPMENT_TEAM: ""
           PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion.native.dev
         Production:
           BRIAR_DISPLAY_NAME: Briar Companion
+          BRIAR_APNS_ENVIRONMENT: production
           DEVELOPMENT_TEAM: QFJZ2V3829
           PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion
     entitlements:
       path: App/BriarCompanion.entitlements
       properties:
+        aps-environment: $(BRIAR_APNS_ENVIRONMENT)
         com.apple.developer.associated-domains:
           - applinks:briar-api.wbai.workers.dev
     info:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: $(BRIAR_DISPLAY_NAME)
+        BriarAPNSEnvironment: $(BRIAR_APNS_ENVIRONMENT)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleURLTypes:
@@ -161,7 +166,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion.native.dev.ui-test-host
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) BRIAR_UI_TEST_SUPPORT
     entitlements:
-      path: App/BriarCompanion.entitlements
+      path: UITestSupport/BriarCompanion.entitlements
       properties:
         com.apple.developer.associated-domains:
           - applinks:briar-api.wbai.workers.dev
