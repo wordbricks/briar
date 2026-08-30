@@ -17036,6 +17036,3023 @@ where
     }
 }
 
+///Shorthand for `OwnedView<ListExecutionWorkersRequestView<'static>>`.
+pub type OwnedListExecutionWorkersRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListExecutionWorkersRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListExecutionWorkersResponseView<'static>>`.
+pub type OwnedListExecutionWorkersResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListExecutionWorkersResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RequestExecutionWorkerUpdateRequestView<'static>>`.
+pub type OwnedRequestExecutionWorkerUpdateRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RequestExecutionWorkerUpdateRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RequestExecutionWorkerUpdateResponseView<'static>>`.
+pub type OwnedRequestExecutionWorkerUpdateResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RequestExecutionWorkerUpdateResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateExecutionWorkerRequestView<'static>>`.
+pub type OwnedUpdateExecutionWorkerRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateExecutionWorkerRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateExecutionWorkerResponseView<'static>>`.
+pub type OwnedUpdateExecutionWorkerResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateExecutionWorkerResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<DeleteExecutionWorkerRequestView<'static>>`.
+pub type OwnedDeleteExecutionWorkerRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteExecutionWorkerRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<DeleteExecutionWorkerResponseView<'static>>`.
+pub type OwnedDeleteExecutionWorkerResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteExecutionWorkerResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetManagedComputerProductRequestView<'static>>`.
+pub type OwnedGetManagedComputerProductRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetManagedComputerProductRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetManagedComputerProductResponseView<'static>>`.
+pub type OwnedGetManagedComputerProductResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetManagedComputerProductResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListManagedComputersRequestView<'static>>`.
+pub type OwnedListManagedComputersRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListManagedComputersRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListManagedComputersResponseView<'static>>`.
+pub type OwnedListManagedComputersResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListManagedComputersResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetManagedComputerRequestView<'static>>`.
+pub type OwnedGetManagedComputerRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetManagedComputerRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetManagedComputerResponseView<'static>>`.
+pub type OwnedGetManagedComputerResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetManagedComputerResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ValidateManagedComputerPromotionRequestView<'static>>`.
+pub type OwnedValidateManagedComputerPromotionRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ValidateManagedComputerPromotionRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ValidateManagedComputerPromotionResponseView<'static>>`.
+pub type OwnedValidateManagedComputerPromotionResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ValidateManagedComputerPromotionResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ApplyForManagedComputerRequestView<'static>>`.
+pub type OwnedApplyForManagedComputerRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ApplyForManagedComputerRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ApplyForManagedComputerResponseView<'static>>`.
+pub type OwnedApplyForManagedComputerResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ApplyForManagedComputerResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RetryManagedComputerRequestView<'static>>`.
+pub type OwnedRetryManagedComputerRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RetryManagedComputerRequestView<'static>,
+>;
+///Shorthand for `OwnedView<RetryManagedComputerResponseView<'static>>`.
+pub type OwnedRetryManagedComputerResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RetryManagedComputerResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RetireManagedComputerRequestView<'static>>`.
+pub type OwnedRetireManagedComputerRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RetireManagedComputerRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RetireManagedComputerResponseView<'static>>`.
+pub type OwnedRetireManagedComputerResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RetireManagedComputerResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreateManagedComputerRemoteSessionRequestView<'static>>`.
+pub type OwnedCreateManagedComputerRemoteSessionRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerRemoteSessionRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreateManagedComputerRemoteSessionResponseView<'static>>`.
+pub type OwnedCreateManagedComputerRemoteSessionResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerRemoteSessionResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<EndManagedComputerRemoteSessionRequestView<'static>>`.
+pub type OwnedEndManagedComputerRemoteSessionRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::EndManagedComputerRemoteSessionRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<EndManagedComputerRemoteSessionResponseView<'static>>`.
+pub type OwnedEndManagedComputerRemoteSessionResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::EndManagedComputerRemoteSessionResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreateManagedComputerSetupSessionRequestView<'static>>`.
+pub type OwnedCreateManagedComputerSetupSessionRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerSetupSessionRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreateManagedComputerSetupSessionResponseView<'static>>`.
+pub type OwnedCreateManagedComputerSetupSessionResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerSetupSessionResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetManagedComputerSetupStatusRequestView<'static>>`.
+pub type OwnedGetManagedComputerSetupStatusRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetManagedComputerSetupStatusRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetManagedComputerSetupStatusResponseView<'static>>`.
+pub type OwnedGetManagedComputerSetupStatusResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetManagedComputerSetupStatusResponseView<
+        'static,
+    >,
+>;
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListExecutionWorkersResponse>
+for crate::proto::briar::app::v1::__buffa::view::ListExecutionWorkersResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListExecutionWorkersResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListExecutionWorkersResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RequestExecutionWorkerUpdateResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::RequestExecutionWorkerUpdateResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RequestExecutionWorkerUpdateResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RequestExecutionWorkerUpdateResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateExecutionWorkerResponse>
+for crate::proto::briar::app::v1::__buffa::view::UpdateExecutionWorkerResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateExecutionWorkerResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateExecutionWorkerResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteExecutionWorkerResponse>
+for crate::proto::briar::app::v1::__buffa::view::DeleteExecutionWorkerResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteExecutionWorkerResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteExecutionWorkerResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::GetManagedComputerProductResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::GetManagedComputerProductResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::GetManagedComputerProductResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetManagedComputerProductResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListManagedComputersResponse>
+for crate::proto::briar::app::v1::__buffa::view::ListManagedComputersResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListManagedComputersResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListManagedComputersResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::GetManagedComputerResponse>
+for crate::proto::briar::app::v1::__buffa::view::GetManagedComputerResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::GetManagedComputerResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetManagedComputerResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ValidateManagedComputerPromotionResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::ValidateManagedComputerPromotionResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ValidateManagedComputerPromotionResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ValidateManagedComputerPromotionResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ApplyForManagedComputerResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::ApplyForManagedComputerResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ApplyForManagedComputerResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ApplyForManagedComputerResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::RetryManagedComputerResponse>
+for crate::proto::briar::app::v1::__buffa::view::RetryManagedComputerResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::RetryManagedComputerResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RetryManagedComputerResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::RetireManagedComputerResponse>
+for crate::proto::briar::app::v1::__buffa::view::RetireManagedComputerResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::RetireManagedComputerResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RetireManagedComputerResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CreateManagedComputerRemoteSessionResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerRemoteSessionResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CreateManagedComputerRemoteSessionResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerRemoteSessionResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::EndManagedComputerRemoteSessionResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::EndManagedComputerRemoteSessionResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::EndManagedComputerRemoteSessionResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::EndManagedComputerRemoteSessionResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CreateManagedComputerSetupSessionResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerSetupSessionResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CreateManagedComputerSetupSessionResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerSetupSessionResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::GetManagedComputerSetupStatusResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::GetManagedComputerSetupStatusResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::GetManagedComputerSetupStatusResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetManagedComputerSetupStatusResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+/// Full service name for this service.
+pub const FLEET_SERVICE_SERVICE_NAME: &str = "briar.app.v1.FleetService";
+/// Static [`Spec`](::connectrpc::Spec) for the `ListExecutionWorkers` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_LIST_EXECUTION_WORKERS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/ListExecutionWorkers",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RequestExecutionWorkerUpdate` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_REQUEST_EXECUTION_WORKER_UPDATE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/RequestExecutionWorkerUpdate",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateExecutionWorker` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_UPDATE_EXECUTION_WORKER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/UpdateExecutionWorker",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `DeleteExecutionWorker` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_DELETE_EXECUTION_WORKER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/DeleteExecutionWorker",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `GetManagedComputerProduct` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_GET_MANAGED_COMPUTER_PRODUCT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/GetManagedComputerProduct",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ListManagedComputers` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_LIST_MANAGED_COMPUTERS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/ListManagedComputers",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `GetManagedComputer` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_GET_MANAGED_COMPUTER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/GetManagedComputer",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ValidateManagedComputerPromotion` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_VALIDATE_MANAGED_COMPUTER_PROMOTION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/ValidateManagedComputerPromotion",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ApplyForManagedComputer` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_APPLY_FOR_MANAGED_COMPUTER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/ApplyForManagedComputer",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RetryManagedComputer` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_RETRY_MANAGED_COMPUTER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/RetryManagedComputer",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RetireManagedComputer` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_RETIRE_MANAGED_COMPUTER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/RetireManagedComputer",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CreateManagedComputerRemoteSession` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_CREATE_MANAGED_COMPUTER_REMOTE_SESSION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/CreateManagedComputerRemoteSession",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `EndManagedComputerRemoteSession` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_END_MANAGED_COMPUTER_REMOTE_SESSION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/EndManagedComputerRemoteSession",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CreateManagedComputerSetupSession` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_CREATE_MANAGED_COMPUTER_SETUP_SESSION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/CreateManagedComputerSetupSession",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `GetManagedComputerSetupStatus` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_GET_MANAGED_COMPUTER_SETUP_STATUS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/GetManagedComputerSetupStatus",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// FleetService owns authenticated organization-level machine administration.
+/// WebSocket upgrades for remote desktop and guided setup remain ordinary HTTP;
+/// this service owns only their unary control-plane requests and tickets.
+///
+/// # Implementing handlers
+///
+/// Implement methods with plain `async fn`; the returned future satisfies
+/// the `Send` bound automatically.
+///
+/// **Unary and server-streaming requests** arrive as
+/// [`ServiceRequest<'_, Req>`](::connectrpc::ServiceRequest): a zero-copy
+/// view of the request plus its body, valid for the duration of the call.
+/// Fields are read directly (`request.name` is a `&str` into the decoded
+/// buffer) and the borrow may be held across `.await` points. Anything
+/// that must outlive the call — `tokio::spawn`, channels, server state,
+/// or data captured by a returned response stream — takes owned data:
+/// call `request.to_owned_message()` (or copy the specific fields)
+/// first.
+///
+/// **Client-streaming and bidi requests** arrive as
+/// [`InboundStream<Req>`](::connectrpc::InboundStream) — a
+/// `ServiceStream` of [`StreamMessage`](::connectrpc::StreamMessage)s.
+/// Each item owns its decoded buffer and is `Send + 'static`, so items
+/// can be buffered or moved into spawned tasks; read fields zero-copy
+/// through the generated accessor methods (`item.name()`) or `.view()`,
+/// convert with `.to_owned_message()`, or yield an item back unchanged —
+/// `StreamMessage<M>` implements `Encodable<M>`.
+///
+/// Request types resolved through `extern_path` (e.g. well-known types
+/// from another crate) use the same wrappers; the crate that owns the
+/// type must be generated with buffa ≥ 0.9.0 and views enabled so the
+/// backing `HasMessageView` impl exists.
+///
+/// The `impl Encodable<Out>` return bound accepts the owned `Out`, the
+/// generated `OutView<'_>` / `OwnedOutView`,
+/// [`MaybeBorrowed`](::connectrpc::MaybeBorrowed), or
+/// [`PreEncoded`](::connectrpc::PreEncoded) for handlers that encode a
+/// non-`'static` view internally and pass the bytes across the handler
+/// boundary. View bodies are not emitted for output types mapped via
+/// `extern_path` (the impl would be an orphan); return owned for
+/// WKT/extern outputs.
+///
+/// Server-streaming and bidi-streaming methods return
+/// `ServiceStream<impl Encodable<Out> + Send + use<Self>>`. The
+/// `use<Self>` precise-capturing clause excludes `&self`'s lifetime and
+/// the request's lifetime (unary methods use `use<'a, Self>` and may
+/// borrow from `&self`), so stream items must be `'static` and cannot
+/// borrow from the request. To stream view-encoded data, encode each
+/// item inside the stream body and yield
+/// [`PreEncoded`](::connectrpc::PreEncoded) — see its `# Streaming
+/// example` doc.
+#[allow(clippy::type_complexity)]
+pub trait FleetService: Send + Sync + 'static {
+    /// Handle the ListExecutionWorkers RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_execution_workers<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ListExecutionWorkersRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ListExecutionWorkersResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RequestExecutionWorkerUpdate RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn request_execution_worker_update<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::RequestExecutionWorkerUpdateRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::RequestExecutionWorkerUpdateResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UpdateExecutionWorker RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_execution_worker<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdateExecutionWorkerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdateExecutionWorkerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the DeleteExecutionWorker RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn delete_execution_worker<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::DeleteExecutionWorkerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::DeleteExecutionWorkerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the GetManagedComputerProduct RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_managed_computer_product<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::GetManagedComputerProductRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::GetManagedComputerProductResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ListManagedComputers RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_managed_computers<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ListManagedComputersRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ListManagedComputersResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the GetManagedComputer RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_managed_computer<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::GetManagedComputerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::GetManagedComputerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ValidateManagedComputerPromotion RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn validate_managed_computer_promotion<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ValidateManagedComputerPromotionRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ValidateManagedComputerPromotionResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ApplyForManagedComputer RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn apply_for_managed_computer<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ApplyForManagedComputerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ApplyForManagedComputerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RetryManagedComputer RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn retry_managed_computer<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::RetryManagedComputerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::RetryManagedComputerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RetireManagedComputer RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn retire_managed_computer<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::RetireManagedComputerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::RetireManagedComputerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the CreateManagedComputerRemoteSession RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_managed_computer_remote_session<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::CreateManagedComputerRemoteSessionRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::CreateManagedComputerRemoteSessionResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the EndManagedComputerRemoteSession RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn end_managed_computer_remote_session<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::EndManagedComputerRemoteSessionRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::EndManagedComputerRemoteSessionResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the CreateManagedComputerSetupSession RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_managed_computer_setup_session<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::CreateManagedComputerSetupSessionRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::CreateManagedComputerSetupSessionResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the GetManagedComputerSetupStatus RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_managed_computer_setup_status<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::GetManagedComputerSetupStatusRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::GetManagedComputerSetupStatusResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+}
+/// Extension trait for registering a service implementation with a Router.
+///
+/// This trait is automatically implemented for all types that implement the service trait.
+/// Prefer [`Router::add_service`](::connectrpc::Router::add_service) for
+/// top-down registration; `register` remains available for compatibility
+/// and cases where the service-first call shape is more convenient.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use std::sync::Arc;
+///
+/// let service = Arc::new(MyServiceImpl);
+/// let router = service.register(Router::new());
+/// ```
+pub trait FleetServiceExt: FleetService {
+    /// Register this service implementation with a Router.
+    ///
+    /// Takes ownership of the `Arc<Self>` and returns a new Router with
+    /// this service's methods registered.
+    fn register(
+        self: ::std::sync::Arc<Self>,
+        router: ::connectrpc::Router,
+    ) -> ::connectrpc::Router;
+}
+impl<S: FleetService> FleetServiceExt for S {
+    fn register(
+        self: ::std::sync::Arc<Self>,
+        router: ::connectrpc::Router,
+    ) -> ::connectrpc::Router {
+        router
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "ListExecutionWorkers",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ListExecutionWorkersRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ListExecutionWorkersRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_execution_workers(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ListExecutionWorkersResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_LIST_EXECUTION_WORKERS_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "RequestExecutionWorkerUpdate",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::RequestExecutionWorkerUpdateRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::RequestExecutionWorkerUpdateRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.request_execution_worker_update(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::RequestExecutionWorkerUpdateResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_REQUEST_EXECUTION_WORKER_UPDATE_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "UpdateExecutionWorker",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateExecutionWorkerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdateExecutionWorkerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_execution_worker(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdateExecutionWorkerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_UPDATE_EXECUTION_WORKER_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "DeleteExecutionWorker",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::DeleteExecutionWorkerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::DeleteExecutionWorkerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.delete_execution_worker(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::DeleteExecutionWorkerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_DELETE_EXECUTION_WORKER_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "GetManagedComputerProduct",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::GetManagedComputerProductRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::GetManagedComputerProductRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_managed_computer_product(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::GetManagedComputerProductResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_GET_MANAGED_COMPUTER_PRODUCT_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "ListManagedComputers",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ListManagedComputersRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ListManagedComputersRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_managed_computers(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ListManagedComputersResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_LIST_MANAGED_COMPUTERS_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "GetManagedComputer",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::GetManagedComputerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::GetManagedComputerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_managed_computer(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::GetManagedComputerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_GET_MANAGED_COMPUTER_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "ValidateManagedComputerPromotion",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ValidateManagedComputerPromotionRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ValidateManagedComputerPromotionRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.validate_managed_computer_promotion(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ValidateManagedComputerPromotionResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_VALIDATE_MANAGED_COMPUTER_PROMOTION_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "ApplyForManagedComputer",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ApplyForManagedComputerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ApplyForManagedComputerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.apply_for_managed_computer(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ApplyForManagedComputerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_APPLY_FOR_MANAGED_COMPUTER_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "RetryManagedComputer",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::RetryManagedComputerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::RetryManagedComputerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.retry_managed_computer(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::RetryManagedComputerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_RETRY_MANAGED_COMPUTER_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "RetireManagedComputer",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::RetireManagedComputerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::RetireManagedComputerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.retire_managed_computer(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::RetireManagedComputerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_RETIRE_MANAGED_COMPUTER_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "CreateManagedComputerRemoteSession",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerRemoteSessionRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::CreateManagedComputerRemoteSessionRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_managed_computer_remote_session(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::CreateManagedComputerRemoteSessionResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_CREATE_MANAGED_COMPUTER_REMOTE_SESSION_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "EndManagedComputerRemoteSession",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::EndManagedComputerRemoteSessionRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::EndManagedComputerRemoteSessionRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.end_managed_computer_remote_session(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::EndManagedComputerRemoteSessionResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_END_MANAGED_COMPUTER_REMOTE_SESSION_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "CreateManagedComputerSetupSession",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerSetupSessionRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::CreateManagedComputerSetupSessionRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_managed_computer_setup_session(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::CreateManagedComputerSetupSessionResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_CREATE_MANAGED_COMPUTER_SETUP_SESSION_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "GetManagedComputerSetupStatus",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::GetManagedComputerSetupStatusRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::GetManagedComputerSetupStatusRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_managed_computer_setup_status(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::GetManagedComputerSetupStatusResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_GET_MANAGED_COMPUTER_SETUP_STATUS_SPEC)
+    }
+}
+/// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
+#[doc(hidden)]
+pub struct FleetServiceRegisterMarker;
+impl<S: FleetService> ::connectrpc::ServiceRegister<FleetServiceRegisterMarker>
+for ::std::sync::Arc<S> {
+    fn register_service(self, router: ::connectrpc::Router) -> ::connectrpc::Router {
+        <S as FleetServiceExt>::register(self, router)
+    }
+}
+/// Monomorphic dispatcher for `FleetService`.
+///
+/// Unlike `.register(Router)` which type-erases each method into an `Arc<dyn ErasedHandler>` stored in a `HashMap`, this struct dispatches via a compile-time `match` on method name: no vtable, no hash lookup.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use connectrpc::ConnectRpcService;
+///
+/// let server = FleetServiceServer::new(MyImpl);
+/// let service = ConnectRpcService::new(server);
+/// // hand `service` to axum/hyper as a fallback_service
+/// ```
+pub struct FleetServiceServer<T> {
+    inner: ::std::sync::Arc<T>,
+}
+impl<T: FleetService> FleetServiceServer<T> {
+    /// Wrap a service implementation in a monomorphic dispatcher.
+    pub fn new(service: T) -> Self {
+        Self {
+            inner: ::std::sync::Arc::new(service),
+        }
+    }
+    /// Wrap an already-`Arc`'d service implementation.
+    pub fn from_arc(inner: ::std::sync::Arc<T>) -> Self {
+        Self { inner }
+    }
+}
+impl<T> Clone for FleetServiceServer<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: ::std::sync::Arc::clone(&self.inner),
+        }
+    }
+}
+impl<T: FleetService> ::connectrpc::Dispatcher for FleetServiceServer<T> {
+    #[inline]
+    fn lookup(
+        &self,
+        path: &str,
+    ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
+        let method = path.strip_prefix("briar.app.v1.FleetService/")?;
+        match method {
+            "ListExecutionWorkers" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_LIST_EXECUTION_WORKERS_SPEC),
+                )
+            }
+            "RequestExecutionWorkerUpdate" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_REQUEST_EXECUTION_WORKER_UPDATE_SPEC),
+                )
+            }
+            "UpdateExecutionWorker" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_UPDATE_EXECUTION_WORKER_SPEC),
+                )
+            }
+            "DeleteExecutionWorker" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_DELETE_EXECUTION_WORKER_SPEC),
+                )
+            }
+            "GetManagedComputerProduct" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_GET_MANAGED_COMPUTER_PRODUCT_SPEC),
+                )
+            }
+            "ListManagedComputers" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_LIST_MANAGED_COMPUTERS_SPEC),
+                )
+            }
+            "GetManagedComputer" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_GET_MANAGED_COMPUTER_SPEC),
+                )
+            }
+            "ValidateManagedComputerPromotion" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            FLEET_SERVICE_VALIDATE_MANAGED_COMPUTER_PROMOTION_SPEC,
+                        ),
+                )
+            }
+            "ApplyForManagedComputer" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_APPLY_FOR_MANAGED_COMPUTER_SPEC),
+                )
+            }
+            "RetryManagedComputer" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_RETRY_MANAGED_COMPUTER_SPEC),
+                )
+            }
+            "RetireManagedComputer" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_RETIRE_MANAGED_COMPUTER_SPEC),
+                )
+            }
+            "CreateManagedComputerRemoteSession" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            FLEET_SERVICE_CREATE_MANAGED_COMPUTER_REMOTE_SESSION_SPEC,
+                        ),
+                )
+            }
+            "EndManagedComputerRemoteSession" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            FLEET_SERVICE_END_MANAGED_COMPUTER_REMOTE_SESSION_SPEC,
+                        ),
+                )
+            }
+            "CreateManagedComputerSetupSession" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            FLEET_SERVICE_CREATE_MANAGED_COMPUTER_SETUP_SESSION_SPEC,
+                        ),
+                )
+            }
+            "GetManagedComputerSetupStatus" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_GET_MANAGED_COMPUTER_SETUP_STATUS_SPEC),
+                )
+            }
+            _ => None,
+        }
+    }
+    fn call_unary(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::Payload,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
+        let Some(method) = path.strip_prefix("briar.app.v1.FleetService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
+        };
+        let _ = (&ctx, &request, &format);
+        match method {
+            "ListExecutionWorkers" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ListExecutionWorkersRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ListExecutionWorkersRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ListExecutionWorkersRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_execution_workers(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ListExecutionWorkersResponse,
+                        >(format)
+                })
+            }
+            "RequestExecutionWorkerUpdate" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::RequestExecutionWorkerUpdateRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::RequestExecutionWorkerUpdateRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::RequestExecutionWorkerUpdateRequest,
+                    >::from_parts(&req, &body);
+                    svc.request_execution_worker_update(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::RequestExecutionWorkerUpdateResponse,
+                        >(format)
+                })
+            }
+            "UpdateExecutionWorker" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdateExecutionWorkerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateExecutionWorkerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdateExecutionWorkerRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_execution_worker(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdateExecutionWorkerResponse,
+                        >(format)
+                })
+            }
+            "DeleteExecutionWorker" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::DeleteExecutionWorkerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::DeleteExecutionWorkerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::DeleteExecutionWorkerRequest,
+                    >::from_parts(&req, &body);
+                    svc.delete_execution_worker(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::DeleteExecutionWorkerResponse,
+                        >(format)
+                })
+            }
+            "GetManagedComputerProduct" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::GetManagedComputerProductRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::GetManagedComputerProductRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::GetManagedComputerProductRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_managed_computer_product(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::GetManagedComputerProductResponse,
+                        >(format)
+                })
+            }
+            "ListManagedComputers" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ListManagedComputersRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ListManagedComputersRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ListManagedComputersRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_managed_computers(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ListManagedComputersResponse,
+                        >(format)
+                })
+            }
+            "GetManagedComputer" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::GetManagedComputerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::GetManagedComputerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::GetManagedComputerRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_managed_computer(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::GetManagedComputerResponse,
+                        >(format)
+                })
+            }
+            "ValidateManagedComputerPromotion" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ValidateManagedComputerPromotionRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ValidateManagedComputerPromotionRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ValidateManagedComputerPromotionRequest,
+                    >::from_parts(&req, &body);
+                    svc.validate_managed_computer_promotion(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ValidateManagedComputerPromotionResponse,
+                        >(format)
+                })
+            }
+            "ApplyForManagedComputer" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ApplyForManagedComputerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ApplyForManagedComputerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ApplyForManagedComputerRequest,
+                    >::from_parts(&req, &body);
+                    svc.apply_for_managed_computer(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ApplyForManagedComputerResponse,
+                        >(format)
+                })
+            }
+            "RetryManagedComputer" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::RetryManagedComputerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::RetryManagedComputerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::RetryManagedComputerRequest,
+                    >::from_parts(&req, &body);
+                    svc.retry_managed_computer(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::RetryManagedComputerResponse,
+                        >(format)
+                })
+            }
+            "RetireManagedComputer" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::RetireManagedComputerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::RetireManagedComputerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::RetireManagedComputerRequest,
+                    >::from_parts(&req, &body);
+                    svc.retire_managed_computer(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::RetireManagedComputerResponse,
+                        >(format)
+                })
+            }
+            "CreateManagedComputerRemoteSession" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::CreateManagedComputerRemoteSessionRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerRemoteSessionRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::CreateManagedComputerRemoteSessionRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_managed_computer_remote_session(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::CreateManagedComputerRemoteSessionResponse,
+                        >(format)
+                })
+            }
+            "EndManagedComputerRemoteSession" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::EndManagedComputerRemoteSessionRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::EndManagedComputerRemoteSessionRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::EndManagedComputerRemoteSessionRequest,
+                    >::from_parts(&req, &body);
+                    svc.end_managed_computer_remote_session(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::EndManagedComputerRemoteSessionResponse,
+                        >(format)
+                })
+            }
+            "CreateManagedComputerSetupSession" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::CreateManagedComputerSetupSessionRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerSetupSessionRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::CreateManagedComputerSetupSessionRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_managed_computer_setup_session(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::CreateManagedComputerSetupSessionResponse,
+                        >(format)
+                })
+            }
+            "GetManagedComputerSetupStatus" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::GetManagedComputerSetupStatusRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::GetManagedComputerSetupStatusRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::GetManagedComputerSetupStatusRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_managed_computer_setup_status(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::GetManagedComputerSetupStatusResponse,
+                        >(format)
+                })
+            }
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
+        }
+    }
+    fn call_server_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        request: ::buffa::bytes::Bytes,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
+        let Some(method) = path.strip_prefix("briar.app.v1.FleetService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
+        };
+        let _ = (&ctx, &request, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
+        }
+    }
+    fn call_client_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        requests: ::connectrpc::dispatcher::codegen::RequestStream,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
+        let Some(method) = path.strip_prefix("briar.app.v1.FleetService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
+        };
+        let _ = (&ctx, &requests, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
+        }
+    }
+    fn call_bidi_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        requests: ::connectrpc::dispatcher::codegen::RequestStream,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
+        let Some(method) = path.strip_prefix("briar.app.v1.FleetService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
+        };
+        let _ = (&ctx, &requests, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
+        }
+    }
+}
+/// Client for this service.
+///
+/// Generic over `T: ClientTransport`. For **gRPC** (HTTP/2), use
+/// `Http2Connection` — it has honest `poll_ready` and composes with
+/// `tower::balance` for multi-connection load balancing. For **Connect
+/// over HTTP/1.1** (or unknown protocol), use `HttpClient`.
+///
+/// # Example (gRPC / HTTP/2)
+///
+/// ```rust,ignore
+/// use connectrpc::client::{Http2Connection, ClientConfig};
+/// use connectrpc::Protocol;
+///
+/// let uri: http::Uri = "http://localhost:8080".parse()?;
+/// let conn = Http2Connection::connect_plaintext(uri.clone()).await?.shared(1024);
+/// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
+///
+/// let client = FleetServiceClient::new(conn, config);
+/// let response = client.list_execution_workers(request).await?;
+/// ```
+///
+/// # Example (Connect / HTTP/1.1 or ALPN)
+///
+/// ```rust,ignore
+/// use connectrpc::client::{HttpClient, ClientConfig};
+///
+/// let http = HttpClient::plaintext();  // cleartext http:// only
+/// let config = ClientConfig::new("http://localhost:8080".parse()?);
+///
+/// let client = FleetServiceClient::new(http, config);
+/// let response = client.list_execution_workers(request).await?;
+/// ```
+///
+/// # Working with the response
+///
+/// Unary calls return [`UnaryResponse<OwnedView<FooView>>`](::connectrpc::client::UnaryResponse).
+/// [`view()`](::connectrpc::client::UnaryResponse::view) borrows the response
+/// message, so field access is zero-copy:
+///
+/// ```rust,ignore
+/// let resp = client.list_execution_workers(request).await?;
+/// let name: &str = resp.view().name;  // borrow into the response buffer
+/// ```
+///
+/// If you need the owned struct (e.g. to store or pass by value), use
+/// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
+///
+/// ```rust,ignore
+/// let owned = client.list_execution_workers(request).await?.into_owned();
+/// ```
+///
+/// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
+/// zero-copy decoded body (an `OwnedView`) without copying; field access on it
+/// goes through `.reborrow()`. Streaming responses yield one
+/// [`StreamMessage`](::connectrpc::StreamMessage) per received message from
+/// `.message().await` — read fields zero-copy through the generated accessor
+/// methods (`msg.name()`) or `.view()`, or convert with `.to_owned_message()`.
+#[cfg(feature = "client")]
+#[derive(Clone)]
+pub struct FleetServiceClient<T> {
+    transport: T,
+    config: ::connectrpc::client::ClientConfig,
+}
+#[cfg(feature = "client")]
+impl<T> FleetServiceClient<T>
+where
+    T: ::connectrpc::client::ClientTransport,
+    <T::ResponseBody as ::connectrpc::http_body::Body>::Error: ::std::fmt::Display,
+{
+    /// Create a new client with the given transport and configuration.
+    pub fn new(transport: T, config: ::connectrpc::client::ClientConfig) -> Self {
+        Self { transport, config }
+    }
+    /// Get the client configuration.
+    pub fn config(&self) -> &::connectrpc::client::ClientConfig {
+        &self.config
+    }
+    /// Get a mutable reference to the client configuration.
+    pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
+        &mut self.config
+    }
+    /// Call the ListExecutionWorkers RPC. Sends a request to /briar.app.v1.FleetService/ListExecutionWorkers.
+    pub async fn list_execution_workers(
+        &self,
+        request: crate::proto::briar::app::v1::ListExecutionWorkersRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListExecutionWorkersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_execution_workers_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListExecutionWorkers RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_execution_workers_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ListExecutionWorkersRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListExecutionWorkersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_LIST_EXECUTION_WORKERS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RequestExecutionWorkerUpdate RPC. Sends a request to /briar.app.v1.FleetService/RequestExecutionWorkerUpdate.
+    pub async fn request_execution_worker_update(
+        &self,
+        request: crate::proto::briar::app::v1::RequestExecutionWorkerUpdateRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RequestExecutionWorkerUpdateResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.request_execution_worker_update_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RequestExecutionWorkerUpdate RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn request_execution_worker_update_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::RequestExecutionWorkerUpdateRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RequestExecutionWorkerUpdateResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_REQUEST_EXECUTION_WORKER_UPDATE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdateExecutionWorker RPC. Sends a request to /briar.app.v1.FleetService/UpdateExecutionWorker.
+    pub async fn update_execution_worker(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateExecutionWorkerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateExecutionWorkerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_execution_worker_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateExecutionWorker RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_execution_worker_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateExecutionWorkerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateExecutionWorkerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_UPDATE_EXECUTION_WORKER_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DeleteExecutionWorker RPC. Sends a request to /briar.app.v1.FleetService/DeleteExecutionWorker.
+    pub async fn delete_execution_worker(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteExecutionWorkerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteExecutionWorkerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.delete_execution_worker_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DeleteExecutionWorker RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_execution_worker_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteExecutionWorkerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteExecutionWorkerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_DELETE_EXECUTION_WORKER_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetManagedComputerProduct RPC. Sends a request to /briar.app.v1.FleetService/GetManagedComputerProduct.
+    pub async fn get_managed_computer_product(
+        &self,
+        request: crate::proto::briar::app::v1::GetManagedComputerProductRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetManagedComputerProductResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_managed_computer_product_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetManagedComputerProduct RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_managed_computer_product_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::GetManagedComputerProductRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetManagedComputerProductResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_GET_MANAGED_COMPUTER_PRODUCT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListManagedComputers RPC. Sends a request to /briar.app.v1.FleetService/ListManagedComputers.
+    pub async fn list_managed_computers(
+        &self,
+        request: crate::proto::briar::app::v1::ListManagedComputersRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListManagedComputersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_managed_computers_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListManagedComputers RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_managed_computers_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ListManagedComputersRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListManagedComputersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_LIST_MANAGED_COMPUTERS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetManagedComputer RPC. Sends a request to /briar.app.v1.FleetService/GetManagedComputer.
+    pub async fn get_managed_computer(
+        &self,
+        request: crate::proto::briar::app::v1::GetManagedComputerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetManagedComputerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_managed_computer_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetManagedComputer RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_managed_computer_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::GetManagedComputerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetManagedComputerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_GET_MANAGED_COMPUTER_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ValidateManagedComputerPromotion RPC. Sends a request to /briar.app.v1.FleetService/ValidateManagedComputerPromotion.
+    pub async fn validate_managed_computer_promotion(
+        &self,
+        request: crate::proto::briar::app::v1::ValidateManagedComputerPromotionRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ValidateManagedComputerPromotionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.validate_managed_computer_promotion_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ValidateManagedComputerPromotion RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn validate_managed_computer_promotion_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ValidateManagedComputerPromotionRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ValidateManagedComputerPromotionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_VALIDATE_MANAGED_COMPUTER_PROMOTION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ApplyForManagedComputer RPC. Sends a request to /briar.app.v1.FleetService/ApplyForManagedComputer.
+    pub async fn apply_for_managed_computer(
+        &self,
+        request: crate::proto::briar::app::v1::ApplyForManagedComputerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ApplyForManagedComputerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.apply_for_managed_computer_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ApplyForManagedComputer RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn apply_for_managed_computer_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ApplyForManagedComputerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ApplyForManagedComputerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_APPLY_FOR_MANAGED_COMPUTER_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RetryManagedComputer RPC. Sends a request to /briar.app.v1.FleetService/RetryManagedComputer.
+    pub async fn retry_managed_computer(
+        &self,
+        request: crate::proto::briar::app::v1::RetryManagedComputerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RetryManagedComputerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.retry_managed_computer_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RetryManagedComputer RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn retry_managed_computer_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::RetryManagedComputerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RetryManagedComputerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_RETRY_MANAGED_COMPUTER_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RetireManagedComputer RPC. Sends a request to /briar.app.v1.FleetService/RetireManagedComputer.
+    pub async fn retire_managed_computer(
+        &self,
+        request: crate::proto::briar::app::v1::RetireManagedComputerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RetireManagedComputerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.retire_managed_computer_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RetireManagedComputer RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn retire_managed_computer_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::RetireManagedComputerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RetireManagedComputerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_RETIRE_MANAGED_COMPUTER_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CreateManagedComputerRemoteSession RPC. Sends a request to /briar.app.v1.FleetService/CreateManagedComputerRemoteSession.
+    pub async fn create_managed_computer_remote_session(
+        &self,
+        request: crate::proto::briar::app::v1::CreateManagedComputerRemoteSessionRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerRemoteSessionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_managed_computer_remote_session_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateManagedComputerRemoteSession RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_managed_computer_remote_session_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::CreateManagedComputerRemoteSessionRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerRemoteSessionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_CREATE_MANAGED_COMPUTER_REMOTE_SESSION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the EndManagedComputerRemoteSession RPC. Sends a request to /briar.app.v1.FleetService/EndManagedComputerRemoteSession.
+    pub async fn end_managed_computer_remote_session(
+        &self,
+        request: crate::proto::briar::app::v1::EndManagedComputerRemoteSessionRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::EndManagedComputerRemoteSessionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.end_managed_computer_remote_session_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the EndManagedComputerRemoteSession RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn end_managed_computer_remote_session_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::EndManagedComputerRemoteSessionRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::EndManagedComputerRemoteSessionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_END_MANAGED_COMPUTER_REMOTE_SESSION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CreateManagedComputerSetupSession RPC. Sends a request to /briar.app.v1.FleetService/CreateManagedComputerSetupSession.
+    pub async fn create_managed_computer_setup_session(
+        &self,
+        request: crate::proto::briar::app::v1::CreateManagedComputerSetupSessionRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerSetupSessionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_managed_computer_setup_session_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateManagedComputerSetupSession RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_managed_computer_setup_session_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::CreateManagedComputerSetupSessionRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerSetupSessionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_CREATE_MANAGED_COMPUTER_SETUP_SESSION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetManagedComputerSetupStatus RPC. Sends a request to /briar.app.v1.FleetService/GetManagedComputerSetupStatus.
+    pub async fn get_managed_computer_setup_status(
+        &self,
+        request: crate::proto::briar::app::v1::GetManagedComputerSetupStatusRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetManagedComputerSetupStatusResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_managed_computer_setup_status_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetManagedComputerSetupStatus RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_managed_computer_setup_status_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::GetManagedComputerSetupStatusRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetManagedComputerSetupStatusResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_GET_MANAGED_COMPUTER_SETUP_STATUS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+}
+
 ///Shorthand for `OwnedView<GetInboxFeedRequestView<'static>>`.
 pub type OwnedGetInboxFeedRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::GetInboxFeedRequestView<'static>,
