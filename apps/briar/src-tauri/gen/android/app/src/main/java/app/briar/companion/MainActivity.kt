@@ -16,13 +16,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.browser.auth.AuthTabIntent
 import androidx.browser.customtabs.CustomTabsIntent
 import me.leolin.shortcutbadger.ShortcutBadger
-import org.json.JSONObject
 import java.security.MessageDigest
 
 class MainActivity : TauriActivity() {
   private var appWebView: WebView? = null
   private var pendingAuthReturn = false
-  private var pendingPushTarget: JSONObject? = null
+  private var pendingPushTargetProto: String? = null
   private val pushPreferences: SharedPreferences by lazy {
     getSharedPreferences(BriarApplication.PUSH_PREFERENCES, MODE_PRIVATE)
   }
@@ -54,7 +53,7 @@ class MainActivity : TauriActivity() {
     }
 
   override fun onCreate(savedInstanceState: Bundle?) {
-    pendingPushTarget = pushTarget(intent)
+    pendingPushTargetProto = pushTargetProto(intent)
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
     onBackPressedDispatcher.addCallback(this, navigationBackCallback)
@@ -92,8 +91,8 @@ class MainActivity : TauriActivity() {
       pendingAuthReturn = true
       notifyAuthReturn(true)
     }
-    pushTarget(intent)?.let {
-      pendingPushTarget = it
+    pushTargetProto(intent)?.let {
+      pendingPushTargetProto = it
       notifyPushOpen()
     }
   }
@@ -186,13 +185,10 @@ class MainActivity : TauriActivity() {
         BuildConfig.BRIAR_FIREBASE_PROJECT_ID.isNotBlank()
 
     @JavascriptInterface
-    fun topic(): String = packageName
-
-    @JavascriptInterface
     fun drainOpen(): String {
-      val target = pendingPushTarget ?: return ""
-      pendingPushTarget = null
-      return target.toString()
+      val targetProto = pendingPushTargetProto ?: return ""
+      pendingPushTargetProto = null
+      return targetProto
     }
 
     @JavascriptInterface
@@ -212,42 +208,20 @@ class MainActivity : TauriActivity() {
   }
 
   private fun notifyPushOpen() {
-    val target = pendingPushTarget ?: return
+    if (pendingPushTargetProto == null) return
     val webView = appWebView ?: return
     webView.post {
       webView.evaluateJavascript(
-        "window.dispatchEvent(new CustomEvent('briar-remote-notification-open',{detail:$target}));",
+        "window.dispatchEvent(new Event('briar-remote-notification-open'));",
         null,
       )
     }
   }
 
-  private fun pushTarget(intent: Intent?): JSONObject? {
+  private fun pushTargetProto(intent: Intent?): String? {
     if (intent?.action != PUSH_OPEN_ACTION) return null
-    val messageId = intent.getStringExtra("messageId") ?: return null
-    val messageVersion = intent.getStringExtra("messageVersion") ?: return null
-    val notificationId = intent.getStringExtra("notificationId") ?: return null
-    val projectId = intent.getStringExtra("projectId") ?: return null
-    val targetId = intent.getStringExtra("targetId") ?: return null
-    val kind = intent.getStringExtra("kind") ?: return null
-    return JSONObject()
-      .put("messageId", messageId)
-      .put("messageVersion", messageVersion)
-      .put("notificationId", notificationId)
-      .put("projectId", projectId)
-      .put("targetId", targetId)
-      .put("kind", kind)
-      .apply {
-        intent.getStringExtra("conversationMessageId")
-          ?.takeIf(String::isNotBlank)
-          ?.let { put("conversationMessageId", it) }
-        intent.getStringExtra("channelMessageId")
-          ?.takeIf(String::isNotBlank)
-          ?.let { put("channelMessageId", it) }
-        intent.getStringExtra("rootMessageId")
-          ?.takeIf(String::isNotBlank)
-          ?.let { put("rootMessageId", it) }
-      }
+    return intent.getStringExtra(PUSH_TARGET_PROTO_EXTRA)
+      ?.takeIf(String::isNotBlank)
   }
 
   private fun remoteCollapseId(value: String): String {
@@ -306,6 +280,7 @@ class MainActivity : TauriActivity() {
     private const val ICON_BRIDGE = "BriarAndroidIcon"
     private const val PUSH_BRIDGE = "BriarAndroidPush"
     private const val PUSH_OPEN_ACTION = "BRIAR_INBOX_NOTIFICATION"
+    private const val PUSH_TARGET_PROTO_EXTRA = "briarInboxTargetProto"
     private const val AUTH_RETURN_HOST = "auth-complete"
     private const val AUTH_RETURN_SCHEME = "briar-companion"
     private val ICON_ALIASES =

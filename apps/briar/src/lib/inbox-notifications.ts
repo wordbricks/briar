@@ -4,6 +4,12 @@ import {
   type InboxMessage,
 } from "../hooks/useInbox";
 import {
+  MobilePushNotificationTargetSchema,
+  type MobilePushNotificationTarget,
+} from "@briar/contracts/gen/briar/app/v1/inbox_pb";
+import { fromBinary } from "@bufbuild/protobuf";
+import * as Schema from "effect/Schema";
+import {
   getMobilePlatform,
   isDesktopTauri,
   isMacDesktopTauri,
@@ -14,7 +20,12 @@ import {
   type InboxNotificationPermissionStatus,
   type InboxNotificationTarget,
 } from "../generated/tauri";
-import { request } from "./api/request";
+import {
+  registerMobilePushDevice,
+  unregisterMobilePushDevice,
+  type MobilePushDeviceLocale,
+} from "./app-rpc/account";
+import { UuidString } from "./api/schema-helpers";
 import { inboxSessionMessageVersion } from "./inbox-session-version";
 
 export const inboxNotificationCategories = [
@@ -204,35 +215,123 @@ function inboxNotificationTargetFrom(
 
 type AndroidRemoteNotificationOpen = {
   target: InboxNotificationTarget;
-  messageVersion?: string;
-  notificationId?: string;
+  messageVersion: string;
+  notificationId: string;
 };
 
-function androidRemoteNotificationOpenFrom(
-  value: unknown,
+const decodeMobilePushValue = Schema.decodeUnknownSync(
+  Schema.Trim.check(Schema.isNonEmpty()),
+);
+const decodeMobilePushUuid = Schema.decodeUnknownSync(UuidString);
+
+const requiredMobilePushValue = (value: string, field: string) => {
+  const decoded = decodeMobilePushValue(value);
+  if (decoded !== value) {
+    throw new Error(`Mobile push target ${field} is required`);
+  }
+  return decoded;
+};
+
+const requiredMobilePushUuid = (value: string) => decodeMobilePushUuid(value);
+
+const impossibleMobilePushDestination = (destination: never): never => {
+  throw new Error(`Unknown mobile push destination: ${String(destination)}`);
+};
+
+const mobilePushNotificationOpenFromMessage = (
+  message: MobilePushNotificationTarget,
+): AndroidRemoteNotificationOpen => {
+  const messageId = requiredMobilePushValue(
+    message.inboxMessageId,
+    "inbox_message_id",
+  );
+  const messageVersion = requiredMobilePushValue(
+    message.inboxMessageVersion,
+    "inbox_message_version",
+  );
+  const notificationId = requiredMobilePushValue(
+    message.notificationId,
+    "notification_id",
+  );
+  const projectId = requiredMobilePushUuid(message.projectId);
+  const metadata = { messageVersion, notificationId };
+  const destination = message.destination;
+  switch (destination.case) {
+    case "issue":
+      return {
+        target: {
+          messageId,
+          projectId,
+          targetId: requiredMobilePushUuid(message.targetId),
+          kind: "issue",
+        },
+        ...metadata,
+      };
+    case "conversation":
+      return {
+        target: {
+          messageId,
+          projectId,
+          targetId: requiredMobilePushUuid(message.targetId),
+          kind: "conversation",
+          conversationMessageId: requiredMobilePushUuid(
+            destination.value.conversationMessageId,
+          ),
+        },
+        ...metadata,
+      };
+    case "channel":
+      return {
+        target: {
+          messageId,
+          projectId,
+          targetId: requiredMobilePushUuid(message.targetId),
+          kind: "channel",
+          channelMessageId: requiredMobilePushUuid(
+            destination.value.channelMessageId,
+          ),
+          rootMessageId: requiredMobilePushUuid(
+            destination.value.rootMessageId,
+          ),
+        },
+        ...metadata,
+      };
+    case "session":
+      return {
+        target: {
+          messageId,
+          projectId,
+          targetId: requiredMobilePushValue(message.targetId, "target_id"),
+          kind: "session",
+        },
+        ...metadata,
+      };
+    case undefined:
+      throw new Error("Mobile push target destination is required");
+  }
+  return impossibleMobilePushDestination(destination);
+};
+
+const standardBase64Bytes = (encoded: string) => {
+  const binary = atob(encoded);
+  if (btoa(binary) !== encoded) throw new Error("Non-canonical base64 payload");
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+};
+
+export function decodeMobilePushNotificationOpen(
+  encoded: unknown,
 ): AndroidRemoteNotificationOpen | null {
-  const target = inboxNotificationTargetFrom(value);
-  if (!target || !value || typeof value !== "object" || Array.isArray(value)) {
+  if (typeof encoded !== "string" || encoded.length === 0) return null;
+  try {
+    return mobilePushNotificationOpenFromMessage(
+      fromBinary(
+        MobilePushNotificationTargetSchema,
+        standardBase64Bytes(encoded),
+      ),
+    );
+  } catch {
     return null;
   }
-  const metadata = value as Record<string, unknown>;
-  if (
-    (metadata.messageVersion !== undefined &&
-      typeof metadata.messageVersion !== "string") ||
-    (metadata.notificationId !== undefined &&
-      typeof metadata.notificationId !== "string")
-  ) {
-    return null;
-  }
-  return {
-    target,
-    ...(typeof metadata.messageVersion === "string"
-      ? { messageVersion: metadata.messageVersion }
-      : {}),
-    ...(typeof metadata.notificationId === "string"
-      ? { notificationId: metadata.notificationId }
-      : {}),
-  };
 }
 
 type MacInboxNotificationBridge = {
@@ -374,38 +473,24 @@ export async function listenForInboxNotificationClicks(
       });
     }
 
-    const handleRemoteOpen = (event: Event) => {
-      const open = androidRemoteNotificationOpenFrom(
-        (event as CustomEvent<unknown>).detail,
+    const drainRemoteOpen = () => {
+      const open = decodeMobilePushNotificationOpen(
+        androidPushBridge()?.drainOpen(),
       );
       if (open) {
         recordAndroidRemoteNotificationReceipt(open);
         onOpen(open.target);
       }
-      androidPushBridge()?.drainOpen();
     };
-    window.addEventListener(androidRemoteOpenEvent, handleRemoteOpen);
-    const pendingRemoteOpen = androidPushBridge()?.drainOpen();
-    if (pendingRemoteOpen) {
-      try {
-        const open = androidRemoteNotificationOpenFrom(
-          JSON.parse(pendingRemoteOpen),
-        );
-        if (open) {
-          recordAndroidRemoteNotificationReceipt(open);
-          onOpen(open.target);
-        }
-      } catch {
-        // Ignore a malformed native payload; the Inbox remains available.
-      }
-    }
+    window.addEventListener(androidRemoteOpenEvent, drainRemoteOpen);
+    drainRemoteOpen();
     const { onAction } = await import("@tauri-apps/plugin-notification");
     const listener = await onAction((payload) => {
       const target = targetFromNotificationAction(payload);
       if (target) onOpen(target);
     });
     return () => {
-      window.removeEventListener(androidRemoteOpenEvent, handleRemoteOpen);
+      window.removeEventListener(androidRemoteOpenEvent, drainRemoteOpen);
       listener.unregister();
     };
   }
@@ -423,7 +508,6 @@ export async function listenForInboxNotificationClicks(
 type AndroidPushBridge = {
   token: () => string;
   configured: () => boolean;
-  topic: () => string;
   drainOpen: () => string;
   hasActiveInboxNotification: (identity: string) => boolean;
 };
@@ -447,7 +531,6 @@ function readAndroidRemoteNotificationReceipts() {
 function recordAndroidRemoteNotificationReceipt(
   open: AndroidRemoteNotificationOpen,
 ) {
-  if (!open.notificationId || !open.messageVersion) return;
   try {
     const receipts = readAndroidRemoteNotificationReceipts();
     receipts[`${open.notificationId}\u0000${open.messageVersion}`] = Date.now();
@@ -485,43 +568,30 @@ function androidPushBridge(): AndroidPushBridge | null {
   return bridge?.configured() ? bridge : null;
 }
 
-function pushLocale(): "ko" | "en" | "zh" {
+function pushLocale(): MobilePushDeviceLocale {
   const language = document.documentElement.lang.toLowerCase();
   if (language.startsWith("zh")) return "zh";
   if (language.startsWith("en")) return "en";
   return "ko";
 }
 
-// Transitional HTTP bridge until AccountService owns mobile push registration.
 export async function synchronizeAndroidPushRegistration(
   sessionToken: string,
 ) {
   const bridge = androidPushBridge();
   const token = bridge?.token().trim();
-  const topic = bridge?.topic().trim();
-  if (!bridge || !token || !topic) return false;
+  if (!bridge || !token) return false;
   const preferences = readInboxNotificationPreferences();
-  await request<{ registered: boolean }>(
-    "/inbox/push-registration",
-    sessionToken,
-    {
-      method: "PUT",
-      body: JSON.stringify({
-        platform: "fcm",
-        token,
-        environment: "production",
-        topic,
-        locale: pushLocale(),
-        preferences: {
-          playSound: readInboxNotificationSoundPreference(),
-          urgent: preferences.urgent,
-          actionRequired: preferences.action_required,
-          important: preferences.important,
-          activity: preferences.activity,
-        },
-      }),
-    },
-  );
+  await registerMobilePushDevice(sessionToken, {
+    endpoint: "fcm",
+    deviceToken: token,
+    locale: pushLocale(),
+    playSound: readInboxNotificationSoundPreference(),
+    urgent: preferences.urgent,
+    actionRequired: preferences.action_required,
+    important: preferences.important,
+    activity: preferences.activity,
+  });
   return true;
 }
 
@@ -529,14 +599,7 @@ export async function deleteAndroidPushRegistration(sessionToken: string) {
   const bridge = androidPushBridge();
   const token = bridge?.token().trim();
   if (!bridge || !token) return false;
-  await request<{ deleted: boolean }>(
-    "/inbox/push-registration",
-    sessionToken,
-    {
-      method: "DELETE",
-      body: JSON.stringify({ platform: "fcm", token }),
-    },
-  );
+  await unregisterMobilePushDevice(sessionToken, "fcm", token);
   return true;
 }
 
