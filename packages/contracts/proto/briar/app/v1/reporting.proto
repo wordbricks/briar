@@ -1,0 +1,275 @@
+syntax = "proto3";
+
+package briar.app.v1;
+
+import "briar/app/v1/common.proto";
+import "briar/app/v1/dashboard.proto";
+import "briar/types/v1/provider.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarAPI_";
+
+// ReportingService owns authenticated, read-only usage and execution reports.
+// Pricing lookup, calendar-window validation, and cross-field usage invariants
+// remain domain concerns; this descriptor owns their language-neutral wire data.
+service ReportingService {
+  rpc ListOrganizationUsageRuns(ListOrganizationUsageRunsRequest) returns (ListOrganizationUsageRunsResponse);
+  rpc GetProjectUsageSummary(GetProjectUsageSummaryRequest) returns (GetProjectUsageSummaryResponse);
+  rpc ListStatusTrayRuns(ListStatusTrayRunsRequest) returns (ListStatusTrayRunsResponse);
+  rpc GetRunCostEstimate(GetRunCostEstimateRequest) returns (GetRunCostEstimateResponse);
+}
+
+enum OrganizationUsageRange {
+  ORGANIZATION_USAGE_RANGE_UNSPECIFIED = 0;
+  ORGANIZATION_USAGE_RANGE_7_DAYS = 1;
+  ORGANIZATION_USAGE_RANGE_30_DAYS = 2;
+  ORGANIZATION_USAGE_RANGE_90_DAYS = 3;
+}
+
+enum ProjectUsagePeriod {
+  PROJECT_USAGE_PERIOD_UNSPECIFIED = 0;
+  PROJECT_USAGE_PERIOD_DAY = 1;
+  PROJECT_USAGE_PERIOD_WEEK = 2;
+  PROJECT_USAGE_PERIOD_MONTH = 3;
+}
+
+enum AgentExecutionModelSource {
+  AGENT_EXECUTION_MODEL_SOURCE_UNSPECIFIED = 0;
+  AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_REPORTED = 1;
+  AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_CONFIG = 2;
+  AGENT_EXECUTION_MODEL_SOURCE_CONFIGURED_FALLBACK = 3;
+  AGENT_EXECUTION_MODEL_SOURCE_UNKNOWN = 4;
+}
+
+enum AgentUsagePricingStatus {
+  AGENT_USAGE_PRICING_STATUS_UNSPECIFIED = 0;
+  AGENT_USAGE_PRICING_STATUS_LIVE = 1;
+  AGENT_USAGE_PRICING_STATUS_CACHED = 2;
+  AGENT_USAGE_PRICING_STATUS_UNAVAILABLE = 3;
+}
+
+enum AgentExecutionCostEstimateStatus {
+  AGENT_EXECUTION_COST_ESTIMATE_STATUS_UNSPECIFIED = 0;
+  AGENT_EXECUTION_COST_ESTIMATE_STATUS_ESTIMATED = 1;
+  AGENT_EXECUTION_COST_ESTIMATE_STATUS_PARTIAL = 2;
+  AGENT_EXECUTION_COST_ESTIMATE_STATUS_UNAVAILABLE = 3;
+}
+
+enum AgentExecutionCostEstimateReason {
+  AGENT_EXECUTION_COST_ESTIMATE_REASON_UNSPECIFIED = 0;
+  AGENT_EXECUTION_COST_ESTIMATE_REASON_PRICING_UNAVAILABLE = 1;
+  AGENT_EXECUTION_COST_ESTIMATE_REASON_USAGE_UNAVAILABLE = 2;
+  AGENT_EXECUTION_COST_ESTIMATE_REASON_MODEL_RATE_UNAVAILABLE = 3;
+  AGENT_EXECUTION_COST_ESTIMATE_REASON_TOKEN_BREAKDOWN_UNAVAILABLE = 4;
+}
+
+message AgentUsagePricing {
+  AgentUsagePricingStatus status = 1;
+  string source = 2;
+  optional google.protobuf.Timestamp fetched_at = 3;
+  uint32 known_models = 4;
+}
+
+message AgentUsageExecutionAttempt {
+  string execution_id = 1;
+  string project_id = 2;
+  uint32 run_attempt = 3;
+  uint32 claim_attempt = 4;
+  optional string worker_id = 5;
+  optional string claimed_by = 6;
+  google.protobuf.Timestamp claimed_at = 7;
+  google.protobuf.Timestamp recorded_at = 8;
+}
+
+message AgentUsageRecord {
+  string execution_id = 1;
+  string project_id = 2;
+  uint32 run_attempt = 3;
+  uint32 claim_attempt = 4;
+  optional string worker_id = 5;
+  google.protobuf.Timestamp claimed_at = 6;
+  string usage_key = 7;
+  optional string session_id = 8;
+  optional string turn_id = 9;
+  optional string scope_id = 10;
+  briar.types.v1.AgentProvider agent_provider = 11;
+  optional string model_provider = 12;
+  optional string model = 13;
+  optional string canonical_model = 14;
+  AgentExecutionModelSource model_source = 15;
+  string source = 16;
+  optional uint64 uncached_input_tokens = 17;
+  optional uint64 cache_read_tokens = 18;
+  optional uint64 cache_write_tokens = 19;
+  optional uint64 output_tokens = 20;
+  optional uint64 reasoning_output_tokens = 21;
+  optional uint64 total_tokens = 22;
+  google.protobuf.Timestamp observed_at = 23;
+  google.protobuf.Timestamp recorded_at = 24;
+}
+
+message AgentUsageCostRecord {
+  string execution_id = 1;
+  string project_id = 2;
+  uint32 run_attempt = 3;
+  uint32 claim_attempt = 4;
+  optional string worker_id = 5;
+  google.protobuf.Timestamp claimed_at = 6;
+  string cost_key = 7;
+  optional string usage_key = 8;
+  optional string session_id = 9;
+  optional string turn_id = 10;
+  optional string scope_id = 11;
+  briar.types.v1.AgentProvider agent_provider = 12;
+  optional string model_provider = 13;
+  optional string model = 14;
+  optional string canonical_model = 15;
+  AgentExecutionModelSource model_source = 16;
+  string source = 17;
+  uint64 amount_usd_ticks = 18;
+  google.protobuf.Timestamp observed_at = 19;
+  google.protobuf.Timestamp recorded_at = 20;
+}
+
+message AgentUsageEstimatedCostRecord {
+  string execution_id = 1;
+  string project_id = 2;
+  uint32 run_attempt = 3;
+  uint32 claim_attempt = 4;
+  optional string worker_id = 5;
+  google.protobuf.Timestamp claimed_at = 6;
+  string usage_key = 7;
+  optional string session_id = 8;
+  optional string turn_id = 9;
+  optional string scope_id = 10;
+  briar.types.v1.AgentProvider agent_provider = 11;
+  optional string model_provider = 12;
+  optional string model = 13;
+  optional string canonical_model = 14;
+  AgentExecutionModelSource model_source = 15;
+  google.protobuf.Timestamp observed_at = 16;
+  string usage_source = 17;
+  string pricing_key = 18;
+  uint64 amount_usd_ticks = 19;
+}
+
+message AgentUsageRun {
+  string id = 1;
+  string project_id = 2;
+  RunStatus status = 3;
+  optional AgentExecutionMetrics execution_metrics = 4;
+  optional string claimed_by = 5;
+  optional google.protobuf.Timestamp claimed_at = 6;
+  uint32 claim_attempts = 7;
+  optional string worker_id = 8;
+  optional briar.types.v1.AgentProvider preferred_provider = 9;
+  optional string preferred_model = 10;
+  optional briar.types.v1.AgentProvider requested_provider = 11;
+  optional string requested_model = 12;
+  optional briar.types.v1.AgentProvider execution_provider = 13;
+  optional string execution_model = 14;
+  google.protobuf.Timestamp started_at = 15;
+  google.protobuf.Timestamp updated_at = 16;
+  optional google.protobuf.Timestamp completed_at = 17;
+  repeated AgentUsageExecutionAttempt execution_attempts = 18;
+  repeated AgentUsageRecord usage_records = 19;
+  repeated AgentUsageCostRecord cost_records = 20;
+  repeated AgentUsageEstimatedCostRecord estimated_cost_records = 21;
+}
+
+message ListOrganizationUsageRunsRequest {
+  string organization_id = 1;
+  OrganizationUsageRange range = 2;
+}
+
+message ListOrganizationUsageRunsResponse {
+  repeated AgentUsageRun runs = 1;
+  google.protobuf.Timestamp generated_at = 2;
+  AgentUsagePricing pricing = 3;
+}
+
+message ProjectUsageTimelinePoint {
+  google.protobuf.Timestamp start_at = 1;
+  uint32 completed_issues = 2;
+  uint64 total_tokens = 3;
+}
+
+message ProjectUsageBreakdownItem {
+  optional string id = 1;
+  optional string name = 2;
+  uint32 issues = 3;
+}
+
+message GetProjectUsageSummaryRequest {
+  string project_id = 1;
+  ProjectUsagePeriod period = 2;
+  // Inclusive UTC calendar date (YYYY-MM-DD). Both fields must be supplied
+  // together; the application layer validates ordering and bucket limits.
+  optional string from_date = 3;
+  optional string to_date = 4;
+}
+
+message GetProjectUsageSummaryResponse {
+  ProjectUsagePeriod period = 1;
+  google.protobuf.Timestamp range_start = 2;
+  google.protobuf.Timestamp range_end = 3;
+  uint64 total_tokens = 4;
+  uint64 tracked_duration_ms = 5;
+  uint32 observed_runs = 6;
+  uint32 reported_runs = 7;
+  uint32 completed_issues = 8;
+  repeated ProjectUsageTimelinePoint timeline = 9;
+  repeated ProjectUsageBreakdownItem issue_creators = 10;
+  repeated ProjectUsageBreakdownItem agents = 11;
+  google.protobuf.Timestamp generated_at = 12;
+}
+
+message StatusTrayRun {
+  string project_id = 1;
+  string project_name = 2;
+  string id = 3;
+  string title = 4;
+  RunStatus status = 5;
+  optional string workflow_stage = 6;
+  optional string workflow_stage_label = 7;
+  google.protobuf.Timestamp started_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  google.protobuf.Timestamp last_event_at = 10;
+}
+
+message ListStatusTrayRunsRequest {
+  string organization_id = 1;
+}
+
+message ListStatusTrayRunsResponse {
+  repeated StatusTrayRun runs = 1;
+  google.protobuf.Timestamp generated_at = 2;
+}
+
+message AgentExecutionCostEstimateModel {
+  string pricing_key = 1;
+  optional string model_provider = 2;
+  string model = 3;
+  double input_cost_per_token = 4;
+  double output_cost_per_token = 5;
+  double cache_read_cost_per_token = 6;
+  double cache_write_cost_per_token = 7;
+  uint64 estimated_usd_ticks = 8;
+}
+
+message GetRunCostEstimateRequest {
+  string project_id = 1;
+  string run_id = 2;
+}
+
+message GetRunCostEstimateResponse {
+  AgentUsagePricing pricing = 1;
+  AgentExecutionCostEstimateStatus status = 2;
+  optional AgentExecutionCostEstimateReason reason = 3;
+  uint32 usage_records = 4;
+  uint32 priced_usage_records = 5;
+  repeated string provider_reported_models = 6;
+  optional uint64 estimated_usd_ticks = 7;
+  uint64 priced_usd_ticks = 8;
+  repeated AgentExecutionCostEstimateModel models = 9;
+}
