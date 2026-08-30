@@ -4,6 +4,7 @@ package briar.mobile.v1;
 
 import "briar/mobile/v1/common.proto";
 import "briar/mobile/v1/project.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
 option swift_prefix = "BriarAPI_";
@@ -29,6 +30,7 @@ message GetDashboardResponse {
   repeated ChannelNotification channel_notifications = 8;
   uint64 cursor = 9;
   google.protobuf.Timestamp generated_at = 10;
+  ProjectSettings settings = 11;
 }
 
 message SyncDashboardRequest {
@@ -50,6 +52,7 @@ message SyncDashboardResponse {
   repeated ConversationNotification conversation_notifications = 11;
   repeated ChannelNotification channel_notifications = 12;
   google.protobuf.Timestamp generated_at = 13;
+  optional ProjectSettings settings = 14;
 }
 
 message ListRunEventsRequest {
@@ -84,11 +87,69 @@ message WorkflowStage {
   string id = 1;
   string label = 2;
   bool required = 3;
+  repeated string evidence = 4;
+  repeated string checks = 5;
 }
 
 message AutoHuntWorkflow {
   uint32 version = 1;
   repeated WorkflowStage stages = 2;
+  repeated WorkflowRequirement requirements = 3;
+  WorkflowExecution execution = 4;
+  WorkflowCompletion completion = 5;
+}
+
+message WorkflowRequirement {
+  string id = 1;
+  string label = 2;
+  string kind = 3;
+  string tool = 4;
+  string reason = 5;
+}
+
+message WorkflowCheckpointSpec {
+  string key = 1;
+  string stage = 2;
+  WorkflowCheckpoint.Position position = 3;
+}
+
+message WorkflowExecution {
+  repeated WorkflowCheckpointSpec checkpoints = 1;
+}
+
+message WorkflowCompletion {
+  repeated string required_stages = 1;
+}
+
+message LinearSettings {
+  bool enabled = 1;
+  optional string source = 2;
+  optional string team_key = 3;
+}
+
+message CheckpointBoundary {
+  string stage = 1;
+  string stage_label = 2;
+  WorkflowCheckpoint.Position position = 3;
+}
+
+message CheckpointPolicy {
+  repeated CheckpointBoundary available_boundaries = 1;
+  repeated WorkflowCheckpointSpec project_mandatory = 2;
+  repeated WorkflowCheckpointSpec user_defaults = 3;
+  repeated WorkflowCheckpointSpec effective = 4;
+  uint64 project_revision = 5;
+  uint64 user_revision = 6;
+}
+
+message ProjectSettings {
+  optional string velen_org = 1;
+  optional string data_source = 2;
+  LinearSettings linear = 3;
+  optional int64 github_repository_id = 4;
+  optional string github_repository = 5;
+  AutoHuntWorkflow workflow = 6;
+  optional CheckpointPolicy checkpoint_policy = 7;
 }
 
 message IssueDependencyReference {
@@ -111,11 +172,25 @@ message DashboardRun {
     DISPATCH_MODE_SPECIFIC = 2;
   }
 
+  enum Source {
+    SOURCE_UNSPECIFIED = 0;
+    SOURCE_ISSUE = 1;
+    SOURCE_ERROR = 2;
+    SOURCE_FEEDBACK = 3;
+  }
+
+  enum QaStatus {
+    QA_STATUS_UNSPECIFIED = 0;
+    QA_STATUS_PENDING = 1;
+    QA_STATUS_PASSED = 2;
+    QA_STATUS_SKIPPED = 3;
+  }
+
   string id = 1;
-  optional uint32 run_number = 2;
-  optional uint32 current_attempt = 3;
-  optional uint32 current_revision = 4;
-  optional string source_key = 5;
+  uint32 run_number = 2;
+  uint32 current_attempt = 3;
+  uint32 current_revision = 4;
+  string source_key = 5;
   optional google.protobuf.Timestamp source_created_at = 6;
   string title = 7;
   RunStatus status = 8;
@@ -124,7 +199,7 @@ message DashboardRun {
   optional google.protobuf.Timestamp paused_at = 11;
   optional google.protobuf.Timestamp resume_requested_at = 12;
   optional WorkflowCheckpoint checkpoint = 13;
-  optional double progress = 14;
+  double progress = 14;
   optional string detail = 15;
   optional uint32 priority = 16;
   optional IssueDifficulty difficulty = 17;
@@ -158,11 +233,49 @@ message DashboardRun {
   optional string claimed_by = 45;
   optional google.protobuf.Timestamp claimed_at = 46;
   optional string worker_id = 47;
-  optional google.protobuf.Timestamp started_at = 48;
+  google.protobuf.Timestamp started_at = 48;
   google.protobuf.Timestamp updated_at = 49;
   optional google.protobuf.Timestamp completed_at = 50;
-  optional google.protobuf.Timestamp last_event_at = 51;
-  optional uint32 event_count = 52;
+  google.protobuf.Timestamp last_event_at = 51;
+  uint32 event_count = 52;
+  Source source = 53;
+  string repository = 54;
+  optional TrackerReference tracker = 55;
+  optional WaitingCheckpoint waiting_checkpoint = 56;
+  repeated WorkflowCheckpointSpec issue_checkpoints = 57;
+  optional AgentExecutionMetrics execution_metrics = 58;
+  optional string target_sha = 59;
+  optional QaStatus staging_qa_status = 60;
+  optional QaStatus production_qa_status = 61;
+  optional string staging_qa_detail = 62;
+  optional string production_qa_detail = 63;
+  optional google.protobuf.Struct context = 64;
+  optional google.protobuf.Timestamp lease_expires_at = 65;
+  uint32 claim_attempts = 66;
+  optional string agent_id = 67;
+}
+
+message TrackerReference {
+  string provider = 1;
+  optional string issue_id = 2;
+  optional string identifier = 3;
+  optional string url = 4;
+  optional string state = 5;
+}
+
+message WaitingCheckpoint {
+  string key = 1;
+  uint32 revision = 2;
+}
+
+message AgentExecutionMetrics {
+  optional uint64 input_tokens = 1;
+  optional uint64 output_tokens = 2;
+  optional uint64 cache_read_tokens = 3;
+  optional uint64 cache_write_tokens = 4;
+  optional uint64 reasoning_output_tokens = 5;
+  optional uint64 total_tokens = 6;
+  uint64 duration_ms = 7;
 }
 
 message WorkerIcon {
@@ -177,17 +290,40 @@ message WorkerIcon {
 }
 
 message DashboardWorker {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_ONLINE = 1;
+    STATE_STALE = 2;
+    STATE_DISABLED = 3;
+  }
+
+  enum Readiness {
+    READINESS_UNSPECIFIED = 0;
+    READINESS_AVAILABLE = 1;
+    READINESS_BUSY = 2;
+    READINESS_OFFLINE = 3;
+    READINESS_NEEDS_ATTENTION = 4;
+    READINESS_DISABLED = 5;
+  }
+
   string id = 1;
   string label = 2;
   optional WorkerIcon icon = 3;
-  optional AgentProvider agent_provider = 4;
+  AgentProvider agent_provider = 4;
   repeated AgentProvider providers = 5;
-  optional ProviderCapabilities capabilities = 6;
-  string readiness = 7;
+  google.protobuf.Struct capabilities = 6;
+  Readiness readiness = 7;
   bool accepting_work = 8;
   optional string readiness_detail = 9;
   uint32 active_sessions = 10;
   uint32 available_sessions = 11;
+  string device_id = 12;
+  string owner_user_id = 13;
+  map<string, string> versions = 14;
+  State state = 15;
+  uint32 max_concurrent_sessions = 16;
+  google.protobuf.Timestamp last_heartbeat_at = 17;
+  google.protobuf.Timestamp created_at = 18;
 }
 
 message ProjectExecutionWorkerPolicy {
@@ -234,4 +370,11 @@ message RunEvent {
   string actor = 5;
   optional string actor_name = 6;
   google.protobuf.Timestamp occurred_at = 7;
+  uint32 attempt = 8;
+  uint32 revision = 9;
+  optional DashboardRun.QaStatus qa_status = 10;
+  optional string tracker_state = 11;
+  repeated string pull_request_urls = 12;
+  optional string target_sha = 13;
+  google.protobuf.Timestamp recorded_at = 14;
 }

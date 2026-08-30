@@ -69,8 +69,6 @@ nonisolated struct BriarAPI_CreateIssueRequest: Sendable {
 
   var projectID: String = String()
 
-  var requestID: String = String()
-
   var title: String = String()
 
   var description_p: String {
@@ -140,8 +138,6 @@ nonisolated struct BriarAPI_CreateIssueRequest: Sendable {
 
   var fullAuto: Bool = false
 
-  var attachmentIds: [String] = []
-
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -206,8 +202,6 @@ nonisolated struct BriarAPI_UpdateIssueRequest: Sendable {
   var projectID: String = String()
 
   var runID: String = String()
-
-  var requestID: String = String()
 
   var title: String = String()
 
@@ -321,8 +315,6 @@ nonisolated struct BriarAPI_DeleteIssueRequest: Sendable {
 
   var runID: String = String()
 
-  var requestID: String = String()
-
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -350,8 +342,6 @@ nonisolated struct BriarAPI_TransferIssueRequest: Sendable {
   var runID: String = String()
 
   var targetProjectID: String = String()
-
-  var requestID: String = String()
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -425,8 +415,6 @@ nonisolated struct BriarAPI_SetIssueSubscriptionRequest: Sendable {
 
   var subscribed: Bool = false
 
-  var requestID: String = String()
-
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -454,8 +442,6 @@ nonisolated struct BriarAPI_UpdateIssuePreferencesRequest: Sendable {
   var projectID: String = String()
 
   var runID: String = String()
-
-  var requestID: String = String()
 
   var provider: BriarAPI_AgentProvider {
     get {_provider ?? .unspecified}
@@ -548,8 +534,6 @@ nonisolated struct BriarAPI_SetIssueDependencyRequest: Sendable {
   var prerequisiteRunID: String = String()
 
   var enabled: Bool = false
-
-  var requestID: String = String()
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1099,8 +1083,6 @@ nonisolated struct BriarAPI_CompleteResultReviewRequest: Sendable {
 
   var runID: String = String()
 
-  var requestID: String = String()
-
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -1230,8 +1212,6 @@ nonisolated struct BriarAPI_CreateIssueMessageRequest: Sendable {
   /// Clears the value of `agentConversationID`. Subsequent reads from it will return its default value.
   mutating func clearAgentConversationID() {self._agentConversationID = nil}
 
-  var attachmentIds: [String] = []
-
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -1256,11 +1236,21 @@ nonisolated struct BriarAPI_CreateIssueMessageResponse: Sendable {
 
   var agentReplies: [BriarAPI_IssueAgentReply] = []
 
+  var agentReply: BriarAPI_IssueAgentReply {
+    get {_agentReply ?? BriarAPI_IssueAgentReply()}
+    set {_agentReply = newValue}
+  }
+  /// Returns true if `agentReply` has been explicitly set.
+  var hasAgentReply: Bool {self._agentReply != nil}
+  /// Clears the value of `agentReply`. Subsequent reads from it will return its default value.
+  mutating func clearAgentReply() {self._agentReply = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
   fileprivate var _message: BriarAPI_IssueMessage? = nil
+  fileprivate var _agentReply: BriarAPI_IssueAgentReply? = nil
 }
 
 nonisolated struct BriarAPI_GetIssueAgentReplyRequest: Sendable {
@@ -1297,11 +1287,21 @@ nonisolated struct BriarAPI_GetIssueAgentReplyResponse: Sendable {
 
   var messages: [BriarAPI_IssueMessage] = []
 
+  var message: BriarAPI_IssueMessage {
+    get {_message ?? BriarAPI_IssueMessage()}
+    set {_message = newValue}
+  }
+  /// Returns true if `message` has been explicitly set.
+  var hasMessage: Bool {self._message != nil}
+  /// Clears the value of `message`. Subsequent reads from it will return its default value.
+  mutating func clearMessage() {self._message = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
   fileprivate var _agentReply: BriarAPI_IssueAgentReply? = nil
+  fileprivate var _message: BriarAPI_IssueMessage? = nil
 }
 
 nonisolated struct BriarAPI_ListRunEvidenceRequest: Sendable {
@@ -1325,6 +1325,12 @@ nonisolated struct BriarAPI_ListRunEvidenceResponse: Sendable {
 
   var evidence: [BriarAPI_RunEvidence] = []
 
+  var runID: String = String()
+
+  var attempt: UInt32 = 0
+
+  var revision: UInt32 = 0
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -1340,8 +1346,6 @@ nonisolated struct BriarAPI_AcceptIssueReworkProposalRequest: Sendable {
   var runID: String = String()
 
   var proposalID: String = String()
-
-  var requestID: String = String()
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1387,8 +1391,6 @@ nonisolated struct BriarAPI_AcceptIssueActionProposalRequest: Sendable {
   var runID: String = String()
 
   var proposalID: String = String()
-
-  var requestID: String = String()
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1511,8 +1513,6 @@ nonisolated struct BriarAPI_AcceptIssueExecutionProposalRequest: Sendable {
 
   var proposalID: String = String()
 
-  var requestID: String = String()
-
   var approval: BriarAPI_IssueExecutionApproval {
     get {_approval ?? BriarAPI_IssueExecutionApproval()}
     set {_approval = newValue}
@@ -1584,8 +1584,6 @@ nonisolated struct BriarAPI_AcceptIssueSkillExecutionProposalRequest: Sendable {
   var conversationRunID: String = String()
 
   var proposalID: String = String()
-
-  var requestID: String = String()
 
   var workerID: String {
     get {_workerID ?? String()}
@@ -2117,6 +2115,33 @@ nonisolated struct BriarAPI_IssueAgentReply: Sendable {
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
   mutating func clearError() {self._error = nil}
 
+  var workerID: String {
+    get {_workerID ?? String()}
+    set {_workerID = newValue}
+  }
+  /// Returns true if `workerID` has been explicitly set.
+  var hasWorkerID: Bool {self._workerID != nil}
+  /// Clears the value of `workerID`. Subsequent reads from it will return its default value.
+  mutating func clearWorkerID() {self._workerID = nil}
+
+  var provider: BriarAPI_AgentProvider {
+    get {_provider ?? .unspecified}
+    set {_provider = newValue}
+  }
+  /// Returns true if `provider` has been explicitly set.
+  var hasProvider: Bool {self._provider != nil}
+  /// Clears the value of `provider`. Subsequent reads from it will return its default value.
+  mutating func clearProvider() {self._provider = nil}
+
+  var updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_updatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_updatedAt = newValue}
+  }
+  /// Returns true if `updatedAt` has been explicitly set.
+  var hasUpdatedAt: Bool {self._updatedAt != nil}
+  /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
+  mutating func clearUpdatedAt() {self._updatedAt = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -2124,6 +2149,9 @@ nonisolated struct BriarAPI_IssueAgentReply: Sendable {
   fileprivate var _agentID: String? = nil
   fileprivate var _agentName: String? = nil
   fileprivate var _error: String? = nil
+  fileprivate var _workerID: String? = nil
+  fileprivate var _provider: BriarAPI_AgentProvider? = nil
+  fileprivate var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
 nonisolated struct BriarAPI_IssueExecutionDispatch: Sendable {
@@ -2273,55 +2301,114 @@ nonisolated struct BriarAPI_IssueExecutionDispatch: Sendable {
   fileprivate var _dispatchedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
-nonisolated struct BriarAPI_RunEvidence: Sendable {
+nonisolated struct BriarAPI_RunEvidence: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var key: String = String()
+  var key: String {
+    get {_storage._key}
+    set {_uniqueStorage()._key = newValue}
+  }
 
-  var attempt: UInt32 = 0
+  var attempt: UInt32 {
+    get {_storage._attempt}
+    set {_uniqueStorage()._attempt = newValue}
+  }
 
-  var revision: UInt32 = 0
+  var revision: UInt32 {
+    get {_storage._revision}
+    set {_uniqueStorage()._revision = newValue}
+  }
 
-  var stage: String = String()
+  var stage: String {
+    get {_storage._stage}
+    set {_uniqueStorage()._stage = newValue}
+  }
 
-  var type: String = String()
+  var type: String {
+    get {_storage._type}
+    set {_uniqueStorage()._type = newValue}
+  }
 
-  var status: BriarAPI_RunEvidence.Status = .unspecified
+  var status: BriarAPI_RunEvidence.Status {
+    get {_storage._status}
+    set {_uniqueStorage()._status = newValue}
+  }
 
   var detail: String {
-    get {_detail ?? String()}
-    set {_detail = newValue}
+    get {_storage._detail ?? String()}
+    set {_uniqueStorage()._detail = newValue}
   }
   /// Returns true if `detail` has been explicitly set.
-  var hasDetail: Bool {self._detail != nil}
+  var hasDetail: Bool {_storage._detail != nil}
   /// Clears the value of `detail`. Subsequent reads from it will return its default value.
-  mutating func clearDetail() {self._detail = nil}
+  mutating func clearDetail() {_uniqueStorage()._detail = nil}
 
   var url: String {
-    get {_url ?? String()}
-    set {_url = newValue}
+    get {_storage._url ?? String()}
+    set {_uniqueStorage()._url = newValue}
   }
   /// Returns true if `url` has been explicitly set.
-  var hasURL: Bool {self._url != nil}
+  var hasURL: Bool {_storage._url != nil}
   /// Clears the value of `url`. Subsequent reads from it will return its default value.
-  mutating func clearURL() {self._url = nil}
+  mutating func clearURL() {_uniqueStorage()._url = nil}
 
-  var actor: String = String()
+  var actor: String {
+    get {_storage._actor}
+    set {_uniqueStorage()._actor = newValue}
+  }
 
   var observedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_observedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_observedAt = newValue}
+    get {_storage._observedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._observedAt = newValue}
   }
   /// Returns true if `observedAt` has been explicitly set.
-  var hasObservedAt: Bool {self._observedAt != nil}
+  var hasObservedAt: Bool {_storage._observedAt != nil}
   /// Clears the value of `observedAt`. Subsequent reads from it will return its default value.
-  mutating func clearObservedAt() {self._observedAt = nil}
+  mutating func clearObservedAt() {_uniqueStorage()._observedAt = nil}
 
-  var images: [BriarAPI_IssueAttachment] = []
+  var images: [BriarAPI_RunEvidenceImage] {
+    get {_storage._images}
+    set {_uniqueStorage()._images = newValue}
+  }
 
-  var canonical: Bool = false
+  var canonical: Bool {
+    get {_storage._canonical}
+    set {_uniqueStorage()._canonical = newValue}
+  }
+
+  var command: String {
+    get {_storage._command ?? String()}
+    set {_uniqueStorage()._command = newValue}
+  }
+  /// Returns true if `command` has been explicitly set.
+  var hasCommand: Bool {_storage._command != nil}
+  /// Clears the value of `command`. Subsequent reads from it will return its default value.
+  mutating func clearCommand() {_uniqueStorage()._command = nil}
+
+  var metadata: SwiftProtobuf.Google_Protobuf_Struct {
+    get {_storage._metadata ?? SwiftProtobuf.Google_Protobuf_Struct()}
+    set {_uniqueStorage()._metadata = newValue}
+  }
+  /// Returns true if `metadata` has been explicitly set.
+  var hasMetadata: Bool {_storage._metadata != nil}
+  /// Clears the value of `metadata`. Subsequent reads from it will return its default value.
+  mutating func clearMetadata() {_uniqueStorage()._metadata = nil}
+
+  var recordedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._recordedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._recordedAt = newValue}
+  }
+  /// Returns true if `recordedAt` has been explicitly set.
+  var hasRecordedAt: Bool {_storage._recordedAt != nil}
+  /// Clears the value of `recordedAt`. Subsequent reads from it will return its default value.
+  mutating func clearRecordedAt() {_uniqueStorage()._recordedAt = nil}
+
+  var requiredRevision: UInt32 {
+    get {_storage._requiredRevision}
+    set {_uniqueStorage()._requiredRevision = newValue}
+  }
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -2373,9 +2460,31 @@ nonisolated struct BriarAPI_RunEvidence: Sendable {
 
   init() {}
 
-  fileprivate var _detail: String? = nil
-  fileprivate var _url: String? = nil
-  fileprivate var _observedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+nonisolated struct BriarAPI_RunEvidenceImage: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var id: String = String()
+
+  var filename: String = String()
+
+  var contentType: String = String()
+
+  var byteSize: UInt64 = 0
+
+  var sha256: String = String()
+
+  var position: UInt32 = 0
+
+  var url: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -2388,7 +2497,7 @@ nonisolated extension BriarAPI_IssueChangedField: SwiftProtobuf._ProtoNameProvid
 
 nonisolated extension BriarAPI_CreateIssueRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".CreateIssueRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}request_id\0\u{1}title\0\u{1}description\0\u{1}priority\0\u{1}difficulty\0\u{3}assignee_user_id\0\u{1}status\0\u{3}preferred_provider\0\u{3}preferred_model\0\u{3}preferred_effort\0\u{3}full_auto\0\u{3}attachment_ids\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{2}\u{2}title\0\u{1}description\0\u{1}priority\0\u{1}difficulty\0\u{3}assignee_user_id\0\u{1}status\0\u{3}preferred_provider\0\u{3}preferred_model\0\u{3}preferred_effort\0\u{3}full_auto\0\u{c}\u{2}\u{1}\u{c}\u{d}\u{1}")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2397,7 +2506,6 @@ nonisolated extension BriarAPI_CreateIssueRequest: SwiftProtobuf.Message, SwiftP
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.title) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._description_p) }()
       case 5: try { try decoder.decodeSingularUInt32Field(value: &self._priority) }()
@@ -2408,7 +2516,6 @@ nonisolated extension BriarAPI_CreateIssueRequest: SwiftProtobuf.Message, SwiftP
       case 10: try { try decoder.decodeSingularStringField(value: &self._preferredModel) }()
       case 11: try { try decoder.decodeSingularStringField(value: &self._preferredEffort) }()
       case 12: try { try decoder.decodeSingularBoolField(value: &self.fullAuto) }()
-      case 13: try { try decoder.decodeRepeatedStringField(value: &self.attachmentIds) }()
       default: break
       }
     }
@@ -2421,9 +2528,6 @@ nonisolated extension BriarAPI_CreateIssueRequest: SwiftProtobuf.Message, SwiftP
     // https://github.com/apple/swift-protobuf/issues/1182
     if !self.projectID.isEmpty {
       try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
-    }
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 2)
     }
     if !self.title.isEmpty {
       try visitor.visitSingularStringField(value: self.title, fieldNumber: 3)
@@ -2455,15 +2559,11 @@ nonisolated extension BriarAPI_CreateIssueRequest: SwiftProtobuf.Message, SwiftP
     if self.fullAuto != false {
       try visitor.visitSingularBoolField(value: self.fullAuto, fieldNumber: 12)
     }
-    if !self.attachmentIds.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.attachmentIds, fieldNumber: 13)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: BriarAPI_CreateIssueRequest, rhs: BriarAPI_CreateIssueRequest) -> Bool {
     if lhs.projectID != rhs.projectID {return false}
-    if lhs.requestID != rhs.requestID {return false}
     if lhs.title != rhs.title {return false}
     if lhs._description_p != rhs._description_p {return false}
     if lhs._priority != rhs._priority {return false}
@@ -2474,7 +2574,6 @@ nonisolated extension BriarAPI_CreateIssueRequest: SwiftProtobuf.Message, SwiftP
     if lhs._preferredModel != rhs._preferredModel {return false}
     if lhs._preferredEffort != rhs._preferredEffort {return false}
     if lhs.fullAuto != rhs.fullAuto {return false}
-    if lhs.attachmentIds != rhs.attachmentIds {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2551,7 +2650,7 @@ nonisolated extension BriarAPI_CreateIssueResponse: SwiftProtobuf.Message, Swift
 
 nonisolated extension BriarAPI_UpdateIssueRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".UpdateIssueRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}request_id\0\u{1}title\0\u{1}description\0\u{1}priority\0\u{1}difficulty\0\u{3}assignee_user_id\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{2}\u{2}title\0\u{1}description\0\u{1}priority\0\u{1}difficulty\0\u{3}assignee_user_id\0\u{c}\u{3}\u{1}")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2561,7 +2660,6 @@ nonisolated extension BriarAPI_UpdateIssueRequest: SwiftProtobuf.Message, SwiftP
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.title) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self._description_p) }()
       case 6: try { try decoder.decodeSingularUInt32Field(value: &self._priority) }()
@@ -2582,9 +2680,6 @@ nonisolated extension BriarAPI_UpdateIssueRequest: SwiftProtobuf.Message, SwiftP
     }
     if !self.runID.isEmpty {
       try visitor.visitSingularStringField(value: self.runID, fieldNumber: 2)
-    }
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 3)
     }
     if !self.title.isEmpty {
       try visitor.visitSingularStringField(value: self.title, fieldNumber: 4)
@@ -2607,7 +2702,6 @@ nonisolated extension BriarAPI_UpdateIssueRequest: SwiftProtobuf.Message, SwiftP
   static func ==(lhs: BriarAPI_UpdateIssueRequest, rhs: BriarAPI_UpdateIssueRequest) -> Bool {
     if lhs.projectID != rhs.projectID {return false}
     if lhs.runID != rhs.runID {return false}
-    if lhs.requestID != rhs.requestID {return false}
     if lhs.title != rhs.title {return false}
     if lhs._description_p != rhs._description_p {return false}
     if lhs._priority != rhs._priority {return false}
@@ -2679,7 +2773,7 @@ nonisolated extension BriarAPI_UpdateIssueResponse: SwiftProtobuf.Message, Swift
 
 nonisolated extension BriarAPI_DeleteIssueRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".DeleteIssueRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}request_id\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{c}\u{3}\u{1}")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2689,7 +2783,6 @@ nonisolated extension BriarAPI_DeleteIssueRequest: SwiftProtobuf.Message, SwiftP
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       default: break
       }
     }
@@ -2702,16 +2795,12 @@ nonisolated extension BriarAPI_DeleteIssueRequest: SwiftProtobuf.Message, SwiftP
     if !self.runID.isEmpty {
       try visitor.visitSingularStringField(value: self.runID, fieldNumber: 2)
     }
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 3)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: BriarAPI_DeleteIssueRequest, rhs: BriarAPI_DeleteIssueRequest) -> Bool {
     if lhs.projectID != rhs.projectID {return false}
     if lhs.runID != rhs.runID {return false}
-    if lhs.requestID != rhs.requestID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2749,7 +2838,7 @@ nonisolated extension BriarAPI_DeleteIssueResponse: SwiftProtobuf.Message, Swift
 
 nonisolated extension BriarAPI_TransferIssueRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".TransferIssueRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}target_project_id\0\u{3}request_id\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}target_project_id\0\u{c}\u{4}\u{1}")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2760,7 +2849,6 @@ nonisolated extension BriarAPI_TransferIssueRequest: SwiftProtobuf.Message, Swif
       case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.targetProjectID) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       default: break
       }
     }
@@ -2776,9 +2864,6 @@ nonisolated extension BriarAPI_TransferIssueRequest: SwiftProtobuf.Message, Swif
     if !self.targetProjectID.isEmpty {
       try visitor.visitSingularStringField(value: self.targetProjectID, fieldNumber: 3)
     }
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 4)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -2786,7 +2871,6 @@ nonisolated extension BriarAPI_TransferIssueRequest: SwiftProtobuf.Message, Swif
     if lhs.projectID != rhs.projectID {return false}
     if lhs.runID != rhs.runID {return false}
     if lhs.targetProjectID != rhs.targetProjectID {return false}
-    if lhs.requestID != rhs.requestID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2843,7 +2927,7 @@ nonisolated extension BriarAPI_TransferIssueResponse.Outcome: SwiftProtobuf._Pro
 
 nonisolated extension BriarAPI_SetIssueSubscriptionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".SetIssueSubscriptionRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{1}subscribed\0\u{3}request_id\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{1}subscribed\0\u{c}\u{4}\u{1}")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2854,7 +2938,6 @@ nonisolated extension BriarAPI_SetIssueSubscriptionRequest: SwiftProtobuf.Messag
       case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self.subscribed) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       default: break
       }
     }
@@ -2870,9 +2953,6 @@ nonisolated extension BriarAPI_SetIssueSubscriptionRequest: SwiftProtobuf.Messag
     if self.subscribed != false {
       try visitor.visitSingularBoolField(value: self.subscribed, fieldNumber: 3)
     }
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 4)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -2880,7 +2960,6 @@ nonisolated extension BriarAPI_SetIssueSubscriptionRequest: SwiftProtobuf.Messag
     if lhs.projectID != rhs.projectID {return false}
     if lhs.runID != rhs.runID {return false}
     if lhs.subscribed != rhs.subscribed {return false}
-    if lhs.requestID != rhs.requestID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2923,7 +3002,7 @@ nonisolated extension BriarAPI_SetIssueSubscriptionResponse: SwiftProtobuf.Messa
 
 nonisolated extension BriarAPI_UpdateIssuePreferencesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".UpdateIssuePreferencesRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}request_id\0\u{1}provider\0\u{1}model\0\u{1}effort\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{2}\u{2}provider\0\u{1}model\0\u{1}effort\0\u{c}\u{3}\u{1}")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2933,7 +3012,6 @@ nonisolated extension BriarAPI_UpdateIssuePreferencesRequest: SwiftProtobuf.Mess
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 4: try { try decoder.decodeSingularEnumField(value: &self._provider) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self._model) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self._effort) }()
@@ -2953,9 +3031,6 @@ nonisolated extension BriarAPI_UpdateIssuePreferencesRequest: SwiftProtobuf.Mess
     if !self.runID.isEmpty {
       try visitor.visitSingularStringField(value: self.runID, fieldNumber: 2)
     }
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 3)
-    }
     try { if let v = self._provider {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 4)
     } }()
@@ -2971,7 +3046,6 @@ nonisolated extension BriarAPI_UpdateIssuePreferencesRequest: SwiftProtobuf.Mess
   static func ==(lhs: BriarAPI_UpdateIssuePreferencesRequest, rhs: BriarAPI_UpdateIssuePreferencesRequest) -> Bool {
     if lhs.projectID != rhs.projectID {return false}
     if lhs.runID != rhs.runID {return false}
-    if lhs.requestID != rhs.requestID {return false}
     if lhs._provider != rhs._provider {return false}
     if lhs._model != rhs._model {return false}
     if lhs._effort != rhs._effort {return false}
@@ -3031,7 +3105,7 @@ nonisolated extension BriarAPI_UpdateIssuePreferencesResponse: SwiftProtobuf.Mes
 
 nonisolated extension BriarAPI_SetIssueDependencyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".SetIssueDependencyRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}prerequisite_run_id\0\u{1}enabled\0\u{3}request_id\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}prerequisite_run_id\0\u{1}enabled\0\u{c}\u{5}\u{1}")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3043,7 +3117,6 @@ nonisolated extension BriarAPI_SetIssueDependencyRequest: SwiftProtobuf.Message,
       case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.prerequisiteRunID) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       default: break
       }
     }
@@ -3062,9 +3135,6 @@ nonisolated extension BriarAPI_SetIssueDependencyRequest: SwiftProtobuf.Message,
     if self.enabled != false {
       try visitor.visitSingularBoolField(value: self.enabled, fieldNumber: 4)
     }
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 5)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -3073,7 +3143,6 @@ nonisolated extension BriarAPI_SetIssueDependencyRequest: SwiftProtobuf.Message,
     if lhs.runID != rhs.runID {return false}
     if lhs.prerequisiteRunID != rhs.prerequisiteRunID {return false}
     if lhs.enabled != rhs.enabled {return false}
-    if lhs.requestID != rhs.requestID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3768,7 +3837,7 @@ nonisolated extension BriarAPI_ReassignRunResponse: SwiftProtobuf.Message, Swift
 
 nonisolated extension BriarAPI_CompleteResultReviewRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".CompleteResultReviewRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}request_id\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{c}\u{3}\u{1}")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3778,7 +3847,6 @@ nonisolated extension BriarAPI_CompleteResultReviewRequest: SwiftProtobuf.Messag
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       default: break
       }
     }
@@ -3791,16 +3859,12 @@ nonisolated extension BriarAPI_CompleteResultReviewRequest: SwiftProtobuf.Messag
     if !self.runID.isEmpty {
       try visitor.visitSingularStringField(value: self.runID, fieldNumber: 2)
     }
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 3)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: BriarAPI_CompleteResultReviewRequest, rhs: BriarAPI_CompleteResultReviewRequest) -> Bool {
     if lhs.projectID != rhs.projectID {return false}
     if lhs.runID != rhs.runID {return false}
-    if lhs.requestID != rhs.requestID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4012,7 +4076,7 @@ nonisolated extension BriarAPI_SyncIssueMessagesResponse: SwiftProtobuf.Message,
 
 nonisolated extension BriarAPI_CreateIssueMessageRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".CreateIssueMessageRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}client_message_id\0\u{1}body\0\u{3}parent_message_id\0\u{3}mentioned_user_ids\0\u{3}mentioned_agent_ids\0\u{3}agent_conversation_id\0\u{3}attachment_ids\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}client_message_id\0\u{1}body\0\u{3}parent_message_id\0\u{3}mentioned_user_ids\0\u{3}mentioned_agent_ids\0\u{3}agent_conversation_id\0\u{c}\u{9}\u{1}")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4028,7 +4092,6 @@ nonisolated extension BriarAPI_CreateIssueMessageRequest: SwiftProtobuf.Message,
       case 6: try { try decoder.decodeRepeatedStringField(value: &self.mentionedUserIds) }()
       case 7: try { try decoder.decodeRepeatedStringField(value: &self.mentionedAgentIds) }()
       case 8: try { try decoder.decodeSingularStringField(value: &self._agentConversationID) }()
-      case 9: try { try decoder.decodeRepeatedStringField(value: &self.attachmentIds) }()
       default: break
       }
     }
@@ -4063,9 +4126,6 @@ nonisolated extension BriarAPI_CreateIssueMessageRequest: SwiftProtobuf.Message,
     try { if let v = self._agentConversationID {
       try visitor.visitSingularStringField(value: v, fieldNumber: 8)
     } }()
-    if !self.attachmentIds.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.attachmentIds, fieldNumber: 9)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4078,7 +4138,6 @@ nonisolated extension BriarAPI_CreateIssueMessageRequest: SwiftProtobuf.Message,
     if lhs.mentionedUserIds != rhs.mentionedUserIds {return false}
     if lhs.mentionedAgentIds != rhs.mentionedAgentIds {return false}
     if lhs._agentConversationID != rhs._agentConversationID {return false}
-    if lhs.attachmentIds != rhs.attachmentIds {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4086,7 +4145,7 @@ nonisolated extension BriarAPI_CreateIssueMessageRequest: SwiftProtobuf.Message,
 
 nonisolated extension BriarAPI_CreateIssueMessageResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".CreateIssueMessageResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}message\0\u{3}agent_replies\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}message\0\u{3}agent_replies\0\u{3}agent_reply\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4096,6 +4155,7 @@ nonisolated extension BriarAPI_CreateIssueMessageResponse: SwiftProtobuf.Message
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._message) }()
       case 2: try { try decoder.decodeRepeatedMessageField(value: &self.agentReplies) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._agentReply) }()
       default: break
       }
     }
@@ -4112,12 +4172,16 @@ nonisolated extension BriarAPI_CreateIssueMessageResponse: SwiftProtobuf.Message
     if !self.agentReplies.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.agentReplies, fieldNumber: 2)
     }
+    try { if let v = self._agentReply {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: BriarAPI_CreateIssueMessageResponse, rhs: BriarAPI_CreateIssueMessageResponse) -> Bool {
     if lhs._message != rhs._message {return false}
     if lhs.agentReplies != rhs.agentReplies {return false}
+    if lhs._agentReply != rhs._agentReply {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4165,7 +4229,7 @@ nonisolated extension BriarAPI_GetIssueAgentReplyRequest: SwiftProtobuf.Message,
 
 nonisolated extension BriarAPI_GetIssueAgentReplyResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".GetIssueAgentReplyResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}agent_reply\0\u{3}agent_replies\0\u{1}messages\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}agent_reply\0\u{3}agent_replies\0\u{1}messages\0\u{1}message\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4176,6 +4240,7 @@ nonisolated extension BriarAPI_GetIssueAgentReplyResponse: SwiftProtobuf.Message
       case 1: try { try decoder.decodeSingularMessageField(value: &self._agentReply) }()
       case 2: try { try decoder.decodeRepeatedMessageField(value: &self.agentReplies) }()
       case 3: try { try decoder.decodeRepeatedMessageField(value: &self.messages) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._message) }()
       default: break
       }
     }
@@ -4195,6 +4260,9 @@ nonisolated extension BriarAPI_GetIssueAgentReplyResponse: SwiftProtobuf.Message
     if !self.messages.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.messages, fieldNumber: 3)
     }
+    try { if let v = self._message {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4202,6 +4270,7 @@ nonisolated extension BriarAPI_GetIssueAgentReplyResponse: SwiftProtobuf.Message
     if lhs._agentReply != rhs._agentReply {return false}
     if lhs.agentReplies != rhs.agentReplies {return false}
     if lhs.messages != rhs.messages {return false}
+    if lhs._message != rhs._message {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4244,7 +4313,7 @@ nonisolated extension BriarAPI_ListRunEvidenceRequest: SwiftProtobuf.Message, Sw
 
 nonisolated extension BriarAPI_ListRunEvidenceResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".ListRunEvidenceResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}evidence\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}evidence\0\u{3}run_id\0\u{1}attempt\0\u{1}revision\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4253,6 +4322,9 @@ nonisolated extension BriarAPI_ListRunEvidenceResponse: SwiftProtobuf.Message, S
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedMessageField(value: &self.evidence) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.attempt) }()
+      case 4: try { try decoder.decodeSingularUInt32Field(value: &self.revision) }()
       default: break
       }
     }
@@ -4262,11 +4334,23 @@ nonisolated extension BriarAPI_ListRunEvidenceResponse: SwiftProtobuf.Message, S
     if !self.evidence.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.evidence, fieldNumber: 1)
     }
+    if !self.runID.isEmpty {
+      try visitor.visitSingularStringField(value: self.runID, fieldNumber: 2)
+    }
+    if self.attempt != 0 {
+      try visitor.visitSingularUInt32Field(value: self.attempt, fieldNumber: 3)
+    }
+    if self.revision != 0 {
+      try visitor.visitSingularUInt32Field(value: self.revision, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: BriarAPI_ListRunEvidenceResponse, rhs: BriarAPI_ListRunEvidenceResponse) -> Bool {
     if lhs.evidence != rhs.evidence {return false}
+    if lhs.runID != rhs.runID {return false}
+    if lhs.attempt != rhs.attempt {return false}
+    if lhs.revision != rhs.revision {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4274,7 +4358,7 @@ nonisolated extension BriarAPI_ListRunEvidenceResponse: SwiftProtobuf.Message, S
 
 nonisolated extension BriarAPI_AcceptIssueReworkProposalRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".AcceptIssueReworkProposalRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}proposal_id\0\u{3}request_id\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}proposal_id\0\u{c}\u{4}\u{1}")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4285,7 +4369,6 @@ nonisolated extension BriarAPI_AcceptIssueReworkProposalRequest: SwiftProtobuf.M
       case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.proposalID) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       default: break
       }
     }
@@ -4301,9 +4384,6 @@ nonisolated extension BriarAPI_AcceptIssueReworkProposalRequest: SwiftProtobuf.M
     if !self.proposalID.isEmpty {
       try visitor.visitSingularStringField(value: self.proposalID, fieldNumber: 3)
     }
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 4)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4311,7 +4391,6 @@ nonisolated extension BriarAPI_AcceptIssueReworkProposalRequest: SwiftProtobuf.M
     if lhs.projectID != rhs.projectID {return false}
     if lhs.runID != rhs.runID {return false}
     if lhs.proposalID != rhs.proposalID {return false}
-    if lhs.requestID != rhs.requestID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4373,7 +4452,7 @@ nonisolated extension BriarAPI_AcceptIssueReworkProposalResponse: SwiftProtobuf.
 
 nonisolated extension BriarAPI_AcceptIssueActionProposalRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".AcceptIssueActionProposalRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}proposal_id\0\u{3}request_id\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}proposal_id\0\u{c}\u{4}\u{1}")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4384,7 +4463,6 @@ nonisolated extension BriarAPI_AcceptIssueActionProposalRequest: SwiftProtobuf.M
       case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.proposalID) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       default: break
       }
     }
@@ -4400,9 +4478,6 @@ nonisolated extension BriarAPI_AcceptIssueActionProposalRequest: SwiftProtobuf.M
     if !self.proposalID.isEmpty {
       try visitor.visitSingularStringField(value: self.proposalID, fieldNumber: 3)
     }
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 4)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4410,7 +4485,6 @@ nonisolated extension BriarAPI_AcceptIssueActionProposalRequest: SwiftProtobuf.M
     if lhs.projectID != rhs.projectID {return false}
     if lhs.runID != rhs.runID {return false}
     if lhs.proposalID != rhs.proposalID {return false}
-    if lhs.requestID != rhs.requestID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4591,7 +4665,7 @@ nonisolated extension BriarAPI_IssueExecutionApproval: SwiftProtobuf.Message, Sw
 
 nonisolated extension BriarAPI_AcceptIssueExecutionProposalRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".AcceptIssueExecutionProposalRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}conversation_run_id\0\u{3}proposal_id\0\u{3}request_id\0\u{1}approval\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}conversation_run_id\0\u{3}proposal_id\0\u{2}\u{2}approval\0\u{c}\u{4}\u{1}")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4602,7 +4676,6 @@ nonisolated extension BriarAPI_AcceptIssueExecutionProposalRequest: SwiftProtobu
       case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.conversationRunID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.proposalID) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._approval) }()
       default: break
       }
@@ -4623,9 +4696,6 @@ nonisolated extension BriarAPI_AcceptIssueExecutionProposalRequest: SwiftProtobu
     if !self.proposalID.isEmpty {
       try visitor.visitSingularStringField(value: self.proposalID, fieldNumber: 3)
     }
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 4)
-    }
     try { if let v = self._approval {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
     } }()
@@ -4636,7 +4706,6 @@ nonisolated extension BriarAPI_AcceptIssueExecutionProposalRequest: SwiftProtobu
     if lhs.projectID != rhs.projectID {return false}
     if lhs.conversationRunID != rhs.conversationRunID {return false}
     if lhs.proposalID != rhs.proposalID {return false}
-    if lhs.requestID != rhs.requestID {return false}
     if lhs._approval != rhs._approval {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -4743,7 +4812,7 @@ nonisolated extension BriarAPI_AcceptIssueExecutionProposalResponse: SwiftProtob
 
 nonisolated extension BriarAPI_AcceptIssueSkillExecutionProposalRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".AcceptIssueSkillExecutionProposalRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}conversation_run_id\0\u{3}proposal_id\0\u{3}request_id\0\u{3}worker_id\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}conversation_run_id\0\u{3}proposal_id\0\u{4}\u{2}worker_id\0\u{c}\u{4}\u{1}")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4754,7 +4823,6 @@ nonisolated extension BriarAPI_AcceptIssueSkillExecutionProposalRequest: SwiftPr
       case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.conversationRunID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.proposalID) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self._workerID) }()
       default: break
       }
@@ -4775,9 +4843,6 @@ nonisolated extension BriarAPI_AcceptIssueSkillExecutionProposalRequest: SwiftPr
     if !self.proposalID.isEmpty {
       try visitor.visitSingularStringField(value: self.proposalID, fieldNumber: 3)
     }
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 4)
-    }
     try { if let v = self._workerID {
       try visitor.visitSingularStringField(value: v, fieldNumber: 5)
     } }()
@@ -4788,7 +4853,6 @@ nonisolated extension BriarAPI_AcceptIssueSkillExecutionProposalRequest: SwiftPr
     if lhs.projectID != rhs.projectID {return false}
     if lhs.conversationRunID != rhs.conversationRunID {return false}
     if lhs.proposalID != rhs.proposalID {return false}
-    if lhs.requestID != rhs.requestID {return false}
     if lhs._workerID != rhs._workerID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -5407,7 +5471,7 @@ nonisolated extension BriarAPI_IssueExecutionProposal: SwiftProtobuf.Message, Sw
 
 nonisolated extension BriarAPI_IssueAgentReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".IssueAgentReply"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}trigger_message_id\0\u{3}parent_message_id\0\u{3}agent_id\0\u{3}agent_name\0\u{1}status\0\u{1}attempts\0\u{1}error\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}trigger_message_id\0\u{3}parent_message_id\0\u{3}agent_id\0\u{3}agent_name\0\u{1}status\0\u{1}attempts\0\u{1}error\0\u{3}worker_id\0\u{1}provider\0\u{3}updated_at\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5423,6 +5487,9 @@ nonisolated extension BriarAPI_IssueAgentReply: SwiftProtobuf.Message, SwiftProt
       case 6: try { try decoder.decodeSingularEnumField(value: &self.status) }()
       case 7: try { try decoder.decodeSingularUInt32Field(value: &self.attempts) }()
       case 8: try { try decoder.decodeSingularStringField(value: &self._error) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self._workerID) }()
+      case 10: try { try decoder.decodeSingularEnumField(value: &self._provider) }()
+      case 11: try { try decoder.decodeSingularMessageField(value: &self._updatedAt) }()
       default: break
       }
     }
@@ -5457,6 +5524,15 @@ nonisolated extension BriarAPI_IssueAgentReply: SwiftProtobuf.Message, SwiftProt
     try { if let v = self._error {
       try visitor.visitSingularStringField(value: v, fieldNumber: 8)
     } }()
+    try { if let v = self._workerID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 9)
+    } }()
+    try { if let v = self._provider {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 10)
+    } }()
+    try { if let v = self._updatedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5469,6 +5545,9 @@ nonisolated extension BriarAPI_IssueAgentReply: SwiftProtobuf.Message, SwiftProt
     if lhs.status != rhs.status {return false}
     if lhs.attempts != rhs.attempts {return false}
     if lhs._error != rhs._error {return false}
+    if lhs._workerID != rhs._workerID {return false}
+    if lhs._provider != rhs._provider {return false}
+    if lhs._updatedAt != rhs._updatedAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5563,88 +5642,174 @@ nonisolated extension BriarAPI_IssueExecutionDispatch.Outcome: SwiftProtobuf._Pr
 
 nonisolated extension BriarAPI_RunEvidence: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".RunEvidence"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}key\0\u{1}attempt\0\u{1}revision\0\u{1}stage\0\u{1}type\0\u{1}status\0\u{1}detail\0\u{1}url\0\u{1}actor\0\u{3}observed_at\0\u{1}images\0\u{1}canonical\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}key\0\u{1}attempt\0\u{1}revision\0\u{1}stage\0\u{1}type\0\u{1}status\0\u{1}detail\0\u{1}url\0\u{1}actor\0\u{3}observed_at\0\u{1}images\0\u{1}canonical\0\u{1}command\0\u{1}metadata\0\u{3}recorded_at\0\u{3}required_revision\0")
+
+  fileprivate class _StorageClass {
+    var _key: String = String()
+    var _attempt: UInt32 = 0
+    var _revision: UInt32 = 0
+    var _stage: String = String()
+    var _type: String = String()
+    var _status: BriarAPI_RunEvidence.Status = .unspecified
+    var _detail: String? = nil
+    var _url: String? = nil
+    var _actor: String = String()
+    var _observedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _images: [BriarAPI_RunEvidenceImage] = []
+    var _canonical: Bool = false
+    var _command: String? = nil
+    var _metadata: SwiftProtobuf.Google_Protobuf_Struct? = nil
+    var _recordedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _requiredRevision: UInt32 = 0
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _key = source._key
+      _attempt = source._attempt
+      _revision = source._revision
+      _stage = source._stage
+      _type = source._type
+      _status = source._status
+      _detail = source._detail
+      _url = source._url
+      _actor = source._actor
+      _observedAt = source._observedAt
+      _images = source._images
+      _canonical = source._canonical
+      _command = source._command
+      _metadata = source._metadata
+      _recordedAt = source._recordedAt
+      _requiredRevision = source._requiredRevision
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.key) }()
-      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.attempt) }()
-      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.revision) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.stage) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self.type) }()
-      case 6: try { try decoder.decodeSingularEnumField(value: &self.status) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self._detail) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self._url) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self.actor) }()
-      case 10: try { try decoder.decodeSingularMessageField(value: &self._observedAt) }()
-      case 11: try { try decoder.decodeRepeatedMessageField(value: &self.images) }()
-      case 12: try { try decoder.decodeSingularBoolField(value: &self.canonical) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._key) }()
+        case 2: try { try decoder.decodeSingularUInt32Field(value: &_storage._attempt) }()
+        case 3: try { try decoder.decodeSingularUInt32Field(value: &_storage._revision) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._stage) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._type) }()
+        case 6: try { try decoder.decodeSingularEnumField(value: &_storage._status) }()
+        case 7: try { try decoder.decodeSingularStringField(value: &_storage._detail) }()
+        case 8: try { try decoder.decodeSingularStringField(value: &_storage._url) }()
+        case 9: try { try decoder.decodeSingularStringField(value: &_storage._actor) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._observedAt) }()
+        case 11: try { try decoder.decodeRepeatedMessageField(value: &_storage._images) }()
+        case 12: try { try decoder.decodeSingularBoolField(value: &_storage._canonical) }()
+        case 13: try { try decoder.decodeSingularStringField(value: &_storage._command) }()
+        case 14: try { try decoder.decodeSingularMessageField(value: &_storage._metadata) }()
+        case 15: try { try decoder.decodeSingularMessageField(value: &_storage._recordedAt) }()
+        case 16: try { try decoder.decodeSingularUInt32Field(value: &_storage._requiredRevision) }()
+        default: break
+        }
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.key.isEmpty {
-      try visitor.visitSingularStringField(value: self.key, fieldNumber: 1)
-    }
-    if self.attempt != 0 {
-      try visitor.visitSingularUInt32Field(value: self.attempt, fieldNumber: 2)
-    }
-    if self.revision != 0 {
-      try visitor.visitSingularUInt32Field(value: self.revision, fieldNumber: 3)
-    }
-    if !self.stage.isEmpty {
-      try visitor.visitSingularStringField(value: self.stage, fieldNumber: 4)
-    }
-    if !self.type.isEmpty {
-      try visitor.visitSingularStringField(value: self.type, fieldNumber: 5)
-    }
-    if self.status != .unspecified {
-      try visitor.visitSingularEnumField(value: self.status, fieldNumber: 6)
-    }
-    try { if let v = self._detail {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
-    } }()
-    try { if let v = self._url {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
-    } }()
-    if !self.actor.isEmpty {
-      try visitor.visitSingularStringField(value: self.actor, fieldNumber: 9)
-    }
-    try { if let v = self._observedAt {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
-    } }()
-    if !self.images.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.images, fieldNumber: 11)
-    }
-    if self.canonical != false {
-      try visitor.visitSingularBoolField(value: self.canonical, fieldNumber: 12)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._key.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._key, fieldNumber: 1)
+      }
+      if _storage._attempt != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._attempt, fieldNumber: 2)
+      }
+      if _storage._revision != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._revision, fieldNumber: 3)
+      }
+      if !_storage._stage.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._stage, fieldNumber: 4)
+      }
+      if !_storage._type.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._type, fieldNumber: 5)
+      }
+      if _storage._status != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._status, fieldNumber: 6)
+      }
+      try { if let v = _storage._detail {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+      } }()
+      try { if let v = _storage._url {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+      } }()
+      if !_storage._actor.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._actor, fieldNumber: 9)
+      }
+      try { if let v = _storage._observedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      } }()
+      if !_storage._images.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._images, fieldNumber: 11)
+      }
+      if _storage._canonical != false {
+        try visitor.visitSingularBoolField(value: _storage._canonical, fieldNumber: 12)
+      }
+      try { if let v = _storage._command {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 13)
+      } }()
+      try { if let v = _storage._metadata {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 14)
+      } }()
+      try { if let v = _storage._recordedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 15)
+      } }()
+      if _storage._requiredRevision != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._requiredRevision, fieldNumber: 16)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: BriarAPI_RunEvidence, rhs: BriarAPI_RunEvidence) -> Bool {
-    if lhs.key != rhs.key {return false}
-    if lhs.attempt != rhs.attempt {return false}
-    if lhs.revision != rhs.revision {return false}
-    if lhs.stage != rhs.stage {return false}
-    if lhs.type != rhs.type {return false}
-    if lhs.status != rhs.status {return false}
-    if lhs._detail != rhs._detail {return false}
-    if lhs._url != rhs._url {return false}
-    if lhs.actor != rhs.actor {return false}
-    if lhs._observedAt != rhs._observedAt {return false}
-    if lhs.images != rhs.images {return false}
-    if lhs.canonical != rhs.canonical {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._key != rhs_storage._key {return false}
+        if _storage._attempt != rhs_storage._attempt {return false}
+        if _storage._revision != rhs_storage._revision {return false}
+        if _storage._stage != rhs_storage._stage {return false}
+        if _storage._type != rhs_storage._type {return false}
+        if _storage._status != rhs_storage._status {return false}
+        if _storage._detail != rhs_storage._detail {return false}
+        if _storage._url != rhs_storage._url {return false}
+        if _storage._actor != rhs_storage._actor {return false}
+        if _storage._observedAt != rhs_storage._observedAt {return false}
+        if _storage._images != rhs_storage._images {return false}
+        if _storage._canonical != rhs_storage._canonical {return false}
+        if _storage._command != rhs_storage._command {return false}
+        if _storage._metadata != rhs_storage._metadata {return false}
+        if _storage._recordedAt != rhs_storage._recordedAt {return false}
+        if _storage._requiredRevision != rhs_storage._requiredRevision {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5652,4 +5817,64 @@ nonisolated extension BriarAPI_RunEvidence: SwiftProtobuf.Message, SwiftProtobuf
 
 nonisolated extension BriarAPI_RunEvidence.Status: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STATUS_UNSPECIFIED\0\u{1}STATUS_PENDING\0\u{1}STATUS_PASSED\0\u{1}STATUS_FAILED\0\u{1}STATUS_SKIPPED\0")
+}
+
+nonisolated extension BriarAPI_RunEvidenceImage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".RunEvidenceImage"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}filename\0\u{3}content_type\0\u{3}byte_size\0\u{1}sha256\0\u{1}position\0\u{1}url\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.filename) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.contentType) }()
+      case 4: try { try decoder.decodeSingularUInt64Field(value: &self.byteSize) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.sha256) }()
+      case 6: try { try decoder.decodeSingularUInt32Field(value: &self.position) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self.url) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if !self.filename.isEmpty {
+      try visitor.visitSingularStringField(value: self.filename, fieldNumber: 2)
+    }
+    if !self.contentType.isEmpty {
+      try visitor.visitSingularStringField(value: self.contentType, fieldNumber: 3)
+    }
+    if self.byteSize != 0 {
+      try visitor.visitSingularUInt64Field(value: self.byteSize, fieldNumber: 4)
+    }
+    if !self.sha256.isEmpty {
+      try visitor.visitSingularStringField(value: self.sha256, fieldNumber: 5)
+    }
+    if self.position != 0 {
+      try visitor.visitSingularUInt32Field(value: self.position, fieldNumber: 6)
+    }
+    if !self.url.isEmpty {
+      try visitor.visitSingularStringField(value: self.url, fieldNumber: 7)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: BriarAPI_RunEvidenceImage, rhs: BriarAPI_RunEvidenceImage) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.filename != rhs.filename {return false}
+    if lhs.contentType != rhs.contentType {return false}
+    if lhs.byteSize != rhs.byteSize {return false}
+    if lhs.sha256 != rhs.sha256 {return false}
+    if lhs.position != rhs.position {return false}
+    if lhs.url != rhs.url {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
 }

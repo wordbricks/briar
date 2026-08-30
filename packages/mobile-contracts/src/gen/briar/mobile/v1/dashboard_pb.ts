@@ -4,19 +4,19 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import type { AgentProvider, IssueAttachment, IssueDifficulty, IssueSubscriber, MessageAuthor, MessageBlock, NotificationReason, OrganizationMember, ProviderCapabilities, RelatedMessageReference, ResultReview, RunStatus, StructuredRunResult } from "./common_pb";
+import type { AgentProvider, IssueAttachment, IssueDifficulty, IssueSubscriber, MessageAuthor, MessageBlock, NotificationReason, OrganizationMember, RelatedMessageReference, ResultReview, RunStatus, StructuredRunResult } from "./common_pb";
 import { file_briar_mobile_v1_common } from "./common_pb";
 import type { Project } from "./project_pb";
 import { file_briar_mobile_v1_project } from "./project_pb";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { Message } from "@bufbuild/protobuf";
+import { file_google_protobuf_struct, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { JsonObject, Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file briar/mobile/v1/dashboard.proto.
  */
 export const file_briar_mobile_v1_dashboard: GenFile = /*@__PURE__*/
-  fileDesc("Ch9icmlhci9tb2JpbGUvdjEvZGFzaGJvYXJkLnByb3RvEg9icmlhci5tb2JpbGUudjEiKQoTR2V0RGFzaGJvYXJkUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJItAEChRHZXREYXNoYm9hcmRSZXNwb25zZRIpCgdwcm9qZWN0GAEgASgLMhguYnJpYXIubW9iaWxlLnYxLlByb2plY3QSKwoEcnVucxgCIAMoCzIdLmJyaWFyLm1vYmlsZS52MS5EYXNoYm9hcmRSdW4SMQoHd29ya2VycxgDIAMoCzIgLmJyaWFyLm1vYmlsZS52MS5EYXNoYm9hcmRXb3JrZXISPgoWb3JnYW5pemF0aW9uX3Byb3ZpZGVycxgEIAMoDjIeLmJyaWFyLm1vYmlsZS52MS5BZ2VudFByb3ZpZGVyEkwKEGV4ZWN1dGlvbl9wb2xpY3kYBSABKAsyLS5icmlhci5tb2JpbGUudjEuUHJvamVjdEV4ZWN1dGlvbldvcmtlclBvbGljeUgAiAEBEjQKB21lbWJlcnMYBiADKAsyIy5icmlhci5tb2JpbGUudjEuT3JnYW5pemF0aW9uTWVtYmVyEk0KGmNvbnZlcnNhdGlvbl9ub3RpZmljYXRpb25zGAcgAygLMikuYnJpYXIubW9iaWxlLnYxLkNvbnZlcnNhdGlvbk5vdGlmaWNhdGlvbhJDChVjaGFubmVsX25vdGlmaWNhdGlvbnMYCCADKAsyJC5icmlhci5tb2JpbGUudjEuQ2hhbm5lbE5vdGlmaWNhdGlvbhIOCgZjdXJzb3IYCSABKAQSMAoMZ2VuZXJhdGVkX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEITChFfZXhlY3V0aW9uX3BvbGljeSI6ChRTeW5jRGFzaGJvYXJkUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEg4KBmN1cnNvchgCIAEoBCKcBQoVU3luY0Rhc2hib2FyZFJlc3BvbnNlEg4KBmN1cnNvchgBIAEoBBIQCghoYXNfbW9yZRgCIAEoCBINCgVyZXNldBgDIAEoCBIrCgRydW5zGAQgAygLMh0uYnJpYXIubW9iaWxlLnYxLkRhc2hib2FyZFJ1bhIXCg9kZWxldGVkX3J1bl9pZHMYBSADKAkSLgoHcHJvamVjdBgGIAEoCzIYLmJyaWFyLm1vYmlsZS52MS5Qcm9qZWN0SACIAQESMQoHd29ya2VycxgHIAMoCzIgLmJyaWFyLm1vYmlsZS52MS5EYXNoYm9hcmRXb3JrZXISPgoWb3JnYW5pemF0aW9uX3Byb3ZpZGVycxgIIAMoDjIeLmJyaWFyLm1vYmlsZS52MS5BZ2VudFByb3ZpZGVyEkwKEGV4ZWN1dGlvbl9wb2xpY3kYCSABKAsyLS5icmlhci5tb2JpbGUudjEuUHJvamVjdEV4ZWN1dGlvbldvcmtlclBvbGljeUgBiAEBEjQKB21lbWJlcnMYCiADKAsyIy5icmlhci5tb2JpbGUudjEuT3JnYW5pemF0aW9uTWVtYmVyEk0KGmNvbnZlcnNhdGlvbl9ub3RpZmljYXRpb25zGAsgAygLMikuYnJpYXIubW9iaWxlLnYxLkNvbnZlcnNhdGlvbk5vdGlmaWNhdGlvbhJDChVjaGFubmVsX25vdGlmaWNhdGlvbnMYDCADKAsyJC5icmlhci5tb2JpbGUudjEuQ2hhbm5lbE5vdGlmaWNhdGlvbhIwCgxnZW5lcmF0ZWRfYXQYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgoKCF9wcm9qZWN0QhMKEV9leGVjdXRpb25fcG9saWN5IjoKFExpc3RSdW5FdmVudHNSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSDgoGcnVuX2lkGAIgASgJIkIKFUxpc3RSdW5FdmVudHNSZXNwb25zZRIpCgZldmVudHMYASADKAsyGS5icmlhci5tb2JpbGUudjEuUnVuRXZlbnQitQMKEldvcmtmbG93Q2hlY2twb2ludBILCgNrZXkYASABKAkSDQoFc3RhZ2UYAiABKAkSEwoLc3RhZ2VfbGFiZWwYAyABKAkSPgoIcG9zaXRpb24YBCABKA4yLC5icmlhci5tb2JpbGUudjEuV29ya2Zsb3dDaGVja3BvaW50LlBvc2l0aW9uEg8KB2F0dGVtcHQYBSABKA0SEAoIcmV2aXNpb24YBiABKA0SMwoKcmVhY2hlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAIgBARIXCgpuZXh0X3N0YWdlGAggASgJSAGIAQESHQoQbmV4dF9zdGFnZV9sYWJlbBgJIAEoCUgCiAEBEhwKFHRlcm1pbmFsX3Jldmlld19vbmx5GAogASgIIk0KCFBvc2l0aW9uEhgKFFBPU0lUSU9OX1VOU1BFQ0lGSUVEEAASEwoPUE9TSVRJT05fQkVGT1JFEAESEgoOUE9TSVRJT05fQUZURVIQAkINCgtfcmVhY2hlZF9hdEINCgtfbmV4dF9zdGFnZUITChFfbmV4dF9zdGFnZV9sYWJlbCI8Cg1Xb3JrZmxvd1N0YWdlEgoKAmlkGAEgASgJEg0KBWxhYmVsGAIgASgJEhAKCHJlcXVpcmVkGAMgASgIIlMKEEF1dG9IdW50V29ya2Zsb3cSDwoHdmVyc2lvbhgBIAEoDRIuCgZzdGFnZXMYAiADKAsyHi5icmlhci5tb2JpbGUudjEuV29ya2Zsb3dTdGFnZSJ1ChhJc3N1ZURlcGVuZGVuY3lSZWZlcmVuY2USCgoCaWQYASABKAkSEgoKcnVuX251bWJlchgCIAEoDRINCgV0aXRsZRgDIAEoCRIqCgZzdGF0dXMYBCABKA4yGi5icmlhci5tb2JpbGUudjEuUnVuU3RhdHVzIpMZCgxEYXNoYm9hcmRSdW4SCgoCaWQYASABKAkSFwoKcnVuX251bWJlchgCIAEoDUgAiAEBEhwKD2N1cnJlbnRfYXR0ZW1wdBgDIAEoDUgBiAEBEh0KEGN1cnJlbnRfcmV2aXNpb24YBCABKA1IAogBARIXCgpzb3VyY2Vfa2V5GAUgASgJSAOIAQESOgoRc291cmNlX2NyZWF0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSASIAQESDQoFdGl0bGUYByABKAkSKgoGc3RhdHVzGAggASgOMhouYnJpYXIubW9iaWxlLnYxLlJ1blN0YXR1cxIbCg53b3JrZmxvd19zdGFnZRgJIAEoCUgFiAEBEjgKCHdvcmtmbG93GAogASgLMiEuYnJpYXIubW9iaWxlLnYxLkF1dG9IdW50V29ya2Zsb3dIBogBARIyCglwYXVzZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSAeIAQESPAoTcmVzdW1lX3JlcXVlc3RlZF9hdBgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBICIgBARI8CgpjaGVja3BvaW50GA0gASgLMiMuYnJpYXIubW9iaWxlLnYxLldvcmtmbG93Q2hlY2twb2ludEgJiAEBEhUKCHByb2dyZXNzGA4gASgBSAqIAQESEwoGZGV0YWlsGA8gASgJSAuIAQESFQoIcHJpb3JpdHkYECABKA1IDIgBARI5CgpkaWZmaWN1bHR5GBEgASgOMiAuYnJpYXIubW9iaWxlLnYxLklzc3VlRGlmZmljdWx0eUgNiAEBEh0KEGFzc2lnbmVlX3VzZXJfaWQYEiABKAlIDogBARIfChJjcmVhdGVkX2J5X3VzZXJfaWQYEyABKAlID4gBARI1CgtzdWJzY3JpYmVycxgUIAMoCzIgLmJyaWFyLm1vYmlsZS52MS5Jc3N1ZVN1YnNjcmliZXISHgoRaXNzdWVfZGVzY3JpcHRpb24YFSABKAlIEIgBARJGCg9yZWxhdGVkX21lc3NhZ2UYFiABKAsyKC5icmlhci5tb2JpbGUudjEuUmVsYXRlZE1lc3NhZ2VSZWZlcmVuY2VIEYgBARI1CgthdHRhY2htZW50cxgXIAMoCzIgLmJyaWFyLm1vYmlsZS52MS5Jc3N1ZUF0dGFjaG1lbnQSQAoNcHJlcmVxdWlzaXRlcxgYIAMoCzIpLmJyaWFyLm1vYmlsZS52MS5Jc3N1ZURlcGVuZGVuY3lSZWZlcmVuY2USPQoKZGVwZW5kZW50cxgZIAMoCzIpLmJyaWFyLm1vYmlsZS52MS5Jc3N1ZURlcGVuZGVuY3lSZWZlcmVuY2USUgoTZXhlY3V0aW9uX3JlYWRpbmVzcxgaIAEoDjIwLmJyaWFyLm1vYmlsZS52MS5EYXNoYm9hcmRSdW4uRXhlY3V0aW9uUmVhZGluZXNzSBKIAQESKgodd2FpdGluZ19vbl9wcmVyZXF1aXNpdGVfY291bnQYGyABKA1IE4gBARIbCg5yZXN1bHRfc3VtbWFyeRgcIAEoCUgUiAEBEkQKEXN0cnVjdHVyZWRfcmVzdWx0GB0gASgLMiQuYnJpYXIubW9iaWxlLnYxLlN0cnVjdHVyZWRSdW5SZXN1bHRIFYgBARI1Cg5yZXN1bHRfcmV2aWV3cxgeIAMoCzIdLmJyaWFyLm1vYmlsZS52MS5SZXN1bHRSZXZpZXcSGQoRcHVsbF9yZXF1ZXN0X3VybHMYHyADKAkSEwoGYnJhbmNoGCAgASgJSBaIAQESFwoKY29tbWl0X3NoYRghIAEoCUgXiAEBEj8KEnByZWZlcnJlZF9wcm92aWRlchgiIAEoDjIeLmJyaWFyLm1vYmlsZS52MS5BZ2VudFByb3ZpZGVySBiIAQESHAoPcHJlZmVycmVkX21vZGVsGCMgASgJSBmIAQESHQoQcHJlZmVycmVkX2VmZm9ydBgkIAEoCUgaiAEBEhYKCWZ1bGxfYXV0bxglIAEoCEgbiAEBEj8KEnJlcXVlc3RlZF9wcm92aWRlchgmIAEoDjIeLmJyaWFyLm1vYmlsZS52MS5BZ2VudFByb3ZpZGVySByIAQESHAoPcmVxdWVzdGVkX21vZGVsGCcgASgJSB2IAQESHQoQcmVxdWVzdGVkX2VmZm9ydBgoIAEoCUgeiAEBEiAKE3JlcXVlc3RlZF93b3JrZXJfaWQYKSABKAlIH4gBARIhChRyZXF1ZXN0ZWRfYnlfdXNlcl9pZBgqIAEoCUggiAEBEkYKDWRpc3BhdGNoX21vZGUYKyABKA4yKi5icmlhci5tb2JpbGUudjEuRGFzaGJvYXJkUnVuLkRpc3BhdGNoTW9kZUghiAEBEjYKDWRpc3BhdGNoZWRfYXQYLCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSCKIAQESFwoKY2xhaW1lZF9ieRgtIAEoCUgjiAEBEjMKCmNsYWltZWRfYXQYLiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSCSIAQESFgoJd29ya2VyX2lkGC8gASgJSCWIAQESMwoKc3RhcnRlZF9hdBgwIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIJogBARIuCgp1cGRhdGVkX2F0GDEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI1Cgxjb21wbGV0ZWRfYXQYMiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSCeIAQESNgoNbGFzdF9ldmVudF9hdBgzIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIKIgBARIYCgtldmVudF9jb3VudBg0IAEoDUgpiAEBInkKEkV4ZWN1dGlvblJlYWRpbmVzcxIjCh9FWEVDVVRJT05fUkVBRElORVNTX1VOU1BFQ0lGSUVEEAASHQoZRVhFQ1VUSU9OX1JFQURJTkVTU19SRUFEWRABEh8KG0VYRUNVVElPTl9SRUFESU5FU1NfV0FJVElORxACImAKDERpc3BhdGNoTW9kZRIdChlESVNQQVRDSF9NT0RFX1VOU1BFQ0lGSUVEEAASFQoRRElTUEFUQ0hfTU9ERV9BTlkQARIaChZESVNQQVRDSF9NT0RFX1NQRUNJRklDEAJCDQoLX3J1bl9udW1iZXJCEgoQX2N1cnJlbnRfYXR0ZW1wdEITChFfY3VycmVudF9yZXZpc2lvbkINCgtfc291cmNlX2tleUIUChJfc291cmNlX2NyZWF0ZWRfYXRCEQoPX3dvcmtmbG93X3N0YWdlQgsKCV93b3JrZmxvd0IMCgpfcGF1c2VkX2F0QhYKFF9yZXN1bWVfcmVxdWVzdGVkX2F0Qg0KC19jaGVja3BvaW50QgsKCV9wcm9ncmVzc0IJCgdfZGV0YWlsQgsKCV9wcmlvcml0eUINCgtfZGlmZmljdWx0eUITChFfYXNzaWduZWVfdXNlcl9pZEIVChNfY3JlYXRlZF9ieV91c2VyX2lkQhQKEl9pc3N1ZV9kZXNjcmlwdGlvbkISChBfcmVsYXRlZF9tZXNzYWdlQhYKFF9leGVjdXRpb25fcmVhZGluZXNzQiAKHl93YWl0aW5nX29uX3ByZXJlcXVpc2l0ZV9jb3VudEIRCg9fcmVzdWx0X3N1bW1hcnlCFAoSX3N0cnVjdHVyZWRfcmVzdWx0QgkKB19icmFuY2hCDQoLX2NvbW1pdF9zaGFCFQoTX3ByZWZlcnJlZF9wcm92aWRlckISChBfcHJlZmVycmVkX21vZGVsQhMKEV9wcmVmZXJyZWRfZWZmb3J0QgwKCl9mdWxsX2F1dG9CFQoTX3JlcXVlc3RlZF9wcm92aWRlckISChBfcmVxdWVzdGVkX21vZGVsQhMKEV9yZXF1ZXN0ZWRfZWZmb3J0QhYKFF9yZXF1ZXN0ZWRfd29ya2VyX2lkQhcKFV9yZXF1ZXN0ZWRfYnlfdXNlcl9pZEIQCg5fZGlzcGF0Y2hfbW9kZUIQCg5fZGlzcGF0Y2hlZF9hdEINCgtfY2xhaW1lZF9ieUINCgtfY2xhaW1lZF9hdEIMCgpfd29ya2VyX2lkQg0KC19zdGFydGVkX2F0Qg8KDV9jb21wbGV0ZWRfYXRCEAoOX2xhc3RfZXZlbnRfYXRCDgoMX2V2ZW50X2NvdW50IokBCgpXb3JrZXJJY29uEi4KBGtpbmQYASABKA4yIC5icmlhci5tb2JpbGUudjEuV29ya2VySWNvbi5LaW5kEg0KBXZhbHVlGAIgASgJIjwKBEtpbmQSFAoQS0lORF9VTlNQRUNJRklFRBAAEg4KCktJTkRfRU1PSkkQARIOCgpLSU5EX0lNQUdFEAIizwMKD0Rhc2hib2FyZFdvcmtlchIKCgJpZBgBIAEoCRINCgVsYWJlbBgCIAEoCRIuCgRpY29uGAMgASgLMhsuYnJpYXIubW9iaWxlLnYxLldvcmtlckljb25IAIgBARI7Cg5hZ2VudF9wcm92aWRlchgEIAEoDjIeLmJyaWFyLm1vYmlsZS52MS5BZ2VudFByb3ZpZGVySAGIAQESMQoJcHJvdmlkZXJzGAUgAygOMh4uYnJpYXIubW9iaWxlLnYxLkFnZW50UHJvdmlkZXISQAoMY2FwYWJpbGl0aWVzGAYgASgLMiUuYnJpYXIubW9iaWxlLnYxLlByb3ZpZGVyQ2FwYWJpbGl0aWVzSAKIAQESEQoJcmVhZGluZXNzGAcgASgJEhYKDmFjY2VwdGluZ193b3JrGAggASgIEh0KEHJlYWRpbmVzc19kZXRhaWwYCSABKAlIA4gBARIXCg9hY3RpdmVfc2Vzc2lvbnMYCiABKA0SGgoSYXZhaWxhYmxlX3Nlc3Npb25zGAsgASgNQgcKBV9pY29uQhEKD19hZ2VudF9wcm92aWRlckIPCg1fY2FwYWJpbGl0aWVzQhMKEV9yZWFkaW5lc3NfZGV0YWlsIvACChxQcm9qZWN0RXhlY3V0aW9uV29ya2VyUG9saWN5ElMKDnNlbGVjdGlvbl9tb2RlGAEgASgOMjsuYnJpYXIubW9iaWxlLnYxLlByb2plY3RFeGVjdXRpb25Xb3JrZXJQb2xpY3kuU2VsZWN0aW9uTW9kZRIeChFkZWZhdWx0X3dvcmtlcl9pZBgCIAEoCUgAiAEBEhoKEmFsbG93ZWRfd29ya2VyX2lkcxgDIAMoCRIzCgp1cGRhdGVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgBiAEBImUKDVNlbGVjdGlvbk1vZGUSHgoaU0VMRUNUSU9OX01PREVfVU5TUEVDSUZJRUQQABIWChJTRUxFQ1RJT05fTU9ERV9BTlkQARIcChhTRUxFQ1RJT05fTU9ERV9BTExPV0xJU1QQAkIUChJfZGVmYXVsdF93b3JrZXJfaWRCDQoLX3VwZGF0ZWRfYXQitAIKGENvbnZlcnNhdGlvbk5vdGlmaWNhdGlvbhIKCgJpZBgBIAEoCRIOCgZydW5faWQYAiABKAkSEQoJcnVuX3RpdGxlGAMgASgJEhcKD3Jvb3RfbWVzc2FnZV9pZBgEIAEoCRIMCgRib2R5GAUgASgJEi0KBmJsb2NrcxgGIAMoCzIdLmJyaWFyLm1vYmlsZS52MS5NZXNzYWdlQmxvY2sSLgoGYXV0aG9yGAcgASgLMh4uYnJpYXIubW9iaWxlLnYxLk1lc3NhZ2VBdXRob3ISMwoGcmVhc29uGAggASgOMiMuYnJpYXIubW9iaWxlLnYxLk5vdGlmaWNhdGlvblJlYXNvbhIuCgpjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKHAgoTQ2hhbm5lbE5vdGlmaWNhdGlvbhIKCgJpZBgBIAEoCRISCgpjaGFubmVsX2lkGAIgASgJEhQKDGNoYW5uZWxfbmFtZRgDIAEoCRIXCg9yb290X21lc3NhZ2VfaWQYBCABKAkSDAoEYm9keRgFIAEoCRIuCgZhdXRob3IYBiABKAsyHi5icmlhci5tb2JpbGUudjEuTWVzc2FnZUF1dGhvchIzCgZyZWFzb24YByABKA4yIy5icmlhci5tb2JpbGUudjEuTm90aWZpY2F0aW9uUmVhc29uEi4KCmNyZWF0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIvoBCghSdW5FdmVudBIKCgJpZBgBIAEoCRIqCgZzdGF0dXMYAiABKA4yGi5icmlhci5tb2JpbGUudjEuUnVuU3RhdHVzEhsKDndvcmtmbG93X3N0YWdlGAMgASgJSACIAQESEwoGZGV0YWlsGAQgASgJSAGIAQESDQoFYWN0b3IYBSABKAkSFwoKYWN0b3JfbmFtZRgGIAEoCUgCiAEBEi8KC29jY3VycmVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIRCg9fd29ya2Zsb3dfc3RhZ2VCCQoHX2RldGFpbEINCgtfYWN0b3JfbmFtZTKvAgoQRGFzaGJvYXJkU2VydmljZRJbCgxHZXREYXNoYm9hcmQSJC5icmlhci5tb2JpbGUudjEuR2V0RGFzaGJvYXJkUmVxdWVzdBolLmJyaWFyLm1vYmlsZS52MS5HZXREYXNoYm9hcmRSZXNwb25zZRJeCg1TeW5jRGFzaGJvYXJkEiUuYnJpYXIubW9iaWxlLnYxLlN5bmNEYXNoYm9hcmRSZXF1ZXN0GiYuYnJpYXIubW9iaWxlLnYxLlN5bmNEYXNoYm9hcmRSZXNwb25zZRJeCg1MaXN0UnVuRXZlbnRzEiUuYnJpYXIubW9iaWxlLnYxLkxpc3RSdW5FdmVudHNSZXF1ZXN0GiYuYnJpYXIubW9iaWxlLnYxLkxpc3RSdW5FdmVudHNSZXNwb25zZUIMugIJQnJpYXJBUElfYgZwcm90bzM", [file_briar_mobile_v1_common, file_briar_mobile_v1_project, file_google_protobuf_timestamp]);
+  fileDesc("Ch9icmlhci9tb2JpbGUvdjEvZGFzaGJvYXJkLnByb3RvEg9icmlhci5tb2JpbGUudjEiKQoTR2V0RGFzaGJvYXJkUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJIoQFChRHZXREYXNoYm9hcmRSZXNwb25zZRIpCgdwcm9qZWN0GAEgASgLMhguYnJpYXIubW9iaWxlLnYxLlByb2plY3QSKwoEcnVucxgCIAMoCzIdLmJyaWFyLm1vYmlsZS52MS5EYXNoYm9hcmRSdW4SMQoHd29ya2VycxgDIAMoCzIgLmJyaWFyLm1vYmlsZS52MS5EYXNoYm9hcmRXb3JrZXISPgoWb3JnYW5pemF0aW9uX3Byb3ZpZGVycxgEIAMoDjIeLmJyaWFyLm1vYmlsZS52MS5BZ2VudFByb3ZpZGVyEkwKEGV4ZWN1dGlvbl9wb2xpY3kYBSABKAsyLS5icmlhci5tb2JpbGUudjEuUHJvamVjdEV4ZWN1dGlvbldvcmtlclBvbGljeUgAiAEBEjQKB21lbWJlcnMYBiADKAsyIy5icmlhci5tb2JpbGUudjEuT3JnYW5pemF0aW9uTWVtYmVyEk0KGmNvbnZlcnNhdGlvbl9ub3RpZmljYXRpb25zGAcgAygLMikuYnJpYXIubW9iaWxlLnYxLkNvbnZlcnNhdGlvbk5vdGlmaWNhdGlvbhJDChVjaGFubmVsX25vdGlmaWNhdGlvbnMYCCADKAsyJC5icmlhci5tb2JpbGUudjEuQ2hhbm5lbE5vdGlmaWNhdGlvbhIOCgZjdXJzb3IYCSABKAQSMAoMZ2VuZXJhdGVkX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIyCghzZXR0aW5ncxgLIAEoCzIgLmJyaWFyLm1vYmlsZS52MS5Qcm9qZWN0U2V0dGluZ3NCEwoRX2V4ZWN1dGlvbl9wb2xpY3kiOgoUU3luY0Rhc2hib2FyZFJlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCRIOCgZjdXJzb3IYAiABKAQi4gUKFVN5bmNEYXNoYm9hcmRSZXNwb25zZRIOCgZjdXJzb3IYASABKAQSEAoIaGFzX21vcmUYAiABKAgSDQoFcmVzZXQYAyABKAgSKwoEcnVucxgEIAMoCzIdLmJyaWFyLm1vYmlsZS52MS5EYXNoYm9hcmRSdW4SFwoPZGVsZXRlZF9ydW5faWRzGAUgAygJEi4KB3Byb2plY3QYBiABKAsyGC5icmlhci5tb2JpbGUudjEuUHJvamVjdEgAiAEBEjEKB3dvcmtlcnMYByADKAsyIC5icmlhci5tb2JpbGUudjEuRGFzaGJvYXJkV29ya2VyEj4KFm9yZ2FuaXphdGlvbl9wcm92aWRlcnMYCCADKA4yHi5icmlhci5tb2JpbGUudjEuQWdlbnRQcm92aWRlchJMChBleGVjdXRpb25fcG9saWN5GAkgASgLMi0uYnJpYXIubW9iaWxlLnYxLlByb2plY3RFeGVjdXRpb25Xb3JrZXJQb2xpY3lIAYgBARI0CgdtZW1iZXJzGAogAygLMiMuYnJpYXIubW9iaWxlLnYxLk9yZ2FuaXphdGlvbk1lbWJlchJNChpjb252ZXJzYXRpb25fbm90aWZpY2F0aW9ucxgLIAMoCzIpLmJyaWFyLm1vYmlsZS52MS5Db252ZXJzYXRpb25Ob3RpZmljYXRpb24SQwoVY2hhbm5lbF9ub3RpZmljYXRpb25zGAwgAygLMiQuYnJpYXIubW9iaWxlLnYxLkNoYW5uZWxOb3RpZmljYXRpb24SMAoMZ2VuZXJhdGVkX2F0GA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI3CghzZXR0aW5ncxgOIAEoCzIgLmJyaWFyLm1vYmlsZS52MS5Qcm9qZWN0U2V0dGluZ3NIAogBAUIKCghfcHJvamVjdEITChFfZXhlY3V0aW9uX3BvbGljeUILCglfc2V0dGluZ3MiOgoUTGlzdFJ1bkV2ZW50c1JlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCRIOCgZydW5faWQYAiABKAkiQgoVTGlzdFJ1bkV2ZW50c1Jlc3BvbnNlEikKBmV2ZW50cxgBIAMoCzIZLmJyaWFyLm1vYmlsZS52MS5SdW5FdmVudCK1AwoSV29ya2Zsb3dDaGVja3BvaW50EgsKA2tleRgBIAEoCRINCgVzdGFnZRgCIAEoCRITCgtzdGFnZV9sYWJlbBgDIAEoCRI+Cghwb3NpdGlvbhgEIAEoDjIsLmJyaWFyLm1vYmlsZS52MS5Xb3JrZmxvd0NoZWNrcG9pbnQuUG9zaXRpb24SDwoHYXR0ZW1wdBgFIAEoDRIQCghyZXZpc2lvbhgGIAEoDRIzCgpyZWFjaGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgAiAEBEhcKCm5leHRfc3RhZ2UYCCABKAlIAYgBARIdChBuZXh0X3N0YWdlX2xhYmVsGAkgASgJSAKIAQESHAoUdGVybWluYWxfcmV2aWV3X29ubHkYCiABKAgiTQoIUG9zaXRpb24SGAoUUE9TSVRJT05fVU5TUEVDSUZJRUQQABITCg9QT1NJVElPTl9CRUZPUkUQARISCg5QT1NJVElPTl9BRlRFUhACQg0KC19yZWFjaGVkX2F0Qg0KC19uZXh0X3N0YWdlQhMKEV9uZXh0X3N0YWdlX2xhYmVsIl4KDVdvcmtmbG93U3RhZ2USCgoCaWQYASABKAkSDQoFbGFiZWwYAiABKAkSEAoIcmVxdWlyZWQYAyABKAgSEAoIZXZpZGVuY2UYBCADKAkSDgoGY2hlY2tzGAUgAygJIv8BChBBdXRvSHVudFdvcmtmbG93Eg8KB3ZlcnNpb24YASABKA0SLgoGc3RhZ2VzGAIgAygLMh4uYnJpYXIubW9iaWxlLnYxLldvcmtmbG93U3RhZ2USOgoMcmVxdWlyZW1lbnRzGAMgAygLMiQuYnJpYXIubW9iaWxlLnYxLldvcmtmbG93UmVxdWlyZW1lbnQSNQoJZXhlY3V0aW9uGAQgASgLMiIuYnJpYXIubW9iaWxlLnYxLldvcmtmbG93RXhlY3V0aW9uEjcKCmNvbXBsZXRpb24YBSABKAsyIy5icmlhci5tb2JpbGUudjEuV29ya2Zsb3dDb21wbGV0aW9uIlwKE1dvcmtmbG93UmVxdWlyZW1lbnQSCgoCaWQYASABKAkSDQoFbGFiZWwYAiABKAkSDAoEa2luZBgDIAEoCRIMCgR0b29sGAQgASgJEg4KBnJlYXNvbhgFIAEoCSJ0ChZXb3JrZmxvd0NoZWNrcG9pbnRTcGVjEgsKA2tleRgBIAEoCRINCgVzdGFnZRgCIAEoCRI+Cghwb3NpdGlvbhgDIAEoDjIsLmJyaWFyLm1vYmlsZS52MS5Xb3JrZmxvd0NoZWNrcG9pbnQuUG9zaXRpb24iUQoRV29ya2Zsb3dFeGVjdXRpb24SPAoLY2hlY2twb2ludHMYASADKAsyJy5icmlhci5tb2JpbGUudjEuV29ya2Zsb3dDaGVja3BvaW50U3BlYyItChJXb3JrZmxvd0NvbXBsZXRpb24SFwoPcmVxdWlyZWRfc3RhZ2VzGAEgAygJImUKDkxpbmVhclNldHRpbmdzEg8KB2VuYWJsZWQYASABKAgSEwoGc291cmNlGAIgASgJSACIAQESFQoIdGVhbV9rZXkYAyABKAlIAYgBAUIJCgdfc291cmNlQgsKCV90ZWFtX2tleSJ4ChJDaGVja3BvaW50Qm91bmRhcnkSDQoFc3RhZ2UYASABKAkSEwoLc3RhZ2VfbGFiZWwYAiABKAkSPgoIcG9zaXRpb24YAyABKA4yLC5icmlhci5tb2JpbGUudjEuV29ya2Zsb3dDaGVja3BvaW50LlBvc2l0aW9uIsYCChBDaGVja3BvaW50UG9saWN5EkEKFGF2YWlsYWJsZV9ib3VuZGFyaWVzGAEgAygLMiMuYnJpYXIubW9iaWxlLnYxLkNoZWNrcG9pbnRCb3VuZGFyeRJCChFwcm9qZWN0X21hbmRhdG9yeRgCIAMoCzInLmJyaWFyLm1vYmlsZS52MS5Xb3JrZmxvd0NoZWNrcG9pbnRTcGVjEj4KDXVzZXJfZGVmYXVsdHMYAyADKAsyJy5icmlhci5tb2JpbGUudjEuV29ya2Zsb3dDaGVja3BvaW50U3BlYxI6CgllZmZlY3RpdmUYBCADKAsyJy5icmlhci5tb2JpbGUudjEuV29ya2Zsb3dDaGVja3BvaW50U3BlYxIYChBwcm9qZWN0X3JldmlzaW9uGAUgASgEEhUKDXVzZXJfcmV2aXNpb24YBiABKAQikgMKD1Byb2plY3RTZXR0aW5ncxIWCgl2ZWxlbl9vcmcYASABKAlIAIgBARIYCgtkYXRhX3NvdXJjZRgCIAEoCUgBiAEBEi8KBmxpbmVhchgDIAEoCzIfLmJyaWFyLm1vYmlsZS52MS5MaW5lYXJTZXR0aW5ncxIhChRnaXRodWJfcmVwb3NpdG9yeV9pZBgEIAEoA0gCiAEBEh4KEWdpdGh1Yl9yZXBvc2l0b3J5GAUgASgJSAOIAQESMwoId29ya2Zsb3cYBiABKAsyIS5icmlhci5tb2JpbGUudjEuQXV0b0h1bnRXb3JrZmxvdxJBChFjaGVja3BvaW50X3BvbGljeRgHIAEoCzIhLmJyaWFyLm1vYmlsZS52MS5DaGVja3BvaW50UG9saWN5SASIAQFCDAoKX3ZlbGVuX29yZ0IOCgxfZGF0YV9zb3VyY2VCFwoVX2dpdGh1Yl9yZXBvc2l0b3J5X2lkQhQKEl9naXRodWJfcmVwb3NpdG9yeUIUChJfY2hlY2twb2ludF9wb2xpY3kidQoYSXNzdWVEZXBlbmRlbmN5UmVmZXJlbmNlEgoKAmlkGAEgASgJEhIKCnJ1bl9udW1iZXIYAiABKA0SDQoFdGl0bGUYAyABKAkSKgoGc3RhdHVzGAQgASgOMhouYnJpYXIubW9iaWxlLnYxLlJ1blN0YXR1cyLcIAoMRGFzaGJvYXJkUnVuEgoKAmlkGAEgASgJEhIKCnJ1bl9udW1iZXIYAiABKA0SFwoPY3VycmVudF9hdHRlbXB0GAMgASgNEhgKEGN1cnJlbnRfcmV2aXNpb24YBCABKA0SEgoKc291cmNlX2tleRgFIAEoCRI6ChFzb3VyY2VfY3JlYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAIgBARINCgV0aXRsZRgHIAEoCRIqCgZzdGF0dXMYCCABKA4yGi5icmlhci5tb2JpbGUudjEuUnVuU3RhdHVzEhsKDndvcmtmbG93X3N0YWdlGAkgASgJSAGIAQESOAoId29ya2Zsb3cYCiABKAsyIS5icmlhci5tb2JpbGUudjEuQXV0b0h1bnRXb3JrZmxvd0gCiAEBEjIKCXBhdXNlZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIA4gBARI8ChNyZXN1bWVfcmVxdWVzdGVkX2F0GAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgEiAEBEjwKCmNoZWNrcG9pbnQYDSABKAsyIy5icmlhci5tb2JpbGUudjEuV29ya2Zsb3dDaGVja3BvaW50SAWIAQESEAoIcHJvZ3Jlc3MYDiABKAESEwoGZGV0YWlsGA8gASgJSAaIAQESFQoIcHJpb3JpdHkYECABKA1IB4gBARI5CgpkaWZmaWN1bHR5GBEgASgOMiAuYnJpYXIubW9iaWxlLnYxLklzc3VlRGlmZmljdWx0eUgIiAEBEh0KEGFzc2lnbmVlX3VzZXJfaWQYEiABKAlICYgBARIfChJjcmVhdGVkX2J5X3VzZXJfaWQYEyABKAlICogBARI1CgtzdWJzY3JpYmVycxgUIAMoCzIgLmJyaWFyLm1vYmlsZS52MS5Jc3N1ZVN1YnNjcmliZXISHgoRaXNzdWVfZGVzY3JpcHRpb24YFSABKAlIC4gBARJGCg9yZWxhdGVkX21lc3NhZ2UYFiABKAsyKC5icmlhci5tb2JpbGUudjEuUmVsYXRlZE1lc3NhZ2VSZWZlcmVuY2VIDIgBARI1CgthdHRhY2htZW50cxgXIAMoCzIgLmJyaWFyLm1vYmlsZS52MS5Jc3N1ZUF0dGFjaG1lbnQSQAoNcHJlcmVxdWlzaXRlcxgYIAMoCzIpLmJyaWFyLm1vYmlsZS52MS5Jc3N1ZURlcGVuZGVuY3lSZWZlcmVuY2USPQoKZGVwZW5kZW50cxgZIAMoCzIpLmJyaWFyLm1vYmlsZS52MS5Jc3N1ZURlcGVuZGVuY3lSZWZlcmVuY2USUgoTZXhlY3V0aW9uX3JlYWRpbmVzcxgaIAEoDjIwLmJyaWFyLm1vYmlsZS52MS5EYXNoYm9hcmRSdW4uRXhlY3V0aW9uUmVhZGluZXNzSA2IAQESKgodd2FpdGluZ19vbl9wcmVyZXF1aXNpdGVfY291bnQYGyABKA1IDogBARIbCg5yZXN1bHRfc3VtbWFyeRgcIAEoCUgPiAEBEkQKEXN0cnVjdHVyZWRfcmVzdWx0GB0gASgLMiQuYnJpYXIubW9iaWxlLnYxLlN0cnVjdHVyZWRSdW5SZXN1bHRIEIgBARI1Cg5yZXN1bHRfcmV2aWV3cxgeIAMoCzIdLmJyaWFyLm1vYmlsZS52MS5SZXN1bHRSZXZpZXcSGQoRcHVsbF9yZXF1ZXN0X3VybHMYHyADKAkSEwoGYnJhbmNoGCAgASgJSBGIAQESFwoKY29tbWl0X3NoYRghIAEoCUgSiAEBEj8KEnByZWZlcnJlZF9wcm92aWRlchgiIAEoDjIeLmJyaWFyLm1vYmlsZS52MS5BZ2VudFByb3ZpZGVySBOIAQESHAoPcHJlZmVycmVkX21vZGVsGCMgASgJSBSIAQESHQoQcHJlZmVycmVkX2VmZm9ydBgkIAEoCUgViAEBEhYKCWZ1bGxfYXV0bxglIAEoCEgWiAEBEj8KEnJlcXVlc3RlZF9wcm92aWRlchgmIAEoDjIeLmJyaWFyLm1vYmlsZS52MS5BZ2VudFByb3ZpZGVySBeIAQESHAoPcmVxdWVzdGVkX21vZGVsGCcgASgJSBiIAQESHQoQcmVxdWVzdGVkX2VmZm9ydBgoIAEoCUgZiAEBEiAKE3JlcXVlc3RlZF93b3JrZXJfaWQYKSABKAlIGogBARIhChRyZXF1ZXN0ZWRfYnlfdXNlcl9pZBgqIAEoCUgbiAEBEkYKDWRpc3BhdGNoX21vZGUYKyABKA4yKi5icmlhci5tb2JpbGUudjEuRGFzaGJvYXJkUnVuLkRpc3BhdGNoTW9kZUgciAEBEjYKDWRpc3BhdGNoZWRfYXQYLCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSB2IAQESFwoKY2xhaW1lZF9ieRgtIAEoCUgeiAEBEjMKCmNsYWltZWRfYXQYLiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSB+IAQESFgoJd29ya2VyX2lkGC8gASgJSCCIAQESLgoKc3RhcnRlZF9hdBgwIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgxIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNQoMY29tcGxldGVkX2F0GDIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEghiAEBEjEKDWxhc3RfZXZlbnRfYXQYMyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhMKC2V2ZW50X2NvdW50GDQgASgNEjQKBnNvdXJjZRg1IAEoDjIkLmJyaWFyLm1vYmlsZS52MS5EYXNoYm9hcmRSdW4uU291cmNlEhIKCnJlcG9zaXRvcnkYNiABKAkSNwoHdHJhY2tlchg3IAEoCzIhLmJyaWFyLm1vYmlsZS52MS5UcmFja2VyUmVmZXJlbmNlSCKIAQESQwoSd2FpdGluZ19jaGVja3BvaW50GDggASgLMiIuYnJpYXIubW9iaWxlLnYxLldhaXRpbmdDaGVja3BvaW50SCOIAQESQgoRaXNzdWVfY2hlY2twb2ludHMYOSADKAsyJy5icmlhci5tb2JpbGUudjEuV29ya2Zsb3dDaGVja3BvaW50U3BlYxJGChFleGVjdXRpb25fbWV0cmljcxg6IAEoCzImLmJyaWFyLm1vYmlsZS52MS5BZ2VudEV4ZWN1dGlvbk1ldHJpY3NIJIgBARIXCgp0YXJnZXRfc2hhGDsgASgJSCWIAQESRgoRc3RhZ2luZ19xYV9zdGF0dXMYPCABKA4yJi5icmlhci5tb2JpbGUudjEuRGFzaGJvYXJkUnVuLlFhU3RhdHVzSCaIAQESSQoUcHJvZHVjdGlvbl9xYV9zdGF0dXMYPSABKA4yJi5icmlhci5tb2JpbGUudjEuRGFzaGJvYXJkUnVuLlFhU3RhdHVzSCeIAQESHgoRc3RhZ2luZ19xYV9kZXRhaWwYPiABKAlIKIgBARIhChRwcm9kdWN0aW9uX3FhX2RldGFpbBg/IAEoCUgpiAEBEi0KB2NvbnRleHQYQCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0SCqIAQESOQoQbGVhc2VfZXhwaXJlc19hdBhBIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIK4gBARIWCg5jbGFpbV9hdHRlbXB0cxhCIAEoDRIVCghhZ2VudF9pZBhDIAEoCUgsiAEBInkKEkV4ZWN1dGlvblJlYWRpbmVzcxIjCh9FWEVDVVRJT05fUkVBRElORVNTX1VOU1BFQ0lGSUVEEAASHQoZRVhFQ1VUSU9OX1JFQURJTkVTU19SRUFEWRABEh8KG0VYRUNVVElPTl9SRUFESU5FU1NfV0FJVElORxACImAKDERpc3BhdGNoTW9kZRIdChlESVNQQVRDSF9NT0RFX1VOU1BFQ0lGSUVEEAASFQoRRElTUEFUQ0hfTU9ERV9BTlkQARIaChZESVNQQVRDSF9NT0RFX1NQRUNJRklDEAIiWQoGU291cmNlEhYKElNPVVJDRV9VTlNQRUNJRklFRBAAEhAKDFNPVVJDRV9JU1NVRRABEhAKDFNPVVJDRV9FUlJPUhACEhMKD1NPVVJDRV9GRUVEQkFDSxADImkKCFFhU3RhdHVzEhkKFVFBX1NUQVRVU19VTlNQRUNJRklFRBAAEhUKEVFBX1NUQVRVU19QRU5ESU5HEAESFAoQUUFfU1RBVFVTX1BBU1NFRBACEhUKEVFBX1NUQVRVU19TS0lQUEVEEANCFAoSX3NvdXJjZV9jcmVhdGVkX2F0QhEKD193b3JrZmxvd19zdGFnZUILCglfd29ya2Zsb3dCDAoKX3BhdXNlZF9hdEIWChRfcmVzdW1lX3JlcXVlc3RlZF9hdEINCgtfY2hlY2twb2ludEIJCgdfZGV0YWlsQgsKCV9wcmlvcml0eUINCgtfZGlmZmljdWx0eUITChFfYXNzaWduZWVfdXNlcl9pZEIVChNfY3JlYXRlZF9ieV91c2VyX2lkQhQKEl9pc3N1ZV9kZXNjcmlwdGlvbkISChBfcmVsYXRlZF9tZXNzYWdlQhYKFF9leGVjdXRpb25fcmVhZGluZXNzQiAKHl93YWl0aW5nX29uX3ByZXJlcXVpc2l0ZV9jb3VudEIRCg9fcmVzdWx0X3N1bW1hcnlCFAoSX3N0cnVjdHVyZWRfcmVzdWx0QgkKB19icmFuY2hCDQoLX2NvbW1pdF9zaGFCFQoTX3ByZWZlcnJlZF9wcm92aWRlckISChBfcHJlZmVycmVkX21vZGVsQhMKEV9wcmVmZXJyZWRfZWZmb3J0QgwKCl9mdWxsX2F1dG9CFQoTX3JlcXVlc3RlZF9wcm92aWRlckISChBfcmVxdWVzdGVkX21vZGVsQhMKEV9yZXF1ZXN0ZWRfZWZmb3J0QhYKFF9yZXF1ZXN0ZWRfd29ya2VyX2lkQhcKFV9yZXF1ZXN0ZWRfYnlfdXNlcl9pZEIQCg5fZGlzcGF0Y2hfbW9kZUIQCg5fZGlzcGF0Y2hlZF9hdEINCgtfY2xhaW1lZF9ieUINCgtfY2xhaW1lZF9hdEIMCgpfd29ya2VyX2lkQg8KDV9jb21wbGV0ZWRfYXRCCgoIX3RyYWNrZXJCFQoTX3dhaXRpbmdfY2hlY2twb2ludEIUChJfZXhlY3V0aW9uX21ldHJpY3NCDQoLX3RhcmdldF9zaGFCFAoSX3N0YWdpbmdfcWFfc3RhdHVzQhcKFV9wcm9kdWN0aW9uX3FhX3N0YXR1c0IUChJfc3RhZ2luZ19xYV9kZXRhaWxCFwoVX3Byb2R1Y3Rpb25fcWFfZGV0YWlsQgoKCF9jb250ZXh0QhMKEV9sZWFzZV9leHBpcmVzX2F0QgsKCV9hZ2VudF9pZCKoAQoQVHJhY2tlclJlZmVyZW5jZRIQCghwcm92aWRlchgBIAEoCRIVCghpc3N1ZV9pZBgCIAEoCUgAiAEBEhcKCmlkZW50aWZpZXIYAyABKAlIAYgBARIQCgN1cmwYBCABKAlIAogBARISCgVzdGF0ZRgFIAEoCUgDiAEBQgsKCV9pc3N1ZV9pZEINCgtfaWRlbnRpZmllckIGCgRfdXJsQggKBl9zdGF0ZSIyChFXYWl0aW5nQ2hlY2twb2ludBILCgNrZXkYASABKAkSEAoIcmV2aXNpb24YAiABKA0i4gIKFUFnZW50RXhlY3V0aW9uTWV0cmljcxIZCgxpbnB1dF90b2tlbnMYASABKARIAIgBARIaCg1vdXRwdXRfdG9rZW5zGAIgASgESAGIAQESHgoRY2FjaGVfcmVhZF90b2tlbnMYAyABKARIAogBARIfChJjYWNoZV93cml0ZV90b2tlbnMYBCABKARIA4gBARIkChdyZWFzb25pbmdfb3V0cHV0X3Rva2VucxgFIAEoBEgEiAEBEhkKDHRvdGFsX3Rva2VucxgGIAEoBEgFiAEBEhMKC2R1cmF0aW9uX21zGAcgASgEQg8KDV9pbnB1dF90b2tlbnNCEAoOX291dHB1dF90b2tlbnNCFAoSX2NhY2hlX3JlYWRfdG9rZW5zQhUKE19jYWNoZV93cml0ZV90b2tlbnNCGgoYX3JlYXNvbmluZ19vdXRwdXRfdG9rZW5zQg8KDV90b3RhbF90b2tlbnMiiQEKCldvcmtlckljb24SLgoEa2luZBgBIAEoDjIgLmJyaWFyLm1vYmlsZS52MS5Xb3JrZXJJY29uLktpbmQSDQoFdmFsdWUYAiABKAkiPAoES2luZBIUChBLSU5EX1VOU1BFQ0lGSUVEEAASDgoKS0lORF9FTU9KSRABEg4KCktJTkRfSU1BR0UQAiKWCAoPRGFzaGJvYXJkV29ya2VyEgoKAmlkGAEgASgJEg0KBWxhYmVsGAIgASgJEi4KBGljb24YAyABKAsyGy5icmlhci5tb2JpbGUudjEuV29ya2VySWNvbkgAiAEBEjYKDmFnZW50X3Byb3ZpZGVyGAQgASgOMh4uYnJpYXIubW9iaWxlLnYxLkFnZW50UHJvdmlkZXISMQoJcHJvdmlkZXJzGAUgAygOMh4uYnJpYXIubW9iaWxlLnYxLkFnZW50UHJvdmlkZXISLQoMY2FwYWJpbGl0aWVzGAYgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBI9CglyZWFkaW5lc3MYByABKA4yKi5icmlhci5tb2JpbGUudjEuRGFzaGJvYXJkV29ya2VyLlJlYWRpbmVzcxIWCg5hY2NlcHRpbmdfd29yaxgIIAEoCBIdChByZWFkaW5lc3NfZGV0YWlsGAkgASgJSAGIAQESFwoPYWN0aXZlX3Nlc3Npb25zGAogASgNEhoKEmF2YWlsYWJsZV9zZXNzaW9ucxgLIAEoDRIRCglkZXZpY2VfaWQYDCABKAkSFQoNb3duZXJfdXNlcl9pZBgNIAEoCRJACgh2ZXJzaW9ucxgOIAMoCzIuLmJyaWFyLm1vYmlsZS52MS5EYXNoYm9hcmRXb3JrZXIuVmVyc2lvbnNFbnRyeRI1CgVzdGF0ZRgPIAEoDjImLmJyaWFyLm1vYmlsZS52MS5EYXNoYm9hcmRXb3JrZXIuU3RhdGUSHwoXbWF4X2NvbmN1cnJlbnRfc2Vzc2lvbnMYECABKA0SNQoRbGFzdF9oZWFydGJlYXRfYXQYESABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmNyZWF0ZWRfYXQYEiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wGi8KDVZlcnNpb25zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJVCgVTdGF0ZRIVChFTVEFURV9VTlNQRUNJRklFRBAAEhAKDFNUQVRFX09OTElORRABEg8KC1NUQVRFX1NUQUxFEAISEgoOU1RBVEVfRElTQUJMRUQQAyKhAQoJUmVhZGluZXNzEhkKFVJFQURJTkVTU19VTlNQRUNJRklFRBAAEhcKE1JFQURJTkVTU19BVkFJTEFCTEUQARISCg5SRUFESU5FU1NfQlVTWRACEhUKEVJFQURJTkVTU19PRkZMSU5FEAMSHQoZUkVBRElORVNTX05FRURTX0FUVEVOVElPThAEEhYKElJFQURJTkVTU19ESVNBQkxFRBAFQgcKBV9pY29uQhMKEV9yZWFkaW5lc3NfZGV0YWlsIvACChxQcm9qZWN0RXhlY3V0aW9uV29ya2VyUG9saWN5ElMKDnNlbGVjdGlvbl9tb2RlGAEgASgOMjsuYnJpYXIubW9iaWxlLnYxLlByb2plY3RFeGVjdXRpb25Xb3JrZXJQb2xpY3kuU2VsZWN0aW9uTW9kZRIeChFkZWZhdWx0X3dvcmtlcl9pZBgCIAEoCUgAiAEBEhoKEmFsbG93ZWRfd29ya2VyX2lkcxgDIAMoCRIzCgp1cGRhdGVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgBiAEBImUKDVNlbGVjdGlvbk1vZGUSHgoaU0VMRUNUSU9OX01PREVfVU5TUEVDSUZJRUQQABIWChJTRUxFQ1RJT05fTU9ERV9BTlkQARIcChhTRUxFQ1RJT05fTU9ERV9BTExPV0xJU1QQAkIUChJfZGVmYXVsdF93b3JrZXJfaWRCDQoLX3VwZGF0ZWRfYXQitAIKGENvbnZlcnNhdGlvbk5vdGlmaWNhdGlvbhIKCgJpZBgBIAEoCRIOCgZydW5faWQYAiABKAkSEQoJcnVuX3RpdGxlGAMgASgJEhcKD3Jvb3RfbWVzc2FnZV9pZBgEIAEoCRIMCgRib2R5GAUgASgJEi0KBmJsb2NrcxgGIAMoCzIdLmJyaWFyLm1vYmlsZS52MS5NZXNzYWdlQmxvY2sSLgoGYXV0aG9yGAcgASgLMh4uYnJpYXIubW9iaWxlLnYxLk1lc3NhZ2VBdXRob3ISMwoGcmVhc29uGAggASgOMiMuYnJpYXIubW9iaWxlLnYxLk5vdGlmaWNhdGlvblJlYXNvbhIuCgpjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKHAgoTQ2hhbm5lbE5vdGlmaWNhdGlvbhIKCgJpZBgBIAEoCRISCgpjaGFubmVsX2lkGAIgASgJEhQKDGNoYW5uZWxfbmFtZRgDIAEoCRIXCg9yb290X21lc3NhZ2VfaWQYBCABKAkSDAoEYm9keRgFIAEoCRIuCgZhdXRob3IYBiABKAsyHi5icmlhci5tb2JpbGUudjEuTWVzc2FnZUF1dGhvchIzCgZyZWFzb24YByABKA4yIy5icmlhci5tb2JpbGUudjEuTm90aWZpY2F0aW9uUmVhc29uEi4KCmNyZWF0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIo0ECghSdW5FdmVudBIKCgJpZBgBIAEoCRIqCgZzdGF0dXMYAiABKA4yGi5icmlhci5tb2JpbGUudjEuUnVuU3RhdHVzEhsKDndvcmtmbG93X3N0YWdlGAMgASgJSACIAQESEwoGZGV0YWlsGAQgASgJSAGIAQESDQoFYWN0b3IYBSABKAkSFwoKYWN0b3JfbmFtZRgGIAEoCUgCiAEBEi8KC29jY3VycmVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIPCgdhdHRlbXB0GAggASgNEhAKCHJldmlzaW9uGAkgASgNEj4KCXFhX3N0YXR1cxgKIAEoDjImLmJyaWFyLm1vYmlsZS52MS5EYXNoYm9hcmRSdW4uUWFTdGF0dXNIA4gBARIaCg10cmFja2VyX3N0YXRlGAsgASgJSASIAQESGQoRcHVsbF9yZXF1ZXN0X3VybHMYDCADKAkSFwoKdGFyZ2V0X3NoYRgNIAEoCUgFiAEBEi8KC3JlY29yZGVkX2F0GA4gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIRCg9fd29ya2Zsb3dfc3RhZ2VCCQoHX2RldGFpbEINCgtfYWN0b3JfbmFtZUIMCgpfcWFfc3RhdHVzQhAKDl90cmFja2VyX3N0YXRlQg0KC190YXJnZXRfc2hhMq8CChBEYXNoYm9hcmRTZXJ2aWNlElsKDEdldERhc2hib2FyZBIkLmJyaWFyLm1vYmlsZS52MS5HZXREYXNoYm9hcmRSZXF1ZXN0GiUuYnJpYXIubW9iaWxlLnYxLkdldERhc2hib2FyZFJlc3BvbnNlEl4KDVN5bmNEYXNoYm9hcmQSJS5icmlhci5tb2JpbGUudjEuU3luY0Rhc2hib2FyZFJlcXVlc3QaJi5icmlhci5tb2JpbGUudjEuU3luY0Rhc2hib2FyZFJlc3BvbnNlEl4KDUxpc3RSdW5FdmVudHMSJS5icmlhci5tb2JpbGUudjEuTGlzdFJ1bkV2ZW50c1JlcXVlc3QaJi5icmlhci5tb2JpbGUudjEuTGlzdFJ1bkV2ZW50c1Jlc3BvbnNlQgy6AglCcmlhckFQSV9iBnByb3RvMw", [file_briar_mobile_v1_common, file_briar_mobile_v1_project, file_google_protobuf_struct, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message briar.mobile.v1.GetDashboardRequest
@@ -88,6 +88,11 @@ export type GetDashboardResponse = Message<"briar.mobile.v1.GetDashboardResponse
    * @generated from field: google.protobuf.Timestamp generated_at = 10;
    */
   generatedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: briar.mobile.v1.ProjectSettings settings = 11;
+   */
+  settings?: ProjectSettings | undefined;
 };
 
 /**
@@ -187,6 +192,11 @@ export type SyncDashboardResponse = Message<"briar.mobile.v1.SyncDashboardRespon
    * @generated from field: google.protobuf.Timestamp generated_at = 13;
    */
   generatedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: optional briar.mobile.v1.ProjectSettings settings = 14;
+   */
+  settings?: ProjectSettings | undefined;
 };
 
 /**
@@ -341,6 +351,16 @@ export type WorkflowStage = Message<"briar.mobile.v1.WorkflowStage"> & {
    * @generated from field: bool required = 3;
    */
   required: boolean;
+
+  /**
+   * @generated from field: repeated string evidence = 4;
+   */
+  evidence: string[];
+
+  /**
+   * @generated from field: repeated string checks = 5;
+   */
+  checks: string[];
 };
 
 /**
@@ -363,6 +383,21 @@ export type AutoHuntWorkflow = Message<"briar.mobile.v1.AutoHuntWorkflow"> & {
    * @generated from field: repeated briar.mobile.v1.WorkflowStage stages = 2;
    */
   stages: WorkflowStage[];
+
+  /**
+   * @generated from field: repeated briar.mobile.v1.WorkflowRequirement requirements = 3;
+   */
+  requirements: WorkflowRequirement[];
+
+  /**
+   * @generated from field: briar.mobile.v1.WorkflowExecution execution = 4;
+   */
+  execution?: WorkflowExecution | undefined;
+
+  /**
+   * @generated from field: briar.mobile.v1.WorkflowCompletion completion = 5;
+   */
+  completion?: WorkflowCompletion | undefined;
 };
 
 /**
@@ -371,6 +406,247 @@ export type AutoHuntWorkflow = Message<"briar.mobile.v1.AutoHuntWorkflow"> & {
  */
 export const AutoHuntWorkflowSchema: GenMessage<AutoHuntWorkflow> = /*@__PURE__*/
   messageDesc(file_briar_mobile_v1_dashboard, 8);
+
+/**
+ * @generated from message briar.mobile.v1.WorkflowRequirement
+ */
+export type WorkflowRequirement = Message<"briar.mobile.v1.WorkflowRequirement"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string label = 2;
+   */
+  label: string;
+
+  /**
+   * @generated from field: string kind = 3;
+   */
+  kind: string;
+
+  /**
+   * @generated from field: string tool = 4;
+   */
+  tool: string;
+
+  /**
+   * @generated from field: string reason = 5;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message briar.mobile.v1.WorkflowRequirement.
+ * Use `create(WorkflowRequirementSchema)` to create a new message.
+ */
+export const WorkflowRequirementSchema: GenMessage<WorkflowRequirement> = /*@__PURE__*/
+  messageDesc(file_briar_mobile_v1_dashboard, 9);
+
+/**
+ * @generated from message briar.mobile.v1.WorkflowCheckpointSpec
+ */
+export type WorkflowCheckpointSpec = Message<"briar.mobile.v1.WorkflowCheckpointSpec"> & {
+  /**
+   * @generated from field: string key = 1;
+   */
+  key: string;
+
+  /**
+   * @generated from field: string stage = 2;
+   */
+  stage: string;
+
+  /**
+   * @generated from field: briar.mobile.v1.WorkflowCheckpoint.Position position = 3;
+   */
+  position: WorkflowCheckpoint_Position;
+};
+
+/**
+ * Describes the message briar.mobile.v1.WorkflowCheckpointSpec.
+ * Use `create(WorkflowCheckpointSpecSchema)` to create a new message.
+ */
+export const WorkflowCheckpointSpecSchema: GenMessage<WorkflowCheckpointSpec> = /*@__PURE__*/
+  messageDesc(file_briar_mobile_v1_dashboard, 10);
+
+/**
+ * @generated from message briar.mobile.v1.WorkflowExecution
+ */
+export type WorkflowExecution = Message<"briar.mobile.v1.WorkflowExecution"> & {
+  /**
+   * @generated from field: repeated briar.mobile.v1.WorkflowCheckpointSpec checkpoints = 1;
+   */
+  checkpoints: WorkflowCheckpointSpec[];
+};
+
+/**
+ * Describes the message briar.mobile.v1.WorkflowExecution.
+ * Use `create(WorkflowExecutionSchema)` to create a new message.
+ */
+export const WorkflowExecutionSchema: GenMessage<WorkflowExecution> = /*@__PURE__*/
+  messageDesc(file_briar_mobile_v1_dashboard, 11);
+
+/**
+ * @generated from message briar.mobile.v1.WorkflowCompletion
+ */
+export type WorkflowCompletion = Message<"briar.mobile.v1.WorkflowCompletion"> & {
+  /**
+   * @generated from field: repeated string required_stages = 1;
+   */
+  requiredStages: string[];
+};
+
+/**
+ * Describes the message briar.mobile.v1.WorkflowCompletion.
+ * Use `create(WorkflowCompletionSchema)` to create a new message.
+ */
+export const WorkflowCompletionSchema: GenMessage<WorkflowCompletion> = /*@__PURE__*/
+  messageDesc(file_briar_mobile_v1_dashboard, 12);
+
+/**
+ * @generated from message briar.mobile.v1.LinearSettings
+ */
+export type LinearSettings = Message<"briar.mobile.v1.LinearSettings"> & {
+  /**
+   * @generated from field: bool enabled = 1;
+   */
+  enabled: boolean;
+
+  /**
+   * @generated from field: optional string source = 2;
+   */
+  source?: string | undefined;
+
+  /**
+   * @generated from field: optional string team_key = 3;
+   */
+  teamKey?: string | undefined;
+};
+
+/**
+ * Describes the message briar.mobile.v1.LinearSettings.
+ * Use `create(LinearSettingsSchema)` to create a new message.
+ */
+export const LinearSettingsSchema: GenMessage<LinearSettings> = /*@__PURE__*/
+  messageDesc(file_briar_mobile_v1_dashboard, 13);
+
+/**
+ * @generated from message briar.mobile.v1.CheckpointBoundary
+ */
+export type CheckpointBoundary = Message<"briar.mobile.v1.CheckpointBoundary"> & {
+  /**
+   * @generated from field: string stage = 1;
+   */
+  stage: string;
+
+  /**
+   * @generated from field: string stage_label = 2;
+   */
+  stageLabel: string;
+
+  /**
+   * @generated from field: briar.mobile.v1.WorkflowCheckpoint.Position position = 3;
+   */
+  position: WorkflowCheckpoint_Position;
+};
+
+/**
+ * Describes the message briar.mobile.v1.CheckpointBoundary.
+ * Use `create(CheckpointBoundarySchema)` to create a new message.
+ */
+export const CheckpointBoundarySchema: GenMessage<CheckpointBoundary> = /*@__PURE__*/
+  messageDesc(file_briar_mobile_v1_dashboard, 14);
+
+/**
+ * @generated from message briar.mobile.v1.CheckpointPolicy
+ */
+export type CheckpointPolicy = Message<"briar.mobile.v1.CheckpointPolicy"> & {
+  /**
+   * @generated from field: repeated briar.mobile.v1.CheckpointBoundary available_boundaries = 1;
+   */
+  availableBoundaries: CheckpointBoundary[];
+
+  /**
+   * @generated from field: repeated briar.mobile.v1.WorkflowCheckpointSpec project_mandatory = 2;
+   */
+  projectMandatory: WorkflowCheckpointSpec[];
+
+  /**
+   * @generated from field: repeated briar.mobile.v1.WorkflowCheckpointSpec user_defaults = 3;
+   */
+  userDefaults: WorkflowCheckpointSpec[];
+
+  /**
+   * @generated from field: repeated briar.mobile.v1.WorkflowCheckpointSpec effective = 4;
+   */
+  effective: WorkflowCheckpointSpec[];
+
+  /**
+   * @generated from field: uint64 project_revision = 5;
+   */
+  projectRevision: bigint;
+
+  /**
+   * @generated from field: uint64 user_revision = 6;
+   */
+  userRevision: bigint;
+};
+
+/**
+ * Describes the message briar.mobile.v1.CheckpointPolicy.
+ * Use `create(CheckpointPolicySchema)` to create a new message.
+ */
+export const CheckpointPolicySchema: GenMessage<CheckpointPolicy> = /*@__PURE__*/
+  messageDesc(file_briar_mobile_v1_dashboard, 15);
+
+/**
+ * @generated from message briar.mobile.v1.ProjectSettings
+ */
+export type ProjectSettings = Message<"briar.mobile.v1.ProjectSettings"> & {
+  /**
+   * @generated from field: optional string velen_org = 1;
+   */
+  velenOrg?: string | undefined;
+
+  /**
+   * @generated from field: optional string data_source = 2;
+   */
+  dataSource?: string | undefined;
+
+  /**
+   * @generated from field: briar.mobile.v1.LinearSettings linear = 3;
+   */
+  linear?: LinearSettings | undefined;
+
+  /**
+   * @generated from field: optional int64 github_repository_id = 4;
+   */
+  githubRepositoryId?: bigint | undefined;
+
+  /**
+   * @generated from field: optional string github_repository = 5;
+   */
+  githubRepository?: string | undefined;
+
+  /**
+   * @generated from field: briar.mobile.v1.AutoHuntWorkflow workflow = 6;
+   */
+  workflow?: AutoHuntWorkflow | undefined;
+
+  /**
+   * @generated from field: optional briar.mobile.v1.CheckpointPolicy checkpoint_policy = 7;
+   */
+  checkpointPolicy?: CheckpointPolicy | undefined;
+};
+
+/**
+ * Describes the message briar.mobile.v1.ProjectSettings.
+ * Use `create(ProjectSettingsSchema)` to create a new message.
+ */
+export const ProjectSettingsSchema: GenMessage<ProjectSettings> = /*@__PURE__*/
+  messageDesc(file_briar_mobile_v1_dashboard, 16);
 
 /**
  * @generated from message briar.mobile.v1.IssueDependencyReference
@@ -402,7 +678,7 @@ export type IssueDependencyReference = Message<"briar.mobile.v1.IssueDependencyR
  * Use `create(IssueDependencyReferenceSchema)` to create a new message.
  */
 export const IssueDependencyReferenceSchema: GenMessage<IssueDependencyReference> = /*@__PURE__*/
-  messageDesc(file_briar_mobile_v1_dashboard, 9);
+  messageDesc(file_briar_mobile_v1_dashboard, 17);
 
 /**
  * @generated from message briar.mobile.v1.DashboardRun
@@ -414,24 +690,24 @@ export type DashboardRun = Message<"briar.mobile.v1.DashboardRun"> & {
   id: string;
 
   /**
-   * @generated from field: optional uint32 run_number = 2;
+   * @generated from field: uint32 run_number = 2;
    */
-  runNumber?: number | undefined;
+  runNumber: number;
 
   /**
-   * @generated from field: optional uint32 current_attempt = 3;
+   * @generated from field: uint32 current_attempt = 3;
    */
-  currentAttempt?: number | undefined;
+  currentAttempt: number;
 
   /**
-   * @generated from field: optional uint32 current_revision = 4;
+   * @generated from field: uint32 current_revision = 4;
    */
-  currentRevision?: number | undefined;
+  currentRevision: number;
 
   /**
-   * @generated from field: optional string source_key = 5;
+   * @generated from field: string source_key = 5;
    */
-  sourceKey?: string | undefined;
+  sourceKey: string;
 
   /**
    * @generated from field: optional google.protobuf.Timestamp source_created_at = 6;
@@ -474,9 +750,9 @@ export type DashboardRun = Message<"briar.mobile.v1.DashboardRun"> & {
   checkpoint?: WorkflowCheckpoint | undefined;
 
   /**
-   * @generated from field: optional double progress = 14;
+   * @generated from field: double progress = 14;
    */
-  progress?: number | undefined;
+  progress: number;
 
   /**
    * @generated from field: optional string detail = 15;
@@ -644,7 +920,7 @@ export type DashboardRun = Message<"briar.mobile.v1.DashboardRun"> & {
   workerId?: string | undefined;
 
   /**
-   * @generated from field: optional google.protobuf.Timestamp started_at = 48;
+   * @generated from field: google.protobuf.Timestamp started_at = 48;
    */
   startedAt?: Timestamp | undefined;
 
@@ -659,14 +935,89 @@ export type DashboardRun = Message<"briar.mobile.v1.DashboardRun"> & {
   completedAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: optional google.protobuf.Timestamp last_event_at = 51;
+   * @generated from field: google.protobuf.Timestamp last_event_at = 51;
    */
   lastEventAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: optional uint32 event_count = 52;
+   * @generated from field: uint32 event_count = 52;
    */
-  eventCount?: number | undefined;
+  eventCount: number;
+
+  /**
+   * @generated from field: briar.mobile.v1.DashboardRun.Source source = 53;
+   */
+  source: DashboardRun_Source;
+
+  /**
+   * @generated from field: string repository = 54;
+   */
+  repository: string;
+
+  /**
+   * @generated from field: optional briar.mobile.v1.TrackerReference tracker = 55;
+   */
+  tracker?: TrackerReference | undefined;
+
+  /**
+   * @generated from field: optional briar.mobile.v1.WaitingCheckpoint waiting_checkpoint = 56;
+   */
+  waitingCheckpoint?: WaitingCheckpoint | undefined;
+
+  /**
+   * @generated from field: repeated briar.mobile.v1.WorkflowCheckpointSpec issue_checkpoints = 57;
+   */
+  issueCheckpoints: WorkflowCheckpointSpec[];
+
+  /**
+   * @generated from field: optional briar.mobile.v1.AgentExecutionMetrics execution_metrics = 58;
+   */
+  executionMetrics?: AgentExecutionMetrics | undefined;
+
+  /**
+   * @generated from field: optional string target_sha = 59;
+   */
+  targetSha?: string | undefined;
+
+  /**
+   * @generated from field: optional briar.mobile.v1.DashboardRun.QaStatus staging_qa_status = 60;
+   */
+  stagingQaStatus?: DashboardRun_QaStatus | undefined;
+
+  /**
+   * @generated from field: optional briar.mobile.v1.DashboardRun.QaStatus production_qa_status = 61;
+   */
+  productionQaStatus?: DashboardRun_QaStatus | undefined;
+
+  /**
+   * @generated from field: optional string staging_qa_detail = 62;
+   */
+  stagingQaDetail?: string | undefined;
+
+  /**
+   * @generated from field: optional string production_qa_detail = 63;
+   */
+  productionQaDetail?: string | undefined;
+
+  /**
+   * @generated from field: optional google.protobuf.Struct context = 64;
+   */
+  context?: JsonObject | undefined;
+
+  /**
+   * @generated from field: optional google.protobuf.Timestamp lease_expires_at = 65;
+   */
+  leaseExpiresAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: uint32 claim_attempts = 66;
+   */
+  claimAttempts: number;
+
+  /**
+   * @generated from field: optional string agent_id = 67;
+   */
+  agentId?: string | undefined;
 };
 
 /**
@@ -674,7 +1025,7 @@ export type DashboardRun = Message<"briar.mobile.v1.DashboardRun"> & {
  * Use `create(DashboardRunSchema)` to create a new message.
  */
 export const DashboardRunSchema: GenMessage<DashboardRun> = /*@__PURE__*/
-  messageDesc(file_briar_mobile_v1_dashboard, 10);
+  messageDesc(file_briar_mobile_v1_dashboard, 18);
 
 /**
  * @generated from enum briar.mobile.v1.DashboardRun.ExecutionReadiness
@@ -700,7 +1051,7 @@ export enum DashboardRun_ExecutionReadiness {
  * Describes the enum briar.mobile.v1.DashboardRun.ExecutionReadiness.
  */
 export const DashboardRun_ExecutionReadinessSchema: GenEnum<DashboardRun_ExecutionReadiness> = /*@__PURE__*/
-  enumDesc(file_briar_mobile_v1_dashboard, 10, 0);
+  enumDesc(file_briar_mobile_v1_dashboard, 18, 0);
 
 /**
  * @generated from enum briar.mobile.v1.DashboardRun.DispatchMode
@@ -726,7 +1077,175 @@ export enum DashboardRun_DispatchMode {
  * Describes the enum briar.mobile.v1.DashboardRun.DispatchMode.
  */
 export const DashboardRun_DispatchModeSchema: GenEnum<DashboardRun_DispatchMode> = /*@__PURE__*/
-  enumDesc(file_briar_mobile_v1_dashboard, 10, 1);
+  enumDesc(file_briar_mobile_v1_dashboard, 18, 1);
+
+/**
+ * @generated from enum briar.mobile.v1.DashboardRun.Source
+ */
+export enum DashboardRun_Source {
+  /**
+   * @generated from enum value: SOURCE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: SOURCE_ISSUE = 1;
+   */
+  ISSUE = 1,
+
+  /**
+   * @generated from enum value: SOURCE_ERROR = 2;
+   */
+  ERROR = 2,
+
+  /**
+   * @generated from enum value: SOURCE_FEEDBACK = 3;
+   */
+  FEEDBACK = 3,
+}
+
+/**
+ * Describes the enum briar.mobile.v1.DashboardRun.Source.
+ */
+export const DashboardRun_SourceSchema: GenEnum<DashboardRun_Source> = /*@__PURE__*/
+  enumDesc(file_briar_mobile_v1_dashboard, 18, 2);
+
+/**
+ * @generated from enum briar.mobile.v1.DashboardRun.QaStatus
+ */
+export enum DashboardRun_QaStatus {
+  /**
+   * @generated from enum value: QA_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: QA_STATUS_PENDING = 1;
+   */
+  PENDING = 1,
+
+  /**
+   * @generated from enum value: QA_STATUS_PASSED = 2;
+   */
+  PASSED = 2,
+
+  /**
+   * @generated from enum value: QA_STATUS_SKIPPED = 3;
+   */
+  SKIPPED = 3,
+}
+
+/**
+ * Describes the enum briar.mobile.v1.DashboardRun.QaStatus.
+ */
+export const DashboardRun_QaStatusSchema: GenEnum<DashboardRun_QaStatus> = /*@__PURE__*/
+  enumDesc(file_briar_mobile_v1_dashboard, 18, 3);
+
+/**
+ * @generated from message briar.mobile.v1.TrackerReference
+ */
+export type TrackerReference = Message<"briar.mobile.v1.TrackerReference"> & {
+  /**
+   * @generated from field: string provider = 1;
+   */
+  provider: string;
+
+  /**
+   * @generated from field: optional string issue_id = 2;
+   */
+  issueId?: string | undefined;
+
+  /**
+   * @generated from field: optional string identifier = 3;
+   */
+  identifier?: string | undefined;
+
+  /**
+   * @generated from field: optional string url = 4;
+   */
+  url?: string | undefined;
+
+  /**
+   * @generated from field: optional string state = 5;
+   */
+  state?: string | undefined;
+};
+
+/**
+ * Describes the message briar.mobile.v1.TrackerReference.
+ * Use `create(TrackerReferenceSchema)` to create a new message.
+ */
+export const TrackerReferenceSchema: GenMessage<TrackerReference> = /*@__PURE__*/
+  messageDesc(file_briar_mobile_v1_dashboard, 19);
+
+/**
+ * @generated from message briar.mobile.v1.WaitingCheckpoint
+ */
+export type WaitingCheckpoint = Message<"briar.mobile.v1.WaitingCheckpoint"> & {
+  /**
+   * @generated from field: string key = 1;
+   */
+  key: string;
+
+  /**
+   * @generated from field: uint32 revision = 2;
+   */
+  revision: number;
+};
+
+/**
+ * Describes the message briar.mobile.v1.WaitingCheckpoint.
+ * Use `create(WaitingCheckpointSchema)` to create a new message.
+ */
+export const WaitingCheckpointSchema: GenMessage<WaitingCheckpoint> = /*@__PURE__*/
+  messageDesc(file_briar_mobile_v1_dashboard, 20);
+
+/**
+ * @generated from message briar.mobile.v1.AgentExecutionMetrics
+ */
+export type AgentExecutionMetrics = Message<"briar.mobile.v1.AgentExecutionMetrics"> & {
+  /**
+   * @generated from field: optional uint64 input_tokens = 1;
+   */
+  inputTokens?: bigint | undefined;
+
+  /**
+   * @generated from field: optional uint64 output_tokens = 2;
+   */
+  outputTokens?: bigint | undefined;
+
+  /**
+   * @generated from field: optional uint64 cache_read_tokens = 3;
+   */
+  cacheReadTokens?: bigint | undefined;
+
+  /**
+   * @generated from field: optional uint64 cache_write_tokens = 4;
+   */
+  cacheWriteTokens?: bigint | undefined;
+
+  /**
+   * @generated from field: optional uint64 reasoning_output_tokens = 5;
+   */
+  reasoningOutputTokens?: bigint | undefined;
+
+  /**
+   * @generated from field: optional uint64 total_tokens = 6;
+   */
+  totalTokens?: bigint | undefined;
+
+  /**
+   * @generated from field: uint64 duration_ms = 7;
+   */
+  durationMs: bigint;
+};
+
+/**
+ * Describes the message briar.mobile.v1.AgentExecutionMetrics.
+ * Use `create(AgentExecutionMetricsSchema)` to create a new message.
+ */
+export const AgentExecutionMetricsSchema: GenMessage<AgentExecutionMetrics> = /*@__PURE__*/
+  messageDesc(file_briar_mobile_v1_dashboard, 21);
 
 /**
  * @generated from message briar.mobile.v1.WorkerIcon
@@ -748,7 +1267,7 @@ export type WorkerIcon = Message<"briar.mobile.v1.WorkerIcon"> & {
  * Use `create(WorkerIconSchema)` to create a new message.
  */
 export const WorkerIconSchema: GenMessage<WorkerIcon> = /*@__PURE__*/
-  messageDesc(file_briar_mobile_v1_dashboard, 11);
+  messageDesc(file_briar_mobile_v1_dashboard, 22);
 
 /**
  * @generated from enum briar.mobile.v1.WorkerIcon.Kind
@@ -774,7 +1293,7 @@ export enum WorkerIcon_Kind {
  * Describes the enum briar.mobile.v1.WorkerIcon.Kind.
  */
 export const WorkerIcon_KindSchema: GenEnum<WorkerIcon_Kind> = /*@__PURE__*/
-  enumDesc(file_briar_mobile_v1_dashboard, 11, 0);
+  enumDesc(file_briar_mobile_v1_dashboard, 22, 0);
 
 /**
  * @generated from message briar.mobile.v1.DashboardWorker
@@ -796,9 +1315,9 @@ export type DashboardWorker = Message<"briar.mobile.v1.DashboardWorker"> & {
   icon?: WorkerIcon | undefined;
 
   /**
-   * @generated from field: optional briar.mobile.v1.AgentProvider agent_provider = 4;
+   * @generated from field: briar.mobile.v1.AgentProvider agent_provider = 4;
    */
-  agentProvider?: AgentProvider | undefined;
+  agentProvider: AgentProvider;
 
   /**
    * @generated from field: repeated briar.mobile.v1.AgentProvider providers = 5;
@@ -806,14 +1325,14 @@ export type DashboardWorker = Message<"briar.mobile.v1.DashboardWorker"> & {
   providers: AgentProvider[];
 
   /**
-   * @generated from field: optional briar.mobile.v1.ProviderCapabilities capabilities = 6;
+   * @generated from field: google.protobuf.Struct capabilities = 6;
    */
-  capabilities?: ProviderCapabilities | undefined;
+  capabilities?: JsonObject | undefined;
 
   /**
-   * @generated from field: string readiness = 7;
+   * @generated from field: briar.mobile.v1.DashboardWorker.Readiness readiness = 7;
    */
-  readiness: string;
+  readiness: DashboardWorker_Readiness;
 
   /**
    * @generated from field: bool accepting_work = 8;
@@ -834,6 +1353,41 @@ export type DashboardWorker = Message<"briar.mobile.v1.DashboardWorker"> & {
    * @generated from field: uint32 available_sessions = 11;
    */
   availableSessions: number;
+
+  /**
+   * @generated from field: string device_id = 12;
+   */
+  deviceId: string;
+
+  /**
+   * @generated from field: string owner_user_id = 13;
+   */
+  ownerUserId: string;
+
+  /**
+   * @generated from field: map<string, string> versions = 14;
+   */
+  versions: { [key: string]: string };
+
+  /**
+   * @generated from field: briar.mobile.v1.DashboardWorker.State state = 15;
+   */
+  state: DashboardWorker_State;
+
+  /**
+   * @generated from field: uint32 max_concurrent_sessions = 16;
+   */
+  maxConcurrentSessions: number;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp last_heartbeat_at = 17;
+   */
+  lastHeartbeatAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 18;
+   */
+  createdAt?: Timestamp | undefined;
 };
 
 /**
@@ -841,7 +1395,79 @@ export type DashboardWorker = Message<"briar.mobile.v1.DashboardWorker"> & {
  * Use `create(DashboardWorkerSchema)` to create a new message.
  */
 export const DashboardWorkerSchema: GenMessage<DashboardWorker> = /*@__PURE__*/
-  messageDesc(file_briar_mobile_v1_dashboard, 12);
+  messageDesc(file_briar_mobile_v1_dashboard, 23);
+
+/**
+ * @generated from enum briar.mobile.v1.DashboardWorker.State
+ */
+export enum DashboardWorker_State {
+  /**
+   * @generated from enum value: STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: STATE_ONLINE = 1;
+   */
+  ONLINE = 1,
+
+  /**
+   * @generated from enum value: STATE_STALE = 2;
+   */
+  STALE = 2,
+
+  /**
+   * @generated from enum value: STATE_DISABLED = 3;
+   */
+  DISABLED = 3,
+}
+
+/**
+ * Describes the enum briar.mobile.v1.DashboardWorker.State.
+ */
+export const DashboardWorker_StateSchema: GenEnum<DashboardWorker_State> = /*@__PURE__*/
+  enumDesc(file_briar_mobile_v1_dashboard, 23, 0);
+
+/**
+ * @generated from enum briar.mobile.v1.DashboardWorker.Readiness
+ */
+export enum DashboardWorker_Readiness {
+  /**
+   * @generated from enum value: READINESS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: READINESS_AVAILABLE = 1;
+   */
+  AVAILABLE = 1,
+
+  /**
+   * @generated from enum value: READINESS_BUSY = 2;
+   */
+  BUSY = 2,
+
+  /**
+   * @generated from enum value: READINESS_OFFLINE = 3;
+   */
+  OFFLINE = 3,
+
+  /**
+   * @generated from enum value: READINESS_NEEDS_ATTENTION = 4;
+   */
+  NEEDS_ATTENTION = 4,
+
+  /**
+   * @generated from enum value: READINESS_DISABLED = 5;
+   */
+  DISABLED = 5,
+}
+
+/**
+ * Describes the enum briar.mobile.v1.DashboardWorker.Readiness.
+ */
+export const DashboardWorker_ReadinessSchema: GenEnum<DashboardWorker_Readiness> = /*@__PURE__*/
+  enumDesc(file_briar_mobile_v1_dashboard, 23, 1);
 
 /**
  * @generated from message briar.mobile.v1.ProjectExecutionWorkerPolicy
@@ -873,7 +1499,7 @@ export type ProjectExecutionWorkerPolicy = Message<"briar.mobile.v1.ProjectExecu
  * Use `create(ProjectExecutionWorkerPolicySchema)` to create a new message.
  */
 export const ProjectExecutionWorkerPolicySchema: GenMessage<ProjectExecutionWorkerPolicy> = /*@__PURE__*/
-  messageDesc(file_briar_mobile_v1_dashboard, 13);
+  messageDesc(file_briar_mobile_v1_dashboard, 24);
 
 /**
  * @generated from enum briar.mobile.v1.ProjectExecutionWorkerPolicy.SelectionMode
@@ -899,7 +1525,7 @@ export enum ProjectExecutionWorkerPolicy_SelectionMode {
  * Describes the enum briar.mobile.v1.ProjectExecutionWorkerPolicy.SelectionMode.
  */
 export const ProjectExecutionWorkerPolicy_SelectionModeSchema: GenEnum<ProjectExecutionWorkerPolicy_SelectionMode> = /*@__PURE__*/
-  enumDesc(file_briar_mobile_v1_dashboard, 13, 0);
+  enumDesc(file_briar_mobile_v1_dashboard, 24, 0);
 
 /**
  * @generated from message briar.mobile.v1.ConversationNotification
@@ -956,7 +1582,7 @@ export type ConversationNotification = Message<"briar.mobile.v1.ConversationNoti
  * Use `create(ConversationNotificationSchema)` to create a new message.
  */
 export const ConversationNotificationSchema: GenMessage<ConversationNotification> = /*@__PURE__*/
-  messageDesc(file_briar_mobile_v1_dashboard, 14);
+  messageDesc(file_briar_mobile_v1_dashboard, 25);
 
 /**
  * @generated from message briar.mobile.v1.ChannelNotification
@@ -1008,7 +1634,7 @@ export type ChannelNotification = Message<"briar.mobile.v1.ChannelNotification">
  * Use `create(ChannelNotificationSchema)` to create a new message.
  */
 export const ChannelNotificationSchema: GenMessage<ChannelNotification> = /*@__PURE__*/
-  messageDesc(file_briar_mobile_v1_dashboard, 15);
+  messageDesc(file_briar_mobile_v1_dashboard, 26);
 
 /**
  * @generated from message briar.mobile.v1.RunEvent
@@ -1048,6 +1674,41 @@ export type RunEvent = Message<"briar.mobile.v1.RunEvent"> & {
    * @generated from field: google.protobuf.Timestamp occurred_at = 7;
    */
   occurredAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: uint32 attempt = 8;
+   */
+  attempt: number;
+
+  /**
+   * @generated from field: uint32 revision = 9;
+   */
+  revision: number;
+
+  /**
+   * @generated from field: optional briar.mobile.v1.DashboardRun.QaStatus qa_status = 10;
+   */
+  qaStatus?: DashboardRun_QaStatus | undefined;
+
+  /**
+   * @generated from field: optional string tracker_state = 11;
+   */
+  trackerState?: string | undefined;
+
+  /**
+   * @generated from field: repeated string pull_request_urls = 12;
+   */
+  pullRequestUrls: string[];
+
+  /**
+   * @generated from field: optional string target_sha = 13;
+   */
+  targetSha?: string | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp recorded_at = 14;
+   */
+  recordedAt?: Timestamp | undefined;
 };
 
 /**
@@ -1055,7 +1716,7 @@ export type RunEvent = Message<"briar.mobile.v1.RunEvent"> & {
  * Use `create(RunEventSchema)` to create a new message.
  */
 export const RunEventSchema: GenMessage<RunEvent> = /*@__PURE__*/
-  messageDesc(file_briar_mobile_v1_dashboard, 16);
+  messageDesc(file_briar_mobile_v1_dashboard, 27);
 
 /**
  * @generated from service briar.mobile.v1.DashboardService

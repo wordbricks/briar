@@ -4,6 +4,7 @@ package briar.mobile.v1;
 
 import "briar/mobile/v1/agent.proto";
 import "briar/mobile/v1/common.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
 option swift_prefix = "BriarAPI_";
@@ -35,8 +36,9 @@ service IssueService {
 }
 
 message CreateIssueRequest {
+  reserved 2, 13;
+
   string project_id = 1;
-  string request_id = 2;
   string title = 3;
   optional string description = 4;
   optional uint32 priority = 5;
@@ -47,7 +49,6 @@ message CreateIssueRequest {
   optional string preferred_model = 10;
   optional string preferred_effort = 11;
   bool full_auto = 12;
-  repeated string attachment_ids = 13;
 }
 
 message CreateIssueResponse {
@@ -62,9 +63,10 @@ message CreateIssueResponse {
 }
 
 message UpdateIssueRequest {
+  reserved 3;
+
   string project_id = 1;
   string run_id = 2;
-  string request_id = 3;
   string title = 4;
   optional string description = 5;
   optional uint32 priority = 6;
@@ -82,9 +84,10 @@ message UpdateIssueResponse {
 }
 
 message DeleteIssueRequest {
+  reserved 3;
+
   string project_id = 1;
   string run_id = 2;
-  string request_id = 3;
 }
 
 message DeleteIssueResponse {
@@ -92,10 +95,11 @@ message DeleteIssueResponse {
 }
 
 message TransferIssueRequest {
+  reserved 4;
+
   string project_id = 1;
   string run_id = 2;
   string target_project_id = 3;
-  string request_id = 4;
 }
 
 message TransferIssueResponse {
@@ -112,10 +116,11 @@ message TransferIssueResponse {
 }
 
 message SetIssueSubscriptionRequest {
+  reserved 4;
+
   string project_id = 1;
   string run_id = 2;
   bool subscribed = 3;
-  string request_id = 4;
 }
 
 message SetIssueSubscriptionResponse {
@@ -124,9 +129,10 @@ message SetIssueSubscriptionResponse {
 }
 
 message UpdateIssuePreferencesRequest {
+  reserved 3;
+
   string project_id = 1;
   string run_id = 2;
-  string request_id = 3;
   optional AgentProvider provider = 4;
   optional string model = 5;
   optional string effort = 6;
@@ -140,11 +146,12 @@ message UpdateIssuePreferencesResponse {
 }
 
 message SetIssueDependencyRequest {
+  reserved 5;
+
   string project_id = 1;
   string run_id = 2;
   string prerequisite_run_id = 3;
   bool enabled = 4;
-  string request_id = 5;
 }
 
 message SetIssueDependencyResponse {
@@ -270,9 +277,10 @@ message ReassignRunResponse {
 }
 
 message CompleteResultReviewRequest {
+  reserved 3;
+
   string project_id = 1;
   string run_id = 2;
-  string request_id = 3;
 }
 
 message CompleteResultReviewResponse {
@@ -306,6 +314,8 @@ message SyncIssueMessagesResponse {
 }
 
 message CreateIssueMessageRequest {
+  reserved 9;
+
   string project_id = 1;
   string run_id = 2;
   string client_message_id = 3;
@@ -314,12 +324,12 @@ message CreateIssueMessageRequest {
   repeated string mentioned_user_ids = 6;
   repeated string mentioned_agent_ids = 7;
   optional string agent_conversation_id = 8;
-  repeated string attachment_ids = 9;
 }
 
 message CreateIssueMessageResponse {
   IssueMessage message = 1;
   repeated IssueAgentReply agent_replies = 2;
+  optional IssueAgentReply agent_reply = 3;
 }
 
 message GetIssueAgentReplyRequest {
@@ -332,6 +342,7 @@ message GetIssueAgentReplyResponse {
   IssueAgentReply agent_reply = 1;
   repeated IssueAgentReply agent_replies = 2;
   repeated IssueMessage messages = 3;
+  optional IssueMessage message = 4;
 }
 
 message ListRunEvidenceRequest {
@@ -341,13 +352,17 @@ message ListRunEvidenceRequest {
 
 message ListRunEvidenceResponse {
   repeated RunEvidence evidence = 1;
+  string run_id = 2;
+  uint32 attempt = 3;
+  uint32 revision = 4;
 }
 
 message AcceptIssueReworkProposalRequest {
+  reserved 4;
+
   string project_id = 1;
   string run_id = 2;
   string proposal_id = 3;
-  string request_id = 4;
 }
 
 message AcceptIssueReworkProposalResponse {
@@ -359,10 +374,11 @@ message AcceptIssueReworkProposalResponse {
 }
 
 message AcceptIssueActionProposalRequest {
+  reserved 4;
+
   string project_id = 1;
   string run_id = 2;
   string proposal_id = 3;
-  string request_id = 4;
 }
 
 message AcceptIssueActionProposalResponse {
@@ -384,10 +400,11 @@ message IssueExecutionApproval {
 }
 
 message AcceptIssueExecutionProposalRequest {
+  reserved 4;
+
   string project_id = 1;
   string conversation_run_id = 2;
   string proposal_id = 3;
-  string request_id = 4;
   IssueExecutionApproval approval = 5;
 }
 
@@ -400,10 +417,11 @@ message AcceptIssueExecutionProposalResponse {
 }
 
 message AcceptIssueSkillExecutionProposalRequest {
+  reserved 4;
+
   string project_id = 1;
   string conversation_run_id = 2;
   string proposal_id = 3;
-  string request_id = 4;
   optional string worker_id = 5;
 }
 
@@ -507,6 +525,9 @@ message IssueAgentReply {
   ReplyJobStatus status = 6;
   uint32 attempts = 7;
   optional string error = 8;
+  optional string worker_id = 9;
+  optional AgentProvider provider = 10;
+  google.protobuf.Timestamp updated_at = 11;
 }
 
 message IssueExecutionDispatch {
@@ -553,6 +574,20 @@ message RunEvidence {
   optional string url = 8;
   string actor = 9;
   google.protobuf.Timestamp observed_at = 10;
-  repeated IssueAttachment images = 11;
+  repeated RunEvidenceImage images = 11;
   bool canonical = 12;
+  optional string command = 13;
+  optional google.protobuf.Struct metadata = 14;
+  google.protobuf.Timestamp recorded_at = 15;
+  uint32 required_revision = 16;
+}
+
+message RunEvidenceImage {
+  string id = 1;
+  string filename = 2;
+  string content_type = 3;
+  uint64 byte_size = 4;
+  string sha256 = 5;
+  uint32 position = 6;
+  string url = 7;
 }

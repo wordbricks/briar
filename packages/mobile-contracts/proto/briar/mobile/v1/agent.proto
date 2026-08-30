@@ -28,8 +28,9 @@ message ListOrganizationAgentsResponse {
 }
 
 message ListProjectAgentsRequest {
+  reserved 2;
+
   string project_id = 1;
-  string locale = 2;
 }
 
 message ListProjectAgentsResponse {
@@ -171,6 +172,7 @@ message ProjectAgent {
   string calendar_color = 14;
   google.protobuf.Timestamp created_at = 15;
   google.protobuf.Timestamp updated_at = 16;
+  string skill = 17;
 }
 
 message OrganizationAgent {

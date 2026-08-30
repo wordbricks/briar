@@ -443,8 +443,6 @@ nonisolated struct BriarAPI_ListProjectAgentsRequest: Sendable {
 
   var projectID: String = String()
 
-  var locale: String = String()
-
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -1070,6 +1068,11 @@ nonisolated struct BriarAPI_ProjectAgent: @unchecked Sendable {
   var hasUpdatedAt: Bool {_storage._updatedAt != nil}
   /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
   mutating func clearUpdatedAt() {_uniqueStorage()._updatedAt = nil}
+
+  var skill: String {
+    get {_storage._skill}
+    set {_uniqueStorage()._skill = newValue}
+  }
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1770,7 +1773,7 @@ nonisolated extension BriarAPI_ListOrganizationAgentsResponse: SwiftProtobuf.Mes
 
 nonisolated extension BriarAPI_ListProjectAgentsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".ListProjectAgentsRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{1}locale\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{c}\u{2}\u{1}")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1779,7 +1782,6 @@ nonisolated extension BriarAPI_ListProjectAgentsRequest: SwiftProtobuf.Message, 
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.locale) }()
       default: break
       }
     }
@@ -1789,15 +1791,11 @@ nonisolated extension BriarAPI_ListProjectAgentsRequest: SwiftProtobuf.Message, 
     if !self.projectID.isEmpty {
       try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
     }
-    if !self.locale.isEmpty {
-      try visitor.visitSingularStringField(value: self.locale, fieldNumber: 2)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: BriarAPI_ListProjectAgentsRequest, rhs: BriarAPI_ListProjectAgentsRequest) -> Bool {
     if lhs.projectID != rhs.projectID {return false}
-    if lhs.locale != rhs.locale {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2565,7 +2563,7 @@ nonisolated extension BriarAPI_CodexPet: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension BriarAPI_ProjectAgent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".ProjectAgent"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}project_id\0\u{1}name\0\u{1}avatar\0\u{3}codex_pet\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{3}designated_worker_id\0\u{3}designated_worker_label\0\u{1}description\0\u{1}responsibility\0\u{1}skills\0\u{3}calendar_color\0\u{3}created_at\0\u{3}updated_at\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}project_id\0\u{1}name\0\u{1}avatar\0\u{3}codex_pet\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{3}designated_worker_id\0\u{3}designated_worker_label\0\u{1}description\0\u{1}responsibility\0\u{1}skills\0\u{3}calendar_color\0\u{3}created_at\0\u{3}updated_at\0\u{1}skill\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -2584,6 +2582,7 @@ nonisolated extension BriarAPI_ProjectAgent: SwiftProtobuf.Message, SwiftProtobu
     var _calendarColor: String = String()
     var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _skill: String = String()
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -2610,6 +2609,7 @@ nonisolated extension BriarAPI_ProjectAgent: SwiftProtobuf.Message, SwiftProtobu
       _calendarColor = source._calendarColor
       _createdAt = source._createdAt
       _updatedAt = source._updatedAt
+      _skill = source._skill
     }
   }
 
@@ -2644,6 +2644,7 @@ nonisolated extension BriarAPI_ProjectAgent: SwiftProtobuf.Message, SwiftProtobu
         case 14: try { try decoder.decodeSingularStringField(value: &_storage._calendarColor) }()
         case 15: try { try decoder.decodeSingularMessageField(value: &_storage._createdAt) }()
         case 16: try { try decoder.decodeSingularMessageField(value: &_storage._updatedAt) }()
+        case 17: try { try decoder.decodeSingularStringField(value: &_storage._skill) }()
         default: break
         }
       }
@@ -2704,6 +2705,9 @@ nonisolated extension BriarAPI_ProjectAgent: SwiftProtobuf.Message, SwiftProtobu
       try { if let v = _storage._updatedAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 16)
       } }()
+      if !_storage._skill.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._skill, fieldNumber: 17)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -2729,6 +2733,7 @@ nonisolated extension BriarAPI_ProjectAgent: SwiftProtobuf.Message, SwiftProtobu
         if _storage._calendarColor != rhs_storage._calendarColor {return false}
         if _storage._createdAt != rhs_storage._createdAt {return false}
         if _storage._updatedAt != rhs_storage._updatedAt {return false}
+        if _storage._skill != rhs_storage._skill {return false}
         return true
       }
       if !storagesAreEqual {return false}

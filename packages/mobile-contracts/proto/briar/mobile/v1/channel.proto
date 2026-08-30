@@ -62,8 +62,9 @@ message ListDirectMessageRecipientsResponse {
 }
 
 message CreateDirectMessageRequest {
+  reserved 2;
+
   string organization_id = 1;
-  string request_id = 2;
   repeated string member_ids = 3;
   repeated string agent_ids = 4;
 }
@@ -88,9 +89,10 @@ message GetChannelResponse {
 }
 
 message MarkChannelReadRequest {
+  reserved 3;
+
   string organization_id = 1;
   string channel_id = 2;
-  string request_id = 3;
   optional google.protobuf.Timestamp last_read_at = 4;
 }
 
@@ -112,15 +114,17 @@ message ListChannelMessagesResponse {
 }
 
 message CreateChannelMessageRequest {
+  reserved 5, 9;
+
   string organization_id = 1;
   string channel_id = 2;
   string client_message_id = 3;
   string body = 4;
-  repeated MessageBlock blocks = 5;
   optional string parent_message_id = 6;
   repeated string mentioned_user_ids = 7;
   repeated string mentioned_agent_ids = 8;
-  repeated string attachment_ids = 9;
+  optional string skill_id = 10;
+  optional string preferred_device_id = 11;
 }
 
 message CreateChannelMessageResponse {
@@ -129,10 +133,11 @@ message CreateChannelMessageResponse {
 }
 
 message DeleteChannelMessageRequest {
+  reserved 4;
+
   string organization_id = 1;
   string channel_id = 2;
   string message_id = 3;
-  string request_id = 4;
 }
 
 message DeleteChannelMessageResponse {
@@ -142,11 +147,12 @@ message DeleteChannelMessageResponse {
 }
 
 message ToggleChannelMessageReactionRequest {
+  reserved 5;
+
   string organization_id = 1;
   string channel_id = 2;
   string message_id = 3;
   string emoji = 4;
-  string request_id = 5;
 }
 
 message ToggleChannelMessageReactionResponse {
@@ -154,11 +160,12 @@ message ToggleChannelMessageReactionResponse {
 }
 
 message SetChannelThreadSubscriptionRequest {
+  reserved 5;
+
   string organization_id = 1;
   string channel_id = 2;
   string root_message_id = 3;
   bool subscribed = 4;
-  string request_id = 5;
 }
 
 message SetChannelThreadSubscriptionResponse {
@@ -167,10 +174,11 @@ message SetChannelThreadSubscriptionResponse {
 }
 
 message AcceptChannelProposalRequest {
+  reserved 4;
+
   string organization_id = 1;
   string channel_id = 2;
   string proposal_id = 3;
-  string request_id = 4;
   optional string project_id = 5;
   optional IssueExecutionApproval execution = 6;
 }
@@ -185,10 +193,11 @@ message AcceptChannelProposalResponse {
 }
 
 message AcceptChannelExecutionProposalRequest {
+  reserved 4;
+
   string organization_id = 1;
   string channel_id = 2;
   string proposal_id = 3;
-  string request_id = 4;
   IssueExecutionApproval approval = 5;
 }
 
@@ -201,10 +210,11 @@ message AcceptChannelExecutionProposalResponse {
 }
 
 message DeclineChannelProposalRequest {
+  reserved 4;
+
   string organization_id = 1;
   string channel_id = 2;
   string proposal_id = 3;
-  string request_id = 4;
 }
 
 message DeclineChannelProposalResponse {
@@ -218,10 +228,11 @@ message DeclineChannelProposalResponse {
 }
 
 message AcceptChannelSkillExecutionProposalRequest {
+  reserved 4;
+
   string organization_id = 1;
   string channel_id = 2;
   string proposal_id = 3;
-  string request_id = 4;
   optional string worker_id = 5;
 }
 
@@ -276,6 +287,7 @@ message ChannelSummary {
   optional google.protobuf.Timestamp last_read_at = 16;
   bool has_unread = 17;
   repeated DirectMessageParticipant direct_message_participants = 18;
+  optional string created_by_user_id = 19;
 }
 
 message ChannelMember {

@@ -99,6 +99,15 @@ nonisolated struct BriarAPI_GetDashboardResponse: @unchecked Sendable {
   /// Clears the value of `generatedAt`. Subsequent reads from it will return its default value.
   mutating func clearGeneratedAt() {_uniqueStorage()._generatedAt = nil}
 
+  var settings: BriarAPI_ProjectSettings {
+    get {_storage._settings ?? BriarAPI_ProjectSettings()}
+    set {_uniqueStorage()._settings = newValue}
+  }
+  /// Returns true if `settings` has been explicitly set.
+  var hasSettings: Bool {_storage._settings != nil}
+  /// Clears the value of `settings`. Subsequent reads from it will return its default value.
+  mutating func clearSettings() {_uniqueStorage()._settings = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -201,6 +210,15 @@ nonisolated struct BriarAPI_SyncDashboardResponse: @unchecked Sendable {
   var hasGeneratedAt: Bool {_storage._generatedAt != nil}
   /// Clears the value of `generatedAt`. Subsequent reads from it will return its default value.
   mutating func clearGeneratedAt() {_uniqueStorage()._generatedAt = nil}
+
+  var settings: BriarAPI_ProjectSettings {
+    get {_storage._settings ?? BriarAPI_ProjectSettings()}
+    set {_uniqueStorage()._settings = newValue}
+  }
+  /// Returns true if `settings` has been explicitly set.
+  var hasSettings: Bool {_storage._settings != nil}
+  /// Clears the value of `settings`. Subsequent reads from it will return its default value.
+  mutating func clearSettings() {_uniqueStorage()._settings = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -339,6 +357,10 @@ nonisolated struct BriarAPI_WorkflowStage: Sendable {
 
   var required: Bool = false
 
+  var evidence: [String] = []
+
+  var checks: [String] = []
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -353,9 +375,238 @@ nonisolated struct BriarAPI_AutoHuntWorkflow: Sendable {
 
   var stages: [BriarAPI_WorkflowStage] = []
 
+  var requirements: [BriarAPI_WorkflowRequirement] = []
+
+  var execution: BriarAPI_WorkflowExecution {
+    get {_execution ?? BriarAPI_WorkflowExecution()}
+    set {_execution = newValue}
+  }
+  /// Returns true if `execution` has been explicitly set.
+  var hasExecution: Bool {self._execution != nil}
+  /// Clears the value of `execution`. Subsequent reads from it will return its default value.
+  mutating func clearExecution() {self._execution = nil}
+
+  var completion: BriarAPI_WorkflowCompletion {
+    get {_completion ?? BriarAPI_WorkflowCompletion()}
+    set {_completion = newValue}
+  }
+  /// Returns true if `completion` has been explicitly set.
+  var hasCompletion: Bool {self._completion != nil}
+  /// Clears the value of `completion`. Subsequent reads from it will return its default value.
+  mutating func clearCompletion() {self._completion = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
+
+  fileprivate var _execution: BriarAPI_WorkflowExecution? = nil
+  fileprivate var _completion: BriarAPI_WorkflowCompletion? = nil
+}
+
+nonisolated struct BriarAPI_WorkflowRequirement: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var id: String = String()
+
+  var label: String = String()
+
+  var kind: String = String()
+
+  var tool: String = String()
+
+  var reason: String = String()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct BriarAPI_WorkflowCheckpointSpec: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var key: String = String()
+
+  var stage: String = String()
+
+  var position: BriarAPI_WorkflowCheckpoint.Position = .unspecified
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct BriarAPI_WorkflowExecution: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var checkpoints: [BriarAPI_WorkflowCheckpointSpec] = []
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct BriarAPI_WorkflowCompletion: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var requiredStages: [String] = []
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct BriarAPI_LinearSettings: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var enabled: Bool = false
+
+  var source: String {
+    get {_source ?? String()}
+    set {_source = newValue}
+  }
+  /// Returns true if `source` has been explicitly set.
+  var hasSource: Bool {self._source != nil}
+  /// Clears the value of `source`. Subsequent reads from it will return its default value.
+  mutating func clearSource() {self._source = nil}
+
+  var teamKey: String {
+    get {_teamKey ?? String()}
+    set {_teamKey = newValue}
+  }
+  /// Returns true if `teamKey` has been explicitly set.
+  var hasTeamKey: Bool {self._teamKey != nil}
+  /// Clears the value of `teamKey`. Subsequent reads from it will return its default value.
+  mutating func clearTeamKey() {self._teamKey = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _source: String? = nil
+  fileprivate var _teamKey: String? = nil
+}
+
+nonisolated struct BriarAPI_CheckpointBoundary: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var stage: String = String()
+
+  var stageLabel: String = String()
+
+  var position: BriarAPI_WorkflowCheckpoint.Position = .unspecified
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct BriarAPI_CheckpointPolicy: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var availableBoundaries: [BriarAPI_CheckpointBoundary] = []
+
+  var projectMandatory: [BriarAPI_WorkflowCheckpointSpec] = []
+
+  var userDefaults: [BriarAPI_WorkflowCheckpointSpec] = []
+
+  var effective: [BriarAPI_WorkflowCheckpointSpec] = []
+
+  var projectRevision: UInt64 = 0
+
+  var userRevision: UInt64 = 0
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct BriarAPI_ProjectSettings: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var velenOrg: String {
+    get {_storage._velenOrg ?? String()}
+    set {_uniqueStorage()._velenOrg = newValue}
+  }
+  /// Returns true if `velenOrg` has been explicitly set.
+  var hasVelenOrg: Bool {_storage._velenOrg != nil}
+  /// Clears the value of `velenOrg`. Subsequent reads from it will return its default value.
+  mutating func clearVelenOrg() {_uniqueStorage()._velenOrg = nil}
+
+  var dataSource: String {
+    get {_storage._dataSource ?? String()}
+    set {_uniqueStorage()._dataSource = newValue}
+  }
+  /// Returns true if `dataSource` has been explicitly set.
+  var hasDataSource: Bool {_storage._dataSource != nil}
+  /// Clears the value of `dataSource`. Subsequent reads from it will return its default value.
+  mutating func clearDataSource() {_uniqueStorage()._dataSource = nil}
+
+  var linear: BriarAPI_LinearSettings {
+    get {_storage._linear ?? BriarAPI_LinearSettings()}
+    set {_uniqueStorage()._linear = newValue}
+  }
+  /// Returns true if `linear` has been explicitly set.
+  var hasLinear: Bool {_storage._linear != nil}
+  /// Clears the value of `linear`. Subsequent reads from it will return its default value.
+  mutating func clearLinear() {_uniqueStorage()._linear = nil}
+
+  var githubRepositoryID: Int64 {
+    get {_storage._githubRepositoryID ?? 0}
+    set {_uniqueStorage()._githubRepositoryID = newValue}
+  }
+  /// Returns true if `githubRepositoryID` has been explicitly set.
+  var hasGithubRepositoryID: Bool {_storage._githubRepositoryID != nil}
+  /// Clears the value of `githubRepositoryID`. Subsequent reads from it will return its default value.
+  mutating func clearGithubRepositoryID() {_uniqueStorage()._githubRepositoryID = nil}
+
+  var githubRepository: String {
+    get {_storage._githubRepository ?? String()}
+    set {_uniqueStorage()._githubRepository = newValue}
+  }
+  /// Returns true if `githubRepository` has been explicitly set.
+  var hasGithubRepository: Bool {_storage._githubRepository != nil}
+  /// Clears the value of `githubRepository`. Subsequent reads from it will return its default value.
+  mutating func clearGithubRepository() {_uniqueStorage()._githubRepository = nil}
+
+  var workflow: BriarAPI_AutoHuntWorkflow {
+    get {_storage._workflow ?? BriarAPI_AutoHuntWorkflow()}
+    set {_uniqueStorage()._workflow = newValue}
+  }
+  /// Returns true if `workflow` has been explicitly set.
+  var hasWorkflow: Bool {_storage._workflow != nil}
+  /// Clears the value of `workflow`. Subsequent reads from it will return its default value.
+  mutating func clearWorkflow() {_uniqueStorage()._workflow = nil}
+
+  var checkpointPolicy: BriarAPI_CheckpointPolicy {
+    get {_storage._checkpointPolicy ?? BriarAPI_CheckpointPolicy()}
+    set {_uniqueStorage()._checkpointPolicy = newValue}
+  }
+  /// Returns true if `checkpointPolicy` has been explicitly set.
+  var hasCheckpointPolicy: Bool {_storage._checkpointPolicy != nil}
+  /// Clears the value of `checkpointPolicy`. Subsequent reads from it will return its default value.
+  mutating func clearCheckpointPolicy() {_uniqueStorage()._checkpointPolicy = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 nonisolated struct BriarAPI_IssueDependencyReference: Sendable {
@@ -387,40 +638,24 @@ nonisolated struct BriarAPI_DashboardRun: @unchecked Sendable {
   }
 
   var runNumber: UInt32 {
-    get {_storage._runNumber ?? 0}
+    get {_storage._runNumber}
     set {_uniqueStorage()._runNumber = newValue}
   }
-  /// Returns true if `runNumber` has been explicitly set.
-  var hasRunNumber: Bool {_storage._runNumber != nil}
-  /// Clears the value of `runNumber`. Subsequent reads from it will return its default value.
-  mutating func clearRunNumber() {_uniqueStorage()._runNumber = nil}
 
   var currentAttempt: UInt32 {
-    get {_storage._currentAttempt ?? 0}
+    get {_storage._currentAttempt}
     set {_uniqueStorage()._currentAttempt = newValue}
   }
-  /// Returns true if `currentAttempt` has been explicitly set.
-  var hasCurrentAttempt: Bool {_storage._currentAttempt != nil}
-  /// Clears the value of `currentAttempt`. Subsequent reads from it will return its default value.
-  mutating func clearCurrentAttempt() {_uniqueStorage()._currentAttempt = nil}
 
   var currentRevision: UInt32 {
-    get {_storage._currentRevision ?? 0}
+    get {_storage._currentRevision}
     set {_uniqueStorage()._currentRevision = newValue}
   }
-  /// Returns true if `currentRevision` has been explicitly set.
-  var hasCurrentRevision: Bool {_storage._currentRevision != nil}
-  /// Clears the value of `currentRevision`. Subsequent reads from it will return its default value.
-  mutating func clearCurrentRevision() {_uniqueStorage()._currentRevision = nil}
 
   var sourceKey: String {
-    get {_storage._sourceKey ?? String()}
+    get {_storage._sourceKey}
     set {_uniqueStorage()._sourceKey = newValue}
   }
-  /// Returns true if `sourceKey` has been explicitly set.
-  var hasSourceKey: Bool {_storage._sourceKey != nil}
-  /// Clears the value of `sourceKey`. Subsequent reads from it will return its default value.
-  mutating func clearSourceKey() {_uniqueStorage()._sourceKey = nil}
 
   var sourceCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
     get {_storage._sourceCreatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
@@ -487,13 +722,9 @@ nonisolated struct BriarAPI_DashboardRun: @unchecked Sendable {
   mutating func clearCheckpoint() {_uniqueStorage()._checkpoint = nil}
 
   var progress: Double {
-    get {_storage._progress ?? 0}
+    get {_storage._progress}
     set {_uniqueStorage()._progress = newValue}
   }
-  /// Returns true if `progress` has been explicitly set.
-  var hasProgress: Bool {_storage._progress != nil}
-  /// Clears the value of `progress`. Subsequent reads from it will return its default value.
-  mutating func clearProgress() {_uniqueStorage()._progress = nil}
 
   var detail: String {
     get {_storage._detail ?? String()}
@@ -805,13 +1036,128 @@ nonisolated struct BriarAPI_DashboardRun: @unchecked Sendable {
   mutating func clearLastEventAt() {_uniqueStorage()._lastEventAt = nil}
 
   var eventCount: UInt32 {
-    get {_storage._eventCount ?? 0}
+    get {_storage._eventCount}
     set {_uniqueStorage()._eventCount = newValue}
   }
-  /// Returns true if `eventCount` has been explicitly set.
-  var hasEventCount: Bool {_storage._eventCount != nil}
-  /// Clears the value of `eventCount`. Subsequent reads from it will return its default value.
-  mutating func clearEventCount() {_uniqueStorage()._eventCount = nil}
+
+  var source: BriarAPI_DashboardRun.Source {
+    get {_storage._source}
+    set {_uniqueStorage()._source = newValue}
+  }
+
+  var repository: String {
+    get {_storage._repository}
+    set {_uniqueStorage()._repository = newValue}
+  }
+
+  var tracker: BriarAPI_TrackerReference {
+    get {_storage._tracker ?? BriarAPI_TrackerReference()}
+    set {_uniqueStorage()._tracker = newValue}
+  }
+  /// Returns true if `tracker` has been explicitly set.
+  var hasTracker: Bool {_storage._tracker != nil}
+  /// Clears the value of `tracker`. Subsequent reads from it will return its default value.
+  mutating func clearTracker() {_uniqueStorage()._tracker = nil}
+
+  var waitingCheckpoint: BriarAPI_WaitingCheckpoint {
+    get {_storage._waitingCheckpoint ?? BriarAPI_WaitingCheckpoint()}
+    set {_uniqueStorage()._waitingCheckpoint = newValue}
+  }
+  /// Returns true if `waitingCheckpoint` has been explicitly set.
+  var hasWaitingCheckpoint: Bool {_storage._waitingCheckpoint != nil}
+  /// Clears the value of `waitingCheckpoint`. Subsequent reads from it will return its default value.
+  mutating func clearWaitingCheckpoint() {_uniqueStorage()._waitingCheckpoint = nil}
+
+  var issueCheckpoints: [BriarAPI_WorkflowCheckpointSpec] {
+    get {_storage._issueCheckpoints}
+    set {_uniqueStorage()._issueCheckpoints = newValue}
+  }
+
+  var executionMetrics: BriarAPI_AgentExecutionMetrics {
+    get {_storage._executionMetrics ?? BriarAPI_AgentExecutionMetrics()}
+    set {_uniqueStorage()._executionMetrics = newValue}
+  }
+  /// Returns true if `executionMetrics` has been explicitly set.
+  var hasExecutionMetrics: Bool {_storage._executionMetrics != nil}
+  /// Clears the value of `executionMetrics`. Subsequent reads from it will return its default value.
+  mutating func clearExecutionMetrics() {_uniqueStorage()._executionMetrics = nil}
+
+  var targetSha: String {
+    get {_storage._targetSha ?? String()}
+    set {_uniqueStorage()._targetSha = newValue}
+  }
+  /// Returns true if `targetSha` has been explicitly set.
+  var hasTargetSha: Bool {_storage._targetSha != nil}
+  /// Clears the value of `targetSha`. Subsequent reads from it will return its default value.
+  mutating func clearTargetSha() {_uniqueStorage()._targetSha = nil}
+
+  var stagingQaStatus: BriarAPI_DashboardRun.QaStatus {
+    get {_storage._stagingQaStatus ?? .unspecified}
+    set {_uniqueStorage()._stagingQaStatus = newValue}
+  }
+  /// Returns true if `stagingQaStatus` has been explicitly set.
+  var hasStagingQaStatus: Bool {_storage._stagingQaStatus != nil}
+  /// Clears the value of `stagingQaStatus`. Subsequent reads from it will return its default value.
+  mutating func clearStagingQaStatus() {_uniqueStorage()._stagingQaStatus = nil}
+
+  var productionQaStatus: BriarAPI_DashboardRun.QaStatus {
+    get {_storage._productionQaStatus ?? .unspecified}
+    set {_uniqueStorage()._productionQaStatus = newValue}
+  }
+  /// Returns true if `productionQaStatus` has been explicitly set.
+  var hasProductionQaStatus: Bool {_storage._productionQaStatus != nil}
+  /// Clears the value of `productionQaStatus`. Subsequent reads from it will return its default value.
+  mutating func clearProductionQaStatus() {_uniqueStorage()._productionQaStatus = nil}
+
+  var stagingQaDetail: String {
+    get {_storage._stagingQaDetail ?? String()}
+    set {_uniqueStorage()._stagingQaDetail = newValue}
+  }
+  /// Returns true if `stagingQaDetail` has been explicitly set.
+  var hasStagingQaDetail: Bool {_storage._stagingQaDetail != nil}
+  /// Clears the value of `stagingQaDetail`. Subsequent reads from it will return its default value.
+  mutating func clearStagingQaDetail() {_uniqueStorage()._stagingQaDetail = nil}
+
+  var productionQaDetail: String {
+    get {_storage._productionQaDetail ?? String()}
+    set {_uniqueStorage()._productionQaDetail = newValue}
+  }
+  /// Returns true if `productionQaDetail` has been explicitly set.
+  var hasProductionQaDetail: Bool {_storage._productionQaDetail != nil}
+  /// Clears the value of `productionQaDetail`. Subsequent reads from it will return its default value.
+  mutating func clearProductionQaDetail() {_uniqueStorage()._productionQaDetail = nil}
+
+  var context: SwiftProtobuf.Google_Protobuf_Struct {
+    get {_storage._context ?? SwiftProtobuf.Google_Protobuf_Struct()}
+    set {_uniqueStorage()._context = newValue}
+  }
+  /// Returns true if `context` has been explicitly set.
+  var hasContext: Bool {_storage._context != nil}
+  /// Clears the value of `context`. Subsequent reads from it will return its default value.
+  mutating func clearContext() {_uniqueStorage()._context = nil}
+
+  var leaseExpiresAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._leaseExpiresAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._leaseExpiresAt = newValue}
+  }
+  /// Returns true if `leaseExpiresAt` has been explicitly set.
+  var hasLeaseExpiresAt: Bool {_storage._leaseExpiresAt != nil}
+  /// Clears the value of `leaseExpiresAt`. Subsequent reads from it will return its default value.
+  mutating func clearLeaseExpiresAt() {_uniqueStorage()._leaseExpiresAt = nil}
+
+  var claimAttempts: UInt32 {
+    get {_storage._claimAttempts}
+    set {_uniqueStorage()._claimAttempts = newValue}
+  }
+
+  var agentID: String {
+    get {_storage._agentID ?? String()}
+    set {_uniqueStorage()._agentID = newValue}
+  }
+  /// Returns true if `agentID` has been explicitly set.
+  var hasAgentID: Bool {_storage._agentID != nil}
+  /// Clears the value of `agentID`. Subsequent reads from it will return its default value.
+  mutating func clearAgentID() {_uniqueStorage()._agentID = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -891,9 +1237,233 @@ nonisolated struct BriarAPI_DashboardRun: @unchecked Sendable {
 
   }
 
+  nonisolated enum Source: SwiftProtobuf.Enum, Swift.CaseIterable {
+    typealias RawValue = Int
+    case unspecified // = 0
+    case issue // = 1
+    case error // = 2
+    case feedback // = 3
+    case UNRECOGNIZED(Int)
+
+    init() {
+      self = .unspecified
+    }
+
+    init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .issue
+      case 2: self = .error
+      case 3: self = .feedback
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .issue: return 1
+      case .error: return 2
+      case .feedback: return 3
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    static let allCases: [BriarAPI_DashboardRun.Source] = [
+      .unspecified,
+      .issue,
+      .error,
+      .feedback,
+    ]
+
+  }
+
+  nonisolated enum QaStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
+    typealias RawValue = Int
+    case unspecified // = 0
+    case pending // = 1
+    case passed // = 2
+    case skipped // = 3
+    case UNRECOGNIZED(Int)
+
+    init() {
+      self = .unspecified
+    }
+
+    init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .pending
+      case 2: self = .passed
+      case 3: self = .skipped
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .pending: return 1
+      case .passed: return 2
+      case .skipped: return 3
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    static let allCases: [BriarAPI_DashboardRun.QaStatus] = [
+      .unspecified,
+      .pending,
+      .passed,
+      .skipped,
+    ]
+
+  }
+
   init() {}
 
   fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+nonisolated struct BriarAPI_TrackerReference: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var provider: String = String()
+
+  var issueID: String {
+    get {_issueID ?? String()}
+    set {_issueID = newValue}
+  }
+  /// Returns true if `issueID` has been explicitly set.
+  var hasIssueID: Bool {self._issueID != nil}
+  /// Clears the value of `issueID`. Subsequent reads from it will return its default value.
+  mutating func clearIssueID() {self._issueID = nil}
+
+  var identifier: String {
+    get {_identifier ?? String()}
+    set {_identifier = newValue}
+  }
+  /// Returns true if `identifier` has been explicitly set.
+  var hasIdentifier: Bool {self._identifier != nil}
+  /// Clears the value of `identifier`. Subsequent reads from it will return its default value.
+  mutating func clearIdentifier() {self._identifier = nil}
+
+  var url: String {
+    get {_url ?? String()}
+    set {_url = newValue}
+  }
+  /// Returns true if `url` has been explicitly set.
+  var hasURL: Bool {self._url != nil}
+  /// Clears the value of `url`. Subsequent reads from it will return its default value.
+  mutating func clearURL() {self._url = nil}
+
+  var state: String {
+    get {_state ?? String()}
+    set {_state = newValue}
+  }
+  /// Returns true if `state` has been explicitly set.
+  var hasState: Bool {self._state != nil}
+  /// Clears the value of `state`. Subsequent reads from it will return its default value.
+  mutating func clearState() {self._state = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _issueID: String? = nil
+  fileprivate var _identifier: String? = nil
+  fileprivate var _url: String? = nil
+  fileprivate var _state: String? = nil
+}
+
+nonisolated struct BriarAPI_WaitingCheckpoint: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var key: String = String()
+
+  var revision: UInt32 = 0
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct BriarAPI_AgentExecutionMetrics: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var inputTokens: UInt64 {
+    get {_inputTokens ?? 0}
+    set {_inputTokens = newValue}
+  }
+  /// Returns true if `inputTokens` has been explicitly set.
+  var hasInputTokens: Bool {self._inputTokens != nil}
+  /// Clears the value of `inputTokens`. Subsequent reads from it will return its default value.
+  mutating func clearInputTokens() {self._inputTokens = nil}
+
+  var outputTokens: UInt64 {
+    get {_outputTokens ?? 0}
+    set {_outputTokens = newValue}
+  }
+  /// Returns true if `outputTokens` has been explicitly set.
+  var hasOutputTokens: Bool {self._outputTokens != nil}
+  /// Clears the value of `outputTokens`. Subsequent reads from it will return its default value.
+  mutating func clearOutputTokens() {self._outputTokens = nil}
+
+  var cacheReadTokens: UInt64 {
+    get {_cacheReadTokens ?? 0}
+    set {_cacheReadTokens = newValue}
+  }
+  /// Returns true if `cacheReadTokens` has been explicitly set.
+  var hasCacheReadTokens: Bool {self._cacheReadTokens != nil}
+  /// Clears the value of `cacheReadTokens`. Subsequent reads from it will return its default value.
+  mutating func clearCacheReadTokens() {self._cacheReadTokens = nil}
+
+  var cacheWriteTokens: UInt64 {
+    get {_cacheWriteTokens ?? 0}
+    set {_cacheWriteTokens = newValue}
+  }
+  /// Returns true if `cacheWriteTokens` has been explicitly set.
+  var hasCacheWriteTokens: Bool {self._cacheWriteTokens != nil}
+  /// Clears the value of `cacheWriteTokens`. Subsequent reads from it will return its default value.
+  mutating func clearCacheWriteTokens() {self._cacheWriteTokens = nil}
+
+  var reasoningOutputTokens: UInt64 {
+    get {_reasoningOutputTokens ?? 0}
+    set {_reasoningOutputTokens = newValue}
+  }
+  /// Returns true if `reasoningOutputTokens` has been explicitly set.
+  var hasReasoningOutputTokens: Bool {self._reasoningOutputTokens != nil}
+  /// Clears the value of `reasoningOutputTokens`. Subsequent reads from it will return its default value.
+  mutating func clearReasoningOutputTokens() {self._reasoningOutputTokens = nil}
+
+  var totalTokens: UInt64 {
+    get {_totalTokens ?? 0}
+    set {_totalTokens = newValue}
+  }
+  /// Returns true if `totalTokens` has been explicitly set.
+  var hasTotalTokens: Bool {self._totalTokens != nil}
+  /// Clears the value of `totalTokens`. Subsequent reads from it will return its default value.
+  mutating func clearTotalTokens() {self._totalTokens = nil}
+
+  var durationMs: UInt64 = 0
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _inputTokens: UInt64? = nil
+  fileprivate var _outputTokens: UInt64? = nil
+  fileprivate var _cacheReadTokens: UInt64? = nil
+  fileprivate var _cacheWriteTokens: UInt64? = nil
+  fileprivate var _reasoningOutputTokens: UInt64? = nil
+  fileprivate var _totalTokens: UInt64? = nil
 }
 
 nonisolated struct BriarAPI_WorkerIcon: Sendable {
@@ -948,69 +1518,218 @@ nonisolated struct BriarAPI_WorkerIcon: Sendable {
   init() {}
 }
 
-nonisolated struct BriarAPI_DashboardWorker: Sendable {
+nonisolated struct BriarAPI_DashboardWorker: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var id: String = String()
+  var id: String {
+    get {_storage._id}
+    set {_uniqueStorage()._id = newValue}
+  }
 
-  var label: String = String()
+  var label: String {
+    get {_storage._label}
+    set {_uniqueStorage()._label = newValue}
+  }
 
   var icon: BriarAPI_WorkerIcon {
-    get {_icon ?? BriarAPI_WorkerIcon()}
-    set {_icon = newValue}
+    get {_storage._icon ?? BriarAPI_WorkerIcon()}
+    set {_uniqueStorage()._icon = newValue}
   }
   /// Returns true if `icon` has been explicitly set.
-  var hasIcon: Bool {self._icon != nil}
+  var hasIcon: Bool {_storage._icon != nil}
   /// Clears the value of `icon`. Subsequent reads from it will return its default value.
-  mutating func clearIcon() {self._icon = nil}
+  mutating func clearIcon() {_uniqueStorage()._icon = nil}
 
   var agentProvider: BriarAPI_AgentProvider {
-    get {_agentProvider ?? .unspecified}
-    set {_agentProvider = newValue}
+    get {_storage._agentProvider}
+    set {_uniqueStorage()._agentProvider = newValue}
   }
-  /// Returns true if `agentProvider` has been explicitly set.
-  var hasAgentProvider: Bool {self._agentProvider != nil}
-  /// Clears the value of `agentProvider`. Subsequent reads from it will return its default value.
-  mutating func clearAgentProvider() {self._agentProvider = nil}
 
-  var providers: [BriarAPI_AgentProvider] = []
+  var providers: [BriarAPI_AgentProvider] {
+    get {_storage._providers}
+    set {_uniqueStorage()._providers = newValue}
+  }
 
-  var capabilities: BriarAPI_ProviderCapabilities {
-    get {_capabilities ?? BriarAPI_ProviderCapabilities()}
-    set {_capabilities = newValue}
+  var capabilities: SwiftProtobuf.Google_Protobuf_Struct {
+    get {_storage._capabilities ?? SwiftProtobuf.Google_Protobuf_Struct()}
+    set {_uniqueStorage()._capabilities = newValue}
   }
   /// Returns true if `capabilities` has been explicitly set.
-  var hasCapabilities: Bool {self._capabilities != nil}
+  var hasCapabilities: Bool {_storage._capabilities != nil}
   /// Clears the value of `capabilities`. Subsequent reads from it will return its default value.
-  mutating func clearCapabilities() {self._capabilities = nil}
+  mutating func clearCapabilities() {_uniqueStorage()._capabilities = nil}
 
-  var readiness: String = String()
+  var readiness: BriarAPI_DashboardWorker.Readiness {
+    get {_storage._readiness}
+    set {_uniqueStorage()._readiness = newValue}
+  }
 
-  var acceptingWork: Bool = false
+  var acceptingWork: Bool {
+    get {_storage._acceptingWork}
+    set {_uniqueStorage()._acceptingWork = newValue}
+  }
 
   var readinessDetail: String {
-    get {_readinessDetail ?? String()}
-    set {_readinessDetail = newValue}
+    get {_storage._readinessDetail ?? String()}
+    set {_uniqueStorage()._readinessDetail = newValue}
   }
   /// Returns true if `readinessDetail` has been explicitly set.
-  var hasReadinessDetail: Bool {self._readinessDetail != nil}
+  var hasReadinessDetail: Bool {_storage._readinessDetail != nil}
   /// Clears the value of `readinessDetail`. Subsequent reads from it will return its default value.
-  mutating func clearReadinessDetail() {self._readinessDetail = nil}
+  mutating func clearReadinessDetail() {_uniqueStorage()._readinessDetail = nil}
 
-  var activeSessions: UInt32 = 0
+  var activeSessions: UInt32 {
+    get {_storage._activeSessions}
+    set {_uniqueStorage()._activeSessions = newValue}
+  }
 
-  var availableSessions: UInt32 = 0
+  var availableSessions: UInt32 {
+    get {_storage._availableSessions}
+    set {_uniqueStorage()._availableSessions = newValue}
+  }
+
+  var deviceID: String {
+    get {_storage._deviceID}
+    set {_uniqueStorage()._deviceID = newValue}
+  }
+
+  var ownerUserID: String {
+    get {_storage._ownerUserID}
+    set {_uniqueStorage()._ownerUserID = newValue}
+  }
+
+  var versions: Dictionary<String,String> {
+    get {_storage._versions}
+    set {_uniqueStorage()._versions = newValue}
+  }
+
+  var state: BriarAPI_DashboardWorker.State {
+    get {_storage._state}
+    set {_uniqueStorage()._state = newValue}
+  }
+
+  var maxConcurrentSessions: UInt32 {
+    get {_storage._maxConcurrentSessions}
+    set {_uniqueStorage()._maxConcurrentSessions = newValue}
+  }
+
+  var lastHeartbeatAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._lastHeartbeatAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._lastHeartbeatAt = newValue}
+  }
+  /// Returns true if `lastHeartbeatAt` has been explicitly set.
+  var hasLastHeartbeatAt: Bool {_storage._lastHeartbeatAt != nil}
+  /// Clears the value of `lastHeartbeatAt`. Subsequent reads from it will return its default value.
+  mutating func clearLastHeartbeatAt() {_uniqueStorage()._lastHeartbeatAt = nil}
+
+  var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._createdAt = newValue}
+  }
+  /// Returns true if `createdAt` has been explicitly set.
+  var hasCreatedAt: Bool {_storage._createdAt != nil}
+  /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
+  mutating func clearCreatedAt() {_uniqueStorage()._createdAt = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
+  nonisolated enum State: SwiftProtobuf.Enum, Swift.CaseIterable {
+    typealias RawValue = Int
+    case unspecified // = 0
+    case online // = 1
+    case stale // = 2
+    case disabled // = 3
+    case UNRECOGNIZED(Int)
+
+    init() {
+      self = .unspecified
+    }
+
+    init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .online
+      case 2: self = .stale
+      case 3: self = .disabled
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .online: return 1
+      case .stale: return 2
+      case .disabled: return 3
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    static let allCases: [BriarAPI_DashboardWorker.State] = [
+      .unspecified,
+      .online,
+      .stale,
+      .disabled,
+    ]
+
+  }
+
+  nonisolated enum Readiness: SwiftProtobuf.Enum, Swift.CaseIterable {
+    typealias RawValue = Int
+    case unspecified // = 0
+    case available // = 1
+    case busy // = 2
+    case offline // = 3
+    case needsAttention // = 4
+    case disabled // = 5
+    case UNRECOGNIZED(Int)
+
+    init() {
+      self = .unspecified
+    }
+
+    init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .available
+      case 2: self = .busy
+      case 3: self = .offline
+      case 4: self = .needsAttention
+      case 5: self = .disabled
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .available: return 1
+      case .busy: return 2
+      case .offline: return 3
+      case .needsAttention: return 4
+      case .disabled: return 5
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    static let allCases: [BriarAPI_DashboardWorker.Readiness] = [
+      .unspecified,
+      .available,
+      .busy,
+      .offline,
+      .needsAttention,
+      .disabled,
+    ]
+
+  }
+
   init() {}
 
-  fileprivate var _icon: BriarAPI_WorkerIcon? = nil
-  fileprivate var _agentProvider: BriarAPI_AgentProvider? = nil
-  fileprivate var _capabilities: BriarAPI_ProviderCapabilities? = nil
-  fileprivate var _readinessDetail: String? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 nonisolated struct BriarAPI_ProjectExecutionWorkerPolicy: Sendable {
@@ -1221,6 +1940,48 @@ nonisolated struct BriarAPI_RunEvent: Sendable {
   /// Clears the value of `occurredAt`. Subsequent reads from it will return its default value.
   mutating func clearOccurredAt() {self._occurredAt = nil}
 
+  var attempt: UInt32 = 0
+
+  var revision: UInt32 = 0
+
+  var qaStatus: BriarAPI_DashboardRun.QaStatus {
+    get {_qaStatus ?? .unspecified}
+    set {_qaStatus = newValue}
+  }
+  /// Returns true if `qaStatus` has been explicitly set.
+  var hasQaStatus: Bool {self._qaStatus != nil}
+  /// Clears the value of `qaStatus`. Subsequent reads from it will return its default value.
+  mutating func clearQaStatus() {self._qaStatus = nil}
+
+  var trackerState: String {
+    get {_trackerState ?? String()}
+    set {_trackerState = newValue}
+  }
+  /// Returns true if `trackerState` has been explicitly set.
+  var hasTrackerState: Bool {self._trackerState != nil}
+  /// Clears the value of `trackerState`. Subsequent reads from it will return its default value.
+  mutating func clearTrackerState() {self._trackerState = nil}
+
+  var pullRequestUrls: [String] = []
+
+  var targetSha: String {
+    get {_targetSha ?? String()}
+    set {_targetSha = newValue}
+  }
+  /// Returns true if `targetSha` has been explicitly set.
+  var hasTargetSha: Bool {self._targetSha != nil}
+  /// Clears the value of `targetSha`. Subsequent reads from it will return its default value.
+  mutating func clearTargetSha() {self._targetSha = nil}
+
+  var recordedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_recordedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_recordedAt = newValue}
+  }
+  /// Returns true if `recordedAt` has been explicitly set.
+  var hasRecordedAt: Bool {self._recordedAt != nil}
+  /// Clears the value of `recordedAt`. Subsequent reads from it will return its default value.
+  mutating func clearRecordedAt() {self._recordedAt = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -1229,6 +1990,10 @@ nonisolated struct BriarAPI_RunEvent: Sendable {
   fileprivate var _detail: String? = nil
   fileprivate var _actorName: String? = nil
   fileprivate var _occurredAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _qaStatus: BriarAPI_DashboardRun.QaStatus? = nil
+  fileprivate var _trackerState: String? = nil
+  fileprivate var _targetSha: String? = nil
+  fileprivate var _recordedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -1267,7 +2032,7 @@ nonisolated extension BriarAPI_GetDashboardRequest: SwiftProtobuf.Message, Swift
 
 nonisolated extension BriarAPI_GetDashboardResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".GetDashboardResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}project\0\u{1}runs\0\u{1}workers\0\u{3}organization_providers\0\u{3}execution_policy\0\u{1}members\0\u{3}conversation_notifications\0\u{3}channel_notifications\0\u{1}cursor\0\u{3}generated_at\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}project\0\u{1}runs\0\u{1}workers\0\u{3}organization_providers\0\u{3}execution_policy\0\u{1}members\0\u{3}conversation_notifications\0\u{3}channel_notifications\0\u{1}cursor\0\u{3}generated_at\0\u{1}settings\0")
 
   fileprivate class _StorageClass {
     var _project: BriarAPI_Project? = nil
@@ -1280,6 +2045,7 @@ nonisolated extension BriarAPI_GetDashboardResponse: SwiftProtobuf.Message, Swif
     var _channelNotifications: [BriarAPI_ChannelNotification] = []
     var _cursor: UInt64 = 0
     var _generatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _settings: BriarAPI_ProjectSettings? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1300,6 +2066,7 @@ nonisolated extension BriarAPI_GetDashboardResponse: SwiftProtobuf.Message, Swif
       _channelNotifications = source._channelNotifications
       _cursor = source._cursor
       _generatedAt = source._generatedAt
+      _settings = source._settings
     }
   }
 
@@ -1328,6 +2095,7 @@ nonisolated extension BriarAPI_GetDashboardResponse: SwiftProtobuf.Message, Swif
         case 8: try { try decoder.decodeRepeatedMessageField(value: &_storage._channelNotifications) }()
         case 9: try { try decoder.decodeSingularUInt64Field(value: &_storage._cursor) }()
         case 10: try { try decoder.decodeSingularMessageField(value: &_storage._generatedAt) }()
+        case 11: try { try decoder.decodeSingularMessageField(value: &_storage._settings) }()
         default: break
         }
       }
@@ -1370,6 +2138,9 @@ nonisolated extension BriarAPI_GetDashboardResponse: SwiftProtobuf.Message, Swif
       try { if let v = _storage._generatedAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
       } }()
+      try { if let v = _storage._settings {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1389,6 +2160,7 @@ nonisolated extension BriarAPI_GetDashboardResponse: SwiftProtobuf.Message, Swif
         if _storage._channelNotifications != rhs_storage._channelNotifications {return false}
         if _storage._cursor != rhs_storage._cursor {return false}
         if _storage._generatedAt != rhs_storage._generatedAt {return false}
+        if _storage._settings != rhs_storage._settings {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1435,7 +2207,7 @@ nonisolated extension BriarAPI_SyncDashboardRequest: SwiftProtobuf.Message, Swif
 
 nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".SyncDashboardResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}cursor\0\u{3}has_more\0\u{1}reset\0\u{1}runs\0\u{3}deleted_run_ids\0\u{1}project\0\u{1}workers\0\u{3}organization_providers\0\u{3}execution_policy\0\u{1}members\0\u{3}conversation_notifications\0\u{3}channel_notifications\0\u{3}generated_at\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}cursor\0\u{3}has_more\0\u{1}reset\0\u{1}runs\0\u{3}deleted_run_ids\0\u{1}project\0\u{1}workers\0\u{3}organization_providers\0\u{3}execution_policy\0\u{1}members\0\u{3}conversation_notifications\0\u{3}channel_notifications\0\u{3}generated_at\0\u{1}settings\0")
 
   fileprivate class _StorageClass {
     var _cursor: UInt64 = 0
@@ -1451,6 +2223,7 @@ nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, Swi
     var _conversationNotifications: [BriarAPI_ConversationNotification] = []
     var _channelNotifications: [BriarAPI_ChannelNotification] = []
     var _generatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _settings: BriarAPI_ProjectSettings? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1474,6 +2247,7 @@ nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, Swi
       _conversationNotifications = source._conversationNotifications
       _channelNotifications = source._channelNotifications
       _generatedAt = source._generatedAt
+      _settings = source._settings
     }
   }
 
@@ -1505,6 +2279,7 @@ nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, Swi
         case 11: try { try decoder.decodeRepeatedMessageField(value: &_storage._conversationNotifications) }()
         case 12: try { try decoder.decodeRepeatedMessageField(value: &_storage._channelNotifications) }()
         case 13: try { try decoder.decodeSingularMessageField(value: &_storage._generatedAt) }()
+        case 14: try { try decoder.decodeSingularMessageField(value: &_storage._settings) }()
         default: break
         }
       }
@@ -1556,6 +2331,9 @@ nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, Swi
       try { if let v = _storage._generatedAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
       } }()
+      try { if let v = _storage._settings {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 14)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1578,6 +2356,7 @@ nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, Swi
         if _storage._conversationNotifications != rhs_storage._conversationNotifications {return false}
         if _storage._channelNotifications != rhs_storage._channelNotifications {return false}
         if _storage._generatedAt != rhs_storage._generatedAt {return false}
+        if _storage._settings != rhs_storage._settings {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1737,7 +2516,7 @@ nonisolated extension BriarAPI_WorkflowCheckpoint.Position: SwiftProtobuf._Proto
 
 nonisolated extension BriarAPI_WorkflowStage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".WorkflowStage"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}label\0\u{1}required\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}label\0\u{1}required\0\u{1}evidence\0\u{1}checks\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1748,6 +2527,8 @@ nonisolated extension BriarAPI_WorkflowStage: SwiftProtobuf.Message, SwiftProtob
       case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.label) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self.required) }()
+      case 4: try { try decoder.decodeRepeatedStringField(value: &self.evidence) }()
+      case 5: try { try decoder.decodeRepeatedStringField(value: &self.checks) }()
       default: break
       }
     }
@@ -1763,6 +2544,12 @@ nonisolated extension BriarAPI_WorkflowStage: SwiftProtobuf.Message, SwiftProtob
     if self.required != false {
       try visitor.visitSingularBoolField(value: self.required, fieldNumber: 3)
     }
+    if !self.evidence.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.evidence, fieldNumber: 4)
+    }
+    if !self.checks.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.checks, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1770,6 +2557,8 @@ nonisolated extension BriarAPI_WorkflowStage: SwiftProtobuf.Message, SwiftProtob
     if lhs.id != rhs.id {return false}
     if lhs.label != rhs.label {return false}
     if lhs.required != rhs.required {return false}
+    if lhs.evidence != rhs.evidence {return false}
+    if lhs.checks != rhs.checks {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1777,7 +2566,7 @@ nonisolated extension BriarAPI_WorkflowStage: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension BriarAPI_AutoHuntWorkflow: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".AutoHuntWorkflow"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}version\0\u{1}stages\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}version\0\u{1}stages\0\u{1}requirements\0\u{1}execution\0\u{1}completion\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1787,24 +2576,444 @@ nonisolated extension BriarAPI_AutoHuntWorkflow: SwiftProtobuf.Message, SwiftPro
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularUInt32Field(value: &self.version) }()
       case 2: try { try decoder.decodeRepeatedMessageField(value: &self.stages) }()
+      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.requirements) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._execution) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._completion) }()
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if self.version != 0 {
       try visitor.visitSingularUInt32Field(value: self.version, fieldNumber: 1)
     }
     if !self.stages.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.stages, fieldNumber: 2)
     }
+    if !self.requirements.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.requirements, fieldNumber: 3)
+    }
+    try { if let v = self._execution {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._completion {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: BriarAPI_AutoHuntWorkflow, rhs: BriarAPI_AutoHuntWorkflow) -> Bool {
     if lhs.version != rhs.version {return false}
     if lhs.stages != rhs.stages {return false}
+    if lhs.requirements != rhs.requirements {return false}
+    if lhs._execution != rhs._execution {return false}
+    if lhs._completion != rhs._completion {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_WorkflowRequirement: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".WorkflowRequirement"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}label\0\u{1}kind\0\u{1}tool\0\u{1}reason\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.label) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.kind) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.tool) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.reason) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if !self.label.isEmpty {
+      try visitor.visitSingularStringField(value: self.label, fieldNumber: 2)
+    }
+    if !self.kind.isEmpty {
+      try visitor.visitSingularStringField(value: self.kind, fieldNumber: 3)
+    }
+    if !self.tool.isEmpty {
+      try visitor.visitSingularStringField(value: self.tool, fieldNumber: 4)
+    }
+    if !self.reason.isEmpty {
+      try visitor.visitSingularStringField(value: self.reason, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: BriarAPI_WorkflowRequirement, rhs: BriarAPI_WorkflowRequirement) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.label != rhs.label {return false}
+    if lhs.kind != rhs.kind {return false}
+    if lhs.tool != rhs.tool {return false}
+    if lhs.reason != rhs.reason {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_WorkflowCheckpointSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".WorkflowCheckpointSpec"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}key\0\u{1}stage\0\u{1}position\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.key) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.stage) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.position) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.key.isEmpty {
+      try visitor.visitSingularStringField(value: self.key, fieldNumber: 1)
+    }
+    if !self.stage.isEmpty {
+      try visitor.visitSingularStringField(value: self.stage, fieldNumber: 2)
+    }
+    if self.position != .unspecified {
+      try visitor.visitSingularEnumField(value: self.position, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: BriarAPI_WorkflowCheckpointSpec, rhs: BriarAPI_WorkflowCheckpointSpec) -> Bool {
+    if lhs.key != rhs.key {return false}
+    if lhs.stage != rhs.stage {return false}
+    if lhs.position != rhs.position {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_WorkflowExecution: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".WorkflowExecution"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}checkpoints\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.checkpoints) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.checkpoints.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.checkpoints, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: BriarAPI_WorkflowExecution, rhs: BriarAPI_WorkflowExecution) -> Bool {
+    if lhs.checkpoints != rhs.checkpoints {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_WorkflowCompletion: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".WorkflowCompletion"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}required_stages\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedStringField(value: &self.requiredStages) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.requiredStages.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.requiredStages, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: BriarAPI_WorkflowCompletion, rhs: BriarAPI_WorkflowCompletion) -> Bool {
+    if lhs.requiredStages != rhs.requiredStages {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_LinearSettings: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".LinearSettings"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}enabled\0\u{1}source\0\u{3}team_key\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._source) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._teamKey) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.enabled != false {
+      try visitor.visitSingularBoolField(value: self.enabled, fieldNumber: 1)
+    }
+    try { if let v = self._source {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._teamKey {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: BriarAPI_LinearSettings, rhs: BriarAPI_LinearSettings) -> Bool {
+    if lhs.enabled != rhs.enabled {return false}
+    if lhs._source != rhs._source {return false}
+    if lhs._teamKey != rhs._teamKey {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_CheckpointBoundary: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".CheckpointBoundary"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}stage\0\u{3}stage_label\0\u{1}position\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.stage) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.stageLabel) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.position) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.stage.isEmpty {
+      try visitor.visitSingularStringField(value: self.stage, fieldNumber: 1)
+    }
+    if !self.stageLabel.isEmpty {
+      try visitor.visitSingularStringField(value: self.stageLabel, fieldNumber: 2)
+    }
+    if self.position != .unspecified {
+      try visitor.visitSingularEnumField(value: self.position, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: BriarAPI_CheckpointBoundary, rhs: BriarAPI_CheckpointBoundary) -> Bool {
+    if lhs.stage != rhs.stage {return false}
+    if lhs.stageLabel != rhs.stageLabel {return false}
+    if lhs.position != rhs.position {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_CheckpointPolicy: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".CheckpointPolicy"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}available_boundaries\0\u{3}project_mandatory\0\u{3}user_defaults\0\u{1}effective\0\u{3}project_revision\0\u{3}user_revision\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.availableBoundaries) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.projectMandatory) }()
+      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.userDefaults) }()
+      case 4: try { try decoder.decodeRepeatedMessageField(value: &self.effective) }()
+      case 5: try { try decoder.decodeSingularUInt64Field(value: &self.projectRevision) }()
+      case 6: try { try decoder.decodeSingularUInt64Field(value: &self.userRevision) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.availableBoundaries.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.availableBoundaries, fieldNumber: 1)
+    }
+    if !self.projectMandatory.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.projectMandatory, fieldNumber: 2)
+    }
+    if !self.userDefaults.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.userDefaults, fieldNumber: 3)
+    }
+    if !self.effective.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.effective, fieldNumber: 4)
+    }
+    if self.projectRevision != 0 {
+      try visitor.visitSingularUInt64Field(value: self.projectRevision, fieldNumber: 5)
+    }
+    if self.userRevision != 0 {
+      try visitor.visitSingularUInt64Field(value: self.userRevision, fieldNumber: 6)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: BriarAPI_CheckpointPolicy, rhs: BriarAPI_CheckpointPolicy) -> Bool {
+    if lhs.availableBoundaries != rhs.availableBoundaries {return false}
+    if lhs.projectMandatory != rhs.projectMandatory {return false}
+    if lhs.userDefaults != rhs.userDefaults {return false}
+    if lhs.effective != rhs.effective {return false}
+    if lhs.projectRevision != rhs.projectRevision {return false}
+    if lhs.userRevision != rhs.userRevision {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ProjectSettings: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ProjectSettings"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}velen_org\0\u{3}data_source\0\u{1}linear\0\u{3}github_repository_id\0\u{3}github_repository\0\u{1}workflow\0\u{3}checkpoint_policy\0")
+
+  fileprivate class _StorageClass {
+    var _velenOrg: String? = nil
+    var _dataSource: String? = nil
+    var _linear: BriarAPI_LinearSettings? = nil
+    var _githubRepositoryID: Int64? = nil
+    var _githubRepository: String? = nil
+    var _workflow: BriarAPI_AutoHuntWorkflow? = nil
+    var _checkpointPolicy: BriarAPI_CheckpointPolicy? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _velenOrg = source._velenOrg
+      _dataSource = source._dataSource
+      _linear = source._linear
+      _githubRepositoryID = source._githubRepositoryID
+      _githubRepository = source._githubRepository
+      _workflow = source._workflow
+      _checkpointPolicy = source._checkpointPolicy
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._velenOrg) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._dataSource) }()
+        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._linear) }()
+        case 4: try { try decoder.decodeSingularInt64Field(value: &_storage._githubRepositoryID) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._githubRepository) }()
+        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._workflow) }()
+        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._checkpointPolicy) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._velenOrg {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+      } }()
+      try { if let v = _storage._dataSource {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+      } }()
+      try { if let v = _storage._linear {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      } }()
+      try { if let v = _storage._githubRepositoryID {
+        try visitor.visitSingularInt64Field(value: v, fieldNumber: 4)
+      } }()
+      try { if let v = _storage._githubRepository {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+      } }()
+      try { if let v = _storage._workflow {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._checkpointPolicy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+      } }()
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: BriarAPI_ProjectSettings, rhs: BriarAPI_ProjectSettings) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._velenOrg != rhs_storage._velenOrg {return false}
+        if _storage._dataSource != rhs_storage._dataSource {return false}
+        if _storage._linear != rhs_storage._linear {return false}
+        if _storage._githubRepositoryID != rhs_storage._githubRepositoryID {return false}
+        if _storage._githubRepository != rhs_storage._githubRepository {return false}
+        if _storage._workflow != rhs_storage._workflow {return false}
+        if _storage._checkpointPolicy != rhs_storage._checkpointPolicy {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1857,14 +3066,14 @@ nonisolated extension BriarAPI_IssueDependencyReference: SwiftProtobuf.Message, 
 
 nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".DashboardRun"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}run_number\0\u{3}current_attempt\0\u{3}current_revision\0\u{3}source_key\0\u{3}source_created_at\0\u{1}title\0\u{1}status\0\u{3}workflow_stage\0\u{1}workflow\0\u{3}paused_at\0\u{3}resume_requested_at\0\u{1}checkpoint\0\u{1}progress\0\u{1}detail\0\u{1}priority\0\u{1}difficulty\0\u{3}assignee_user_id\0\u{3}created_by_user_id\0\u{1}subscribers\0\u{3}issue_description\0\u{3}related_message\0\u{1}attachments\0\u{1}prerequisites\0\u{1}dependents\0\u{3}execution_readiness\0\u{3}waiting_on_prerequisite_count\0\u{3}result_summary\0\u{3}structured_result\0\u{3}result_reviews\0\u{3}pull_request_urls\0\u{1}branch\0\u{3}commit_sha\0\u{3}preferred_provider\0\u{3}preferred_model\0\u{3}preferred_effort\0\u{3}full_auto\0\u{3}requested_provider\0\u{3}requested_model\0\u{3}requested_effort\0\u{3}requested_worker_id\0\u{3}requested_by_user_id\0\u{3}dispatch_mode\0\u{3}dispatched_at\0\u{3}claimed_by\0\u{3}claimed_at\0\u{3}worker_id\0\u{3}started_at\0\u{3}updated_at\0\u{3}completed_at\0\u{3}last_event_at\0\u{3}event_count\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}run_number\0\u{3}current_attempt\0\u{3}current_revision\0\u{3}source_key\0\u{3}source_created_at\0\u{1}title\0\u{1}status\0\u{3}workflow_stage\0\u{1}workflow\0\u{3}paused_at\0\u{3}resume_requested_at\0\u{1}checkpoint\0\u{1}progress\0\u{1}detail\0\u{1}priority\0\u{1}difficulty\0\u{3}assignee_user_id\0\u{3}created_by_user_id\0\u{1}subscribers\0\u{3}issue_description\0\u{3}related_message\0\u{1}attachments\0\u{1}prerequisites\0\u{1}dependents\0\u{3}execution_readiness\0\u{3}waiting_on_prerequisite_count\0\u{3}result_summary\0\u{3}structured_result\0\u{3}result_reviews\0\u{3}pull_request_urls\0\u{1}branch\0\u{3}commit_sha\0\u{3}preferred_provider\0\u{3}preferred_model\0\u{3}preferred_effort\0\u{3}full_auto\0\u{3}requested_provider\0\u{3}requested_model\0\u{3}requested_effort\0\u{3}requested_worker_id\0\u{3}requested_by_user_id\0\u{3}dispatch_mode\0\u{3}dispatched_at\0\u{3}claimed_by\0\u{3}claimed_at\0\u{3}worker_id\0\u{3}started_at\0\u{3}updated_at\0\u{3}completed_at\0\u{3}last_event_at\0\u{3}event_count\0\u{1}source\0\u{1}repository\0\u{1}tracker\0\u{3}waiting_checkpoint\0\u{3}issue_checkpoints\0\u{3}execution_metrics\0\u{3}target_sha\0\u{3}staging_qa_status\0\u{3}production_qa_status\0\u{3}staging_qa_detail\0\u{3}production_qa_detail\0\u{1}context\0\u{3}lease_expires_at\0\u{3}claim_attempts\0\u{3}agent_id\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
-    var _runNumber: UInt32? = nil
-    var _currentAttempt: UInt32? = nil
-    var _currentRevision: UInt32? = nil
-    var _sourceKey: String? = nil
+    var _runNumber: UInt32 = 0
+    var _currentAttempt: UInt32 = 0
+    var _currentRevision: UInt32 = 0
+    var _sourceKey: String = String()
     var _sourceCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _title: String = String()
     var _status: BriarAPI_RunStatus = .unspecified
@@ -1873,7 +3082,7 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
     var _pausedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _resumeRequestedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _checkpoint: BriarAPI_WorkflowCheckpoint? = nil
-    var _progress: Double? = nil
+    var _progress: Double = 0
     var _detail: String? = nil
     var _priority: UInt32? = nil
     var _difficulty: BriarAPI_IssueDifficulty? = nil
@@ -1911,7 +3120,22 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
     var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _completedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _lastEventAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-    var _eventCount: UInt32? = nil
+    var _eventCount: UInt32 = 0
+    var _source: BriarAPI_DashboardRun.Source = .unspecified
+    var _repository: String = String()
+    var _tracker: BriarAPI_TrackerReference? = nil
+    var _waitingCheckpoint: BriarAPI_WaitingCheckpoint? = nil
+    var _issueCheckpoints: [BriarAPI_WorkflowCheckpointSpec] = []
+    var _executionMetrics: BriarAPI_AgentExecutionMetrics? = nil
+    var _targetSha: String? = nil
+    var _stagingQaStatus: BriarAPI_DashboardRun.QaStatus? = nil
+    var _productionQaStatus: BriarAPI_DashboardRun.QaStatus? = nil
+    var _stagingQaDetail: String? = nil
+    var _productionQaDetail: String? = nil
+    var _context: SwiftProtobuf.Google_Protobuf_Struct? = nil
+    var _leaseExpiresAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _claimAttempts: UInt32 = 0
+    var _agentID: String? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1974,6 +3198,21 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
       _completedAt = source._completedAt
       _lastEventAt = source._lastEventAt
       _eventCount = source._eventCount
+      _source = source._source
+      _repository = source._repository
+      _tracker = source._tracker
+      _waitingCheckpoint = source._waitingCheckpoint
+      _issueCheckpoints = source._issueCheckpoints
+      _executionMetrics = source._executionMetrics
+      _targetSha = source._targetSha
+      _stagingQaStatus = source._stagingQaStatus
+      _productionQaStatus = source._productionQaStatus
+      _stagingQaDetail = source._stagingQaDetail
+      _productionQaDetail = source._productionQaDetail
+      _context = source._context
+      _leaseExpiresAt = source._leaseExpiresAt
+      _claimAttempts = source._claimAttempts
+      _agentID = source._agentID
     }
   }
 
@@ -2044,6 +3283,21 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
         case 50: try { try decoder.decodeSingularMessageField(value: &_storage._completedAt) }()
         case 51: try { try decoder.decodeSingularMessageField(value: &_storage._lastEventAt) }()
         case 52: try { try decoder.decodeSingularUInt32Field(value: &_storage._eventCount) }()
+        case 53: try { try decoder.decodeSingularEnumField(value: &_storage._source) }()
+        case 54: try { try decoder.decodeSingularStringField(value: &_storage._repository) }()
+        case 55: try { try decoder.decodeSingularMessageField(value: &_storage._tracker) }()
+        case 56: try { try decoder.decodeSingularMessageField(value: &_storage._waitingCheckpoint) }()
+        case 57: try { try decoder.decodeRepeatedMessageField(value: &_storage._issueCheckpoints) }()
+        case 58: try { try decoder.decodeSingularMessageField(value: &_storage._executionMetrics) }()
+        case 59: try { try decoder.decodeSingularStringField(value: &_storage._targetSha) }()
+        case 60: try { try decoder.decodeSingularEnumField(value: &_storage._stagingQaStatus) }()
+        case 61: try { try decoder.decodeSingularEnumField(value: &_storage._productionQaStatus) }()
+        case 62: try { try decoder.decodeSingularStringField(value: &_storage._stagingQaDetail) }()
+        case 63: try { try decoder.decodeSingularStringField(value: &_storage._productionQaDetail) }()
+        case 64: try { try decoder.decodeSingularMessageField(value: &_storage._context) }()
+        case 65: try { try decoder.decodeSingularMessageField(value: &_storage._leaseExpiresAt) }()
+        case 66: try { try decoder.decodeSingularUInt32Field(value: &_storage._claimAttempts) }()
+        case 67: try { try decoder.decodeSingularStringField(value: &_storage._agentID) }()
         default: break
         }
       }
@@ -2059,18 +3313,18 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
       if !_storage._id.isEmpty {
         try visitor.visitSingularStringField(value: _storage._id, fieldNumber: 1)
       }
-      try { if let v = _storage._runNumber {
-        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 2)
-      } }()
-      try { if let v = _storage._currentAttempt {
-        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 3)
-      } }()
-      try { if let v = _storage._currentRevision {
-        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 4)
-      } }()
-      try { if let v = _storage._sourceKey {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-      } }()
+      if _storage._runNumber != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._runNumber, fieldNumber: 2)
+      }
+      if _storage._currentAttempt != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._currentAttempt, fieldNumber: 3)
+      }
+      if _storage._currentRevision != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._currentRevision, fieldNumber: 4)
+      }
+      if !_storage._sourceKey.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._sourceKey, fieldNumber: 5)
+      }
       try { if let v = _storage._sourceCreatedAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
       } }()
@@ -2095,9 +3349,9 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
       try { if let v = _storage._checkpoint {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
       } }()
-      try { if let v = _storage._progress {
-        try visitor.visitSingularDoubleField(value: v, fieldNumber: 14)
-      } }()
+      if _storage._progress.bitPattern != 0 {
+        try visitor.visitSingularDoubleField(value: _storage._progress, fieldNumber: 14)
+      }
       try { if let v = _storage._detail {
         try visitor.visitSingularStringField(value: v, fieldNumber: 15)
       } }()
@@ -2209,8 +3463,53 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
       try { if let v = _storage._lastEventAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 51)
       } }()
-      try { if let v = _storage._eventCount {
-        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 52)
+      if _storage._eventCount != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._eventCount, fieldNumber: 52)
+      }
+      if _storage._source != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._source, fieldNumber: 53)
+      }
+      if !_storage._repository.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._repository, fieldNumber: 54)
+      }
+      try { if let v = _storage._tracker {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 55)
+      } }()
+      try { if let v = _storage._waitingCheckpoint {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 56)
+      } }()
+      if !_storage._issueCheckpoints.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._issueCheckpoints, fieldNumber: 57)
+      }
+      try { if let v = _storage._executionMetrics {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 58)
+      } }()
+      try { if let v = _storage._targetSha {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 59)
+      } }()
+      try { if let v = _storage._stagingQaStatus {
+        try visitor.visitSingularEnumField(value: v, fieldNumber: 60)
+      } }()
+      try { if let v = _storage._productionQaStatus {
+        try visitor.visitSingularEnumField(value: v, fieldNumber: 61)
+      } }()
+      try { if let v = _storage._stagingQaDetail {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 62)
+      } }()
+      try { if let v = _storage._productionQaDetail {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 63)
+      } }()
+      try { if let v = _storage._context {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 64)
+      } }()
+      try { if let v = _storage._leaseExpiresAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 65)
+      } }()
+      if _storage._claimAttempts != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._claimAttempts, fieldNumber: 66)
+      }
+      try { if let v = _storage._agentID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 67)
       } }()
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -2273,6 +3572,21 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
         if _storage._completedAt != rhs_storage._completedAt {return false}
         if _storage._lastEventAt != rhs_storage._lastEventAt {return false}
         if _storage._eventCount != rhs_storage._eventCount {return false}
+        if _storage._source != rhs_storage._source {return false}
+        if _storage._repository != rhs_storage._repository {return false}
+        if _storage._tracker != rhs_storage._tracker {return false}
+        if _storage._waitingCheckpoint != rhs_storage._waitingCheckpoint {return false}
+        if _storage._issueCheckpoints != rhs_storage._issueCheckpoints {return false}
+        if _storage._executionMetrics != rhs_storage._executionMetrics {return false}
+        if _storage._targetSha != rhs_storage._targetSha {return false}
+        if _storage._stagingQaStatus != rhs_storage._stagingQaStatus {return false}
+        if _storage._productionQaStatus != rhs_storage._productionQaStatus {return false}
+        if _storage._stagingQaDetail != rhs_storage._stagingQaDetail {return false}
+        if _storage._productionQaDetail != rhs_storage._productionQaDetail {return false}
+        if _storage._context != rhs_storage._context {return false}
+        if _storage._leaseExpiresAt != rhs_storage._leaseExpiresAt {return false}
+        if _storage._claimAttempts != rhs_storage._claimAttempts {return false}
+        if _storage._agentID != rhs_storage._agentID {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -2288,6 +3602,167 @@ nonisolated extension BriarAPI_DashboardRun.ExecutionReadiness: SwiftProtobuf._P
 
 nonisolated extension BriarAPI_DashboardRun.DispatchMode: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DISPATCH_MODE_UNSPECIFIED\0\u{1}DISPATCH_MODE_ANY\0\u{1}DISPATCH_MODE_SPECIFIC\0")
+}
+
+nonisolated extension BriarAPI_DashboardRun.Source: SwiftProtobuf._ProtoNameProviding {
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SOURCE_UNSPECIFIED\0\u{1}SOURCE_ISSUE\0\u{1}SOURCE_ERROR\0\u{1}SOURCE_FEEDBACK\0")
+}
+
+nonisolated extension BriarAPI_DashboardRun.QaStatus: SwiftProtobuf._ProtoNameProviding {
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0QA_STATUS_UNSPECIFIED\0\u{1}QA_STATUS_PENDING\0\u{1}QA_STATUS_PASSED\0\u{1}QA_STATUS_SKIPPED\0")
+}
+
+nonisolated extension BriarAPI_TrackerReference: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".TrackerReference"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}provider\0\u{3}issue_id\0\u{1}identifier\0\u{1}url\0\u{1}state\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.provider) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._issueID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._identifier) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._url) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._state) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.provider.isEmpty {
+      try visitor.visitSingularStringField(value: self.provider, fieldNumber: 1)
+    }
+    try { if let v = self._issueID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._identifier {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._url {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._state {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: BriarAPI_TrackerReference, rhs: BriarAPI_TrackerReference) -> Bool {
+    if lhs.provider != rhs.provider {return false}
+    if lhs._issueID != rhs._issueID {return false}
+    if lhs._identifier != rhs._identifier {return false}
+    if lhs._url != rhs._url {return false}
+    if lhs._state != rhs._state {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_WaitingCheckpoint: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".WaitingCheckpoint"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}key\0\u{1}revision\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.key) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.revision) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.key.isEmpty {
+      try visitor.visitSingularStringField(value: self.key, fieldNumber: 1)
+    }
+    if self.revision != 0 {
+      try visitor.visitSingularUInt32Field(value: self.revision, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: BriarAPI_WaitingCheckpoint, rhs: BriarAPI_WaitingCheckpoint) -> Bool {
+    if lhs.key != rhs.key {return false}
+    if lhs.revision != rhs.revision {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_AgentExecutionMetrics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".AgentExecutionMetrics"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}input_tokens\0\u{3}output_tokens\0\u{3}cache_read_tokens\0\u{3}cache_write_tokens\0\u{3}reasoning_output_tokens\0\u{3}total_tokens\0\u{3}duration_ms\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt64Field(value: &self._inputTokens) }()
+      case 2: try { try decoder.decodeSingularUInt64Field(value: &self._outputTokens) }()
+      case 3: try { try decoder.decodeSingularUInt64Field(value: &self._cacheReadTokens) }()
+      case 4: try { try decoder.decodeSingularUInt64Field(value: &self._cacheWriteTokens) }()
+      case 5: try { try decoder.decodeSingularUInt64Field(value: &self._reasoningOutputTokens) }()
+      case 6: try { try decoder.decodeSingularUInt64Field(value: &self._totalTokens) }()
+      case 7: try { try decoder.decodeSingularUInt64Field(value: &self.durationMs) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._inputTokens {
+      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._outputTokens {
+      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._cacheReadTokens {
+      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._cacheWriteTokens {
+      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._reasoningOutputTokens {
+      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._totalTokens {
+      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 6)
+    } }()
+    if self.durationMs != 0 {
+      try visitor.visitSingularUInt64Field(value: self.durationMs, fieldNumber: 7)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: BriarAPI_AgentExecutionMetrics, rhs: BriarAPI_AgentExecutionMetrics) -> Bool {
+    if lhs._inputTokens != rhs._inputTokens {return false}
+    if lhs._outputTokens != rhs._outputTokens {return false}
+    if lhs._cacheReadTokens != rhs._cacheReadTokens {return false}
+    if lhs._cacheWriteTokens != rhs._cacheWriteTokens {return false}
+    if lhs._reasoningOutputTokens != rhs._reasoningOutputTokens {return false}
+    if lhs._totalTokens != rhs._totalTokens {return false}
+    if lhs.durationMs != rhs.durationMs {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
 }
 
 nonisolated extension BriarAPI_WorkerIcon: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -2331,86 +3806,199 @@ nonisolated extension BriarAPI_WorkerIcon.Kind: SwiftProtobuf._ProtoNameProvidin
 
 nonisolated extension BriarAPI_DashboardWorker: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".DashboardWorker"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}label\0\u{1}icon\0\u{3}agent_provider\0\u{1}providers\0\u{1}capabilities\0\u{1}readiness\0\u{3}accepting_work\0\u{3}readiness_detail\0\u{3}active_sessions\0\u{3}available_sessions\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}label\0\u{1}icon\0\u{3}agent_provider\0\u{1}providers\0\u{1}capabilities\0\u{1}readiness\0\u{3}accepting_work\0\u{3}readiness_detail\0\u{3}active_sessions\0\u{3}available_sessions\0\u{3}device_id\0\u{3}owner_user_id\0\u{1}versions\0\u{1}state\0\u{3}max_concurrent_sessions\0\u{3}last_heartbeat_at\0\u{3}created_at\0")
+
+  fileprivate class _StorageClass {
+    var _id: String = String()
+    var _label: String = String()
+    var _icon: BriarAPI_WorkerIcon? = nil
+    var _agentProvider: BriarAPI_AgentProvider = .unspecified
+    var _providers: [BriarAPI_AgentProvider] = []
+    var _capabilities: SwiftProtobuf.Google_Protobuf_Struct? = nil
+    var _readiness: BriarAPI_DashboardWorker.Readiness = .unspecified
+    var _acceptingWork: Bool = false
+    var _readinessDetail: String? = nil
+    var _activeSessions: UInt32 = 0
+    var _availableSessions: UInt32 = 0
+    var _deviceID: String = String()
+    var _ownerUserID: String = String()
+    var _versions: Dictionary<String,String> = [:]
+    var _state: BriarAPI_DashboardWorker.State = .unspecified
+    var _maxConcurrentSessions: UInt32 = 0
+    var _lastHeartbeatAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _id = source._id
+      _label = source._label
+      _icon = source._icon
+      _agentProvider = source._agentProvider
+      _providers = source._providers
+      _capabilities = source._capabilities
+      _readiness = source._readiness
+      _acceptingWork = source._acceptingWork
+      _readinessDetail = source._readinessDetail
+      _activeSessions = source._activeSessions
+      _availableSessions = source._availableSessions
+      _deviceID = source._deviceID
+      _ownerUserID = source._ownerUserID
+      _versions = source._versions
+      _state = source._state
+      _maxConcurrentSessions = source._maxConcurrentSessions
+      _lastHeartbeatAt = source._lastHeartbeatAt
+      _createdAt = source._createdAt
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.label) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._icon) }()
-      case 4: try { try decoder.decodeSingularEnumField(value: &self._agentProvider) }()
-      case 5: try { try decoder.decodeRepeatedEnumField(value: &self.providers) }()
-      case 6: try { try decoder.decodeSingularMessageField(value: &self._capabilities) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self.readiness) }()
-      case 8: try { try decoder.decodeSingularBoolField(value: &self.acceptingWork) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self._readinessDetail) }()
-      case 10: try { try decoder.decodeSingularUInt32Field(value: &self.activeSessions) }()
-      case 11: try { try decoder.decodeSingularUInt32Field(value: &self.availableSessions) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._id) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._label) }()
+        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._icon) }()
+        case 4: try { try decoder.decodeSingularEnumField(value: &_storage._agentProvider) }()
+        case 5: try { try decoder.decodeRepeatedEnumField(value: &_storage._providers) }()
+        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._capabilities) }()
+        case 7: try { try decoder.decodeSingularEnumField(value: &_storage._readiness) }()
+        case 8: try { try decoder.decodeSingularBoolField(value: &_storage._acceptingWork) }()
+        case 9: try { try decoder.decodeSingularStringField(value: &_storage._readinessDetail) }()
+        case 10: try { try decoder.decodeSingularUInt32Field(value: &_storage._activeSessions) }()
+        case 11: try { try decoder.decodeSingularUInt32Field(value: &_storage._availableSessions) }()
+        case 12: try { try decoder.decodeSingularStringField(value: &_storage._deviceID) }()
+        case 13: try { try decoder.decodeSingularStringField(value: &_storage._ownerUserID) }()
+        case 14: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._versions) }()
+        case 15: try { try decoder.decodeSingularEnumField(value: &_storage._state) }()
+        case 16: try { try decoder.decodeSingularUInt32Field(value: &_storage._maxConcurrentSessions) }()
+        case 17: try { try decoder.decodeSingularMessageField(value: &_storage._lastHeartbeatAt) }()
+        case 18: try { try decoder.decodeSingularMessageField(value: &_storage._createdAt) }()
+        default: break
+        }
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.id.isEmpty {
-      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
-    }
-    if !self.label.isEmpty {
-      try visitor.visitSingularStringField(value: self.label, fieldNumber: 2)
-    }
-    try { if let v = self._icon {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._agentProvider {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 4)
-    } }()
-    if !self.providers.isEmpty {
-      try visitor.visitPackedEnumField(value: self.providers, fieldNumber: 5)
-    }
-    try { if let v = self._capabilities {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-    } }()
-    if !self.readiness.isEmpty {
-      try visitor.visitSingularStringField(value: self.readiness, fieldNumber: 7)
-    }
-    if self.acceptingWork != false {
-      try visitor.visitSingularBoolField(value: self.acceptingWork, fieldNumber: 8)
-    }
-    try { if let v = self._readinessDetail {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 9)
-    } }()
-    if self.activeSessions != 0 {
-      try visitor.visitSingularUInt32Field(value: self.activeSessions, fieldNumber: 10)
-    }
-    if self.availableSessions != 0 {
-      try visitor.visitSingularUInt32Field(value: self.availableSessions, fieldNumber: 11)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._id.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._id, fieldNumber: 1)
+      }
+      if !_storage._label.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._label, fieldNumber: 2)
+      }
+      try { if let v = _storage._icon {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      } }()
+      if _storage._agentProvider != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._agentProvider, fieldNumber: 4)
+      }
+      if !_storage._providers.isEmpty {
+        try visitor.visitPackedEnumField(value: _storage._providers, fieldNumber: 5)
+      }
+      try { if let v = _storage._capabilities {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+      } }()
+      if _storage._readiness != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._readiness, fieldNumber: 7)
+      }
+      if _storage._acceptingWork != false {
+        try visitor.visitSingularBoolField(value: _storage._acceptingWork, fieldNumber: 8)
+      }
+      try { if let v = _storage._readinessDetail {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 9)
+      } }()
+      if _storage._activeSessions != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._activeSessions, fieldNumber: 10)
+      }
+      if _storage._availableSessions != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._availableSessions, fieldNumber: 11)
+      }
+      if !_storage._deviceID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._deviceID, fieldNumber: 12)
+      }
+      if !_storage._ownerUserID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._ownerUserID, fieldNumber: 13)
+      }
+      if !_storage._versions.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: _storage._versions, fieldNumber: 14)
+      }
+      if _storage._state != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._state, fieldNumber: 15)
+      }
+      if _storage._maxConcurrentSessions != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._maxConcurrentSessions, fieldNumber: 16)
+      }
+      try { if let v = _storage._lastHeartbeatAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 17)
+      } }()
+      try { if let v = _storage._createdAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 18)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: BriarAPI_DashboardWorker, rhs: BriarAPI_DashboardWorker) -> Bool {
-    if lhs.id != rhs.id {return false}
-    if lhs.label != rhs.label {return false}
-    if lhs._icon != rhs._icon {return false}
-    if lhs._agentProvider != rhs._agentProvider {return false}
-    if lhs.providers != rhs.providers {return false}
-    if lhs._capabilities != rhs._capabilities {return false}
-    if lhs.readiness != rhs.readiness {return false}
-    if lhs.acceptingWork != rhs.acceptingWork {return false}
-    if lhs._readinessDetail != rhs._readinessDetail {return false}
-    if lhs.activeSessions != rhs.activeSessions {return false}
-    if lhs.availableSessions != rhs.availableSessions {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._id != rhs_storage._id {return false}
+        if _storage._label != rhs_storage._label {return false}
+        if _storage._icon != rhs_storage._icon {return false}
+        if _storage._agentProvider != rhs_storage._agentProvider {return false}
+        if _storage._providers != rhs_storage._providers {return false}
+        if _storage._capabilities != rhs_storage._capabilities {return false}
+        if _storage._readiness != rhs_storage._readiness {return false}
+        if _storage._acceptingWork != rhs_storage._acceptingWork {return false}
+        if _storage._readinessDetail != rhs_storage._readinessDetail {return false}
+        if _storage._activeSessions != rhs_storage._activeSessions {return false}
+        if _storage._availableSessions != rhs_storage._availableSessions {return false}
+        if _storage._deviceID != rhs_storage._deviceID {return false}
+        if _storage._ownerUserID != rhs_storage._ownerUserID {return false}
+        if _storage._versions != rhs_storage._versions {return false}
+        if _storage._state != rhs_storage._state {return false}
+        if _storage._maxConcurrentSessions != rhs_storage._maxConcurrentSessions {return false}
+        if _storage._lastHeartbeatAt != rhs_storage._lastHeartbeatAt {return false}
+        if _storage._createdAt != rhs_storage._createdAt {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
+}
+
+nonisolated extension BriarAPI_DashboardWorker.State: SwiftProtobuf._ProtoNameProviding {
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STATE_UNSPECIFIED\0\u{1}STATE_ONLINE\0\u{1}STATE_STALE\0\u{1}STATE_DISABLED\0")
+}
+
+nonisolated extension BriarAPI_DashboardWorker.Readiness: SwiftProtobuf._ProtoNameProviding {
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0READINESS_UNSPECIFIED\0\u{1}READINESS_AVAILABLE\0\u{1}READINESS_BUSY\0\u{1}READINESS_OFFLINE\0\u{1}READINESS_NEEDS_ATTENTION\0\u{1}READINESS_DISABLED\0")
 }
 
 nonisolated extension BriarAPI_ProjectExecutionWorkerPolicy: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -2611,7 +4199,7 @@ nonisolated extension BriarAPI_ChannelNotification: SwiftProtobuf.Message, Swift
 
 nonisolated extension BriarAPI_RunEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".RunEvent"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}status\0\u{3}workflow_stage\0\u{1}detail\0\u{1}actor\0\u{3}actor_name\0\u{3}occurred_at\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}status\0\u{3}workflow_stage\0\u{1}detail\0\u{1}actor\0\u{3}actor_name\0\u{3}occurred_at\0\u{1}attempt\0\u{1}revision\0\u{3}qa_status\0\u{3}tracker_state\0\u{3}pull_request_urls\0\u{3}target_sha\0\u{3}recorded_at\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2626,6 +4214,13 @@ nonisolated extension BriarAPI_RunEvent: SwiftProtobuf.Message, SwiftProtobuf._M
       case 5: try { try decoder.decodeSingularStringField(value: &self.actor) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self._actorName) }()
       case 7: try { try decoder.decodeSingularMessageField(value: &self._occurredAt) }()
+      case 8: try { try decoder.decodeSingularUInt32Field(value: &self.attempt) }()
+      case 9: try { try decoder.decodeSingularUInt32Field(value: &self.revision) }()
+      case 10: try { try decoder.decodeSingularEnumField(value: &self._qaStatus) }()
+      case 11: try { try decoder.decodeSingularStringField(value: &self._trackerState) }()
+      case 12: try { try decoder.decodeRepeatedStringField(value: &self.pullRequestUrls) }()
+      case 13: try { try decoder.decodeSingularStringField(value: &self._targetSha) }()
+      case 14: try { try decoder.decodeSingularMessageField(value: &self._recordedAt) }()
       default: break
       }
     }
@@ -2657,6 +4252,27 @@ nonisolated extension BriarAPI_RunEvent: SwiftProtobuf.Message, SwiftProtobuf._M
     try { if let v = self._occurredAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
     } }()
+    if self.attempt != 0 {
+      try visitor.visitSingularUInt32Field(value: self.attempt, fieldNumber: 8)
+    }
+    if self.revision != 0 {
+      try visitor.visitSingularUInt32Field(value: self.revision, fieldNumber: 9)
+    }
+    try { if let v = self._qaStatus {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 10)
+    } }()
+    try { if let v = self._trackerState {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 11)
+    } }()
+    if !self.pullRequestUrls.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.pullRequestUrls, fieldNumber: 12)
+    }
+    try { if let v = self._targetSha {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 13)
+    } }()
+    try { if let v = self._recordedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 14)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -2668,6 +4284,13 @@ nonisolated extension BriarAPI_RunEvent: SwiftProtobuf.Message, SwiftProtobuf._M
     if lhs.actor != rhs.actor {return false}
     if lhs._actorName != rhs._actorName {return false}
     if lhs._occurredAt != rhs._occurredAt {return false}
+    if lhs.attempt != rhs.attempt {return false}
+    if lhs.revision != rhs.revision {return false}
+    if lhs._qaStatus != rhs._qaStatus {return false}
+    if lhs._trackerState != rhs._trackerState {return false}
+    if lhs.pullRequestUrls != rhs.pullRequestUrls {return false}
+    if lhs._targetSha != rhs._targetSha {return false}
+    if lhs._recordedAt != rhs._recordedAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
