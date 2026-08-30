@@ -123,7 +123,9 @@ const workflowRequirementFromProto = (
   };
 };
 
-const workflowFromProto = (value: AutoHuntWorkflowMessage): AutoHuntWorkflow => {
+export const workflowFromProto = (
+  value: AutoHuntWorkflowMessage,
+): AutoHuntWorkflow => {
   if (value.version !== 2) {
     throw new Error(`Unsupported workflow version: ${value.version}`);
   }

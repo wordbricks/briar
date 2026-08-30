@@ -1,6 +1,6 @@
 import { briarApiUrl, briarWebAppOrigin } from "./api-config";
 export { briarApiUrl } from "./api-config";
-import { ApiError, isApiErrorStatus } from "./api/errors";
+import { ApiError } from "./api/errors";
 export {
   ApiError,
   ApiResponseDecodeError,
@@ -20,15 +20,6 @@ import {
   decodeOrganizationsResponse,
 } from "./api/organization-contract";
 import {
-  decodeClaimedProjectAgentScheduleRunResponse,
-  decodeLeaseExpirationResponse,
-  decodeProjectAgentResponse,
-  decodeProjectAgentScheduleResponse,
-  decodeProjectAgentScheduleRunResponse,
-  decodeProjectAgentScheduleRunsResponse,
-  decodeProjectAgentSchedulesResponse,
-} from "./api/project-agent-contract";
-import {
   decodeProjectResponse,
   decodeProjectUsageSummaryResponse,
 } from "./api/project-contract";
@@ -46,13 +37,27 @@ import {
   syncDashboard,
 } from "./app-rpc/dashboard";
 export {
+  claimProjectAgentScheduleRuns,
+  completeProjectAgentScheduleRun,
+  createOrganizationAgent,
+  createProjectAgent,
+  createProjectAgentSchedule,
+  deleteOrganizationAgent,
+  deleteProjectAgent,
+  deleteProjectAgentSchedule,
   listOrganizationAgents,
   loadProjectAgents,
+  loadProjectAgentScheduleRuns,
+  loadProjectAgentSchedules,
   loadProjectAgentSession,
   loadProjectAgentSessionChanges,
+  renewProjectAgentScheduleRun,
   runProjectAgentTaskOnWorker,
   type ProjectAgentSessionSyncResult,
   type ProjectAgentSessionSyncState,
+  updateOrganizationAgent,
+  updateProjectAgent,
+  updateProjectAgentSchedule,
   upsertProjectAgentSession,
 } from "./app-rpc/agent";
 export {
@@ -104,13 +109,11 @@ export {
   updateIssueExecutionPreferences,
   updateIssueSubscription,
 } from "./app-rpc/issue";
-import type { StructuredAgentResult } from "./agent-result";
 import {
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
   type AutoHuntWorkflowCheckpoint,
 } from "./auto-hunt-contract";
-import type { ModelEffort } from "./agent-provider-contract";
 import type { AgentProvider } from "./agent-provider";
 import type { UsageRangeDays } from "./agent-usage-overview";
 import type {
@@ -120,7 +123,6 @@ import type {
 import { LITELLM_MAIN_PRICING_SOURCE } from "./agent-usage-pricing";
 import type { InboxMessage } from "../hooks/useInbox";
 import type {
-  ChannelAgentSkillInput,
   ChannelAgentSummary,
   ChannelLinkPreview,
   ChannelMember,
@@ -136,8 +138,6 @@ import type {
   LinearImportStatesResult,
 } from "./linear-import";
 import type {
-  CreateProjectAgentInput,
-  CreateProjectAgentScheduleInput,
   AgentUsageReport,
   AgentExecutionCostEstimate,
   DashboardPayload,
@@ -154,11 +154,7 @@ import type {
   HuntEvent,
   IssueAttachment,
   IssueMessage,
-  ClaimedProjectAgentScheduleRun,
   Project,
-  ProjectAgent,
-  ProjectAgentSchedule,
-  ProjectAgentScheduleRun,
   Organization,
   OrganizationInvitation,
   OrganizationInvitationPreview,
@@ -168,8 +164,6 @@ import type {
   ProjectUsageSummary,
   RunEvidenceImage,
   StatusTrayRunsPayload,
-  UpdateProjectAgentInput,
-  UpdateProjectAgentScheduleInput,
   WorkerIcon,
 } from "../types";
 
@@ -1007,199 +1001,6 @@ export async function updateProjectTabs(
   return { project: decodeProjectResponse(result.project) };
 }
 
-export async function createProjectAgent(
-  token: string,
-  projectId: string,
-  input: CreateProjectAgentInput,
-): Promise<ProjectAgent> {
-  const result = await request<{ agent: unknown }>(
-    `/projects/${projectId}/agents`,
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify(projectAgentInputJson(input)),
-    },
-  );
-  return decodeProjectAgentResponse(result.agent);
-}
-
-export async function loadProjectAgentSchedules(
-  token: string,
-  projectId: string,
-): Promise<ProjectAgentSchedule[]> {
-  const result = await request<{ schedules: unknown[] }>(
-    `/projects/${projectId}/agent-schedules`,
-    token,
-  );
-  return decodeProjectAgentSchedulesResponse(result.schedules);
-}
-
-export async function createProjectAgentSchedule(
-  token: string,
-  projectId: string,
-  input: CreateProjectAgentScheduleInput,
-): Promise<ProjectAgentSchedule> {
-  const result = await request<{ schedule: unknown }>(
-    `/projects/${projectId}/agent-schedules`,
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
-  );
-  return decodeProjectAgentScheduleResponse(result.schedule);
-}
-
-export async function updateProjectAgentSchedule(
-  token: string,
-  projectId: string,
-  scheduleId: string,
-  input: UpdateProjectAgentScheduleInput,
-): Promise<ProjectAgentSchedule> {
-  const result = await request<{ schedule: unknown }>(
-    `/projects/${projectId}/agent-schedules/${scheduleId}`,
-    token,
-    {
-      method: "PUT",
-      body: JSON.stringify(input),
-    },
-  );
-  return decodeProjectAgentScheduleResponse(result.schedule);
-}
-
-export async function deleteProjectAgentSchedule(
-  token: string,
-  projectId: string,
-  scheduleId: string,
-) {
-  try {
-    return await request<void>(
-      `/projects/${projectId}/agent-schedules/${scheduleId}`,
-      token,
-      { method: "DELETE" },
-    );
-  } catch (error) {
-    // Deletion is idempotent: a stale client should still be able to remove an
-    // entry that was already deleted by another request or cascading cleanup.
-    if (isApiErrorStatus(error, 404)) return;
-    throw error;
-  }
-}
-
-export async function loadProjectAgentScheduleRuns(
-  token: string,
-  projectId: string,
-): Promise<ProjectAgentScheduleRun[]> {
-  const result = await request<{ runs: unknown[] }>(
-    `/projects/${projectId}/agent-schedule-runs`,
-    token,
-  );
-  return decodeProjectAgentScheduleRunsResponse(result.runs);
-}
-
-export async function claimProjectAgentScheduleRuns(
-  token: string,
-  projectIds: readonly string[],
-): Promise<ClaimedProjectAgentScheduleRun | null> {
-  const uniqueProjectIds = [...new Set(projectIds)];
-  for (let offset = 0; offset < uniqueProjectIds.length; offset += 100) {
-    const result = await request<{ run: unknown }>(
-      "/agent-schedule-runs/claim",
-      token,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          projectIds: uniqueProjectIds.slice(offset, offset + 100),
-        }),
-      },
-    );
-    if (result.run !== null) {
-      return decodeClaimedProjectAgentScheduleRunResponse(result.run);
-    }
-  }
-  return null;
-}
-
-export async function completeProjectAgentScheduleRun(
-  token: string,
-  projectId: string,
-  runId: string,
-  input:
-    | {
-        claimToken: string;
-        status: "completed";
-        resultSummary: string;
-        structuredResult: StructuredAgentResult;
-      }
-    | {
-        claimToken: string;
-        status: "failed";
-        error: string;
-        structuredResult: StructuredAgentResult;
-      },
-): Promise<ProjectAgentScheduleRun> {
-  const result = await request<{ run: unknown }>(
-    `/projects/${projectId}/agent-schedule-runs/${runId}/complete`,
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        claimToken: input.claimToken,
-        status: input.status,
-        resultSummary:
-          input.status === "completed" ? input.resultSummary : null,
-        structuredResult: input.structuredResult,
-        error: input.status === "failed" ? input.error : null,
-      }),
-    },
-  );
-  return decodeProjectAgentScheduleRunResponse(result.run);
-}
-
-export async function renewProjectAgentScheduleRun(
-  token: string,
-  projectId: string,
-  runId: string,
-  claimToken: string,
-) {
-  const result = await request<{ leaseExpiresAt: unknown }>(
-    `/projects/${projectId}/agent-schedule-runs/${runId}/renew`,
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify({ claimToken }),
-    },
-  );
-  return decodeLeaseExpirationResponse(result.leaseExpiresAt);
-}
-
-export async function updateProjectAgent(
-  token: string,
-  projectId: string,
-  agentId: string,
-  input: UpdateProjectAgentInput,
-): Promise<ProjectAgent> {
-  const result = await request<{ agent: unknown }>(
-    `/projects/${projectId}/agents/${agentId}`,
-    token,
-    {
-      method: "PUT",
-      body: JSON.stringify(projectAgentInputJson(input)),
-    },
-  );
-  return decodeProjectAgentResponse(result.agent);
-}
-
-export async function deleteProjectAgent(
-  token: string,
-  projectId: string,
-  agentId: string,
-) {
-  return request<void>(`/projects/${projectId}/agents/${agentId}`, token, {
-    method: "DELETE",
-  });
-}
-
 export async function loadProjectAgentSpriteSheet(
   token: string,
   projectId: string,
@@ -1223,18 +1024,6 @@ export async function loadProjectAgentSpriteSheet(
     throw new Error("Invalid agent sprite sheet");
   }
   return spriteSheet;
-}
-
-function projectAgentInputJson(input: CreateProjectAgentInput) {
-  return {
-    ...input,
-    codexPet:
-      input.codexPet === undefined
-        ? undefined
-        : input.codexPet === null
-          ? null
-          : { slug: input.codexPet.slug },
-  };
 }
 
 export async function createChannel(
@@ -1417,59 +1206,6 @@ export async function revokeChannelWebhook(
 ) {
   return request<{ webhook: ChannelWebhook }>(
     `/organizations/${organizationId}/channels/${channelId}/webhooks/${webhookId}`,
-    token,
-    { method: "DELETE" },
-  );
-}
-
-export async function createOrganizationAgent(
-  token: string,
-  organizationId: string,
-  input: {
-    name: string;
-    provider: AgentProvider;
-    model: string | null;
-    description?: string;
-    responsibility: string;
-    effort?: ModelEffort | null;
-    skills?: ChannelAgentSkillInput[];
-  },
-) {
-  return request<{ agent: ChannelAgentSummary }>(
-    `/organizations/${organizationId}/agents`,
-    token,
-    { method: "POST", body: JSON.stringify(input) },
-  );
-}
-
-export async function updateOrganizationAgent(
-  token: string,
-  organizationId: string,
-  agentId: string,
-  input: {
-    name: string;
-    provider: AgentProvider;
-    model: string | null;
-    description?: string;
-    responsibility: string;
-    effort?: ModelEffort | null;
-    skills: ChannelAgentSkillInput[];
-  },
-) {
-  return request<{ agent: ChannelAgentSummary }>(
-    `/organizations/${organizationId}/agents/${agentId}`,
-    token,
-    { method: "PATCH", body: JSON.stringify(input) },
-  );
-}
-
-export async function deleteOrganizationAgent(
-  token: string,
-  organizationId: string,
-  agentId: string,
-) {
-  return request<{ deleted: boolean }>(
-    `/organizations/${organizationId}/agents/${agentId}`,
     token,
     { method: "DELETE" },
   );

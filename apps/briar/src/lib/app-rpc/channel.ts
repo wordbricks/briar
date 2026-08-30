@@ -39,16 +39,12 @@ import {
   type IssueExecutionDispatch as IssueExecutionDispatchMessage,
   type IssueExecutionProposal as IssueExecutionProposalMessage,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
-import {
-  AgentProvider as ProtoAgentProvider,
-} from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import type { AutoHuntSession } from "../../hooks/useAutoHuntSessions";
 import type {
   AgentSkillExecutionApprovalInput,
   IssueExecutionApprovalInput,
   OrganizationMember,
 } from "../../types";
-import type { AgentProvider } from "../agent-provider";
 import { request } from "../api/request";
 import type {
   AgentSkillExecutionProposal,
@@ -75,6 +71,7 @@ import {
 } from "./agent";
 import {
   agentProviderFromProto,
+  agentProviderToProto,
   issueAttachmentFromProto,
   optionalAgentProviderFromProto,
   optionalTimestamp,
@@ -84,6 +81,8 @@ import {
   runStatusFromProto,
   safeNumber,
 } from "./mappers";
+
+export { agentProviderToProto } from "./mappers";
 import {
   appCallOptions,
   appRpc,
@@ -657,27 +656,6 @@ const timestampFromIso = (value: string, field: string) => {
     throw new Error(`${field} is not a valid timestamp`);
   }
   return timestampFromDate(date);
-};
-
-export const agentProviderToProto = (
-  value: AgentProvider,
-): ProtoAgentProvider => {
-  switch (value) {
-    case "codex":
-      return ProtoAgentProvider.CODEX;
-    case "claude":
-      return ProtoAgentProvider.CLAUDE;
-    case "cursor":
-      return ProtoAgentProvider.CURSOR;
-    case "grok":
-      return ProtoAgentProvider.GROK;
-    case "agy":
-      return ProtoAgentProvider.AGY;
-    case "opencode":
-      return ProtoAgentProvider.OPENCODE;
-    case "openrouter":
-      return ProtoAgentProvider.OPENROUTER;
-  }
 };
 
 export const approvalToMessage = (input: IssueExecutionApprovalInput) => ({

@@ -5,12 +5,25 @@ import { createReactTestRoot } from "../test/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import { demoDashboard } from "../lib/demo-data";
-import type {
-  ProjectAgent,
-  ProjectAgentSchedule,
-  ProjectAgentScheduleRun,
-} from "../types";
-import { ProjectSchedule } from "./ProjectSchedule";
+import type { ProjectAgent, ProjectAgentSchedule, ProjectAgentScheduleRun } from "../types";
+import {
+  ProjectSchedule,
+  type ProjectScheduleServices,
+} from "./ProjectSchedule";
+
+const scheduleApi = {
+  createProjectAgentSchedule:
+    vi.fn<ProjectScheduleServices["createProjectAgentSchedule"]>(),
+  deleteProjectAgentSchedule:
+    vi.fn<ProjectScheduleServices["deleteProjectAgentSchedule"]>(),
+  loadProjectAgentSchedules:
+    vi.fn<ProjectScheduleServices["loadProjectAgentSchedules"]>(),
+  loadProjectAgentScheduleRuns:
+    vi.fn<ProjectScheduleServices["loadProjectAgentScheduleRuns"]>(),
+  loadProjectAgents: vi.fn<ProjectScheduleServices["loadProjectAgents"]>(),
+  updateProjectAgentSchedule:
+    vi.fn<ProjectScheduleServices["updateProjectAgentSchedule"]>(),
+} satisfies ProjectScheduleServices;
 
 const projectId = "22222222-2222-4222-8222-222222222222";
 const project = { ...demoDashboard.project, id: projectId };
@@ -110,29 +123,17 @@ function stubScheduleApi({
   runs?: ProjectAgentScheduleRun[];
   schedules?: ProjectAgentSchedule[];
 }) {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      const body = url.endsWith("/agent-schedule-runs")
-        ? { runs }
-        : url.endsWith("/agent-schedules")
-          ? { schedules }
-          : { agents };
-      return new Response(JSON.stringify(body), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }),
-  );
+  scheduleApi.loadProjectAgents.mockResolvedValue(agents);
+  scheduleApi.loadProjectAgentScheduleRuns.mockResolvedValue(runs);
+  scheduleApi.loadProjectAgentSchedules.mockResolvedValue(schedules);
 }
 
 beforeAll(() => {
-Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  vi.clearAllMocks();
 });
 
 describe("ProjectSchedule agent filter", () => {
@@ -140,16 +141,8 @@ describe("ProjectSchedule agent filter", () => {
     stubScheduleApi({
       agents: [agentA, agentB, agentC],
       schedules: [
-        calendarSchedule(
-          "44444444-4444-4444-8444-444444444444",
-          agentA,
-          "Review calendar layout",
-        ),
-        calendarSchedule(
-          "55555555-5555-4555-8555-555555555555",
-          agentB,
-          "Audit release notes",
-        ),
+        calendarSchedule("44444444-4444-4444-8444-444444444444", agentA, "Review calendar layout"),
+        calendarSchedule("55555555-5555-4555-8555-555555555555", agentB, "Audit release notes"),
       ],
       runs: [
         calendarRun(
@@ -188,6 +181,7 @@ describe("ProjectSchedule agent filter", () => {
             isSidebarOpen
             now={new Date("2026-07-27T03:00:00.000Z")}
             project={project}
+            services={scheduleApi}
             token="token"
           />
         </I18nProvider>,
@@ -198,20 +192,14 @@ describe("ProjectSchedule agent filter", () => {
     expect(container.textContent).toContain("Review calendar layout");
     expect(container.textContent).toContain("Audit release notes");
     expect(container.textContent).not.toContain("Stale Agent A");
-    expect(
-      container.querySelector(".project-schedule-event.completed"),
-    ).not.toBeNull();
-    expect(
-      container.querySelector(".project-schedule-event.failed"),
-    ).not.toBeNull();
+    expect(container.querySelector(".project-schedule-event.completed")).not.toBeNull();
+    expect(container.querySelector(".project-schedule-event.failed")).not.toBeNull();
     expect(
       container
         .querySelector<HTMLElement>(".project-schedule-event.completed")
         ?.style.getPropertyValue("--agent-color"),
     ).toBe(agentA.calendarColor);
-    const trigger = container.querySelector<HTMLButtonElement>(
-      "#project-schedule-agent-filter",
-    );
+    const trigger = container.querySelector<HTMLButtonElement>("#project-schedule-agent-filter");
     expect(trigger?.getAttribute("aria-label")).toBe("Agent filter");
     expect(trigger?.textContent).toContain("All agents");
 
@@ -282,6 +270,7 @@ describe("ProjectSchedule agent filter", () => {
             isSidebarOpen
             now={new Date("2026-07-27T03:00:00.000Z")}
             project={project}
+            services={scheduleApi}
             token="token"
           />
         </I18nProvider>,
@@ -292,15 +281,9 @@ describe("ProjectSchedule agent filter", () => {
     expect(container.textContent).toContain("Agent A audit");
     expect(container.textContent).toContain("Agent B report");
     expect(container.querySelector(".project-schedule-plans")).toBeNull();
-    expect(
-      container.querySelector(".project-schedule-event.missed"),
-    ).not.toBeNull();
-    expect(
-      container.querySelector(".project-schedule-event.scheduled"),
-    ).not.toBeNull();
-    const trigger = container.querySelector<HTMLButtonElement>(
-      "#project-schedule-agent-filter",
-    );
+    expect(container.querySelector(".project-schedule-event.missed")).not.toBeNull();
+    expect(container.querySelector(".project-schedule-event.scheduled")).not.toBeNull();
+    const trigger = container.querySelector<HTMLButtonElement>("#project-schedule-agent-filter");
     await act(async () => trigger?.click());
     const agentAOption = document.querySelector<HTMLButtonElement>(
       `[data-value="agent:${agentA.id}"]`,
@@ -327,38 +310,22 @@ describe("ProjectSchedule agent filter", () => {
       "2026-07-27T01:00:00.000Z",
       "2026-07-27T01:20:00.000Z",
     );
-    run.resultSummary =
-      "Reviewed the release branch and found no blocking issues.";
+    run.resultSummary = "Reviewed the release branch and found no blocking issues.";
     let currentSchedule = schedule;
-    const fetchMock = vi.fn(
-      async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (init?.method === "PUT") {
-          currentSchedule = {
-            ...currentSchedule,
-            ...JSON.parse(String(init.body)),
-            updatedAt: "2026-07-27T02:00:00.000Z",
-          };
-          return new Response(
-            JSON.stringify({ schedule: currentSchedule }),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          );
-        }
-        if (init?.method === "DELETE") {
-          return new Response(null, { status: 204 });
-        }
-        const body = url.endsWith("/agent-schedule-runs")
-          ? { runs: [run] }
-          : url.endsWith("/agent-schedules")
-            ? { schedules: [currentSchedule] }
-            : { agents: [agentA] };
-        return new Response(JSON.stringify(body), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
+    scheduleApi.loadProjectAgents.mockResolvedValue([agentA]);
+    scheduleApi.loadProjectAgentScheduleRuns.mockResolvedValue([run]);
+    scheduleApi.loadProjectAgentSchedules.mockImplementation(async () => [currentSchedule]);
+    scheduleApi.updateProjectAgentSchedule.mockImplementation(
+      async (_token, _projectId, _scheduleId, input) => {
+        currentSchedule = {
+          ...currentSchedule,
+          ...input,
+          updatedAt: "2026-07-27T02:00:00.000Z",
+        };
+        return currentSchedule;
       },
     );
-    vi.stubGlobal("fetch", fetchMock);
+    scheduleApi.deleteProjectAgentSchedule.mockResolvedValue(undefined);
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
@@ -370,6 +337,7 @@ describe("ProjectSchedule agent filter", () => {
             isSidebarOpen
             now={new Date("2026-07-27T03:00:00.000Z")}
             project={project}
+            services={scheduleApi}
             token="token"
           />
         </I18nProvider>,
@@ -395,24 +363,24 @@ describe("ProjectSchedule agent filter", () => {
     );
     expect(nameInput?.value).toBe("Daily review");
     await act(async () => {
-      Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        "value",
-      )?.set?.call(nameInput, "Updated daily review");
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+        nameInput,
+        "Updated daily review",
+      );
       nameInput?.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await act(async () => {
       container
         .querySelector<HTMLFormElement>(".project-schedule-dialog")
-        ?.dispatchEvent(
-          new Event("submit", { bubbles: true, cancelable: true }),
-        );
+        ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(container.textContent).toContain("Updated daily review");
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining(`/agent-schedules/${schedule.id}`),
-      expect.objectContaining({ method: "PUT" }),
+    expect(scheduleApi.updateProjectAgentSchedule).toHaveBeenCalledWith(
+      "token",
+      projectId,
+      schedule.id,
+      expect.objectContaining({ name: "Updated daily review" }),
     );
 
     const updatedEvent = container.querySelector<HTMLButtonElement>(
@@ -441,12 +409,11 @@ describe("ProjectSchedule agent filter", () => {
       confirmDelete?.click();
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
-    expect(
-      container.querySelector(".project-schedule-event"),
-    ).toBeNull();
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining(`/agent-schedules/${schedule.id}`),
-      expect.objectContaining({ method: "DELETE" }),
+    expect(container.querySelector(".project-schedule-event")).toBeNull();
+    expect(scheduleApi.deleteProjectAgentSchedule).toHaveBeenCalledWith(
+      "token",
+      projectId,
+      schedule.id,
     );
 
     await cleanup();
