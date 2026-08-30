@@ -13,12 +13,6 @@ import { sha256 } from "./crypto-digest";
 import { HttpError, corsHeaders, json } from "./http-response";
 import { hasOrganizationCapability } from "./organization-access";
 import {
-  createOrganizationAgent,
-  deleteOrganizationAgent,
-  organizationAgentJson,
-  updateOrganizationAgent,
-} from "./organization-agents";
-import {
   acceptOrganizationInvitation,
   addOrganizationMember,
   createOrganization,
@@ -46,7 +40,6 @@ import {
   listOrganizations,
   type OrganizationRow,
 } from "./organization-repository";
-import { decodeOrganizationAgentWrite } from "./project-request-contract";
 import { readJson } from "./request-readers";
 import { decodeUsageRangeDays } from "./run-request-contract";
 import { requireSession } from "./session-auth";
@@ -519,72 +512,4 @@ export async function handleOrganizationRoute(
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  const organizationAgentsMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/agents$/u,
-  );
-  if (organizationAgentsMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const organizationId = organizationAgentsMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!hasOrganizationCapability(role, "development:manage")) {
-      throw new HttpError(403, "Development management permission required");
-    }
-    const input = decodeOrganizationAgentWrite(await readJson(request));
-    const agent = await createOrganizationAgent(db, {
-      id: crypto.randomUUID(),
-      organizationId,
-      name: input.name,
-      provider: input.provider,
-      model: input.model,
-      description: input.description ?? "",
-      responsibility: input.responsibility,
-      effort: input.effort,
-      skills: input.skills ?? [],
-      createdAt: new Date().toISOString(),
-    });
-    if (!agent) throw new HttpError(500, "Agent was not created");
-    return json({ agent: organizationAgentJson(agent) }, 201);
-  }
-
-  const organizationAgentMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/agents\/([0-9a-f-]+)$/u,
-  );
-  if (organizationAgentMatch && request.method === "PATCH") {
-    const session = await requireSession(auth, request);
-    const organizationId = organizationAgentMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!hasOrganizationCapability(role, "development:manage")) {
-      throw new HttpError(403, "Development management permission required");
-    }
-    const input = decodeOrganizationAgentWrite(await readJson(request));
-    const agent = await updateOrganizationAgent(db, {
-      organizationId,
-      agentId: organizationAgentMatch[2],
-      name: input.name,
-      provider: input.provider,
-      model: input.model,
-      description: input.description,
-      responsibility: input.responsibility,
-      effort: input.effort,
-      skills: input.skills,
-      updatedAt: new Date().toISOString(),
-    });
-    if (!agent) throw new HttpError(404, "Organization agent not found");
-    return json({ agent: organizationAgentJson(agent) });
-  }
-  if (organizationAgentMatch && request.method === "DELETE") {
-    const session = await requireSession(auth, request);
-    const organizationId = organizationAgentMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!hasOrganizationCapability(role, "development:manage")) {
-      throw new HttpError(403, "Development management permission required");
-    }
-    const deleted = await deleteOrganizationAgent(
-      db,
-      organizationId,
-      organizationAgentMatch[2],
-    );
-    if (!deleted) throw new HttpError(404, "Organization agent not found");
-    return json({ deleted: true });
-  }
 }

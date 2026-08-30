@@ -401,22 +401,11 @@ export function channelMutationOrganization(
   )?.[1] ?? null;
 }
 
-export function projectScheduleClaimMutation(
-  pathname: string,
-  method: string,
-  status: number,
-) {
-  if (status >= 400 || method !== "POST") return false;
-  return pathname === "/agent-schedule-runs/claim" ||
-    /^\/projects\/[0-9a-f-]+\/agent-schedule-runs\/claim$/u.test(pathname);
-}
-
 export function projectMutationProject(
   pathname: string,
   method: string,
   status: number,
 ) {
   if (status >= 400 || method === "GET" || method === "HEAD") return null;
-  if (projectScheduleClaimMutation(pathname, method, status)) return null;
   return pathname.match(/^\/projects\/([0-9a-f-]+)(?:\/|$)/u)?.[1] ?? null;
 }

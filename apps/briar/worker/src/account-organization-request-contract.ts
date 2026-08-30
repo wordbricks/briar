@@ -102,12 +102,6 @@ export const InboxUnreadStateInput = strictSchema(Schema.Struct({
   messageId: InboxReadStateMessageId,
 }));
 
-export const ProjectAgentScheduleBatchClaim = strictSchema(Schema.Struct({
-  projectIds: Schema.mutable(Schema.Array(UuidString)).check(
-    Schema.isLengthBetween(1, 100),
-  ),
-}));
-
 export const AccountDeletionInput = strictSchema(Schema.Struct({
   confirmation: Email,
 }));
@@ -174,9 +168,6 @@ export const decodeInboxReadStatesInput = decodeRequestSync(
 );
 export const decodeInboxUnreadStateInput = decodeRequestSync(
   InboxUnreadStateInput,
-);
-export const decodeProjectAgentScheduleBatchClaim = decodeRequestSync(
-  ProjectAgentScheduleBatchClaim,
 );
 export const decodeAccountDeletionInput = decodeRequestSync(
   AccountDeletionInput,

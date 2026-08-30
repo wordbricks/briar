@@ -190,7 +190,7 @@ export const appOrganizationMember = (
     projectIds: [...projectIds],
   });
 
-const appStructuredResult = (result: StructuredAgentResult) =>
+export const appStructuredResult = (result: StructuredAgentResult) =>
   create(StructuredRunResultSchema, {
     summary: result.summary,
     outcome: structuredOutcome[result.outcome],
@@ -352,7 +352,7 @@ const appCheckpointSpec = (checkpoint: AutoHuntWorkflowCheckpoint) =>
     position: checkpointPosition[checkpoint.position],
   });
 
-const appWorkflow = (workflow: AutoHuntWorkflow) =>
+export const appWorkflow = (workflow: AutoHuntWorkflow) =>
   create(AutoHuntWorkflowSchema, {
     version: workflow.version,
     stages: workflow.stages.map((stage) => create(WorkflowStageSchema, {

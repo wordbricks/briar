@@ -7,10 +7,7 @@ import {
   loadChannelCatalogSnapshot,
   resolveChannelProposalTargetProjectId,
 } from "./channel-proposal-helpers";
-import {
-  projectMutationProject,
-  projectScheduleClaimMutation,
-} from "./realtime-scheduling";
+import { projectMutationProject } from "./realtime-scheduling";
 import {
   readChannelReplyCompleteRequest,
   readIssueReplyCompleteRequest,
@@ -38,7 +35,6 @@ import {
   decodeAccountDeletionInput,
   decodeAccountProfileInput,
   decodeOrganizationMemberRoleInput,
-  decodeProjectAgentScheduleBatchClaim,
 } from "./account-organization-request-contract";
 import {
   decodeExecutionPreferences,
@@ -1874,26 +1870,6 @@ describe("Worker HTTP contract", () => {
         error: null,
       }),
     ).toThrow(/resultSummary must match structuredResult.summary/u);
-  });
-
-  it("publishes schedule claims only when the route handles a real claim", () => {
-    const projectId = "22222222-2222-4222-8222-222222222222";
-    const pathname = `/projects/${projectId}/agent-schedule-runs/claim`;
-    expect(projectScheduleClaimMutation(pathname, "POST", 200)).toBe(true);
-    expect(projectMutationProject(pathname, "POST", 200)).toBeNull();
-    expect(projectScheduleClaimMutation(
-      "/agent-schedule-runs/claim",
-      "POST",
-      200,
-    )).toBe(true);
-    expect(projectMutationProject(
-      `/projects/${projectId}/agent-schedules`,
-      "POST",
-      201,
-    )).toBe(projectId);
-    expect(decodeProjectAgentScheduleBatchClaim({
-      projectIds: [projectId, projectId],
-    })).toEqual({ projectIds: [projectId, projectId] });
   });
 
   it("rejects a GitHub webhook before touching the database when its signature is invalid", async () => {

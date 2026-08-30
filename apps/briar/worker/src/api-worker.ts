@@ -76,7 +76,6 @@ import {
 } from "./slack-app-routes";
 import { handleSlackEventPublicRoute } from "./slack-event-routes";
 import { sha256 } from "./crypto-digest";
-import { handleProjectAgentScheduleRoute } from "./project-agent-schedule-routes";
 import {
   corsHeaders,
   HttpError,
@@ -86,7 +85,6 @@ import { handleAppConnectRequest } from "./app-connect";
 import {
   channelMutationOrganization,
   projectMutationProject,
-  projectScheduleClaimMutation,
   scheduleChannelRealtimePublish,
   scheduleInboxRealtimeFlush,
   scheduleProjectRealtimePublish,
@@ -316,16 +314,6 @@ async function route(
     attachmentsBucket,
   });
   if (projectAgentResponse !== undefined) return projectAgentResponse;
-
-  const projectAgentScheduleResponse =
-    await handleProjectAgentScheduleRoute({
-      request,
-      db,
-      env,
-      context,
-      requireSession: () => requireSession(auth, request),
-    });
-  if (projectAgentScheduleResponse) return projectAgentScheduleResponse;
 
   const projectLinearResponse = await handleProjectLinearRoute({
     request,
@@ -587,15 +575,9 @@ export default {
       if (projectId) {
         scheduleProjectRealtimePublish(env, env.DB, projectId, ctx);
       }
-      const projectScheduleClaimHandled = projectScheduleClaimMutation(
-        url.pathname,
-        request.method,
-        response.status,
-      );
       if (
         !organizationId &&
         !projectId &&
-        !projectScheduleClaimHandled &&
         request.method !== "GET" &&
         request.method !== "HEAD"
       ) {
