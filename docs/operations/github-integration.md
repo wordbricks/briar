@@ -28,18 +28,19 @@ available to GitHub accounts outside the account that owns the App. Configure:
 - Webhook URL: `https://<worker-host>/github/webhooks`
 - Webhook secret: the value of `BRIAR_GITHUB_WEBHOOK_SECRET`
 - Repository permissions:
-  - **Pull requests — Read-only**
+  - **Contents — Read and write**
+  - **Pull requests — Read and write**
+  - **Commit statuses — Read and write**
 - Subscribe to events:
   - **Pull request**
 
-Record the App's **Client ID**, generate a **Client secret**, and record the App
-slug from `https://github.com/apps/<app-slug>`. The App does not need Contents
-or Commit statuses write access, an App private key, or a long-lived user or
-installation token. Signed webhooks are inbound authority only; the designated
-local Worker uses its existing `gh` login for bors-style integration refs,
-ordinary pull-request merges, and status reporting. Briar does not inspect or
-modify repository rulesets. GitHub's native Merge queues permission and Merge
-group webhook are not required.
+Record the App's **App ID** and **Client ID**, generate a **Client secret** and
+private key, and record the App slug. Convert the private key to unencrypted
+PKCS#8 PEM before encrypting it for the Worker. The server exchanges that key
+for a repository-scoped, short-lived installation token; it never stores that
+token in Git configuration or logs. The App performs branch push, PR
+read/write/merge, and status publication. GitHub still enforces rulesets,
+required reviews, and required checks.
 
 GitHub sends a signed `ping` delivery when the webhook is saved. A successful
 configuration receives an HTTP 200 response from Briar.
@@ -62,6 +63,10 @@ bunx dotenvx set GITHUB_CALLBACK_ORIGIN 'https://<worker-host>' \
   -f .env.production --no-native --no-armor
 bunx dotenvx set GITHUB_WEBHOOK_SECRET "$BRIAR_GITHUB_WEBHOOK_SECRET" \
   -f .env.production --no-native --no-armor
+bunx dotenvx set GITHUB_APP_ID '<github-app-id>' \
+  -f .env.production --no-native --no-armor
+bunx dotenvx set GITHUB_APP_PRIVATE_KEY '<pkcs8-private-key-pem>' \
+  -f .env.production --no-native --no-armor
 unset BRIAR_GITHUB_WEBHOOK_SECRET
 ```
 
@@ -73,7 +78,7 @@ bun run d1:migrate:remote
 bun run worker:deploy
 ```
 
-The five GitHub settings form one optional deployment group. Configure all of
+The seven GitHub settings form one optional deployment group. Configure all of
 them or none of them; the deployment wrapper rejects a partial group. Without
 the group, the rest of Briar remains available, the Integrations page reports
 that GitHub is not configured, and `POST /github/webhooks` returns 503.
@@ -95,10 +100,8 @@ organization mapping and repository snapshot. The temporary `ghu_` token is
 discarded immediately. Returning focus to Briar refreshes the page until it
 shows **Connected**.
 
-This organization connection is separate from the desktop's local GitHub CLI
-readiness. The local `gh` login is still required for a worker to push branches
-and create or inspect pull requests; the GitHub App connection supplies signed
-inbound events.
+The same organization connection authorizes outbound GitHub work. A Worker
+does not require GitHub CLI or a personal GitHub login.
 
 ## 4. Link a project and pull request
 
@@ -110,7 +113,8 @@ evidence. Evidence for another repository or provider is rejected while a
 GitHub repository is configured for the project.
 
 Before sending the evidence, the bundled Briar CLI adds the exact Briar issue
-URL to the PR description and reads the PR through `gh api`. The evidence
+URL to the PR description and reads the PR through Briar's project-scoped
+GitHub REST client. The evidence
 includes GitHub's repository ID, PR ID, node ID, and PR number. Neither the
 editable description nor the worker-supplied identity is trusted alone. Briar
 accepts a merge only when the signed GitHub payload contains that exact

@@ -394,6 +394,7 @@ mod tests {
             linear_source: None,
             linear_team: None,
             github_repository: Some("example/repository".to_string()),
+            github_repository_id: Some(701),
             workflow: repository_workflow_bootstrap(),
         };
 

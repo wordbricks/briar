@@ -5,6 +5,7 @@ import {
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
 import type { OrganizationRole, ProjectSettings } from "../types";
+import type { ProjectGithubCredential } from "./api";
 import type { AgentProvider } from "./agent-provider";
 import { hasOrganizationCapability } from "./organization-role";
 
@@ -66,6 +67,7 @@ export type RepositoryReadiness = {
   remoteReachable: boolean;
   pushAccess: boolean;
   requiresGithub: boolean;
+  githubRepositoryId?: number | null;
   githubRepository: string | null;
   ghInstalled: boolean;
   ghVersion: string | null;
@@ -92,6 +94,7 @@ export type LocalAutoHuntConfig = {
   linearSource?: string | null;
   linearTeam?: string | null;
   githubRepository?: string | null;
+  githubRepositoryId?: number | null;
   workflow: AutoHuntWorkflow;
 };
 
@@ -103,6 +106,14 @@ export type CreatedProjectWorkspace = {
 export type ClonedProjectRepository = {
   repositoryPath: string;
   repositoryName: string;
+};
+
+export type PreparedProjectRepository = {
+  repositoryPath: string;
+  repositoryId: number;
+  repository: string;
+  reused: boolean;
+  completedSteps: string[];
 };
 
 export type ConnectedLocalProject = {
@@ -210,6 +221,20 @@ export async function cloneGithubSshRepository(
   });
 }
 
+export async function prepareProjectRepository(
+  projectId: string,
+  credential: ProjectGithubCredential,
+): Promise<PreparedProjectRepository> {
+  if (!isTauri()) {
+    throw new Error("이 컴퓨터에서 작업 시작은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<PreparedProjectRepository>("prepare_project_repository", {
+    projectId,
+    credential,
+  });
+}
+
 export async function inspectRepositoryReadiness(
   repositoryPath: string,
   workflow: AutoHuntWorkflow,
@@ -251,26 +276,6 @@ export async function loadProjectRepositoryReadiness(projectId: string) {
   if (!isTauri()) return null;
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<RepositoryReadiness>("project_repository_readiness", {
-    projectId,
-  });
-}
-
-export async function installProjectGithubCli(projectId: string) {
-  if (!isTauri()) {
-    throw new Error("GitHub CLI 설치는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
-  }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<RepositoryReadiness>("install_project_github_cli", {
-    projectId,
-  });
-}
-
-export async function loginProjectGithub(projectId: string) {
-  if (!isTauri()) {
-    throw new Error("GitHub 로그인은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
-  }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<RepositoryReadiness>("login_project_github", {
     projectId,
   });
 }

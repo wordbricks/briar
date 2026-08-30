@@ -315,7 +315,10 @@ describe("detached execution workers", () => {
        );`,
     );
     await applyD1Migrations(db, {
-      files: ["0146_organization_capability_roles.sql"],
+      files: [
+        "0146_organization_capability_roles.sql",
+        "0147_project_github_repository_identity.sql",
+      ],
     });
     await executeD1Sql(
       db,

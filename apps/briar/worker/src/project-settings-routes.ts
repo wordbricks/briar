@@ -362,11 +362,42 @@ export async function handleProjectSettingsRoute(
         input.workflow,
       );
     }
+    const githubRepository = input.githubRepository
+      ? await (async () => {
+          const connection = await getGithubConnectionForOrganization(
+            db,
+            project.organization_id,
+          );
+          if (!connection) {
+            throw new HttpError(
+              409,
+              "Connect the organization GitHub App before selecting a project repository",
+              "GITHUB_APP_NOT_CONNECTED",
+            );
+          }
+          const repository = (await listGithubConnectionRepositories(
+            db,
+            connection.installation_id,
+          )).find((candidate) =>
+            candidate.full_name.toLowerCase() ===
+              input.githubRepository!.toLowerCase()
+          );
+          if (!repository) {
+            throw new HttpError(
+              409,
+              "The selected repository is not included in the GitHub App installation",
+              "GITHUB_REPOSITORY_NOT_INSTALLED",
+            );
+          }
+          return repository;
+        })()
+      : null;
     const settings = await updateProjectSettings(db, project.id, {
       velenOrg: input.velenOrg ?? null,
       dataSource: input.dataSource ?? null,
       linear: input.linear,
-      githubRepository: input.githubRepository ?? null,
+      githubRepositoryId: githubRepository?.repository_id ?? null,
+      githubRepository: githubRepository?.full_name ?? null,
       workflow: input.workflow,
     });
     const policy = await loadWorkflowCheckpointPolicy(

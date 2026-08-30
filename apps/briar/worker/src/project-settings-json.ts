@@ -17,6 +17,7 @@ export const settingsJson = (
       source: row?.linear_source ?? null,
       teamKey: row?.linear_team_key ?? null,
     },
+    githubRepositoryId: row?.github_repository_id ?? null,
     githubRepository: row?.github_repository ?? null,
     workflow: row?.workflow_json
       ? normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json))

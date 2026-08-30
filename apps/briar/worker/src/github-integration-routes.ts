@@ -71,6 +71,8 @@ const githubCallbackOrigin = (env: Env) => {
 const githubConfigAvailable = (env: Env) =>
   Boolean(
     env.GITHUB_WEBHOOK_SECRET?.trim() &&
+      env.GITHUB_APP_ID?.trim() &&
+      env.GITHUB_APP_PRIVATE_KEY?.trim() &&
       env.GITHUB_APP_CLIENT_ID?.trim() &&
       env.GITHUB_APP_CLIENT_SECRET?.trim() &&
       /^[a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?$/u.test(

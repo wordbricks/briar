@@ -892,13 +892,9 @@ export function ProjectLobby({
                         ? t("lobby.githubOptional")
                         : connectsOnDesktop
                           ? t("health.desktopOnly")
-                          : inspectedReadiness?.ghAccount
-                            ? t("lobby.githubAccount", {
-                                account: inspectedReadiness.ghAccount,
-                              })
-                            : repositoryReady
-                              ? t("lobby.githubReady")
-                              : t("lobby.githubSetupHint")}
+                          : repositoryReady
+                            ? t("lobby.githubReady")
+                            : t("lobby.githubSetupHint")}
                   </span>
                 </div>
                 {!githubOptional ? (

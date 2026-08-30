@@ -17,7 +17,7 @@ const identity = {
   pullRequestNodeId: "PR_kwDOExample",
   pullRequestNumber: 417,
 };
-const githubResponse = (body: string) => JSON.stringify({ body, ...identity });
+const githubResponse = (body: string) => ({ pullRequest: { body, ...identity } });
 
 describe("GitHub PR Briar issue link", () => {
   it("builds the public Briar issue URL from the configured API", () => {
@@ -60,81 +60,83 @@ describe("GitHub PR Briar issue link", () => {
     expect(appendBriarIssueLink(linked, issueUrl)).toBe(linked);
   });
 
-  it("adds a missing Briar issue link through the GitHub API", () => {
-    const run = vi.fn()
-      .mockReturnValueOnce({
-        exitCode: 0,
-        stdout: githubResponse("## Summary\n\nShipped.\n"),
-        stderr: "",
-      })
-      .mockReturnValueOnce({ exitCode: 0, stdout: "{}", stderr: "" });
+  it("adds a missing Briar issue link through the project GitHub API", async () => {
+    const send = vi.fn()
+      .mockResolvedValueOnce(githubResponse("## Summary\n\nShipped.\n"))
+      .mockResolvedValueOnce({});
 
-    expect(
+    await expect(
       ensureBriarIssueLinkInGithubPullRequest(
         {
+          apiUrl: "https://briar-api.example",
+          projectId,
+          token: "project-token",
           pullRequestUrl:
             "https://github.com/wordbricks/briar/pull/417",
           issueUrl,
         },
-        run,
+        send,
       ),
-    ).toEqual({ updated: true, reason: "linked", identity });
-    expect(run).toHaveBeenNthCalledWith(2, [
-      "gh",
-      "api",
-      "--method",
-      "PATCH",
-      "repos/wordbricks/briar/pulls/417",
-      "--raw-field",
-      `body=## Summary\n\nShipped.\n\n[Briar issue](${issueUrl})\n`,
-    ]);
+    ).resolves.toEqual({ updated: true, reason: "linked", identity });
+    expect(send).toHaveBeenNthCalledWith(
+      2,
+      `/projects/${projectId}/github/pull-requests/417`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          body: `## Summary\n\nShipped.\n\n[Briar issue](${issueUrl})\n`,
+        }),
+      },
+    );
   });
 
-  it("does not update a PR that already links the Briar issue", () => {
-    const run = vi.fn().mockReturnValue({
-      exitCode: 0,
-      stdout: githubResponse(`[Briar issue](${issueUrl})\n`),
-      stderr: "",
-    });
+  it("does not update a PR that already links the Briar issue", async () => {
+    const send = vi.fn().mockResolvedValue(
+      githubResponse(`[Briar issue](${issueUrl})\n`),
+    );
 
-    expect(
+    await expect(
       ensureBriarIssueLinkInGithubPullRequest(
         {
+          apiUrl: "https://briar-api.example",
+          projectId,
+          token: "project-token",
           pullRequestUrl:
             "https://github.com/wordbricks/briar/pull/417",
           issueUrl,
         },
-        run,
+        send,
       ),
-    ).toEqual({
+    ).resolves.toEqual({
       updated: false,
       reason: "already_linked",
       identity,
     });
-    expect(run).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects immutable identity metadata for a different repository", () => {
-    const run = vi.fn().mockReturnValue({
-      exitCode: 0,
-      stdout: JSON.stringify({
+  it("rejects immutable identity metadata for a different repository", async () => {
+    const send = vi.fn().mockResolvedValue({
+      pullRequest: {
         body: "",
         ...identity,
         repositoryId: 999,
         repository: "other/repository",
-      }),
-      stderr: "",
+      },
     });
 
-    expect(() =>
+    await expect(
       ensureBriarIssueLinkInGithubPullRequest(
         {
+          apiUrl: "https://briar-api.example",
+          projectId,
+          token: "project-token",
           pullRequestUrl:
             "https://github.com/wordbricks/briar/pull/417",
           issueUrl,
         },
-        run,
-      )
-    ).toThrow("did not match the requested PR");
+        send,
+      ),
+    ).rejects.toThrow("did not match the requested PR");
   });
 });

@@ -181,6 +181,9 @@ const AutoHuntConfig = passthrough(Schema.Struct({
   sandbox: Schema.mutableKey(Schema.optional(SandboxConfig)),
   linear: Schema.mutableKey(Schema.optional(LinearConfig)),
   githubRepository: Schema.mutableKey(Schema.optional(Schema.NonEmptyString)),
+  githubRepositoryId: Schema.mutableKey(
+    Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
+  ),
   workflow: Schema.mutableKey(Schema.optional(WorkflowConfig)),
 }));
 

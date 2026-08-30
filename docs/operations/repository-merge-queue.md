@@ -47,15 +47,14 @@ The coordinator enforces these boundaries:
 GitHub remains the authoritative merge gate. Briar neither reads nor modifies
 repository rulesets, branch protection, required checks, reviews, or bypass
 actors. Existing repository policy is applied by the same GitHub merge API used
-for an ordinary PR. A policy that rejects the Worker's authenticated `gh` user
-also rejects the queued merge and is reported as a GitHub merge failure.
+for an ordinary PR. A policy that rejects the GitHub App installation also
+rejects the queued merge and is reported as a GitHub merge failure.
 
-The Briar GitHub App needs Pull requests read and the Pull request webhook
-subscription. It remains read-only. Neither Merge queues permission nor the
-Merge group event is used. The local Worker's existing `gh` credential fetches
-PR refs, publishes the temporary integration ref and status, and merges the
-original PRs through GitHub. The App supplies signed inbound lifecycle events;
-it is not a merge publisher or ruleset bypass actor.
+The Briar GitHub App needs Contents, Pull requests, and Commit statuses
+read/write permissions plus the Pull request webhook subscription. Neither
+Merge queues permission nor the Merge group event is used. Repository-scoped
+short-lived installation tokens fetch PR refs, publish the integration ref and
+status, and merge the original PRs. The App is not a ruleset bypass actor.
 
 ## Safe rollout
 
@@ -68,7 +67,7 @@ Roll out in this order:
    deploy, publish, or require a pull-request branch identity.
 3. Confirm signed Pull request deliveries reach Briar.
 4. Confirm the designated local Worker has the repository checkout, every tool
-   required by the validation commands, authenticated `gh`, and one free
+   required by the validation commands, working GitHub App access, and one free
    regular execution slot.
 5. Configure the profile disabled and run the read-only doctor.
 6. Enable the project profile last. Start with a canary window and two pull
@@ -82,8 +81,8 @@ briar merge-queue configure --enable \
   --readiness-stage ci_qa --quiet-window-ms 300000 --max-batch-size 5
 ```
 
-`doctor` is read-only. It validates the repository validation plan, local `gh`
-authentication, origin remote, and immutable repository identity. It does not
+`doctor` is read-only. It validates the repository validation plan, GitHub App
+access, origin remote, and immutable repository identity. It does not
 inspect or change GitHub rulesets.
 
 The profile API is owner/admin-only:

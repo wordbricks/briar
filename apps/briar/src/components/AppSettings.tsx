@@ -1408,7 +1408,7 @@ export function AppSettings({
               <SettingsCard>
                 <ProviderRow
                   available={Boolean(
-                    githubRequired && inspectedReadiness?.ghInstalled,
+                    githubRequired && inspectedReadiness?.githubRepository,
                   )}
                   availabilityLabel={
                     !inspectedReadiness
@@ -1422,19 +1422,13 @@ export function AppSettings({
                       ? unresolvedReadiness
                       : !githubRequired
                         ? t("appSettings.githubNotRequired")
-                        : inspectedReadiness.ghAuthenticated
-                        ? t("appSettings.authenticatedAs", {
-                            account:
-                              inspectedReadiness.ghAccount ??
-                              t("appSettings.unknownAccount"),
-                          })
-                        : inspectedReadiness.ghInstalled
-                          ? t("appSettings.authenticationRequired")
-                          : t("appSettings.githubUnavailable")
+                        : inspectedReadiness.githubRepository
+                          ? t("appSettings.githubAppReady")
+                          : t("appSettings.githubAppUnavailable")
                   }
                   enabled={Boolean(
                     githubRequired &&
-                      inspectedReadiness?.ghInstalled &&
+                      inspectedReadiness?.githubRepository &&
                       githubEnabled,
                   )}
                   icon={
@@ -1455,8 +1449,8 @@ export function AppSettings({
                   title={
                     <>
                       GitHub
-                      {inspectedReadiness?.ghVersion ? (
-                        <code>{inspectedReadiness.ghVersion}</code>
+                      {inspectedReadiness?.githubRepository ? (
+                        <code>{inspectedReadiness.githubRepository}</code>
                       ) : null}
                     </>
                   }

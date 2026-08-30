@@ -1721,11 +1721,6 @@ export function App({
     });
 
     setRepositorySetupProjectId(null);
-    if (destination === "reconnect") {
-      beginProjectReconnect(projectId);
-      return;
-    }
-
     briar.setActiveProjectId(projectId);
     if (destination === "settings") {
       repositorySetupTriggerRef.current = null;
@@ -1748,7 +1743,6 @@ export function App({
     briar.remoteMode,
     briar.refreshProjectReadiness,
     briar.setActiveProjectId,
-    beginProjectReconnect,
     rememberRepositorySetupTrigger,
     navigateToPage,
   ]);
@@ -3767,16 +3761,8 @@ export function App({
               setRepositorySetupProjectId(null);
               restoreRepositorySetupTrigger();
             }}
-            onInstallGithub={() =>
-              briar.installGithubForProject(repositorySetupProjectId)
-            }
-            onLoginGithub={() =>
-              briar.loginGithubForProject(repositorySetupProjectId)
-            }
-            onReconnect={() => {
-              const projectId = repositorySetupProjectId;
-              setRepositorySetupProjectId(null);
-              beginProjectReconnect(projectId, false);
+            onStartWorking={async () => {
+              await briar.startWorkingOnProject(repositorySetupProjectId);
             }}
             onRefresh={() =>
               briar.refreshProjectReadiness(repositorySetupProjectId)

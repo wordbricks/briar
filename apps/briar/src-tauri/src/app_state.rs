@@ -104,6 +104,8 @@ pub(super) struct AutoHuntConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) linear_team: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) github_repository_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) github_repository: Option<String>,
     #[serde(default = "repository_workflow_bootstrap")]
     pub(super) workflow: WorkflowConfig,
@@ -232,6 +234,8 @@ pub(super) struct StoredAutoHuntConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) linear: Option<StoredLinearConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) github_repository_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) github_repository: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) workflow: Option<WorkflowConfig>,
@@ -305,6 +309,7 @@ impl From<AutoHuntConfig> for StoredAutoHuntConfig {
                 team_key: config.linear_team,
                 extra: BTreeMap::new(),
             }),
+            github_repository_id: config.github_repository_id,
             github_repository: config.github_repository,
             workflow: Some(canonicalize_workflow(config.workflow)),
             // Worktree and sandbox settings belong to the CLI; callers carry the
@@ -460,6 +465,41 @@ pub(super) struct RepositoryReadiness {
     pub(super) git_ready: bool,
     pub(super) pr_ready: bool,
     pub(super) issues: Vec<String>,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProjectGithubCredential {
+    pub(super) project: ProjectGithubCredentialProject,
+    pub(super) repository: ProjectGithubCredentialRepository,
+    pub(super) username: String,
+    pub(super) password: String,
+    pub(super) expires_at: String,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProjectGithubCredentialProject {
+    pub(super) id: String,
+    pub(super) organization_id: String,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProjectGithubCredentialRepository {
+    pub(super) id: u64,
+    pub(super) full_name: String,
+    pub(super) clone_url: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct PreparedProjectRepository {
+    pub(super) repository_path: String,
+    pub(super) repository_id: u64,
+    pub(super) repository: String,
+    pub(super) reused: bool,
+    pub(super) completed_steps: Vec<String>,
 }
 
 #[derive(Clone, Serialize)]

@@ -38,8 +38,10 @@ Repeat that command for the following variables:
 - `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
   `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`
 
-Publishing additionally requires `CLOUDFLARE_API_TOKEN` in `.env.release` and
-an authenticated GitHub CLI session from `gh auth login`. The current Wrangler
+Publishing additionally requires `CLOUDFLARE_API_TOKEN` in `.env.release`. The
+repository's macOS release script separately uses an authenticated GitHub CLI
+session to publish binary releases; this is a **project-specific release tool**,
+not a Briar Worker or default Workflow requirement. The current Wrangler
 upload path uses Cloudflare's REST API, so the token needs Account /
 `Workers R2 Storage` / Edit permission. Bucket-scoped R2 Object Read & Write
 credentials are S3-only and are not compatible with this command path.

@@ -1912,6 +1912,7 @@ describe("D1 migrations", () => {
           "0102_channel_read_states.sql",
           "0136_issue_difficulty.sql",
           "0140_issue_difficulty_optional.sql",
+          "0147_project_github_repository_identity.sql",
         ],
       });
       const userId = "channel-upgrade-owner";

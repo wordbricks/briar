@@ -48,11 +48,6 @@ pub(super) fn git_binary(home: &Path) -> Result<PathBuf, String> {
         .map_err(|_| "Git이 필요합니다. Git을 설치한 뒤 다시 확인하세요.".to_string())
 }
 
-pub(super) fn gh_binary(home: &Path) -> Result<PathBuf, String> {
-    which::which_in("gh", Some(cli_execution_path(home)?), home)
-        .map_err(|_| "GitHub CLI가 설치되지 않았습니다.".to_string())
-}
-
 pub(super) fn parse_cli_version(stdout: &[u8]) -> Option<String> {
     let output = String::from_utf8_lossy(stdout);
     let trimmed = output.trim();

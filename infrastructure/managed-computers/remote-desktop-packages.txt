@@ -10,7 +10,6 @@ fontconfig
 fonts-liberation
 fonts-noto-cjk
 fonts-noto-color-emoji
-gh
 git
 iproute2
 jq
