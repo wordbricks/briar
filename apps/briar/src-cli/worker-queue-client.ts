@@ -16,6 +16,11 @@ import {
   type WorkerLeaseRenewal,
 } from "./worker-queue-contract";
 
+const workerConnectTransport = (apiUrl: string) => createConnectTransport({
+  baseUrl: apiUrl.replace(/\/+$/u, ""),
+  useBinaryFormat: true,
+});
+
 const requiredIsoTimestamp = (
   value: Parameters<typeof timestampDate>[0] | undefined,
   field: string,
@@ -74,7 +79,7 @@ const claimIdentity = (work: ClaimedWork): WorkClaimIdentity => ({
 export function createWorkerQueueClient(apiUrl: string, token: string) {
   const client = createClient(
     WorkerQueueService,
-    createConnectTransport({ baseUrl: apiUrl.replace(/\/+$/u, "") }),
+    workerConnectTransport(apiUrl),
   );
   const options = { headers: { Authorization: `Bearer ${token}` } };
 
@@ -163,8 +168,8 @@ export function createAuthenticatedWorkerExecutionClient(
 ) {
   return {
     client: createClient(
-    WorkerExecutionService,
-    createConnectTransport({ baseUrl: apiUrl.replace(/\/+$/u, "") }),
+      WorkerExecutionService,
+      workerConnectTransport(apiUrl),
     ),
     options: { headers: { Authorization: `Bearer ${token}` } },
   };

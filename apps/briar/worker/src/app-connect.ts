@@ -33,6 +33,8 @@ export type AppConnectRouteInput = {
 
 export type AppConnectServices = AppConnectProjectServices;
 
+export const appConnectReadMaxBytes = 2 * 1_024 * 1_024;
+
 /** Serve a generated Connect RPC when the request targets a registered method. */
 export async function handleAppConnectRequest(
   input: AppConnectRouteInput,
@@ -42,6 +44,7 @@ export async function handleAppConnectRequest(
     connect: true,
     grpc: false,
     grpcWeb: false,
+    readMaxBytes: appConnectReadMaxBytes,
   });
   registerAppProjectService(router, {
     request: input.request,

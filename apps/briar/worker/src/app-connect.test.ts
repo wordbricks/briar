@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { BriarAuth } from "./auth";
 import { HttpError } from "./http-response";
 import {
+  appConnectReadMaxBytes,
   handleAppConnectRequest,
   type AppConnectServices,
 } from "./app-connect";
@@ -103,5 +104,41 @@ describe("app Connect adapter", () => {
       code: "unauthenticated",
       message: "Unauthorized",
     });
+  });
+
+  it("rejects oversized Connect messages before application code", async () => {
+    const db = {} as D1Database;
+    const env = {
+      DB: db,
+      ARCHIVES: {} as R2Bucket,
+      ATTACHMENTS: {} as R2Bucket,
+    } as Env;
+    const services = {
+      ...appConnectProjectServices,
+      requireSession: vi.fn<AppConnectServices["requireSession"]>(),
+      listProjects: vi.fn<AppConnectServices["listProjects"]>(),
+    } satisfies AppConnectServices;
+    const request = new Request(listProjectsUrl, {
+      method: "POST",
+      headers: {
+        "connect-protocol-version": "1",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ padding: "x".repeat(appConnectReadMaxBytes) }),
+    });
+
+    const response = await handleAppConnectRequest({
+      request,
+      auth: {} as BriarAuth,
+      env,
+      requireRunExecutionProject: vi.fn(),
+    }, services);
+
+    expect(response?.status).toBe(429);
+    expect(await response?.json()).toMatchObject({
+      code: "resource_exhausted",
+    });
+    expect(services.requireSession).not.toHaveBeenCalled();
+    expect(services.listProjects).not.toHaveBeenCalled();
   });
 });
