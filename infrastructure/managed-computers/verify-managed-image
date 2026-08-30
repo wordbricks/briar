@@ -33,7 +33,13 @@ test "$(dpkg-query --show --showformat='${Version}' google-chrome-stable)" = \
 test "$(dpkg-query --show --showformat='${Version}' amazon-ssm-agent)" = \
   "$SSM_AGENT_PACKAGE_VERSION"
 
-codex_version_output="$(sudo -u briar -H /opt/briar/bin/codex --version 2>&1)"
+# sudo resets PATH, while the npm entry point needs the image's pinned Node.js.
+# Use the same login environment as the managed user and report startup errors.
+if ! codex_version_output="$(sudo -u briar -H bash -lc '/opt/briar/bin/codex --version' 2>&1)"; then
+  printf 'Codex version check failed for the managed user:\n%s\n' \
+    "$codex_version_output" >&2
+  exit 1
+fi
 grep -Fq "$CODEX_CLI_VERSION" <<< "$codex_version_output"
 if grep -Fq "could not create PATH aliases" <<< "$codex_version_output"; then
   echo "Codex cannot write temporary helper aliases as the managed user" >&2
