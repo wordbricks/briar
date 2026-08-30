@@ -22,6 +22,7 @@ import {
 } from "./app-connect-project";
 import { registerWorkerExecutionService } from "./worker-connect-execution";
 import { registerWorkerControlService } from "./worker-connect-control";
+import { registerManagedComputerSetupService } from "./worker-connect-managed-computer-setup";
 import { registerWorkerQueueService } from "./worker-connect-queue";
 
 export type AppConnectRouteInput = {
@@ -117,6 +118,11 @@ export async function handleAppConnectRequest(
   registerWorkerControlService(router, {
     request: input.request,
     db: input.env.DB,
+  });
+  registerManagedComputerSetupService(router, {
+    request: input.request,
+    db: input.env.DB,
+    env: input.env,
   });
   registerWorkerExecutionService(router, {
     request: input.request,

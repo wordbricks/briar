@@ -101,25 +101,28 @@ export const appBeginGithubInstallation = (
     installUrl: result.installUrl,
   });
 
+export const appProjectGithubCredentialMessage = (result: CredentialResult) =>
+  create(ProjectGitHubCredentialSchema, {
+    projectId: result.projectId,
+    organizationId: result.organizationId,
+    repositoryId: positiveUint64(
+      result.repositoryId,
+      "GitHub credential repository id",
+    ),
+    repository: result.repository,
+    cloneUrl: result.cloneUrl,
+    username: result.username,
+    // This request-only secret must never be copied into logs or errors.
+    password: result.password,
+    expiresAt: requiredTimestamp(
+      result.expiresAt,
+      "GitHub credential expiration",
+    ),
+  });
+
 export const appProjectGithubCredential = (result: CredentialResult) =>
   create(CreateProjectGitHubCredentialResponseSchema, {
-    credential: create(ProjectGitHubCredentialSchema, {
-      projectId: result.projectId,
-      organizationId: result.organizationId,
-      repositoryId: positiveUint64(
-        result.repositoryId,
-        "GitHub credential repository id",
-      ),
-      repository: result.repository,
-      cloneUrl: result.cloneUrl,
-      username: result.username,
-      // This request-only secret must never be copied into logs or errors.
-      password: result.password,
-      expiresAt: requiredTimestamp(
-        result.expiresAt,
-        "GitHub credential expiration",
-      ),
-    }),
+    credential: appProjectGithubCredentialMessage(result),
   });
 
 export const appProjectGithubRepository = (result: RepositoryResult) =>

@@ -1,0 +1,127 @@
+import { create } from "@bufbuild/protobuf";
+import {
+  ManagedComputerSetupSessionSchema,
+  ManagedComputerSetupSessionStatus,
+} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
+import {
+  ManagedComputerSetupService,
+} from "@briar/contracts/gen/briar/worker/v1/managed_computer_setup_pb";
+import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
+import { withConnectErrors } from "./app-connect-errors";
+import { appFleetTimestamp } from "./app-connect-fleet-mappers";
+import { appProjectGithubCredentialMessage } from "./app-connect-github-mappers";
+import { appDashboardWorker, appProjectSettings } from "./app-connect-mappers";
+import { HttpError } from "./http-response";
+import {
+  bindManagedComputerSetupApplication,
+  getManagedComputerSetupContextApplication,
+} from "./managed-computer-setup-application";
+import { ManagedComputerServiceError } from "./managed-computer-service";
+import { decodeRequestSync } from "./request-schema";
+import { UuidString } from "./schema-codecs";
+import { workerJson } from "./worker-json";
+import { requireWorkerCredential } from "./worker-route-auth";
+import {
+  workerRuntimeMetadataFromProto,
+  WorkerRuntimeValidationError,
+} from "./worker-runtime-mappers";
+
+export type WorkerConnectManagedComputerSetupInput = {
+  readonly request: Request;
+  readonly db: D1Database;
+  readonly env: Env;
+};
+
+const decodeUuid = decodeRequestSync(UuidString);
+const setupTokenPattern = /^briar_setup_[A-Za-z0-9_-]{43}$/u;
+
+const setupToken = (value: string) => {
+  if (!setupTokenPattern.test(value)) {
+    throw new HttpError(400, "Managed computer setup token is invalid");
+  }
+  return value;
+};
+
+const withManagedComputerSetupErrors = async <A>(operation: Promise<A>) => {
+  try {
+    return await operation;
+  } catch (error) {
+    if (error instanceof WorkerRuntimeValidationError) {
+      throw new HttpError(400, error.message);
+    }
+    if (error instanceof ManagedComputerServiceError) {
+      throw new HttpError(error.status, error.message, error.code);
+    }
+    throw error;
+  }
+};
+
+export const createManagedComputerSetupService = (
+  { request, db, env }: WorkerConnectManagedComputerSetupInput,
+): ServiceImpl<typeof ManagedComputerSetupService> => ({
+  getManagedComputerSetupContext: (input, context) =>
+    withConnectErrors(async () => {
+      context.responseHeader.set("Cache-Control", "private, no-store");
+      const principal = await requireWorkerCredential(db, request);
+      const managedComputerId = decodeUuid(input.managedComputerId);
+      const result = await withManagedComputerSetupErrors(
+        getManagedComputerSetupContextApplication({
+          db,
+          env,
+          principal,
+          managedComputerId,
+          setupToken: setupToken(input.setupToken),
+          observedAt: new Date().toISOString(),
+        }),
+      );
+      return {
+        session: create(ManagedComputerSetupSessionSchema, {
+          id: result.session.id,
+          managedComputerId,
+          organizationId: principal.organizationId,
+          projectId: result.session.projectId,
+          status: ManagedComputerSetupSessionStatus.PENDING,
+          expiresAt: appFleetTimestamp(result.session.expiresAt),
+        }),
+        project: result.project,
+        settings: appProjectSettings(result.settings),
+        repositoryCredential: result.repositoryCredential
+          ? appProjectGithubCredentialMessage(result.repositoryCredential)
+          : undefined,
+      };
+    }),
+
+  bindManagedComputerSetup: (input, context) =>
+    withConnectErrors(async () => {
+      context.responseHeader.set("Cache-Control", "private, no-store");
+      const principal = await requireWorkerCredential(db, request);
+      const observedAt = new Date().toISOString();
+      const managedComputerId = decodeUuid(input.managedComputerId);
+      const result = await withManagedComputerSetupErrors(
+        bindManagedComputerSetupApplication({
+          db,
+          principal,
+          managedComputerId,
+          setupToken: setupToken(input.setupToken),
+          runtime: workerRuntimeMetadataFromProto(input.runtime),
+          observedAt,
+        }),
+      );
+      return {
+        managedComputerId,
+        organizationId: principal.organizationId,
+        projectId: result.session.project_id,
+        deviceId: principal.deviceId,
+        worker: appDashboardWorker(workerJson(result.worker, observedAt)),
+        duplicate: result.duplicate,
+      };
+    }),
+});
+
+export const registerManagedComputerSetupService = (
+  router: ConnectRouter,
+  input: WorkerConnectManagedComputerSetupInput,
+) => router.service(
+  ManagedComputerSetupService,
+  createManagedComputerSetupService(input),
+);
