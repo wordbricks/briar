@@ -2,6 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import {
   AppendTranscriptEventsResponseSchema,
   ClaimIssueResponseSchema,
+  ListProjectChannelMessagesResponseSchema,
   RecordRunEventResponseSchema,
   ReportIssueExecutionTelemetryResponseSchema,
   TransitionWorkflowStageResponse_Outcome,
@@ -10,7 +11,16 @@ import {
   WorkflowStageLifecycleCheckpointSchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { WorkflowCheckpoint_Position } from "@briar/contracts/gen/briar/types/v1/workflow_pb";
-import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
+import {
+  Code,
+  ConnectError,
+  type ConnectRouter,
+  type ServiceImpl,
+} from "@connectrpc/connect";
+import {
+  appChannelMessage,
+  appChannelSummaryJson,
+} from "./app-connect-channel-response-mappers";
 import {
   appCancelRunResponse,
   appReworkRunResponse,
@@ -23,6 +33,11 @@ import { claimNextQueueWork } from "./queue-claim-routes";
 import { decodeRequestSync } from "./request-schema";
 import { runEvidenceResponseMessage } from "./run-evidence-connect";
 import { listRunEvidenceForProject } from "./run-evidence-routes";
+import {
+  listProjectAgentChannelMessagesApplication,
+  ProjectAgentChannelApplicationError,
+} from "./project-agent-channel-application";
+import { decodeChannelMessageQuery } from "./query-contract";
 import {
   scheduleInboxRealtimeFlush,
   scheduleProjectRealtimePublish,
@@ -114,6 +129,8 @@ export async function authorizeIssueClaim(
 export type WorkerExecutionServices = {
   readonly authorizeIssueClaim: typeof authorizeIssueClaim;
   readonly claimIssue: typeof claimNextQueueWork;
+  readonly listProjectChannelMessages:
+    typeof listProjectAgentChannelMessagesApplication;
   readonly listRunEvidence: typeof listRunEvidenceForProject;
   readonly requireWorkerProjectBinding: typeof requireWorkerProjectBinding;
   readonly appendTranscript: typeof appendTranscriptEventsApplication;
@@ -130,6 +147,7 @@ export type WorkerExecutionServices = {
 const workerExecutionServices: WorkerExecutionServices = {
   authorizeIssueClaim,
   claimIssue: claimNextQueueWork,
+  listProjectChannelMessages: listProjectAgentChannelMessagesApplication,
   listRunEvidence: listRunEvidenceForProject,
   requireWorkerProjectBinding,
   appendTranscript: appendTranscriptEventsApplication,
@@ -143,6 +161,32 @@ const workerExecutionServices: WorkerExecutionServices = {
 };
 
 const canonicalUuid = decodeRequestSync(UuidString);
+
+const projectAgentChannelConnectError = (
+  error: ProjectAgentChannelApplicationError,
+): never => {
+  switch (error.reason) {
+    case "channel_not_found":
+    case "thread_parent_not_found":
+      throw new ConnectError(error.message, Code.NotFound, undefined, undefined, error);
+    case "channel_forbidden":
+      throw new ConnectError(
+        error.message,
+        Code.PermissionDenied,
+        undefined,
+        undefined,
+        error,
+      );
+    case "cursor_invalid":
+      throw new ConnectError(
+        error.message,
+        Code.InvalidArgument,
+        undefined,
+        undefined,
+        error,
+      );
+  }
+};
 
 const claimedBy = (value: string) => {
   const normalized = value.trim();
@@ -273,6 +317,45 @@ export function createWorkerExecutionService(
       return create(ClaimIssueResponseSchema, {
         issue: issue ? workerIssueClaimMessage(issue) : undefined,
       });
+    }),
+    listProjectChannelMessages: (request, context) => withConnectErrors(async () => {
+      context.responseHeader.set("Cache-Control", "private, no-store");
+      const projectId = canonicalUuid(request.projectId).toLowerCase();
+      const authenticatedProjectId = await services.requireAgentProject(
+        input.db,
+        input.request,
+      );
+      if (authenticatedProjectId !== projectId) {
+        throw new ConnectError(
+          "Agent token is not valid for this project",
+          Code.PermissionDenied,
+        );
+      }
+      const query = decodeChannelMessageQuery({
+        limit: request.limit,
+        cursor: request.cursor ?? null,
+        parentMessageId: request.parentMessageId ?? null,
+      });
+      try {
+        const result = await services.listProjectChannelMessages({
+          db: input.db,
+          projectId,
+          channelId: canonicalUuid(request.channelId).toLowerCase(),
+          parentMessageId: query.parentMessageId?.toLowerCase() ?? null,
+          cursor: query.cursor?.toLowerCase() ?? null,
+          limit: query.limit,
+        });
+        return create(ListProjectChannelMessagesResponseSchema, {
+          channel: appChannelSummaryJson(result.channel),
+          messages: result.messages.map(appChannelMessage),
+          nextCursor: result.nextCursor ?? undefined,
+        });
+      } catch (error) {
+        if (error instanceof ProjectAgentChannelApplicationError) {
+          return projectAgentChannelConnectError(error);
+        }
+        throw error;
+      }
     }),
     listRunEvidence: (request) => withConnectErrors(async () => {
       const authenticatedProjectId = await input.requireRunExecutionProject(

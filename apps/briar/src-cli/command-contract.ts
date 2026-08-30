@@ -75,20 +75,6 @@ export const CreateIssueInput = Schema.Struct({
 export type CreateIssueInput = typeof CreateIssueInput.Type;
 export const decodeCreateIssueInput = Schema.decodeUnknownSync(CreateIssueInput);
 
-export const ChannelMessagesInput = Schema.Struct({
-  channelId: Uuid,
-  limit: Schema.Int.check(
-    Schema.isGreaterThanOrEqualTo(1),
-    Schema.isLessThanOrEqualTo(100, { message: "Too big" }),
-  ),
-  cursor: Schema.NullOr(Uuid),
-  parentMessageId: Schema.NullOr(Uuid),
-});
-export type ChannelMessagesInput = typeof ChannelMessagesInput.Type;
-export const decodeChannelMessagesInput = Schema.decodeUnknownSync(
-  ChannelMessagesInput,
-);
-
 export const RunEvidenceInput = Schema.Struct({
   evidenceKey: Schema.String.check(Schema.isLengthBetween(1, 300)),
   stage: WorkflowStageId,

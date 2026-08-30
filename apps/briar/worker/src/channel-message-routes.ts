@@ -28,7 +28,6 @@ import {
 } from "./channel-route-access";
 import { decodeChannelMessageReactionInput } from "./channel-route-decoders";
 import {
-  channelJson,
   channelReplyJson,
   createChannelMessage,
   deleteChannelMessage,
@@ -36,10 +35,7 @@ import {
   getChannelMessage,
   getChannelMessageAttachment,
   getChannelReplySessionForThread,
-  getProjectAgentChannel,
-  getProjectOrganizationChannel,
   isChannelReactionEmoji,
-  isChannelRootMessage,
   listChannelAgents,
   listChannelMessagePage,
   listChannelRootMessages,
@@ -50,12 +46,8 @@ import {
   toggleChannelMessageReaction,
   unsubscribeChannelThread,
 } from "./channels";
-import { sha256 } from "./crypto-digest";
-import { findProjectIdByAgentTokenHash } from "./hunt-run-claim-repository";
 import {
   HttpError,
-  json,
-  privateNoStoreJson,
   privateNoStoreProtobufResponse,
 } from "./http-response";
 import {
@@ -63,7 +55,6 @@ import {
 } from "./app-connect-channel-response-mappers";
 import { getOrganizationRole } from "./organization-repository";
 import {
-  decodeChannelMessageQuery,
   decodeProjectChannelMessageQuery,
 } from "./query-contract";
 import {
@@ -80,24 +71,6 @@ import { schedulePostCommitCleanup } from "./post-commit-cleanup";
 export const decodeChannelMessageApplicationInput = decodeRequestSync(
   channelMessageInputSchema,
 );
-
-const bearerToken = (request: Request) => {
-  const authorization = request.headers.get("authorization") ?? "";
-  return authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-};
-
-async function requireAgentProject(db: D1Database, request: Request) {
-  const token = bearerToken(request);
-  if (!token.startsWith("briar_agent_")) {
-    throw new HttpError(401, "Invalid agent token");
-  }
-  const projectId = await findProjectIdByAgentTokenHash(
-    db,
-    await sha256(token),
-  );
-  if (!projectId) throw new HttpError(401, "Invalid agent token");
-  return projectId;
-}
 
 export type ChannelMessageRouteInput = {
   request: Request;
@@ -513,60 +486,6 @@ export async function handleChannelMessageRoute(
 ): Promise<Response | undefined> {
   const { request, url, auth, db, attachmentsBucket } = routeInput;
   const { pathname } = url;
-
-  const projectChannelMessagesMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages$/u,
-  );
-  if (projectChannelMessagesMatch && request.method === "GET") {
-    const requestedProjectId = projectChannelMessagesMatch[1];
-    const channelId = projectChannelMessagesMatch[2];
-    const authenticatedProjectId = await requireAgentProject(db, request);
-    if (authenticatedProjectId !== requestedProjectId) {
-      throw new HttpError(403, "Agent token is not valid for this project");
-    }
-
-    const channel = await getProjectAgentChannel(
-      db,
-      requestedProjectId,
-      channelId,
-    );
-    if (!channel) {
-      const organizationChannel = await getProjectOrganizationChannel(
-        db,
-        requestedProjectId,
-        channelId,
-      );
-      if (!organizationChannel) throw new HttpError(404, "Channel not found");
-      throw new HttpError(
-        403,
-        "No Project Agent for this project has access to the channel",
-      );
-    }
-
-    const searchParams = new URL(request.url).searchParams;
-    const query = decodeChannelMessageQuery({
-      limit: searchParams.get("limit") ?? undefined,
-      cursor: searchParams.get("cursor"),
-      parentMessageId: searchParams.get("parentMessageId"),
-    });
-    if (
-      query.parentMessageId &&
-      !(await isChannelRootMessage(db, channel.id, query.parentMessageId))
-    ) {
-      throw new HttpError(404, "Thread parent message not found");
-    }
-    const page = await listChannelMessagePage(db, {
-      channelId: channel.id,
-      parentMessageId: query.parentMessageId,
-      cursor: query.cursor,
-      limit: query.limit,
-      includeRepliesInTimeline: channel.kind === "dm",
-    });
-    if (!page) {
-      throw new HttpError(400, "Cursor does not belong to this message view");
-    }
-    return privateNoStoreJson({ channel: channelJson(channel), ...page });
-  }
 
   const channelMessagesMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages$/u,

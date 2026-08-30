@@ -22,6 +22,7 @@ import {
 import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   RecordRunEventResponseSchema,
+  ListProjectChannelMessagesResponseSchema,
   RunSourceIdentitySchema,
   TransitionWorkflowStageRequest_Action,
   TransitionWorkflowStageResponse_Outcome,
@@ -34,7 +35,6 @@ import {
   ensureBriarIssueLinkInGithubPullRequest,
 } from "./github-pr";
 import {
-  decodeChannelMessagesInput,
   decodeCreateIssueInput,
   decodeRunEvidenceInput,
   decodeUuid,
@@ -166,28 +166,26 @@ async function listChannelMessagesCommand() {
   }
   const config = await loadConfig();
   const project = await currentProject(config);
-  const input = decodeChannelMessagesInput({
-    channelId: required("--channel-id"),
-    limit: value("--limit") === undefined ? 50 : Number(value("--limit")),
-    cursor: value("--cursor") ?? null,
-    parentMessageId: value("--parent-message-id") ?? null,
-  });
-  const searchParams = new URLSearchParams({ limit: String(input.limit) });
-  if (input.cursor) searchParams.set("cursor", input.cursor);
-  if (input.parentMessageId) {
-    searchParams.set("parentMessageId", input.parentMessageId);
+  const limit = value("--limit") === undefined ? 50 : Number(value("--limit"));
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new Error("--limit must be an integer from 1 to 100");
   }
-  const result = await request<{
-    channel: unknown;
-    messages: unknown[];
-    nextCursor: string | null;
-  }>(
+  const cursor = value("--cursor");
+  const parentMessageId = value("--parent-message-id");
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    `/projects/${encodeURIComponent(project.id)}` +
-      `/channels/${encodeURIComponent(input.channelId)}/messages?${searchParams}`,
     executionToken(project),
   );
-  console.log(JSON.stringify(result));
+  const result = await executionRpc.client.listProjectChannelMessages({
+    projectId: decodeUuid(project.id).toLowerCase(),
+    channelId: decodeUuid(required("--channel-id")).toLowerCase(),
+    cursor: cursor ? decodeUuid(cursor).toLowerCase() : undefined,
+    parentMessageId: parentMessageId
+      ? decodeUuid(parentMessageId).toLowerCase()
+      : undefined,
+    limit,
+  }, executionRpc.options);
+  console.log(toJsonString(ListProjectChannelMessagesResponseSchema, result));
 }
 
 async function addRunEvent(forcedStatus?: string) {
