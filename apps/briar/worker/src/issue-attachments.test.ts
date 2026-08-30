@@ -88,96 +88,6 @@ const multipartFormRequest = (form: FormData) =>
   });
 
 describe("shared multipart request envelope", () => {
-  it.each([
-    {
-      name: "run evidence",
-      read: readRunEvidenceRequest,
-      emptyField: "images",
-      body: {
-        evidenceKey: "LOCAL-1:qa:result",
-        stage: "qa",
-        type: "test",
-        status: "passed",
-        observedAt: "2026-08-10T00:00:00.000Z",
-        actor: "test",
-      },
-    },
-    {
-      name: "issue message",
-      read: readIssueMessageRequest,
-      emptyField: "attachments",
-      body: { body: "JSON issue message" },
-    },
-    {
-      name: "issue create",
-      read: readIssueRequest,
-      emptyField: "attachments",
-      body: { title: "JSON issue" },
-    },
-    {
-      name: "issue update",
-      read: readIssueUpdateRequest,
-      emptyField: "attachments",
-      body: {
-        title: "JSON update",
-        description: null,
-        priority: null,
-        difficulty: "normal",
-      },
-    },
-  ])("keeps non-multipart $name requests on the JSON path", async ({
-    read,
-    emptyField,
-    body,
-  }) => {
-    const parsed = (await read(
-      new Request("https://briar.example/json", {
-        method: "POST",
-        headers: { "Content-Type": "application/json; charset=utf-8" },
-        body: JSON.stringify(body),
-      }),
-    )) as Record<string, unknown>;
-
-    expect(parsed[emptyField]).toEqual([]);
-  });
-
-  it.each([
-    {
-      name: "issue message",
-      read: readIssueMessageRequest,
-      body: { body: "Issue message" },
-    },
-    {
-      name: "issue create",
-      read: readIssueRequest,
-      body: { title: "Issue with an existing image" },
-    },
-    {
-      name: "issue update",
-      read: readIssueUpdateRequest,
-      body: {
-        title: "Issue with an existing image",
-        description: null,
-        priority: null,
-        difficulty: null,
-      },
-    },
-  ])("preserves JSON attachment references for $name", async ({
-    read,
-    body,
-  }) => {
-    const result = await read(new Request("https://briar.example/json", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...body,
-        attachmentReferences: ["existing-image"],
-      }),
-    }));
-
-    expect(result.attachmentReferences).toEqual(["existing-image"]);
-  });
-
   it.each(multipartReaders)(
     "requires Content-Length for $name",
     async ({ read }) => {
@@ -342,22 +252,6 @@ describe("issue multipart input", () => {
     expect(result.attachmentReferences).toEqual([reference]);
   });
 
-  it("keeps queued as the default for JSON clients that omit status", async () => {
-    const result = await readIssueRequest(
-      new Request("https://briar.example/projects/project/issues", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: "Legacy issue client",
-          description: null,
-          priority: null,
-        }),
-      }),
-    );
-
-    expect(result.input.status).toBe("queued");
-  });
-
   it("accepts SVG media and rejects oversized multipart bodies", async () => {
     const svg = await readIssueRequest(
       issueRequest(new File(["svg"], "diagram.svg", { type: "image/svg+xml" })),
@@ -512,32 +406,6 @@ describe("issue update multipart input", () => {
 
   const existingAttachmentId = "7316678b-e3d4-4de3-a045-b76a0fc2e765";
 
-  it("parses a JSON update without attachment fields", async () => {
-    const result = await readIssueUpdateRequest(
-      new Request("https://briar.example/projects/project/runs/run", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: "Updated issue",
-          description: null,
-          priority: 2,
-          difficulty: "easy",
-          assigneeUserId: null,
-        }),
-      }),
-    );
-
-    expect(result.input).toEqual({
-      title: "Updated issue",
-      description: null,
-      priority: 2,
-      difficulty: "easy",
-      assigneeUserId: null,
-    });
-    expect(result.attachments).toEqual([]);
-    expect(result.keptAttachmentIds).toBeUndefined();
-  });
-
   it("parses a multipart update with attachments and kept IDs", async () => {
     const result = await readIssueUpdateRequest(
       updateRequest(
@@ -635,28 +503,6 @@ describe("issue conversation multipart input", () => {
       expect.objectContaining({ name: "clipboard.png", type: "image/png" }),
     ]);
     expect(result.attachmentReferences).toEqual([reference]);
-  });
-
-  it("canonicalizes uppercase agent UUIDs from iOS conversation requests", async () => {
-    const mentionedAgentId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-    const request = new Request(
-      "https://briar.example/projects/project/runs/run/messages",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          body: "@developer 확인해 주세요",
-          parentMessageId: null,
-          mentionedUserIds: [],
-          mentionedAgentIds: [mentionedAgentId.toUpperCase()],
-          agentConversationId: null,
-        }),
-      },
-    );
-
-    const result = await readIssueMessageRequest(request);
-
-    expect(result.input.mentionedAgentIds).toEqual([mentionedAgentId]);
   });
 
   it("rejects videos in issue conversations", async () => {

@@ -490,47 +490,18 @@ export async function handleIssueConversationRoute(input: {
   const issueMessagesMatch = url.pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/messages$/u,
   );
-  const issueMessagesDeltaMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/messages\/delta$/u,
-  );
-  if (issueMessagesDeltaMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const rawCursor = new URL(request.url).searchParams.get("cursor");
-    if (!rawCursor || !/^\d+$/u.test(rawCursor)) {
-      throw new HttpError(400, "A non-negative conversation cursor is required");
-    }
-    const cursor = Number(rawCursor);
-    if (!Number.isSafeInteger(cursor)) {
-      throw new HttpError(400, "Conversation cursor is outside the safe range");
-    }
-    try {
-      return json(await syncProjectIssueMessages({
-        db,
-        archivesBucket,
-        projectId: issueMessagesDeltaMatch[1],
-        runId: issueMessagesDeltaMatch[2],
-        userId: session.user.id,
-        cursor,
-      }));
-    } catch (error) {
-      if (!(error instanceof HttpError) || error.status !== 410) throw error;
-      return json({ code: error.code, message: error.message }, 410);
-    }
-  }
-  if (issueMessagesMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    return json(await listProjectIssueMessages({
-      db,
-      archivesBucket,
-      projectId: issueMessagesMatch[1],
-      runId: issueMessagesMatch[2],
-      userId: session.user.id,
-    }));
-  }
-  if (issueMessagesMatch && request.method === "POST") {
+  if (
+    issueMessagesMatch && request.method === "POST" &&
+    request.headers.get("content-type")?.toLowerCase().startsWith(
+      "multipart/form-data",
+    )
+  ) {
     const session = await requireSession(auth, request);
     const messageRequest =
       await readIssueMessageRequest(request);
+    if (messageRequest.attachments.length === 0) {
+      throw new HttpError(400, "Issue message upload requires an attachment");
+    }
     return json(await createProjectIssueMessage({
       db,
       archivesBucket,
@@ -660,22 +631,6 @@ export async function handleIssueConversationRoute(input: {
     );
     return new Response(null, { status: 204, headers: corsHeaders });
   }
-
-  const issueAgentReplyStatusMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/agent-reply$/u,
-  );
-  if (issueAgentReplyStatusMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    return json(await getProjectIssueAgentReply({
-      db,
-      archivesBucket,
-      projectId: issueAgentReplyStatusMatch[1],
-      runId: issueAgentReplyStatusMatch[2],
-      triggerMessageId: issueAgentReplyStatusMatch[3],
-      userId: session.user.id,
-    }));
-  }
-
 
   return undefined;
 }

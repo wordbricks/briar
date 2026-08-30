@@ -33,8 +33,13 @@ import {
   acceptOrganizationChannelExecutionProposal,
   acceptOrganizationChannelProposal,
 } from "./channel-proposal-routes";
+import {
+  acceptProjectIssueActionProposal,
+  acceptProjectIssueExecutionProposal,
+} from "./issue-proposal-routes";
 import { HttpError } from "./http-response";
 import { createOrganizationAgent } from "./organization-agents";
+import { RequestDecodeError } from "./request-schema";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import {
   dispatchHuntRun,
@@ -294,6 +299,14 @@ describe("conversational issue execution approval", () => {
     request: Record<string, unknown>;
   };
 
+  type IssueProposalApplicationCall = {
+    kind: "action" | "execution";
+    runId: string;
+    proposalId: string;
+    token: string;
+    request?: Record<string, unknown>;
+  };
+
   const invokeChannelProposal = async (
     call: ChannelProposalApplicationCall,
     runtimeEnv: Env,
@@ -338,11 +351,55 @@ describe("conversational issue execution approval", () => {
     }
   };
 
+  const invokeIssueProposal = async (call: IssueProposalApplicationCall) => {
+    const session = await db.prepare(
+      `select "userId" as user_id from "session" where token = ?`,
+    ).bind(call.token).first<{ user_id: string }>();
+    const userId = session?.user_id ?? null;
+    if (!userId) {
+      return Response.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    try {
+      const shared = {
+        db,
+        attachmentsBucket: attachments,
+        archivesBucket: attachments,
+        projectId: projectAId,
+        conversationRunId: call.runId,
+        proposalId: call.proposalId,
+        userId,
+      };
+      const result = call.kind === "action"
+        ? await acceptProjectIssueActionProposal(shared)
+        : await acceptProjectIssueExecutionProposal({
+          ...shared,
+          request: call.request ?? {},
+        });
+      return Response.json(result);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return Response.json({ message: error.message }, { status: error.status });
+      }
+      if (error instanceof RequestDecodeError) {
+        return Response.json({ message: error.message }, { status: 400 });
+      }
+      if (error instanceof WorkerConflictError) {
+        return Response.json({ message: error.message }, { status: 409 });
+      }
+      return Response.json({ message: "Internal server error" }, { status: 500 });
+    }
+  };
+
   const worker = {
-    fetch: (input: Request | ChannelProposalApplicationCall, runtimeEnv: Env) =>
+    fetch: (
+      input: Request | ChannelProposalApplicationCall | IssueProposalApplicationCall,
+      runtimeEnv: Env,
+    ) =>
       input instanceof Request
         ? apiWorker.fetch(input, runtimeEnv)
-        : invokeChannelProposal(input, runtimeEnv),
+        : "channelId" in input
+        ? invokeChannelProposal(input, runtimeEnv)
+        : invokeIssueProposal(input),
   };
 
   const seedIssueProposal = async () => {
@@ -408,18 +465,13 @@ describe("conversational issue execution approval", () => {
       effort: "high",
       workerId: null,
     },
-  ) => new Request(
-    `https://briar.example/projects/${projectAId}/runs/${runId}` +
-      `/issue-execution-proposals/${proposalId}/accept`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${token}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-    },
-  );
+  ): IssueProposalApplicationCall => ({
+    kind: "execution",
+    runId,
+    proposalId,
+    token,
+    request: body,
+  });
 
   const seedClaimedIssueReply = async (input?: {
     claimToken?: string;
@@ -1041,11 +1093,12 @@ describe("conversational issue execution approval", () => {
       executionProposalId: issueExecutionId,
       createdAt: initialAt,
     });
-    const issueCreateAccept = () => new Request(
-      `https://briar.example/projects/${projectAId}/runs/${conversationRunId}` +
-        `/issue-action-proposals/${issueActionId}/accept`,
-      { method: "POST", headers: { authorization: `Bearer ${ownerToken}` } },
-    );
+    const issueCreateAccept = (): IssueProposalApplicationCall => ({
+      kind: "action",
+      runId: conversationRunId,
+      proposalId: issueActionId,
+      token: ownerToken,
+    });
     const issueCreatedResponse = await worker.fetch(issueCreateAccept(), env());
     expect(issueCreatedResponse.status).toBe(200);
     const issueCreated = await issueCreatedResponse.json<{

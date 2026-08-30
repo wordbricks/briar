@@ -276,50 +276,6 @@ export async function handleIssueControlRoute(input: {
 }): Promise<Response | undefined> {
   const { request, url, auth, db, archivesBucket } = input;
 
-  const recoveryMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/(retry|cancel)$/u,
-  );
-
-  const issueTransferMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/transfer$/u,
-  );
-  if (issueTransferMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await transferProjectIssue({
-      db,
-      projectId: issueTransferMatch[1],
-      runId: issueTransferMatch[2],
-      userId: session.user.id,
-      request: await readJson(request),
-    }));
-  }
-
-  if (recoveryMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await recoverProjectIssueRun({
-      db,
-      projectId: recoveryMatch[1],
-      runId: recoveryMatch[2],
-      action: recoveryMatch[3] as "retry" | "cancel",
-      userId: session.user.id,
-      request: await readJson(request),
-    }));
-  }
-
-  const resumeRunMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/resume$/u,
-  );
-  if (resumeRunMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await resumeProjectIssueRun({
-      db,
-      projectId: resumeRunMatch[1],
-      runId: resumeRunMatch[2],
-      userId: session.user.id,
-      request: await readJson(request),
-    }));
-  }
-
   const pausedReworkMatch = url.pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/rework$/u,
   );
@@ -355,35 +311,6 @@ export async function handleIssueControlRoute(input: {
       }
       throw error;
     }
-  }
-
-  const moveRunMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/status$/u,
-  );
-  if (moveRunMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    return json(await moveProjectIssueRun({
-      db,
-      projectId: moveRunMatch[1],
-      runId: moveRunMatch[2],
-      userId: session.user.id,
-      request: await readJson(request),
-    }));
-  }
-
-  const dispatchRunMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/(dispatch|reassign)$/u,
-  );
-  if (dispatchRunMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await dispatchProjectIssueRun({
-      db,
-      projectId: dispatchRunMatch[1],
-      runId: dispatchRunMatch[2],
-      userId: session.user.id,
-      reassign: dispatchRunMatch[3] === "reassign",
-      request: await readJson(request),
-    }));
   }
 
   const unassignRunMatch = url.pathname.match(
@@ -451,7 +378,6 @@ export async function handleIssueControlRoute(input: {
       })),
     });
   }
-
 
   return undefined;
 }

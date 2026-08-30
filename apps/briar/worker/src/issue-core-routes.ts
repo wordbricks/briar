@@ -16,7 +16,7 @@ import {
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
 } from "./db";
-import { corsHeaders, HttpError, json } from "./http-response";
+import { HttpError, json } from "./http-response";
 import { issueAttachmentJson } from "./issue-conversation-json";
 import { hasOrganizationCapability } from "./organization-access";
 import {
@@ -375,8 +375,6 @@ export async function handleIssueCoreRoute(input: {
   auth: BriarAuth;
   db: D1Database;
   attachmentsBucket: R2Bucket;
-  archivesBucket: R2Bucket;
-  context?: ExecutionContext;
 }): Promise<Response | undefined> {
   const {
     request,
@@ -384,15 +382,21 @@ export async function handleIssueCoreRoute(input: {
     auth,
     db,
     attachmentsBucket,
-    archivesBucket,
-    context,
   } = input;
 
   const issuesMatch = url.pathname.match(/^\/projects\/([0-9a-f-]+)\/issues$/u);
-  if (issuesMatch && request.method === "POST") {
+  if (
+    issuesMatch && request.method === "POST" &&
+    request.headers.get("content-type")?.toLowerCase().startsWith(
+      "multipart/form-data",
+    )
+  ) {
     const session = await requireSession(auth, request);
     const issueRequest =
       await readIssueRequest(request);
+    if (issueRequest.attachments.length === 0) {
+      throw new HttpError(400, "Issue upload requires an attachment");
+    }
     return json(await createProjectIssue({
       db,
       projectId: issuesMatch[1],
@@ -407,68 +411,9 @@ export async function handleIssueCoreRoute(input: {
   const issueUpdateMatch = url.pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)$/u,
   );
-  const issueSubscriptionMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/subscription$/u,
-  );
-  const issueDependencyMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/dependencies\/([0-9a-f-]+)$/u,
-  );
-  const issuePreferencesMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/preferences$/u,
-  );
   const issueCheckpointsMatch = url.pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/checkpoints$/u,
   );
-  const issueResultReviewsMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/result-reviews$/u,
-  );
-  if (
-    issueSubscriptionMatch &&
-    (request.method === "PUT" || request.method === "DELETE")
-  ) {
-    const session = await requireSession(auth, request);
-    return json(await setProjectIssueSubscription({
-      db,
-      projectId: issueSubscriptionMatch[1],
-      runId: issueSubscriptionMatch[2],
-      userId: session.user.id,
-      subscribed: request.method === "PUT",
-    }));
-  }
-  if (issueDependencyMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    const result = await setProjectIssueDependency({
-      db,
-      projectId: issueDependencyMatch[1],
-      dependentRunId: issueDependencyMatch[2],
-      prerequisiteRunId: issueDependencyMatch[3],
-      userId: session.user.id,
-      enabled: true,
-    });
-    return json(result, result.outcome === "created" ? 201 : 200);
-  }
-  if (issueDependencyMatch && request.method === "DELETE") {
-    const session = await requireSession(auth, request);
-    await setProjectIssueDependency({
-      db,
-      projectId: issueDependencyMatch[1],
-      dependentRunId: issueDependencyMatch[2],
-      prerequisiteRunId: issueDependencyMatch[3],
-      userId: session.user.id,
-      enabled: false,
-    });
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-  if (issuePreferencesMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    return json(await updateProjectIssuePreferences({
-      db,
-      projectId: issuePreferencesMatch[1],
-      runId: issuePreferencesMatch[2],
-      userId: session.user.id,
-      request: await readJson(request),
-    }));
-  }
   if (issueCheckpointsMatch && request.method === "PUT") {
     const session = await requireSession(auth, request);
     const project = await getProject(
@@ -500,19 +445,18 @@ export async function handleIssueCoreRoute(input: {
       checkpoints: input.checkpoints,
     });
   }
-  if (issueResultReviewsMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await completeProjectIssueResultReview({
-      db,
-      projectId: issueResultReviewsMatch[1],
-      runId: issueResultReviewsMatch[2],
-      userId: session.user.id,
-    }));
-  }
-  if (issueUpdateMatch && request.method === "PATCH") {
+  if (
+    issueUpdateMatch && request.method === "PATCH" &&
+    request.headers.get("content-type")?.toLowerCase().startsWith(
+      "multipart/form-data",
+    )
+  ) {
     const session = await requireSession(auth, request);
     const issueRequest =
       await readIssueUpdateRequest(request);
+    if (issueRequest.attachments.length === 0) {
+      throw new HttpError(400, "Issue update upload requires an attachment");
+    }
     return json(await updateProjectIssue({
       db,
       projectId: issueUpdateMatch[1],
@@ -525,20 +469,5 @@ export async function handleIssueCoreRoute(input: {
       keptAttachmentIds: issueRequest.keptAttachmentIds,
     }));
   }
-  if (issueUpdateMatch && request.method === "DELETE") {
-    const session = await requireSession(auth, request);
-    await deleteProjectIssue({
-      db,
-      projectId: issueUpdateMatch[1],
-      userId: session.user.id,
-      runId: issueUpdateMatch[2],
-      attachmentsBucket,
-      archivesBucket,
-      context,
-    });
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-
-
   return undefined;
 }

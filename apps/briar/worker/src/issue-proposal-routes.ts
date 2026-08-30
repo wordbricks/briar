@@ -2,7 +2,6 @@ import { channelExecutionProposalAcceptInputSchema } from "../../src/lib/channel
 import {
   approveAgentSkillExecutionProposal,
 } from "./agent-skill-execution-approval";
-import type { BriarAuth } from "./auth";
 import { approvedIssueCreation } from "./channel-proposal-helpers";
 import {
   acceptIssueCreateProposal,
@@ -22,7 +21,7 @@ import {
   reserveIssueExecutionProposalApproval,
   reworkHuntRun,
 } from "./db";
-import { HttpError, json } from "./http-response";
+import { HttpError } from "./http-response";
 import { hasOrganizationCapability } from "./organization-access";
 import {
   issueActionProposalJson,
@@ -37,9 +36,7 @@ import {
 } from "./issue-request-contract";
 import { createIssueWithAttachments } from "./issue-write-service";
 import { newConversationProposalIssueSourceKey } from "./proposal-issue-source";
-import { readJson } from "./request-readers";
 import { decodeRequestSync } from "./request-schema";
-import { requireSession } from "./session-auth";
 import { dispatchHuntRun, WorkerConflictError } from "./workers";
 
 const decodeChannelExecutionProposalAcceptInput = decodeRequestSync(
@@ -531,91 +528,4 @@ export async function acceptProjectIssueExecutionProposal(
     }
     throw error;
   }
-}
-
-export async function handleIssueProposalRoute(input: {
-  request: Request;
-  url: URL;
-  auth: BriarAuth;
-  db: D1Database;
-  attachmentsBucket: R2Bucket;
-  archivesBucket: R2Bucket;
-}): Promise<Response | undefined> {
-  const {
-    request,
-    url,
-    auth,
-    db,
-    attachmentsBucket,
-    archivesBucket,
-  } = input;
-
-  const issueReworkProposalAcceptMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/rework-proposals\/([0-9a-f-]+)\/accept$/u,
-  );
-  if (issueReworkProposalAcceptMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await acceptProjectIssueReworkProposal({
-      db,
-      attachmentsBucket,
-      archivesBucket,
-      projectId: issueReworkProposalAcceptMatch[1],
-      conversationRunId: issueReworkProposalAcceptMatch[2],
-      proposalId: issueReworkProposalAcceptMatch[3],
-      userId: session.user.id,
-    }));
-  }
-
-  const issueActionProposalAcceptMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/issue-action-proposals\/([0-9a-f-]+)\/accept$/u,
-  );
-  if (issueActionProposalAcceptMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await acceptProjectIssueActionProposal({
-      db,
-      attachmentsBucket,
-      archivesBucket,
-      projectId: issueActionProposalAcceptMatch[1],
-      conversationRunId: issueActionProposalAcceptMatch[2],
-      proposalId: issueActionProposalAcceptMatch[3],
-      userId: session.user.id,
-    }));
-  }
-
-  const issueSkillExecutionProposalAcceptMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/skill-execution-proposals\/([0-9a-f-]+)\/accept$/u,
-  );
-  if (issueSkillExecutionProposalAcceptMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await acceptProjectIssueSkillExecutionProposal({
-      db,
-      attachmentsBucket,
-      archivesBucket,
-      projectId: issueSkillExecutionProposalAcceptMatch[1],
-      conversationRunId: issueSkillExecutionProposalAcceptMatch[2],
-      proposalId: issueSkillExecutionProposalAcceptMatch[3],
-      userId: session.user.id,
-      request: await readJson(request),
-    }));
-  }
-
-  const issueExecutionProposalAcceptMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/issue-execution-proposals\/([0-9a-f-]+)\/accept$/u,
-  );
-  if (issueExecutionProposalAcceptMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await acceptProjectIssueExecutionProposal({
-      db,
-      attachmentsBucket,
-      archivesBucket,
-      projectId: issueExecutionProposalAcceptMatch[1],
-      conversationRunId: issueExecutionProposalAcceptMatch[2],
-      proposalId: issueExecutionProposalAcceptMatch[3],
-      userId: session.user.id,
-      request: await readJson(request),
-    }));
-  }
-
-
-  return undefined;
 }

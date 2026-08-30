@@ -12,7 +12,6 @@ import { handleIssueConversationRoute } from "./issue-conversation-routes";
 import { handleIssueCoreRoute } from "./issue-core-routes";
 import { handleIssueControlRoute } from "./issue-control-routes";
 import { handleIssueReplyWorkerRoute } from "./issue-reply-worker-routes";
-import { handleIssueProposalRoute } from "./issue-proposal-routes";
 import { handleChannelMessageRoute } from "./channel-message-routes";
 import { handleChannelOrganizationContextRoute } from "./channel-organization-context-routes";
 import { handleChannelReplyClaimRoute } from "./channel-reply-claim-routes";
@@ -361,16 +360,6 @@ async function route(
     return issueConversationResponse;
   }
 
-  const issueProposalResponse = await handleIssueProposalRoute({
-    request,
-    url,
-    auth,
-    db,
-    attachmentsBucket,
-    archivesBucket: env.ARCHIVES,
-  });
-  if (issueProposalResponse !== undefined) return issueProposalResponse;
-
   const runEvidenceResponse = await handleRunEvidenceRoute({
     request,
     url,
@@ -389,8 +378,6 @@ async function route(
     auth,
     db,
     attachmentsBucket,
-    archivesBucket: env.ARCHIVES,
-    context,
   });
   if (issueCoreResponse !== undefined) return issueCoreResponse;
 

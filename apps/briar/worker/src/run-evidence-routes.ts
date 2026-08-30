@@ -8,10 +8,9 @@ import {
   listRunStageRevisions,
   type RunEvidenceImageRow,
 } from "./db";
-import { HttpError, json } from "./http-response";
+import { HttpError } from "./http-response";
 import { issueAttachmentResponse } from "./issue-attachment-service";
 import { runEvidenceJson } from "./run-evidence-json";
-import { requireSession } from "./session-auth";
 
 type RequireRunExecutionProject = (
   db: D1Database,
@@ -108,20 +107,6 @@ export async function handleRunEvidenceRoute(input: {
     requireRunExecutionProject,
     requireProjectAccess,
   } = input;
-
-  const projectRunEvidenceMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/evidence$/u,
-  );
-  if (projectRunEvidenceMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    return json(await listProjectRunEvidence({
-      db,
-      archivesBucket,
-      projectId: projectRunEvidenceMatch[1],
-      runId: projectRunEvidenceMatch[2],
-      userId: session.user.id,
-    }));
-  }
 
   const projectEvidenceImageMatch = url.pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/evidence\/images\/([0-9a-f-]+)$/u,
