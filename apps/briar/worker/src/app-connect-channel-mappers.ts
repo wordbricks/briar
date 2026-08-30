@@ -2,6 +2,8 @@ import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   ChannelKind,
+  ChannelDocumentContentSchema,
+  ChannelLinkPreviewSchema,
   ChannelMemberRole,
   ChannelMemberSchema,
   ChannelSummarySchema,
@@ -12,7 +14,12 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
 import * as Schema from "effect/Schema";
-import type { ChannelRow, ChannelWebhookRow } from "./channels";
+import type {
+  ChannelMessageDocumentRow,
+  ChannelRow,
+  ChannelWebhookRow,
+} from "./channels";
+import type { ChannelLinkPreview } from "./link-preview";
 
 const requiredTimestamp = (value: string, field: string) => {
   const date = new Date(value);
@@ -58,6 +65,25 @@ const channelKind = {
   channel: ChannelKind.CHANNEL,
   dm: ChannelKind.DIRECT_MESSAGE,
 } as const satisfies Record<ChannelRow["kind"], ChannelKind>;
+
+export const appChannelDocumentContent = (
+  document: ChannelMessageDocumentRow,
+) => create(ChannelDocumentContentSchema, {
+  messageId: document.message_id,
+  title: document.title,
+  markdown: document.markdown,
+  projectId: document.project_id ?? undefined,
+});
+
+export const appChannelLinkPreview = (preview: ChannelLinkPreview) =>
+  create(ChannelLinkPreviewSchema, {
+    url: preview.url,
+    title: preview.title ?? undefined,
+    description: preview.description ?? undefined,
+    imageUrl: preview.imageUrl ?? undefined,
+    faviconUrl: preview.faviconUrl ?? undefined,
+    siteName: preview.siteName ?? undefined,
+  });
 
 /** Maps a channel repository row directly to the generated API DTO. */
 export const appChannelSummary = (row: ChannelRow) =>

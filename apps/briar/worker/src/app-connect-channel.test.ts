@@ -14,6 +14,10 @@ import {
 const applicationMocks = {
   acceptProposal: vi.fn<AppConnectChannelServices["acceptProposal"]>(),
   createMessage: vi.fn<AppConnectChannelServices["createMessage"]>(),
+  getLinkPreview: vi.fn<AppConnectChannelServices["getLinkPreview"]>(),
+  getMessageDocument: vi.fn<
+    AppConnectChannelServices["getMessageDocument"]
+  >(),
   requireSession: vi.fn<AppConnectChannelServices["requireSession"]>(),
 };
 
@@ -549,5 +553,118 @@ describe("app Channel Connect adapter", () => {
     const missing = await createFetchHandler(handler)(requestFor(false));
     expect(missing.status).toBe(400);
     expect(setChannelMember).not.toHaveBeenCalled();
+  });
+
+  it("authenticates channel content reads and preserves a null preview", async () => {
+    applicationMocks.requireSession.mockClear();
+    applicationMocks.getMessageDocument.mockClear();
+    applicationMocks.getLinkPreview.mockClear();
+    applicationMocks.requireSession.mockResolvedValue({
+      session: {
+        id: "session-content-read",
+        userId,
+        token: "session-token",
+        expiresAt: new Date("2027-08-30T00:00:00.000Z"),
+        createdAt: new Date("2026-08-30T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+      },
+      user: {
+        id: userId,
+        name: "Owner",
+        email: "owner@example.com",
+        emailVerified: true,
+        createdAt: new Date("2026-08-30T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+      },
+    });
+    applicationMocks.getMessageDocument.mockResolvedValueOnce({
+      message_id: messageId,
+      channel_id: channelId,
+      project_id: null,
+      title: "Rollout plan",
+      markdown: "# Rollout",
+    });
+    applicationMocks.getLinkPreview.mockResolvedValueOnce(null);
+
+    const requestFor = (method: string, body: Record<string, string>) =>
+      new Request(
+        `https://api.example.test/briar.app.v1.ChannelService/${method}`,
+        {
+          method: "POST",
+          headers: {
+            authorization: "Bearer session-token",
+            "connect-protocol-version": "1",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(body),
+        },
+      );
+    const router = createConnectRouter({
+      connect: true,
+      grpc: false,
+      grpcWeb: false,
+    });
+    registerAppChannelService(
+      router,
+      {
+        request: requestFor("GetChannelMessageDocument", {}),
+        auth: {} as BriarAuth,
+        db: {} as D1Database,
+        attachmentsBucket: {} as R2Bucket,
+        env: {} as Env,
+      },
+      {
+        ...appConnectChannelServices,
+        getLinkPreview: applicationMocks.getLinkPreview,
+        getMessageDocument: applicationMocks.getMessageDocument,
+        requireSession: applicationMocks.requireSession,
+      },
+    );
+    const handlerFor = (method: string) => router.handlers.find((candidate) =>
+      candidate.requestPath === `/briar.app.v1.ChannelService/${method}`
+    )!;
+
+    const documentResponse = await createFetchHandler(
+      handlerFor("GetChannelMessageDocument"),
+    )(requestFor("GetChannelMessageDocument", {
+      organizationId,
+      channelId,
+      messageId,
+    }));
+    expect(documentResponse.status, await documentResponse.clone().text())
+      .toBe(200);
+    expect(applicationMocks.getMessageDocument).toHaveBeenCalledWith({
+      db: {},
+      organizationId,
+      channelId,
+      messageId,
+      userId,
+    });
+    await expect(documentResponse.json()).resolves.toEqual({
+      document: {
+        messageId,
+        title: "Rollout plan",
+        markdown: "# Rollout",
+      },
+    });
+
+    const previewUrl = "https://news.example.com/articles/42";
+    const previewResponse = await createFetchHandler(
+      handlerFor("GetChannelLinkPreview"),
+    )(requestFor("GetChannelLinkPreview", {
+      organizationId,
+      channelId,
+      url: previewUrl,
+    }));
+    expect(previewResponse.status, await previewResponse.clone().text()).toBe(200);
+    expect(applicationMocks.getLinkPreview).toHaveBeenCalledWith({
+      db: {},
+      organizationId,
+      channelId,
+      userId,
+      url: previewUrl,
+    });
+    await expect(previewResponse.json()).resolves.toEqual({});
+    expect(applicationMocks.requireSession).toHaveBeenCalledTimes(2);
   });
 });

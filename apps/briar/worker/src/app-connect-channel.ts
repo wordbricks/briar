@@ -23,6 +23,10 @@ import {
   updateChannelApplication,
 } from "./channel-administration-application";
 import {
+  getChannelLinkPreviewApplication,
+  getChannelMessageDocumentApplication,
+} from "./channel-content-application";
+import {
   createOrganizationChannelMessage,
   decodeChannelMessageApplicationInput,
   deleteOrganizationChannelMessage,
@@ -79,6 +83,8 @@ import { toConnectError } from "./app-connect-errors";
 import { appOrganizationMember } from "./app-connect-mappers";
 import { appOrganizationAgent } from "./app-connect-agent-mappers";
 import {
+  appChannelDocumentContent,
+  appChannelLinkPreview,
   appChannelMember,
   appChannelSummary,
   appChannelWebhook,
@@ -125,6 +131,8 @@ export type AppConnectChannelServices = {
   readonly declineProposal: typeof declineOrganizationChannelProposal;
   readonly deleteMessage: typeof deleteOrganizationChannelMessage;
   readonly getChannel: typeof getOrganizationChannelDetail;
+  readonly getLinkPreview: typeof getChannelLinkPreviewApplication;
+  readonly getMessageDocument: typeof getChannelMessageDocumentApplication;
   readonly listChannels: typeof listOrganizationChannels;
   readonly listMessages: typeof listOrganizationChannelMessages;
   readonly markRead: typeof markOrganizationChannelRead;
@@ -154,6 +162,8 @@ export const appConnectChannelServices: AppConnectChannelServices = {
   declineProposal: declineOrganizationChannelProposal,
   deleteMessage: deleteOrganizationChannelMessage,
   getChannel: getOrganizationChannelDetail,
+  getLinkPreview: getChannelLinkPreviewApplication,
+  getMessageDocument: getChannelMessageDocumentApplication,
   listChannels: listOrganizationChannels,
   listMessages: listOrganizationChannelMessages,
   markRead: markOrganizationChannelRead,
@@ -675,6 +685,34 @@ const createAppChannelService = (
       parentMessage: result.parentMessage
         ? appChannelMessage(result.parentMessage)
         : undefined,
+    });
+  }),
+
+  getChannelMessageDocument: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const document = await services.getMessageDocument({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      messageId: canonicalUuid(request.messageId),
+      userId: session.user.id,
+    });
+    return create(ChannelService.method.getChannelMessageDocument.output, {
+      document: appChannelDocumentContent(document),
+    });
+  }),
+
+  getChannelLinkPreview: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const preview = await services.getLinkPreview({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      userId: session.user.id,
+      url: request.url,
+    });
+    return create(ChannelService.method.getChannelLinkPreview.output, {
+      preview: preview ? appChannelLinkPreview(preview) : undefined,
     });
   }),
 
