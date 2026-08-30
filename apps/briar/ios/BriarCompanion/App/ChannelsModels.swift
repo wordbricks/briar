@@ -195,7 +195,7 @@ enum DirectMessageOrdering {
     }
 }
 
-struct ChannelMessageAttachment: Codable, Hashable, Identifiable, Sendable {
+struct ChannelMessageAttachment: Hashable, Identifiable, Sendable {
     let id: UUID
     let filename: String
     let contentType: String
@@ -203,7 +203,7 @@ struct ChannelMessageAttachment: Codable, Hashable, Identifiable, Sendable {
     let url: String
 }
 
-struct ChannelMessageReaction: Codable, Hashable, Identifiable, Sendable {
+struct ChannelMessageReaction: Hashable, Identifiable, Sendable {
     let emoji: String
     let count: Int
     let userIds: [String]
@@ -211,7 +211,7 @@ struct ChannelMessageReaction: Codable, Hashable, Identifiable, Sendable {
     var id: String { emoji }
 }
 
-struct ChannelBlockText: Codable, Hashable, Sendable {
+struct ChannelBlockText: Hashable, Sendable {
     let type: Kind
     let text: String
 
@@ -221,14 +221,14 @@ struct ChannelBlockText: Codable, Hashable, Sendable {
     }
 }
 
-struct ChannelRichTextStyle: Codable, Hashable, Sendable {
+struct ChannelRichTextStyle: Hashable, Sendable {
     let bold: Bool?
     let italic: Bool?
     let strike: Bool?
     let code: Bool?
 }
 
-struct ChannelRichTextInline: Codable, Hashable, Sendable {
+struct ChannelRichTextInline: Hashable, Sendable {
     let type: Kind
     let text: String?
     let url: String?
@@ -242,12 +242,12 @@ struct ChannelRichTextInline: Codable, Hashable, Sendable {
     }
 }
 
-struct ChannelRichTextSection: Codable, Hashable, Sendable {
+struct ChannelRichTextSection: Hashable, Sendable {
     let type: String
     let elements: [ChannelRichTextInline]
 }
 
-struct ChannelRichTextElement: Codable, Hashable, Sendable {
+struct ChannelRichTextElement: Hashable, Sendable {
     let type: Kind
     let elements: [ChannelRichTextInline]?
     let sections: [ChannelRichTextSection]?
@@ -260,14 +260,6 @@ struct ChannelRichTextElement: Codable, Hashable, Sendable {
         case list = "rich_text_list"
         case quote = "rich_text_quote"
         case preformatted = "rich_text_preformatted"
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case type
-        case elements
-        case style
-        case indent
-        case offset
     }
 
     init(
@@ -286,36 +278,9 @@ struct ChannelRichTextElement: Codable, Hashable, Sendable {
         self.offset = offset
     }
 
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        type = try container.decode(Kind.self, forKey: .type)
-        style = try container.decodeIfPresent(String.self, forKey: .style)
-        indent = try container.decodeIfPresent(Int.self, forKey: .indent)
-        offset = try container.decodeIfPresent(Int.self, forKey: .offset)
-        if type == .list {
-            sections = try container.decode([ChannelRichTextSection].self, forKey: .elements)
-            elements = nil
-        } else {
-            elements = try container.decode([ChannelRichTextInline].self, forKey: .elements)
-            sections = nil
-        }
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(type, forKey: .type)
-        try container.encodeIfPresent(style, forKey: .style)
-        try container.encodeIfPresent(indent, forKey: .indent)
-        try container.encodeIfPresent(offset, forKey: .offset)
-        if type == .list {
-            try container.encode(sections ?? [], forKey: .elements)
-        } else {
-            try container.encode(elements ?? [], forKey: .elements)
-        }
-    }
 }
 
-struct ChannelMessageBlock: Codable, Hashable, Sendable {
+struct ChannelMessageBlock: Hashable, Sendable {
     let type: Kind
     let textObject: ChannelBlockText?
     let markdownText: String?
@@ -329,12 +294,6 @@ struct ChannelMessageBlock: Codable, Hashable, Sendable {
         case divider
         case context
         case richText = "rich_text"
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case type
-        case text
-        case elements
     }
 
     init(
@@ -351,57 +310,9 @@ struct ChannelMessageBlock: Codable, Hashable, Sendable {
         self.richTextElements = richTextElements
     }
 
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        type = try container.decode(Kind.self, forKey: .type)
-        switch type {
-        case .header, .section:
-            textObject = try container.decode(ChannelBlockText.self, forKey: .text)
-            markdownText = nil
-            contextElements = nil
-            richTextElements = nil
-        case .markdown:
-            textObject = nil
-            markdownText = try container.decode(String.self, forKey: .text)
-            contextElements = nil
-            richTextElements = nil
-        case .context:
-            textObject = nil
-            markdownText = nil
-            contextElements = try container.decode([ChannelBlockText].self, forKey: .elements)
-            richTextElements = nil
-        case .richText:
-            textObject = nil
-            markdownText = nil
-            contextElements = nil
-            richTextElements = try container.decode([ChannelRichTextElement].self, forKey: .elements)
-        case .divider:
-            textObject = nil
-            markdownText = nil
-            contextElements = nil
-            richTextElements = nil
-        }
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(type, forKey: .type)
-        switch type {
-        case .header, .section:
-            try container.encodeIfPresent(textObject, forKey: .text)
-        case .markdown:
-            try container.encodeIfPresent(markdownText, forKey: .text)
-        case .context:
-            try container.encode(contextElements ?? [], forKey: .elements)
-        case .richText:
-            try container.encode(richTextElements ?? [], forKey: .elements)
-        case .divider:
-            break
-        }
-    }
 }
 
-struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
+struct ChannelMessage: Hashable, Identifiable, Sendable {
     let id: UUID
     let channelId: UUID
     let parentMessageId: UUID?
@@ -427,29 +338,6 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     var subscribers: [IssueSubscriber]
     let createdAt: Date
     let deletedAt: Date?
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case channelId
-        case parentMessageId
-        case body
-        case blocks
-        case author
-        case mentionedUserIds
-        case mentionedAgentIds
-        case attachments
-        case reactions
-        case replyCount
-        case lastReplyAt
-        case replyAuthors
-        case document
-        case proposal
-        case executionProposal
-        case skillExecutionProposal
-        case subscribers
-        case createdAt
-        case deletedAt
-    }
 
     init(
         id: UUID,
@@ -495,40 +383,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         self.deletedAt = deletedAt
     }
 
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        channelId = try container.decode(UUID.self, forKey: .channelId)
-        parentMessageId = try container.decodeIfPresent(UUID.self, forKey: .parentMessageId)
-        body = try container.decode(String.self, forKey: .body)
-        blocks = try container.decodeIfPresent([ChannelMessageBlock].self, forKey: .blocks)
-        author = try container.decode(Author.self, forKey: .author)
-        mentionedUserIds = try container.decodeIfPresent([String].self, forKey: .mentionedUserIds) ?? []
-        mentionedAgentIds = try container.decodeIfPresent([UUID].self, forKey: .mentionedAgentIds) ?? []
-        attachments = try container.decodeIfPresent([ChannelMessageAttachment].self, forKey: .attachments) ?? []
-        reactions = try container.decodeIfPresent([ChannelMessageReaction].self, forKey: .reactions) ?? []
-        replyCount = try container.decode(Int.self, forKey: .replyCount)
-        lastReplyAt = try container.decodeIfPresent(Date.self, forKey: .lastReplyAt)
-        replyAuthors = try container.decodeIfPresent([Author].self, forKey: .replyAuthors) ?? []
-        document = try container.decodeIfPresent(Document.self, forKey: .document)
-        proposal = try container.decodeIfPresent(Proposal.self, forKey: .proposal)
-        executionProposal = try container.decodeIfPresent(
-            IssueExecutionProposal.self,
-            forKey: .executionProposal
-        )
-        skillExecutionProposal = try container.decodeIfPresent(
-            AgentSkillExecutionProposal.self,
-            forKey: .skillExecutionProposal
-        )
-        subscribers = try container.decodeIfPresent(
-            [IssueSubscriber].self,
-            forKey: .subscribers
-        ) ?? []
-        createdAt = try container.decode(Date.self, forKey: .createdAt)
-        deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
-    }
-
-    struct Author: Codable, Hashable, Sendable {
+    struct Author: Hashable, Sendable {
         let type: Kind
         let name: String
         let image: String?
@@ -556,13 +411,13 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         }
     }
 
-    struct Document: Codable, Hashable, Sendable {
+    struct Document: Hashable, Sendable {
         let messageId: UUID
         let title: String
         let projectId: UUID?
     }
 
-    struct Proposal: Codable, Hashable, Identifiable, Sendable {
+    struct Proposal: Hashable, Identifiable, Sendable {
         let id: UUID
         let actionType: ActionType
         let status: Status
@@ -589,38 +444,12 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
             self.resultItems = resultItems
         }
 
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            id = try container.decode(UUID.self, forKey: .id)
-            actionType = try container.decode(ActionType.self, forKey: .actionType)
-            status = try container.decode(Status.self, forKey: .status)
-            projectId = try container.decodeIfPresent(UUID.self, forKey: .projectId)
-            // Older responses omitted payload, while future action types may use
-            // a different shape. Neither should make the channel unreadable.
-            payload = try? container.decodeIfPresent(Payload.self, forKey: .payload)
-            resultRunId = try container.decodeIfPresent(UUID.self, forKey: .resultRunId)
-            resultItems = try container.decodeIfPresent(
-                [ResultItem].self,
-                forKey: .resultItems
-            ) ?? []
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case id
-            case actionType
-            case status
-            case projectId
-            case payload
-            case resultRunId
-            case resultItems
-        }
-
-        struct ResultItem: Codable, Hashable, Sendable {
+        struct ResultItem: Hashable, Sendable {
             let localKey: String
             let runId: UUID
         }
 
-        struct Payload: Codable, Hashable, Sendable {
+        struct Payload: Hashable, Sendable {
             /// Present only for `request_issue_create` proposals.
             let issue: Issue?
             /// Present only for an atomic multi-issue backlog proposal.
@@ -639,22 +468,22 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
                 self.executeAfterCreate = executeAfterCreate
             }
 
-            struct Batch: Codable, Hashable, Sendable {
+            struct Batch: Hashable, Sendable {
                 let items: [Item]
                 let dependencies: [Dependency]
 
-                struct Item: Codable, Hashable, Sendable {
+                struct Item: Hashable, Sendable {
                     let key: String
                     let issue: Issue
                 }
 
-                struct Dependency: Codable, Hashable, Sendable {
+                struct Dependency: Hashable, Sendable {
                     let prerequisiteKey: String
                     let dependentKey: String
                 }
             }
 
-            struct Issue: Codable, Hashable, Sendable {
+            struct Issue: Hashable, Sendable {
                 let title: String
                 let description: String?
                 let priority: Int?
@@ -670,75 +499,6 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
                     self.description = description
                     self.priority = priority
                     self.status = status
-                }
-
-                init(from decoder: Decoder) throws {
-                    let container = try decoder.container(keyedBy: CodingKeys.self)
-                    let decodedTitle = try container.decode(String.self, forKey: .title)
-                    let normalizedTitle = decodedTitle.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    )
-                    guard !normalizedTitle.isEmpty, normalizedTitle.count <= 300 else {
-                        throw DecodingError.dataCorruptedError(
-                            forKey: .title,
-                            in: container,
-                            debugDescription: "Issue title must contain 1...300 characters"
-                        )
-                    }
-                    guard container.contains(.description) else {
-                        throw DecodingError.keyNotFound(
-                            CodingKeys.description,
-                            .init(
-                                codingPath: decoder.codingPath,
-                                debugDescription: "Issue description is required, and may be null"
-                            )
-                        )
-                    }
-                    let decodedDescription = try container.decodeIfPresent(
-                        String.self,
-                        forKey: .description
-                    )
-                    if let decodedDescription,
-                       decodedDescription.trimmingCharacters(
-                           in: .whitespacesAndNewlines
-                       ).count > 100_000 {
-                        throw DecodingError.dataCorruptedError(
-                            forKey: .description,
-                            in: container,
-                            debugDescription: "Issue description is too long"
-                        )
-                    }
-                    guard container.contains(.priority) else {
-                        throw DecodingError.keyNotFound(
-                            CodingKeys.priority,
-                            .init(
-                                codingPath: decoder.codingPath,
-                                debugDescription: "Issue priority is required, and may be null"
-                            )
-                        )
-                    }
-                    let decodedPriority = try container.decodeIfPresent(Int.self, forKey: .priority)
-                    if let decodedPriority, !(1 ... 4).contains(decodedPriority) {
-                        throw DecodingError.dataCorruptedError(
-                            forKey: .priority,
-                            in: container,
-                            debugDescription: "Issue priority must be between 1 and 4"
-                        )
-                    }
-
-                    title = normalizedTitle
-                    description = decodedDescription?.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    )
-                    priority = decodedPriority
-                    status = try container.decode(IssueStatus.self, forKey: .status)
-                }
-
-                private enum CodingKeys: String, CodingKey {
-                    case title
-                    case description
-                    case priority
-                    case status
                 }
 
                 enum IssueStatus: String, Codable, Hashable, Sendable {
@@ -762,7 +522,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-struct ChannelAgentReply: Codable, Equatable, Identifiable, Sendable {
+struct ChannelAgentReply: Equatable, Identifiable, Sendable {
     let id: UUID
     let agentId: UUID
     let channelId: UUID
@@ -998,7 +758,7 @@ struct ChannelDeltaResponse: Equatable, Sendable {
     var agentReplies: [ChannelAgentReply]? = nil
 }
 
-struct CreateChannelMessageResponse: Codable, Sendable {
+struct CreateChannelMessageResponse: Sendable {
     let message: ChannelMessage
     let agentReplies: [ChannelAgentReply]
 
@@ -1007,19 +767,6 @@ struct CreateChannelMessageResponse: Codable, Sendable {
         self.agentReplies = agentReplies
     }
 
-    private enum CodingKeys: String, CodingKey {
-        case message
-        case agentReplies
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        message = try container.decode(ChannelMessage.self, forKey: .message)
-        agentReplies = try container.decodeIfPresent(
-            [ChannelAgentReply].self,
-            forKey: .agentReplies
-        ) ?? []
-    }
 }
 
 struct AcceptChannelProposalResponse: Equatable, Sendable {
@@ -1055,26 +802,13 @@ struct AcceptChannelProposalResponse: Equatable, Sendable {
 }
 
 /// Values selected by the user at the moment an Agent-authored execution
-/// proposal is approved. Every nullable key is encoded explicitly because the
-/// API is strict and distinguishes a deliberate automatic/default selection
-/// from an omitted field.
-struct AcceptIssueExecutionProposalRequest: Codable, Equatable, Sendable {
+/// proposal is approved.
+struct AcceptIssueExecutionProposalRequest: Equatable, Sendable {
     let provider: AgentProvider
     let model: String?
     let effort: ModelEffort?
     let workerId: String?
 
-    private enum CodingKeys: String, CodingKey {
-        case provider, model, effort, workerId
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(provider, forKey: .provider)
-        try container.encode(model, forKey: .model)
-        try container.encode(effort, forKey: .effort)
-        try container.encode(workerId, forKey: .workerId)
-    }
 }
 
 struct AcceptChannelExecutionProposalResponse: Sendable {

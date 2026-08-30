@@ -1,4 +1,6 @@
+import BriarContracts
 import Foundation
+import SwiftProtobuf
 import XCTest
 @testable import BriarCompanion
 
@@ -32,17 +34,29 @@ final class CoreAPITests: XCTestCase {
         URLProtocolStub.handler = { request in
             XCTAssertEqual(request.httpMethod, "POST")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/protobuf")
             let body = String(decoding: try request.bodyData(), as: UTF8.self)
             XCTAssertTrue(body.contains("name=\"title\""))
             XCTAssertTrue(body.contains("filename=\"note.txt\""))
             XCTAssertTrue(body.contains("hello"))
+            var response = BriarAPI_CreateIssueResponse()
+            response.runID = "11111111-1111-4111-8111-111111111111"
+            response.sourceKey = "briar-issue:11111111-1111-4111-8111-111111111111"
+            response.stage = "queued"
+            response.status = .queued
+            response.createdByUserID = "user-1"
             return (
-                HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
-                Data(#"{"ok":true}"#.utf8)
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 201,
+                    httpVersion: nil,
+                    headerFields: ["Content-Type": "application/protobuf"]
+                )!,
+                try response.serializedData()
             )
         }
 
-        let response: UploadResponse = try await client.upload(
+        let response: BriarAPI_CreateIssueResponse = try await client.upload(
             "/upload",
             fields: ["title": "Example"],
             files: [MultipartFile(
@@ -53,12 +67,11 @@ final class CoreAPITests: XCTestCase {
             )],
             token: "token"
         )
-        XCTAssertTrue(response.ok)
+        XCTAssertEqual(response.stage, "queued")
+        XCTAssertEqual(response.status, .queued)
     }
 
 }
-
-private struct UploadResponse: Codable { let ok: Bool }
 
 private extension URLRequest {
     func bodyData() throws -> Data {

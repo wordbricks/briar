@@ -146,7 +146,7 @@ struct ProjectAgent: Codable, Equatable, Identifiable, Sendable {
 /// An Agent-authored request to run one immutable saved Skill. The Agent,
 /// Skill, natural-language request, and runtime are server snapshots; native
 /// clients only choose the exact Worker at the separate approval boundary.
-struct AgentSkillExecutionProposal: Codable, Equatable, Hashable, Identifiable, Sendable {
+struct AgentSkillExecutionProposal: Equatable, Hashable, Identifiable, Sendable {
     let id: UUID
     let type: Kind
     let status: Status
@@ -196,15 +196,6 @@ struct AgentSkillExecutionProposal: Codable, Equatable, Hashable, Identifiable, 
         case running
         case completed
         case failed
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case id, type, status, projectId, agentId, agentName, skillId, skillName
-        case request, provider, model, effort, createdAt, acceptedAt
-        case executionMode, approvalPolicy, executionStatus
-        case requestedWorkerId, requestedWorkerLabel, resultSessionId
-        case resultMessageId, error
-        case delegatedByAgentId, delegatedByAgentName
     }
 
     init(
@@ -261,78 +252,6 @@ struct AgentSkillExecutionProposal: Codable, Equatable, Hashable, Identifiable, 
         self.delegatedByAgentName = delegatedByAgentName
     }
 
-    init(from decoder: Swift.Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        type = try container.decode(Kind.self, forKey: .type)
-        status = try container.decode(Status.self, forKey: .status)
-        projectId = try container.decode(UUID.self, forKey: .projectId)
-        agentId = try container.decode(UUID.self, forKey: .agentId)
-        agentName = try container.decode(String.self, forKey: .agentName)
-        skillId = try container.decode(UUID.self, forKey: .skillId)
-        skillName = try container.decode(String.self, forKey: .skillName)
-        request = try container.decode(String.self, forKey: .request)
-        provider = try container.decode(AgentProvider.self, forKey: .provider)
-        // Canonical nullable fields must be present. This rejects a partial
-        // proposal instead of silently inventing mutable runtime metadata.
-        model = try container.decode(String?.self, forKey: .model)
-        effort = try container.decode(ModelEffort?.self, forKey: .effort)
-        executionMode = try container.decodeIfPresent(
-            ExecutionMode.self,
-            forKey: .executionMode
-        ) ?? .task
-        approvalPolicy = try container.decodeIfPresent(
-            ApprovalPolicy.self,
-            forKey: .approvalPolicy
-        ) ?? .explicit
-        executionStatus = try container.decodeIfPresent(
-            ExecutionStatus.self,
-            forKey: .executionStatus
-        ) ?? (status == .pending ? .waiting : .running)
-        createdAt = try container.decode(Date.self, forKey: .createdAt)
-        acceptedAt = try container.decode(Date?.self, forKey: .acceptedAt)
-        requestedWorkerId = try container.decode(String?.self, forKey: .requestedWorkerId)
-        requestedWorkerLabel = try container.decode(
-            String?.self,
-            forKey: .requestedWorkerLabel
-        )
-        resultSessionId = try container.decode(String?.self, forKey: .resultSessionId)
-        resultMessageId = try container.decodeIfPresent(UUID.self, forKey: .resultMessageId)
-        error = try container.decodeIfPresent(String.self, forKey: .error)
-        delegatedByAgentId = try container.decode(UUID?.self, forKey: .delegatedByAgentId)
-        delegatedByAgentName = try container.decode(
-            String?.self,
-            forKey: .delegatedByAgentName
-        )
-    }
-
-    func encode(to encoder: Swift.Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(type, forKey: .type)
-        try container.encode(status, forKey: .status)
-        try container.encode(projectId, forKey: .projectId)
-        try container.encode(agentId, forKey: .agentId)
-        try container.encode(agentName, forKey: .agentName)
-        try container.encode(skillId, forKey: .skillId)
-        try container.encode(skillName, forKey: .skillName)
-        try container.encode(request, forKey: .request)
-        try container.encode(provider, forKey: .provider)
-        try container.encode(model, forKey: .model)
-        try container.encode(effort, forKey: .effort)
-        try container.encode(executionMode, forKey: .executionMode)
-        try container.encode(approvalPolicy, forKey: .approvalPolicy)
-        try container.encode(executionStatus, forKey: .executionStatus)
-        try container.encode(createdAt, forKey: .createdAt)
-        try container.encode(acceptedAt, forKey: .acceptedAt)
-        try container.encode(requestedWorkerId, forKey: .requestedWorkerId)
-        try container.encode(requestedWorkerLabel, forKey: .requestedWorkerLabel)
-        try container.encode(resultSessionId, forKey: .resultSessionId)
-        try container.encode(resultMessageId, forKey: .resultMessageId)
-        try container.encode(error, forKey: .error)
-        try container.encode(delegatedByAgentId, forKey: .delegatedByAgentId)
-        try container.encode(delegatedByAgentName, forKey: .delegatedByAgentName)
-    }
 }
 
 struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
@@ -529,7 +448,7 @@ struct AcceptAgentSkillExecutionProposalRequest: Codable, Equatable, Sendable {
     let workerId: String?
 }
 
-struct AcceptAgentSkillExecutionProposalResponse: Codable, Equatable, Sendable {
+struct AcceptAgentSkillExecutionProposalResponse: Equatable, Sendable {
     let outcome: Outcome
     let proposal: AgentSkillExecutionProposal
     let projectId: UUID

@@ -293,7 +293,7 @@ struct IssueDraft: Codable, Equatable, Sendable {
     }
 }
 
-struct CreateIssueResponse: Codable, Sendable {
+struct CreateIssueResponse: Sendable {
     let runId: UUID
     let sourceKey: String
     let stage: String
@@ -793,7 +793,7 @@ struct DispatchRunResponse: Codable, Equatable, Sendable {
     let outcome: String
 }
 
-struct IssueAgentReplyJob: Codable, Equatable, Sendable {
+struct IssueAgentReplyJob: Equatable, Sendable {
     enum Status: String, Codable, Sendable {
         case queued
         case running
@@ -830,34 +830,9 @@ struct IssueAgentReplyJob: Codable, Equatable, Sendable {
         self.error = error
     }
 
-    private enum CodingKeys: String, CodingKey {
-        case id
-        case triggerMessageId
-        case parentMessageId
-        case agentId
-        case agentName
-        case status
-        case attempts
-        case error
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        triggerMessageId = try container.decode(UUID.self, forKey: .triggerMessageId)
-        parentMessageId = try container.decodeIfPresent(
-            UUID.self,
-            forKey: .parentMessageId
-        ) ?? triggerMessageId
-        agentId = try container.decodeIfPresent(UUID.self, forKey: .agentId)
-        agentName = try container.decodeIfPresent(String.self, forKey: .agentName)
-        status = try container.decode(Status.self, forKey: .status)
-        attempts = try container.decodeIfPresent(Int.self, forKey: .attempts) ?? 0
-        error = try container.decodeIfPresent(String.self, forKey: .error)
-    }
 }
 
-struct CreateIssueMessageResponse: Codable, Sendable {
+struct CreateIssueMessageResponse: Sendable {
     let message: IssueMessage
     let agentReply: IssueAgentReplyJob?
     let agentReplies: [IssueAgentReplyJob]
@@ -872,24 +847,6 @@ struct CreateIssueMessageResponse: Codable, Sendable {
         self.agentReplies = agentReplies
     }
 
-    private enum CodingKeys: String, CodingKey {
-        case message
-        case agentReply
-        case agentReplies
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        message = try container.decode(IssueMessage.self, forKey: .message)
-        agentReply = try container.decodeIfPresent(
-            IssueAgentReplyJob.self,
-            forKey: .agentReply
-        )
-        agentReplies = try container.decodeIfPresent(
-            [IssueAgentReplyJob].self,
-            forKey: .agentReplies
-        ) ?? []
-    }
 }
 
 enum IssueMutationError: LocalizedError, Equatable {

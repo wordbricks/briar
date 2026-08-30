@@ -203,18 +203,18 @@ private actor IssueHTTPRecorder: MobileHTTPClientProtocol {
         throw MobileAPIError.invalidRequest
     }
 
-    func upload<Response: Decodable & Sendable>(
+    func upload<Response: SwiftProtobuf.Message & Sendable>(
         _ path: String,
         fields: [String: String],
         files: [MultipartFile],
         token: String,
         as responseType: Response.Type
     ) async throws -> Response {
-        if responseType == CreateIssueResponse.self {
+        if responseType == BriarAPI_CreateIssueResponse.self {
             recorded.multipartCreates += 1
             return createResponse() as! Response
         }
-        if responseType == CreateIssueMessageResponse.self {
+        if responseType == BriarAPI_CreateIssueMessageResponse.self {
             recorded.multipartMessages += 1
             let referencesData = Data((fields["attachmentReferences"] ?? "[]").utf8)
             recorded.messageAttachmentReferences.append(
@@ -225,34 +225,33 @@ private actor IssueHTTPRecorder: MobileHTTPClientProtocol {
         throw MobileAPIError.invalidRequest
     }
 
-    private func createResponse() -> CreateIssueResponse {
-        CreateIssueResponse(
-            runId: runID,
-            sourceKey: "BR-1",
-            stage: "backlog",
-            status: .backlog,
-            attachments: [],
-            assigneeUserId: nil,
-            createdByUserId: "user-1",
-            difficulty: nil
-        )
+    private func createResponse() -> BriarAPI_CreateIssueResponse {
+        var response = BriarAPI_CreateIssueResponse()
+        response.runID = runID.uuidString.lowercased()
+        response.sourceKey = "BR-1"
+        response.stage = "backlog"
+        response.status = .backlog
+        response.createdByUserID = "user-1"
+        return response
     }
 
-    private func messageResponse(id: UUID, body: String) -> CreateIssueMessageResponse {
-        CreateIssueMessageResponse(
-            message: IssueMessage(
-                id: id,
-                runId: runID,
-                parentMessageId: nil,
-                body: body,
-                attachments: [],
-                author: .init(id: "user-1", name: "User", image: nil, provider: nil),
-                replyCount: 0,
-                createdAt: Date(timeIntervalSince1970: 10),
-                updatedAt: Date(timeIntervalSince1970: 10)
-            ),
-            agentReply: nil
-        )
+    private func messageResponse(
+        id: UUID,
+        body: String
+    ) -> BriarAPI_CreateIssueMessageResponse {
+        var author = BriarAPI_MessageAuthor()
+        author.id = "user-1"
+        author.name = "User"
+        var message = BriarAPI_IssueMessage()
+        message.id = id.uuidString.lowercased()
+        message.runID = runID.uuidString.lowercased()
+        message.body = body
+        message.author = author
+        message.createdAt = Google_Protobuf_Timestamp(date: Date(timeIntervalSince1970: 10))
+        message.updatedAt = Google_Protobuf_Timestamp(date: Date(timeIntervalSince1970: 10))
+        var response = BriarAPI_CreateIssueMessageResponse()
+        response.message = message
+        return response
     }
 }
 

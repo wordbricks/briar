@@ -252,7 +252,7 @@ protocol MobileHTTPClientProtocol: Sendable {
         as responseType: Response.Type
     ) async throws -> Response
 
-    func upload<Response: Decodable & Sendable>(
+    func upload<Response: SwiftProtobuf.Message & Sendable>(
         _ path: String,
         fields: [String: String],
         files: [MultipartFile],
@@ -313,7 +313,7 @@ extension MobileHTTPClientProtocol {
         throw MobileAPIError.invalidRequest
     }
 
-    func upload<Response: Decodable & Sendable>(
+    func upload<Response: SwiftProtobuf.Message & Sendable>(
         _ path: String,
         fields: [String: String],
         files: [MultipartFile],
@@ -372,7 +372,7 @@ struct MobileHTTPClient: MobileHTTPClientProtocol, Sendable {
         return data
     }
 
-    func upload<Response: Decodable & Sendable>(
+    func upload<Response: SwiftProtobuf.Message & Sendable>(
         _ path: String,
         fields: [String: String],
         files: [MultipartFile],
@@ -383,13 +383,24 @@ struct MobileHTTPClient: MobileHTTPClientProtocol, Sendable {
         let boundary = "BriarBoundary-\(UUID().uuidString)"
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/protobuf", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.httpBody = MultipartEncoder.encode(fields: fields, files: files, boundary: boundary)
         let (data, response) = try await session.data(for: request)
         try validate(response: response, data: data)
-        return try JSONDecoder.mobileContract.decode(responseType, from: data)
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.value(forHTTPHeaderField: "Content-Type")?
+                .lowercased()
+                .hasPrefix("application/protobuf") == true
+        else {
+            throw MobileAPIError.invalidResponse
+        }
+        do {
+            return try responseType.init(serializedBytes: data)
+        } catch {
+            throw MobileAPIError.invalidResponse
+        }
     }
 
     func download(_ path: String, token: String, to destination: URL) async throws -> URL {

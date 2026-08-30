@@ -272,7 +272,7 @@ private actor ChannelHTTPRecorder: MobileHTTPClientProtocol {
     func multipartUploadCount() -> Int { uploadCount }
     func multipartAttachmentReferences() -> [[String]] { uploadReferences }
 
-    func upload<Response: Decodable & Sendable>(
+    func upload<Response: SwiftProtobuf.Message & Sendable>(
         _ path: String,
         fields: [String: String],
         files: [MultipartFile],
@@ -284,18 +284,19 @@ private actor ChannelHTTPRecorder: MobileHTTPClientProtocol {
             [String].self,
             from: Data((fields["attachmentReferences"] ?? "[]").utf8)
         ))
-        let response = CreateChannelMessageResponse(message: ChannelMessage(
-            id: UUID(uuidString: fields["clientMessageId"] ?? "") ?? UUID(),
-            channelId: channel.id,
-            parentMessageId: nil,
-            body: fields["body"] ?? "",
-            author: .init(type: .user, name: "Briar User", image: nil, provider: nil),
-            replyCount: 0,
-            lastReplyAt: nil,
-            document: nil,
-            proposal: nil,
-            createdAt: Date(timeIntervalSince1970: 1_775_260_800)
-        ))
+        var author = BriarAPI_ChannelMessageAuthor()
+        author.kind = .user
+        author.name = "Briar User"
+        var message = BriarAPI_ChannelMessage()
+        message.id = fields["clientMessageId"] ?? UUID().uuidString.lowercased()
+        message.channelID = channel.id.uuidString.lowercased()
+        message.body = fields["body"] ?? ""
+        message.author = author
+        message.createdAt = Google_Protobuf_Timestamp(
+            date: Date(timeIntervalSince1970: 1_775_260_800)
+        )
+        var response = BriarAPI_CreateChannelMessageResponse()
+        response.message = message
         guard let typed = response as? Response else { throw MobileAPIError.invalidResponse }
         return typed
     }

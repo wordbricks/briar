@@ -72,7 +72,7 @@ final class IssueMutationStore: ObservableObject {
                 )
                 return try CreateIssueResponse(connectMessage: response.briarValue())
             }
-            return try await api.upload(
+            let wireResponse = try await api.upload(
                 MobileAPIContract.Endpoint.issues(projectID: projectID),
                 fields: [
                     "title": title,
@@ -97,8 +97,9 @@ final class IssueMutationStore: ObservableObject {
                     )
                 },
                 token: token,
-                as: CreateIssueResponse.self
+                as: BriarAPI_CreateIssueResponse.self
             )
+            return try CreateIssueResponse(connectMessage: wireResponse)
         }
     }
 
@@ -522,7 +523,7 @@ final class IssueMutationStore: ObservableObject {
                     references: attachmentReferences,
                     referenceGenerator: attachmentReference
                 )
-                response = try await api.upload(
+                let wireResponse = try await api.upload(
                     MobileAPIContract.Endpoint.runMessages(
                         projectID: projectID,
                         runID: runID
@@ -538,8 +539,9 @@ final class IssueMutationStore: ObservableObject {
                     ],
                     files: payload.files,
                     token: token,
-                    as: CreateIssueMessageResponse.self
+                    as: BriarAPI_CreateIssueMessageResponse.self
                 )
+                response = try CreateIssueMessageResponse(connectMessage: wireResponse)
             }
             onCreated?(response.message)
             let initialReplies = response.agentReplies.isEmpty

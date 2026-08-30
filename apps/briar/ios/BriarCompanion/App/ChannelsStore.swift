@@ -955,7 +955,7 @@ final class ChannelsStore: ObservableObject {
                     ),
                     encoding: .utf8
                 ) ?? "[]"
-                response = try await api.upload(
+                let wireResponse = try await api.upload(
                     path,
                     fields: [
                         "body": payload.body,
@@ -975,8 +975,9 @@ final class ChannelsStore: ObservableObject {
                     ],
                     files: payload.files,
                     token: token,
-                    as: CreateChannelMessageResponse.self
+                    as: BriarAPI_CreateChannelMessageResponse.self
                 )
+                response = try CreateChannelMessageResponse(connectMessage: wireResponse)
             }
             if parentMessageID == nil {
                 messages = Self.mergeMessages(messages, updates: [response.message], removing: [])

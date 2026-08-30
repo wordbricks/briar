@@ -356,7 +356,7 @@ struct ProjectExecutionWorkerPolicy: Codable, Equatable, Sendable {
     }
 }
 
-struct ConversationNotification: Codable, Equatable, Identifiable, Sendable {
+struct ConversationNotification: Equatable, Identifiable, Sendable {
     let id: UUID
     let runId: UUID
     let runTitle: String
@@ -367,7 +367,7 @@ struct ConversationNotification: Codable, Equatable, Identifiable, Sendable {
     let createdAt: Date
 }
 
-struct ChannelNotification: Codable, Equatable, Identifiable, Sendable {
+struct ChannelNotification: Equatable, Identifiable, Sendable {
     let id: UUID
     let channelId: UUID
     let channelName: String
@@ -542,7 +542,7 @@ struct RunEvent: Equatable, Identifiable, Sendable {
     let recordedAt: Date
 }
 
-struct IssueMessagesResponse: Codable, Equatable, Sendable {
+struct IssueMessagesResponse: Equatable, Sendable {
     let cursor: Int?
     let messages: [IssueMessage]
     let agentReplies: [IssueAgentReplyJob]
@@ -557,21 +557,6 @@ struct IssueMessagesResponse: Codable, Equatable, Sendable {
         self.agentReplies = agentReplies
     }
 
-    private enum CodingKeys: String, CodingKey {
-        case cursor
-        case messages
-        case agentReplies
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        cursor = try container.decodeIfPresent(Int.self, forKey: .cursor)
-        messages = try container.decode([IssueMessage].self, forKey: .messages)
-        agentReplies = try container.decodeIfPresent(
-            [IssueAgentReplyJob].self,
-            forKey: .agentReplies
-        ) ?? []
-    }
 }
 
 struct IssueMessagesDeltaResponse: Equatable, Sendable {
@@ -599,7 +584,7 @@ struct IssueMessagesDeltaResponse: Equatable, Sendable {
     }
 }
 
-struct IssueMessage: Codable, Equatable, Identifiable, Sendable {
+struct IssueMessage: Equatable, Identifiable, Sendable {
     let id: UUID
     let runId: UUID
     let parentMessageId: UUID?
@@ -617,7 +602,7 @@ struct IssueMessage: Codable, Equatable, Identifiable, Sendable {
     let createdAt: Date
     let updatedAt: Date
 
-    struct Author: Codable, Equatable, Sendable {
+    struct Author: Equatable, Sendable {
         let id: String?
         let agentId: UUID?
         let name: String
@@ -640,7 +625,7 @@ struct IssueMessage: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-struct IssueProposedAction: Codable, Equatable, Identifiable, Sendable {
+struct IssueProposedAction: Equatable, Identifiable, Sendable {
     let id: UUID
     let type: ActionType
     let workflowStage: String?
@@ -712,7 +697,7 @@ struct IssueProposedAction: Codable, Equatable, Identifiable, Sendable {
 
 /// Separate from issue create/update/rework proposals so creation evidence and
 /// execution approval may coexist on one message.
-struct IssueExecutionProposal: Codable, Equatable, Hashable, Identifiable, Sendable {
+struct IssueExecutionProposal: Equatable, Hashable, Identifiable, Sendable {
     let id: UUID
     let type: Kind
     let status: Status
@@ -735,12 +720,6 @@ struct IssueExecutionProposal: Codable, Equatable, Hashable, Identifiable, Senda
     enum Status: String, Codable, Sendable {
         case pending
         case accepted
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case id, type, status, projectId, runId, title, createdAt, acceptedAt
-        case requestedProvider, requestedModel, requestedEffort, requestedWorkerId
-        case delegatedByAgentId, delegatedByAgentName
     }
 
     init(
@@ -775,50 +754,9 @@ struct IssueExecutionProposal: Codable, Equatable, Hashable, Identifiable, Senda
         self.delegatedByAgentName = delegatedByAgentName
     }
 
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        type = try container.decode(Kind.self, forKey: .type)
-        status = try container.decode(Status.self, forKey: .status)
-        projectId = try container.decode(UUID.self, forKey: .projectId)
-        runId = try container.decode(UUID.self, forKey: .runId)
-        title = try container.decode(String.self, forKey: .title)
-        createdAt = try container.decode(Date.self, forKey: .createdAt)
-        // These nullable fields are nevertheless required by this Codable
-        // snapshot. `decode(Optional.self)` accepts JSON null but rejects a
-        // missing key.
-        acceptedAt = try container.decode(Date?.self, forKey: .acceptedAt)
-        requestedProvider = try container.decode(
-            AgentProvider?.self,
-            forKey: .requestedProvider
-        )
-        requestedModel = try container.decode(String?.self, forKey: .requestedModel)
-        requestedEffort = try container.decode(ModelEffort?.self, forKey: .requestedEffort)
-        requestedWorkerId = try container.decode(String?.self, forKey: .requestedWorkerId)
-        delegatedByAgentId = try container.decode(UUID?.self, forKey: .delegatedByAgentId)
-        delegatedByAgentName = try container.decode(String?.self, forKey: .delegatedByAgentName)
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(type, forKey: .type)
-        try container.encode(status, forKey: .status)
-        try container.encode(projectId, forKey: .projectId)
-        try container.encode(runId, forKey: .runId)
-        try container.encode(title, forKey: .title)
-        try container.encode(createdAt, forKey: .createdAt)
-        try container.encode(acceptedAt, forKey: .acceptedAt)
-        try container.encode(requestedProvider, forKey: .requestedProvider)
-        try container.encode(requestedModel, forKey: .requestedModel)
-        try container.encode(requestedEffort, forKey: .requestedEffort)
-        try container.encode(requestedWorkerId, forKey: .requestedWorkerId)
-        try container.encode(delegatedByAgentId, forKey: .delegatedByAgentId)
-        try container.encode(delegatedByAgentName, forKey: .delegatedByAgentName)
-    }
 }
 
-struct AcceptIssueExecutionProposalResponse: Codable, Sendable {
+struct AcceptIssueExecutionProposalResponse: Sendable {
     let proposal: IssueExecutionProposal
     let outcome: Outcome
     let projectId: UUID
@@ -831,7 +769,7 @@ struct AcceptIssueExecutionProposalResponse: Codable, Sendable {
     }
 }
 
-struct AcceptIssueReworkProposalResponse: Codable, Equatable, Sendable {
+struct AcceptIssueReworkProposalResponse: Equatable, Sendable {
     let proposal: IssueProposedAction
     let outcome: String
     let attempt: Int
@@ -839,7 +777,7 @@ struct AcceptIssueReworkProposalResponse: Codable, Equatable, Sendable {
     let workflowStage: String
 }
 
-struct AcceptIssueActionProposalResponse: Codable, Equatable, Sendable {
+struct AcceptIssueActionProposalResponse: Equatable, Sendable {
     let proposal: IssueProposedAction
     let outcome: String
     let resultRunId: UUID?

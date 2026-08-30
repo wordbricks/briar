@@ -299,68 +299,33 @@ final class ChannelGroupingTests: XCTestCase {
         XCTAssertGreaterThan(participants.count, 1)
     }
 
-    func testDecodesAvatarAndLastReplyMetadataUsedByMessageRows() throws {
-        let json = """
-        {
-          "id": "aaaaaaaa-0000-4000-8000-000000000001",
-          "channelId": "bbbbbbbb-0000-4000-8000-000000000001",
-          "parentMessageId": null,
-          "body": "Hello team",
-          "author": {
-            "type": "user",
-            "name": "Jay",
-            "image": "https://example.com/jay.png",
-            "provider": null
-          },
-          "replyCount": 2,
-          "lastReplyAt": "2026-08-01T08:00:00Z",
-          "document": null,
-          "createdAt": "2026-08-01T01:00:00Z"
-        }
-        """
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-
-        let message = try decoder.decode(ChannelMessage.self, from: Data(json.utf8))
-
-        XCTAssertEqual(message.author.image, "https://example.com/jay.png")
-        XCTAssertEqual(message.replyCount, 2)
-        XCTAssertNotNil(message.lastReplyAt)
-        XCTAssertTrue(message.replyAuthors.isEmpty)
-    }
-
-    func testDecodesReplyAuthorsUsedByThreadSummaries() throws {
-        let json = """
-        {
-          "id": "aaaaaaaa-0000-4000-8000-000000000001",
-          "channelId": "bbbbbbbb-0000-4000-8000-000000000001",
-          "parentMessageId": null,
-          "body": "Hello team",
-          "author": {
-            "type": "user",
-            "name": "Jay",
-            "image": "https://example.com/jay.png",
-            "provider": null
-          },
-          "replyCount": 2,
-          "lastReplyAt": "2026-08-01T08:00:00Z",
-          "replyAuthors": [
-            {
-              "type": "agent",
-              "id": "66666666-6666-4666-8666-666666666666",
-              "name": "Honey",
-              "provider": "claude",
-              "image": null
-            }
-          ],
-          "document": null,
-          "createdAt": "2026-08-01T01:00:00Z"
-        }
-        """
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-
-        let message = try decoder.decode(ChannelMessage.self, from: Data(json.utf8))
+    func testReplyAuthorsDriveThreadSummaryPresentation() {
+        let message = ChannelMessage(
+            id: UUID(uuidString: "aaaaaaaa-0000-4000-8000-000000000001")!,
+            channelId: UUID(uuidString: "bbbbbbbb-0000-4000-8000-000000000001")!,
+            parentMessageId: nil,
+            body: "Hello team",
+            author: ChannelMessage.Author(
+                type: .user,
+                name: "Jay",
+                image: "https://example.com/jay.png",
+                provider: nil
+            ),
+            replyCount: 2,
+            lastReplyAt: Date(timeIntervalSince1970: 1_700_000_100),
+            replyAuthors: [
+                ChannelMessage.Author(
+                    type: .agent,
+                    name: "Honey",
+                    image: nil,
+                    provider: "claude",
+                    id: "66666666-6666-4666-8666-666666666666"
+                ),
+            ],
+            document: nil,
+            proposal: nil,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
 
         XCTAssertEqual(message.replyAuthors.map(\.name), ["Honey"])
         XCTAssertEqual(
@@ -381,39 +346,6 @@ final class ChannelGroupingTests: XCTestCase {
                 replyCount: 0
             )
         )
-    }
-
-    func testDecodesAgentChannelMessageAuthorAvatar() throws {
-        let json = """
-        {
-          "id": "aaaaaaaa-0000-4000-8000-000000000001",
-          "channelId": "bbbbbbbb-0000-4000-8000-000000000001",
-          "parentMessageId": null,
-          "body": "Agent report",
-          "author": {
-            "type": "agent",
-            "id": "66666666-6666-4666-8666-666666666666",
-            "name": "Honey",
-            "provider": "claude",
-            "image": "data:image/png;base64,cHJvamVjdC1hdmF0YXI="
-          },
-          "replyCount": 0,
-          "lastReplyAt": null,
-          "document": null,
-          "createdAt": "2026-08-01T01:00:00Z"
-        }
-        """
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-
-        let message = try decoder.decode(ChannelMessage.self, from: Data(json.utf8))
-
-        XCTAssertEqual(message.author.type, .agent)
-        XCTAssertEqual(
-            message.author.image,
-            "data:image/png;base64,cHJvamVjdC1hdmF0YXI="
-        )
-        XCTAssertEqual(message.author.provider, "claude")
     }
 
     func testMentionCandidatesAppearForAtSignAndInsertASelectedAgent() {
@@ -490,39 +422,6 @@ final class ChannelGroupingTests: XCTestCase {
 
         XCTAssertEqual(ChannelMentions.retained(in: "@sam 확인", mentions: targets), targets)
         XCTAssertTrue(ChannelMentions.retained(in: "sam 확인", mentions: targets).isEmpty)
-    }
-
-    func testChannelMessageDecodesStructuredMentionRecipients() throws {
-        let json = """
-        {
-          "id": "44444444-4444-4444-8444-444444444444",
-          "channelId": "33333333-3333-4333-8333-333333333333",
-          "parentMessageId": null,
-          "body": "@honey 온보딩 개편 계획서를 정리해줘",
-          "author": {
-            "type": "user",
-            "name": "Jay",
-            "image": null,
-            "provider": null
-          },
-          "mentionedUserIds": [],
-          "mentionedAgentIds": ["66666666-6666-4666-8666-666666666666"],
-          "replyCount": 1,
-          "lastReplyAt": "2026-08-06T00:04:00Z",
-          "document": null,
-          "proposal": null,
-          "createdAt": "2026-08-06T00:03:00Z"
-        }
-        """
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let message = try decoder.decode(ChannelMessage.self, from: Data(json.utf8))
-
-        XCTAssertEqual(message.mentionedUserIds, [])
-        XCTAssertEqual(
-            message.mentionedAgentIds,
-            [UUID(uuidString: "66666666-6666-4666-8666-666666666666")!]
-        )
     }
 
     func testMessageMentionsLinkOnlyKnownHandles() {
@@ -620,85 +519,4 @@ final class ChannelGroupingTests: XCTestCase {
         XCTAssertEqual(handles, Set(["Honey", "sam"]))
     }
 
-    func testChannelMessageDecodesAttachmentsAndDefaultsToEmpty() throws {
-        let withAttachment = """
-        {
-          "id": "aaaaaaaa-0000-4000-8000-000000000001",
-          "channelId": "bbbbbbbb-0000-4000-8000-000000000001",
-          "parentMessageId": null,
-          "body": "스크린샷 공유합니다",
-          "author": {
-            "type": "user",
-            "name": "Jay",
-            "image": null,
-            "provider": null
-          },
-          "mentionedUserIds": [],
-          "mentionedAgentIds": [],
-          "attachments": [
-            {
-              "id": "cccccccc-0000-4000-8000-000000000001",
-              "filename": "design.png",
-              "contentType": "image/png",
-              "byteSize": 2048,
-              "url": "/organizations/99999999-9999-4999-8999-999999999999/channels/bbbbbbbb-0000-4000-8000-000000000001/messages/aaaaaaaa-0000-4000-8000-000000000001/attachments/cccccccc-0000-4000-8000-000000000001"
-            }
-          ],
-          "replyCount": 0,
-          "lastReplyAt": null,
-          "document": null,
-          "createdAt": "2026-08-01T01:00:00Z"
-        }
-        """
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let message = try decoder.decode(ChannelMessage.self, from: Data(withAttachment.utf8))
-
-        XCTAssertEqual(message.attachments.count, 1)
-        XCTAssertEqual(message.attachments[0].filename, "design.png")
-        XCTAssertEqual(message.attachments[0].contentType, "image/png")
-        XCTAssertEqual(message.attachments[0].byteSize, 2048)
-
-        let withoutAttachment = """
-        {
-          "id": "aaaaaaaa-0000-4000-8000-000000000001",
-          "channelId": "bbbbbbbb-0000-4000-8000-000000000001",
-          "parentMessageId": null,
-          "body": "Hello team",
-          "author": {
-            "type": "user",
-            "name": "Jay",
-            "image": null,
-            "provider": null
-          },
-          "mentionedUserIds": [],
-          "mentionedAgentIds": [],
-          "replyCount": 0,
-          "lastReplyAt": null,
-          "document": null,
-          "createdAt": "2026-08-01T01:00:00Z"
-        }
-        """
-        let plain = try decoder.decode(ChannelMessage.self, from: Data(withoutAttachment.utf8))
-        XCTAssertTrue(plain.attachments.isEmpty)
-    }
-
-    func testChannelMessageAttachmentFieldsRoundTripThroughJSONEncoder() throws {
-        let attachment = ChannelMessageAttachment(
-            id: UUID(uuidString: "cccccccc-0000-4000-8000-000000000001")!,
-            filename: "design.png",
-            contentType: "image/png",
-            byteSize: 2048,
-            url: "/organizations/99999999-9999-4999-8999-999999999999/channels/bbbbbbbb-0000-4000-8000-000000000001/messages/aaaaaaaa-0000-4000-8000-000000000001/attachments/cccccccc-0000-4000-8000-000000000001"
-        )
-        let encoded = try JSONEncoder().encode(attachment)
-        let object = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
-        )
-
-        XCTAssertEqual(object["filename"] as? String, "design.png")
-        XCTAssertEqual(object["contentType"] as? String, "image/png")
-        XCTAssertEqual(object["byteSize"] as? Int, 2048)
-        XCTAssertTrue((object["url"] as? String)?.hasSuffix("/attachments/cccccccc-0000-4000-8000-000000000001") == true)
-    }
 }
