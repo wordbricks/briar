@@ -199,11 +199,10 @@ final class IssueMutationStore: ObservableObject {
             request.runID = coreUUIDString(runID)
             request.prerequisiteRunID = coreUUIDString(prerequisiteID)
             request.enabled = enabled
-            let response = try await issueClient().setIssueDependency(
+            _ = try await issueClient().setIssueDependency(
                 request: request,
                 headers: [:]
-            )
-            _ = try DependencyResponse(connectMessage: response.briarValue())
+            ).briarValue()
         }
     }
 
@@ -216,11 +215,10 @@ final class IssueMutationStore: ObservableObject {
             request.requestID = coreUUIDString(idempotencyID(for: idempotencyKey))
             request.status = issueRunStatusMessage(status)
             if let workflowStage { request.workflowStage = workflowStage }
-            let response = try await issueClient().moveRun(
+            _ = try await issueClient().moveRun(
                 request: request,
                 headers: [:]
-            )
-            _ = try RunStatusResponse(connectMessage: response.briarValue())
+            ).briarValue()
             pendingRequestIDs.removeValue(forKey: idempotencyKey)
         }
     }
@@ -277,7 +275,6 @@ final class IssueMutationStore: ObservableObject {
     func recover(runID: UUID, action: String, reason: String? = nil) async throws {
         try await perform("recover-\(runID)") {
             let idempotencyKey = "recover-\(runID)-\(action)-\(reason ?? "none")"
-            let result: RunRecoveryResponse
             switch action {
             case "retry":
                 var request = BriarAPI_RetryRunRequest()
@@ -285,26 +282,23 @@ final class IssueMutationStore: ObservableObject {
                 request.runID = coreUUIDString(runID)
                 request.requestID = coreUUIDString(idempotencyID(for: idempotencyKey))
                 if let reason { request.reason = reason }
-                let response = try await issueClient().retryRun(
+                _ = try await issueClient().retryRun(
                     request: request,
                     headers: [:]
-                )
-                result = try RunRecoveryResponse(retryMessage: response.briarValue())
+                ).briarValue()
             case "cancel":
                 var request = BriarAPI_CancelRunRequest()
                 request.projectID = coreUUIDString(projectID)
                 request.runID = coreUUIDString(runID)
                 request.requestID = coreUUIDString(idempotencyID(for: idempotencyKey))
                 if let reason { request.reason = reason }
-                let response = try await issueClient().cancelRun(
+                _ = try await issueClient().cancelRun(
                     request: request,
                     headers: [:]
-                )
-                result = try RunRecoveryResponse(cancelMessage: response.briarValue())
+                ).briarValue()
             default:
                 throw MobileAPIError.invalidRequest
             }
-            _ = result
             pendingRequestIDs.removeValue(forKey: idempotencyKey)
         }
     }
@@ -322,11 +316,10 @@ final class IssueMutationStore: ObservableObject {
             request.checkpointKey = checkpoint.key
             request.attempt = attempt
             request.revision = revision
-            let response = try await issueClient().resumeRun(
+            _ = try await issueClient().resumeRun(
                 request: request,
                 headers: [:]
-            )
-            _ = try ResumeRunResponse(connectMessage: response.briarValue())
+            ).briarValue()
             pendingRequestIDs.removeValue(forKey: idempotencyKey)
         }
     }

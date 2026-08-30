@@ -814,31 +814,6 @@ struct IssueExecutionPreferencesResponse: Codable, Sendable {
     let effort: ModelEffort?
 }
 
-struct RunStatusResponse: Codable, Sendable {
-    let runId: UUID
-    let outcome: String
-    let status: DashboardRun.Status
-    let workflowStage: String?
-}
-
-struct RunRecoveryResponse: Codable, Sendable {
-    let runId: UUID
-    let outcome: String
-    let attempt: Int
-    let stage: String
-}
-
-struct ResumeRunResponse: Codable, Sendable {
-    let runId: UUID
-    let outcome: String
-    let workflowStage: String?
-    let startStage: String?
-    let checkpointKey: String?
-    let attempt: Int?
-    let revision: Int?
-    let terminalReviewOnly: Bool
-}
-
 struct DispatchRunRequest: Codable, Sendable {
     let agentId: UUID?
     let provider: AgentProvider
@@ -898,12 +873,6 @@ struct DispatchRunResponse: Codable, Equatable, Sendable {
     let requestedByUserId: String
     let dispatchMode: String
     let dispatchedAt: Date
-    let outcome: String
-}
-
-struct DependencyResponse: Codable, Sendable {
-    let prerequisiteRunId: UUID
-    let dependentRunId: UUID
     let outcome: String
 }
 
