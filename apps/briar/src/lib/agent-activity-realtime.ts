@@ -1,18 +1,16 @@
-import { briarApiUrl } from "./api-config";
+import { isWebSocketUrl } from "./realtime-transport";
 
 type Listener<Frame> = (frame: Frame) => void;
 
 export type AgentActivityRealtimeAdapter<Frame> = {
   label: "Channel" | "Issue";
-  ticketPath: string;
   decodeFrame: (value: Uint8Array) => Frame | null;
   matchesScope: (frame: Frame) => boolean;
 };
 
 export type AgentActivityRealtimeInput<Frame> = {
-  token: string;
   adapter: AgentActivityRealtimeAdapter<Frame>;
-  fetch?: typeof fetch;
+  createTicket: (signal: AbortSignal) => Promise<string>;
   createWebSocket?: (url: string) => WebSocket;
 };
 
@@ -21,6 +19,7 @@ export class AgentActivityRealtimeTransport<Frame> {
   private active = false;
   private generation = 0;
   private socket: WebSocket | null = null;
+  private ticketRequest: AbortController | null = null;
   private reconnectTimer: number | null = null;
   private reconnectDelayMs = 1_000;
 
@@ -41,6 +40,8 @@ export class AgentActivityRealtimeTransport<Frame> {
   stop() {
     this.active = false;
     this.generation += 1;
+    this.ticketRequest?.abort();
+    this.ticketRequest = null;
     if (this.reconnectTimer !== null) {
       window.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -52,22 +53,11 @@ export class AgentActivityRealtimeTransport<Frame> {
 
   private async connect(generation: number) {
     const { adapter } = this.input;
+    const ticketRequest = new AbortController();
+    this.ticketRequest = ticketRequest;
     try {
-      const fetchImpl = this.input.fetch ?? fetch;
-      const response = await fetchImpl(`${briarApiUrl}${adapter.ticketPath}`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${this.input.token}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error(
-          `${adapter.label} activity ticket failed (${response.status})`,
-        );
-      }
-      const body = await response.json() as { url?: unknown };
-      if (typeof body.url !== "string" || !/^wss?:\/\//u.test(body.url)) {
+      const ticketUrl = await this.input.createTicket(ticketRequest.signal);
+      if (!isWebSocketUrl(ticketUrl)) {
         throw new Error(
           `${adapter.label} activity ticket returned an invalid URL`,
         );
@@ -75,7 +65,7 @@ export class AgentActivityRealtimeTransport<Frame> {
       if (!this.active || generation !== this.generation) return;
       const createSocket = this.input.createWebSocket ??
         ((url: string) => new WebSocket(url));
-      const socket = createSocket(body.url);
+      const socket = createSocket(ticketUrl);
       socket.binaryType = "arraybuffer";
       this.socket = socket;
       let finished = false;
@@ -103,10 +93,11 @@ export class AgentActivityRealtimeTransport<Frame> {
         finish();
       });
     } catch (error) {
+      if (!this.active || generation !== this.generation) return;
       console.warn(`${adapter.label} activity socket disconnected`, error);
-      if (this.active && generation === this.generation) {
-        this.scheduleReconnect(generation);
-      }
+      this.scheduleReconnect(generation);
+    } finally {
+      if (this.ticketRequest === ticketRequest) this.ticketRequest = null;
     }
   }
 

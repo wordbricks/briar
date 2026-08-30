@@ -1,9 +1,11 @@
+/** @vitest-environment jsdom */
+
 import {
   OrganizationNotificationSchema,
   ProjectChangedSchema,
 } from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
 import { create, toBinary } from "@bufbuild/protobuf";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   WebSocketRealtimeTransport,
   type RealtimeNotification,
@@ -30,20 +32,13 @@ class FakeWebSocket {
 }
 
 describe("WebSocketRealtimeTransport", () => {
-  it("exchanges the bearer token and emits a protobuf oneof frame", async () => {
-    let request: RequestInit | undefined;
+  it("opens the issued URL and emits a protobuf oneof frame", async () => {
     const socket = new FakeWebSocket();
-    const fetchMock = async (_input: RequestInfo | URL, init?: RequestInit) => {
-      request = init;
-      return Response.json({
-        url: "wss://api.test/channel-events?ticket=signed",
-        expiresAt: "2026-08-12T00:00:00.000Z",
-      });
-    };
+    const createTicket = vi.fn(async () =>
+      "wss://api.test/channel-events?ticket=signed"
+    );
     const transport = new WebSocketRealtimeTransport({
-      url: "https://api.test/channel-events",
-      token: "secret-token",
-      fetch: fetchMock,
+      createTicket,
       createWebSocket: () => socket as unknown as WebSocket,
     });
     const notification = new Promise<RealtimeNotification>(
@@ -75,11 +70,49 @@ describe("WebSocketRealtimeTransport", () => {
       projectId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
       cursor: 34,
     });
-    expect(request?.method).toBe("POST");
-    expect(new Headers(request?.headers).get("authorization"))
-      .toBe("Bearer secret-token");
+    expect(createTicket).toHaveBeenCalledWith(expect.any(AbortSignal));
     expect(socket.binaryType).toBe("arraybuffer");
     transport.stop();
     expect(socket.closeCode).toBe(1000);
+  });
+
+  it("rejects a non-WebSocket URL", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const createWebSocket = vi.fn(
+      () => new FakeWebSocket() as unknown as WebSocket,
+    );
+    const transport = new WebSocketRealtimeTransport({
+      createTicket: async () => "https://api.test/not-a-websocket",
+      createWebSocket,
+    });
+
+    transport.start();
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledOnce());
+
+    expect(createWebSocket).not.toHaveBeenCalled();
+    transport.stop();
+    warn.mockRestore();
+  });
+
+  it("aborts a pending ticket request when stopped", async () => {
+    let signal: AbortSignal | undefined;
+    const createTicket = vi.fn((value: AbortSignal) => {
+      signal = value;
+      return new Promise<string>(() => undefined);
+    });
+    const createWebSocket = vi.fn(
+      () => new FakeWebSocket() as unknown as WebSocket,
+    );
+    const transport = new WebSocketRealtimeTransport({
+      createTicket,
+      createWebSocket,
+    });
+
+    transport.start();
+    await vi.waitFor(() => expect(createTicket).toHaveBeenCalledOnce());
+    transport.stop();
+
+    expect(signal?.aborted).toBe(true);
+    expect(createWebSocket).not.toHaveBeenCalled();
   });
 });

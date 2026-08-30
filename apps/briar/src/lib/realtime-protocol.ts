@@ -4,7 +4,6 @@ import {
 } from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
 import { fromBinary } from "@bufbuild/protobuf";
 import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
 
 /**
  * UI-facing projection of the generated protobuf oneof. The protobuf message
@@ -78,13 +77,3 @@ const toRealtimeNotification = (
 
 export const decodeRealtimeNotificationBinary = (bytes: Uint8Array) =>
   Option.flatMap(decodeOrganizationNotification(bytes), toRealtimeNotification);
-
-const WebSocketUrl = Schema.String.check(
-  Schema.isPattern(/^wss?:\/\//u),
-);
-
-const WebSocketTicket = Schema.Struct({
-  url: WebSocketUrl,
-});
-
-export const decodeWebSocketTicket = Schema.decodeUnknownOption(WebSocketTicket);

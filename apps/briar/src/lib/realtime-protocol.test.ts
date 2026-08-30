@@ -7,7 +7,6 @@ import * as Option from "effect/Option";
 import { describe, expect, it } from "vitest";
 import {
   decodeRealtimeNotificationBinary,
-  decodeWebSocketTicket,
 } from "./realtime-protocol";
 
 describe("realtime protocol", () => {
@@ -33,16 +32,4 @@ describe("realtime protocol", () => {
       .toBe(true);
   });
 
-  it("validates WebSocket ticket payloads", () => {
-    expect(
-      Option.getOrUndefined(decodeWebSocketTicket({
-        url: "wss://api.test/realtime?ticket=signed",
-        expiresAt: "2026-08-20T00:00:00.000Z",
-      })),
-    ).toEqual({
-      url: "wss://api.test/realtime?ticket=signed",
-    });
-    expect(Option.isNone(decodeWebSocketTicket({ url: "https://api.test" })))
-      .toBe(true);
-  });
 });

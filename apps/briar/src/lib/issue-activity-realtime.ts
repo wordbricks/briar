@@ -4,6 +4,7 @@ import {
   type IssueAgentActivityFrame,
 } from "./channel-agent-activity";
 import { AgentActivityRealtimeTransport } from "./agent-activity-realtime";
+import { createIssueActivityTicket } from "./app-rpc/realtime";
 
 export class IssueActivityRealtimeTransport
   extends AgentActivityRealtimeTransport<IssueAgentActivityFrame> {
@@ -12,22 +13,25 @@ export class IssueActivityRealtimeTransport
       token: string;
       projectId: string;
       runId: string;
-      fetch?: typeof fetch;
+      createTicket?: (signal: AbortSignal) => Promise<string>;
       createWebSocket?: (url: string) => WebSocket;
     },
   ) {
     super({
-      token: input.token,
+      createTicket: input.createTicket ?? ((signal) =>
+        createIssueActivityTicket(
+          input.token,
+          input.projectId,
+          input.runId,
+          signal,
+        )),
       adapter: {
         label: "Issue",
-        ticketPath: `/projects/${input.projectId}/runs/${input.runId}/` +
-          "agent-activity-events",
         decodeFrame: (value) =>
           Option.getOrNull(decodeIssueAgentActivityFrameBinaryOption(value)),
         matchesScope: (frame) =>
           frame.projectId === input.projectId && frame.runId === input.runId,
       },
-      fetch: input.fetch,
       createWebSocket: input.createWebSocket,
     });
   }

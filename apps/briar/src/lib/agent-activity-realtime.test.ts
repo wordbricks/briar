@@ -60,8 +60,6 @@ const emitFrame = (socket: FakeWebSocket, frame: AgentReplyActivityFrame) => {
 const scenarios = [
   {
     name: "channel",
-    ticketPath:
-      `/organizations/${organizationId}/channels/${channelId}/agent-activity-events`,
     frame: {
       ...frameBase,
       agentId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
@@ -72,34 +70,37 @@ const scenarios = [
       agentId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
       channelId: projectId,
     },
-    create(fetchImpl: typeof fetch, createWebSocket: (url: string) => WebSocket) {
+    create(
+      createTicket: (signal: AbortSignal) => Promise<string>,
+      createWebSocket: (url: string) => WebSocket,
+    ) {
       return new ChannelActivityRealtimeTransport({
         token: "token",
         organizationId,
         channelId,
-        fetch: fetchImpl,
+        createTicket,
         createWebSocket,
       }) as unknown as TestTransport;
     },
     stopReason: "Channel activity stopped",
-    invalidUrlMessage: "Channel activity ticket returned an invalid URL",
   },
   {
     name: "issue",
-    ticketPath: `/projects/${projectId}/runs/${runId}/agent-activity-events`,
     frame: { ...frameBase, projectId, runId },
     crossScope: { ...frameBase, projectId, runId: channelId },
-    create(fetchImpl: typeof fetch, createWebSocket: (url: string) => WebSocket) {
+    create(
+      createTicket: (signal: AbortSignal) => Promise<string>,
+      createWebSocket: (url: string) => WebSocket,
+    ) {
       return new IssueActivityRealtimeTransport({
         token: "token",
         projectId,
         runId,
-        fetch: fetchImpl,
+        createTicket,
         createWebSocket,
       }) as unknown as TestTransport;
     },
     stopReason: "Issue activity stopped",
-    invalidUrlMessage: "Issue activity ticket returned an invalid URL",
   },
 ] as const;
 
@@ -111,12 +112,12 @@ afterEach(() => {
 describe.each(scenarios)("$name activity realtime", (scenario) => {
   it("requests its scoped ticket and rejects malformed or cross-scope frames", async () => {
     const socket = new FakeWebSocket();
-    const fetchMock = vi.fn(async () => Response.json({
-      url: "wss://api.test/agent-activity-events?ticket=signed",
-    }));
+    const createTicket = vi.fn(async () =>
+      "wss://api.test/agent-activity-events?ticket=signed"
+    );
     const createWebSocket = vi.fn(() => socket as unknown as WebSocket);
     const transport = scenario.create(
-      fetchMock as unknown as typeof fetch,
+      createTicket,
       createWebSocket,
     );
     const listener = vi.fn();
@@ -124,16 +125,7 @@ describe.each(scenarios)("$name activity realtime", (scenario) => {
     transport.start();
     await vi.waitFor(() => expect(createWebSocket).toHaveBeenCalledOnce());
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining(scenario.ticketPath),
-      {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          Authorization: "Bearer token",
-        },
-      },
-    );
+    expect(createTicket).toHaveBeenCalledWith(expect.any(AbortSignal));
     socket.emit("message", new MessageEvent("message", { data: "not-binary" }));
     socket.emit("message", new MessageEvent("message", {
       data: new ArrayBuffer(1),
@@ -147,20 +139,24 @@ describe.each(scenarios)("$name activity realtime", (scenario) => {
     transport.stop();
     expect(socket.close).toHaveBeenCalledWith(1000, scenario.stopReason);
   });
+});
+
+describe("agent activity ticket lifecycle", () => {
+  const scenario = scenarios[0];
 
   it("reconnects after close and stop cancels the pending reconnect", async () => {
     vi.useFakeTimers();
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     const sockets = [new FakeWebSocket(), new FakeWebSocket()];
-    const fetchMock = vi.fn(async () => Response.json({
-      url: "wss://api.test/agent-activity-events?ticket=signed",
-    }));
+    const createTicket = vi.fn(async () =>
+      "wss://api.test/agent-activity-events?ticket=signed"
+    );
     const createWebSocket = vi.fn(
       () =>
         sockets[createWebSocket.mock.calls.length - 1] as unknown as WebSocket,
     );
     const transport = scenario.create(
-      fetchMock as unknown as typeof fetch,
+      createTicket,
       createWebSocket,
     );
 
@@ -174,26 +170,31 @@ describe.each(scenarios)("$name activity realtime", (scenario) => {
     sockets[1]!.emit("close");
     transport.stop();
     await vi.advanceTimersByTimeAsync(30_000);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(createTicket).toHaveBeenCalledTimes(2);
   });
 
-  it("does not open a socket when stopped while the ticket is pending", async () => {
-    let resolveTicket!: (response: Response) => void;
-    const ticket = new Promise<Response>((resolve) => {
+  it("aborts the request and does not open a socket when stopped", async () => {
+    let resolveTicket!: (url: string) => void;
+    let signal: AbortSignal | undefined;
+    const ticket = new Promise<string>((resolve) => {
       resolveTicket = resolve;
     });
-    const fetchMock = vi.fn(() => ticket);
+    const createTicket = vi.fn((value: AbortSignal) => {
+      signal = value;
+      return ticket;
+    });
     const createWebSocket = vi.fn(
       () => new FakeWebSocket() as unknown as WebSocket,
     );
     const transport = scenario.create(
-      fetchMock as unknown as typeof fetch,
+      createTicket,
       createWebSocket,
     );
 
     transport.start();
     transport.stop();
-    resolveTicket(Response.json({ url: "wss://api.test/activity" }));
+    expect(signal?.aborted).toBe(true);
+    resolveTicket("wss://api.test/activity");
     await ticket;
     await Promise.resolve();
 
@@ -202,21 +203,21 @@ describe.each(scenarios)("$name activity realtime", (scenario) => {
 
   it("rejects a ticket URL outside the WebSocket protocols", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const fetchMock = vi.fn(async () => Response.json({
-      url: "https://api.test/not-a-websocket",
-    }));
+    const createTicket = vi.fn(async () =>
+      "https://api.test/not-a-websocket"
+    );
     const createWebSocket = vi.fn(
       () => new FakeWebSocket() as unknown as WebSocket,
     );
     const transport = scenario.create(
-      fetchMock as unknown as typeof fetch,
+      createTicket,
       createWebSocket,
     );
 
     transport.start();
     await vi.waitFor(() => expect(warn).toHaveBeenCalledOnce());
     expect(warn.mock.calls[0]?.[1]).toMatchObject({
-      message: scenario.invalidUrlMessage,
+      message: "Channel activity ticket returned an invalid URL",
     });
     expect(createWebSocket).not.toHaveBeenCalled();
     transport.stop();
