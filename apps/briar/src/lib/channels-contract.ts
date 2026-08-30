@@ -1079,11 +1079,11 @@ const channelReplyDelegationSchema = strict(Schema.Struct({
 
 export const channelReplyCompletionSchema = strict(Schema.Struct({
   body: channelMessageBodySchema,
-  document: nullableDefault(channelReplyDocumentSchema),
-  issueProposal: nullableDefault(channelReplyIssueProposalSchema),
-  issueBatchProposal: nullableDefault(channelReplyIssueBatchProposalSchema),
-  executionProposal: nullableDefault(channelReplyExecutionProposalSchema),
-  skillExecutionProposal: nullableDefault(
+  document: Schema.NullOr(channelReplyDocumentSchema),
+  issueProposal: Schema.NullOr(channelReplyIssueProposalSchema),
+  issueBatchProposal: Schema.NullOr(channelReplyIssueBatchProposalSchema),
+  executionProposal: Schema.NullOr(channelReplyExecutionProposalSchema),
+  skillExecutionProposal: Schema.NullOr(
     channelReplySkillExecutionProposalSchema,
   ),
     /**
@@ -1091,7 +1091,7 @@ export const channelReplyCompletionSchema = strict(Schema.Struct({
      * eligible Project Agent. The server remains authoritative for the target
      * organization, project, channel roster, and recursion boundary.
      */
-  delegation: nullableDefault(channelReplyDelegationSchema),
+  delegation: Schema.NullOr(channelReplyDelegationSchema),
 }).check(
   Schema.makeFilter((reply) => {
     const issues: Array<Schema.FilterIssue> = [];
@@ -1144,22 +1144,6 @@ export const channelReplyLeaseInputSchema = strict(Schema.Struct({
   ...channelReplyClaimInputSchema.fields,
   claimToken: Schema.Trim.check(Schema.isLengthBetween(1, 200)),
 }));
-
-export const channelReplyCompleteInputSchema = strict(Schema.Struct({
-  ...channelReplyLeaseInputSchema.fields,
-  conversationId: nullableDefault(
-    Schema.Trim.check(Schema.isLengthBetween(1, 1_024)),
-  ),
-  error: nullableDefault(
-    Schema.Trim.check(Schema.isLengthBetween(1, 4_000)),
-  ),
-  result: nullableDefault(channelReplyCompletionSchema),
-}).check(
-  Schema.makeFilter((input) =>
-    Boolean(input.error) !== Boolean(input.result) ||
-    "Provide either an error or a reply result"
-  ),
-));
 
 export const channelIssueProposalPayloadSchema = Schema.Struct({
   issue: strict(Schema.Struct({

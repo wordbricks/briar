@@ -183,34 +183,22 @@ export const IssueAgentProposedAction = Schema.Union([
   IssueCreateProposalAction,
 ]);
 
-export const IssueAgentReplyCompletion = strictSchema(Schema.Struct({
-  projectId: UuidString,
-  workerId: trimmedText(1, 128),
-  claimToken: Schema.String.check(
-    Schema.isStartsWith("briar_reply_claim_"),
-  ),
-  body: Schema.optional(trimmedText(1, 10_000)),
-  proposedAction: Schema.optional(Schema.NullOr(IssueAgentProposedAction)),
-  executionProposal: Schema.optional(Schema.NullOr(
+export const IssueAgentReplyResult = strictSchema(Schema.Struct({
+  body: trimmedText(1, 10_000),
+  proposedAction: Schema.NullOr(IssueAgentProposedAction),
+  executionProposal: Schema.NullOr(
     strictSchema(Schema.Struct({
       type: Schema.Literal("request_issue_execute"),
     })),
-  )),
-  skillExecutionProposal: Schema.optional(Schema.NullOr(
+  ),
+  skillExecutionProposal: Schema.NullOr(
     strictSchema(Schema.Struct({
       type: Schema.Literal("request_agent_skill_execute"),
     })),
-  )),
-  error: Schema.optional(trimmedText(1, 4_000)),
+  ),
 }).check(
   Schema.makeFilter((input) => {
     const issues: Array<Schema.FilterIssue> = [];
-    if (Boolean(input.body) === Boolean(input.error)) {
-      issues.push({
-        path: [],
-        issue: "Provide exactly one of body or error",
-      });
-    }
     if (input.executionProposal && input.proposedAction) {
       issues.push({
         path: ["executionProposal"],
@@ -270,8 +258,8 @@ export const decodeIssueUpdateProposalAction = decodeRequestSync(
 export const decodeIssueCreateProposalAction = decodeRequestSync(
   IssueCreateProposalAction,
 );
-export const decodeIssueAgentReplyCompletion = decodeRequestSync(
-  IssueAgentReplyCompletion,
+export const decodeIssueAgentReplyResult = decodeRequestSync(
+  IssueAgentReplyResult,
 );
 export const decodeAgentSkillExecutionProposalAcceptInput = decodeRequestSync(
   AgentSkillExecutionProposalAcceptInput,

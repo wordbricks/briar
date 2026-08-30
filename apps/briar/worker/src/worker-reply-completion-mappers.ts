@@ -6,17 +6,14 @@ import type {
   ReplyIssueDraft,
   WorkClaimIdentity,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
-import {
-  channelReplyCompleteInputSchema,
-  type channelReplyCompletionSchema,
-} from "../../src/lib/channels-contract";
+import { channelReplyCompletionSchema } from "../../src/lib/channels-contract";
 import {
   agentReplyAttachmentMimeTypeFromName,
   htmlArtifactMimeType,
   validateAgentReplyAttachments,
 } from "../../src/lib/agent-reply-attachments";
 import { issueAttachmentMimeTypes } from "../../src/lib/issue-attachments";
-import { decodeIssueAgentReplyCompletion } from "./issue-request-contract";
+import { decodeIssueAgentReplyResult } from "./issue-request-contract";
 import { decodeRequestSync } from "./request-schema";
 import type {
   ReplyAttachmentMetadata,
@@ -25,8 +22,8 @@ import type {
 import { UuidString } from "./schema-codecs";
 
 const canonicalUuid = decodeRequestSync(UuidString);
-const decodeChannelReplyCompleteInput = decodeRequestSync(
-  channelReplyCompleteInputSchema,
+const decodeChannelReplyCompletion = decodeRequestSync(
+  channelReplyCompletionSchema,
 );
 const imageMimeTypes = new Set<string>(
   issueAttachmentMimeTypes.filter((type) => type.startsWith("image/")),
@@ -56,6 +53,12 @@ const requiredText = (value: string, field: string, maximum: number) => {
   }
   return normalized;
 };
+
+const optionalText = (
+  value: string | undefined,
+  field: string,
+  maximum: number,
+) => value === undefined ? null : requiredText(value, field, maximum);
 
 const requestId = (value: string) =>
   mapping(() => canonicalUuid(value).toLowerCase(), "Request ID is invalid");
@@ -265,7 +268,7 @@ export type IssueReplyCompletionInput = {
     | { case: "failure"; error: string }
     | {
         case: "success";
-        completion: ReturnType<typeof decodeIssueAgentReplyCompletion>;
+        completion: ReturnType<typeof decodeIssueAgentReplyResult>;
       };
 };
 
@@ -278,19 +281,16 @@ export function completeIssueReplyInputFromProto(
   const workerId = requiredText(request.workerId, "Worker ID", 128);
   if (request.outcome.case === "failure") {
     const failure = request.outcome.value;
-    const completion = mapping(() => decodeIssueAgentReplyCompletion({
-      projectId: normalizedProjectId,
-      workerId,
-      claimToken: claim.claimToken,
-      error: failure.error,
-    }), "Issue reply failure is invalid");
     return {
       requestId: requestId(request.requestId),
       projectId: normalizedProjectId,
       workerId,
       claim,
       attachmentIds: [],
-      outcome: { case: "failure", error: completion.error! },
+      outcome: {
+        case: "failure",
+        error: requiredText(failure.error, "Issue reply error", 4_000),
+      },
     };
   }
   if (request.outcome.case !== "success") {
@@ -343,10 +343,7 @@ export function completeIssueReplyInputFromProto(
     default:
       throw new ReplyCompletionMappingError("Issue reply action is unknown");
   }
-  const completion = mapping(() => decodeIssueAgentReplyCompletion({
-    projectId: normalizedProjectId,
-    workerId,
-    claimToken: claim.claimToken,
+  const completion = mapping(() => decodeIssueAgentReplyResult({
     body: success.body,
     proposedAction,
     executionProposal,
@@ -385,14 +382,6 @@ export function completeChannelReplyInputFromProto(
   const workerId = requiredText(request.workerId, "Worker ID", 128);
   if (request.outcome.case === "failure") {
     const failure = request.outcome.value;
-    const decoded = mapping(() => decodeChannelReplyCompleteInput({
-      organizationId: claim.organizationId,
-      workerId,
-      claimToken: claim.claimToken,
-      error: failure.error,
-      result: null,
-      conversationId: null,
-    }), "Channel reply failure is invalid");
     return {
       requestId: requestId(request.requestId),
       projectId: normalizedProjectId,
@@ -400,7 +389,10 @@ export function completeChannelReplyInputFromProto(
       claim,
       attachmentIds: [],
       conversationId: null,
-      outcome: { case: "failure", error: decoded.error! },
+      outcome: {
+        case: "failure",
+        error: requiredText(failure.error, "Channel reply error", 4_000),
+      },
     };
   }
   if (request.outcome.case !== "success") {
@@ -478,21 +470,14 @@ export function completeChannelReplyInputFromProto(
     default:
       throw new ReplyCompletionMappingError("Channel reply action is unknown");
   }
-  const decoded = mapping(() => decodeChannelReplyCompleteInput({
-    organizationId: claim.organizationId,
-    workerId,
-    claimToken: claim.claimToken,
-    conversationId: success.conversationId ?? null,
-    error: null,
-    result: {
-      body: success.body,
-      document,
-      issueProposal,
-      issueBatchProposal,
-      executionProposal,
-      skillExecutionProposal,
-      delegation,
-    },
+  const completion = mapping(() => decodeChannelReplyCompletion({
+    body: success.body,
+    document,
+    issueProposal,
+    issueBatchProposal,
+    executionProposal,
+    skillExecutionProposal,
+    delegation,
   }), "Channel reply result is invalid");
   return {
     requestId: requestId(request.requestId),
@@ -500,7 +485,11 @@ export function completeChannelReplyInputFromProto(
     workerId,
     claim,
     attachmentIds: attachmentReferences(success.attachments),
-    conversationId: decoded.conversationId,
-    outcome: { case: "success", completion: decoded.result! },
+    conversationId: optionalText(
+      success.conversationId,
+      "Channel reply conversation ID",
+      1_024,
+    ),
+    outcome: { case: "success", completion },
   };
 }

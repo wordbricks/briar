@@ -1,0 +1,137 @@
+import { create } from "@bufbuild/protobuf";
+import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
+import {
+  ChannelReplyClaimIdentitySchema,
+  type CompleteIssueReplyRequest,
+  CompleteChannelReplyRequestSchema,
+  CompleteIssueReplyRequestSchema,
+  IssueReplyClaimIdentitySchema,
+  WorkClaimIdentitySchema,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import { describe, expect, it } from "vitest";
+import {
+  completeChannelReplyInputFromProto,
+  completeIssueReplyInputFromProto,
+} from "./worker-reply-completion-mappers";
+
+const requestId = "10000000-0000-4000-8000-000000000001";
+const projectId = "20000000-0000-4000-8000-000000000001";
+const organizationId = "30000000-0000-4000-8000-000000000001";
+const workId = "40000000-0000-4000-8000-000000000001";
+const runId = "50000000-0000-4000-8000-000000000001";
+
+const issueWork = () => create(WorkClaimIdentitySchema, {
+  workId,
+  runId,
+  claimToken: "briar_reply_claim_generated",
+  work: {
+    case: "issueReply",
+    value: create(IssueReplyClaimIdentitySchema),
+  },
+});
+
+const channelWork = () => create(WorkClaimIdentitySchema, {
+  workId,
+  runId,
+  claimToken: "briar_channel_claim_generated",
+  work: {
+    case: "channelReply",
+    value: create(ChannelReplyClaimIdentitySchema, { organizationId }),
+  },
+});
+
+describe("reply completion protobuf mapping", () => {
+  it("accepts the protobuf worker limit and normalizes the domain payload", () => {
+    const workerId = "w".repeat(128);
+    const mapped = completeChannelReplyInputFromProto(create(
+      CompleteChannelReplyRequestSchema,
+      {
+        requestId,
+        projectId,
+        workerId,
+        work: channelWork(),
+        outcome: {
+          case: "success",
+          value: {
+            body: "  Done.  ",
+            conversationId: "  conversation-1  ",
+          },
+        },
+      },
+    ));
+
+    expect(mapped.workerId).toBe(workerId);
+    expect(mapped.conversationId).toBe("conversation-1");
+    expect(mapped.outcome).toMatchObject({
+      case: "success",
+      completion: { body: "Done." },
+    });
+  });
+
+  it("retains semantic validation for generated success payloads", () => {
+    expect(() => completeIssueReplyInputFromProto(create(
+      CompleteIssueReplyRequestSchema,
+      {
+        requestId,
+        projectId,
+        workerId: "worker-1",
+        work: issueWork(),
+        outcome: { case: "success", value: { body: "   " } },
+      },
+    ))).toThrow("Issue reply result is invalid");
+
+    expect(() => completeChannelReplyInputFromProto(create(
+      CompleteChannelReplyRequestSchema,
+      {
+        requestId,
+        projectId,
+        workerId: "worker-1",
+        work: channelWork(),
+        outcome: {
+          case: "success",
+          value: {
+            body: "Create both issues.",
+            action: {
+              case: "artifacts",
+              value: {
+                proposal: {
+                  case: "issueBatch",
+                  value: {
+                    items: [{
+                      key: "only",
+                      issue: { title: "Only", status: RunStatus.BACKLOG },
+                    }],
+                    dependencies: [{
+                      prerequisiteKey: "only",
+                      dependentKey: "only",
+                    }],
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    ))).toThrow("Channel reply result is invalid");
+  });
+
+  it("fails closed when the generated outcome oneof is absent or unknown", () => {
+    const absent = create(CompleteIssueReplyRequestSchema, {
+      requestId,
+      projectId,
+      workerId: "worker-1",
+      work: issueWork(),
+    });
+    expect(() => completeIssueReplyInputFromProto(absent)).toThrow(
+      "Issue reply outcome is required",
+    );
+
+    const unknown = {
+      ...absent,
+      outcome: { case: "futureOutcome", value: {} },
+    } as unknown as CompleteIssueReplyRequest;
+    expect(() => completeIssueReplyInputFromProto(unknown)).toThrow(
+      "Issue reply outcome is required",
+    );
+  });
+});
