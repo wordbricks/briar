@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package briar.app.v1;
+
+import "briar/app/v1/common.proto";
+
+option swift_prefix = "BriarAPI_";
+
+// LinearImportService owns the authenticated one-time import control plane.
+// API keys are request-only secrets and are never reflected in responses or
+// error metadata. Linear's provider GraphQL remains an internal Worker edge.
+service LinearImportService {
+  rpc ConnectLinearImport(ConnectLinearImportRequest) returns (ConnectLinearImportResponse);
+  rpc ListLinearImportStates(ListLinearImportStatesRequest) returns (ListLinearImportStatesResponse);
+  rpc ImportLinearIssues(ImportLinearIssuesRequest) returns (ImportLinearIssuesResponse);
+}
+
+message LinearImportViewer {
+  string name = 1;
+  optional string email = 2;
+  string organization_name = 3;
+}
+
+message LinearTeam {
+  string id = 1;
+  string name = 2;
+  string key = 3;
+}
+
+message LinearWorkflowState {
+  string id = 1;
+  string name = 2;
+  string type = 3;
+  string color = 4;
+  double position = 5;
+  string team_id = 6;
+  string team_key = 7;
+  string team_name = 8;
+}
+
+message ConnectLinearImportRequest {
+  string project_id = 1;
+  string api_key = 2;
+}
+
+message ConnectLinearImportResponse {
+  LinearImportViewer viewer = 1;
+  repeated LinearTeam teams = 2;
+}
+
+message ListLinearImportStatesRequest {
+  string project_id = 1;
+  string api_key = 2;
+  repeated string team_ids = 3;
+}
+
+message ListLinearImportStatesResponse {
+  repeated LinearWorkflowState states = 1;
+}
+
+message LinearStatusMapping {
+  string state_id = 1;
+
+  // A workflow-stage placement always means RUNNING. All other placements use
+  // an explicit persisted run status, eliminating the former string mini-language.
+  oneof placement {
+    RunStatus status = 2;
+    string workflow_stage_id = 3;
+  }
+}
+
+message ImportLinearIssuesRequest {
+  string project_id = 1;
+  string api_key = 2;
+  repeated string team_ids = 3;
+  repeated LinearStatusMapping status_mappings = 4;
+}
+
+message ImportLinearIssuesResponse {
+  uint32 imported = 1;
+  uint32 skipped = 2;
+  uint32 failed = 3;
+  uint32 total = 4;
+  bool truncated = 5;
+}
