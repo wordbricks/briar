@@ -87,6 +87,31 @@ finds a release blocker, fix the SwiftUI implementation, increment the build
 number, repeat the full gate, and submit the corrected native build. There is no
 Tauri iOS rollback binary or source-retention policy.
 
+## 2026-08-30 — 1.2.172 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.172`
+- App Store Connect build: `1`
+- App Store Connect build ID: `ed8f0017-6397-43be-9469-87e7a7c29587`
+- Latest main commit: `95bf188eca59d60507b54a6eb17e7ae27c373b6b`
+- Release source commit: `7c27c93c3a98e3486a5e3758ff3776ef98a47f0c`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `e747f6d9219c051c553eff44c8e1b49f6d220ae0f75fe3c48d7f12a72602193f`
+
+The release passed the shared API contract (12/12), Swift unit tests, 19 iPhone
+UI tests, iPad accessibility checks, Production analyze/build, session/download/
+log security invariant checks, and the retained Tauri Android arm64 debug
+regression build. The release gate was updated to enter issue creation through
+the current Tasks floating menu. The archive identity, App Store provisioning,
+distribution signature, and production entitlements were independently verified
+before the exact exported IPA was uploaded.
+
 ## 2026-08-28 — 1.2.170 (1)
 
 - App: Briar Companion (`app.briar.companion`)
