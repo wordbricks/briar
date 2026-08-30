@@ -1,6 +1,14 @@
+import { fromBinary } from "@bufbuild/protobuf";
+import {
+  MobilePushNotificationTargetSchema,
+} from "@briar/contracts/gen/briar/app/v1/inbox_pb";
 import { describe, expect, it } from "vitest";
 import type { InboxFeedMessage } from "./inbox-feed";
-import { normalizedMobilePushCollapseId } from "./mobile-push-provider";
+import {
+  mobilePushTargetProviderData,
+  mobilePushTargetProtoBase64,
+  normalizedMobilePushCollapseId,
+} from "./mobile-push-provider";
 import {
   classifyMobilePushInboxMessage,
   mobilePushNotificationContent,
@@ -65,7 +73,7 @@ describe("mobile push Inbox adapter", () => {
     expect(classifyMobilePushInboxMessage(baseMessage)).toBe("activity");
   });
 
-  it("builds a localized provider payload with a navigable target", () => {
+  it("roundtrips the generated destination oneof through provider base64", () => {
     const content = mobilePushNotificationContent({
       ...baseMessage,
       id: "conversation:33333333-3333-4333-8333-333333333333",
@@ -76,20 +84,53 @@ describe("mobile push Inbox adapter", () => {
       authorName: "Eve",
       body: "First line\n\nSecond line",
     }, "ko");
+    const encoded = mobilePushTargetProtoBase64(content.target);
+    const decoded = fromBinary(
+      MobilePushNotificationTargetSchema,
+      Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0)),
+    );
 
-    expect(content).toMatchObject({
-      title: "Eve in BR-42",
-      body: "First line\nSecond line",
-      target: {
-        messageId: "conversation:33333333-3333-4333-8333-333333333333",
-        messageVersion: baseMessage.version,
-        projectId: baseMessage.projectId,
-        targetId: baseMessage.targetId,
-        kind: "conversation",
-        conversationMessageId: "33333333-3333-4333-8333-333333333333",
+    expect(decoded).toMatchObject({
+      inboxMessageId:
+        "conversation:33333333-3333-4333-8333-333333333333",
+      inboxMessageVersion: baseMessage.version,
+      notificationId: content.collapseId,
+      projectId: baseMessage.projectId,
+      targetId: baseMessage.targetId,
+      destination: {
+        case: "conversation",
+        value: {
+          conversationMessageId: "33333333-3333-4333-8333-333333333333",
+        },
       },
     });
-    expect(content.target.notificationId).toBe(content.collapseId);
+    expect(mobilePushTargetProviderData(content.target)).toEqual({
+      briarInboxTargetProto: encoded,
+    });
+
+    const destinationCases = [
+      baseMessage,
+      {
+        ...baseMessage,
+        kind: "conversation" as const,
+        messageId: "33333333-3333-4333-8333-333333333333",
+      },
+      {
+        ...baseMessage,
+        kind: "channel" as const,
+        messageId: "55555555-5555-4555-8555-555555555555",
+        rootMessageId: "66666666-6666-4666-8666-666666666666",
+      },
+      { ...baseMessage, kind: "session" as const },
+    ].map((message) =>
+      mobilePushNotificationContent(message, "en").target.destination.case
+    );
+    expect(destinationCases).toEqual([
+      "issue",
+      "conversation",
+      "channel",
+      "session",
+    ]);
   });
 
   it("prioritizes the newest groups when a flush must cap alerts", () => {

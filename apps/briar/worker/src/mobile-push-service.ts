@@ -1,3 +1,10 @@
+import { create } from "@bufbuild/protobuf";
+import { EmptySchema } from "@bufbuild/protobuf/wkt";
+import {
+  MobilePushChannelDestinationSchema,
+  MobilePushConversationDestinationSchema,
+  MobilePushNotificationTargetSchema,
+} from "@briar/contracts/gen/briar/app/v1/inbox_pb";
 import type { InboxFeedMessage } from "./inbox-feed";
 import { listInboxReadStates } from "./inbox-read-state-repository";
 import { sendMobilePush, type MobilePushContent } from "./mobile-push-provider";
@@ -95,6 +102,47 @@ const statusLabels = {
   Record<"paused" | "completed" | "failed" | "blocked", string>
 >;
 
+const requiredDestinationField = (
+  value: string | undefined,
+  field: string,
+) => {
+  if (!value) throw new Error(`Inbox ${field} is required for mobile push`);
+  return value;
+};
+
+const mobilePushDestination = (message: InboxFeedMessage) => {
+  switch (message.kind) {
+    case "issue":
+      return { case: "issue", value: create(EmptySchema) } as const;
+    case "conversation":
+      return {
+        case: "conversation",
+        value: create(MobilePushConversationDestinationSchema, {
+          conversationMessageId: requiredDestinationField(
+            message.messageId,
+            "conversation message ID",
+          ),
+        }),
+      } as const;
+    case "channel":
+      return {
+        case: "channel",
+        value: create(MobilePushChannelDestinationSchema, {
+          channelMessageId: requiredDestinationField(
+            message.messageId,
+            "channel message ID",
+          ),
+          rootMessageId: requiredDestinationField(
+            message.rootMessageId,
+            "channel root message ID",
+          ),
+        }),
+      } as const;
+    case "session":
+      return { case: "session", value: create(EmptySchema) } as const;
+  }
+};
+
 export function mobilePushNotificationContent(
   message: InboxFeedMessage,
   locale: MobilePushLocale,
@@ -123,23 +171,14 @@ export function mobilePushNotificationContent(
     title: title.slice(0, 160),
     body: preview(body) || status,
     collapseId: mobilePushNotificationGroupId(message),
-    target: {
-      messageId: message.id,
-      messageVersion: message.version,
+    target: create(MobilePushNotificationTargetSchema, {
+      inboxMessageId: message.id,
+      inboxMessageVersion: message.version,
       notificationId: mobilePushNotificationGroupId(message),
       projectId: message.projectId,
       targetId: message.targetId,
-      kind: message.kind,
-      ...(message.kind === "conversation" && message.messageId
-        ? { conversationMessageId: message.messageId }
-        : {}),
-      ...(message.kind === "channel" && message.messageId
-        ? { channelMessageId: message.messageId }
-        : {}),
-      ...(message.kind === "channel" && message.rootMessageId
-        ? { rootMessageId: message.rootMessageId }
-        : {}),
-    },
+      destination: mobilePushDestination(message),
+    }),
   };
 }
 

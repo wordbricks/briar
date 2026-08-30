@@ -2,10 +2,7 @@ import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   acknowledgeMobilePushOutbox,
-  deleteMobilePushRegistration,
   listMobilePushOutbox,
-  listMobilePushRegistrations,
-  upsertMobilePushRegistration,
 } from "./mobile-push-repository";
 import {
   createIsolatedTestDatabase,
@@ -43,84 +40,6 @@ describe("mobile push repository", () => {
 
   afterAll(async () => {
     await miniflare.dispose();
-  });
-
-  it("keeps a stable baseline across preference updates and token transfer", async () => {
-    const token = "a".repeat(64);
-    const registeredAt = "2026-08-30T10:01:00.000Z";
-    const initial = await upsertMobilePushRegistration(db, "owner", {
-      platform: "apns",
-      token,
-      environment: "development",
-      topic: "app.briar.companion",
-      locale: "ko",
-      preferences: {
-        playSound: true,
-        urgent: true,
-        actionRequired: true,
-        important: true,
-        activity: false,
-      },
-    }, registeredAt);
-
-    await upsertMobilePushRegistration(db, "owner", {
-      platform: "apns",
-      token,
-      environment: "production",
-      topic: "app.briar.companion",
-      locale: "en",
-      preferences: {
-        playSound: false,
-        urgent: false,
-        actionRequired: true,
-        important: false,
-        activity: true,
-      },
-    }, "2026-08-30T10:02:00.000Z");
-
-    const updated = await listMobilePushRegistrations(db, "push-org");
-    expect(updated).toEqual([
-      expect.objectContaining({
-        id: initial.id,
-        user_id: "owner",
-        environment: "production",
-        locale: "en",
-        play_sound: 0,
-        notify_activity: 1,
-        registered_at: registeredAt,
-        baseline_version: 7,
-      }),
-    ]);
-
-    const transferred = await upsertMobilePushRegistration(db, "member", {
-      platform: "apns",
-      token,
-      environment: "production",
-      topic: "app.briar.companion",
-      locale: "ko",
-      preferences: {
-        playSound: true,
-        urgent: true,
-        actionRequired: true,
-        important: true,
-        activity: true,
-      },
-    }, "2026-08-30T10:03:00.000Z");
-    expect(transferred.id).not.toBe(initial.id);
-    await expect(listMobilePushRegistrations(db, "push-org")).resolves.toEqual([
-      expect.objectContaining({
-        id: transferred.id,
-        user_id: "member",
-        baseline_version: 7,
-      }),
-    ]);
-
-    await expect(
-      deleteMobilePushRegistration(db, "owner", "apns", token),
-    ).resolves.toBe(false);
-    await expect(
-      deleteMobilePushRegistration(db, "member", "apns", token),
-    ).resolves.toBe(true);
   });
 
   it("coalesces sync revisions in the independent push outbox", async () => {

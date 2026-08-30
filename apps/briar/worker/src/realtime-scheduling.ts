@@ -39,6 +39,24 @@ import { HttpError } from "./http-response";
 import { mobilePushProvidersConfigured } from "./mobile-push-provider";
 import { flushMobilePushOutbox } from "./mobile-push-service";
 
+type OrganizationInboxFlushServices = {
+  readonly mobilePushProvidersConfigured:
+    typeof mobilePushProvidersConfigured;
+  readonly flushMobilePushOutbox: typeof flushMobilePushOutbox;
+  readonly listRealtimeOutbox: typeof listOrganizationInboxRealtimeOutbox;
+  readonly publishRealtime: typeof publishInboxRealtime;
+  readonly acknowledgeRealtime:
+    typeof acknowledgeOrganizationInboxRealtimeOutbox;
+};
+
+const organizationInboxFlushServices: OrganizationInboxFlushServices = {
+  mobilePushProvidersConfigured,
+  flushMobilePushOutbox,
+  listRealtimeOutbox: listOrganizationInboxRealtimeOutbox,
+  publishRealtime: publishInboxRealtime,
+  acknowledgeRealtime: acknowledgeOrganizationInboxRealtimeOutbox,
+};
+
 type ActivityReplyIdentity = {
   id: string;
   trigger_message_id: string;
@@ -130,40 +148,45 @@ function scheduleActivityClear<Frame>(
 export async function flushOrganizationInboxRealtimeOutbox(
   env: Env,
   db: D1Database,
+  services: OrganizationInboxFlushServices = organizationInboxFlushServices,
 ) {
-  if (mobilePushProvidersConfigured(env)) {
-    try {
-      await flushMobilePushOutbox(env, db);
-    } catch (error) {
-      // Remote push retries from its own outbox and must never prevent the
-      // existing websocket fan-out from advancing.
+  const pushFlush = services.mobilePushProvidersConfigured(env)
+    ? services.flushMobilePushOutbox(env, db).catch((error) => {
+      // Remote push retries from its own outbox and must never delay or
+      // prevent the existing websocket fan-out from advancing.
       console.error(JSON.stringify({
         message: "Mobile push outbox flush failed",
         error: error instanceof Error ? error.message : String(error),
       }));
+    })
+    : undefined;
+  if (env.CHANNEL_REALTIME) {
+    const pending = await services.listRealtimeOutbox(db);
+    for (const row of pending) {
+      try {
+        await services.publishRealtime(
+          env,
+          row.organization_id,
+          row.version,
+        );
+        await services.acknowledgeRealtime(
+          db,
+          row.organization_id,
+          row.version,
+        );
+      } catch (error) {
+        // Keep the transactional outbox row for the next mutation, scheduled
+        // sweep, or client fallback refresh.
+        console.error(JSON.stringify({
+          message: "Inbox realtime publish failed",
+          organizationId: row.organization_id,
+          version: row.version,
+          error: error instanceof Error ? error.message : String(error),
+        }));
+      }
     }
   }
-  if (!env.CHANNEL_REALTIME) return;
-  const pending = await listOrganizationInboxRealtimeOutbox(db);
-  for (const row of pending) {
-    try {
-      await publishInboxRealtime(env, row.organization_id, row.version);
-      await acknowledgeOrganizationInboxRealtimeOutbox(
-        db,
-        row.organization_id,
-        row.version,
-      );
-    } catch (error) {
-      // Keep the transactional outbox row for the next mutation, scheduled
-      // sweep, or client fallback refresh.
-      console.error(JSON.stringify({
-        message: "Inbox realtime publish failed",
-        organizationId: row.organization_id,
-        version: row.version,
-        error: error instanceof Error ? error.message : String(error),
-      }));
-    }
-  }
+  await pushFlush;
 }
 
 export function scheduleInboxRealtimeFlush(

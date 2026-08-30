@@ -6,6 +6,7 @@ import {
 } from "../../src/lib/channel-agent-activity";
 import {
   channelActivityCredential,
+  flushOrganizationInboxRealtimeOutbox,
   issueActivityCredential,
   scheduleChannelActivityClear,
   scheduleInboxRealtimeFlush,
@@ -146,5 +147,38 @@ describe("activity scheduling adapters", () => {
       { waitUntil } as unknown as ExecutionContext,
     );
     expect(waitUntil).not.toHaveBeenCalled();
+  });
+
+  it("does not let a slow failing push provider delay realtime fan-out", async () => {
+    let rejectPush: (error: Error) => void = () => undefined;
+    const push = new Promise<void>((_resolve, reject) => {
+      rejectPush = reject;
+    });
+    const publishRealtime = vi.fn(async () => undefined);
+    const acknowledgeRealtime = vi.fn(async () => undefined);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const flushing = flushOrganizationInboxRealtimeOutbox(
+      { CHANNEL_REALTIME: {} } as Env,
+      {} as D1Database,
+      {
+        mobilePushProvidersConfigured: () => true,
+        flushMobilePushOutbox: () => push,
+        listRealtimeOutbox: async () => [{
+          organization_id: organizationId,
+          version: 4,
+        }],
+        publishRealtime,
+        acknowledgeRealtime,
+      },
+    );
+
+    await vi.waitFor(() => expect(publishRealtime).toHaveBeenCalledOnce());
+    expect(acknowledgeRealtime).toHaveBeenCalledOnce();
+    rejectPush(new Error("provider unavailable"));
+    await expect(flushing).resolves.toBeUndefined();
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining(
+      "Mobile push outbox flush failed",
+    ));
+    consoleError.mockRestore();
   });
 });
