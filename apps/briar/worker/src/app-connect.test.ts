@@ -51,9 +51,15 @@ describe("app Connect adapter", () => {
     );
     const services = { requireSession, listProjects };
     const request = connectRequest();
+    const requireRunExecutionProject = vi.fn(async () => projectRow.id);
 
     const response = await handleAppConnectRequest(
-      { request, auth, env },
+      {
+        request,
+        auth,
+        env,
+        requireRunExecutionProject,
+      },
       services,
     );
 
@@ -78,7 +84,12 @@ describe("app Connect adapter", () => {
 
     requireSession.mockRejectedValueOnce(new HttpError(401, "Unauthorized"));
     const unauthorized = await handleAppConnectRequest(
-      { request: connectRequest(), auth, env },
+      {
+        request: connectRequest(),
+        auth,
+        env,
+        requireRunExecutionProject,
+      },
       services,
     );
 

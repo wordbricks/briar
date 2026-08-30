@@ -25,13 +25,6 @@ import {
 } from "./schema-codecs";
 import { decodeRequestSync } from "./request-schema";
 
-export const ClaimInput = strictSchema(Schema.Struct({
-  claimedBy: trimmedText(1, 128),
-  workerId: Schema.optional(trimmedText(1, 128)),
-  projectId: Schema.optional(UuidString),
-  runId: Schema.optional(UuidString),
-}));
-
 export const WorkerClaimInput = strictSchema(Schema.Struct({
   claimedBy: trimmedText(1, 128),
   workerId: trimmedText(1, 128),
@@ -293,7 +286,6 @@ export const ProjectAgentScheduleRunCompletion = strictSchema(Schema.Struct({
   }),
 ));
 
-export const decodeClaimInput = decodeRequestSync(ClaimInput);
 export const decodeWorkerClaimInput = decodeRequestSync(WorkerClaimInput);
 export const decodeIssueReplyClaimInput = decodeRequestSync(
   IssueReplyClaimInput,

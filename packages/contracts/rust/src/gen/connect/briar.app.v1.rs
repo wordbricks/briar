@@ -6388,7 +6388,8 @@ pub trait IssueService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the ListRunEvidence RPC.
+    /// Shared intentionally with WorkerExecutionService so evidence has one DTO.
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

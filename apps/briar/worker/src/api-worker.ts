@@ -27,7 +27,6 @@ import { handleProjectGithubRoute } from "./project-github-routes";
 import { handleProjectLinearRoute } from "./project-linear-routes";
 import { handleProjectSettingsRoute } from "./project-settings-routes";
 import { handleProjectWorkerRoute } from "./project-worker-routes";
-import { handleQueueClaimRoute } from "./queue-claim-routes";
 import { handlePublicRoute } from "./public-routes";
 import { handleIncomingChannelWebhookRoute } from "./incoming-channel-webhook";
 import { handleRealtimeRoute } from "./realtime-routes";
@@ -463,14 +462,6 @@ async function route(
     return projectAgentTaskWorkerResponse;
   }
 
-  const queueClaimResponse = await handleQueueClaimRoute({
-    request,
-    url,
-    db,
-    env,
-  });
-  if (queueClaimResponse !== undefined) return queueClaimResponse;
-
   const runAgentResponse = await handleRunAgentRoute({
     request,
     url,
@@ -547,6 +538,8 @@ export default {
         auth,
         env,
         context: ctx,
+        requireRunExecutionProject: (runId) =>
+          requireRunExecutionProject(env.DB, request, runId),
       });
       // Connect uses POST for reads as well as writes. RPC implementations own
       // mutation scheduling instead of relying on the legacy HTTP verb fallback.

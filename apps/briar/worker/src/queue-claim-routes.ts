@@ -11,17 +11,11 @@ import {
   issueClaimExecutionConfig,
   legacyAgentSkillInstructions,
 } from "./agent-execution-config";
-import { HttpError, json } from "./http-response";
+import { HttpError } from "./http-response";
 import { issueAttachmentJson } from "./issue-conversation-json";
 import { claimConversationJson } from "./issue-conversation-json";
 import { listIssueMessagesWithArchive } from "./issue-conversation-service";
-import { readJson } from "./request-readers";
-import {
-  type AuthenticatedWorkerProject,
-  requireAgentProject,
-  requireWorkerProjectBinding,
-} from "./worker-route-auth";
-import { decodeClaimInput } from "./worker-request-contract";
+import type { AuthenticatedWorkerProject } from "./worker-route-auth";
 import { latestExecutionWorkerUpdateHandoff } from "./worker-update-repository";
 import { claimWorkflowContext } from "./workflow-resume";
 import {
@@ -214,30 +208,4 @@ export async function claimNextQueueWork(input: {
               : null,
           }
         : null;
-}
-
-export async function handleQueueClaimRoute(input: {
-  request: Request;
-  url: URL;
-  db: D1Database;
-  env: Env;
-}): Promise<Response | undefined> {
-  const { request, url, db, env } = input;
-  if (url.pathname !== "/queue/claims" || request.method !== "POST") {
-    return undefined;
-  }
-  const claim = decodeClaimInput(await readJson(request));
-  if (claim.workerId || claim.projectId) {
-    throw new HttpError(400, "Worker claims use briar.worker.v1.WorkerQueueService");
-  }
-  const projectId = await requireAgentProject(db, request);
-  return json({
-    work: await claimNextQueueWork({
-      db,
-      env,
-      projectId,
-      claimedBy: claim.claimedBy,
-      runId: claim.runId,
-    }),
-  });
 }

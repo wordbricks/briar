@@ -141,51 +141,82 @@ fn records_an_actionable_handoff_for_runtime_blockers() {
         .contains("저장소 연결을 다시 확인"));
 }
 
-#[test]
-fn parses_the_claimed_runs_durable_issue_snapshot() {
-    let response = serde_json::from_value::<CliClaimResponse>(serde_json::json!({
-        "work": {
-            "runId": "515b7a2c-8918-5a8f-a292-f0b95090281c",
-            "runNumber": 13,
-            "sourceKey": "BRIAR-13",
-            "title": "Render the attached layout",
-            "description": "Match the mobile reference.",
-            "priority": 1,
-            "context": { "customer": "enterprise" },
-            "workflow": { "version": 2 },
-            "attachments": [{
-                "id": "attachment-1",
-                "filename": "layout.png",
-                "contentType": "image/png",
-                "byteSize": 2048,
-                "url": "/projects/project-1/runs/run-1/attachments/attachment-1",
-                "localPath": "/tmp/attachments/layout.png",
-                "downloadError": null
-            }],
-            "messages": [{
-                "id": "message-1",
-                "parentMessageId": null,
-                "body": "The compact breakpoint is required.",
-                "author": {
-                    "id": "user-1",
-                    "name": "Jay",
-                    "provider": null
-                },
-                "createdAt": "2026-07-30T00:00:00Z",
-                "updatedAt": "2026-07-30T00:00:00Z"
-            }]
+fn generated_claim(
+    workspace: Option<local_proto::LocalWorkspace>,
+    workspace_error: Option<&str>,
+) -> local_proto::LocalClaimResult {
+    let run = local_proto::LocalClaimedRun {
+        payload: worker_proto::ClaimedIssuePayload {
+            run_id: "515b7a2c-8918-5a8f-a292-f0b95090281c".to_string(),
+            run_number: 13,
+            source_key: "BRIAR-13".to_string(),
+            title: "Render the attached layout".to_string(),
+            workflow: types_proto::AutoHuntWorkflow {
+                version: 2,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
         }
-    }))
-    .expect("claim response should parse");
-    let work = response.work.expect("claim should contain work");
+        .into(),
+        workspace: workspace.into(),
+        workspace_error: workspace_error.map(str::to_string),
+        ..Default::default()
+    };
+    local_proto::LocalClaimResult {
+        outcome: Some(local_proto::local_claim_result::Outcome::Claimed(Box::new(
+            run,
+        ))),
+        ..Default::default()
+    }
+}
 
+#[test]
+fn maps_the_generated_no_work_outcome() {
+    let result = claim_outcome(local_proto::LocalClaimResult {
+        outcome: Some(local_proto::local_claim_result::Outcome::NoWork(
+            Box::default(),
+        )),
+        ..Default::default()
+    })
+    .expect("generated no-work result should map");
+
+    assert!(matches!(result, AutoHuntClaimOutcome::NoWork));
+}
+
+#[test]
+fn maps_the_generated_worktree_to_the_runtime_domain() {
+    let result = claim_outcome(generated_claim(
+        Some(local_proto::LocalWorkspace {
+            kind: local_proto::local_workspace::Kind::Worktree.into(),
+            path: "/tmp/briar/worktrees/BRIAR-13".to_string(),
+            ..Default::default()
+        }),
+        None,
+    ))
+    .expect("generated claim should map");
+
+    let AutoHuntClaimOutcome::Claimed(claimed) = result else {
+        panic!("claim should contain work");
+    };
+    assert_eq!(claimed.issue.source_key, "BRIAR-13");
     assert_eq!(
-        work.description.as_deref(),
-        Some("Match the mobile reference.")
+        claimed.workspace_path.as_deref(),
+        Some("/tmp/briar/worktrees/BRIAR-13")
     );
+}
+
+#[test]
+fn preserves_workspace_allocation_failure_as_claimed_work() {
+    let result = claim_outcome(generated_claim(None, Some("worktree creation failed")))
+        .expect("workspace failure should remain reportable");
+
+    let AutoHuntClaimOutcome::Claimed(claimed) = result else {
+        panic!("claim should remain claimed");
+    };
+    assert!(claimed.workspace_path.is_none());
     assert_eq!(
-        work.attachments[0].local_path.as_deref(),
-        Some("/tmp/attachments/layout.png")
+        claimed.workspace_error.as_deref(),
+        Some("worktree creation failed")
     );
-    assert_eq!(work.messages[0].body, "The compact breakpoint is required.");
 }

@@ -3,6 +3,7 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import {
   HandoffWorkResponse_Outcome,
+  WorkerExecutionService,
   WorkerQueueService,
   type ChannelActivityCredential as ProtoChannelActivityCredential,
   type WorkClaimIdentity,
@@ -153,5 +154,18 @@ export function createWorkerQueueClient(apiUrl: string, token: string) {
       }
       return response;
     },
+  };
+}
+
+export function createAuthenticatedWorkerExecutionClient(
+  apiUrl: string,
+  token: string,
+) {
+  return {
+    client: createClient(
+    WorkerExecutionService,
+    createConnectTransport({ baseUrl: apiUrl.replace(/\/+$/u, "") }),
+    ),
+    options: { headers: { Authorization: `Bearer ${token}` } },
   };
 }

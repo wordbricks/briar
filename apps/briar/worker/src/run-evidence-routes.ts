@@ -39,14 +39,28 @@ export async function listProjectRunEvidence(input: {
 }) {
   const project = await getProject(input.db, input.projectId, input.userId);
   if (!project) throw new HttpError(404, "Project not found");
+  return listRunEvidenceForProject({
+    db: input.db,
+    archivesBucket: input.archivesBucket,
+    projectId: project.id,
+    runId: input.runId,
+  });
+}
+
+export async function listRunEvidenceForProject(input: {
+  db: D1Database;
+  archivesBucket: R2Bucket;
+  projectId: string;
+  runId: string;
+}) {
   const [hotEvidence, revisions, hotImages, archived] = await Promise.all([
-    listRunEvidence(input.db, project.id, input.runId),
-    listRunStageRevisions(input.db, project.id, input.runId),
-    listRunEvidenceImages(input.db, project.id, input.runId),
+    listRunEvidence(input.db, input.projectId, input.runId),
+    listRunStageRevisions(input.db, input.projectId, input.runId),
+    listRunEvidenceImages(input.db, input.projectId, input.runId),
     listArchivedRunEvidence(
       input.db,
       input.archivesBucket,
-      project.id,
+      input.projectId,
       input.runId,
     ),
   ]);

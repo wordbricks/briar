@@ -31,11 +31,16 @@ import {
 } from "./command-contract";
 import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
+import type {
+  QueuedAttachment,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { fetchDashboard } from "./app-connect-client";
 import {
-  decodeQueuedIssue,
-  type QueuedAttachment,
-} from "./queue-claim-contract";
+  localClaimResult,
+  localClaimResultJson,
+  localNoWorkResult,
+  type LocalClaimWorkspace,
+} from "./local-output-contract";
 import {
   executionToken,
   configDirectory,
@@ -45,13 +50,20 @@ import {
   loadConfig,
   saveConfig,
   saveConfigAt,
-  request,
   runGit,
   worktreeSettings,
   worktreesEnabled,
   activeClaimWorktree,
   currentProject,
 } from "./command-support";
+import {
+  createAuthenticatedWorkerExecutionClient,
+} from "./worker-queue-client";
+
+type DownloadableAttachment = Pick<
+  QueuedAttachment,
+  "id" | "filename" | "contentType" | "byteSize" | "url"
+>;
 
 function safeAttachmentFilename(filename: string) {
   const normalized = filename
@@ -67,7 +79,7 @@ async function downloadClaimAttachment(
   token: string,
   projectId: string,
   runId: string,
-  attachment: QueuedAttachment,
+  attachment: DownloadableAttachment,
   storageDirectory = configDirectory,
 ) {
   const expectedPrefix = `/projects/${projectId}/runs/${runId}/attachments/`;
@@ -111,33 +123,35 @@ async function claimWork() {
       `이미 처리 중인 claim이 있습니다: ${project.activeClaim.sourceKey}`,
     );
   }
-  const result = await request<{ work: unknown }>(
+  const agentToken = executionToken(project);
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    "/queue/claims",
-    executionToken(project),
-    {
-      method: "POST",
-      body: JSON.stringify({
-        claimedBy: value("--actor") ?? "briar-workflow",
-        ...(runId ? { runId } : {}),
-      }),
-    },
+    agentToken,
   );
-  if (result.work === null) {
-    console.log(JSON.stringify({ work: null }));
+  const result = await executionRpc.client.claimIssue({
+    projectId: project.id,
+    runId,
+    claimedBy: value("--actor") ?? "briar-workflow",
+  }, executionRpc.options);
+  if (result.issue === undefined) {
+    console.log(localClaimResultJson(localNoWorkResult()));
     return;
   }
-  const issue = decodeQueuedIssue(result.work);
-  const agentToken = executionToken(project);
+  const issue = result.issue;
+  const payload = issue.payload;
+  if (payload === undefined || payload.leaseExpiresAt === undefined) {
+    throw new Error("Worker claim omitted its durable issue payload");
+  }
+  const leaseExpiresAt = timestampDate(payload.leaseExpiresAt).toISOString();
   config.projects = config.projects.map((candidate) =>
     candidate.id === project.id
       ? {
           ...candidate,
           activeClaim: {
-            runId: issue.runId,
-            sourceKey: issue.sourceKey,
+            runId: payload.runId,
+            sourceKey: payload.sourceKey,
             token: issue.claimToken,
-            leaseExpiresAt: issue.leaseExpiresAt,
+            leaseExpiresAt,
           },
         }
       : candidate,
@@ -148,46 +162,43 @@ async function claimWork() {
   const { workspace, workspaceError } = await allocateClaimWorkspace(
     config,
     project,
-    issue,
+    payload,
   );
   const attachments = await Promise.all(
     issue.attachments.map(async (attachment) => {
       try {
         return {
-          ...attachment,
+          attachment,
           localPath: await downloadClaimAttachment(
             config.apiUrl,
             agentToken,
             project.id,
-            issue.runId,
+            payload.runId,
             attachment,
           ),
           downloadError: null,
         };
       } catch (error) {
         return {
-          ...attachment,
+          attachment,
           localPath: null,
           downloadError: error instanceof Error ? error.message : String(error),
         };
       }
     }),
   );
-  const { claimToken: _claimToken, ...publicIssue } = issue;
   console.log(
-    JSON.stringify({
-      work: {
-        ...publicIssue,
-        briarIssueUrl: briarIssueUrl(
-          config.apiUrl,
-          project.id,
-          issue.runId,
-        ),
-        attachments,
-        workspace,
-      },
-      ...(workspaceError ? { workspaceError } : {}),
-    }),
+    localClaimResultJson(localClaimResult({
+      issue,
+      attachments,
+      briarIssueUrl: briarIssueUrl(
+        config.apiUrl,
+        project.id,
+        payload.runId,
+      ),
+      workspace,
+      workspaceError,
+    })),
   );
 }
 
@@ -201,10 +212,7 @@ async function allocateClaimWorkspace(
   issue: { runId: string; sourceKey: string; title: string },
   storageDirectory = configDirectory,
 ): Promise<{
-  workspace:
-    | ({ type: "worktree" } & IssueWorktree & { warning?: string })
-    | { type: "current"; path: string }
-    | null;
+  workspace: LocalClaimWorkspace;
   workspaceError: string | null;
 }> {
   const requestedMode = decodeWorkspaceMode(value("--workspace") ?? "project");

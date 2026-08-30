@@ -23,9 +23,9 @@ use crate::host::CommandRunner;
 pub(crate) use codex::{
     AutoHuntCliEnvironment, AutoHuntCoordinatorResponse, ProjectAgentRunRequest,
     ProjectAgentRunResponse, ProjectAutoHuntIssue, ProjectAutoHuntIssueAttachment,
-    ProjectAutoHuntIssueMessage, ProjectAutoHuntIssueResult, ProjectAutoHuntRequest,
-    ProjectAutoHuntResponse, ProjectAutoHuntResult, ProjectAutoHuntWorkerResponse,
-    MAX_AUTO_HUNT_ISSUES,
+    ProjectAutoHuntIssueMessage, ProjectAutoHuntIssueMessageAuthor, ProjectAutoHuntIssueResult,
+    ProjectAutoHuntRequest, ProjectAutoHuntResponse, ProjectAutoHuntResult,
+    ProjectAutoHuntWorkerResponse, MAX_AUTO_HUNT_ISSUES,
 };
 
 #[derive(

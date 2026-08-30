@@ -3,6 +3,10 @@ import {
   basename,
   resolve,
 } from "node:path";
+import { toJsonString } from "@bufbuild/protobuf";
+import {
+  ListRunEvidenceResponseSchema,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { decodeStructuredAgentResult } from "../src/lib/agent-result";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {
@@ -35,6 +39,9 @@ import {
   currentRepositoryPath,
   currentProject,
 } from "./command-support";
+import {
+  createAuthenticatedWorkerExecutionClient,
+} from "./worker-queue-client";
 
 async function optionalText(valueFlag: string, fileFlag: string) {
   const path = value(fileFlag);
@@ -360,12 +367,15 @@ async function listCurrentRunEvidence() {
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
   decodeUuid(runId);
-  const result = await request(
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    `/runs/${runId}/evidence`,
     executionToken(project),
   );
-  console.log(JSON.stringify(result));
+  const result = await executionRpc.client.listRunEvidence(
+    { projectId: project.id, runId },
+    executionRpc.options,
+  );
+  console.log(toJsonString(ListRunEvidenceResponseSchema, result));
 }
 
 async function recoverRun(action: "retry" | "cancel") {

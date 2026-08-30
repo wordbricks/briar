@@ -322,45 +322,58 @@ const common = (
   handoffContext: handoffContext(value.handoffContext),
 });
 
-const issueFromProto = (value: ProtoClaimedIssue) => ({
-  ...common({ ...value, workId: value.runId }),
-  workType: "issue" as const,
-  executionId: value.executionId,
-  runNumber: value.runNumber,
-  currentAttempt: value.currentAttempt,
-  currentRevision: value.currentRevision,
-  source: autoHuntSource(value.source),
-  description: value.description ?? null,
-  priority: value.priority ?? null,
-  repository: value.repository,
-  sourceCreatedAt: optionalTimestamp(value.sourceCreatedAt),
-  createdByUserId: value.createdByUserId ?? null,
-  context: value.context ?? null,
-  reviewFeedback: value.reviewFeedback ?? null,
-  workflow: workflow(value.workflow),
-  workflowStage: value.workflowStage ?? null,
-  startStage: value.startStage ?? null,
-  resumeContext: value.resumeContext
-    ? {
-        checkpointKey: value.resumeContext.checkpointKey,
-        position: checkpointPosition(value.resumeContext.position),
-        revision: value.resumeContext.revision,
-        terminalReviewOnly: value.resumeContext.terminalReviewOnly,
-      }
-    : null,
-  attachments: value.attachments.map(attachment),
-  messages: value.messages.map(issueMessage),
-  claimedBy: value.claimedBy,
-  execution: value.execution
-    ? {
-        provider: agentProvider(value.execution.provider),
-        model: value.execution.model ?? null,
-        effort: value.execution.effort ?? null,
-      }
-    : null,
-  agent: value.agent ? agent(value.agent) : null,
-  activeSkill: value.activeSkill ? agentSkill(value.activeSkill) : null,
-});
+const issueFromProto = (value: ProtoClaimedIssue) => {
+  const payload = required(value.payload, "issue.payload");
+  return {
+    ...common({
+      workId: payload.runId,
+      runId: payload.runId,
+      sourceKey: payload.sourceKey,
+      title: payload.title,
+      claimToken: value.claimToken,
+      claimedAt: payload.claimedAt,
+      leaseExpiresAt: payload.leaseExpiresAt,
+      claimAttempts: payload.claimAttempts,
+      handoffContext: value.handoffContext,
+    }),
+    workType: "issue" as const,
+    executionId: payload.executionId,
+    runNumber: payload.runNumber,
+    currentAttempt: payload.currentAttempt,
+    currentRevision: payload.currentRevision,
+    source: autoHuntSource(payload.source),
+    description: payload.description ?? null,
+    priority: payload.priority ?? null,
+    repository: payload.repository,
+    sourceCreatedAt: optionalTimestamp(payload.sourceCreatedAt),
+    createdByUserId: payload.createdByUserId ?? null,
+    context: payload.context ?? null,
+    reviewFeedback: payload.reviewFeedback ?? null,
+    workflow: workflow(payload.workflow),
+    workflowStage: payload.workflowStage ?? null,
+    startStage: payload.startStage ?? null,
+    resumeContext: payload.resumeContext
+      ? {
+          checkpointKey: payload.resumeContext.checkpointKey,
+          position: checkpointPosition(payload.resumeContext.position),
+          revision: payload.resumeContext.revision,
+          terminalReviewOnly: payload.resumeContext.terminalReviewOnly,
+        }
+      : null,
+    attachments: value.attachments.map(attachment),
+    messages: payload.messages.map(issueMessage),
+    claimedBy: payload.claimedBy,
+    execution: payload.execution
+      ? {
+          provider: agentProvider(payload.execution.provider),
+          model: payload.execution.model ?? null,
+          effort: payload.execution.effort ?? null,
+        }
+      : null,
+    agent: value.agent ? agent(value.agent) : null,
+    activeSkill: value.activeSkill ? agentSkill(value.activeSkill) : null,
+  };
+};
 
 const projectAgentTaskFromProto = (
   value: ProtoClaimedProjectAgentTask,

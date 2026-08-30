@@ -30,6 +30,8 @@ service IssueService {
   rpc SyncIssueMessages(SyncIssueMessagesRequest) returns (SyncIssueMessagesResponse);
   rpc CreateIssueMessage(CreateIssueMessageRequest) returns (CreateIssueMessageResponse);
   rpc GetIssueAgentReply(GetIssueAgentReplyRequest) returns (GetIssueAgentReplyResponse);
+  // Shared intentionally with WorkerExecutionService so evidence has one DTO.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
   rpc ListRunEvidence(ListRunEvidenceRequest) returns (ListRunEvidenceResponse);
   rpc AcceptIssueReworkProposal(AcceptIssueReworkProposalRequest) returns (AcceptIssueReworkProposalResponse);
   rpc AcceptIssueActionProposal(AcceptIssueActionProposalRequest) returns (AcceptIssueActionProposalResponse);

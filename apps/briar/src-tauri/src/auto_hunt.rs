@@ -1,48 +1,175 @@
 use super::*;
+use briar_contracts::proto::briar::{
+    app::v1 as app_proto, local::v1 as local_proto, types::v1 as types_proto,
+    worker::v1 as worker_proto,
+};
 use tauri_specta::Event as _;
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct CliClaimResponse {
-    pub(super) work: Option<CliClaimedRun>,
-    #[serde(default)]
+#[derive(Debug)]
+pub(super) enum AutoHuntClaimOutcome {
+    Claimed(AutoHuntClaimedRun),
+    NoWork,
+}
+
+#[derive(Debug)]
+pub(super) struct AutoHuntClaimedRun {
+    pub(super) issue: agent::ProjectAutoHuntIssue,
+    pub(super) workflow_json: String,
+    pub(super) workspace_path: Option<String>,
     pub(super) workspace_error: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct CliClaimedRun {
-    pub(super) run_id: String,
-    pub(super) run_number: u64,
-    pub(super) source_key: String,
-    pub(super) title: String,
-    #[serde(default)]
-    pub(super) description: Option<String>,
-    #[serde(default)]
-    pub(super) priority: Option<u8>,
-    #[serde(default)]
-    pub(super) context: Option<serde_json::Value>,
-    #[serde(default)]
-    pub(super) attachments: Vec<agent::ProjectAutoHuntIssueAttachment>,
-    #[serde(default)]
-    pub(super) messages: Vec<agent::ProjectAutoHuntIssueMessage>,
-    pub(super) workflow: serde_json::Value,
-    #[serde(default)]
-    pub(super) workspace: Option<CliClaimedWorkspace>,
+fn required_text(value: String, field: &str) -> Result<String, String> {
+    if value.trim().is_empty() {
+        Err(format!("로컬 claim 결과에 {field}가 없습니다."))
+    } else {
+        Ok(value)
+    }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct CliClaimedWorkspace {
-    #[serde(rename = "type")]
-    pub(super) workspace_type: String,
-    pub(super) path: String,
+fn timestamp_text(seconds: i64, nanos: i32, field: &str) -> Result<String, String> {
+    let nanos = u32::try_from(nanos)
+        .map_err(|_| format!("로컬 결과의 {field} timestamp가 올바르지 않습니다."))?;
+    chrono::DateTime::from_timestamp(seconds, nanos)
+        .map(|value| value.to_rfc3339())
+        .ok_or_else(|| format!("로컬 결과의 {field} timestamp가 올바르지 않습니다."))
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct CliRunEvidenceResponse {
-    pub(super) evidence: Vec<serde_json::Value>,
+fn agent_provider(
+    value: buffa::EnumValue<types_proto::AgentProvider>,
+) -> Result<agent::AgentProviderKind, String> {
+    match value.as_known() {
+        Some(types_proto::AgentProvider::Codex) => Ok(agent::AgentProviderKind::Codex),
+        Some(types_proto::AgentProvider::Claude) => Ok(agent::AgentProviderKind::Claude),
+        Some(types_proto::AgentProvider::Cursor) => Ok(agent::AgentProviderKind::Cursor),
+        Some(types_proto::AgentProvider::Grok) => Ok(agent::AgentProviderKind::Grok),
+        Some(types_proto::AgentProvider::Agy) => Ok(agent::AgentProviderKind::Agy),
+        Some(types_proto::AgentProvider::Opencode) => Ok(agent::AgentProviderKind::Opencode),
+        Some(types_proto::AgentProvider::Openrouter) => Ok(agent::AgentProviderKind::Openrouter),
+        _ => Err("로컬 claim 결과의 Agent provider가 올바르지 않습니다.".to_string()),
+    }
+}
+
+fn claimed_attachment(
+    value: local_proto::LocalQueuedAttachment,
+) -> Result<agent::ProjectAutoHuntIssueAttachment, String> {
+    let attachment = value
+        .attachment
+        .into_option()
+        .ok_or_else(|| "로컬 claim attachment metadata가 비어 있습니다.".to_string())?;
+    Ok(agent::ProjectAutoHuntIssueAttachment {
+        id: required_text(attachment.id, "attachment.id")?,
+        filename: required_text(attachment.filename, "attachment.filename")?,
+        content_type: required_text(attachment.content_type, "attachment.contentType")?,
+        byte_size: u64::from(attachment.byte_size),
+        url: required_text(attachment.url, "attachment.url")?,
+        local_path: value.local_path,
+        download_error: value.download_error,
+    })
+}
+
+fn claimed_message(
+    value: worker_proto::QueuedIssueMessage,
+) -> Result<agent::ProjectAutoHuntIssueMessage, String> {
+    let author = value
+        .author
+        .into_option()
+        .ok_or_else(|| "로컬 claim message author가 비어 있습니다.".to_string())?;
+    let provider = author.provider.map(agent_provider).transpose()?;
+    let created_at = value
+        .created_at
+        .into_option()
+        .ok_or_else(|| "로컬 claim message createdAt이 비어 있습니다.".to_string())?;
+    let updated_at = value
+        .updated_at
+        .into_option()
+        .ok_or_else(|| "로컬 claim message updatedAt이 비어 있습니다.".to_string())?;
+    Ok(agent::ProjectAutoHuntIssueMessage {
+        id: required_text(value.id, "message.id")?,
+        parent_message_id: value.parent_message_id,
+        body: required_text(value.body, "message.body")?,
+        author: agent::ProjectAutoHuntIssueMessageAuthor {
+            id: author.id,
+            name: required_text(author.name, "message.author.name")?,
+            provider,
+        },
+        created_at: timestamp_text(created_at.seconds, created_at.nanos, "message.createdAt")?,
+        updated_at: timestamp_text(updated_at.seconds, updated_at.nanos, "message.updatedAt")?,
+    })
+}
+
+fn claimed_run(value: local_proto::LocalClaimedRun) -> Result<AutoHuntClaimedRun, String> {
+    let payload = value
+        .payload
+        .into_option()
+        .ok_or_else(|| "로컬 claim payload가 비어 있습니다.".to_string())?;
+    let context = payload
+        .context
+        .into_option()
+        .map(|context| {
+            serde_json::to_value(context)
+                .map_err(|error| format!("claim context를 읽지 못했습니다: {error}"))
+        })
+        .transpose()?;
+    let workflow = payload
+        .workflow
+        .into_option()
+        .ok_or_else(|| "로컬 claim workflow가 비어 있습니다.".to_string())?;
+    let workflow_json = serde_json::to_string_pretty(&workflow)
+        .map_err(|error| format!("claim workflow를 직렬화하지 못했습니다: {error}"))?;
+    let workspace_path = value
+        .workspace
+        .into_option()
+        .map(|workspace| {
+            if workspace.kind.as_known() != Some(local_proto::local_workspace::Kind::Worktree) {
+                return Err(
+                    "로컬 런타임이 전용 worktree가 아닌 workspace를 할당했습니다.".to_string(),
+                );
+            }
+            required_text(workspace.path, "workspace.path")
+        })
+        .transpose()?;
+    let issue = agent::ProjectAutoHuntIssue {
+        run_id: required_text(payload.run_id, "runId")?,
+        run_number: u64::from(payload.run_number),
+        source_key: required_text(payload.source_key, "sourceKey")?,
+        title: required_text(payload.title, "title")?,
+        issue_description: payload.description,
+        priority: payload
+            .priority
+            .map(u8::try_from)
+            .transpose()
+            .map_err(|_| "로컬 claim priority가 올바르지 않습니다.".to_string())?,
+        context,
+        attachments: value
+            .attachments
+            .into_iter()
+            .map(claimed_attachment)
+            .collect::<Result<Vec<_>, _>>()?,
+        conversation: payload
+            .messages
+            .into_iter()
+            .map(claimed_message)
+            .collect::<Result<Vec<_>, _>>()?,
+    };
+    Ok(AutoHuntClaimedRun {
+        issue,
+        workflow_json,
+        workspace_path,
+        workspace_error: value.workspace_error,
+    })
+}
+
+fn claim_outcome(value: local_proto::LocalClaimResult) -> Result<AutoHuntClaimOutcome, String> {
+    match value.outcome {
+        Some(local_proto::local_claim_result::Outcome::Claimed(value)) => {
+            claimed_run(*value).map(AutoHuntClaimOutcome::Claimed)
+        }
+        Some(local_proto::local_claim_result::Outcome::NoWork(_)) => {
+            Ok(AutoHuntClaimOutcome::NoWork)
+        }
+        None => Err("로컬 claim 결과에 outcome이 없습니다.".to_string()),
+    }
 }
 
 pub(super) fn claim_auto_hunt_run(
@@ -50,7 +177,7 @@ pub(super) fn claim_auto_hunt_run(
     cli_environment: &agent::AutoHuntCliEnvironment,
     connected_workspace: &Path,
     run_id: &str,
-) -> Result<CliClaimResponse, String> {
+) -> Result<AutoHuntClaimOutcome, String> {
     let arguments = auto_hunt_claim_arguments(run_id);
     let output = cli_environment.run_briar(runner, connected_workspace, arguments)?;
     if !output.success() {
@@ -59,8 +186,9 @@ pub(super) fn claim_auto_hunt_run(
             output.failure_message()
         ));
     }
-    serde_json::from_str(output.stdout.trim())
-        .map_err(|error| format!("로컬 claim 결과를 읽지 못했습니다: {error}"))
+    let result = serde_json::from_str::<local_proto::LocalClaimResult>(output.stdout.trim())
+        .map_err(|error| format!("로컬 claim ProtoJSON을 읽지 못했습니다: {error}"))?;
+    claim_outcome(result)
 }
 
 pub(super) fn auto_hunt_claim_arguments(run_id: &str) -> Vec<String> {
@@ -248,7 +376,7 @@ pub(super) fn record_auto_hunt_terminal_event(
     runner: &dyn host::CommandRunner,
     cli_environment: &agent::AutoHuntCliEnvironment,
     workspace: &Path,
-    run: &CliClaimedRun,
+    run: &agent::ProjectAutoHuntIssue,
     status: &str,
     cause: &str,
     detail: &str,
@@ -264,6 +392,91 @@ pub(super) fn record_auto_hunt_terminal_event(
             output.failure_message()
         ))
     }
+}
+
+fn evidence_status(
+    value: buffa::EnumValue<app_proto::run_evidence::Status>,
+) -> Result<&'static str, String> {
+    match value.as_known() {
+        Some(app_proto::run_evidence::Status::Pending) => Ok("pending"),
+        Some(app_proto::run_evidence::Status::Passed) => Ok("passed"),
+        Some(app_proto::run_evidence::Status::Failed) => Ok("failed"),
+        Some(app_proto::run_evidence::Status::Skipped) => Ok("skipped"),
+        _ => Err("로컬 run evidence status가 올바르지 않습니다.".to_string()),
+    }
+}
+
+fn run_evidence_json(value: app_proto::RunEvidence) -> Result<serde_json::Value, String> {
+    let observed_at = value
+        .observed_at
+        .into_option()
+        .ok_or_else(|| "로컬 run evidence observedAt이 비어 있습니다.".to_string())?;
+    let recorded_at = value
+        .recorded_at
+        .into_option()
+        .ok_or_else(|| "로컬 run evidence recordedAt이 비어 있습니다.".to_string())?;
+    let metadata = value
+        .metadata
+        .into_option()
+        .map(|metadata| {
+            serde_json::to_value(metadata)
+                .map_err(|error| format!("run evidence metadata를 읽지 못했습니다: {error}"))
+        })
+        .transpose()?;
+    let images = value
+        .images
+        .into_iter()
+        .map(|image| {
+            serde_json::json!({
+                "id": image.id,
+                "filename": image.filename,
+                "contentType": image.content_type,
+                "byteSize": image.byte_size,
+                "sha256": image.sha256,
+                "position": image.position,
+                "url": image.url,
+            })
+        })
+        .collect::<Vec<_>>();
+    Ok(serde_json::json!({
+        "key": value.key,
+        "attempt": value.attempt,
+        "revision": value.revision,
+        "stage": value.stage,
+        "type": value.r#type,
+        "status": evidence_status(value.status)?,
+        "detail": value.detail,
+        "command": value.command,
+        "url": value.url,
+        "metadata": metadata,
+        "actor": value.actor,
+        "observedAt": timestamp_text(
+            observed_at.seconds,
+            observed_at.nanos,
+            "evidence.observedAt",
+        )?,
+        "recordedAt": timestamp_text(
+            recorded_at.seconds,
+            recorded_at.nanos,
+            "evidence.recordedAt",
+        )?,
+        "images": images,
+        "requiredRevision": value.required_revision,
+        "canonical": value.canonical,
+    }))
+}
+
+fn run_evidence_result(
+    value: worker_proto::ListRunEvidenceResponse,
+    expected_run_id: &str,
+) -> Result<Vec<serde_json::Value>, String> {
+    if value.run_id != expected_run_id {
+        return Err(format!(
+            "로컬 evidence가 요청한 run {expected_run_id} 대신 {}을 반환했습니다.",
+            value.run_id
+        ));
+    }
+    value.evidence.into_iter().map(run_evidence_json).collect()
 }
 
 pub(super) struct AutoHuntEvidenceCapture<'a> {
@@ -292,9 +505,11 @@ impl AutoHuntEvidenceCapture<'_> {
                 if !output.success() {
                     return Err(output.failure_message());
                 }
-                serde_json::from_str::<CliRunEvidenceResponse>(output.stdout.trim())
-                    .map(|response| response.evidence)
-                    .map_err(|error| format!("run evidence 결과를 읽지 못했습니다: {error}"))
+                let response = serde_json::from_str::<worker_proto::ListRunEvidenceResponse>(
+                    output.stdout.trim(),
+                )
+                .map_err(|error| format!("run evidence ProtoJSON을 읽지 못했습니다: {error}"))?;
+                run_evidence_result(response, run_id)
             });
         match result {
             Ok(evidence) => {
@@ -569,41 +784,35 @@ pub(super) async fn start_project_auto_hunt(
                 &workspace,
                 &requested_issue.run_id,
             )?;
-            let Some(claimed) = claim.work else {
-                return Err(format!(
-                    "요청한 이슈 {}을 claim할 수 없습니다. 대기 상태와 기존 실행 여부를 확인해 주세요.",
-                    requested_issue.source_key
-                ));
+            let AutoHuntClaimedRun {
+                issue,
+                workflow_json,
+                workspace_path,
+                workspace_error,
+            } = match claim {
+                AutoHuntClaimOutcome::Claimed(claimed) => claimed,
+                AutoHuntClaimOutcome::NoWork => {
+                    return Err(format!(
+                        "요청한 이슈 {}을 claim할 수 없습니다. 대기 상태와 기존 실행 여부를 확인해 주세요.",
+                        requested_issue.source_key
+                    ));
+                }
             };
-            if claimed.run_id != requested_issue.run_id {
+            if issue.run_id != requested_issue.run_id {
                 return Err(format!(
                     "로컬 런타임이 요청한 run {} 대신 {}을 claim했습니다.",
-                    requested_issue.run_id, claimed.run_id
+                    requested_issue.run_id, issue.run_id
                 ));
             }
             let worker_session_id = format!("{}-w{}", request.session_id, index + 1);
-            let issue = agent::ProjectAutoHuntIssue {
-                run_id: claimed.run_id.clone(),
-                run_number: claimed.run_number,
-                source_key: claimed.source_key.clone(),
-                title: claimed.title.clone(),
-                issue_description: claimed.description.clone(),
-                priority: claimed.priority,
-                context: claimed.context.clone(),
-                attachments: claimed.attachments.clone(),
-                conversation: claimed.messages.clone(),
-            };
             let dispatch = dispatch_store.add_worker(
                 &request.session_id,
                 auto_hunt_dispatch::AutoHuntDispatchWorker {
                     session_id: worker_session_id.clone(),
-                    run_id: claimed.run_id.clone(),
-                    source_key: claimed.source_key.clone(),
-                    title: claimed.title.clone(),
-                    workspace_root: claimed
-                        .workspace
-                        .as_ref()
-                        .map(|workspace| workspace.path.clone()),
+                    run_id: issue.run_id.clone(),
+                    source_key: issue.source_key.clone(),
+                    title: issue.title.clone(),
+                    workspace_root: workspace_path.clone(),
                     conversation_id: None,
                     status: auto_hunt_dispatch::AutoHuntWorkerStatus::Allocating,
                     summary: None,
@@ -618,7 +827,7 @@ pub(super) async fn start_project_auto_hunt(
                     runner.as_ref(),
                     &cli_environment,
                     &workspace,
-                    &claimed,
+                    &issue,
                     "cancelled",
                     "session-stopped",
                     detail,
@@ -627,10 +836,7 @@ pub(super) async fn start_project_auto_hunt(
                     &request.session_id,
                     &worker_session_id,
                     auto_hunt_dispatch::AutoHuntWorkerStatus::Cancelled,
-                    claimed
-                        .workspace
-                        .as_ref()
-                        .map(|workspace| workspace.path.clone()),
+                    workspace_path.clone(),
                     None,
                     Some(detail.to_string()),
                 )?;
@@ -638,16 +844,15 @@ pub(super) async fn start_project_auto_hunt(
                 return Err(detail.to_string());
             }
 
-            let Some(claimed_workspace) = claimed.workspace.as_ref() else {
-                let detail = claim
-                    .workspace_error
+            let Some(claimed_workspace) = workspace_path.as_ref() else {
+                let detail = workspace_error
                     .as_deref()
                     .unwrap_or("claim한 run의 전용 worktree를 반환하지 않았습니다.");
                 let record_error = record_auto_hunt_terminal_event(
                     runner.as_ref(),
                     &cli_environment,
                     &workspace,
-                    &claimed,
+                    &issue,
                     "blocked",
                     "workspace-allocation",
                     detail,
@@ -658,15 +863,15 @@ pub(super) async fn start_project_auto_hunt(
                     None => detail.to_string(),
                 };
                 issue_results.push(agent::ProjectAutoHuntIssueResult {
-                    source_key: claimed.source_key.clone(),
-                    title: claimed.title.clone(),
+                    source_key: issue.source_key.clone(),
+                    title: issue.title.clone(),
                     outcome: "blocked".to_string(),
                     summary: summary.clone(),
                 });
                 workers.push(agent::ProjectAutoHuntWorkerResponse {
                     session_id: worker_session_id.clone(),
-                    run_id: claimed.run_id,
-                    source_key: claimed.source_key,
+                    run_id: issue.run_id.clone(),
+                    source_key: issue.source_key.clone(),
                     conversation_id: None,
                     workspace_root: None,
                     outcome: "blocked".to_string(),
@@ -684,25 +889,19 @@ pub(super) async fn start_project_auto_hunt(
                 emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
                 continue;
             };
-            if claimed_workspace.workspace_type != "worktree" {
-                return Err(
-                    "로컬 런타임이 전용 worktree가 아닌 workspace를 할당했습니다.".to_string(),
-                );
-            }
-            let worker_workspace = PathBuf::from(&claimed_workspace.path);
+            let worker_workspace = PathBuf::from(claimed_workspace);
             let dispatch = dispatch_store.transition_worker(
                 &request.session_id,
                 &worker_session_id,
                 auto_hunt_dispatch::AutoHuntWorkerStatus::Running,
-                Some(claimed_workspace.path.clone()),
+                Some(claimed_workspace.clone()),
                 None,
-                Some(format!("{} 워커를 시작했습니다.", claimed.source_key)),
+                Some(format!("{} 워커를 시작했습니다.", issue.source_key)),
             )?;
             emit_latest_auto_hunt_dispatch_event(&dispatch_app, &dispatch);
             let mut worker_request = request.clone();
             worker_request.issues = vec![issue.clone()];
-            worker_request.workflow_json = serde_json::to_string_pretty(&claimed.workflow)
-                .map_err(|error| format!("claim workflow를 직렬화하지 못했습니다: {error}"))?;
+            worker_request.workflow_json = workflow_json;
             let worker_event_sink = create_auto_hunt_worker_event_sink(
                 event_sink.clone(),
                 dispatch_store.clone(),
@@ -766,7 +965,7 @@ pub(super) async fn start_project_auto_hunt(
                     full_access,
                 },
                 worker_request,
-                issue,
+                issue.clone(),
                 &approve,
             ) {
                 Ok(response) => {
@@ -787,13 +986,13 @@ pub(super) async fn start_project_auto_hunt(
                     }
                     .capture(
                         &worker_workspace,
-                        &claimed.run_id,
+                        &issue.run_id,
                         &worker_session_id,
                     );
                     workers.push(agent::ProjectAutoHuntWorkerResponse {
                         session_id: worker_session_id.clone(),
-                        run_id: claimed.run_id.clone(),
-                        source_key: claimed.source_key.clone(),
+                        run_id: issue.run_id.clone(),
+                        source_key: issue.source_key.clone(),
                         conversation_id: Some(response.conversation_id.clone()),
                         workspace_root: Some(response.workspace_root.clone()),
                         outcome: result.outcome.clone(),
@@ -804,7 +1003,7 @@ pub(super) async fn start_project_auto_hunt(
                         &request.session_id,
                         &worker_session_id,
                         auto_hunt_dispatch::AutoHuntWorkerStatus::from_outcome(&result.outcome),
-                        Some(claimed_workspace.path.clone()),
+                        Some(claimed_workspace.clone()),
                         Some(response.conversation_id),
                         Some(result.summary.clone()),
                     )?;
@@ -818,7 +1017,7 @@ pub(super) async fn start_project_auto_hunt(
                             runner.as_ref(),
                             &cli_environment,
                             &worker_workspace,
-                            &claimed,
+                            &issue,
                             "cancelled",
                             "session-stopped",
                             &detail,
@@ -827,7 +1026,7 @@ pub(super) async fn start_project_auto_hunt(
                             &request.session_id,
                             &worker_session_id,
                             auto_hunt_dispatch::AutoHuntWorkerStatus::Cancelled,
-                            Some(claimed_workspace.path.clone()),
+                            Some(claimed_workspace.clone()),
                             None,
                             Some(detail.clone()),
                         )?;
@@ -848,7 +1047,7 @@ pub(super) async fn start_project_auto_hunt(
                         runner.as_ref(),
                         &cli_environment,
                         &worker_workspace,
-                        &claimed,
+                        &issue,
                         "failed",
                         "worker-execution",
                         &error,
@@ -867,21 +1066,21 @@ pub(super) async fn start_project_auto_hunt(
                     }
                     .capture(
                         &worker_workspace,
-                        &claimed.run_id,
+                        &issue.run_id,
                         &worker_session_id,
                     );
                     issue_results.push(agent::ProjectAutoHuntIssueResult {
-                        source_key: claimed.source_key.clone(),
-                        title: claimed.title.clone(),
+                        source_key: issue.source_key.clone(),
+                        title: issue.title.clone(),
                         outcome: "failed".to_string(),
                         summary: summary.clone(),
                     });
                     workers.push(agent::ProjectAutoHuntWorkerResponse {
                         session_id: worker_session_id.clone(),
-                        run_id: claimed.run_id.clone(),
-                        source_key: claimed.source_key.clone(),
+                        run_id: issue.run_id.clone(),
+                        source_key: issue.source_key.clone(),
                         conversation_id: None,
-                        workspace_root: Some(claimed_workspace.path.clone()),
+                        workspace_root: Some(claimed_workspace.clone()),
                         outcome: "failed".to_string(),
                         summary,
                         evidence,
@@ -890,7 +1089,7 @@ pub(super) async fn start_project_auto_hunt(
                         &request.session_id,
                         &worker_session_id,
                         auto_hunt_dispatch::AutoHuntWorkerStatus::Failed,
-                        Some(claimed_workspace.path.clone()),
+                        Some(claimed_workspace.clone()),
                         None,
                         workers.last().map(|worker| worker.summary.clone()),
                     )?;
@@ -917,7 +1116,7 @@ pub(super) async fn start_project_auto_hunt(
                 &cli_environment,
                 &workspace,
                 &worker_workspace,
-                completed_at.as_ref().map(|_| claimed.run_id.as_str()),
+                completed_at.as_ref().map(|_| issue.run_id.as_str()),
                 completed_at.as_deref(),
             ) {
                 eprintln!("{error}");

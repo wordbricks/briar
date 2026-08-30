@@ -23,7 +23,9 @@ service WorkerQueueService {
 // their dedicated transports.
 service WorkerExecutionService {
   rpc ClaimIssue(ClaimIssueRequest) returns (ClaimIssueResponse);
-  rpc ListRunEvidence(ListRunEvidenceRequest) returns (ListRunEvidenceResponse);
+  // Shared intentionally with IssueService so evidence has one DTO.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  rpc ListRunEvidence(briar.app.v1.ListRunEvidenceRequest) returns (briar.app.v1.ListRunEvidenceResponse);
 }
 
 message ClaimIssueRequest {
@@ -34,18 +36,6 @@ message ClaimIssueRequest {
 
 message ClaimIssueResponse {
   optional ClaimedIssue issue = 1;
-}
-
-message ListRunEvidenceRequest {
-  string project_id = 1;
-  string run_id = 2;
-}
-
-message ListRunEvidenceResponse {
-  repeated briar.app.v1.RunEvidence evidence = 1;
-  string run_id = 2;
-  uint32 attempt = 3;
-  uint32 revision = 4;
 }
 
 message ClaimWorkRequest {

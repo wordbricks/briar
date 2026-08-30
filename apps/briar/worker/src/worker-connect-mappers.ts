@@ -16,6 +16,7 @@ import {
   ClaimedChannelDelegationSchema,
   ClaimedIssueReplySchema,
   ClaimedIssueReply_SnapshotSchema,
+  ClaimedIssuePayloadSchema,
   ClaimedIssueSchema,
   ClaimedMergeBatchSchema,
   ClaimedProjectAgentTaskSchema,
@@ -45,6 +46,7 @@ import {
   MergeBatchPhase,
   MergeBatchState,
   MergeBatchValidationFailureCode,
+  type ClaimedIssue,
   type ClaimedWork,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
@@ -334,88 +336,94 @@ const activity = (value: { token: string; expiresAt: string } | null) =>
         expiresAt: requiredTimestamp(value.expiresAt, "activity.expiresAt"),
       });
 
+export const workerIssueClaimMessage = (
+  value: AwaitedClaim<typeof claimNextQueueWork>,
+): ClaimedIssue => create(ClaimedIssueSchema, {
+      payload: create(ClaimedIssuePayloadSchema, {
+        executionId: value.executionId ?? undefined,
+        runId: value.runId,
+        runNumber: value.runNumber,
+        currentAttempt: value.currentAttempt,
+        currentRevision: value.currentRevision,
+        source: source(value.source),
+        sourceKey: value.sourceKey,
+        title: value.title,
+        description: value.description ?? undefined,
+        priority: value.priority ?? undefined,
+        repository: value.repository,
+        sourceCreatedAt: optionalTimestamp(value.sourceCreatedAt),
+        createdByUserId: value.createdByUserId ?? undefined,
+        context: value.context == null
+          ? undefined
+          : jsonObject(value.context, "issue.context"),
+        reviewFeedback: value.reviewFeedback ?? undefined,
+        workflow: create(AutoHuntWorkflowSchema, {
+          version: value.workflow.version,
+          requirements: value.workflow.requirements?.map((item) =>
+            create(WorkflowRequirementSchema, {
+            id: item.id,
+            label: item.label,
+            kind: item.kind,
+            tool: item.tool,
+            reason: item.reason,
+            })) ?? [],
+          stages: value.workflow.stages.map((stage) =>
+            create(WorkflowStageSchema, {
+            id: stage.id,
+            label: stage.label,
+            required: stage.required,
+            evidence: stage.evidence ?? [],
+            checks: stage.checks ?? [],
+            })),
+          execution: create(WorkflowExecutionSchema, {
+            checkpoints: value.workflow.execution.checkpoints.map((checkpoint) =>
+              create(WorkflowCheckpointSpecSchema, {
+                key: checkpoint.key,
+                stage: checkpoint.stage,
+                position: checkpointPosition(checkpoint.position),
+              })
+            ),
+          }),
+          completion: create(WorkflowCompletionSchema, {
+            requiredStages: value.workflow.completion.requiredStages,
+          }),
+        }),
+        resumeContext: value.resumeContext
+          ? create(ResumeContextSchema, {
+              checkpointKey: value.resumeContext.checkpointKey,
+              position: checkpointPosition(value.resumeContext.position),
+              revision: value.resumeContext.revision,
+              terminalReviewOnly: value.resumeContext.terminalReviewOnly,
+            })
+          : undefined,
+        workflowStage: value.workflowStage ?? undefined,
+        startStage: value.startStage ?? undefined,
+        messages: value.messages.map(issueMessage),
+        claimedBy: requiredString(value.claimedBy, "claimedBy"),
+        claimedAt: requiredTimestamp(value.claimedAt, "claimedAt"),
+        leaseExpiresAt: requiredTimestamp(value.leaseExpiresAt, "leaseExpiresAt"),
+        claimAttempts: value.claimAttempts,
+        execution: value.execution?.provider
+          ? create(DetachedExecutionSchema, {
+              provider: provider(value.execution.provider),
+              model: value.execution.model ?? undefined,
+              effort: value.execution.effort ?? undefined,
+            })
+          : undefined,
+      }),
+      attachments: value.attachments.map(attachment),
+      claimToken: requiredString(value.claimToken, "claimToken"),
+      handoffContext: handoff(value.handoffContext),
+      agent: value.agent ? agent(value.agent) : undefined,
+      activeSkill: value.activeSkill ? skill(value.activeSkill) : undefined,
+});
+
 const issue = (
   value: AwaitedClaim<typeof claimNextQueueWork>,
 ): ClaimedWork => create(ClaimedWorkSchema, {
   work: {
     case: "issue",
-    value: create(ClaimedIssueSchema, {
-      executionId: value.executionId ?? undefined,
-      runId: value.runId,
-      runNumber: value.runNumber,
-      currentAttempt: value.currentAttempt,
-      currentRevision: value.currentRevision,
-      source: source(value.source),
-      sourceKey: value.sourceKey,
-      title: value.title,
-      description: value.description ?? undefined,
-      priority: value.priority ?? undefined,
-      repository: value.repository,
-      sourceCreatedAt: optionalTimestamp(value.sourceCreatedAt),
-      createdByUserId: value.createdByUserId ?? undefined,
-      context: value.context == null
-        ? undefined
-        : jsonObject(value.context, "issue.context"),
-      reviewFeedback: value.reviewFeedback ?? undefined,
-      workflow: create(AutoHuntWorkflowSchema, {
-        version: value.workflow.version,
-        requirements: value.workflow.requirements?.map((item) =>
-          create(WorkflowRequirementSchema, {
-          id: item.id,
-          label: item.label,
-          kind: item.kind,
-          tool: item.tool,
-          reason: item.reason,
-          })) ?? [],
-        stages: value.workflow.stages.map((stage) =>
-          create(WorkflowStageSchema, {
-          id: stage.id,
-          label: stage.label,
-          required: stage.required,
-          evidence: stage.evidence ?? [],
-          checks: stage.checks ?? [],
-          })),
-        execution: create(WorkflowExecutionSchema, {
-          checkpoints: value.workflow.execution.checkpoints.map((checkpoint) =>
-            create(WorkflowCheckpointSpecSchema, {
-              key: checkpoint.key,
-              stage: checkpoint.stage,
-              position: checkpointPosition(checkpoint.position),
-            })
-          ),
-        }),
-        completion: create(WorkflowCompletionSchema, {
-          requiredStages: value.workflow.completion.requiredStages,
-        }),
-      }),
-      resumeContext: value.resumeContext
-        ? create(ResumeContextSchema, {
-            checkpointKey: value.resumeContext.checkpointKey,
-            position: checkpointPosition(value.resumeContext.position),
-            revision: value.resumeContext.revision,
-            terminalReviewOnly: value.resumeContext.terminalReviewOnly,
-          })
-        : undefined,
-      workflowStage: value.workflowStage ?? undefined,
-      startStage: value.startStage ?? undefined,
-      attachments: value.attachments.map(attachment),
-      messages: value.messages.map(issueMessage),
-      claimToken: requiredString(value.claimToken, "claimToken"),
-      claimedBy: requiredString(value.claimedBy, "claimedBy"),
-      claimedAt: requiredTimestamp(value.claimedAt, "claimedAt"),
-      leaseExpiresAt: requiredTimestamp(value.leaseExpiresAt, "leaseExpiresAt"),
-      claimAttempts: value.claimAttempts,
-      handoffContext: handoff(value.handoffContext),
-      execution: value.execution?.provider
-        ? create(DetachedExecutionSchema, {
-            provider: provider(value.execution.provider),
-            model: value.execution.model ?? undefined,
-            effort: value.execution.effort ?? undefined,
-          })
-        : undefined,
-      agent: value.agent ? agent(value.agent) : undefined,
-      activeSkill: value.activeSkill ? skill(value.activeSkill) : undefined,
-    }),
+    value: workerIssueClaimMessage(value),
   },
 });
 

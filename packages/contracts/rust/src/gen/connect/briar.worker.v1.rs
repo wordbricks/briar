@@ -34,11 +34,11 @@ pub type OwnedClaimIssueResponseView = ::buffa::view::OwnedView<
 >;
 ///Shorthand for `OwnedView<ListRunEvidenceRequestView<'static>>`.
 pub type OwnedListRunEvidenceRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::ListRunEvidenceRequestView<'static>,
+    crate::proto::briar::app::v1::__buffa::view::ListRunEvidenceRequestView<'static>,
 >;
 ///Shorthand for `OwnedView<ListRunEvidenceResponseView<'static>>`.
 pub type OwnedListRunEvidenceResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::ListRunEvidenceResponseView<'static>,
+    crate::proto::briar::app::v1::__buffa::view::ListRunEvidenceResponseView<'static>,
 >;
 impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::ClaimWorkResponse>
 for crate::proto::briar::worker::v1::__buffa::view::ClaimWorkResponseView<'_> {
@@ -154,40 +154,6 @@ for crate::proto::briar::worker::v1::__buffa::view::ClaimIssueResponseView<'_> {
 impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::ClaimIssueResponse>
 for ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::ClaimIssueResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-    /// An `OwnedView` still holds the buffer it was decoded from, so
-    /// its large fields can be handed to the response body by
-    /// reference count instead of copied. The bare view impl above
-    /// cannot do this: it has borrows but no buffer to name.
-    fn encode_segments(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body_segments(
-            self.reborrow(),
-            self.bytes(),
-            codec,
-        )
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::ListRunEvidenceResponse>
-for crate::proto::briar::worker::v1::__buffa::view::ListRunEvidenceResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::ListRunEvidenceResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::ListRunEvidenceResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -983,7 +949,8 @@ pub trait WorkerExecutionService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the ListRunEvidence RPC.
+    /// Shared intentionally with IssueService so evidence has one DTO.
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -997,12 +964,12 @@ pub trait WorkerExecutionService: Send + Sync + 'static {
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::worker::v1::ListRunEvidenceRequest,
+            crate::proto::briar::app::v1::ListRunEvidenceRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::worker::v1::ListRunEvidenceResponse,
+                crate::proto::briar::app::v1::ListRunEvidenceResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -1075,7 +1042,7 @@ impl<S: WorkerExecutionService> WorkerExecutionServiceExt for S {
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::worker::v1::__buffa::view::ListRunEvidenceRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::ListRunEvidenceRequestView<
                                 'static,
                             >,
                         >,
@@ -1084,12 +1051,12 @@ impl<S: WorkerExecutionService> WorkerExecutionServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::worker::v1::ListRunEvidenceRequest,
+                                crate::proto::briar::app::v1::ListRunEvidenceRequest,
                             >::from_parts(req.reborrow(), req.bytes());
                             svc.list_run_evidence(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::worker::v1::ListRunEvidenceResponse,
+                                    crate::proto::briar::app::v1::ListRunEvidenceResponse,
                                 >(format)
                         }
                     })
@@ -1207,21 +1174,21 @@ for WorkerExecutionServiceServer<T> {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::worker::v1::ListRunEvidenceRequest,
+                        crate::proto::briar::app::v1::ListRunEvidenceRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::worker::v1::__buffa::view::ListRunEvidenceRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::ListRunEvidenceRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::worker::v1::ListRunEvidenceRequest,
+                        crate::proto::briar::app::v1::ListRunEvidenceRequest,
                     >::from_parts(&req, &body);
                     svc.list_run_evidence(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::worker::v1::ListRunEvidenceResponse,
+                            crate::proto::briar::app::v1::ListRunEvidenceResponse,
                         >(format)
                 })
             }
@@ -1406,11 +1373,11 @@ where
     /// Call the ListRunEvidence RPC. Sends a request to /briar.worker.v1.WorkerExecutionService/ListRunEvidence.
     pub async fn list_run_evidence(
         &self,
-        request: crate::proto::briar::worker::v1::ListRunEvidenceRequest,
+        request: crate::proto::briar::app::v1::ListRunEvidenceRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::ListRunEvidenceResponseView<
+                crate::proto::briar::app::v1::__buffa::view::ListRunEvidenceResponseView<
                     'static,
                 >,
             >,
@@ -1426,12 +1393,12 @@ where
     /// Call the ListRunEvidence RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
     pub async fn list_run_evidence_with_options(
         &self,
-        request: crate::proto::briar::worker::v1::ListRunEvidenceRequest,
+        request: crate::proto::briar::app::v1::ListRunEvidenceRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::ListRunEvidenceResponseView<
+                crate::proto::briar::app::v1::__buffa::view::ListRunEvidenceResponseView<
                     'static,
                 >,
             >,

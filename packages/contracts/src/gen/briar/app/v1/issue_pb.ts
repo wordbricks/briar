@@ -2669,6 +2669,9 @@ export const IssueService: GenService<{
     output: typeof GetIssueAgentReplyResponseSchema;
   },
   /**
+   * Shared intentionally with WorkerExecutionService so evidence has one DTO.
+   * buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+   *
    * @generated from rpc briar.app.v1.IssueService.ListRunEvidence
    */
   listRunEvidence: {

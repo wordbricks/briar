@@ -1,5 +1,4 @@
 import { contentDisposition } from "./attachment-storage";
-import { listArchivedRunEvidence } from "./archive";
 import { sha256, sha256Bytes } from "./crypto-digest";
 import {
   assertQueuedHuntClaim,
@@ -11,23 +10,19 @@ import {
   HuntClaimError,
   HuntTransitionError,
   listEvidenceImagesForEvidence,
-  listRunEvidence,
-  listRunEvidenceImages,
-  listRunStageRevisions,
   recoverHuntRun,
   recordHuntEvent,
   recordRunEvidence,
   reworkHuntRun,
   startWorkflowStageLifecycle,
   type RunEvidenceImageInput,
-  type RunEvidenceImageRow,
 } from "./db";
 import { HttpError, json } from "./http-response";
 import { registerReadyMergeCandidates } from "./merge-batches";
 import { getMergeQueueProfile } from "./merge-queue-profile";
 import { isReservedProposalIssueSourceKey } from "./proposal-issue-source";
 import { readJson, readRunEvidenceRequest, dashboardStageForProgress } from "./request-readers";
-import { evidenceImageJson, runEvidenceJson } from "./run-evidence-json";
+import { evidenceImageJson } from "./run-evidence-json";
 import {
   decodeRecoveryAgentInput,
   decodeResumeAgentInput,
@@ -251,54 +246,6 @@ export async function handleRunAgentRoute(
   }
 
   const evidenceMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/evidence$/u);
-  if (evidenceMatch && request.method === "GET") {
-    const projectId = await requireRunExecutionProject(
-      db,
-      request,
-      evidenceMatch[1],
-    );
-    const [hotEvidence, revisions, hotImages, archived] = await Promise.all([
-      listRunEvidence(db, projectId, evidenceMatch[1]),
-      listRunStageRevisions(db, projectId, evidenceMatch[1]),
-      listRunEvidenceImages(db, projectId, evidenceMatch[1]),
-      listArchivedRunEvidence(db, env.ARCHIVES, projectId, evidenceMatch[1]),
-    ]);
-    if (!hotEvidence || !revisions || !hotImages) {
-      throw new HttpError(404, "Run not found");
-    }
-    const evidence = [
-      ...new Map(
-        [...archived.evidence, ...hotEvidence].map((item) => [item.id, item]),
-      ).values(),
-    ].sort(
-      (left, right) =>
-        left.observed_at.localeCompare(right.observed_at) ||
-        left.id.localeCompare(right.id),
-    );
-    const images = [
-      ...new Map(
-        [...archived.images, ...hotImages].map((item) => [item.id, item]),
-      ).values(),
-    ];
-    const imagesByEvidence = new Map<string, RunEvidenceImageRow[]>();
-    for (const image of images) {
-      const evidenceImages = imagesByEvidence.get(image.evidence_id) ?? [];
-      evidenceImages.push(image);
-      imagesByEvidence.set(image.evidence_id, evidenceImages);
-    }
-    return json({
-      runId: evidenceMatch[1],
-      attempt: revisions.attempt,
-      revision: revisions.revision,
-      evidence: evidence.map((item) =>
-        runEvidenceJson(
-          item,
-          revisions.requirements.get(item.workflow_stage) ?? 1,
-          imagesByEvidence.get(item.id) ?? [],
-        ),
-      ),
-    });
-  }
   if (evidenceMatch && request.method === "POST") {
     const { projectId, claimTokenHash, authenticatedAt } =
       await requireActiveWorkerRunClaim(

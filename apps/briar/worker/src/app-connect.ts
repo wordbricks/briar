@@ -1,4 +1,7 @@
-import { createConnectRouter } from "@connectrpc/connect";
+import {
+  createConnectRouter,
+  type ServiceImpl,
+} from "@connectrpc/connect";
 import { createFetchHandler } from "@connectrpc/connect/protocol";
 import { ProjectService } from "@briar/contracts/gen/briar/app/v1/project_pb";
 import type { BriarAuth } from "./auth";
@@ -13,6 +16,7 @@ import { registerAppIssueService } from "./app-connect-issue";
 import { appProject } from "./app-connect-mappers";
 import { listProjects } from "./project-repository";
 import { requireSession } from "./session-auth";
+import { registerWorkerExecutionService } from "./worker-connect-execution";
 import { registerWorkerQueueService } from "./worker-connect-queue";
 
 export type AppConnectRouteInput = {
@@ -20,6 +24,7 @@ export type AppConnectRouteInput = {
   readonly auth: BriarAuth;
   readonly env: Env;
   readonly context?: ExecutionContext;
+  readonly requireRunExecutionProject: (runId: string) => Promise<string>;
 };
 
 export type AppConnectServices = {
@@ -35,7 +40,7 @@ const appConnectServices: AppConnectServices = {
 const createProjectService = (
   { request, auth, env }: AppConnectRouteInput,
   services: AppConnectServices,
-) => ({
+): ServiceImpl<typeof ProjectService> => ({
   listProjects: async () =>
     withConnectErrors(async () => {
       const session = await services.requireSession(auth, request);
@@ -93,6 +98,13 @@ export async function handleAppConnectRequest(
     db: input.env.DB,
     env: input.env,
     context: input.context,
+  });
+  registerWorkerExecutionService(router, {
+    request: input.request,
+    db: input.env.DB,
+    env: input.env,
+    archivesBucket: input.env.ARCHIVES,
+    requireRunExecutionProject: input.requireRunExecutionProject,
   });
 
   const pathname = new URL(input.request.url).pathname;

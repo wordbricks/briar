@@ -30,6 +30,7 @@ describe("App Connect errors", () => {
             ARCHIVES: {} as R2Bucket,
             ATTACHMENTS: {} as R2Bucket,
           } as Env,
+          requireRunExecutionProject: vi.fn(),
         }, services);
         return response ?? new Response(null, { status: 404 });
       },

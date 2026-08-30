@@ -65,6 +65,8 @@ public protocol BriarAPI_IssueServiceClientInterface: Sendable {
     @available(iOS 13, *)
     func `getIssueAgentReply`(request: BriarAPI_GetIssueAgentReplyRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_GetIssueAgentReplyResponse>
 
+    /// Shared intentionally with WorkerExecutionService so evidence has one DTO.
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
     @available(iOS 13, *)
     func `listRunEvidence`(request: BriarAPI_ListRunEvidenceRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListRunEvidenceResponse>
 

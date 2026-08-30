@@ -1458,24 +1458,24 @@ describe("conversational Agent Skill execution approval", () => {
         occurredAt: new Date().toISOString(),
       })).toMatchObject({ runId: capacityRunId, requestedWorkerId: workerId });
       const claimHunt = () => apiWorker.fetch(new Request(
-        "https://briar.example/queue/claims",
+        "https://briar.example/briar.worker.v1.WorkerQueueService/ClaimWork",
         {
           method: "POST",
           headers: {
             authorization: "Bearer briar_worker_skill_credential_one",
+            "connect-protocol-version": "1",
             "content-type": "application/json",
           },
           body: JSON.stringify({
             projectId,
             workerId,
-            runId: capacityRunId,
             claimedBy: "capacity-test",
           }),
         },
       ), env());
       const taskBlocksHunt = await claimHunt();
       expect(taskBlocksHunt.status).toBe(200);
-      expect(await taskBlocksHunt.json()).toEqual({ work: null });
+      expect(await taskBlocksHunt.json()).toEqual({});
 
       expect((await completeTask(activeTask.workId, activeTask.claimToken, {
         summary: "Capacity holder completed.",
@@ -1484,7 +1484,7 @@ describe("conversational Agent Skill execution approval", () => {
       const huntClaim = await claimHunt();
       expect(huntClaim.status).toBe(200);
       expect(await huntClaim.json()).toMatchObject({
-        work: { runId: capacityRunId },
+        work: { issue: { payload: { runId: capacityRunId } } },
       });
       await expect(countExecutionWorkerDeviceSessions(
         db,
