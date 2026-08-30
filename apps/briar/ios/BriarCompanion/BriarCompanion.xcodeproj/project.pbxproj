@@ -38,6 +38,7 @@
 		30E4605D2D2ABE4D53975FE2 /* issue.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9178761C6C06EBFE0C17E556 /* issue.pb.swift */; };
 		32C49F7F08A6EC8D1D32DD1B /* CompanionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B0BE22C1849DA483E8B7BFF /* CompanionViews.swift */; };
 		3B4D6409E11267AE58A8C0F2 /* ProfileImageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DBAE843F4181E4041EE9A69 /* ProfileImageTests.swift */; };
+		3B68476B05A282979F276747 /* fleet.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D4C094542374E3999AFEB38 /* fleet.connect.swift */; };
 		3C2F3D1E9973B1EA2A461D44 /* CompanionRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D2CC4C3D7F505A0B3A0C564 /* CompanionRootView.swift */; };
 		3C609C35137E12D867B28B4F /* Connect in Frameworks */ = {isa = PBXBuildFile; productRef = 163FD83848950098714E4D91 /* Connect */; };
 		3DB8D1A6D350998AF802BF7C /* DeviceAuthorization.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A2BD65A5BF60B1D39F7690 /* DeviceAuthorization.swift */; };
@@ -50,6 +51,7 @@
 		5415F07E987CCCD336FFEF00 /* realtime_control.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD14868F9918DAE630EEE34C /* realtime_control.mock.swift */; };
 		550E8373BA9623DC874E64A0 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 3A81CE17E519DE673B3CA058 /* SwiftProtobuf */; };
 		587852F5E838090FEF48C797 /* InboxViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80FCA400D10FEE6AF26FBAA /* InboxViews.swift */; };
+		59C69F8E830D30BB93FE8E98 /* reporting.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E017171354BC7FB72C83C74 /* reporting.pb.swift */; };
 		5B4040109297B03A3DAC26DB /* agent.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 572BBF0BC55E9C6D66970168 /* agent.mock.swift */; };
 		6002A10BFAB8BE839391B114 /* FoundationStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D59E70E330C5C3C60094A493 /* FoundationStatusView.swift */; };
 		611A83D238A5702F2065137A /* organization.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3649EF54DD00BBD97DF2FCBE /* organization.pb.swift */; };
@@ -84,6 +86,7 @@
 		8F93611A53BF30C71375722B /* account.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6560F18BE176A37A2F5C2627 /* account.connect.swift */; };
 		921C8B38B3838485535BF1AF /* provider.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 279214785628E863F8B7FB7A /* provider.pb.swift */; };
 		93F911C575ED24F7ECB0C47C /* inbox.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1745F8806A14CA3818736C8 /* inbox.pb.swift */; };
+		957E8AFF03429BC551975288 /* reporting.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80BB9356BE45ADFDEE713D69 /* reporting.mock.swift */; };
 		95EA1BD09B301286DE638DEC /* AttachmentPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F35D1C669DD97F245139645C /* AttachmentPipelineTests.swift */; };
 		967C64C6A88A080B5711C4CA /* CompanionReadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5F0E3F338DC5E3C1A397CA /* CompanionReadTests.swift */; };
 		9855A8195A6A253247277F80 /* UITestCompanionFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 233573EB5589EBF9DE724279 /* UITestCompanionFlow.swift */; };
@@ -95,6 +98,7 @@
 		9E0D35016E2101F7008CCCF5 /* IssueConnect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327BFAD2ED52442DD19EC6F8 /* IssueConnect.swift */; };
 		9F38B49386B6BD993AF2E1BB /* BriarContractsMocks.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 255A359627FF6AC89CD8CA47 /* BriarContractsMocks.framework */; };
 		A17F67B12946ADE07AF4E7DF /* AgentsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17FF04740F5A18F25325D2C /* AgentsStore.swift */; };
+		A22AF0B2CD4B1D549FD4B721 /* fleet.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14C2B20FE26375716AC37013 /* fleet.mock.swift */; };
 		A2B6BCC98A929E8D9B7011BC /* project.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48BC061E16C5068969283B5D /* project.connect.swift */; };
 		A2E278A9A475BB7D7F2FCA36 /* BriarCompanionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CA08856EAF2B67E13727846 /* BriarCompanionUITests.swift */; };
 		A2F13135A46A9A55D9B5ECCF /* MessageMentions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151B809A488C8E38ABA12C73 /* MessageMentions.swift */; };
@@ -130,9 +134,11 @@
 		D1B0527BC9665558D9BEEB09 /* account.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F2969694A8EC6FF1813790 /* account.mock.swift */; };
 		D2E5DCDCC649B4D9EEF58EFA /* CompanionLocale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38415BB3EE4DDCA4212DB1F9 /* CompanionLocale.swift */; };
 		D3A6AD589D6C6456AC8B1345 /* MessageMentions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151B809A488C8E38ABA12C73 /* MessageMentions.swift */; };
+		D8437E9934E3CFC8462F1A41 /* reporting.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8494CBE4DE832D91FC511CC7 /* reporting.connect.swift */; };
 		D977334E42CF3FDAACDCB7A3 /* AttachmentPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF612FD7D34E422E51B3A302 /* AttachmentPreview.swift */; };
 		DA7CAE323CE6B503DC07DFA8 /* CompanionRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D2CC4C3D7F505A0B3A0C564 /* CompanionRootView.swift */; };
 		DC70136D9CD22F33F740BBE4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 73C8DE502A3DAA054172B395 /* Assets.xcassets */; };
+		E120F8FE913482D43E546870 /* fleet.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F7316C27C7E73CF9DAC24CC /* fleet.pb.swift */; };
 		E57A80FF76256DE142AF8B33 /* CoreConnect.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A0DAF596DFA24E90833C53 /* CoreConnect.swift */; };
 		E7374AC1B41B6011DFE7337D /* project.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66C0B2EFCEE4C98F323991B1 /* project.mock.swift */; };
 		E88C5500AE05DEE13EDC5E9C /* realtime_control.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 592D767B90F774DB900387AD /* realtime_control.pb.swift */; };
@@ -257,8 +263,10 @@
 		0C3D7B1D017C131E8DD36044 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		0C8A2465F8FD58758747D7EA /* dashboard.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = dashboard.connect.swift; sourceTree = "<group>"; };
 		0CA08856EAF2B67E13727846 /* BriarCompanionUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BriarCompanionUITests.swift; sourceTree = "<group>"; };
+		14C2B20FE26375716AC37013 /* fleet.mock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = fleet.mock.swift; sourceTree = "<group>"; };
 		151B809A488C8E38ABA12C73 /* MessageMentions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageMentions.swift; sourceTree = "<group>"; };
 		1BEDE13FA827C88C7264C715 /* RealtimeConnectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeConnectTests.swift; sourceTree = "<group>"; };
+		1F7316C27C7E73CF9DAC24CC /* fleet.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = fleet.pb.swift; sourceTree = "<group>"; };
 		2034C52B05B2B54DF7F3F3E5 /* BriarCompanionTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BriarCompanionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		216793AD86019D1D7BDF5133 /* SessionStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStoreTests.swift; sourceTree = "<group>"; };
 		233573EB5589EBF9DE724279 /* UITestCompanionFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestCompanionFlow.swift; sourceTree = "<group>"; };
@@ -267,6 +275,7 @@
 		279214785628E863F8B7FB7A /* provider.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = provider.pb.swift; sourceTree = "<group>"; };
 		29358CE27DE56C1F3F0EF787 /* BriarCompanionUITestHost.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BriarCompanionUITestHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2A26E7B294AE842A63FE02C2 /* BriarCompanionUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BriarCompanionUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D4C094542374E3999AFEB38 /* fleet.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = fleet.connect.swift; sourceTree = "<group>"; };
 		327BFAD2ED52442DD19EC6F8 /* IssueConnect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueConnect.swift; sourceTree = "<group>"; };
 		34368CFC402513DE2753ABCA /* DashboardModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardModels.swift; sourceTree = "<group>"; };
 		3649EF54DD00BBD97DF2FCBE /* organization.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = organization.pb.swift; sourceTree = "<group>"; };
@@ -278,6 +287,7 @@
 		48888E3E40EC72372BEEB40F /* BriarCompanion.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BriarCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		48BC061E16C5068969283B5D /* project.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = project.connect.swift; sourceTree = "<group>"; };
 		4DBAE843F4181E4041EE9A69 /* ProfileImageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileImageTests.swift; sourceTree = "<group>"; };
+		4E017171354BC7FB72C83C74 /* reporting.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = reporting.pb.swift; sourceTree = "<group>"; };
 		5004E20D26F2AC91C541EE9A /* BriarCompanionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BriarCompanionApp.swift; sourceTree = "<group>"; };
 		500ADEC830355232DEACCCF8 /* AgentsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentsViews.swift; sourceTree = "<group>"; };
 		54CCA2946DCE0666A5C40619 /* DirectMessagesViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectMessagesViews.swift; sourceTree = "<group>"; };
@@ -304,6 +314,8 @@
 		798EBF3A4F42C2F3C5CC6639 /* IssueMutationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueMutationTests.swift; sourceTree = "<group>"; };
 		7A0055D7021C0AA301B69305 /* common.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = common.pb.swift; sourceTree = "<group>"; };
 		7A620C899AADEFAF1C81B587 /* inbox.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = inbox.connect.swift; sourceTree = "<group>"; };
+		80BB9356BE45ADFDEE713D69 /* reporting.mock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = reporting.mock.swift; sourceTree = "<group>"; };
+		8494CBE4DE832D91FC511CC7 /* reporting.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = reporting.connect.swift; sourceTree = "<group>"; };
 		894C6282DA7AFFFA63925739 /* SelectableTextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectableTextTests.swift; sourceTree = "<group>"; };
 		8A65B754A339632E2DB2E3E6 /* MobileAPIContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileAPIContract.swift; sourceTree = "<group>"; };
 		8BFE8FB1BE3297692F1673DD /* agent.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = agent.pb.swift; sourceTree = "<group>"; };
@@ -452,6 +464,8 @@
 				7A0055D7021C0AA301B69305 /* common.pb.swift */,
 				0C8A2465F8FD58758747D7EA /* dashboard.connect.swift */,
 				78CFA41B950A7B2C95B54652 /* dashboard.pb.swift */,
+				2D4C094542374E3999AFEB38 /* fleet.connect.swift */,
+				1F7316C27C7E73CF9DAC24CC /* fleet.pb.swift */,
 				7A620C899AADEFAF1C81B587 /* inbox.connect.swift */,
 				B1745F8806A14CA3818736C8 /* inbox.pb.swift */,
 				CB1AB5B0E9614EE7D0DB7CE5 /* issue.connect.swift */,
@@ -462,6 +476,8 @@
 				F6043AEFCDEA9CFCFF8263EC /* project.pb.swift */,
 				93B2CEACE7CBCA7F825B9DE7 /* realtime_control.connect.swift */,
 				592D767B90F774DB900387AD /* realtime_control.pb.swift */,
+				8494CBE4DE832D91FC511CC7 /* reporting.connect.swift */,
+				4E017171354BC7FB72C83C74 /* reporting.pb.swift */,
 			);
 			path = v1;
 			sourceTree = "<group>";
@@ -545,11 +561,13 @@
 				572BBF0BC55E9C6D66970168 /* agent.mock.swift */,
 				C0DEFA6DD8128EA0D6D1EFBB /* channel.mock.swift */,
 				BB67453F67DCDAA5038EA8B0 /* dashboard.mock.swift */,
+				14C2B20FE26375716AC37013 /* fleet.mock.swift */,
 				07312CF8E63F9B91F53DFF1D /* inbox.mock.swift */,
 				71BEF122F4A451C82E235ED0 /* issue.mock.swift */,
 				6C163E49260290ADF3D883BD /* organization.mock.swift */,
 				66C0B2EFCEE4C98F323991B1 /* project.mock.swift */,
 				FD14868F9918DAE630EEE34C /* realtime_control.mock.swift */,
+				80BB9356BE45ADFDEE713D69 /* reporting.mock.swift */,
 			);
 			path = v1;
 			sourceTree = "<group>";
@@ -903,11 +921,13 @@
 				5B4040109297B03A3DAC26DB /* agent.mock.swift in Sources */,
 				F30124C886CA34A2BF2881A5 /* channel.mock.swift in Sources */,
 				187555FF2F72F3FCF2B46FD3 /* dashboard.mock.swift in Sources */,
+				A22AF0B2CD4B1D549FD4B721 /* fleet.mock.swift in Sources */,
 				1023A10E51D22F6A8AB50D3D /* inbox.mock.swift in Sources */,
 				C9048A4BC527A0ED29958D0D /* issue.mock.swift in Sources */,
 				9A9D978C665BCCBDBF57D9C5 /* organization.mock.swift in Sources */,
 				E7374AC1B41B6011DFE7337D /* project.mock.swift in Sources */,
 				5415F07E987CCCD336FFEF00 /* realtime_control.mock.swift in Sources */,
+				957E8AFF03429BC551975288 /* reporting.mock.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -996,6 +1016,8 @@
 				6B326F011260ACFD4E776FA8 /* dashboard.connect.swift in Sources */,
 				52A457910284AD216750AE87 /* dashboard.pb.swift in Sources */,
 				D0DD4BF381A4A6242A402DEB /* error.pb.swift in Sources */,
+				3B68476B05A282979F276747 /* fleet.connect.swift in Sources */,
+				E120F8FE913482D43E546870 /* fleet.pb.swift in Sources */,
 				0E591256797429437E9A2027 /* inbox.connect.swift in Sources */,
 				93F911C575ED24F7ECB0C47C /* inbox.pb.swift in Sources */,
 				8733685C8D417EB80DAC77CE /* issue.connect.swift in Sources */,
@@ -1008,6 +1030,8 @@
 				B532FA624619C1D5F63C921B /* realtime.pb.swift in Sources */,
 				2605D001E3586D14CF40FA44 /* realtime_control.connect.swift in Sources */,
 				E88C5500AE05DEE13EDC5E9C /* realtime_control.pb.swift in Sources */,
+				D8437E9934E3CFC8462F1A41 /* reporting.connect.swift in Sources */,
+				59C69F8E830D30BB93FE8E98 /* reporting.pb.swift in Sources */,
 				F36F0EAAFF971E537480FBCA /* worker.pb.swift in Sources */,
 				0D9BC5551C8A3678D076B904 /* workflow.pb.swift in Sources */,
 			);
