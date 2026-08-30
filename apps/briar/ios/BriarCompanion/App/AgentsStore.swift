@@ -212,15 +212,10 @@ final class AgentsStore: ObservableObject {
                 let effort = run.preferredModel != nil
                     ? run.preferredEffort
                     : (run.preferredProvider == nil ? agent.effort : nil)
-                _ = try await api.send(
-                    MobileAPIContract.Endpoint.runDispatch(
-                        projectID: projectID,
-                        runID: run.id,
-                        reassign: run.dispatchedAt != nil || run.workerId != nil
-                    ),
-                    method: "POST",
-                    token: token,
-                    body: DispatchRunRequest(
+                _ = try await api.dispatchRun(
+                    projectID: projectID,
+                    runID: run.id,
+                    request: DispatchRunRequest(
                         agentId: agent.id,
                         provider: provider,
                         model: model,
@@ -229,7 +224,8 @@ final class AgentsStore: ObservableObject {
                         workerId: nil,
                         requestId: UUID()
                     ),
-                    as: DispatchRunResponse.self
+                    reassign: run.dispatchedAt != nil || run.workerId != nil,
+                    token: token
                 )
             }
             await refresh()

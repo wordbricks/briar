@@ -469,6 +469,54 @@ final class CompanionReadTests: XCTestCase {
     }
 
     @MainActor
+    func testRunDetailResetReplacesTheEntireConversationSnapshot() async throws {
+        let initial = issueMessage(body: "stale")
+        let replacement = issueMessage(
+            id: UUID(uuidString: "dddddddd-dddd-4ddd-8ddd-dddddddddddd")!,
+            body: "authoritative"
+        )
+        let optimistic = issueMessage(
+            id: UUID(uuidString: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")!,
+            body: "optimistic"
+        )
+        let reply = IssueAgentReplyJob(
+            id: UUID(uuidString: "ffffffff-ffff-4fff-8fff-ffffffffffff")!,
+            triggerMessageId: replacement.id,
+            parentMessageId: replacement.id,
+            status: .completed,
+            attempts: 1,
+            error: nil
+        )
+        let api = RunDetailSnapshotAPI(
+            messageSnapshots: [IssueMessagesResponse(messages: [initial], cursor: 41)],
+            messageDeltas: [IssueMessagesDeltaResponse(
+                cursor: 2,
+                hasMore: false,
+                changed: true,
+                reset: true,
+                messages: [replacement],
+                agentReplies: [reply]
+            )]
+        )
+        let store = RunDetailStore(
+            api: api,
+            projectID: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
+            runID: initial.runId,
+            token: "token"
+        )
+
+        await store.load()
+        store.appendOptimisticMessage(optimistic)
+        await store.syncConversationChanges()
+
+        XCTAssertEqual(store.messages.map(\.id), [replacement.id])
+        XCTAssertFalse(store.isMessageOptimistic(optimistic.id))
+        XCTAssertEqual(store.agentReplies, [reply])
+        let snapshotRequests = await api.messageRequestCount()
+        XCTAssertEqual(snapshotRequests, 1)
+    }
+
+    @MainActor
     func testCreateAcceptanceResponseImmediatelyAddsSeparateExecutionProposal() throws {
         let proposalID = UUID(uuidString: "abababab-abab-4bab-8bab-abababababab")!
         let pendingCreate = IssueProposedAction(
@@ -817,6 +865,39 @@ private actor RunDetailSnapshotAPI: MobileAPIClientProtocol {
         deltaRequests
     }
 
+    func listIssueMessages(
+        projectID: UUID,
+        runID: UUID,
+        token: String
+    ) async throws -> IssueMessagesResponse {
+        guard !messageSnapshots.isEmpty else { throw MobileAPIError.invalidRequest }
+        messageRequests += 1
+        let response = messageSnapshots.removeFirst()
+        if let messageDelay { try await Task.sleep(for: messageDelay) }
+        return response
+    }
+
+    func syncIssueMessages(
+        projectID: UUID,
+        runID: UUID,
+        cursor: Int,
+        token: String
+    ) async throws -> IssueMessagesDeltaResponse {
+        guard !messageDeltas.isEmpty else { throw MobileAPIError.invalidRequest }
+        deltaRequests += 1
+        let response = messageDeltas.removeFirst()
+        if let messageDelay { try await Task.sleep(for: messageDelay) }
+        return response
+    }
+
+    func listRunEvidence(
+        projectID: UUID,
+        runID: UUID,
+        token: String
+    ) async throws -> RunEvidenceResponse {
+        RunEvidenceResponse(evidence: [])
+    }
+
     func send<Response: Decodable & Sendable>(
         _ path: String,
         method: String,
@@ -827,20 +908,6 @@ private actor RunDetailSnapshotAPI: MobileAPIClientProtocol {
         let data: Data
         if path.hasSuffix("/events") {
             data = try JSONEncoder.mobileContract.encode(RunEventsResponse(events: []))
-        } else if path.contains("/messages/delta?cursor=") {
-            guard !messageDeltas.isEmpty else { throw MobileAPIError.invalidRequest }
-            deltaRequests += 1
-            let response = messageDeltas.removeFirst()
-            if let messageDelay { try await Task.sleep(for: messageDelay) }
-            data = try JSONEncoder.mobileContract.encode(response)
-        } else if path.hasSuffix("/messages") {
-            guard !messageSnapshots.isEmpty else { throw MobileAPIError.invalidRequest }
-            messageRequests += 1
-            let response = messageSnapshots.removeFirst()
-            if let messageDelay { try await Task.sleep(for: messageDelay) }
-            data = try JSONEncoder.mobileContract.encode(response)
-        } else if path.hasSuffix("/evidence") {
-            data = try JSONEncoder.mobileContract.encode(RunEvidenceResponse(evidence: []))
         } else {
             throw MobileAPIError.invalidRequest
         }

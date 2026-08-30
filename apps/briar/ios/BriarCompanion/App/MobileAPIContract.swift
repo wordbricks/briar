@@ -17,20 +17,13 @@ enum MobileAPIContract {
             "/organizations/\(organizationID.uuidString.lowercased())/inbox"
         }
 
+        /// Multipart issue creation remains HTTP because Connect requests do not carry file bytes.
         static func issues(projectID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/issues"
         }
 
         static func run(projectID: UUID, runID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())"
-        }
-
-        static func runTransfer(projectID: UUID, runID: UUID) -> String {
-            "\(run(projectID: projectID, runID: runID))/transfer"
-        }
-
-        static func runSubscription(projectID: UUID, runID: UUID) -> String {
-            "\(run(projectID: projectID, runID: runID))/subscription"
         }
 
         static func dashboard(projectID: UUID) -> String {
@@ -66,82 +59,10 @@ enum MobileAPIContract {
             "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/events"
         }
 
+        /// Multipart issue messages remain HTTP because Connect requests do not carry file bytes.
         static func runMessages(projectID: UUID, runID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/messages"
         }
-
-        static func runMessagesDelta(projectID: UUID, runID: UUID, cursor: Int) -> String {
-            "\(runMessages(projectID: projectID, runID: runID))/delta?cursor=\(cursor)"
-        }
-
-        static func runEvidence(projectID: UUID, runID: UUID) -> String {
-            "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/evidence"
-        }
-
-        static func runPreferences(projectID: UUID, runID: UUID) -> String {
-            "\(run(projectID: projectID, runID: runID))/preferences"
-        }
-
-        static func runDependency(projectID: UUID, runID: UUID, prerequisiteID: UUID) -> String {
-            "\(run(projectID: projectID, runID: runID))/dependencies/\(prerequisiteID.uuidString.lowercased())"
-        }
-
-        static func runStatus(projectID: UUID, runID: UUID) -> String {
-            "\(run(projectID: projectID, runID: runID))/status"
-        }
-
-        static func runDispatch(projectID: UUID, runID: UUID, reassign: Bool) -> String {
-            "\(run(projectID: projectID, runID: runID))/\(reassign ? "reassign" : "dispatch")"
-        }
-
-        static func runRecovery(projectID: UUID, runID: UUID, action: String) -> String {
-            "\(run(projectID: projectID, runID: runID))/\(action)"
-        }
-
-        static func runResume(projectID: UUID, runID: UUID) -> String {
-            "\(run(projectID: projectID, runID: runID))/resume"
-        }
-
-        static func runResultReviews(projectID: UUID, runID: UUID) -> String {
-            "\(run(projectID: projectID, runID: runID))/result-reviews"
-        }
-
-        static func runAgentReply(projectID: UUID, runID: UUID, triggerMessageID: UUID) -> String {
-            "\(runMessages(projectID: projectID, runID: runID))/\(triggerMessageID.uuidString.lowercased())/agent-reply"
-        }
-
-        static func acceptIssueReworkProposal(
-            projectID: UUID,
-            runID: UUID,
-            proposalID: UUID
-        ) -> String {
-            "\(run(projectID: projectID, runID: runID))/rework-proposals/\(proposalID.uuidString.lowercased())/accept"
-        }
-
-        static func acceptIssueActionProposal(
-            projectID: UUID,
-            runID: UUID,
-            proposalID: UUID
-        ) -> String {
-            "\(run(projectID: projectID, runID: runID))/issue-action-proposals/\(proposalID.uuidString.lowercased())/accept"
-        }
-
-        static func acceptIssueExecutionProposal(
-            projectID: UUID,
-            conversationRunID: UUID,
-            proposalID: UUID
-        ) -> String {
-            "\(run(projectID: projectID, runID: conversationRunID))/issue-execution-proposals/\(proposalID.uuidString.lowercased())/accept"
-        }
-
-        static func acceptIssueSkillExecutionProposal(
-            projectID: UUID,
-            conversationRunID: UUID,
-            proposalID: UUID
-        ) -> String {
-            "\(run(projectID: projectID, runID: conversationRunID))/skill-execution-proposals/\(proposalID.uuidString.lowercased())/accept"
-        }
-
     }
 }
 
@@ -362,6 +283,15 @@ enum MobileAPIError: LocalizedError, Equatable {
 
 extension MobileAPIError {
     static func connect(_ error: ConnectError) -> MobileAPIError {
+        let validationDetails: [BriarTypes_ValidationErrorDetail] = error.unpackedDetails()
+        let detailMessage = validationDetails
+            .flatMap(\.violations)
+            .map { violation in
+                violation.path.isEmpty
+                    ? violation.message
+                    : "\(violation.path): \(violation.message)"
+            }
+            .joined(separator: "\n")
         let status: Int
         switch error.code {
         case .invalidArgument:
@@ -372,18 +302,31 @@ extension MobileAPIError {
             status = 403
         case .notFound:
             status = 404
-        case .alreadyExists, .aborted:
+        case .alreadyExists, .aborted, .failedPrecondition:
             status = 409
-        case .outOfRange, .failedPrecondition:
+        case .outOfRange:
             status = 410
+        case .resourceExhausted:
+            status = 429
+        case .unimplemented:
+            status = 501
+        case .unavailable:
+            status = 503
+        case .deadlineExceeded:
+            status = 504
         default:
             status = 500
         }
-        return .httpStatus(status, error.message ?? "Connect request failed")
+        return .httpStatus(
+            status,
+            detailMessage.isEmpty
+                ? (error.message ?? "Connect request failed")
+                : detailMessage
+        )
     }
 }
 
-protocol MobileAPIClientProtocol: Sendable {
+protocol MobileAPIClientProtocol: MobileIssueAPIClientProtocol, Sendable {
     func listProjects(token: String) async throws -> ProjectsResponse
 
     func listChannels(
@@ -922,6 +865,7 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
     private let projectService: BriarAPI_ProjectServiceClient
     private let agentService: BriarAPI_AgentServiceClient
     let channelService: BriarAPI_ChannelServiceClient
+    let issueService: BriarAPI_IssueServiceClient
 
     init(baseURL: URL, session: URLSession = .shared) {
         self.baseURL = baseURL
@@ -938,6 +882,7 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
         projectService = BriarAPI_ProjectServiceClient(client: protocolClient)
         agentService = BriarAPI_AgentServiceClient(client: protocolClient)
         channelService = BriarAPI_ChannelServiceClient(client: protocolClient)
+        issueService = BriarAPI_IssueServiceClient(client: protocolClient)
     }
 
     func listProjects(token: String) async throws -> ProjectsResponse {

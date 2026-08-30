@@ -293,19 +293,6 @@ struct IssueDraft: Codable, Equatable, Sendable {
     }
 }
 
-struct CreateIssueRequest: Codable, Sendable {
-    let title: String
-    let description: String?
-    let priority: Int?
-    let difficulty: IssueDifficulty?
-    let assigneeUserId: String?
-    let status: DashboardRun.Status
-    let preferredProvider: AgentProvider?
-    let preferredModel: String?
-    let preferredEffort: ModelEffort?
-    let fullAuto: Bool
-}
-
 struct CreateIssueResponse: Codable, Sendable {
     let runId: UUID
     let sourceKey: String
@@ -317,14 +304,6 @@ struct CreateIssueResponse: Codable, Sendable {
     let difficulty: IssueDifficulty?
 }
 
-struct UpdateIssueRequest: Codable, Sendable {
-    let title: String
-    let description: String?
-    let priority: Int?
-    let difficulty: IssueDifficulty?
-    let assigneeUserId: String?
-}
-
 struct UpdateIssueResponse: Codable, Sendable {
     let runId: UUID
     let title: String
@@ -332,6 +311,7 @@ struct UpdateIssueResponse: Codable, Sendable {
     let priority: Int?
     let difficulty: IssueDifficulty?
     let assigneeUserId: String?
+    let attachments: [IssueAttachment]
 }
 
 struct IssueSubscriptionResponse: Codable, Equatable, Sendable {
@@ -342,10 +322,6 @@ struct IssueSubscriptionResponse: Codable, Equatable, Sendable {
 struct ChannelThreadSubscriptionResponse: Equatable, Sendable {
     let rootMessageId: UUID
     let subscribers: [IssueSubscriber]
-}
-
-struct TransferIssueRequest: Codable, Sendable {
-    let targetProjectId: UUID
 }
 
 struct TransferIssueResponse: Codable, Sendable {
@@ -838,31 +814,6 @@ struct IssueExecutionPreferencesResponse: Codable, Sendable {
     let effort: ModelEffort?
 }
 
-struct RequestIdentity: Codable, Sendable {
-    let requestId: UUID
-    let reason: String?
-}
-
-struct RunStatusRequest: Codable, Sendable {
-    let requestId: UUID
-    let status: DashboardRun.Status
-    /// Required by the mobile contract as `string | null`. Must encode JSON `null`
-    /// for non-running placements; omitting the key fails server validation.
-    let workflowStage: String?
-
-    enum CodingKeys: String, CodingKey {
-        case requestId, status, workflowStage
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(requestId, forKey: .requestId)
-        try container.encode(status, forKey: .status)
-        // Prefer encode(_:forKey:) over encodeIfPresent so nil becomes JSON null.
-        try container.encode(workflowStage, forKey: .workflowStage)
-    }
-}
-
 struct RunStatusResponse: Codable, Sendable {
     let runId: UUID
     let outcome: String
@@ -875,13 +826,6 @@ struct RunRecoveryResponse: Codable, Sendable {
     let outcome: String
     let attempt: Int
     let stage: String
-}
-
-struct ResumeRunRequest: Codable, Sendable {
-    let requestId: UUID
-    let checkpointKey: String
-    let attempt: Int
-    let revision: Int
 }
 
 struct ResumeRunResponse: Codable, Sendable {
@@ -961,63 +905,6 @@ struct DependencyResponse: Codable, Sendable {
     let prerequisiteRunId: UUID
     let dependentRunId: UUID
     let outcome: String
-}
-
-struct CreateIssueMessageRequest: Codable, Sendable {
-    let body: String
-    let clientMessageId: UUID?
-    let parentMessageId: UUID?
-    let mentionedUserIds: [String]
-    let mentionedAgentIds: [String]
-    let agentConversationId: String?
-
-    private enum CodingKeys: String, CodingKey {
-        case body
-        case clientMessageId
-        case parentMessageId
-        case mentionedUserIds
-        case mentionedAgentIds
-        case agentConversationId
-    }
-
-    init(
-        body: String,
-        clientMessageId: UUID? = nil,
-        parentMessageId: UUID?,
-        mentionedUserIds: [String],
-        mentionedAgentIds: [String] = [],
-        agentConversationId: String?
-    ) {
-        self.body = body
-        self.clientMessageId = clientMessageId
-        self.parentMessageId = parentMessageId
-        self.mentionedUserIds = mentionedUserIds
-        self.mentionedAgentIds = mentionedAgentIds
-        self.agentConversationId = agentConversationId
-    }
-
-    /// The API stores UUID identifiers in lowercase. Foundation's synthesized
-    /// UUID encoding uses uppercase characters, which breaks case-sensitive
-    /// parent-message lookups on the server.
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(body, forKey: .body)
-        try container.encodeIfPresent(
-            clientMessageId?.uuidString.lowercased(),
-            forKey: .clientMessageId
-        )
-        if let parentMessageId {
-            try container.encode(
-                parentMessageId.uuidString.lowercased(),
-                forKey: .parentMessageId
-            )
-        } else {
-            try container.encodeNil(forKey: .parentMessageId)
-        }
-        try container.encode(mentionedUserIds, forKey: .mentionedUserIds)
-        try container.encode(mentionedAgentIds, forKey: .mentionedAgentIds)
-        try container.encodeIfPresent(agentConversationId, forKey: .agentConversationId)
-    }
 }
 
 struct IssueAgentReplyJob: Codable, Equatable, Sendable {
@@ -1130,6 +1017,18 @@ struct IssueAgentReplyResponse: Codable, Sendable {
         case message
         case agentReplies
         case messages
+    }
+
+    init(
+        agentReply: IssueAgentReplyJob,
+        message: IssueMessage?,
+        agentReplies: [IssueAgentReplyJob],
+        messages: [IssueMessage]
+    ) {
+        self.agentReply = agentReply
+        self.message = message
+        self.agentReplies = agentReplies
+        self.messages = messages
     }
 
     init(from decoder: Decoder) throws {

@@ -515,10 +515,11 @@ struct IssueMessagesResponse: Codable, Equatable, Sendable {
     }
 }
 
-struct IssueMessagesDeltaResponse: Codable, Equatable, Sendable {
+struct IssueMessagesDeltaResponse: Equatable, Sendable {
     let cursor: Int
     let hasMore: Bool
     let changed: Bool
+    let reset: Bool
     let messages: [IssueMessage]?
     let agentReplies: [IssueAgentReplyJob]?
 
@@ -526,12 +527,14 @@ struct IssueMessagesDeltaResponse: Codable, Equatable, Sendable {
         cursor: Int,
         hasMore: Bool,
         changed: Bool,
+        reset: Bool = false,
         messages: [IssueMessage]? = nil,
         agentReplies: [IssueAgentReplyJob]? = nil
     ) {
         self.cursor = cursor
         self.hasMore = hasMore
         self.changed = changed
+        self.reset = reset
         self.messages = messages
         self.agentReplies = agentReplies
     }
@@ -557,10 +560,24 @@ struct IssueMessage: Codable, Equatable, Identifiable, Sendable {
 
     struct Author: Codable, Equatable, Sendable {
         let id: String?
-        let agentId: UUID? = nil
+        let agentId: UUID?
         let name: String
         let image: String?
         let provider: String?
+
+        init(
+            id: String?,
+            agentId: UUID? = nil,
+            name: String,
+            image: String?,
+            provider: String?
+        ) {
+            self.id = id
+            self.agentId = agentId
+            self.name = name
+            self.image = image
+            self.provider = provider
+        }
     }
 }
 

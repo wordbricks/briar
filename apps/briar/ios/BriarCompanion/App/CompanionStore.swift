@@ -461,19 +461,15 @@ final class RunDetailStore: ObservableObject {
                     body: nil,
                     as: RunEventsResponse.self
                 )
-                async let messageResponse: IssueMessagesResponse = api.send(
-                    MobileAPIContract.Endpoint.runMessages(projectID: projectID, runID: runID),
-                    method: "GET",
-                    token: token,
-                    body: nil,
-                    as: IssueMessagesResponse.self
+                async let messageResponse = api.listIssueMessages(
+                    projectID: projectID,
+                    runID: runID,
+                    token: token
                 )
-                async let evidenceResponse: RunEvidenceResponse = api.send(
-                    MobileAPIContract.Endpoint.runEvidence(projectID: projectID, runID: runID),
-                    method: "GET",
-                    token: token,
-                    body: nil,
-                    as: RunEvidenceResponse.self
+                async let evidenceResponse = api.listRunEvidence(
+                    projectID: projectID,
+                    runID: runID,
+                    token: token
                 )
                 let loaded = try await (eventResponse, messageResponse, evidenceResponse)
                 guard expectedLifecycleRevision == lifecycleRevision else { return }
@@ -551,20 +547,27 @@ final class RunDetailStore: ObservableObject {
                 guard expectedLifecycleRevision == lifecycleRevision,
                       let cursor = conversationCursor
                 else { return }
-                let delta: IssueMessagesDeltaResponse = try await api.send(
-                    MobileAPIContract.Endpoint.runMessagesDelta(
-                        projectID: projectID,
-                        runID: runID,
-                        cursor: cursor
-                    ),
-                    method: "GET",
+                let delta = try await api.syncIssueMessages(
+                    projectID: projectID,
+                    runID: runID,
+                    cursor: cursor,
                     token: token,
-                    body: nil,
-                    as: IssueMessagesDeltaResponse.self
                 )
                 guard expectedLifecycleRevision == lifecycleRevision else { return }
                 conversationCursor = delta.cursor
-                if delta.changed {
+                if delta.reset {
+                    let snapshot = delta.messages ?? []
+                    reconcileExecutionProposals(snapshot, authoritative: true)
+                    optimisticMessageIDs = []
+                    messages = snapshot.sorted {
+                        if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
+                        return $0.id.uuidString < $1.id.uuidString
+                    }
+                    agentReplies = delta.agentReplies ?? []
+                    activityExpiryTask?.cancel()
+                    activityExpiryTask = nil
+                    activityFrames = [:]
+                } else if delta.changed {
                     if let deltaMessages = delta.messages {
                         appendMessages(deltaMessages)
                     }

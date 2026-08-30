@@ -49,31 +49,23 @@ final class IssueMutationStore: ObservableObject {
                 throw IssueMutationError.attachment(message)
             }
             let description = draft.description.trimmingCharacters(in: .whitespacesAndNewlines)
-            let path = MobileAPIContract.Endpoint.issues(projectID: projectID)
             if attachments.isEmpty {
-                return try await api.send(
-                    path,
-                    method: "POST",
+                var normalizedDraft = draft
+                normalizedDraft.title = title
+                normalizedDraft.description = description
+                normalizedDraft.preferredEffort = draft.preferredProvider != nil &&
+                        draft.preferredModel != nil
+                    ? draft.preferredEffort
+                    : nil
+                return try await api.createIssue(
+                    projectID: projectID,
+                    draft: normalizedDraft,
+                    attachmentReferences: [],
                     token: token,
-                    body: CreateIssueRequest(
-                        title: title,
-                        description: description.isEmpty ? nil : description,
-                        priority: draft.priority,
-                        difficulty: draft.difficulty,
-                        assigneeUserId: draft.assigneeUserId,
-                        status: draft.status,
-                        preferredProvider: draft.preferredProvider,
-                        preferredModel: draft.preferredModel,
-                        preferredEffort: draft.preferredProvider != nil && draft.preferredModel != nil
-                            ? draft.preferredEffort
-                            : nil,
-                        fullAuto: draft.fullAuto
-                    ),
-                    as: CreateIssueResponse.self
                 )
             }
             return try await api.upload(
-                path,
+                MobileAPIContract.Endpoint.issues(projectID: projectID),
                 fields: [
                     "title": title,
                     "description": description,
@@ -109,18 +101,17 @@ final class IssueMutationStore: ObservableObject {
                 throw titleError
             }
             let description = draft.description.trimmingCharacters(in: .whitespacesAndNewlines)
-            return try await api.send(
-                MobileAPIContract.Endpoint.run(projectID: projectID, runID: runID),
-                method: "PATCH",
+            var normalizedDraft = draft
+            normalizedDraft.title = title
+            normalizedDraft.description = description
+            return try await api.updateIssue(
+                projectID: projectID,
+                runID: runID,
+                draft: normalizedDraft,
+                assigneeUpdate: draft.assigneeUserId.map(IssueAssigneeUpdate.assign) ?? .clear,
+                attachmentReferences: [],
+                keptAttachmentIDs: nil,
                 token: token,
-                body: UpdateIssueRequest(
-                    title: title,
-                    description: description.isEmpty ? nil : description,
-                    priority: draft.priority,
-                    difficulty: draft.difficulty,
-                    assigneeUserId: draft.assigneeUserId
-                ),
-                as: UpdateIssueResponse.self
             )
         }
     }
@@ -130,38 +121,28 @@ final class IssueMutationStore: ObservableObject {
         subscribed: Bool
     ) async throws -> IssueSubscriptionResponse {
         try await perform("subscription-\(runID)") {
-            try await api.send(
-                MobileAPIContract.Endpoint.runSubscription(
-                    projectID: projectID,
-                    runID: runID
-                ),
-                method: subscribed ? "PUT" : "DELETE",
+            try await api.setIssueSubscription(
+                projectID: projectID,
+                runID: runID,
+                subscribed: subscribed,
                 token: token,
-                body: nil,
-                as: IssueSubscriptionResponse.self
             )
         }
     }
 
     func deleteIssue(runID: UUID) async throws {
         try await perform("delete-\(runID)") {
-            try await api.sendVoid(
-                MobileAPIContract.Endpoint.run(projectID: projectID, runID: runID),
-                method: "DELETE",
-                token: token,
-                body: nil
-            )
+            try await api.deleteIssue(projectID: projectID, runID: runID, token: token)
         }
     }
 
     func transferIssue(runID: UUID, targetProjectID: UUID) async throws -> TransferIssueResponse {
         try await perform("transfer-\(runID)") {
-            try await api.send(
-                MobileAPIContract.Endpoint.runTransfer(projectID: projectID, runID: runID),
-                method: "POST",
+            try await api.transferIssue(
+                projectID: projectID,
+                runID: runID,
+                targetProjectID: targetProjectID,
                 token: token,
-                body: TransferIssueRequest(targetProjectId: targetProjectID),
-                as: TransferIssueResponse.self
             )
         }
     }
@@ -172,50 +153,37 @@ final class IssueMutationStore: ObservableObject {
     ) async throws -> IssueExecutionPreferencesResponse {
         try await perform("preferences-\(runID)") {
             guard preferences.isValid else { throw IssueMutationError.invalidPreferences }
-            return try await api.send(
-                MobileAPIContract.Endpoint.runPreferences(projectID: projectID, runID: runID),
-                method: "PUT",
+            return try await api.updateIssuePreferences(
+                projectID: projectID,
+                runID: runID,
+                preferences: preferences,
                 token: token,
-                body: preferences,
-                as: IssueExecutionPreferencesResponse.self
             )
         }
     }
 
     func setDependency(runID: UUID, prerequisiteID: UUID, enabled: Bool) async throws {
         try await perform("dependency-\(runID)-\(prerequisiteID)") {
-            let path = MobileAPIContract.Endpoint.runDependency(
+            _ = try await api.setIssueDependency(
                 projectID: projectID,
                 runID: runID,
-                prerequisiteID: prerequisiteID
+                prerequisiteRunID: prerequisiteID,
+                enabled: enabled,
+                token: token
             )
-            if enabled {
-                let _: DependencyResponse = try await api.send(
-                    path,
-                    method: "PUT",
-                    token: token,
-                    body: nil,
-                    as: DependencyResponse.self
-                )
-            } else {
-                try await api.sendVoid(path, method: "DELETE", token: token, body: nil)
-            }
         }
     }
 
     func move(runID: UUID, status: DashboardRun.Status, workflowStage: String? = nil) async throws {
         try await perform("move-\(runID)") {
             let idempotencyKey = "move-\(runID)-\(status.rawValue)-\(workflowStage ?? "none")"
-            let _: RunStatusResponse = try await api.send(
-                MobileAPIContract.Endpoint.runStatus(projectID: projectID, runID: runID),
-                method: "PUT",
+            _ = try await api.moveRun(
+                projectID: projectID,
+                runID: runID,
+                requestID: idempotencyID(for: idempotencyKey),
+                status: status,
+                workflowStage: workflowStage,
                 token: token,
-                body: RunStatusRequest(
-                    requestId: idempotencyID(for: idempotencyKey),
-                    status: status,
-                    workflowStage: workflowStage
-                ),
-                as: RunStatusResponse.self
             )
             pendingRequestIDs.removeValue(forKey: idempotencyKey)
         }
@@ -233,15 +201,10 @@ final class IssueMutationStore: ObservableObject {
             }
             guard preferences.isValid else { throw IssueMutationError.invalidPreferences }
             let idempotencyKey = "dispatch-\(runID)-\(reassign)-\(provider.rawValue)-\(preferences.model ?? "none")-\(preferences.effort?.rawValue ?? "none")-\(workerID ?? "any")"
-            let _: DispatchRunResponse = try await api.send(
-                MobileAPIContract.Endpoint.runDispatch(
-                    projectID: projectID,
-                    runID: runID,
-                    reassign: reassign
-                ),
-                method: "POST",
-                token: token,
-                body: DispatchRunRequest(
+            _ = try await api.dispatchRun(
+                projectID: projectID,
+                runID: runID,
+                request: DispatchRunRequest(
                     provider: provider,
                     model: preferences.model,
                     effort: preferences.effort,
@@ -249,7 +212,8 @@ final class IssueMutationStore: ObservableObject {
                     workerId: workerID,
                     requestId: idempotencyID(for: idempotencyKey)
                 ),
-                as: DispatchRunResponse.self
+                reassign: reassign,
+                token: token,
             )
             pendingRequestIDs.removeValue(forKey: idempotencyKey)
         }
@@ -258,19 +222,13 @@ final class IssueMutationStore: ObservableObject {
     func recover(runID: UUID, action: String, reason: String? = nil) async throws {
         try await perform("recover-\(runID)") {
             let idempotencyKey = "recover-\(runID)-\(action)-\(reason ?? "none")"
-            let _: RunRecoveryResponse = try await api.send(
-                MobileAPIContract.Endpoint.runRecovery(
-                    projectID: projectID,
-                    runID: runID,
-                    action: action
-                ),
-                method: "POST",
+            _ = try await api.recoverRun(
+                projectID: projectID,
+                runID: runID,
+                requestID: idempotencyID(for: idempotencyKey),
+                action: action,
+                reason: reason,
                 token: token,
-                body: RequestIdentity(
-                    requestId: idempotencyID(for: idempotencyKey),
-                    reason: reason
-                ),
-                as: RunRecoveryResponse.self
             )
             pendingRequestIDs.removeValue(forKey: idempotencyKey)
         }
@@ -279,17 +237,12 @@ final class IssueMutationStore: ObservableObject {
     func resume(runID: UUID, checkpoint: WorkflowCheckpoint) async throws {
         try await perform("resume-\(runID)") {
             let idempotencyKey = "resume-\(runID)-\(checkpoint.key)-\(checkpoint.attempt)-\(checkpoint.revision)"
-            let _: ResumeRunResponse = try await api.send(
-                MobileAPIContract.Endpoint.runResume(projectID: projectID, runID: runID),
-                method: "POST",
+            _ = try await api.resumeRun(
+                projectID: projectID,
+                runID: runID,
+                requestID: idempotencyID(for: idempotencyKey),
+                checkpoint: checkpoint,
                 token: token,
-                body: ResumeRunRequest(
-                    requestId: idempotencyID(for: idempotencyKey),
-                    checkpointKey: checkpoint.key,
-                    attempt: checkpoint.attempt,
-                    revision: checkpoint.revision
-                ),
-                as: ResumeRunResponse.self
             )
             pendingRequestIDs.removeValue(forKey: idempotencyKey)
         }
@@ -297,13 +250,7 @@ final class IssueMutationStore: ObservableObject {
 
     func completeReview(runID: UUID) async throws -> ResultReview {
         try await perform("review-\(runID)") {
-            try await api.send(
-                MobileAPIContract.Endpoint.runResultReviews(projectID: projectID, runID: runID),
-                method: "POST",
-                token: token,
-                body: nil,
-                as: ResultReview.self
-            )
+            try await api.completeResultReview(projectID: projectID, runID: runID, token: token)
         }
     }
 
@@ -313,16 +260,11 @@ final class IssueMutationStore: ObservableObject {
     ) async throws -> AcceptIssueProposalResult {
         try await perform("issue-proposal-\(proposal.id)") {
             if proposal.type == .rework {
-                let response: AcceptIssueReworkProposalResponse = try await api.send(
-                    MobileAPIContract.Endpoint.acceptIssueReworkProposal(
-                        projectID: projectID,
-                        runID: runID,
-                        proposalID: proposal.id
-                    ),
-                    method: "POST",
+                let response = try await api.acceptIssueReworkProposal(
+                    projectID: projectID,
+                    runID: runID,
+                    proposalID: proposal.id,
                     token: token,
-                    body: nil,
-                    as: AcceptIssueReworkProposalResponse.self
                 )
                 return AcceptIssueProposalResult(
                     proposal: response.proposal,
@@ -330,16 +272,11 @@ final class IssueMutationStore: ObservableObject {
                     requiresAuthoritativeReload: false
                 )
             }
-            let response: AcceptIssueActionProposalResponse = try await api.send(
-                MobileAPIContract.Endpoint.acceptIssueActionProposal(
-                    projectID: projectID,
-                    runID: runID,
-                    proposalID: proposal.id
-                ),
-                method: "POST",
+            let response = try await api.acceptIssueActionProposal(
+                projectID: projectID,
+                runID: runID,
+                proposalID: proposal.id,
                 token: token,
-                body: nil,
-                as: AcceptIssueActionProposalResponse.self
             )
             let proposalMatches = response.proposal.id == proposal.id
             let executionProposal: IssueExecutionProposal? =
@@ -369,16 +306,12 @@ final class IssueMutationStore: ObservableObject {
         request: AcceptIssueExecutionProposalRequest
     ) async throws -> AcceptIssueExecutionProposalResponse {
         try await perform("issue-execution-proposal-\(proposalID)") {
-            try await api.send(
-                MobileAPIContract.Endpoint.acceptIssueExecutionProposal(
-                    projectID: projectID,
-                    conversationRunID: conversationRunID,
-                    proposalID: proposalID
-                ),
-                method: "POST",
+            try await api.acceptIssueExecutionProposal(
+                projectID: projectID,
+                conversationRunID: conversationRunID,
+                proposalID: proposalID,
+                approval: request,
                 token: token,
-                body: request,
-                as: AcceptIssueExecutionProposalResponse.self
             )
         }
     }
@@ -389,16 +322,12 @@ final class IssueMutationStore: ObservableObject {
         request: AcceptAgentSkillExecutionProposalRequest
     ) async throws -> AcceptAgentSkillExecutionProposalResponse {
         try await perform("agent-skill-execution-proposal-\(proposalID)") {
-            try await api.send(
-                MobileAPIContract.Endpoint.acceptIssueSkillExecutionProposal(
-                    projectID: projectID,
-                    conversationRunID: conversationRunID,
-                    proposalID: proposalID
-                ),
-                method: "POST",
+            try await api.acceptIssueSkillExecutionProposal(
+                projectID: projectID,
+                conversationRunID: conversationRunID,
+                proposalID: proposalID,
+                workerID: request.workerId,
                 token: token,
-                body: request,
-                as: AcceptAgentSkillExecutionProposalResponse.self
             )
         }
     }
@@ -428,7 +357,6 @@ final class IssueMutationStore: ObservableObject {
             guard attachments.allSatisfy({ $0.contentType.hasPrefix("image/") }) else {
                 throw IssueMutationError.attachment(L10n.text("대화에는 이미지만 첨부할 수 있습니다."))
             }
-            let path = MobileAPIContract.Endpoint.runMessages(projectID: projectID, runID: runID)
             let uniqueMentionedUserIds = Array(Set(mentionedUserIds.filter { !$0.isEmpty })).sorted()
             let uniqueMentionedAgentIds = Array(Set(mentionedAgentIds.filter { !$0.isEmpty })).sorted()
             let mentionedUserIdsJSON = String(
@@ -441,19 +369,17 @@ final class IssueMutationStore: ObservableObject {
             ) ?? "[]"
             let response: CreateIssueMessageResponse
             if attachments.isEmpty {
-                response = try await api.send(
-                    path,
-                    method: "POST",
+                response = try await api.createIssueMessage(
+                    projectID: projectID,
+                    runID: runID,
+                    clientMessageID: clientMessageID ?? UUID(),
+                    body: trimmed,
+                    parentMessageID: parentMessageID,
+                    mentionedUserIDs: uniqueMentionedUserIds,
+                    mentionedAgentIDs: uniqueMentionedAgentIds,
+                    agentConversationID: nil,
+                    attachmentReferences: attachmentReferences ?? [],
                     token: token,
-                    body: CreateIssueMessageRequest(
-                        body: trimmed,
-                        clientMessageId: clientMessageID,
-                        parentMessageId: parentMessageID,
-                        mentionedUserIds: uniqueMentionedUserIds,
-                        mentionedAgentIds: uniqueMentionedAgentIds,
-                        agentConversationId: nil
-                    ),
-                    as: CreateIssueMessageResponse.self
                 )
             } else {
                 let payload = try AttachmentMessagePayload(
@@ -463,7 +389,10 @@ final class IssueMutationStore: ObservableObject {
                     referenceGenerator: attachmentReference
                 )
                 response = try await api.upload(
-                    path,
+                    MobileAPIContract.Endpoint.runMessages(
+                        projectID: projectID,
+                        runID: runID
+                    ),
                     fields: [
                         "body": payload.body,
                         "clientMessageId": clientMessageID?.uuidString.lowercased() ?? "",
@@ -490,16 +419,11 @@ final class IssueMutationStore: ObservableObject {
                 try await Task.sleep(for: pollInterval)
                 let polled: IssueAgentReplyResponse
                 do {
-                    polled = try await api.send(
-                        MobileAPIContract.Endpoint.runAgentReply(
-                            projectID: projectID,
-                            runID: runID,
-                            triggerMessageID: response.message.id
-                        ),
-                        method: "GET",
+                    polled = try await api.getIssueAgentReply(
+                        projectID: projectID,
+                        runID: runID,
+                        triggerMessageID: response.message.id,
                         token: token,
-                        body: nil,
-                        as: IssueAgentReplyResponse.self
                     )
                 } catch is CancellationError {
                     throw CancellationError()
