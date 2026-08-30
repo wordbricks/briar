@@ -1327,7 +1327,7 @@ private extension AcceptAgentSkillExecutionProposalResponse.Outcome {
     }
 }
 
-private func issueDispatchMessage(_ request: DispatchRunRequest) -> BriarAPI_DispatchRunInput {
+func issueDispatchMessage(_ request: DispatchRunRequest) -> BriarAPI_DispatchRunInput {
     var message = BriarAPI_DispatchRunInput()
     message.requestID = issueUUIDString(request.requestId)
     if let agentID = request.agentId { message.agentID = issueUUIDString(agentID) }
@@ -1339,7 +1339,7 @@ private func issueDispatchMessage(_ request: DispatchRunRequest) -> BriarAPI_Dis
     return message
 }
 
-private func issueExecutionApprovalMessage(
+func issueExecutionApprovalMessage(
     _ approval: AcceptIssueExecutionProposalRequest
 ) -> BriarAPI_IssueExecutionApproval {
     var message = BriarAPI_IssueExecutionApproval()
@@ -1403,7 +1403,7 @@ private func issueProvider(_ value: BriarTypes_AgentProvider) throws -> AgentPro
     }
 }
 
-private func issueProviderMessage(_ value: AgentProvider) -> BriarTypes_AgentProvider {
+func issueProviderMessage(_ value: AgentProvider) -> BriarTypes_AgentProvider {
     switch value {
     case .codex: .codex
     case .claude: .claude
@@ -1429,7 +1429,7 @@ private func issueRunStatus(_ value: BriarAPI_RunStatus) throws -> DashboardRun.
     }
 }
 
-private func issueRunStatusMessage(_ value: DashboardRun.Status) -> BriarAPI_RunStatus {
+func issueRunStatusMessage(_ value: DashboardRun.Status) -> BriarAPI_RunStatus {
     switch value {
     case .backlog: .backlog
     case .queued: .queued

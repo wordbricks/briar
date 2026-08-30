@@ -1,4 +1,5 @@
 import BriarContracts
+import BriarContractsMocks
 import Connect
 import Foundation
 import SwiftProtobuf
@@ -103,9 +104,18 @@ final class IssueMutationTests: XCTestCase {
     }
 
     func testCreateAndMessageUseConnectWithoutBytesAndMultipartWithBytes() async throws {
-        let api = IssueTransportRecorder(projectID: Self.projectID, runID: Self.runID)
+        let api = IssueHTTPRecorder(projectID: Self.projectID, runID: Self.runID)
+        let scenario = IssueConnectScenario(projectID: Self.projectID, runID: Self.runID)
+        let issue = BriarAPI_IssueServiceClientMock()
+        issue.mockAsyncCreateIssue = { request in
+            .init(result: .success(scenario.createIssue(request)))
+        }
+        issue.mockAsyncCreateIssueMessage = { request in
+            .init(result: .success(scenario.createMessage(request)))
+        }
         let store = IssueMutationStore(
             api: api,
+            issueService: issue,
             projectID: Self.projectID,
             token: "token",
             attachmentReference: { "generated-upload-ref" }
@@ -135,12 +145,12 @@ final class IssueMutationTests: XCTestCase {
             maximumPolls: 0
         )
 
-        let calls = await api.calls()
-        XCTAssertEqual(calls.connectCreates, 1)
-        XCTAssertEqual(calls.connectMessages, 1)
-        XCTAssertEqual(calls.multipartCreates, 1)
-        XCTAssertEqual(calls.multipartMessages, 1)
-        XCTAssertEqual(calls.messageAttachmentReferences, [["existing-upload-ref"]])
+        let httpCalls = await api.calls()
+        XCTAssertEqual(scenario.connectCreates, 1)
+        XCTAssertEqual(scenario.connectMessages, 1)
+        XCTAssertEqual(httpCalls.multipartCreates, 1)
+        XCTAssertEqual(httpCalls.multipartMessages, 1)
+        XCTAssertEqual(httpCalls.messageAttachmentReferences, [["existing-upload-ref"]])
     }
 
     func testContractValidationRetainsTheUserFacingLimits() {
@@ -165,10 +175,8 @@ final class IssueMutationTests: XCTestCase {
     }
 }
 
-private actor IssueTransportRecorder: MobileAPIClientProtocol {
+private actor IssueHTTPRecorder: MobileAPIClientProtocol {
     struct Calls: Sendable {
-        var connectCreates = 0
-        var connectMessages = 0
         var multipartCreates = 0
         var multipartMessages = 0
         var messageAttachmentReferences: [[String]] = []
@@ -184,32 +192,6 @@ private actor IssueTransportRecorder: MobileAPIClientProtocol {
     }
 
     func calls() -> Calls { recorded }
-
-    func createIssue(
-        projectID: UUID,
-        draft: IssueDraft,
-        attachmentReferences: [String],
-        token: String
-    ) async throws -> CreateIssueResponse {
-        recorded.connectCreates += 1
-        return createResponse()
-    }
-
-    func createIssueMessage(
-        projectID: UUID,
-        runID: UUID,
-        clientMessageID: UUID,
-        body: String,
-        parentMessageID: UUID?,
-        mentionedUserIDs: [String],
-        mentionedAgentIDs: [String],
-        agentConversationID: String?,
-        attachmentReferences: [String],
-        token: String
-    ) async throws -> CreateIssueMessageResponse {
-        recorded.connectMessages += 1
-        return messageResponse(id: clientMessageID, body: body)
-    }
 
     func send<Response: Decodable & Sendable>(
         _ path: String,
@@ -271,5 +253,70 @@ private actor IssueTransportRecorder: MobileAPIClientProtocol {
             ),
             agentReply: nil
         )
+    }
+}
+
+private final class IssueConnectScenario: @unchecked Sendable {
+    private let lock = NSLock()
+    private let projectID: UUID
+    private let runID: UUID
+    private var createCount = 0
+    private var messageCount = 0
+
+    init(projectID: UUID, runID: UUID) {
+        self.projectID = projectID
+        self.runID = runID
+    }
+
+    var connectCreates: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return createCount
+    }
+
+    var connectMessages: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return messageCount
+    }
+
+    func createIssue(_ request: BriarAPI_CreateIssueRequest) -> BriarAPI_CreateIssueResponse {
+        lock.lock()
+        defer { lock.unlock() }
+        precondition(request.projectID == projectID.uuidString.lowercased())
+        precondition(request.title == "Connect")
+        createCount += 1
+
+        var response = BriarAPI_CreateIssueResponse()
+        response.runID = runID.uuidString.lowercased()
+        response.sourceKey = "BR-1"
+        response.stage = "backlog"
+        response.status = .backlog
+        response.createdByUserID = "user-1"
+        return response
+    }
+
+    func createMessage(
+        _ request: BriarAPI_CreateIssueMessageRequest
+    ) -> BriarAPI_CreateIssueMessageResponse {
+        lock.lock()
+        defer { lock.unlock() }
+        precondition(request.projectID == projectID.uuidString.lowercased())
+        precondition(request.runID == runID.uuidString.lowercased())
+        messageCount += 1
+
+        var author = BriarAPI_MessageAuthor()
+        author.id = "user-1"
+        author.name = "User"
+        var message = BriarAPI_IssueMessage()
+        message.id = request.clientMessageID
+        message.runID = request.runID
+        message.body = request.body
+        message.author = author
+        message.createdAt = Google_Protobuf_Timestamp(date: Date(timeIntervalSince1970: 10))
+        message.updatedAt = Google_Protobuf_Timestamp(date: Date(timeIntervalSince1970: 10))
+        var response = BriarAPI_CreateIssueMessageResponse()
+        response.message = message
+        return response
     }
 }
