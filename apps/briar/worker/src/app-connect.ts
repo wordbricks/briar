@@ -9,6 +9,7 @@ import { registerAppDashboardService } from "./app-connect-dashboard";
 import { registerAppFleetService } from "./app-connect-fleet";
 import { registerAppInboxService } from "./app-connect-inbox";
 import { registerAppIssueService } from "./app-connect-issue";
+import { registerAppMergeQueueService } from "./app-connect-merge-queue";
 import { registerAppOrganizationService } from "./app-connect-organization";
 import { registerAppReportingService } from "./app-connect-reporting";
 import { registerAppRealtimeService } from "./app-connect-realtime";
@@ -54,6 +55,7 @@ export async function handleAppConnectRequest(
   };
   registerAppAccountService(router, sharedInput);
   registerAppOrganizationService(router, sharedInput);
+  registerAppMergeQueueService(router, sharedInput);
   registerAppReportingService(router, sharedInput);
   registerAppDashboardService(router, {
     ...sharedInput,
