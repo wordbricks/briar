@@ -16,7 +16,6 @@ import {
   resolveCursorModelId,
   shouldAutoApproveCursorPermission,
   shouldDenyCursorPermission,
-  type CursorRunnerOutput,
 } from "./cursor-runner-lib";
 import {
   providerInstructionSeatbeltPattern,
@@ -143,9 +142,7 @@ export function cursorModelConfigId(setup: CursorSessionSetup | undefined) {
   )?.id ?? "model";
 }
 
-type CursorRunnerIo = ReturnType<
-  typeof createRunnerIo<CursorRunnerOutput>
->;
+type CursorRunnerIo = ReturnType<typeof createRunnerIo>;
 
 async function main(runnerIo: CursorRunnerIo) {
   const { emit, request: requestPromise, waitForApproval } = runnerIo;
@@ -177,16 +174,16 @@ async function main(runnerIo: CursorRunnerIo) {
       onNotification: (rpc) => {
         if (shouldSuppressCursorNotification(rpc, sessionLoadInProgress)) return;
         if (rpc.method !== "session/update") {
-          emit({ type: "event", raw: rpc });
+          emit.event({ raw: rpc });
           return;
         }
         const normalized = normalizeCursorSessionUpdate(rpc.params, state);
         if (normalized.events.length === 0) {
-          emit({ type: "event", raw: normalized.raw });
+          emit.event({ raw: normalized.raw });
           return;
         }
         for (const event of normalized.events) {
-          emit({ type: "event", raw: normalized.raw, event });
+          emit.event({ raw: normalized.raw, event });
         }
       },
       onServerRequest: async (rpc) => {
@@ -223,8 +220,7 @@ async function main(runnerIo: CursorRunnerIo) {
         }
 
         const id = String(++approvalSequence);
-        emit({
-          type: "approval",
+        emit.approval({
           id,
           toolName,
           input,
@@ -265,7 +261,7 @@ async function main(runnerIo: CursorRunnerIo) {
       } finally {
         sessionLoadInProgress = false;
       }
-      emit({ type: "event", raw: cursorRpcEnvelope("session/load", params, setup) });
+      emit.event({ raw: cursorRpcEnvelope("session/load", params, setup) });
       sessionId = setup?.sessionId?.trim() || resumeId;
     } else {
       const params = {
@@ -274,11 +270,11 @@ async function main(runnerIo: CursorRunnerIo) {
         ...(sessionMeta ? { _meta: sessionMeta } : {}),
       };
       setup = await connection.request("session/new", params) as CursorSessionSetup;
-      emit({ type: "event", raw: cursorRpcEnvelope("session/new", params, setup) });
+      emit.event({ raw: cursorRpcEnvelope("session/new", params, setup) });
       sessionId = setup?.sessionId?.trim() || "";
       if (!sessionId) throw new Error("Cursor Agent did not return a session id.");
     }
-    emit({ type: "session", sessionId });
+    emit.session(sessionId);
 
     const modelParams = {
       sessionId,
@@ -292,8 +288,7 @@ async function main(runnerIo: CursorRunnerIo) {
     if (modelResult?.configOptions) {
       setup = { ...setup, configOptions: modelResult.configOptions };
     }
-    emit({
-      type: "event",
+    emit.event({
       raw: cursorRpcEnvelope(
         "session/set_config_option",
         modelParams,
@@ -324,8 +319,7 @@ async function main(runnerIo: CursorRunnerIo) {
       messageId: promptId,
       _meta: { promptId, requestId: promptId },
     };
-    emit({
-      type: "event",
+    emit.event({
       raw: {
         jsonrpc: "2.0",
         method: "briar/session/prompt_start",
@@ -336,8 +330,7 @@ async function main(runnerIo: CursorRunnerIo) {
       "session/prompt",
       promptParams,
     ) as { stopReason?: string; text?: string } | undefined;
-    emit({
-      type: "event",
+    emit.event({
       raw: cursorRpcEnvelope(
         "session/prompt",
         { sessionId, messageId: promptId, _meta: promptParams._meta },
@@ -346,7 +339,7 @@ async function main(runnerIo: CursorRunnerIo) {
     });
 
     for (const event of finalizeCursorMessage(state, promptResult?.stopReason)) {
-      emit({ type: "event", raw: { type: "turn", event }, event });
+      emit.event({ raw: { type: "turn", event }, event });
     }
     if (!cursorStopReasonSucceeded(promptResult?.stopReason)) {
       throw new Error(
@@ -361,8 +354,7 @@ async function main(runnerIo: CursorRunnerIo) {
       typeof promptResult?.text === "string" ? promptResult.text : undefined,
       request.outputSchema,
     );
-    emit({
-      type: "result",
+    emit.result({
       sessionId,
       message: finalMessage || "(empty response)",
     });
@@ -372,16 +364,15 @@ async function main(runnerIo: CursorRunnerIo) {
 }
 
 export async function runCursorRunner() {
-  const runnerIo = createRunnerIo<CursorRunnerOutput>({
+  const runnerIo = createRunnerIo({
     closeError: "Briar closed the Cursor runner input.",
   });
   try {
     await main(runnerIo);
   } catch (caught) {
-    runnerIo.emit({
-      type: "error",
-      message: caught instanceof Error ? caught.message : String(caught),
-    });
+    runnerIo.emit.error(
+      caught instanceof Error ? caught.message : String(caught),
+    );
     process.exitCode = 1;
   } finally {
     runnerIo.close();

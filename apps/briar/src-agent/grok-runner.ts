@@ -18,7 +18,6 @@ import {
   resolveGrokModelId,
   shouldAutoApprovePermission,
   shouldDenyGrokPermission,
-  type GrokRunnerOutput,
   type JsonRpcMessage,
 } from "./grok-runner-lib";
 import { createRunnerIo } from "./runner-io";
@@ -185,9 +184,7 @@ export function shouldSuppressGrokNotification(
   return sessionLoadInProgress;
 }
 
-type GrokRunnerIo = ReturnType<
-  typeof createRunnerIo<GrokRunnerOutput>
->;
+type GrokRunnerIo = ReturnType<typeof createRunnerIo>;
 
 async function main(runnerIo: GrokRunnerIo) {
   const { emit, request: requestPromise, waitForApproval } = runnerIo;
@@ -214,15 +211,15 @@ async function main(runnerIo: GrokRunnerIo) {
           return;
         }
         if (rpc.method !== "session/update") {
-          emit({ type: "event", raw: rpc });
+          emit.event({ raw: rpc });
           return;
         }
         const normalized = normalizeGrokSessionUpdate(rpc.params, state);
         if (normalized.events.length === 0) {
-          emit({ type: "event", raw: normalized.raw });
+          emit.event({ raw: normalized.raw });
         } else {
           for (const event of normalized.events) {
-            emit({ type: "event", raw: normalized.raw, event });
+            emit.event({ raw: normalized.raw, event });
           }
         }
       },
@@ -251,8 +248,7 @@ async function main(runnerIo: GrokRunnerIo) {
           }
 
           const id = String(++approvalSequence);
-          emit({
-            type: "approval",
+          emit.approval({
             id,
             toolName,
             input,
@@ -308,8 +304,7 @@ async function main(runnerIo: GrokRunnerIo) {
       } finally {
         sessionLoadInProgress = false;
       }
-      emit({
-        type: "event",
+      emit.event({
         raw: grokRpcResultEnvelope("session/load", loadParams, loaded),
       });
       sessionId = loaded?.sessionId?.trim() || resumeId;
@@ -326,8 +321,7 @@ async function main(runnerIo: GrokRunnerIo) {
         sessionId?: string;
         models?: { currentModelId?: string };
       };
-      emit({
-        type: "event",
+      emit.event({
         raw: grokRpcResultEnvelope("session/new", newParams, created),
       });
       sessionId = created.sessionId?.trim() || "";
@@ -335,7 +329,7 @@ async function main(runnerIo: GrokRunnerIo) {
         throw new Error("Grok agent did not return a session id.");
       }
     }
-    emit({ type: "session", sessionId });
+    emit.session(sessionId);
 
     const modelId = resolveGrokModelId(request.model);
     if (modelId) {
@@ -348,8 +342,7 @@ async function main(runnerIo: GrokRunnerIo) {
           "session/set_model",
           setModelParams,
         );
-        emit({
-          type: "event",
+        emit.event({
           raw: grokRpcResultEnvelope(
             "session/set_model",
             setModelParams,
@@ -376,22 +369,19 @@ async function main(runnerIo: GrokRunnerIo) {
 
     const prompt = await buildGrokPromptParts(request);
     const promptInvocation = createGrokPromptInvocation(sessionId, prompt);
-    emit({
-      type: "event",
+    emit.event({
       raw: grokPromptStartEnvelope(promptInvocation),
     });
     const promptResult = (await connection.request(
       "session/prompt",
       promptInvocation.params,
     )) as { stopReason?: string; text?: string } | undefined;
-    emit({
-      type: "event",
+    emit.event({
       raw: grokPromptResultEnvelope(promptInvocation, promptResult),
     });
 
     for (const event of finalizeGrokMessage(state, promptResult?.stopReason)) {
-      emit({
-        type: "event",
+      emit.event({
         raw: { type: "turn", event },
         event,
       });
@@ -409,8 +399,7 @@ async function main(runnerIo: GrokRunnerIo) {
       typeof promptResult?.text === "string" ? promptResult.text : undefined,
       request.outputSchema,
     );
-    emit({
-      type: "result",
+    emit.result({
       sessionId,
       message: finalMessage || "(empty response)",
     });
@@ -420,17 +409,14 @@ async function main(runnerIo: GrokRunnerIo) {
 }
 
 export async function runGrokRunner() {
-  const runnerIo = createRunnerIo<GrokRunnerOutput>({
+  const runnerIo = createRunnerIo({
     closeError: "Briar closed the Grok runner input.",
   });
   const { emit } = runnerIo;
   try {
     await main(runnerIo);
   } catch (caught) {
-    emit({
-      type: "error",
-      message: caught instanceof Error ? caught.message : String(caught),
-    });
+    emit.error(caught instanceof Error ? caught.message : String(caught));
     process.exitCode = 1;
   } finally {
     runnerIo.close();

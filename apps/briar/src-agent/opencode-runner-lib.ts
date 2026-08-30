@@ -18,20 +18,6 @@ export type {
   NormalizedAgentEvent,
 } from "./normalized-agent-event";
 
-export type OpenCodeRunnerOutput =
-  | { type: "session"; sessionId: string }
-  | { type: "event"; raw: unknown; event?: NormalizedAgentEvent }
-  | {
-      type: "approval";
-      id: string;
-      toolName: string;
-      input: Record<string, unknown>;
-      title?: string;
-    }
-  | ({ type: "blocked" } & OpenCodeBlockedRetry)
-  | { type: "result"; sessionId: string; message: string }
-  | { type: "error"; message: string };
-
 export type OpenCodeBlockedRetry =
   | {
       reason: "free_tier_limit";

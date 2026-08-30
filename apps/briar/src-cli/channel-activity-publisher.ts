@@ -1,4 +1,6 @@
+import type { RunnerToParent } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import type { NormalizedAgentEvent } from "../src-agent/normalized-agent-event";
+import { sidecarNormalizedEvent } from "../src-agent/sidecar-protocol";
 import { naturalLanguageFromAgentMessage } from "../src/lib/auto-hunt-agent";
 import {
   CHANNEL_AGENT_ACTIVITY_HEADLINE_MAX_LENGTH,
@@ -58,6 +60,16 @@ export function safeChannelActivityHeadline(
 }
 
 function normalizedEventFromPayload(payload: unknown): NormalizedAgentEvent | null {
+  if (
+    payload && typeof payload === "object" && "$typeName" in payload &&
+    payload.$typeName === "briar.sidecar.v1.RunnerToParent"
+  ) {
+    const output = payload as RunnerToParent;
+    const normalized = output.payload.case === "event"
+      ? output.payload.value.normalized
+      : undefined;
+    return normalized ? sidecarNormalizedEvent(normalized) ?? null : null;
+  }
   if (
     payload === null || typeof payload !== "object" || !("event" in payload)
   ) return null;

@@ -13,7 +13,6 @@ import {
   normalizeCodexAppServerMessage,
   type CodexMcpIsolation,
   type CodexMcpTurnFailure,
-  type CodexRunnerOutput,
   type CodexRpcMessage,
 } from "./codex-runner-lib";
 import { decodeJsonRpcMessageJsonResult } from "./json-rpc-message";
@@ -21,7 +20,7 @@ import { createRunnerIo } from "./runner-io";
 import type { RunnerRequest } from "./runner-request";
 
 let activeChild: ChildProcessWithoutNullStreams | null = null;
-const runnerIo = createRunnerIo<CodexRunnerOutput>({
+const runnerIo = createRunnerIo({
   closeError: "Briar closed the Codex runner input.",
   onClose: () => {
     if (activeChild && activeChild.exitCode === null) {
@@ -41,7 +40,7 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
 
 function send(child: ChildProcessWithoutNullStreams, message: CodexRpcMessage) {
   child.stdin.write(`${JSON.stringify(message)}\n`);
-  emit({ type: "event", direction: "client", raw: message });
+  emit.event({ direction: "client", raw: message });
 }
 
 function childExit(
@@ -110,8 +109,7 @@ async function runCodexAttempt(
       const message: CodexRpcMessage = decoded.success;
 
       const normalized = normalizeCodexAppServerMessage(message);
-      emit({
-        type: "event",
+      emit.event({
         direction: "server",
         raw: message,
         ...(normalized ? { event: normalized } : {}),
@@ -119,8 +117,7 @@ async function runCodexAttempt(
 
       const approval = codexApprovalRequest(message);
       if (approval) {
-        emit({
-          type: "approval",
+        emit.approval({
           id: approval.id,
           toolName: approval.toolName,
           input: approval.input,
@@ -141,7 +138,7 @@ async function runCodexAttempt(
       const transition = consumeCodexAppServerMessage(state, request, message);
       if (state.threadId && !emittedSessions.has(state.threadId)) {
         emittedSessions.add(state.threadId);
-        emit({ type: "session", sessionId: state.threadId });
+        emit.session(state.threadId);
       }
       for (const outgoing of transition.outgoing) send(child, outgoing);
       if (transition.mcpFailure) {
@@ -212,8 +209,7 @@ async function main() {
       emittedSessions,
     );
     if (result.type === "completed") {
-      emit({
-        type: "result",
+      emit.result({
         sessionId: result.threadId,
         message: result.message,
       });
@@ -221,8 +217,7 @@ async function main() {
     }
 
     if (result.failure.disposition === "blocked") {
-      emit({
-        type: "blocked",
+      emit.blocked({
         reason: "mcp_auth_required",
         provider: "codex",
         message: `Authentication is required for MCP server(s): ${result.failure.serverNames.join(", ")}.`,
@@ -284,10 +279,7 @@ function isolationKey(value: CodexMcpIsolation): string {
 
 void main()
   .catch((caught) => {
-    emit({
-      type: "error",
-      message: caught instanceof Error ? caught.message : String(caught),
-    });
+    emit.error(caught instanceof Error ? caught.message : String(caught));
     process.exitCode = 1;
   })
   .finally(runnerIo.close);

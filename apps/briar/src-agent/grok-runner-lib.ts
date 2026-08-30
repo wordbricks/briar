@@ -49,33 +49,6 @@ export type GrokEventState = {
   >;
 };
 
-export type GrokRunnerOutput =
-  | {
-      type: "session";
-      sessionId: string;
-    }
-  | {
-      type: "event";
-      raw: unknown;
-      event?: NormalizedAgentEvent;
-    }
-  | {
-      type: "approval";
-      id: string;
-      toolName: string;
-      input: Record<string, unknown>;
-      title?: string;
-    }
-  | {
-      type: "result";
-      sessionId: string;
-      message: string;
-    }
-  | {
-      type: "error";
-      message: string;
-    };
-
 export type JsonRpcMessage = AcpJsonRpcMessage;
 
 export const GROK_OAUTH2_REFERRER_ENV = "GROK_OAUTH2_REFERRER";

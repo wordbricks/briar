@@ -23,13 +23,6 @@ export type AgyBlockedRetry =
       statusCode: 502 | 503 | 504;
     };
 
-export type AgyRunnerOutput =
-  | { type: "session"; sessionId: string }
-  | { type: "event"; raw: unknown; event?: NormalizedAgentEvent }
-  | ({ type: "blocked" } & AgyBlockedRetry)
-  | { type: "result"; sessionId: string; message: string }
-  | { type: "error"; message: string };
-
 export type AgyEventState = {
   messageId: string;
   messageStarted: boolean;

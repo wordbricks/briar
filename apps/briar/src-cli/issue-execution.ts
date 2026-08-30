@@ -29,6 +29,7 @@ import {
   type DetachedAgent,
 } from "./agent-runner";
 import { agentImageAttachments } from "../src-agent/runner-attachments";
+import { sidecarProviderRaw } from "../src-agent/sidecar-protocol";
 import {
   detachedProviderTurnFailure,
   logDetachedProviderTurnDiagnostic,
@@ -378,11 +379,14 @@ async function runClaimedIssueInRuntime(
           conversationId = nextConversationId;
           reportCheckpoint?.({ conversationId: nextConversationId });
         },
-        onPayload: async (rawPayload, line) => {
-          usageCollector.observe(rawPayload, new Date().toISOString());
-          runnerBlock ??= detachedProviderBlockFromPayload(rawPayload);
-          const direction = detachedPayloadDirection(rawPayload);
-          const payload = detachedTranscriptPayload(rawPayload, line);
+        onPayload: async (output, line) => {
+          usageCollector.observe(
+            sidecarProviderRaw(output),
+            new Date().toISOString(),
+          );
+          runnerBlock ??= detachedProviderBlockFromPayload(output);
+          const direction = detachedPayloadDirection(output);
+          const payload = detachedTranscriptPayload(output, line);
           const transcriptSequence = transcriptSequencer.nextForPayload(payload);
           if (transcriptSequence !== null) {
             await transcriptBatcher.enqueue({

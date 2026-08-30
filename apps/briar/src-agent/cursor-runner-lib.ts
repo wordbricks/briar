@@ -16,19 +16,6 @@ import {
 import type { NormalizedAgentEvent } from "./normalized-agent-event";
 import type { RunnerRequest } from "./runner-request";
 
-export type CursorRunnerOutput =
-  | { type: "session"; sessionId: string }
-  | { type: "event"; raw: unknown; event?: NormalizedAgentEvent }
-  | {
-      type: "approval";
-      id: string;
-      toolName: string;
-      input: Record<string, unknown>;
-      title?: string;
-    }
-  | { type: "result"; sessionId: string; message: string }
-  | { type: "error"; message: string };
-
 export type CursorEventState = GrokEventState;
 
 function asStandardAcpRequest(

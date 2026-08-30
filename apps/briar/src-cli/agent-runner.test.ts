@@ -5,13 +5,17 @@ import {
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import { describe, expect, it } from "vitest";
 import {
+  sidecarProviderEvent,
+  sidecarRunBlocked,
+  sidecarSessionStarted,
+} from "../src-agent/sidecar-protocol";
+import {
   boundedTranscriptPayload,
   createDetachedTranscriptSequencer,
   detachedAgentContext,
   detachedAgentPrompt,
   detachedChannelReplyPrompt,
   detachedChannelReplyOutputSchema,
-  detachedConversationIdFromPayload,
   detachedPayloadDirection,
   detachedIssueReplyPrompt,
   detachedIssueReplyOutputSchema,
@@ -26,7 +30,6 @@ import {
   detachedTranscriptSequence,
   detachedTranscriptSessionId,
   detachedTranscriptPayload,
-  issueReplyTextFromPayload,
   parseDetachedJsonResult,
   parseDetachedIssueReplyResult,
   runProjectAgentTaskCompletionFlow,
@@ -81,13 +84,12 @@ describe("detached Agent runner", () => {
   });
 
   it("builds a structured blocked handoff for an exhausted OpenCode free tier", () => {
-    const block = detachedProviderBlockFromPayload({
-      type: "blocked",
+    const block = detachedProviderBlockFromPayload(sidecarRunBlocked({
       reason: "free_tier_limit",
       provider: "opencode",
       message: "Free limit reached",
       nextRetryAt: "2026-08-06T00:00:00.864Z",
-    });
+    }));
     expect(block).not.toBeNull();
 
     const event = detachedProviderBlockedRunEvent({
@@ -113,14 +115,13 @@ describe("detached Agent runner", () => {
   });
 
   it("builds a structured blocked handoff for transient OpenCode overload", () => {
-    const block = detachedProviderBlockFromPayload({
-      type: "blocked",
+    const block = detachedProviderBlockFromPayload(sidecarRunBlocked({
       reason: "upstream_overloaded",
       provider: "opencode",
       message: "Streaming response failed: [503] The request queue is full.",
       nextRetryAt: null,
       statusCode: 503,
-    });
+    }));
     expect(block).not.toBeNull();
 
     const event = detachedProviderBlockedRunEvent({
@@ -147,14 +148,13 @@ describe("detached Agent runner", () => {
   });
 
   it("names Antigravity in a structured upstream overload handoff", () => {
-    const block = detachedProviderBlockFromPayload({
-      type: "blocked",
+    const block = detachedProviderBlockFromPayload(sidecarRunBlocked({
       reason: "upstream_overloaded",
       provider: "agy",
       message: "The request queue is full.",
       nextRetryAt: null,
       statusCode: 503,
-    });
+    }));
 
     const event = detachedProviderBlockedRunEvent({
       block: block!,
@@ -172,14 +172,13 @@ describe("detached Agent runner", () => {
   });
 
   it("maps a required MCP authentication failure to an authentication wait", () => {
-    const block = detachedProviderBlockFromPayload({
-      type: "blocked",
+    const block = detachedProviderBlockFromPayload(sidecarRunBlocked({
       reason: "mcp_auth_required",
       provider: "codex",
       message: "Authentication is required for MCP server(s): figma.",
       nextRetryAt: null,
       serverNames: ["figma", "figma"],
-    });
+    }));
     expect(block).toEqual({
       reason: "mcp_auth_required",
       provider: "codex",
@@ -751,24 +750,6 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("is not by itself a terminal run outcome");
     expect(prompt).toContain("correct the code or execution environment");
     expect(prompt).toContain('"ci:local exited with code 1"');
-  });
-
-  it("extracts provider conversation IDs from session payloads", () => {
-    expect(
-      detachedConversationIdFromPayload({
-        type: "session",
-        sessionId: "thread-42",
-      }),
-    ).toBe("thread-42");
-    expect(
-      detachedConversationIdFromPayload({
-        type: "event",
-        event: {
-          type: "conversationStarted",
-          conversationId: "thread-43",
-        },
-      }),
-    ).toBe("thread-43");
   });
 
   it("continues only while the claimed run remains active", () => {
@@ -1387,51 +1368,6 @@ describe("detached Agent runner", () => {
     },
   );
 
-  it("extracts final replies from every detached provider event shape", () => {
-    expect(
-      issueReplyTextFromPayload({ type: "result", message: " Claude reply " }),
-    ).toBe("Claude reply");
-    expect(
-      issueReplyTextFromPayload({
-        type: "event",
-        event: { type: "messageCompleted", text: "Grok reply" },
-      }),
-    ).toBe("Grok reply");
-    expect(
-      issueReplyTextFromPayload({
-        type: "item.completed",
-        item: { type: "agent_message", text: "Codex reply" },
-      }),
-    ).toBe("Codex reply");
-    expect(
-      issueReplyTextFromPayload({
-        type: "event",
-        raw: {
-          method: "item/completed",
-          params: {
-            item: { type: "agentMessage", phase: "final_answer", text: "App Server reply" },
-          },
-        },
-      }),
-    ).toBe("App Server reply");
-    expect(
-      issueReplyTextFromPayload({
-        type: "event",
-        raw: {
-          method: "turn/completed",
-          params: {
-            turn: {
-              items: [
-                { type: "agentMessage", phase: "commentary", text: "Working" },
-                { type: "agentMessage", phase: "final_answer", text: "Final App Server reply" },
-              ],
-            },
-          },
-        },
-      }),
-    ).toBe("Final App Server reply");
-  });
-
   it("bounds untrusted transcript payloads", () => {
     expect(boundedTranscriptPayload({ message: "ok" }, "ok")).toEqual({
       message: "ok",
@@ -1442,23 +1378,18 @@ describe("detached Agent runner", () => {
   });
 
   it("preserves runner event directions and exposes session starts", () => {
-    const clientEvent = { type: "event", direction: "client", raw: {} };
+    const clientEvent = sidecarProviderEvent({ direction: "client", raw: {} });
     expect(detachedPayloadDirection(clientEvent)).toBe("client");
-    expect(detachedPayloadDirection({ type: "event", raw: {} })).toBe("server");
+    expect(
+      detachedPayloadDirection(sidecarProviderEvent({ raw: {} })),
+    ).toBe("server");
+    const session = sidecarSessionStarted("thread-1");
+    expect(detachedTranscriptPayload(session, '{"sessionStarted":{}}')).toBe(
+      session,
+    );
     expect(
       detachedTranscriptPayload(
-        { type: "session", sessionId: "thread-1" },
-        '{"type":"session","sessionId":"thread-1"}',
-      ),
-    ).toEqual({
-      type: "session",
-      sessionId: "thread-1",
-      event: { type: "conversationStarted", conversationId: "thread-1" },
-    });
-    expect(
-      detachedTranscriptPayload(
-        {
-          type: "event",
+        sidecarProviderEvent({
           direction: "server",
           event: {
             type: "messageCompleted",
@@ -1467,7 +1398,7 @@ describe("detached Agent runner", () => {
             text: "Done",
           },
           raw: { text: "x".repeat(40_000) },
-        },
+        }),
         "x".repeat(40_000),
       ),
     ).toMatchObject({
@@ -1478,34 +1409,13 @@ describe("detached Agent runner", () => {
 
   it("accepts normalized deltas for compaction and drops raw-only stream noise", () => {
     expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "event",
+      shouldPersistDetachedTranscriptPayload(sidecarProviderEvent({
+        raw: {},
         event: { type: "messageDelta", id: "message-1", delta: "hello" },
-      }),
+      })),
     ).toBe(true);
     expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "messageDelta",
-        id: "message-1",
-        delta: "hello",
-      }),
-    ).toBe(true);
-    expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "event",
-        event: { type: "activityDelta", id: "command-1", delta: "output" },
-      }),
-    ).toBe(true);
-    expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "activityDelta",
-        id: "command-1",
-        delta: "output",
-      }),
-    ).toBe(true);
-    expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "event",
+      shouldPersistDetachedTranscriptPayload(sidecarProviderEvent({
         raw: {
           sessionId: "grok-session",
           update: {
@@ -1513,50 +1423,25 @@ describe("detached Agent runner", () => {
             content: { type: "text", text: "private thought" },
           },
         },
-      }),
+      })),
     ).toBe(false);
     expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "event",
-        raw: {
-          type: "stream_event",
-          event: {
-            type: "content_block_delta",
-            delta: { type: "thinking_delta", thinking: "private thought" },
-          },
-        },
-      }),
-    ).toBe(false);
-    expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "event",
+      shouldPersistDetachedTranscriptPayload(sidecarProviderEvent({
         raw: {
           method: "item/reasoning/textDelta",
           params: { delta: "private thought" },
         },
-      }),
+      })),
     ).toBe(false);
     expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "event",
+      shouldPersistDetachedTranscriptPayload(sidecarProviderEvent({
         raw: { method: "item/completed", params: { item: { type: "tool" } } },
-      }),
-    ).toBe(true);
-    expect(
-      shouldPersistDetachedTranscriptPayload({
-        type: "event",
-        event: {
-          type: "messageCompleted",
-          id: "message-1",
-          text: "hello",
-        },
-      }),
+      })),
     ).toBe(true);
   });
 
   it("bounds oversized normalized activity payloads below the upload threshold", () => {
-    const payload = {
-      type: "event",
+    const payload = sidecarProviderEvent({
       direction: "server",
       raw: { output: "원격 명령 출력".repeat(20_000) },
       event: {
@@ -1567,7 +1452,7 @@ describe("detached Agent runner", () => {
         text: "아주 긴 실행 결과 ".repeat(20_000),
         status: "completed",
       },
-    };
+    });
     const bounded = detachedTranscriptPayload(payload, JSON.stringify(payload));
 
     expect(Buffer.byteLength(JSON.stringify(bounded), "utf8")).toBeLessThan(
@@ -1587,28 +1472,28 @@ describe("detached Agent runner", () => {
   it("assigns every accepted payload a stable transcript sequence", () => {
     const sequencer = createDetachedTranscriptSequencer(1);
     expect(
-      sequencer.nextForPayload({
-        type: "event",
+      sequencer.nextForPayload(sidecarProviderEvent({
         raw: {
           update: { sessionUpdate: "agent_thought_chunk" },
         },
-      }),
+      })),
     ).toBeNull();
-    const delta = {
-      type: "event",
+    const delta = sidecarProviderEvent({
+      raw: {},
       event: { type: "messageDelta", id: "message-1", delta: "x" },
-    };
+    });
     expect(sequencer.nextForPayload(delta)).toBe(1);
 
     expect(
-      sequencer.nextForPayload({
-        type: "event",
+      sequencer.nextForPayload(sidecarProviderEvent({
+        raw: {},
         event: {
           type: "messageCompleted",
           id: "message-1",
+          phase: null,
           text: "done",
         },
-      }),
+      })),
     ).toBe(2);
     expect(sequencer.next()).toBe(3);
   });

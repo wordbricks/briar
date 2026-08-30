@@ -1,13 +1,21 @@
 import { Buffer } from "node:buffer";
 import { create, type JsonObject } from "@bufbuild/protobuf";
+import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
 import {
   ApprovalPolicy,
+  BlockReason,
   JsonSchemaSchema,
   RunRequestSchema,
   SandboxMode,
+  type RunnerToParent,
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
+import { AgentEventDirection } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
+import {
+  sidecarNormalizedEvent,
+  sidecarProviderRaw,
+} from "../src-agent/sidecar-protocol";
 import type { ModelEffort } from "../src/lib/agent-provider-contract";
 import type { AgentProvider } from "../src/lib/agent-provider";
 import type { JsonSchema } from "../src/lib/project-llm";
@@ -699,69 +707,54 @@ export type DetachedProviderBlock =
     };
 
 export function detachedProviderBlockFromPayload(
-  payload: unknown,
+  payload: RunnerToParent,
 ): DetachedProviderBlock | null {
-  if (!payload || typeof payload !== "object") return null;
-  const record = payload as Record<string, unknown>;
-  if (
-    record.type !== "blocked" ||
-    (record.reason !== "free_tier_limit" &&
-      record.reason !== "upstream_overloaded" &&
-      record.reason !== "mcp_auth_required")
-  ) {
-    return null;
-  }
-  if (typeof record.provider !== "string" || !record.provider.trim()) {
-    return null;
-  }
-  if (typeof record.message !== "string" || !record.message.trim()) {
-    return null;
-  }
-  const nextRetryAt =
-    typeof record.nextRetryAt === "string" &&
-      !Number.isNaN(Date.parse(record.nextRetryAt))
-      ? new Date(record.nextRetryAt).toISOString()
-      : null;
-  if (record.reason === "mcp_auth_required") {
-    const serverNames = Array.isArray(record.serverNames)
-      ? record.serverNames
-        .filter((value): value is string => typeof value === "string")
-        .map((value) =>
-          value
-            .replace(/[\r\n\t]+/g, " ")
-            .replace(/[^\p{L}\p{N} ._@/-]+/gu, " ")
-            .replace(/\s+/g, " ")
-            .trim()
-            .slice(0, 200)
-        )
-        .filter(Boolean)
-      : [];
-    if (record.provider !== "codex" || serverNames.length === 0) return null;
+  if (payload.payload.case !== "blocked") return null;
+  const blocked = payload.payload.value;
+  const provider = blocked.provider?.trim();
+  const message = blocked.message.trim();
+  if (!provider || !message) return null;
+  const nextRetryAt = blocked.nextRetryAt
+    ? timestampDate(blocked.nextRetryAt).toISOString()
+    : null;
+  if (blocked.reason === BlockReason.MCP_AUTH_REQUIRED) {
+    const serverNames = blocked.serverNames
+      .map((value) =>
+        value
+          .replace(/[\r\n\t]+/g, " ")
+          .replace(/[^\p{L}\p{N} ._@/-]+/gu, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 200)
+      )
+      .filter(Boolean);
+    if (provider !== "codex" || serverNames.length === 0) return null;
     return {
       reason: "mcp_auth_required",
       provider: "codex",
-      message: record.message.trim(),
+      message,
       nextRetryAt: null,
       serverNames: [...new Set(serverNames)].sort(),
     };
   }
-  if (record.reason === "upstream_overloaded") {
-    const statusCode = Number(record.statusCode);
+  if (blocked.reason === BlockReason.UPSTREAM_OVERLOADED) {
+    const statusCode = blocked.statusCode;
     if (statusCode !== 502 && statusCode !== 503 && statusCode !== 504) {
       return null;
     }
     return {
       reason: "upstream_overloaded",
-      provider: record.provider.trim(),
-      message: record.message.trim(),
+      provider,
+      message,
       nextRetryAt: null,
       statusCode,
     };
   }
+  if (blocked.reason !== BlockReason.FREE_TIER_LIMIT) return null;
   return {
     reason: "free_tier_limit",
-    provider: record.provider.trim(),
-    message: record.message.trim(),
+    provider,
+    message,
     nextRetryAt,
   };
 }
@@ -1363,82 +1356,6 @@ export function parseDetachedJsonResult(text: string): unknown {
   }
 }
 
-export function issueReplyTextFromPayload(payload: unknown): string | null {
-  if (!payload || typeof payload !== "object") return null;
-  const record = payload as Record<string, unknown>;
-  const candidates = [
-    record,
-    ...(record.raw && typeof record.raw === "object"
-      ? [record.raw as Record<string, unknown>]
-      : []),
-  ];
-  for (const candidate of candidates) {
-    if (candidate.type === "result" && typeof candidate.message === "string") {
-      return candidate.message.trim() || null;
-    }
-    const event =
-      candidate.event && typeof candidate.event === "object"
-        ? (candidate.event as Record<string, unknown>)
-        : null;
-    if (
-      event?.type === "messageCompleted" &&
-      typeof event.text === "string"
-    ) {
-      return event.text.trim() || null;
-    }
-    const item =
-      candidate.item && typeof candidate.item === "object"
-        ? (candidate.item as Record<string, unknown>)
-        : null;
-    if (
-      candidate.type === "item.completed" &&
-      item?.type === "agent_message" &&
-      typeof item.text === "string"
-    ) {
-      return item.text.trim() || null;
-    }
-    if (candidate.method === "item/completed") {
-      const params =
-        candidate.params && typeof candidate.params === "object"
-          ? (candidate.params as Record<string, unknown>)
-          : null;
-      const appServerItem =
-        params?.item && typeof params.item === "object"
-          ? (params.item as Record<string, unknown>)
-          : null;
-      if (
-        appServerItem?.type === "agentMessage" &&
-        typeof appServerItem.text === "string"
-      ) {
-        return appServerItem.text.trim() || null;
-      }
-    }
-    if (candidate.method === "turn/completed") {
-      const params =
-        candidate.params && typeof candidate.params === "object"
-          ? (candidate.params as Record<string, unknown>)
-          : null;
-      const turn =
-        params?.turn && typeof params.turn === "object"
-          ? (params.turn as Record<string, unknown>)
-          : null;
-      const items = Array.isArray(turn?.items) ? turn.items : [];
-      const messages = items.filter(
-        (item): item is Record<string, unknown> =>
-          Boolean(item) && typeof item === "object" && !Array.isArray(item) &&
-          (item as Record<string, unknown>).type === "agentMessage" &&
-          typeof (item as Record<string, unknown>).text === "string",
-      );
-      const finalMessage =
-        messages.find((item) => item.phase === "final_answer") ?? messages.at(-1);
-      if (finalMessage && typeof finalMessage.text === "string") {
-        return finalMessage.text.trim() || null;
-      }
-    }
-  }
-  return null;
-}
-
 export function detachedProviderRequest(input: {
   agent: DetachedAgent;
   prompt: string;
@@ -1500,35 +1417,6 @@ export function detachedProviderRequest(input: {
   };
 }
 
-export function detachedConversationIdFromPayload(payload: unknown) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return null;
-  }
-  const record = payload as Record<string, unknown>;
-  if (
-    record.type === "session" &&
-    typeof record.sessionId === "string" &&
-    record.sessionId.trim()
-  ) {
-    return record.sessionId.trim();
-  }
-  const event =
-    record.type === "event" &&
-      record.event &&
-      typeof record.event === "object" &&
-      !Array.isArray(record.event)
-      ? (record.event as Record<string, unknown>)
-      : null;
-  if (
-    event?.type === "conversationStarted" &&
-    typeof event.conversationId === "string" &&
-    event.conversationId.trim()
-  ) {
-    return event.conversationId.trim();
-  }
-  return null;
-}
-
 export function detachedRunContinuationPrompt(input: {
   runId: string;
   sourceKey: string;
@@ -1581,11 +1469,12 @@ export function detachedRunTurnDecision(
 }
 
 export function detachedPayloadDirection(
-  payload: unknown,
+  payload: RunnerToParent,
 ): "client" | "server" {
-  if (!payload || typeof payload !== "object") return "server";
-  const direction = (payload as Record<string, unknown>).direction;
-  return direction === "client" ? "client" : "server";
+  return payload.payload.case === "event" &&
+      payload.payload.value.direction === AgentEventDirection.CLIENT
+    ? "client"
+    : "server";
 }
 
 /**
@@ -1595,10 +1484,23 @@ export function detachedPayloadDirection(
  */
 export function shouldPersistDetachedTranscriptPayload(payload: unknown) {
   if (!payload || typeof payload !== "object") return true;
+  if (
+    "$typeName" in payload &&
+    payload.$typeName === "briar.sidecar.v1.RunnerToParent"
+  ) {
+    const output = payload as RunnerToParent;
+    if (output.payload.case !== "event") return true;
+    if (output.payload.value.normalized) return true;
+    return shouldPersistDetachedProviderRaw(sidecarProviderRaw(output));
+  }
   const envelope = payload as Record<string, unknown>;
   if (envelope.type !== "event" || envelope.event !== undefined) return true;
-  const raw = envelope.raw && typeof envelope.raw === "object"
-    ? (envelope.raw as Record<string, unknown>)
+  return shouldPersistDetachedProviderRaw(envelope.raw);
+}
+
+function shouldPersistDetachedProviderRaw(payload: unknown) {
+  const raw = payload && typeof payload === "object"
+    ? (payload as Record<string, unknown>)
     : null;
   if (!raw) return true;
 
@@ -1636,38 +1538,29 @@ export function createDetachedTranscriptSequencer(claimAttempt: number) {
   };
 }
 
-export function detachedTranscriptPayload(payload: unknown, rawLine: string) {
+export function detachedTranscriptPayload(
+  payload: RunnerToParent,
+  rawLine: string,
+) {
   const bounded = boundedTranscriptPayload(payload, rawLine);
   if (!bounded || typeof bounded !== "object") return bounded;
   const record = bounded as Record<string, unknown>;
-  const original =
-    payload && typeof payload === "object"
-      ? (payload as Record<string, unknown>)
-      : null;
-  if (
-    record.type === "truncated" &&
-    original?.type === "event" &&
-    original.event &&
-    typeof original.event === "object"
-  ) {
+  if (record.type === "truncated" && payload.payload.case === "event") {
+    const event = payload.payload.value.normalized
+      ? sidecarNormalizedEvent(payload.payload.value.normalized)
+      : undefined;
     return {
       type: "event",
-      ...(original.direction === "client" ? { direction: "client" } : {}),
-      event: boundedNormalizedTranscriptEvent(
-        original.event as Record<string, unknown>,
-      ),
+      ...(detachedPayloadDirection(payload) === "client"
+        ? { direction: "client" }
+        : {}),
+      ...(event
+        ? { event: boundedNormalizedTranscriptEvent({ ...event }) }
+        : {}),
+      raw: bounded,
     };
   }
-  if (record.type !== "session" || typeof record.sessionId !== "string") {
-    return bounded;
-  }
-  return {
-    ...record,
-    event: {
-      type: "conversationStarted",
-      conversationId: record.sessionId,
-    },
-  };
+  return bounded;
 }
 
 function boundedNormalizedTranscriptEvent(
@@ -1697,8 +1590,7 @@ function boundedNormalizedTranscriptEvent(
 }
 
 export function boundedTranscriptPayload(payload: unknown, rawLine: string) {
-  const serialized = JSON.stringify(payload);
-  if (Buffer.byteLength(serialized, "utf8") <= 28_000) return payload;
+  if (Buffer.byteLength(rawLine, "utf8") <= 28_000) return payload;
   return {
     type: "truncated",
     preview: utf8Prefix(rawLine, 8_000),

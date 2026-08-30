@@ -11,12 +11,8 @@ import {
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import { PassThrough } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
-import {
-  type CodexRunnerOutput,
-} from "./codex-runner-lib";
 import { createRunnerIo } from "./runner-io";
 import {
-  decodeSidecarRunnerOutput,
   encodeSidecarApprovalResponse,
   encodeSidecarRunRequest,
 } from "./sidecar-protocol";
@@ -43,7 +39,7 @@ async function firstFrame(bytes: Uint8Array) {
     RunnerToParentSchema,
     source(),
   )) {
-    return decodeSidecarRunnerOutput(message);
+    return message;
   }
   throw new Error("missing frame");
 }
@@ -54,7 +50,7 @@ function testIo(onClose = vi.fn()) {
   const written: Buffer[] = [];
   const terminate = vi.fn();
   output.on("data", (chunk: Buffer) => written.push(chunk));
-  const io = createRunnerIo<CodexRunnerOutput>({
+  const io = createRunnerIo({
     closeError: "input closed",
     input,
     onClose,
@@ -93,11 +89,12 @@ describe("runner protobuf I/O", () => {
       outputSchema: { type: "object" },
       providerBinaryPath: "/bin/codex",
     });
-    io.emit({ type: "result", sessionId: "session-1", message: "done" });
-    await expect(firstFrame(written())).resolves.toEqual({
-      type: "result",
-      sessionId: "session-1",
-      message: "done",
+    io.emit.result({ sessionId: "session-1", message: "done" });
+    await expect(firstFrame(written())).resolves.toMatchObject({
+      payload: {
+        case: "result",
+        value: { sessionId: "session-1", message: "done" },
+      },
     });
     io.close();
   });
@@ -117,7 +114,7 @@ describe("runner protobuf I/O", () => {
     await expect(cancelled).resolves.toBe(false);
 
     const deniedOnClose = io.waitForApproval("approval-closed");
-    io.emit({ type: "result", sessionId: "session-1", message: "done" });
+    io.emit.result({ sessionId: "session-1", message: "done" });
     io.close();
     await expect(deniedOnClose).resolves.toBe(false);
   });
@@ -191,10 +188,9 @@ describe("runner protobuf I/O", () => {
   it("rejects every frame after terminal output", async () => {
     const { input, io, terminate } = testIo();
     await beginRun(input, io.request);
-    io.emit({ type: "result", sessionId: "session-1", message: "done" });
+    io.emit.result({ sessionId: "session-1", message: "done" });
 
-    expect(() => io.emit({
-      type: "event",
+    expect(() => io.emit.event({
       direction: "server",
       raw: { jsonrpc: "2.0" },
     })).toThrow("after terminal output");

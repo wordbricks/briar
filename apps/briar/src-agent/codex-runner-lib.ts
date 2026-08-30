@@ -14,42 +14,6 @@ export type {
   NormalizedAgentEvent,
 } from "./normalized-agent-event";
 
-export type CodexRunnerOutput =
-  | {
-      type: "session";
-      sessionId: string;
-    }
-  | {
-      type: "event";
-      direction: "client" | "server";
-      raw: CodexRpcMessage;
-      event?: NormalizedAgentEvent;
-    }
-  | {
-      type: "approval";
-      id: string;
-      toolName: string;
-      input: Record<string, unknown>;
-      title?: string;
-    }
-  | {
-      type: "result";
-      sessionId: string;
-      message: string;
-    }
-  | {
-      type: "blocked";
-      reason: "mcp_auth_required";
-      provider: "codex";
-      message: string;
-      serverNames: string[];
-      nextRetryAt: null;
-    }
-  | {
-      type: "error";
-      message: string;
-    };
-
 export type CodexRpcMessage = JsonRpcMessage;
 
 export type CodexAppServerState = {

@@ -36,33 +36,6 @@ export type ClaudeEventState = {
   >;
 };
 
-export type ClaudeRunnerOutput =
-  | {
-      type: "session";
-      sessionId: string;
-    }
-  | {
-      type: "event";
-      raw: SDKMessage;
-      event?: NormalizedAgentEvent;
-    }
-  | {
-      type: "approval";
-      id: string;
-      toolName: string;
-      input: Record<string, unknown>;
-      title?: string;
-    }
-  | {
-      type: "result";
-      sessionId: string;
-      message: string;
-    }
-  | {
-      type: "error";
-      message: string;
-    };
-
 const readOnlyTools = ["Read", "Glob", "Grep"] as const;
 const supportedClaudeImageMimeTypes = new Set([
   "image/gif",

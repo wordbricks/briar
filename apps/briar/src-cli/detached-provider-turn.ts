@@ -1,23 +1,22 @@
 import { Buffer } from "node:buffer";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
+import { toJson } from "@bufbuild/protobuf";
 import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
 import {
   RunnerToParentSchema,
   SandboxMode,
+  type RunnerToParent,
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
 import {
-  decodeSidecarRunnerOutput,
   encodeSidecarApprovalResponse,
   encodeSidecarRunRequest,
 } from "../src-agent/sidecar-protocol";
 import type { JsonSchema } from "../src/lib/project-llm";
 import { agentProviderBinaryName } from "../src/lib/agent-provider";
 import {
-  detachedConversationIdFromPayload,
   detachedProviderRequest,
-  issueReplyTextFromPayload,
   type DetachedAgent,
   type DetachedDelegationTarget,
 } from "./agent-runner";
@@ -69,7 +68,7 @@ export type DetachedProviderTurnInput = {
   signal: AbortSignal;
   diagnosticContext?: DetachedProviderTurnDiagnosticContext;
   onDiagnostic?: (diagnostic: DetachedProviderTurnDiagnostic) => void;
-  onPayload?: (payload: unknown, rawLine: string) => void | Promise<void>;
+  onPayload?: (payload: RunnerToParent, rawLine: string) => void | Promise<void>;
   onConversationId?: (conversationId: string) => void | Promise<void>;
 };
 
@@ -348,10 +347,15 @@ async function executeDetachedProviderTurn(
       if (terminalOutputSeen) {
         throw new Error("Agent runner emitted output after a terminal frame");
       }
-      const payload = decodeSidecarRunnerOutput(message);
-      const serializedPayload = JSON.stringify(payload);
+      const payload = message.payload;
+      if (payload.case === undefined) {
+        throw new Error("Agent runner emitted an empty protobuf output frame");
+      }
+      const serializedPayload = JSON.stringify(
+        toJson(RunnerToParentSchema, message),
+      );
       outputCount += 1;
-      const payloadType = payload.type;
+      const payloadType = payload.case;
       diagnose("runner.stdout_payload", {
         runnerPid: child.pid ?? null,
         outputNumber: outputCount,
@@ -359,35 +363,39 @@ async function executeDetachedProviderTurn(
         bytes: Buffer.byteLength(serializedPayload, "utf8"),
         ...(payloadType === "error"
           ? {
-              error: redactDiagnosticText(payload.message),
+              error: redactDiagnosticText(payload.value.message),
             }
           : {}),
       });
-      const nextConversationId = detachedConversationIdFromPayload(payload);
-      if (nextConversationId && nextConversationId !== conversationId) {
-        conversationId = nextConversationId;
-        await input.onConversationId?.(nextConversationId);
+      if (
+        payload.case === "sessionStarted" &&
+        payload.value.sessionId.trim() &&
+        payload.value.sessionId !== conversationId
+      ) {
+        conversationId = payload.value.sessionId;
+        await input.onConversationId?.(payload.value.sessionId);
       }
-      const candidate = issueReplyTextFromPayload(payload);
-      if (candidate) resultText = candidate;
-      if (payload.type === "approval") {
+      if (payload.case === "result") {
+        resultText = payload.value.message.trim() || null;
+      }
+      if (payload.case === "approval") {
         child.stdin.write(
           encodeSidecarApprovalResponse(
-            payload.id,
+            payload.value.id,
             runnerRequest.sandboxMode !== SandboxMode.READ_ONLY,
           ),
         );
       }
-      if (payload.type === "error") {
-        runnerError = payload.message || "Agent failed";
+      if (payload.case === "error") {
+        runnerError = payload.value.message || "Agent failed";
         terminalOutputSeen = true;
       }
-      if (payload.type === "result") {
+      if (payload.case === "result") {
         completed = true;
         terminalOutputSeen = true;
       }
-      if (payload.type === "blocked") terminalOutputSeen = true;
-      await input.onPayload?.(payload, serializedPayload);
+      if (payload.case === "blocked") terminalOutputSeen = true;
+      await input.onPayload?.(message, serializedPayload);
     }
     if (!terminalOutputSeen) {
       throw new Error("Agent runner stdout closed before terminal output");

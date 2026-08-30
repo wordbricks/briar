@@ -4,7 +4,16 @@ import * as Result from "effect/Result";
 import {
   decodeSidecarRunRequest,
   encodeSidecarRunnerOutput,
-  type SidecarRunnerOutput,
+  sidecarApprovalRequest,
+  sidecarProviderEvent,
+  sidecarRunBlocked,
+  sidecarRunError,
+  sidecarRunResult,
+  sidecarSessionStarted,
+  type SidecarApprovalInput,
+  type SidecarBlockedInput,
+  type SidecarProviderEventInput,
+  type SidecarResultInput,
 } from "./sidecar-protocol";
 import { decodeRunnerRequest, type RunnerRequest } from "./runner-request";
 
@@ -32,7 +41,7 @@ const maxSidecarFrameBytes = 16 * 1024 * 1024;
  * Owns the size-delimited protobuf control channel shared by the bundled
  * agent runners. Stdout contains frames only; diagnostics belong on stderr.
  */
-export function createRunnerIo<Output extends SidecarRunnerOutput>({
+export function createRunnerIo({
   closeError,
   input = process.stdin,
   onClose,
@@ -140,7 +149,7 @@ export function createRunnerIo<Output extends SidecarRunnerOutput>({
     }
   })();
 
-  function emit(value: Output) {
+  function emitFrame(value: Parameters<typeof encodeSidecarRunnerOutput>[0]) {
     if (closed) {
       throw new Error("Cannot emit a sidecar frame after the channel closed.");
     }
@@ -151,9 +160,9 @@ export function createRunnerIo<Output extends SidecarRunnerOutput>({
     }
     output.write(encodeSidecarRunnerOutput(value));
     if (
-      value.type === "result" ||
-      value.type === "blocked" ||
-      value.type === "error"
+      value.payload.case === "result" ||
+      value.payload.case === "blocked" ||
+      value.payload.case === "error"
     ) {
       terminalEmitted = true;
     }
@@ -183,7 +192,20 @@ export function createRunnerIo<Output extends SidecarRunnerOutput>({
       input.destroy?.();
       settleClosed();
     },
-    emit,
+    emit: {
+      frame: emitFrame,
+      session: (sessionId: string) =>
+        emitFrame(sidecarSessionStarted(sessionId)),
+      event: (input: SidecarProviderEventInput) =>
+        emitFrame(sidecarProviderEvent(input)),
+      approval: (input: SidecarApprovalInput) =>
+        emitFrame(sidecarApprovalRequest(input)),
+      result: (input: SidecarResultInput) =>
+        emitFrame(sidecarRunResult(input)),
+      blocked: (input: SidecarBlockedInput) =>
+        emitFrame(sidecarRunBlocked(input)),
+      error: (message: string) => emitFrame(sidecarRunError(message)),
+    },
     request,
     waitForApproval,
   };

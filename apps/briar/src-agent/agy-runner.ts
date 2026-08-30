@@ -9,7 +9,6 @@ import {
   agyEnvironment,
   createAgyEventState,
   normalizeAgyEvent,
-  type AgyRunnerOutput,
 } from "./agy-runner-lib";
 import { createRunnerIo } from "./runner-io";
 import type { RunnerRequest } from "./runner-request";
@@ -44,9 +43,7 @@ function stop(child: ChildProcessWithoutNullStreams | null) {
   child.kill("SIGTERM");
 }
 
-type AgyRunnerIo = ReturnType<
-  typeof createRunnerIo<AgyRunnerOutput>
->;
+type AgyRunnerIo = ReturnType<typeof createRunnerIo>;
 
 function parseAgyLine(line: string) {
   try {
@@ -80,7 +77,7 @@ async function main(io: AgyRunnerIo) {
     stderr += chunk;
   });
   child.on("error", (error) => {
-    io.emit({ type: "error", message: `Antigravity CLI 실행에 실패했습니다: ${error.message}` });
+    io.emit.error(`Antigravity CLI 실행에 실패했습니다: ${error.message}`);
   });
 
   for await (const line of lines) {
@@ -89,18 +86,18 @@ async function main(io: AgyRunnerIo) {
     const discoveredSessionId = agyConversationId(raw);
     if (discoveredSessionId && discoveredSessionId !== sessionId) {
       sessionId = discoveredSessionId;
-      io.emit({ type: "session", sessionId });
+      io.emit.session(sessionId);
     }
     const blocker = agyBlockedRetry(raw);
     if (blocker && !blockerEmitted) {
       blockerEmitted = true;
-      io.emit({ type: "blocked", ...blocker });
+      io.emit.blocked(blocker);
     }
     const events = normalizeAgyEvent(raw, state);
     if (events.length) {
-      for (const event of events) io.emit({ type: "event", raw, event });
+      for (const event of events) io.emit.event({ raw, event });
     } else {
-      io.emit({ type: "event", raw });
+      io.emit.event({ raw });
     }
     finalMessage = agyFinalMessage(raw, finalMessage);
   }
@@ -112,34 +109,31 @@ async function main(io: AgyRunnerIo) {
   activeChild = null;
   const stderrBlocker = agyBlockedRetry(stderr);
   if (stderrBlocker && !blockerEmitted) {
-    io.emit({ type: "blocked", ...stderrBlocker });
+    io.emit.blocked(stderrBlocker);
     return;
   }
   if (code !== 0) {
-    io.emit({
-      type: "error",
-      message: stderr.trim() || `Antigravity CLI가 코드 ${code ?? "unknown"}(으)로 종료되었습니다.`,
-    });
+    io.emit.error(
+      stderr.trim() ||
+        `Antigravity CLI가 코드 ${code ?? "unknown"}(으)로 종료되었습니다.`,
+    );
     return;
   }
   if (!sessionId) {
-    io.emit({ type: "error", message: "Antigravity가 대화 ID를 반환하지 않았습니다." });
+    io.emit.error("Antigravity가 대화 ID를 반환하지 않았습니다.");
     return;
   }
-  io.emit({ type: "result", sessionId, message: finalMessage });
+  io.emit.result({ sessionId, message: finalMessage });
 }
 
 let activeChild: ChildProcessWithoutNullStreams | null = null;
-const io = createRunnerIo<AgyRunnerOutput>({
+const io = createRunnerIo({
   closeError: "Antigravity runner 입력이 요청 전에 닫혔습니다.",
   onClose: () => stop(activeChild),
 });
 
 main(io)
   .catch((caught) => {
-    io.emit({
-      type: "error",
-      message: caught instanceof Error ? caught.message : String(caught),
-    });
+    io.emit.error(caught instanceof Error ? caught.message : String(caught));
   })
   .finally(() => io.close());

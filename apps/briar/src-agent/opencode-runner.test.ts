@@ -129,21 +129,16 @@ describe("OpenCode runner terminal output", () => {
       "Done",
     );
     const terminal = outputs.find(
-      (output) =>
-        output.type === "event" && output.event?.type === "turnCompleted",
+      (output) => output.event.type === "turnCompleted",
     );
 
     expect(terminal).toBeDefined();
-    expect(terminal?.type === "event" ? terminal.raw : undefined).toBe(response);
-    expect(
-      terminal?.type === "event"
-        ? (terminal.raw as typeof response).parts[1]
-        : undefined,
-    ).toEqual(response.parts[1]);
+    expect(terminal?.raw).toBe(response);
+    expect((terminal?.raw as typeof response).parts[1]).toEqual(
+      response.parts[1],
+    );
     for (const output of outputs) {
-      if (output.type === "event") {
-        expect(output.raw).toBe(response);
-      }
+      expect(output.raw).toBe(response);
     }
   });
 });

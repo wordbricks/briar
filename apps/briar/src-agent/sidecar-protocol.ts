@@ -10,7 +10,6 @@ import {
 } from "@bufbuild/protobuf/wire";
 import {
   ValueSchema,
-  timestampDate,
   timestampFromDate,
   type Value,
 } from "@bufbuild/protobuf/wkt";
@@ -27,8 +26,10 @@ import {
   RunResultSchema,
   RunnerToParentSchema,
   SessionStartedSchema,
+  type ApprovalRequest as ProtoApprovalRequest,
   type ParentToRunner,
   type RunRequest,
+  type RunResult as ProtoRunResult,
   type RunnerToParent,
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import {
@@ -41,36 +42,36 @@ import {
 import { timingSafeEqual } from "node:crypto";
 import type { NormalizedAgentEvent } from "./normalized-agent-event";
 
-export type SidecarRunnerOutput =
-  | { type: "session"; sessionId: string }
-  | {
-      type: "event";
-      raw: unknown;
-      event?: NormalizedAgentEvent;
-      direction?: "client" | "server";
-    }
-  | {
-      type: "approval";
-      id: string;
-      toolName: string;
-      input: Record<string, unknown>;
-      title?: string;
-    }
-  | { type: "result"; sessionId: string; message: string }
-  | {
-      type: "blocked";
-      reason:
-        | "mcp_auth_required"
-        | "usage_exhausted"
-        | "upstream_overloaded"
-        | "free_tier_limit";
-      message: string;
-      provider?: string;
-      serverNames?: string[];
-      nextRetryAt?: string | null;
-      statusCode?: number;
-    }
-  | { type: "error"; message: string };
+export type SidecarProviderEventInput = {
+  raw: unknown;
+  event?: NormalizedAgentEvent;
+  direction?: "client" | "server";
+};
+
+export type SidecarApprovalInput = Pick<
+  ProtoApprovalRequest,
+  "id" | "toolName" | "title"
+> & {
+  input: Record<string, unknown>;
+};
+
+export type SidecarResultInput = Pick<
+  ProtoRunResult,
+  "sessionId" | "message"
+>;
+
+export type SidecarBlockedInput = {
+  reason:
+    | "mcp_auth_required"
+    | "usage_exhausted"
+    | "upstream_overloaded"
+    | "free_tier_limit";
+  message: string;
+  provider?: string;
+  serverNames?: string[];
+  nextRetryAt?: string | null;
+  statusCode?: number;
+};
 
 const activityKindToProto = {
   command: ProtoAgentActivityKind.COMMAND,
@@ -117,42 +118,12 @@ const activityStatusFromProto = (
   }
 };
 
-const eventDirectionFromProto = (
-  value: AgentEventDirection,
-): "client" | "server" => {
-  switch (value) {
-    case AgentEventDirection.CLIENT:
-      return "client";
-    case AgentEventDirection.SERVER:
-      return "server";
-    default:
-      throw new Error(`Unsupported sidecar event direction: ${value}`);
-  }
-};
-
 const blockReasonToProto = {
   mcp_auth_required: BlockReason.MCP_AUTH_REQUIRED,
   usage_exhausted: BlockReason.USAGE_EXHAUSTED,
   upstream_overloaded: BlockReason.UPSTREAM_OVERLOADED,
   free_tier_limit: BlockReason.FREE_TIER_LIMIT,
 } as const;
-
-const blockReasonFromProto = (
-  value: BlockReason,
-): Extract<SidecarRunnerOutput, { type: "blocked" }>["reason"] => {
-  switch (value) {
-    case BlockReason.MCP_AUTH_REQUIRED:
-      return "mcp_auth_required";
-    case BlockReason.USAGE_EXHAUSTED:
-      return "usage_exhausted";
-    case BlockReason.UPSTREAM_OVERLOADED:
-      return "upstream_overloaded";
-    case BlockReason.FREE_TIER_LIMIT:
-      return "free_tier_limit";
-    default:
-      throw new Error(`Unsupported sidecar block reason: ${value}`);
-  }
-};
 
 function normalizedJson(value: unknown): JsonValue {
   const serialized = JSON.stringify(value);
@@ -166,6 +137,13 @@ const rawToProto = (value: unknown) =>
 
 const rawFromProto = (value: Value) =>
   toJson(ValueSchema, value);
+
+export const sidecarProviderRaw = (
+  message: RunnerToParent,
+): unknown | undefined =>
+  message.payload.case === "event" && message.payload.value.raw
+    ? rawFromProto(message.payload.value.raw)
+    : undefined;
 
 function normalizedEventToProto(
   event: NormalizedAgentEvent,
@@ -233,7 +211,7 @@ function normalizedEventToProto(
   }
 }
 
-function normalizedEventFromProto(
+export function sidecarNormalizedEvent(
   event: ProtoNormalizedAgentEvent,
 ): NormalizedAgentEvent | undefined {
   switch (event.event.case) {
@@ -328,149 +306,93 @@ export function encodeSidecarApprovalResponse(
   );
 }
 
-export function encodeSidecarRunnerOutput(
-  output: SidecarRunnerOutput,
-): Uint8Array {
-  let payload: RunnerToParent["payload"];
-  switch (output.type) {
-    case "session":
-      payload = {
-        case: "sessionStarted",
-        value: create(SessionStartedSchema, { sessionId: output.sessionId }),
-      };
-      break;
-    case "event":
-      payload = {
-        case: "event",
-        value: create(ProviderEventSchema, {
-          raw: rawToProto(output.raw),
-          normalized: output.event
-            ? normalizedEventToProto(output.event)
-            : undefined,
-          direction:
-            output.direction === "client"
-              ? AgentEventDirection.CLIENT
-              : AgentEventDirection.SERVER,
-        }),
-      };
-      break;
-    case "approval":
-      payload = {
-        case: "approval",
-        value: create(ApprovalRequestSchema, {
-          id: output.id,
-          toolName: output.toolName,
-          input: normalizedJson(output.input) as JsonObject,
-          title: output.title,
-        }),
-      };
-      break;
-    case "result":
-      payload = {
-        case: "result",
-        value: create(RunResultSchema, {
-          sessionId: output.sessionId,
-          message: output.message,
-        }),
-      };
-      break;
-    case "blocked": {
-      const retryDate = output.nextRetryAt
-        ? new Date(output.nextRetryAt)
-        : undefined;
-      if (retryDate && Number.isNaN(retryDate.valueOf())) {
-        throw new Error(`Invalid sidecar retry timestamp: ${output.nextRetryAt}`);
-      }
-      const nextRetryAt = retryDate ? timestampFromDate(retryDate) : undefined;
-      payload = {
-        case: "blocked",
-        value: create(RunBlockedSchema, {
-          reason: blockReasonToProto[output.reason],
-          message: output.message,
-          provider: output.provider,
-          serverNames: output.serverNames ?? [],
-          nextRetryAt,
-          statusCode: output.statusCode,
-        }),
-      };
-      break;
-    }
-    case "error":
-      payload = {
-        case: "error",
-        value: create(RunErrorSchema, {
-          code: RunErrorCode.PROVIDER_FAILED,
-          message: output.message,
-        }),
-      };
-      break;
-  }
-  return sizeDelimitedEncode(
-    RunnerToParentSchema,
-    create(RunnerToParentSchema, { payload }),
-  );
-}
+export const sidecarSessionStarted = (sessionId: string): RunnerToParent =>
+  create(RunnerToParentSchema, {
+    payload: {
+      case: "sessionStarted",
+      value: create(SessionStartedSchema, { sessionId }),
+    },
+  });
 
-export function decodeSidecarRunnerOutput(
-  message: RunnerToParent,
-): SidecarRunnerOutput {
-  switch (message.payload.case) {
-    case "sessionStarted":
-      return {
-        type: "session",
-        sessionId: message.payload.value.sessionId,
-      };
-    case "event": {
-      const event = message.payload.value.normalized
-        ? normalizedEventFromProto(message.payload.value.normalized)
-        : undefined;
-      return {
-        type: "event",
-        raw: message.payload.value.raw
-          ? rawFromProto(message.payload.value.raw)
-          : null,
-        ...(event ? { event } : {}),
-        direction: eventDirectionFromProto(message.payload.value.direction),
-      };
-    }
-    case "approval":
-      return {
-        type: "approval",
-        id: message.payload.value.id,
-        toolName: message.payload.value.toolName,
-        input: (message.payload.value.input ?? {}) as Record<string, unknown>,
-        ...(message.payload.value.title
-          ? { title: message.payload.value.title }
-          : {}),
-      };
-    case "result":
-      return {
-        type: "result",
-        sessionId: message.payload.value.sessionId,
-        message: message.payload.value.message,
-      };
-    case "blocked": {
-      return {
-        type: "blocked",
-        reason: blockReasonFromProto(message.payload.value.reason),
-        message: message.payload.value.message,
-        ...(message.payload.value.provider
-          ? { provider: message.payload.value.provider }
-          : {}),
-        ...(message.payload.value.serverNames.length > 0
-          ? { serverNames: message.payload.value.serverNames }
-          : {}),
-        nextRetryAt: message.payload.value.nextRetryAt
-          ? timestampDate(message.payload.value.nextRetryAt).toISOString()
-          : null,
-        ...(message.payload.value.statusCode === undefined
-          ? {}
-          : { statusCode: message.payload.value.statusCode }),
-      };
-    }
-    case "error":
-      return { type: "error", message: message.payload.value.message };
-    case undefined:
-      throw new Error("Sidecar output frame does not contain a payload.");
+export const sidecarProviderEvent = (
+  input: SidecarProviderEventInput,
+): RunnerToParent =>
+  create(RunnerToParentSchema, {
+    payload: {
+      case: "event",
+      value: create(ProviderEventSchema, {
+        raw: rawToProto(input.raw),
+        normalized: input.event
+          ? normalizedEventToProto(input.event)
+          : undefined,
+        direction:
+          input.direction === "client"
+            ? AgentEventDirection.CLIENT
+            : AgentEventDirection.SERVER,
+      }),
+    },
+  });
+
+export const sidecarApprovalRequest = (
+  input: SidecarApprovalInput,
+): RunnerToParent =>
+  create(RunnerToParentSchema, {
+    payload: {
+      case: "approval",
+      value: create(ApprovalRequestSchema, {
+        id: input.id,
+        toolName: input.toolName,
+        input: normalizedJson(input.input) as JsonObject,
+        title: input.title,
+      }),
+    },
+  });
+
+export const sidecarRunResult = (
+  input: SidecarResultInput,
+): RunnerToParent =>
+  create(RunnerToParentSchema, {
+    payload: {
+      case: "result",
+      value: create(RunResultSchema, input),
+    },
+  });
+
+export const sidecarRunBlocked = (
+  input: SidecarBlockedInput,
+): RunnerToParent => {
+  const retryDate = input.nextRetryAt
+    ? new Date(input.nextRetryAt)
+    : undefined;
+  if (retryDate && Number.isNaN(retryDate.valueOf())) {
+    throw new Error(`Invalid sidecar retry timestamp: ${input.nextRetryAt}`);
   }
-}
+  return create(RunnerToParentSchema, {
+    payload: {
+      case: "blocked",
+      value: create(RunBlockedSchema, {
+        reason: blockReasonToProto[input.reason],
+        message: input.message,
+        provider: input.provider,
+        serverNames: input.serverNames ?? [],
+        nextRetryAt: retryDate ? timestampFromDate(retryDate) : undefined,
+        statusCode: input.statusCode,
+      }),
+    },
+  });
+};
+
+export const sidecarRunError = (message: string): RunnerToParent =>
+  create(RunnerToParentSchema, {
+    payload: {
+      case: "error",
+      value: create(RunErrorSchema, {
+        code: RunErrorCode.PROVIDER_FAILED,
+        message,
+      }),
+    },
+  });
+
+export const encodeSidecarRunnerOutput = (
+  output: RunnerToParent,
+): Uint8Array => sizeDelimitedEncode(RunnerToParentSchema, output);

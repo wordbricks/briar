@@ -2,6 +2,7 @@ import {
   create,
   fromJson,
   toBinary,
+  toJson,
   type JsonValue,
 } from "@bufbuild/protobuf";
 import {
@@ -12,6 +13,10 @@ import {
   Code,
   ConnectError,
 } from "@connectrpc/connect";
+import {
+  RunnerToParentSchema,
+  type RunnerToParent,
+} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import {
   AgentTranscriptEventSchema,
   AppendTranscriptEventsRequestSchema,
@@ -115,7 +120,7 @@ const normalizedRecord = (payload: unknown): JsonRecord | null => {
   return typeof nested?.type === "string" ? nested : envelope;
 };
 
-export function normalizedTranscriptEventToProto(
+function normalizedTranscriptEventToProto(
   payload: unknown,
 ): NormalizedAgentEvent | undefined {
   const event = normalizedRecord(payload);
@@ -215,6 +220,39 @@ const archiveCompaction = (payload: unknown) => {
 };
 
 export const transcriptEventToProto = (event: TranscriptBatchEvent) => {
+  const sidecar =
+    event.payload && typeof event.payload === "object" &&
+      "$typeName" in event.payload &&
+      event.payload.$typeName === "briar.sidecar.v1.RunnerToParent"
+      ? event.payload as RunnerToParent
+      : undefined;
+  if (sidecar) {
+    const payload = sidecar.payload;
+    if (payload.case === "event") {
+      return create(AgentTranscriptEventSchema, {
+        sequence: BigInt(event.sequence),
+        direction: payload.value.direction,
+        rawPayload: payload.value.raw,
+        normalized: payload.value.normalized,
+      });
+    }
+    return create(AgentTranscriptEventSchema, {
+      sequence: BigInt(event.sequence),
+      direction: AgentEventDirection.SERVER,
+      rawPayload: fromJson(
+        ValueSchema,
+        toJson(RunnerToParentSchema, sidecar),
+      ),
+      normalized: payload.case === "sessionStarted"
+        ? create(NormalizedAgentEventSchema, {
+            event: {
+              case: "conversationStarted",
+              value: { conversationId: payload.value.sessionId },
+            },
+          })
+        : undefined,
+    });
+  }
   const rawPayload = rawTranscriptPayload(event.payload);
   return create(AgentTranscriptEventSchema, {
     sequence: BigInt(event.sequence),

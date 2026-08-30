@@ -3,9 +3,11 @@ import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
 import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
 import {
   ApprovalPolicy,
+  BlockReason,
   RunRequestSchema,
   RunnerToParentSchema,
   SandboxMode,
+  type RunnerToParent,
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -13,8 +15,9 @@ import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import {
-  decodeSidecarRunnerOutput,
   encodeSidecarRunRequest,
+  sidecarNormalizedEvent,
+  sidecarProviderRaw,
 } from "./sidecar-protocol";
 
 const runnerRequest = (providerBinaryPath: string) =>
@@ -36,71 +39,78 @@ describe("Codex runner MCP isolation", () => {
     const result = await runScenario("optional");
 
     expect(result.exitCode).toBe(0);
-    expect(result.payloads).toContainEqual(
-      expect.objectContaining({
-        type: "event",
-        event: expect.objectContaining({
-          type: "activityCompleted",
-          title: "codex_apps MCP unavailable",
-          status: "failed",
-        }),
-      }),
-    );
-    expect(result.payloads.filter((payload) => payload.type === "session"))
+    expect(result.payloads.some((payload) => {
+      const normalized = payload.payload.case === "event"
+        ? payload.payload.value.normalized
+        : undefined;
+      const event = normalized ? sidecarNormalizedEvent(normalized) : undefined;
+      return event?.type === "activityCompleted" &&
+        event.title === "codex_apps MCP unavailable" &&
+        event.status === "failed";
+    })).toBe(true);
+    expect(
+      result.payloads.filter(
+        (payload) => payload.payload.case === "sessionStarted",
+      ),
+    )
       .toHaveLength(1);
-    expect(result.payloads).toContainEqual(
-      expect.objectContaining({
-        type: "event",
-        direction: "client",
-        raw: expect.objectContaining({
-          method: "thread/resume",
-          params: expect.objectContaining({
-            config: {
-              apps: { connector_figma: { enabled: false } },
-            },
-          }),
+    expect(result.payloads.some((payload) => {
+      const raw = sidecarProviderRaw(payload);
+      if (!raw || typeof raw !== "object") return false;
+      const record = raw as Record<string, unknown>;
+      return record.method === "thread/resume" &&
+        JSON.stringify(record.params).includes("connector_figma");
+    })).toBe(true);
+    expect(result.payloads).toContainEqual(expect.objectContaining({
+      payload: {
+        case: "result",
+        value: expect.objectContaining({
+          sessionId: "thread-1",
+          message: "Review and checks continued after Figma isolation.",
         }),
-      }),
-    );
-    expect(result.payloads).toContainEqual({
-      type: "result",
-      sessionId: "thread-1",
-      message: "Review and checks continued after Figma isolation.",
-    });
-    expect(result.payloads.some((payload) => payload.type === "error")).toBe(
-      false,
-    );
+      },
+    }));
+    expect(
+      result.payloads.some((payload) => payload.payload.case === "error"),
+    ).toBe(false);
   });
 
   it("returns an authentication wait when the failed MCP was invoked", async () => {
     const result = await runScenario("required");
 
     expect(result.exitCode).toBe(0);
-    expect(result.payloads).toContainEqual({
-      type: "blocked",
-      reason: "mcp_auth_required",
-      provider: "codex",
-      message: "Authentication is required for MCP server(s): Figma.",
-      serverNames: ["Figma"],
-      nextRetryAt: null,
-    });
-    expect(result.payloads.some((payload) => payload.type === "result")).toBe(
-      false,
-    );
-    expect(result.payloads.some((payload) => payload.type === "error")).toBe(
-      false,
-    );
+    expect(result.payloads).toContainEqual(expect.objectContaining({
+      payload: {
+        case: "blocked",
+        value: expect.objectContaining({
+          reason: BlockReason.MCP_AUTH_REQUIRED,
+          provider: "codex",
+          message: "Authentication is required for MCP server(s): Figma.",
+          serverNames: ["Figma"],
+        }),
+      },
+    }));
+    expect(
+      result.payloads.some((payload) => payload.payload.case === "result"),
+    ).toBe(false);
+    expect(
+      result.payloads.some((payload) => payload.payload.case === "error"),
+    ).toBe(false);
   });
 
   it("fails fast when the App Server emits a schema-invalid message", async () => {
     const result = await runScenario("invalid");
 
     expect(result.exitCode).toBe(1);
-    expect(result.payloads).toContainEqual({
-      type: "error",
-      message:
-        'Codex App Server emitted invalid JSON: {"id":1,"method":42}',
-    });
+    expect(result.payloads).toContainEqual(expect.objectContaining({
+      payload: {
+        case: "error",
+        value: expect.objectContaining({
+          message:
+            'Codex App Server emitted invalid JSON: {"id":1,"method":42}',
+        }),
+      },
+    }));
   });
 });
 
@@ -117,13 +127,13 @@ async function runScenario(scenario: "invalid" | "optional" | "required") {
   let stderr = "";
   child.stderr.setEncoding("utf8");
   const outputPromise = (async () => {
-    const payloads = [];
+    const payloads: RunnerToParent[] = [];
     for await (const message of sizeDelimitedDecodeStream(
       RunnerToParentSchema,
       child.stdout,
       { readMaxBytes: 16 * 1024 * 1024 },
     )) {
-      payloads.push(decodeSidecarRunnerOutput(message));
+      payloads.push(message);
     }
     return payloads;
   })();

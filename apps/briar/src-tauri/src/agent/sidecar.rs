@@ -1044,6 +1044,10 @@ import { ParentToRunnerSchema } from "@briar/contracts/gen/briar/sidecar/v1/agen
 import {
   decodeSidecarRunRequest,
   encodeSidecarRunnerOutput,
+  sidecarApprovalRequest,
+  sidecarProviderEvent,
+  sidecarRunResult,
+  sidecarSessionStarted,
 } from "../src-agent/sidecar-protocol";
 
 let runReceived = false;
@@ -1058,12 +1062,10 @@ for await (const message of sizeDelimitedDecodeStream(
       throw new Error(`unexpected provider binary: ${request.providerBinaryPath}`);
     }
     runReceived = true;
-    process.stdout.write(encodeSidecarRunnerOutput({
-      type: "session",
-      sessionId: "session-1",
-    }));
-    process.stdout.write(encodeSidecarRunnerOutput({
-      type: "event",
+    process.stdout.write(encodeSidecarRunnerOutput(
+      sidecarSessionStarted("session-1"),
+    ));
+    process.stdout.write(encodeSidecarRunnerOutput(sidecarProviderEvent({
       direction: "server",
       raw: { type: "assistant" },
       event: {
@@ -1072,14 +1074,13 @@ for await (const message of sizeDelimitedDecodeStream(
         phase: "commentary",
         text: "working",
       },
-    }));
-    process.stdout.write(encodeSidecarRunnerOutput({
-      type: "approval",
+    })));
+    process.stdout.write(encodeSidecarRunnerOutput(sidecarApprovalRequest({
       id: "approval-1",
       toolName: "Bash",
       input: { command: "bun test" },
       title: "Run tests",
-    }));
+    })));
     continue;
   }
   if (
@@ -1089,11 +1090,10 @@ for await (const message of sizeDelimitedDecodeStream(
   ) {
     throw new Error("expected an approved response");
   }
-  process.stdout.write(encodeSidecarRunnerOutput({
-    type: "result",
+  process.stdout.write(encodeSidecarRunnerOutput(sidecarRunResult({
     sessionId: "session-1",
     message: "done",
-  }));
+  })));
   break;
 }
 "#,
