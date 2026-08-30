@@ -14,6 +14,7 @@ const repositoryMocks = {
   backfill: vi.fn<AppConnectAgentServices["backfillSessionSummaries"]>(),
   getProject: vi.fn<AppConnectAgentServices["getProject"]>(),
   getCursor: vi.fn<AppConnectAgentServices["getSessionCursor"]>(),
+  getTranscript: vi.fn<AppConnectAgentServices["getTranscript"]>(),
   listSummaries: vi.fn<AppConnectAgentServices["listSessionSummaries"]>(),
   requireSession: vi.fn<AppConnectAgentServices["requireSession"]>(),
 };
@@ -102,6 +103,34 @@ describe("app Agent Connect adapter", () => {
         inboxVersion: "ignored-server-projection",
       }),
     }]);
+    repositoryMocks.getTranscript.mockResolvedValue({
+      session: {
+        session_id: sessionId,
+        project_id: projectId,
+        run_id: "44444444-4444-4444-8444-444444444444",
+        worker_id: "worker-1",
+        agent_provider: "codex",
+        started_at: "2026-08-30T02:03:00.000Z",
+        last_event_at: "2026-08-30T02:03:04.000Z",
+        event_count: 2,
+        byte_count: 42,
+      },
+      entries: [{
+        session_id: sessionId,
+        entry_id: "message-1",
+        sequence: 1,
+        updated_sequence: 2,
+        entry_type: "message",
+        activity_kind: null,
+        phase: "analysis",
+        title: null,
+        body: "Contract migrated",
+        status: "completed",
+        started_at: "2026-08-30T02:03:01.000Z",
+        updated_at: "2026-08-30T02:03:02.000Z",
+        completed_at: "2026-08-30T02:03:02.000Z",
+      }],
+    });
 
     const router = createConnectRouter({
       connect: true,
@@ -121,6 +150,7 @@ describe("app Agent Connect adapter", () => {
         getProject: repositoryMocks.getProject,
         backfillSessionSummaries: repositoryMocks.backfill,
         getSessionCursor: repositoryMocks.getCursor,
+        getTranscript: repositoryMocks.getTranscript,
         listSessionSummaries: repositoryMocks.listSummaries,
       },
     );
@@ -165,6 +195,52 @@ describe("app Agent Connect adapter", () => {
         workerId: "worker-1",
         requestedByUserId: userId,
         updatedAt: "2026-08-30T02:03:04Z",
+      }],
+    });
+
+    const transcriptHandler = router.handlers.find((candidate) =>
+      candidate.requestPath ===
+        "/briar.app.v1.AgentService/GetProjectAgentTranscript"
+    );
+    expect(transcriptHandler).toBeDefined();
+    const transcriptResponse = await createFetchHandler(transcriptHandler!)(
+      new Request(
+        "https://api.example.test/briar.app.v1.AgentService/GetProjectAgentTranscript",
+        {
+          method: "POST",
+          headers: {
+            "connect-protocol-version": "1",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ projectId, sessionId }),
+        },
+      ),
+    );
+    expect(transcriptResponse.status).toBe(200);
+    expect(repositoryMocks.getTranscript).toHaveBeenCalledWith({
+      db: {},
+      archives: {},
+      projectId,
+      selector: { sessionId },
+    });
+    expect(await transcriptResponse.json()).toEqual({
+      session: {
+        sessionId,
+        runId: "44444444-4444-4444-8444-444444444444",
+        workerId: "worker-1",
+        agentProvider: "AGENT_PROVIDER_CODEX",
+        startedAt: "2026-08-30T02:03:00Z",
+        lastEventAt: "2026-08-30T02:03:04Z",
+      },
+      entries: [{
+        entryId: "message-1",
+        sequence: "1",
+        updatedSequence: "2",
+        status: "PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_COMPLETED",
+        startedAt: "2026-08-30T02:03:01Z",
+        updatedAt: "2026-08-30T02:03:02Z",
+        completedAt: "2026-08-30T02:03:02Z",
+        message: { phase: "analysis", text: "Contract migrated" },
       }],
     });
   });

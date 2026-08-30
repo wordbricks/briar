@@ -33,6 +33,12 @@ import {
   type UpdateOrganizationAgentRequest,
   type UpdateProjectAgentRequest,
 } from "@briar/contracts/gen/briar/app/v1/agent_pb";
+import {
+  ProjectAgentWorkLogEntryStatus,
+} from "@briar/contracts/gen/briar/app/v1/agent_transcript_pb";
+import {
+  AgentActivityKind,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
   Code,
@@ -43,6 +49,8 @@ import {
 import * as Schema from "effect/Schema";
 import type { AgentProvider as DomainAgentProvider } from "../../src/lib/agent-provider";
 import { getAgentSkill } from "./agent-skills";
+import type { AgentWorkLogEntryRow } from "./agent-worklog";
+import { getProjectAgentTranscriptApplication } from "./agent-transcript-application";
 import {
   backfillArchivedProjectAgentSessionSummaries,
   getArchivedProjectAgentSession,
@@ -140,6 +148,7 @@ export type AppConnectAgentServices = {
     typeof backfillArchivedProjectAgentSessionSummaries;
   readonly getSessionCursor: typeof getProjectAgentSessionSyncCursor;
   readonly listSessionSummaries: typeof listProjectAgentSessionSummaries;
+  readonly getTranscript: typeof getProjectAgentTranscriptApplication;
 };
 
 const appConnectAgentServices: AppConnectAgentServices = {
@@ -148,6 +157,7 @@ const appConnectAgentServices: AppConnectAgentServices = {
   backfillSessionSummaries: backfillArchivedProjectAgentSessionSummaries,
   getSessionCursor: getProjectAgentSessionSyncCursor,
   listSessionSummaries: listProjectAgentSessionSummaries,
+  getTranscript: getProjectAgentTranscriptApplication,
 };
 
 const run = withConnectErrors;
@@ -186,6 +196,55 @@ const agentProvider = {
   opencode: AgentProvider.OPENCODE,
   openrouter: AgentProvider.OPENROUTER,
 } as const satisfies Record<DomainAgentProvider, AgentProvider>;
+
+const workLogEntryStatus = {
+  writing: ProjectAgentWorkLogEntryStatus.WRITING,
+  completed: ProjectAgentWorkLogEntryStatus.COMPLETED,
+  failed: ProjectAgentWorkLogEntryStatus.FAILED,
+  cancelled: ProjectAgentWorkLogEntryStatus.CANCELLED,
+  interrupted: ProjectAgentWorkLogEntryStatus.INTERRUPTED,
+} as const satisfies Record<
+  AgentWorkLogEntryRow["status"],
+  ProjectAgentWorkLogEntryStatus
+>;
+
+const workLogActivityKind = {
+  command: AgentActivityKind.COMMAND,
+  fileChange: AgentActivityKind.FILE_CHANGE,
+  webSearch: AgentActivityKind.WEB_SEARCH,
+  tool: AgentActivityKind.TOOL,
+} as const satisfies Record<
+  NonNullable<AgentWorkLogEntryRow["activity_kind"]>,
+  AgentActivityKind
+>;
+
+const appWorkLogEntry = (entry: AgentWorkLogEntryRow) => ({
+  entryId: entry.entry_id,
+  sequence: BigInt(entry.sequence),
+  updatedSequence: BigInt(entry.updated_sequence),
+  status: workLogEntryStatus[entry.status],
+  startedAt: requiredTimestamp(entry.started_at, "work-log startedAt"),
+  updatedAt: requiredTimestamp(entry.updated_at, "work-log updatedAt"),
+  completedAt: entry.completed_at
+    ? requiredTimestamp(entry.completed_at, "work-log completedAt")
+    : undefined,
+  entry: entry.entry_type === "message"
+    ? {
+      case: "message" as const,
+      value: {
+        phase: entry.phase ?? undefined,
+        text: entry.body,
+      },
+    }
+    : {
+      case: "activity" as const,
+      value: {
+        kind: workLogActivityKind[entry.activity_kind ?? "tool"],
+        title: entry.title ?? "Use tool",
+        text: entry.body,
+      },
+    },
+});
 
 const domainAgentProvider = (value: AgentProvider): DomainAgentProvider => {
   switch (value) {
@@ -1528,6 +1587,50 @@ export const createAppAgentService = (
       if (!archived) throw new HttpError(404, "Agent session not found");
       return {
         session: rowToProjectAgentSession(archived, { archived: true }),
+      };
+    }),
+
+  getProjectAgentTranscript: (input) =>
+    run(async () => {
+      const session = await services.requireSession(auth, request);
+      const project = await requireProject(
+        db,
+        input.projectId,
+        session.user.id,
+        services.getProject,
+      );
+      const selector = input.selector.case === "sessionId"
+        ? { sessionId: decodeSessionId(input.selector.value) }
+        : input.selector.case === "latestForRunId"
+          ? { latestForRunId: decodeUuid(input.selector.value) }
+          : (() => {
+            throw new ConnectError(
+              "transcript selector is required",
+              Code.InvalidArgument,
+            );
+          })();
+      const workLog = await services.getTranscript({
+        db,
+        archives: env.ARCHIVES,
+        projectId: project.id,
+        selector,
+      });
+      return {
+        session: {
+          sessionId: workLog.session.session_id,
+          runId: workLog.session.run_id ?? undefined,
+          workerId: workLog.session.worker_id ?? undefined,
+          agentProvider: agentProvider[workLog.session.agent_provider],
+          startedAt: requiredTimestamp(
+            workLog.session.started_at,
+            "transcript startedAt",
+          ),
+          lastEventAt: requiredTimestamp(
+            workLog.session.last_event_at,
+            "transcript lastEventAt",
+          ),
+        },
+        entries: workLog.entries.map(appWorkLogEntry),
       };
     }),
 
