@@ -1,16 +1,14 @@
 import {
-  AgentActivitySchema,
   type AgentReplyActivityFrame as AgentReplyActivityFrameMessage,
   AgentReplyActivityFrameSchema,
-  ChannelActivityScopeSchema,
-  IssueActivityScopeSchema,
+  type ChannelActivityScope,
+  type IssueActivityScope,
 } from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
 import { AgentActivityKind as ProtoAgentActivityKind } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
-import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
-import { timestampDate, timestampFromDate } from "@bufbuild/protobuf/wkt";
+import { fromBinary, toBinary } from "@bufbuild/protobuf";
+import { timestampDate, type Timestamp } from "@bufbuild/protobuf/wkt";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import { IsoDateTimeUtc } from "./date-time-schema";
 
 export const CHANNEL_AGENT_ACTIVITY_HEADLINE_MAX_LENGTH = 240;
 export const CHANNEL_AGENT_ACTIVITY_STALE_MS = 30_000;
@@ -53,47 +51,53 @@ export const ChannelAgentActivityPublishInput = Schema.Struct({
 export type ChannelAgentActivityPublishInput =
   typeof ChannelAgentActivityPublishInput.Type;
 
-export const ChannelAgentActivityFrame = Schema.Struct({
-  replyJobId: Schema.String.check(Schema.isUUID()),
-  attempt: PositiveInteger,
-  sequence: PositiveInteger,
-  agentId: Schema.String.check(Schema.isUUID()),
-  channelId: Schema.String.check(Schema.isUUID()),
-  triggerMessageId: Schema.String.check(Schema.isUUID()),
-  parentMessageId: Schema.String.check(Schema.isUUID()),
-  activity: Schema.NullOr(ChannelAgentActivityDescriptor),
-  sentAt: IsoDateTimeUtc,
-  expiresAt: IsoDateTimeUtc,
-}).annotate({ parseOptions: strictSchemaOptions });
+export type AgentReplyActivityFrame = AgentReplyActivityFrameMessage;
+
+declare const validatedAgentReplyActivityFrame: unique symbol;
+export type ValidatedAgentReplyActivityFrame =
+  Omit<AgentReplyActivityFrameMessage, "scope"> & {
+    scope: Exclude<
+      AgentReplyActivityFrameMessage["scope"],
+      { case: undefined }
+    >;
+    readonly [validatedAgentReplyActivityFrame]: true;
+  };
+
+type CommonAgentActivityFrame = Omit<
+  AgentReplyActivityFrameMessage,
+  | "$typeName"
+  | "$unknown"
+  | "sequence"
+  | "activity"
+  | "sentAt"
+  | "expiresAt"
+  | "scope"
+> & {
+  sequence: number;
+  activity: ChannelAgentActivityDescriptor | null;
+  sentAt: string;
+  expiresAt: string;
+};
+
+type DomainChannelScope = Omit<ChannelActivityScope, "$typeName" | "$unknown">;
+type DomainIssueScope = Omit<IssueActivityScope, "$typeName" | "$unknown">;
+
 export type ChannelAgentActivityFrame =
-  typeof ChannelAgentActivityFrame.Type;
+  CommonAgentActivityFrame & DomainChannelScope;
 
-export const IssueAgentActivityFrame = Schema.Struct({
-  replyJobId: Schema.String.check(Schema.isUUID()),
-  attempt: PositiveInteger,
-  sequence: PositiveInteger,
-  projectId: Schema.String.check(Schema.isUUID()),
-  runId: Schema.String.check(Schema.isUUID()),
-  triggerMessageId: Schema.String.check(Schema.isUUID()),
-  parentMessageId: Schema.String.check(Schema.isUUID()),
-  activity: Schema.NullOr(ChannelAgentActivityDescriptor),
-  sentAt: IsoDateTimeUtc,
-  expiresAt: IsoDateTimeUtc,
-}).annotate({ parseOptions: strictSchemaOptions });
-export type IssueAgentActivityFrame =
-  typeof IssueAgentActivityFrame.Type;
+export type IssueAgentActivityFrame = CommonAgentActivityFrame & DomainIssueScope;
 
-export const AgentReplyActivityFrame = Schema.Union([
-  ChannelAgentActivityFrame,
-  IssueAgentActivityFrame,
-]);
-export type AgentReplyActivityFrame =
-  typeof AgentReplyActivityFrame.Type;
+export type AgentReplyActivityDomainFrame =
+  | ChannelAgentActivityFrame
+  | IssueAgentActivityFrame;
 
-const decodeDomainFrame = Schema.decodeUnknownOption(AgentReplyActivityFrame);
+const maxSafeSequence = BigInt(Number.MAX_SAFE_INTEGER);
 
-const decodeProtobufFrame = Option.liftThrowable((bytes: Uint8Array) =>
-  fromBinary(AgentReplyActivityFrameSchema, bytes)
+const decodeDomainDescriptor = Schema.decodeUnknownSync(
+  ChannelAgentActivityDescriptor,
+);
+const decodeUuid = Schema.decodeUnknownSync(
+  Schema.String.check(Schema.isUUID()),
 );
 
 const toDomainKind = (kind: ProtoAgentActivityKind): ChannelAgentActivityKind => {
@@ -114,7 +118,7 @@ const toDomainKind = (kind: ProtoAgentActivityKind): ChannelAgentActivityKind =>
   throw new Error(`Unknown Agent activity kind: ${String(kind)}`);
 };
 
-const fromDomainKind = (kind: ChannelAgentActivityKind) => {
+export const agentActivityKindToProto = (kind: ChannelAgentActivityKind) => {
   switch (kind) {
     case "message":
       return ProtoAgentActivityKind.MESSAGE;
@@ -129,16 +133,78 @@ const fromDomainKind = (kind: ChannelAgentActivityKind) => {
   }
 };
 
-const toDomainFrame = Option.liftThrowable(
-  (message: AgentReplyActivityFrameMessage) => {
+const timestampMilliseconds = (value: Timestamp | undefined, name: string) => {
+  if (value === undefined) throw new Error(`Agent activity ${name} is required`);
+  const milliseconds = timestampDate(value).getTime();
+  if (!Number.isFinite(milliseconds)) {
+    throw new Error(`Agent activity ${name} is invalid`);
+  }
+  return milliseconds;
+};
+
+const validateProtobufFrame = (
+  message: AgentReplyActivityFrameMessage,
+): ValidatedAgentReplyActivityFrame => {
+  if (
+    message.attempt < 1 || message.sequence < 1n ||
+    message.sequence > maxSafeSequence
+  ) {
+    throw new Error("Invalid Agent activity revision");
+  }
+  decodeUuid(message.replyJobId);
+  decodeUuid(message.triggerMessageId);
+  decodeUuid(message.parentMessageId);
+  timestampMilliseconds(message.sentAt, "sent_at");
+  timestampMilliseconds(message.expiresAt, "expires_at");
+  if (message.activity !== undefined) {
+    const descriptor = decodeDomainDescriptor({
+      id: message.activity.id,
+      kind: toDomainKind(message.activity.kind),
+      headline: message.activity.headline,
+    });
     if (
-      message.sequence > BigInt(Number.MAX_SAFE_INTEGER) ||
-      message.sentAt === undefined ||
-      message.expiresAt === undefined
+      descriptor.id !== message.activity.id ||
+      descriptor.headline !== message.activity.headline
     ) {
-      throw new Error("Invalid Agent activity revision or timestamps");
+      throw new Error("Agent activity descriptor is not canonical");
     }
-    const common = {
+  }
+  switch (message.scope.case) {
+    case "channel":
+      decodeUuid(message.scope.value.agentId);
+      decodeUuid(message.scope.value.channelId);
+      break;
+    case "issue":
+      decodeUuid(message.scope.value.projectId);
+      decodeUuid(message.scope.value.runId);
+      break;
+    case undefined:
+      throw new Error("Agent activity scope is required");
+  }
+  return message as ValidatedAgentReplyActivityFrame;
+};
+
+const decodeProtobufFrame = Option.liftThrowable((bytes: Uint8Array) =>
+  validateProtobufFrame(
+    fromBinary(AgentReplyActivityFrameSchema, bytes),
+  )
+);
+
+export const decodeAgentReplyActivityFrameBinaryOption = (
+  bytes: Uint8Array,
+) => decodeProtobufFrame(bytes);
+
+export const encodeAgentReplyActivityFrameBinary = (
+  frame: AgentReplyActivityFrameMessage,
+) => toBinary(AgentReplyActivityFrameSchema, frame);
+
+export const agentReplyActivityExpiresAt = (
+  frame: AgentReplyActivityFrameMessage,
+) => timestampMilliseconds(frame.expiresAt, "expires_at");
+
+export const agentReplyActivityDomainFrameOption = Option.liftThrowable(
+  (message: ValidatedAgentReplyActivityFrame): AgentReplyActivityDomainFrame => {
+    const common: CommonAgentActivityFrame = {
       replyJobId: message.replyJobId,
       attempt: message.attempt,
       sequence: Number(message.sequence),
@@ -151,8 +217,12 @@ const toDomainFrame = Option.liftThrowable(
           kind: toDomainKind(message.activity.kind),
           headline: message.activity.headline,
         },
-      sentAt: timestampDate(message.sentAt).toISOString(),
-      expiresAt: timestampDate(message.expiresAt).toISOString(),
+      sentAt: new Date(
+        timestampMilliseconds(message.sentAt, "sent_at"),
+      ).toISOString(),
+      expiresAt: new Date(
+        timestampMilliseconds(message.expiresAt, "expires_at"),
+      ).toISOString(),
     };
     switch (message.scope.case) {
       case "channel":
@@ -167,70 +237,6 @@ const toDomainFrame = Option.liftThrowable(
           projectId: message.scope.value.projectId,
           runId: message.scope.value.runId,
         };
-      case undefined:
-        throw new Error("Agent activity scope is required");
     }
   },
 );
-
-export const decodeAgentReplyActivityFrameBinaryOption = (
-  bytes: Uint8Array,
-) => Option.flatMap(
-  decodeProtobufFrame(bytes),
-  (message) => Option.flatMap(toDomainFrame(message), decodeDomainFrame),
-);
-
-export const decodeChannelAgentActivityFrameBinaryOption = (
-  bytes: Uint8Array,
-) => Option.filter(
-  decodeAgentReplyActivityFrameBinaryOption(bytes),
-  (frame): frame is ChannelAgentActivityFrame => "channelId" in frame,
-);
-
-export const decodeIssueAgentActivityFrameBinaryOption = (
-  bytes: Uint8Array,
-) => Option.filter(
-  decodeAgentReplyActivityFrameBinaryOption(bytes),
-  (frame): frame is IssueAgentActivityFrame => "projectId" in frame,
-);
-
-export const encodeAgentReplyActivityFrameBinary = (
-  frame: AgentReplyActivityFrame,
-) => {
-  const activity = frame.activity === null
-    ? undefined
-    : create(AgentActivitySchema, {
-      id: frame.activity.id,
-      kind: fromDomainKind(frame.activity.kind),
-      headline: frame.activity.headline,
-    });
-  const scope = "channelId" in frame
-    ? {
-      case: "channel" as const,
-      value: create(ChannelActivityScopeSchema, {
-        agentId: frame.agentId,
-        channelId: frame.channelId,
-      }),
-    }
-    : {
-      case: "issue" as const,
-      value: create(IssueActivityScopeSchema, {
-        projectId: frame.projectId,
-        runId: frame.runId,
-      }),
-    };
-  return toBinary(
-    AgentReplyActivityFrameSchema,
-    create(AgentReplyActivityFrameSchema, {
-      replyJobId: frame.replyJobId,
-      attempt: frame.attempt,
-      sequence: BigInt(frame.sequence),
-      triggerMessageId: frame.triggerMessageId,
-      parentMessageId: frame.parentMessageId,
-      activity,
-      sentAt: timestampFromDate(new Date(frame.sentAt)),
-      expiresAt: timestampFromDate(new Date(frame.expiresAt)),
-      scope,
-    }),
-  );
-};

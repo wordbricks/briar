@@ -1,11 +1,18 @@
+import { create } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
+import {
+  AgentActivitySchema,
+  AgentReplyActivityFrameSchema,
+  ChannelActivityScopeSchema,
+  IssueActivityScopeSchema,
+} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
+import { AgentActivityKind } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import * as Option from "effect/Option";
 import { describe, expect, it, vi } from "vitest";
 import {
   decodeAgentReplyActivityFrameBinaryOption,
   encodeAgentReplyActivityFrameBinary,
   type AgentReplyActivityFrame,
-  type ChannelAgentActivityFrame,
-  type IssueAgentActivityFrame,
 } from "../../src/lib/channel-agent-activity";
 import {
   ChannelActivityHub,
@@ -35,18 +42,49 @@ class FakeSocket {
   }
 }
 
-const frame = (sequence: number): ChannelAgentActivityFrame => ({
+const activity = create(AgentActivitySchema, {
+  id: "command-1",
+  kind: AgentActivityKind.COMMAND,
+  headline: "Running tests",
+});
+
+const frame = (
+  sequence: number,
+  frameActivity = activity,
+): AgentReplyActivityFrame => create(AgentReplyActivityFrameSchema, {
   replyJobId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
   attempt: 1,
-  sequence,
-  agentId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-  channelId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  sequence: BigInt(sequence),
   triggerMessageId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
   parentMessageId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
-  activity: { id: "command-1", kind: "command", headline: "Running tests" },
-  sentAt: new Date().toISOString(),
-  expiresAt: new Date(Date.now() + 30_000).toISOString(),
+  activity: frameActivity,
+  sentAt: timestampFromDate(new Date()),
+  expiresAt: timestampFromDate(new Date(Date.now() + 30_000)),
+  scope: {
+    case: "channel",
+    value: create(ChannelActivityScopeSchema, {
+      agentId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      channelId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    }),
+  },
 });
+
+const issueFrame = (): AgentReplyActivityFrame =>
+  create(AgentReplyActivityFrameSchema, {
+    ...frame(1),
+    activity: create(AgentActivitySchema, {
+      id: "commentary-1",
+      kind: AgentActivityKind.MESSAGE,
+      headline: "원인을 확인하고 있습니다.",
+    }),
+    scope: {
+      case: "issue",
+      value: create(IssueActivityScopeSchema, {
+        projectId: "11111111-1111-4111-8111-111111111111",
+        runId: "22222222-2222-4222-8222-222222222222",
+      }),
+    },
+  });
 
 const publishRequest = (value: AgentReplyActivityFrame) =>
   new Request("https://activity.test/publish", {
@@ -74,7 +112,27 @@ describe("ChannelActivityHub", () => {
       expect(response.status).toBe(204);
     }
     expect(socket.sent).toHaveLength(1);
-    expect(decodeFrame(socket.sent[0])).toMatchObject({ sequence: 2 });
+    expect(decodeFrame(socket.sent[0])).toMatchObject({ sequence: 2n });
+  });
+
+  it("rejects a protobuf frame without a scope oneof", async () => {
+    const socket = new FakeSocket({
+      userId: "user-a",
+      authorizationExpiresAt: Date.now() + 60_000,
+    });
+    const hub = new ChannelActivityHub(
+      { getWebSockets: () => [socket] } as unknown as DurableObjectState,
+      {} as Env,
+    );
+    const invalid = create(AgentReplyActivityFrameSchema, {
+      ...frame(1),
+      scope: { case: undefined },
+    });
+
+    const response = await hub.fetch(publishRequest(invalid));
+
+    expect(response.status).toBe(400);
+    expect(socket.sent).toEqual([]);
   });
 
   it("closes expired subscribers before sending private activity", async () => {
@@ -103,18 +161,19 @@ describe("ChannelActivityHub", () => {
       { getWebSockets: () => [socket] } as unknown as DurableObjectState,
       {} as Env,
     );
-    const cleared = {
+    const cleared = create(AgentReplyActivityFrameSchema, {
       ...frame(Number.MAX_SAFE_INTEGER),
-      activity: null,
-    } satisfies ChannelAgentActivityFrame;
+      activity: undefined,
+    });
     for (const update of [cleared, frame(3)]) {
       await hub.fetch(publishRequest(update));
     }
     expect(socket.sent).toHaveLength(1);
-    expect(decodeFrame(socket.sent[0])).toMatchObject({
-      sequence: Number.MAX_SAFE_INTEGER,
-      activity: null,
+    const tombstone = decodeFrame(socket.sent[0]);
+    expect(tombstone).toMatchObject({
+      sequence: BigInt(Number.MAX_SAFE_INTEGER),
     });
+    expect(tombstone.activity).toBeUndefined();
   });
 
   it("fans out issue-scoped commentary frames through the same ephemeral hub", async () => {
@@ -126,27 +185,15 @@ describe("ChannelActivityHub", () => {
       { getWebSockets: () => [socket] } as unknown as DurableObjectState,
       {} as Env,
     );
-    const issueFrame: IssueAgentActivityFrame = {
-      replyJobId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-      attempt: 1,
-      sequence: 1,
-      projectId: "11111111-1111-4111-8111-111111111111",
-      runId: "22222222-2222-4222-8222-222222222222",
-      triggerMessageId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-      parentMessageId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
-      activity: {
-        id: "commentary-1",
-        kind: "message",
-        headline: "원인을 확인하고 있습니다.",
-      },
-      sentAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 30_000).toISOString(),
-    };
-    const response = await hub.fetch(publishRequest(issueFrame));
+    const issue = issueFrame();
+    const response = await hub.fetch(publishRequest(issue));
     expect(response.status).toBe(204);
     expect(decodeFrame(socket.sent[0])).toMatchObject({
-      projectId: issueFrame.projectId,
-      activity: { kind: "message" },
+      scope: {
+        case: "issue",
+        value: { projectId: "11111111-1111-4111-8111-111111111111" },
+      },
+      activity: { kind: AgentActivityKind.MESSAGE },
     });
   });
 });
@@ -194,18 +241,18 @@ describe("activity hub adapters", () => {
       CHANNEL_ACTIVITY_REALTIME: { getByName: vi.fn(() => ({ fetch })) },
     } as unknown as Env;
     const channelFrame = frame(1);
-    const issueFrame: IssueAgentActivityFrame = {
-      replyJobId: channelFrame.replyJobId,
-      attempt: channelFrame.attempt,
-      sequence: channelFrame.sequence,
-      projectId: "11111111-1111-4111-8111-111111111111",
-      runId: "22222222-2222-4222-8222-222222222222",
-      triggerMessageId: channelFrame.triggerMessageId,
-      parentMessageId: channelFrame.parentMessageId,
-      activity: channelFrame.activity,
-      sentAt: channelFrame.sentAt,
-      expiresAt: channelFrame.expiresAt,
-    };
+    const issue = issueFrame();
+
+    await expect(publishChannelActivity(
+      env,
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      issue,
+    )).rejects.toThrow("requires channel scope");
+    await expect(publishIssueActivity(
+      env,
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      channelFrame,
+    )).rejects.toThrow("requires issue scope");
 
     await expect(publishChannelActivity(
       env,
@@ -215,7 +262,7 @@ describe("activity hub adapters", () => {
     await expect(publishIssueActivity(
       env,
       "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      issueFrame,
+      issue,
     )).rejects.toThrow("Issue activity publish failed (503)");
 
     expect(fetch).toHaveBeenCalledTimes(2);

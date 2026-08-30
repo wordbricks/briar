@@ -1,14 +1,12 @@
 import * as Option from "effect/Option";
 import { describe, expect, it, vi } from "vitest";
 import {
-  CHANNEL_AGENT_ACTIVITY_STALE_MS,
+  type AgentReplyActivityFrame,
   decodeAgentReplyActivityFrameBinaryOption,
 } from "../../src/lib/channel-agent-activity";
 import {
   channelActivityCredential,
-  channelActivityFrame,
   issueActivityCredential,
-  issueActivityFrame,
   scheduleChannelActivityClear,
   scheduleIssueActivityClear,
 } from "./realtime-scheduling";
@@ -48,39 +46,6 @@ const issueJob = (leaseExpiresAt: string | null) => ({
 });
 
 describe("activity scheduling adapters", () => {
-  it("builds channel and issue frames with one expiry policy", () => {
-    const now = Date.UTC(2026, 7, 26, 0, 0, 0);
-    const input = {
-      sequence: 4,
-      activity: { id: "tool-1", kind: "tool" as const, headline: "Testing" },
-    };
-
-    expect(channelActivityFrame(channelJob(null), input, now)).toEqual({
-      replyJobId,
-      attempt: 2,
-      sequence: 4,
-      agentId,
-      channelId,
-      triggerMessageId,
-      parentMessageId,
-      activity: input.activity,
-      sentAt: new Date(now).toISOString(),
-      expiresAt: new Date(now + CHANNEL_AGENT_ACTIVITY_STALE_MS).toISOString(),
-    });
-    expect(issueActivityFrame(issueJob(null), input, now)).toEqual({
-      replyJobId,
-      attempt: 3,
-      sequence: 4,
-      projectId,
-      runId,
-      triggerMessageId,
-      parentMessageId,
-      activity: input.activity,
-      sentAt: new Date(now).toISOString(),
-      expiresAt: new Date(now + CHANNEL_AGENT_ACTIVITY_STALE_MS).toISOString(),
-    });
-  });
-
   it("preserves channel and issue credential payload scopes", async () => {
     const now = Date.now();
     const leaseExpiresAt = new Date(now + 60_000).toISOString();
@@ -114,7 +79,7 @@ describe("activity scheduling adapters", () => {
   });
 
   it("publishes terminal tombstones through the shared clear scheduler", async () => {
-    const requests: Array<{ name: string; body: unknown }> = [];
+    const requests: Array<{ name: string; body: AgentReplyActivityFrame }> = [];
     const pending: Promise<unknown>[] = [];
     const env = {
       CHANNEL_ACTIVITY_REALTIME: {
@@ -145,12 +110,20 @@ describe("activity scheduling adapters", () => {
     expect(requests).toHaveLength(2);
     expect(requests[0]).toMatchObject({
       name: `${organizationId}:${channelId}`,
-      body: { channelId, sequence: Number.MAX_SAFE_INTEGER, activity: null },
+      body: {
+        sequence: BigInt(Number.MAX_SAFE_INTEGER),
+        scope: { case: "channel", value: { channelId } },
+      },
     });
     expect(requests[1]).toMatchObject({
       name: `${organizationId}:issue:${projectId}:${runId}`,
-      body: { projectId, runId, sequence: Number.MAX_SAFE_INTEGER, activity: null },
+      body: {
+        sequence: BigInt(Number.MAX_SAFE_INTEGER),
+        scope: { case: "issue", value: { projectId, runId } },
+      },
     });
+    expect(requests[0]?.body.activity).toBeUndefined();
+    expect(requests[1]?.body.activity).toBeUndefined();
   });
 
   it("rejects missing leases before issuing either credential", async () => {

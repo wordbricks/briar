@@ -1,9 +1,18 @@
 /** @vitest-environment jsdom */
 
+import { create } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
+import {
+  AgentActivitySchema,
+  AgentReplyActivityFrameSchema,
+  ChannelActivityScopeSchema,
+  IssueActivityScopeSchema,
+  type AgentReplyActivityFrame,
+} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
+import { AgentActivityKind } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   encodeAgentReplyActivityFrameBinary,
-  type AgentReplyActivityFrame,
 } from "./channel-agent-activity";
 import { ChannelActivityRealtimeTransport } from "./channel-activity-realtime";
 import { IssueActivityRealtimeTransport } from "./issue-activity-realtime";
@@ -35,7 +44,7 @@ const channelId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const projectId = "11111111-1111-4111-8111-111111111111";
 const runId = "22222222-2222-4222-8222-222222222222";
 
-const frameBase = {
+const domainFrameBase = {
   replyJobId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
   attempt: 1,
   sequence: 1,
@@ -50,6 +59,26 @@ const frameBase = {
   expiresAt: "2099-01-01T00:00:00.000Z",
 } as const;
 
+const activityMessage = (
+  scope: AgentReplyActivityFrame["scope"],
+  overrides: Partial<AgentReplyActivityFrame> = {},
+) => create(AgentReplyActivityFrameSchema, {
+  replyJobId: domainFrameBase.replyJobId,
+  attempt: domainFrameBase.attempt,
+  sequence: BigInt(domainFrameBase.sequence),
+  triggerMessageId: domainFrameBase.triggerMessageId,
+  parentMessageId: domainFrameBase.parentMessageId,
+  activity: create(AgentActivitySchema, {
+    id: domainFrameBase.activity.id,
+    kind: AgentActivityKind.MESSAGE,
+    headline: domainFrameBase.activity.headline,
+  }),
+  sentAt: timestampFromDate(new Date(domainFrameBase.sentAt)),
+  expiresAt: timestampFromDate(new Date(domainFrameBase.expiresAt)),
+  scope,
+  ...overrides,
+});
+
 const emitFrame = (socket: FakeWebSocket, frame: AgentReplyActivityFrame) => {
   const bytes = encodeAgentReplyActivityFrameBinary(frame);
   socket.emit("message", new MessageEvent("message", {
@@ -61,15 +90,24 @@ const scenarios = [
   {
     name: "channel",
     frame: {
-      ...frameBase,
+      ...domainFrameBase,
       agentId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
       channelId,
     },
-    crossScope: {
-      ...frameBase,
-      agentId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-      channelId: projectId,
-    },
+    message: activityMessage({
+      case: "channel",
+      value: create(ChannelActivityScopeSchema, {
+        agentId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        channelId,
+      }),
+    }),
+    crossScope: activityMessage({
+      case: "channel",
+      value: create(ChannelActivityScopeSchema, {
+        agentId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        channelId: projectId,
+      }),
+    }),
     create(
       createTicket: (signal: AbortSignal) => Promise<string>,
       createWebSocket: (url: string) => WebSocket,
@@ -86,8 +124,18 @@ const scenarios = [
   },
   {
     name: "issue",
-    frame: { ...frameBase, projectId, runId },
-    crossScope: { ...frameBase, projectId, runId: channelId },
+    frame: { ...domainFrameBase, projectId, runId },
+    message: activityMessage({
+      case: "issue",
+      value: create(IssueActivityScopeSchema, { projectId, runId }),
+    }),
+    crossScope: activityMessage({
+      case: "issue",
+      value: create(IssueActivityScopeSchema, {
+        projectId,
+        runId: channelId,
+      }),
+    }),
     create(
       createTicket: (signal: AbortSignal) => Promise<string>,
       createWebSocket: (url: string) => WebSocket,
@@ -130,8 +178,20 @@ describe.each(scenarios)("$name activity realtime", (scenario) => {
     socket.emit("message", new MessageEvent("message", {
       data: new ArrayBuffer(1),
     }));
+    emitFrame(socket, activityMessage({ case: undefined }));
+    emitFrame(socket, activityMessage(
+      scenario.message.scope,
+      { replyJobId: "not-a-uuid" },
+    ));
+    emitFrame(socket, activityMessage(scenario.message.scope, {
+      activity: create(AgentActivitySchema, {
+        id: "activity-1",
+        kind: AgentActivityKind.MESSAGE,
+        headline: " ",
+      }),
+    }));
     emitFrame(socket, scenario.crossScope);
-    emitFrame(socket, scenario.frame);
+    emitFrame(socket, scenario.message);
 
     expect(listener).toHaveBeenCalledOnce();
     expect(listener).toHaveBeenCalledWith(scenario.frame);

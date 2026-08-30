@@ -1,11 +1,16 @@
+import * as Option from "effect/Option";
+import {
+  decodeAgentReplyActivityFrameBinaryOption,
+  type ValidatedAgentReplyActivityFrame,
+} from "./channel-agent-activity";
 import { isWebSocketUrl } from "./realtime-transport";
 
 type Listener<Frame> = (frame: Frame) => void;
 
 export type AgentActivityRealtimeAdapter<Frame> = {
   label: "Channel" | "Issue";
-  decodeFrame: (value: Uint8Array) => Frame | null;
-  matchesScope: (frame: Frame) => boolean;
+  matchesScope: (frame: ValidatedAgentReplyActivityFrame) => boolean;
+  projectFrame: (frame: ValidatedAgentReplyActivityFrame) => Frame | null;
 };
 
 export type AgentActivityRealtimeInput<Frame> = {
@@ -83,9 +88,15 @@ export class AgentActivityRealtimeTransport<Frame> {
       socket.addEventListener("message", (event) => {
         if (!this.active || generation !== this.generation) return;
         if (!(event.data instanceof ArrayBuffer)) return;
-        const parsed = adapter.decodeFrame(new Uint8Array(event.data));
-        if (parsed === null || !adapter.matchesScope(parsed)) return;
-        for (const listener of this.listeners) listener(parsed);
+        const message = Option.getOrNull(
+          decodeAgentReplyActivityFrameBinaryOption(
+            new Uint8Array(event.data),
+          ),
+        );
+        if (message === null || !adapter.matchesScope(message)) return;
+        const frame = adapter.projectFrame(message);
+        if (frame === null) return;
+        for (const listener of this.listeners) listener(frame);
       });
       socket.addEventListener("close", finish);
       socket.addEventListener("error", () => {

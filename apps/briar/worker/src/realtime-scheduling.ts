@@ -1,7 +1,16 @@
+import { create } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
+  AgentActivitySchema,
+  AgentReplyActivityFrameSchema,
+  ChannelActivityScopeSchema,
+  IssueActivityScopeSchema,
+  type AgentReplyActivityFrame,
+} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
+import {
+  agentActivityKindToProto,
   CHANNEL_AGENT_ACTIVITY_STALE_MS,
-  type ChannelAgentActivityFrame,
-  type IssueAgentActivityFrame,
+  type ChannelAgentActivityPublishInput,
 } from "../../src/lib/channel-agent-activity";
 import { getDashboardSyncCursor } from "./dashboard-change-repository";
 import {
@@ -59,27 +68,35 @@ async function activityCredential(
 }
 
 type ActivityFrameInput = Pick<
-  ChannelAgentActivityFrame,
+  ChannelAgentActivityPublishInput,
   "sequence" | "activity"
 >;
 
-function activityFrame<Scope extends object>(
+function activityFrame(
   job: Omit<ActivityReplyIdentity, "lease_expires_at">,
   input: ActivityFrameInput,
-  scope: Scope,
+  scope: AgentReplyActivityFrame["scope"],
   now: number,
 ) {
-  return {
+  return create(AgentReplyActivityFrameSchema, {
     replyJobId: job.id,
     attempt: job.attempts,
-    sequence: input.sequence,
-    ...scope,
+    sequence: BigInt(input.sequence),
     triggerMessageId: job.trigger_message_id,
     parentMessageId: job.parent_message_id,
-    activity: input.activity,
-    sentAt: new Date(now).toISOString(),
-    expiresAt: new Date(now + CHANNEL_AGENT_ACTIVITY_STALE_MS).toISOString(),
-  };
+    activity: input.activity === null
+      ? undefined
+      : create(AgentActivitySchema, {
+        id: input.activity.id,
+        kind: agentActivityKindToProto(input.activity.kind),
+        headline: input.activity.headline,
+      }),
+    sentAt: timestampFromDate(new Date(now)),
+    expiresAt: timestampFromDate(
+      new Date(now + CHANNEL_AGENT_ACTIVITY_STALE_MS),
+    ),
+    scope,
+  });
 }
 
 function scheduleActivityClear<Frame>(
@@ -209,13 +226,19 @@ export async function channelActivityCredential(
 
 export function channelActivityFrame(
   job: Omit<ChannelActivityReplyIdentity, "lease_expires_at">,
-  input: Pick<ChannelAgentActivityFrame, "sequence" | "activity">,
+  input: ActivityFrameInput,
   now = Date.now(),
-): ChannelAgentActivityFrame {
+): AgentReplyActivityFrame {
   return activityFrame(
     job,
     input,
-    { agentId: job.agent_id, channelId: job.channel_id },
+    {
+      case: "channel",
+      value: create(ChannelActivityScopeSchema, {
+        agentId: job.agent_id,
+        channelId: job.channel_id,
+      }),
+    },
     now,
   );
 }
@@ -274,13 +297,19 @@ export async function issueActivityCredential(
 
 export function issueActivityFrame(
   job: Omit<IssueActivityReplyIdentity, "lease_expires_at">,
-  input: Pick<IssueAgentActivityFrame, "sequence" | "activity">,
+  input: ActivityFrameInput,
   now = Date.now(),
-): IssueAgentActivityFrame {
+): AgentReplyActivityFrame {
   return activityFrame(
     job,
     input,
-    { projectId: job.project_id, runId: job.run_id },
+    {
+      case: "issue",
+      value: create(IssueActivityScopeSchema, {
+        projectId: job.project_id,
+        runId: job.run_id,
+      }),
+    },
     now,
   );
 }

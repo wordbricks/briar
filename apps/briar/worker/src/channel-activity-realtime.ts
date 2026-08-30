@@ -1,10 +1,9 @@
 import * as Option from "effect/Option";
 import {
+  agentReplyActivityExpiresAt,
   decodeAgentReplyActivityFrameBinaryOption,
   encodeAgentReplyActivityFrameBinary,
   type AgentReplyActivityFrame,
-  type ChannelAgentActivityFrame,
-  type IssueAgentActivityFrame,
 } from "../../src/lib/channel-agent-activity";
 
 type ChannelActivitySocketAttachment = {
@@ -119,7 +118,7 @@ export class ChannelActivityHub {
     server.serializeAttachment(attachment);
     const now = Date.now();
     for (const [replyJobId, frame] of this.latestByReply) {
-      if (Date.parse(frame.expiresAt) <= now) {
+      if (agentReplyActivityExpiresAt(frame) <= now) {
         this.latestByReply.delete(replyJobId);
         continue;
       }
@@ -131,7 +130,7 @@ export class ChannelActivityHub {
   private publish(frame: AgentReplyActivityFrame) {
     const now = Date.now();
     for (const [replyJobId, current] of this.latestByReply) {
-      if (Date.parse(current.expiresAt) <= now) {
+      if (agentReplyActivityExpiresAt(current) <= now) {
         this.latestByReply.delete(replyJobId);
       }
     }
@@ -202,11 +201,14 @@ export async function subscribeToChannelActivity(
 export async function publishChannelActivity(
   env: Env,
   organizationId: string,
-  frame: ChannelAgentActivityFrame,
+  frame: AgentReplyActivityFrame,
 ) {
+  if (frame.scope.case !== "channel") {
+    throw new Error("Channel activity frame requires channel scope");
+  }
   return publishActivity(
     env,
-    activityHubName(organizationId, frame.channelId),
+    activityHubName(organizationId, frame.scope.value.channelId),
     frame,
     "Channel activity publish failed",
   );
@@ -232,11 +234,18 @@ export async function subscribeToIssueActivity(
 export async function publishIssueActivity(
   env: Env,
   organizationId: string,
-  frame: IssueAgentActivityFrame,
+  frame: AgentReplyActivityFrame,
 ) {
+  if (frame.scope.case !== "issue") {
+    throw new Error("Issue activity frame requires issue scope");
+  }
   return publishActivity(
     env,
-    issueActivityHubName(organizationId, frame.projectId, frame.runId),
+    issueActivityHubName(
+      organizationId,
+      frame.scope.value.projectId,
+      frame.scope.value.runId,
+    ),
     frame,
     "Issue activity publish failed",
   );

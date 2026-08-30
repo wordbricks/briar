@@ -1,6 +1,6 @@
 import * as Option from "effect/Option";
 import {
-  decodeChannelAgentActivityFrameBinaryOption,
+  agentReplyActivityDomainFrameOption,
   type ChannelAgentActivityFrame,
 } from "./channel-agent-activity";
 import { AgentActivityRealtimeTransport } from "./agent-activity-realtime";
@@ -27,9 +27,15 @@ export class ChannelActivityRealtimeTransport
         )),
       adapter: {
         label: "Channel",
-        decodeFrame: (value) =>
-          Option.getOrNull(decodeChannelAgentActivityFrameBinaryOption(value)),
-        matchesScope: (frame) => frame.channelId === input.channelId,
+        matchesScope: (frame) =>
+          frame.scope.case === "channel" &&
+          frame.scope.value.channelId === input.channelId,
+        projectFrame: (message) => {
+          const frame = Option.getOrNull(
+            agentReplyActivityDomainFrameOption(message),
+          );
+          return frame && "channelId" in frame ? frame : null;
+        },
       },
       createWebSocket: input.createWebSocket,
     });
