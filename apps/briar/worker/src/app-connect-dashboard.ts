@@ -1,5 +1,5 @@
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
-import type { ConnectRouter } from "@connectrpc/connect";
+import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
 import {
   DashboardService,
 } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
@@ -145,8 +145,8 @@ const runJsonWithRelations = (
 
 export const createAppDashboardService = (
   { request, auth, db, archivesBucket }: AppConnectDashboardInput,
-) => ({
-  getDashboard: async (rpcRequest: { readonly projectId: string }) =>
+): ServiceImpl<typeof DashboardService> => ({
+  getDashboard: async (rpcRequest) =>
     withConnectErrors(async () => {
       const input = decodeProjectId({ projectId: rpcRequest.projectId });
       const session = await requireSession(auth, request);
@@ -225,10 +225,7 @@ export const createAppDashboardService = (
       };
     }),
 
-  syncDashboard: async (rpcRequest: {
-    readonly projectId: string;
-    readonly cursor: bigint;
-  }) => withConnectErrors(async () => {
+  syncDashboard: async (rpcRequest) => withConnectErrors(async () => {
     const input = decodeProjectId({ projectId: rpcRequest.projectId });
     if (
       rpcRequest.cursor < 0n ||
@@ -361,10 +358,7 @@ export const createAppDashboardService = (
     };
   }),
 
-  listRunEvents: async (rpcRequest: {
-    readonly projectId: string;
-    readonly runId: string;
-  }) => withConnectErrors(async () => {
+  listRunEvents: async (rpcRequest) => withConnectErrors(async () => {
     const input = decodeRunIds({
       projectId: rpcRequest.projectId,
       runId: rpcRequest.runId,

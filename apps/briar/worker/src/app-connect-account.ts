@@ -1,4 +1,4 @@
-import type { ConnectRouter } from "@connectrpc/connect";
+import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
 import {
   AccountService,
 } from "@briar/contracts/gen/briar/app/v1/account_pb";
@@ -32,15 +32,13 @@ const decodeOrganizationId = decodeRequestSync(Schema.Struct({
 
 export const createAppAccountService = (
   { request, auth, db }: AppConnectAccountInput,
-) => ({
+): ServiceImpl<typeof AccountService> => ({
   getCurrentUser: async () => withConnectErrors(async () => {
     const session = await requireSession(auth, request);
     return { user: appUser(session.user) };
   }),
 
-  listOrganizationMembers: async (rpcRequest: {
-    readonly organizationId: string;
-  }) => withConnectErrors(async () => {
+  listOrganizationMembers: async (rpcRequest) => withConnectErrors(async () => {
     const input = decodeOrganizationId({
       organizationId: rpcRequest.organizationId,
     });

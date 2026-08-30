@@ -1,5 +1,5 @@
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
-import type { ConnectRouter } from "@connectrpc/connect";
+import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
 import {
   InboxService,
 } from "@briar/contracts/gen/briar/app/v1/inbox_pb";
@@ -116,11 +116,8 @@ async function loadInboxFeed(
 
 export const createAppInboxService = (
   { request, auth, db, env, context }: AppConnectInboxInput,
-) => ({
-  getInboxFeed: async (rpcRequest: {
-    readonly organizationId: string;
-    readonly knownVersion?: string;
-  }) => withConnectErrors(async () => {
+): ServiceImpl<typeof InboxService> => ({
+  getInboxFeed: async (rpcRequest) => withConnectErrors(async () => {
     const input = decodeInboxFeedInput({
       organizationId: rpcRequest.organizationId,
       knownVersion: rpcRequest.knownVersion,
@@ -172,9 +169,7 @@ export const createAppInboxService = (
     };
   }),
 
-  putInboxReadStates: async (rpcRequest: {
-    readonly readVersions: Record<string, string>;
-  }) => withConnectErrors(async () => {
+  putInboxReadStates: async (rpcRequest) => withConnectErrors(async () => {
     const session = await requireSession(auth, request);
     const input = decodeInboxReadStatesInput({
       readVersions: rpcRequest.readVersions,
@@ -192,9 +187,7 @@ export const createAppInboxService = (
     return { readVersions: readVersions(rows) };
   }),
 
-  deleteInboxReadState: async (rpcRequest: {
-    readonly messageId: string;
-  }) => withConnectErrors(async () => {
+  deleteInboxReadState: async (rpcRequest) => withConnectErrors(async () => {
     const session = await requireSession(auth, request);
     const input = decodeInboxUnreadStateInput({
       messageId: rpcRequest.messageId,
