@@ -10,20 +10,25 @@
     "catalog": {
       "@bufbuild/protobuf": "2.14.0",
       "@cloudflare/workers-types": "5.20260721.1",
+      "@dotenvx/dotenvx": "2.19.2",
       "@effect/eslint-plugin": "0.3.2",
       "@effect/tsgo": "0.36.5",
       "@oxlint/plugins": "1.80.0",
       "@types/bun": "1.4.0",
       "@types/node": "24.10.1",
+      "@types/react": "19.2.14",
       "@types/react-dom": "19.2.3",
       "@vitejs/plugin-react": "6.0.2",
       "effect": "4.0.0-rc.112",
       "oxlint": "1.80.0",
       "oxlint-tsgolint": "7.0.2001",
+      "react": "19.2.8",
+      "react-dom": "19.2.8",
+      "tailwindcss": "4.3.3",
       "typescript": "7.0.2",
       "vite": "8.0.16",
       "vitest": "4.1.0",
-      "wrangler": "4.118.0"
+      "wrangler": "4.125.0"
     }
   },
   "bin": {
@@ -94,7 +99,7 @@
     "managed-computer:image:build": "infrastructure/managed-computers/build-managed-computer-image"
   },
   "devDependencies": {
-    "@dotenvx/dotenvx": "2.19.2",
+    "@dotenvx/dotenvx": "catalog:",
     "@effect/eslint-plugin": "catalog:",
     "@effect/tsgo": "catalog:",
     "@oxlint/plugins": "catalog:",

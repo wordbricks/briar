@@ -19,15 +19,15 @@
   "dependencies": {
     "drizzle-orm": "0.45.2",
     "next": "16.3.1",
-    "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
     "@cloudflare/vite-plugin": "1.53.1",
     "@tailwindcss/postcss": "4.2.1",
-    "@types/node": "22.19.19",
-    "@types/react": "19.2.14",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "@vitejs/plugin-rsc": "0.5.26",
@@ -35,11 +35,11 @@
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
     "react-server-dom-webpack": "19.2.8",
-    "tailwindcss": "4.2.1",
+    "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vinext": "0.0.50",
     "vite": "catalog:",
-    "wrangler": "4.125.0"
+    "wrangler": "catalog:"
   },
   "type": "module"
 }
