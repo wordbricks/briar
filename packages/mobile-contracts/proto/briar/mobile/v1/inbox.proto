@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+package briar.mobile.v1;
+
+import "briar/mobile/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarAPI_";
+
+service InboxService {
+  rpc GetInboxFeed(GetInboxFeedRequest) returns (GetInboxFeedResponse);
+  rpc GetInboxReadStates(GetInboxReadStatesRequest) returns (GetInboxReadStatesResponse);
+  rpc PutInboxReadStates(PutInboxReadStatesRequest) returns (PutInboxReadStatesResponse);
+  rpc DeleteInboxReadState(DeleteInboxReadStateRequest) returns (DeleteInboxReadStateResponse);
+}
+
+message GetInboxFeedRequest {
+  string organization_id = 1;
+  optional string known_version = 2;
+}
+
+message GetInboxFeedResponse {
+  repeated InboxFeedMessage messages = 1;
+  repeated string subscribed_issue_ids = 2;
+  google.protobuf.Timestamp generated_at = 3;
+  string version = 4;
+  bool unchanged = 5;
+}
+
+message GetInboxReadStatesRequest {}
+
+message GetInboxReadStatesResponse {
+  map<string, string> read_versions = 1;
+}
+
+message PutInboxReadStatesRequest {
+  map<string, string> read_versions = 1;
+}
+
+message PutInboxReadStatesResponse {
+  map<string, string> read_versions = 1;
+}
+
+message DeleteInboxReadStateRequest {
+  string message_id = 1;
+}
+
+message DeleteInboxReadStateResponse {
+  map<string, string> read_versions = 1;
+}
+
+message InboxMessageIdentity {
+  string id = 1;
+  string project_id = 2;
+  string project_name = 3;
+  string target_id = 4;
+  string title = 5;
+  google.protobuf.Timestamp occurred_at = 6;
+  string version = 7;
+}
+
+message InboxIssueMessage {
+  uint32 run_number = 1;
+  RunStatus status = 2;
+  optional string workflow_stage = 3;
+  optional string workflow_stage_label = 4;
+  optional uint32 priority = 5;
+  optional StructuredRunResult structured_result = 6;
+}
+
+message InboxConversationMessage {
+  string message_id = 1;
+  string root_message_id = 2;
+  string body = 3;
+  repeated MessageBlock blocks = 4;
+  string author_name = 5;
+  optional string author_image = 6;
+  optional string issue_key = 7;
+  NotificationReason reason = 8;
+}
+
+message InboxChannelMessage {
+  string channel_id = 1;
+  string channel_name = 2;
+  string message_id = 3;
+  string root_message_id = 4;
+  string body = 5;
+  string author_name = 6;
+  optional string author_image = 7;
+  NotificationReason reason = 8;
+}
+
+message InboxSessionMessage {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_COMPLETED = 1;
+    STATUS_FAILED = 2;
+  }
+
+  Status status = 1;
+  optional string agent_name = 2;
+  uint32 issue_count = 3;
+  optional string error = 4;
+  optional string summary = 5;
+  bool requires_attention = 6;
+}
+
+message InboxFeedMessage {
+  InboxMessageIdentity identity = 1;
+
+  oneof content {
+    InboxIssueMessage issue = 2;
+    InboxConversationMessage conversation = 3;
+    InboxChannelMessage channel = 4;
+    InboxSessionMessage session = 5;
+  }
+}

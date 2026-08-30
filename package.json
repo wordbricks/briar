@@ -47,6 +47,8 @@
     "mobile:contract": "vitest run scripts/generate-mobile-contracts.test.ts && turbo run mobile:contract --filter=@briar/app",
     "mobile:contract:generate": "bun run scripts/generate-mobile-contracts.ts",
     "mobile:contract:check": "bun run scripts/generate-mobile-contracts.ts --check",
+    "mobile:proto:generate": "buf generate --template packages/mobile-contracts/buf.gen.yaml",
+    "mobile:proto:check": "bash scripts/check-mobile-proto.sh",
     "mobile:ci": "bash scripts/ci-mobile.sh",
     "ios:bootstrap": "bash scripts/ios-simulator.sh bootstrap",
     "ios:native:project": "turbo run ios:native:project --filter=@briar/app",

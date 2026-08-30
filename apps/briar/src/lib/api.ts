@@ -1,5 +1,4 @@
 import { briarApiUrl, briarWebAppOrigin } from "./api-config";
-import { listProjectsOperation } from "@briar/mobile-contracts";
 export { briarApiUrl } from "./api-config";
 import { ApiError, isApiErrorStatus } from "./api/errors";
 export {
@@ -9,10 +8,7 @@ export {
   errorWithMessage,
   isApiErrorStatus,
 } from "./api/errors";
-import {
-  request,
-  requestMobileOperationUnknown,
-} from "./api/request";
+import { request } from "./api/request";
 export {
   deleteAccount,
   loadSession,
@@ -37,9 +33,9 @@ import {
 } from "./api/project-agent-contract";
 import {
   decodeProjectResponse,
-  decodeProjectsResponse,
   decodeProjectUsageSummaryResponse,
 } from "./api/project-contract";
+import { listProjects } from "./mobile-rpc/project";
 import type { StructuredAgentResult } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import {
@@ -329,11 +325,7 @@ export async function deleteInboxReadState(
 }
 
 export async function loadProjects(token: string): Promise<Project[]> {
-  const result = await requestMobileOperationUnknown(
-    listProjectsOperation,
-    token,
-  );
-  return decodeProjectsResponse(result);
+  return listProjects(token);
 }
 
 export async function loadOrganizations(

@@ -1,0 +1,406 @@
+syntax = "proto3";
+
+package briar.mobile.v1;
+
+import "briar/mobile/v1/agent.proto";
+import "briar/mobile/v1/common.proto";
+import "briar/mobile/v1/issue.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarAPI_";
+
+service ChannelService {
+  rpc ListChannels(ListChannelsRequest) returns (ListChannelsResponse);
+  rpc SyncChannels(SyncChannelsRequest) returns (SyncChannelsResponse);
+  rpc ListDirectMessageRecipients(ListDirectMessageRecipientsRequest) returns (ListDirectMessageRecipientsResponse);
+  rpc CreateDirectMessage(CreateDirectMessageRequest) returns (CreateDirectMessageResponse);
+  rpc GetChannel(GetChannelRequest) returns (GetChannelResponse);
+  rpc MarkChannelRead(MarkChannelReadRequest) returns (MarkChannelReadResponse);
+  rpc ListChannelMessages(ListChannelMessagesRequest) returns (ListChannelMessagesResponse);
+  rpc CreateChannelMessage(CreateChannelMessageRequest) returns (CreateChannelMessageResponse);
+  rpc DeleteChannelMessage(DeleteChannelMessageRequest) returns (DeleteChannelMessageResponse);
+  rpc ToggleChannelMessageReaction(ToggleChannelMessageReactionRequest) returns (ToggleChannelMessageReactionResponse);
+  rpc SetChannelThreadSubscription(SetChannelThreadSubscriptionRequest) returns (SetChannelThreadSubscriptionResponse);
+  rpc AcceptChannelProposal(AcceptChannelProposalRequest) returns (AcceptChannelProposalResponse);
+  rpc AcceptChannelExecutionProposal(AcceptChannelExecutionProposalRequest) returns (AcceptChannelExecutionProposalResponse);
+  rpc DeclineChannelProposal(DeclineChannelProposalRequest) returns (DeclineChannelProposalResponse);
+  rpc AcceptChannelSkillExecutionProposal(AcceptChannelSkillExecutionProposalRequest) returns (AcceptChannelSkillExecutionProposalResponse);
+}
+
+message ListChannelsRequest {
+  string organization_id = 1;
+}
+
+message ListChannelsResponse {
+  repeated ChannelSummary channels = 1;
+  uint64 cursor = 2;
+}
+
+message SyncChannelsRequest {
+  string organization_id = 1;
+  uint64 cursor = 2;
+}
+
+message SyncChannelsResponse {
+  uint64 cursor = 1;
+  bool has_more = 2;
+  bool reset = 3;
+  repeated ChannelSummary channels = 4;
+  repeated string removed_channel_ids = 5;
+  repeated ChannelMessage messages = 6;
+  repeated string removed_message_ids = 7;
+  repeated ChannelAgentReply agent_replies = 8;
+}
+
+message ListDirectMessageRecipientsRequest {
+  string organization_id = 1;
+}
+
+message ListDirectMessageRecipientsResponse {
+  repeated OrganizationMember members = 1;
+  repeated OrganizationAgent agents = 2;
+}
+
+message CreateDirectMessageRequest {
+  string organization_id = 1;
+  string request_id = 2;
+  repeated string member_ids = 3;
+  repeated string agent_ids = 4;
+}
+
+message CreateDirectMessageResponse {
+  ChannelSummary channel = 1;
+}
+
+message GetChannelRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  optional uint32 message_limit = 3;
+}
+
+message GetChannelResponse {
+  ChannelSummary channel = 1;
+  repeated ChannelMember members = 2;
+  repeated OrganizationAgent agents = 3;
+  repeated ChannelMessage messages = 4;
+  repeated ChannelAgentReply agent_replies = 5;
+  optional string next_cursor = 6;
+}
+
+message MarkChannelReadRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string request_id = 3;
+  optional google.protobuf.Timestamp last_read_at = 4;
+}
+
+message MarkChannelReadResponse {
+  ChannelSummary channel = 1;
+}
+
+message ListChannelMessagesRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  optional string parent_message_id = 3;
+  optional string cursor = 4;
+  optional uint32 limit = 5;
+}
+
+message ListChannelMessagesResponse {
+  repeated ChannelMessage messages = 1;
+  optional string next_cursor = 2;
+}
+
+message CreateChannelMessageRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string client_message_id = 3;
+  string body = 4;
+  repeated MessageBlock blocks = 5;
+  optional string parent_message_id = 6;
+  repeated string mentioned_user_ids = 7;
+  repeated string mentioned_agent_ids = 8;
+  repeated string attachment_ids = 9;
+}
+
+message CreateChannelMessageResponse {
+  ChannelMessage message = 1;
+  repeated ChannelAgentReply agent_replies = 2;
+}
+
+message DeleteChannelMessageRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string message_id = 3;
+  string request_id = 4;
+}
+
+message DeleteChannelMessageResponse {
+  bool deleted = 1;
+  optional ChannelMessage message = 2;
+  optional ChannelMessage parent_message = 3;
+}
+
+message ToggleChannelMessageReactionRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string message_id = 3;
+  string emoji = 4;
+  string request_id = 5;
+}
+
+message ToggleChannelMessageReactionResponse {
+  ChannelMessage message = 1;
+}
+
+message SetChannelThreadSubscriptionRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string root_message_id = 3;
+  bool subscribed = 4;
+  string request_id = 5;
+}
+
+message SetChannelThreadSubscriptionResponse {
+  string root_message_id = 1;
+  repeated IssueSubscriber subscribers = 2;
+}
+
+message AcceptChannelProposalRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string proposal_id = 3;
+  string request_id = 4;
+  optional string project_id = 5;
+  optional IssueExecutionApproval execution = 6;
+}
+
+message AcceptChannelProposalResponse {
+  ApprovalOutcome outcome = 1;
+  string project_id = 2;
+  string result_run_id = 3;
+  repeated ChannelIssueBatchResultItem result_items = 4;
+  optional IssueExecutionProposal execution_proposal = 5;
+  optional IssueExecutionDispatch dispatch = 6;
+}
+
+message AcceptChannelExecutionProposalRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string proposal_id = 3;
+  string request_id = 4;
+  IssueExecutionApproval approval = 5;
+}
+
+message AcceptChannelExecutionProposalResponse {
+  IssueExecutionProposal proposal = 1;
+  ApprovalOutcome outcome = 2;
+  string project_id = 3;
+  string run_id = 4;
+  IssueExecutionDispatch dispatch = 5;
+}
+
+message DeclineChannelProposalRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string proposal_id = 3;
+  string request_id = 4;
+}
+
+message DeclineChannelProposalResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_DECLINED = 1;
+    OUTCOME_ALREADY_DECLINED = 2;
+  }
+
+  Outcome outcome = 1;
+}
+
+message AcceptChannelSkillExecutionProposalRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string proposal_id = 3;
+  string request_id = 4;
+  optional string worker_id = 5;
+}
+
+message AcceptChannelSkillExecutionProposalResponse {
+  ApprovalOutcome outcome = 1;
+  AgentSkillExecutionProposal proposal = 2;
+  string project_id = 3;
+  optional ProjectAgentSession session = 4;
+}
+
+enum ChannelVisibility {
+  CHANNEL_VISIBILITY_UNSPECIFIED = 0;
+  CHANNEL_VISIBILITY_PUBLIC = 1;
+  CHANNEL_VISIBILITY_PRIVATE = 2;
+}
+
+enum ChannelKind {
+  CHANNEL_KIND_UNSPECIFIED = 0;
+  CHANNEL_KIND_CHANNEL = 1;
+  CHANNEL_KIND_DIRECT_MESSAGE = 2;
+}
+
+message DirectMessageParticipant {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_USER = 1;
+    KIND_AGENT = 2;
+  }
+
+  Kind kind = 1;
+  string id = 2;
+  string name = 3;
+  optional string image = 4;
+}
+
+message ChannelSummary {
+  string id = 1;
+  string organization_id = 2;
+  string slug = 3;
+  string name = 4;
+  optional string topic = 5;
+  ChannelVisibility visibility = 6;
+  optional string default_project_id = 7;
+  optional google.protobuf.Timestamp archived_at = 8;
+  uint32 member_count = 9;
+  uint32 agent_count = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  ChannelKind kind = 13;
+  optional google.protobuf.Timestamp last_message_at = 14;
+  optional string last_message_preview = 15;
+  optional google.protobuf.Timestamp last_read_at = 16;
+  bool has_unread = 17;
+  repeated DirectMessageParticipant direct_message_participants = 18;
+}
+
+message ChannelMember {
+  string user_id = 1;
+  string name = 2;
+  string email = 3;
+  optional string image = 4;
+  string role = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message ChannelMessageAuthor {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_USER = 1;
+    KIND_AGENT = 2;
+    KIND_WEBHOOK = 3;
+  }
+
+  Kind kind = 1;
+  optional string id = 2;
+  string name = 3;
+  optional string email = 4;
+  optional string image = 5;
+  optional string provider = 6;
+}
+
+message ChannelMessageReactionPerson {
+  string user_id = 1;
+  string name = 2;
+  optional string image = 3;
+}
+
+message ChannelMessageReaction {
+  string emoji = 1;
+  uint32 count = 2;
+  repeated string user_ids = 3;
+  repeated ChannelMessageReactionPerson people = 4;
+}
+
+message ChannelDocument {
+  string message_id = 1;
+  string title = 2;
+  optional string project_id = 3;
+}
+
+message ChannelMessage {
+  string id = 1;
+  string channel_id = 2;
+  optional string parent_message_id = 3;
+  string body = 4;
+  repeated MessageBlock blocks = 5;
+  ChannelMessageAuthor author = 6;
+  repeated string mentioned_user_ids = 7;
+  repeated string mentioned_agent_ids = 8;
+  repeated IssueAttachment attachments = 9;
+  repeated ChannelMessageReaction reactions = 10;
+  uint32 reply_count = 11;
+  optional google.protobuf.Timestamp last_reply_at = 12;
+  repeated ChannelMessageAuthor reply_authors = 13;
+  optional ChannelDocument document = 14;
+  optional ChannelProposal proposal = 15;
+  optional IssueExecutionProposal execution_proposal = 16;
+  optional AgentSkillExecutionProposal skill_execution_proposal = 17;
+  repeated IssueSubscriber subscribers = 18;
+  google.protobuf.Timestamp created_at = 19;
+  optional google.protobuf.Timestamp deleted_at = 20;
+}
+
+message ChannelIssueProposal {
+  string title = 1;
+  optional string description = 2;
+  optional uint32 priority = 3;
+  RunStatus status = 4;
+}
+
+message ChannelIssueProposalPayload {
+  ChannelIssueProposal issue = 1;
+  bool execute_after_create = 2;
+}
+
+message ChannelIssueBatchProposalItem {
+  string key = 1;
+  ChannelIssueProposal issue = 2;
+}
+
+message ChannelIssueBatchProposalDependency {
+  string prerequisite_key = 1;
+  string dependent_key = 2;
+}
+
+message ChannelIssueBatchProposalPayload {
+  repeated ChannelIssueBatchProposalItem items = 1;
+  repeated ChannelIssueBatchProposalDependency dependencies = 2;
+}
+
+message ChannelIssueBatchResultItem {
+  string local_key = 1;
+  string run_id = 2;
+}
+
+message ChannelProposal {
+  string id = 1;
+  ProposalStatus status = 2;
+  optional string project_id = 3;
+
+  oneof payload {
+    ChannelIssueProposalPayload issue = 4;
+    ChannelIssueBatchProposalPayload batch = 5;
+  }
+
+  optional string result_run_id = 6;
+  repeated ChannelIssueBatchResultItem result_items = 7;
+}
+
+message ChannelAgentReply {
+  string id = 1;
+  string agent_id = 2;
+  string channel_id = 3;
+  string trigger_message_id = 4;
+  string parent_message_id = 5;
+  string reply_message_id = 6;
+  ReplyJobStatus status = 7;
+  uint32 attempts = 8;
+  optional string error = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}

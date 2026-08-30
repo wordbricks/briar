@@ -1,3 +1,4 @@
+import Connect
 import Foundation
 
 enum MobileAPIContract {
@@ -369,6 +370,42 @@ struct CurrentUserResponse: Codable, Equatable, Sendable {
 }
 
 extension Project {
+    init(connectMessage message: BriarAPI_Project) throws {
+        guard
+            let id = UUID(uuidString: message.id),
+            let organizationID = UUID(uuidString: message.organizationID),
+            message.hasCreatedAt
+        else {
+            throw MobileAPIError.invalidResponse
+        }
+        let role: Role
+        switch message.role {
+        case .owner:
+            role = .owner
+        case .coOwner:
+            role = .coOwner
+        case .developer:
+            role = .developer
+        case .editor:
+            role = .editor
+        case .viewer:
+            role = .viewer
+        case .unspecified, .UNRECOGNIZED:
+            throw MobileAPIError.invalidResponse
+        }
+        self.init(
+            id: id,
+            name: message.name,
+            issueKeyPrefix: message.issueKeyPrefix,
+            scheduleTabEnabled: message.scheduleTabEnabled,
+            icon: message.hasIcon ? message.icon : nil,
+            organizationId: organizationID,
+            organizationName: message.organizationName,
+            role: role,
+            createdAt: message.createdAt.date
+        )
+    }
+
     var effectiveIssueKeyPrefix: String {
         let normalized = issueKeyPrefix.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         guard normalized.range(of: #"^[A-Z0-9]{1,3}$"#, options: .regularExpression) != nil
@@ -413,6 +450,29 @@ enum MobileAPIError: LocalizedError, Equatable {
     }
 }
 
+private extension MobileAPIError {
+    static func connect(_ error: ConnectError) -> MobileAPIError {
+        let status: Int
+        switch error.code {
+        case .invalidArgument:
+            status = 400
+        case .unauthenticated:
+            status = 401
+        case .permissionDenied:
+            status = 403
+        case .notFound:
+            status = 404
+        case .alreadyExists, .aborted:
+            status = 409
+        case .outOfRange, .failedPrecondition:
+            status = 410
+        default:
+            status = 500
+        }
+        return .httpStatus(status, error.message ?? "Connect request failed")
+    }
+}
+
 struct AuthenticatedMobileAPIOperation<Response: Decodable & Sendable>: Sendable {
     let id: String
     let method: String
@@ -426,6 +486,8 @@ struct PublicMobileAPIOperation<Response: Decodable & Sendable>: Sendable {
 }
 
 protocol MobileAPIClientProtocol: Sendable {
+    func listProjects(token: String) async throws -> ProjectsResponse
+
     func send<Response: Decodable & Sendable>(
         _ path: String,
         method: String,
@@ -523,6 +585,10 @@ extension MobileRealtimeClientProtocol {
 }
 
 extension MobileAPIClientProtocol {
+    func listProjects(token: String) async throws -> ProjectsResponse {
+        try await send(MobileAPIOperations.listProjects, token: token)
+    }
+
     func send<Response: Decodable & Sendable>(
         _ operation: AuthenticatedMobileAPIOperation<Response>,
         token: String
@@ -604,10 +670,37 @@ private struct EmptyAPIResponse: Decodable, Sendable {}
 struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, Sendable {
     let baseURL: URL
     let session: URLSession
+    private let projectService: BriarAPI_ProjectServiceClient
 
     init(baseURL: URL, session: URLSession = .shared) {
         self.baseURL = baseURL
         self.session = session
+        projectService = BriarAPI_ProjectServiceClient(
+            client: ProtocolClient(
+                httpClient: URLSessionHTTPClient(configuration: session.configuration),
+                config: ProtocolClientConfig(
+                    host: baseURL.absoluteString,
+                    networkProtocol: .connect,
+                    codec: ProtoCodec(),
+                    unaryGET: .disabled
+                )
+            )
+        )
+    }
+
+    func listProjects(token: String) async throws -> ProjectsResponse {
+        let response = await projectService.listProjects(
+            request: BriarAPI_ListProjectsRequest(),
+            headers: ["authorization": ["Bearer \(token)"]]
+        )
+        do {
+            let message = try response.result.get()
+            return ProjectsResponse(
+                projects: try message.projects.map { try Project(connectMessage: $0) }
+            )
+        } catch let error as ConnectError {
+            throw MobileAPIError.connect(error)
+        }
     }
 
     func get<Response: Decodable & Sendable>(

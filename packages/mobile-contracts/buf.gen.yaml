@@ -1,0 +1,19 @@
+version: v2
+clean: true
+plugins:
+  - remote: buf.build/bufbuild/es:v2.14.0
+    out: packages/mobile-contracts/src/gen
+    opt:
+      - target=ts
+  - remote: buf.build/apple/swift:v1.38.1
+    out: apps/briar/ios/BriarCompanion/App/Generated/Connect
+    opt:
+      - Visibility=Internal
+  - remote: buf.build/connectrpc/swift:v1.2.3
+    out: apps/briar/ios/BriarCompanion/App/Generated/Connect
+    opt:
+      - Visibility=Internal
+      - GenerateAsyncMethods=true
+      - GenerateCallbackMethods=false
+inputs:
+  - directory: packages/mobile-contracts/proto

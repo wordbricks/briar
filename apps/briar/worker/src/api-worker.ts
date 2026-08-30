@@ -88,6 +88,7 @@ import {
   HttpError,
   json,
 } from "./http-response";
+import { handleMobileConnectRequest } from "./mobile-connect";
 import {
   channelMutationOrganization,
   projectMutationProject,
@@ -627,6 +628,14 @@ export default {
           ? `http://${url.host}`
           : url.origin;
       const auth = createAuth(env, authOrigin, ctx);
+      const connectResponse = await handleMobileConnectRequest({
+        request,
+        auth,
+        db: env.DB,
+      });
+      // Connect uses POST for reads as well as writes. RPC implementations own
+      // mutation scheduling instead of relying on the legacy HTTP verb fallback.
+      if (connectResponse !== undefined) return connectResponse;
       const response = await route(
         request,
         auth,
