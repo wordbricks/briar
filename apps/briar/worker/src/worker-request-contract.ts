@@ -1,12 +1,6 @@
 import * as Schema from "effect/Schema";
-import {
-  AgentProviderCapabilityCatalog,
-  ModelEffort,
-} from "../../src/lib/agent-provider-contract";
-import {
-  agentProviders,
-  type AgentProvider,
-} from "../../src/lib/agent-provider";
+import { ModelEffort } from "../../src/lib/agent-provider-contract";
+import { agentProviders } from "../../src/lib/agent-provider";
 import { StructuredAgentResult } from "../../src/lib/agent-result";
 import {
   isWorkerEmoji,
@@ -36,64 +30,6 @@ export const IssueReplyClaimInput = strictSchema(Schema.Struct({
   workerId: trimmedText(1, 128),
   projectId: UuidString,
 }));
-
-const ProviderHealth = strictSchema(Schema.Struct({
-  installed: Schema.Boolean,
-  authenticated: Schema.Boolean,
-  healthy: Schema.Boolean,
-  reason: Schema.optional(
-    Schema.NullOr(Schema.Trim.check(Schema.isMaxLength(64))),
-  ),
-  usageExhausted: Schema.optional(Schema.Boolean),
-  maxUsedPercent: Schema.optional(Schema.NullOr(
-    Schema.Finite.check(
-      Schema.isGreaterThanOrEqualTo(0),
-      Schema.isLessThanOrEqualTo(100),
-    ),
-  )),
-}));
-
-const ProviderHealthFields = {
-  codex: ProviderHealth,
-  claude: ProviderHealth,
-  cursor: ProviderHealth,
-  grok: ProviderHealth,
-  agy: ProviderHealth,
-  opencode: ProviderHealth,
-  openrouter: ProviderHealth,
-} satisfies Record<AgentProvider, typeof ProviderHealth>;
-
-const ProviderHealthMap = strictSchema(Schema.Struct(ProviderHealthFields));
-
-const Versions = Schema.Record(
-  Schema.String,
-  Schema.String.check(Schema.isMaxLength(64)),
-).check(
-  Schema.makeFilter((versions) =>
-    Object.keys(versions)
-      .filter((key) => key.length > 64)
-      .map((key) => ({
-        path: [key],
-        issue: "Version keys must contain at most 64 characters",
-      }))
-  ),
-);
-
-const WorkerRuntimeMetadataFields = {
-  agentProvider: Schema.Literals(agentProviders),
-  providers: Schema.optional(
-    mutableArray(Schema.Literals(agentProviders)).check(
-      Schema.isMaxLength(agentProviders.length),
-    ),
-  ),
-  providerHealth: Schema.optional(ProviderHealthMap),
-  providerCapabilities: Schema.optional(AgentProviderCapabilityCatalog),
-  versions: defaulted(Versions, {}),
-} as const;
-
-export const WorkerRuntimeMetadata = strictSchema(Schema.Struct(
-  WorkerRuntimeMetadataFields,
-));
 
 const WorkerIcon = Schema.Union([
   strictSchema(Schema.Struct({

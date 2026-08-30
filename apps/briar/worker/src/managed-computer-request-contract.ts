@@ -1,7 +1,6 @@
 import * as Schema from "effect/Schema";
 import { strictSchema, trimmedText, UuidString } from "./schema-codecs";
 import { decodeRequestSync } from "./request-schema";
-import { WorkerRuntimeMetadata } from "./worker-request-contract";
 
 export const ManagedComputerPromotionValidation = strictSchema(Schema.Struct({
   code: trimmedText(1, 100),
@@ -19,19 +18,6 @@ export const ManagedComputerRetry = strictSchema(Schema.Struct({
 export const ManagedComputerSetupSession = strictSchema(Schema.Struct({
   projectId: UuidString,
   requestId: UuidString,
-}));
-
-export const ManagedComputerSetupBind = strictSchema(Schema.Struct({
-  setupToken: Schema.String.check(
-    Schema.isPattern(/^briar_setup_[A-Za-z0-9_-]{43}$/u),
-  ),
-  worker: WorkerRuntimeMetadata,
-}));
-
-export const ManagedComputerSetupAccess = strictSchema(Schema.Struct({
-  setupToken: Schema.String.check(
-    Schema.isPattern(/^briar_setup_[A-Za-z0-9_-]{43}$/u),
-  ),
 }));
 
 export const ManagedComputerRemoteSessionRequest = strictSchema(Schema.Struct({
@@ -88,12 +74,6 @@ export const decodeManagedComputerRetry = decodeRequestSync(
 );
 export const decodeManagedComputerSetupSession = decodeRequestSync(
   ManagedComputerSetupSession,
-);
-export const decodeManagedComputerSetupBind = decodeRequestSync(
-  ManagedComputerSetupBind,
-);
-export const decodeManagedComputerSetupAccess = decodeRequestSync(
-  ManagedComputerSetupAccess,
 );
 export const decodeManagedComputerRemoteSessionRequest = decodeRequestSync(
   ManagedComputerRemoteSessionRequest,

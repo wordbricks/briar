@@ -1,20 +1,9 @@
-import {
-  corsHeaders,
-  HttpError,
-  json,
-  privateNoStoreJson,
-} from "./http-response";
+import { HttpError, json } from "./http-response";
 import {
   decodeManagedComputerEnrollment,
-  decodeManagedComputerSetupAccess,
-  decodeManagedComputerSetupBind,
 } from "./managed-computer-request-contract";
 import { managedComputerById } from "./managed-computer-repository";
-import {
-  bindManagedComputerSetup,
-  enrollManagedComputer,
-  managedComputerSetupContext,
-} from "./managed-computer-service";
+import { enrollManagedComputer } from "./managed-computer-service";
 import {
   connectManagedComputerRemoteAgent,
   connectManagedComputerRemoteClient,
@@ -26,10 +15,7 @@ import {
   managedComputerSetupAgentToken,
 } from "./managed-computer-setup-relay-service";
 import { readJson } from "./request-readers";
-import { requireWorkerCredential } from "./worker-auth";
-import { workerJson } from "./worker-json";
-import { createGithubInstallationToken } from "./github-app-api";
-import { projectGithubIdentity } from "./project-github-application";
+import { requireWorkerCredential } from "./worker-route-auth";
 
 export type ManagedComputerRouteInput = {
   request: Request;
@@ -39,7 +25,8 @@ export type ManagedComputerRouteInput = {
 
 /**
  * Serve machine bootstrap and WebSocket upgrade routes that intentionally stay
- * outside Connect. Authenticated unary fleet control lives in FleetService.
+ * outside Connect. Authenticated unary setup and fleet control live in their
+ * generated Connect services.
  */
 export async function handleManagedComputerRoute(
   { request, db, env }: ManagedComputerRouteInput,
@@ -57,75 +44,6 @@ export async function handleManagedComputerRoute(
       observedAt: new Date().toISOString(),
     });
     return json(result);
-  }
-
-  const managedComputerSetupBindMatch = pathname.match(
-    /^\/managed-computers\/([0-9a-f-]+)\/setup\/bind$/u,
-  );
-  if (managedComputerSetupBindMatch && request.method === "POST") {
-    const principal = await requireWorkerCredential(db, request);
-    const input = decodeManagedComputerSetupBind(await readJson(request));
-    const observedAt = new Date().toISOString();
-    const result = await bindManagedComputerSetup(db, {
-      managedComputerId: managedComputerSetupBindMatch[1],
-      organizationId: principal.organizationId,
-      deviceId: principal.deviceId,
-      setupToken: input.setupToken,
-      worker: input.worker,
-      observedAt,
-    });
-    return Response.json({
-      managedComputerId: managedComputerSetupBindMatch[1],
-      organizationId: principal.organizationId,
-      projectId: result.session.project_id,
-      deviceId: principal.deviceId,
-      worker: workerJson(result.worker, observedAt),
-      duplicate: result.duplicate,
-    }, {
-      status: result.duplicate ? 200 : 201,
-      headers: { ...corsHeaders, "Cache-Control": "private, no-store" },
-    });
-  }
-
-  const managedComputerSetupContextMatch = pathname.match(
-    /^\/managed-computers\/([0-9a-f-]+)\/setup\/context$/u,
-  );
-  if (managedComputerSetupContextMatch && request.method === "POST") {
-    const principal = await requireWorkerCredential(db, request);
-    const input = decodeManagedComputerSetupAccess(await readJson(request));
-    const setupContext = await managedComputerSetupContext(db, {
-      managedComputerId: managedComputerSetupContextMatch[1],
-      organizationId: principal.organizationId,
-      deviceId: principal.deviceId,
-      setupToken: input.setupToken,
-      observedAt: new Date().toISOString(),
-    });
-    let repositoryCredential: Record<string, unknown> | undefined;
-    if (setupContext.settings.githubRepository) {
-      const identity = await projectGithubIdentity(db, {
-        id: setupContext.project.id,
-        organization_id: principal.organizationId,
-      });
-      const credential = await createGithubInstallationToken(env, identity);
-      repositoryCredential = {
-        project: {
-          id: setupContext.project.id,
-          organizationId: principal.organizationId,
-        },
-        repository: {
-          id: identity.repositoryId,
-          fullName: identity.repository,
-          cloneUrl: `https://github.com/${identity.repository}.git`,
-        },
-        username: "x-access-token",
-        password: credential.token,
-        expiresAt: credential.expiresAt,
-      };
-    }
-    return privateNoStoreJson({
-      ...setupContext,
-      ...(repositoryCredential ? { repositoryCredential } : {}),
-    });
   }
 
   const managedComputerSetupAgentMatch = pathname.match(
