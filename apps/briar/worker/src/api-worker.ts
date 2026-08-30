@@ -56,9 +56,6 @@ import { TranscriptRequestDecodeError } from "./transcript-request";
 import {
   RequestDecodeError,
 } from "./request-schema";
-import {
-  ProjectWorkflowInputError,
-} from "./run-request-contract";
 import { ManagedComputerServiceError } from "./managed-computer-service";
 import {
   OrganizationAgentContextCursorError,
@@ -605,13 +602,6 @@ export default {
         return json({
           message: "Invalid request",
           issues: formatSchemaIssue(error.cause.issue).issues,
-        }, 400);
-      }
-      if (error instanceof ProjectWorkflowInputError) {
-        return json({
-          message: error.message,
-          code: error.code,
-          issues: error.issues,
         }, 400);
       }
       if (error instanceof AutoHuntWorkflowValidationError) {
