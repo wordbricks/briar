@@ -52,7 +52,6 @@ import {
   decodeRunReworkInput,
   decodeUsageRangeDays,
   decodeWorkflowStageLifecycleInput,
-  parseProjectSettingsInput,
 } from "./run-request-contract";
 import {
   decodeProjectAgentScheduleRunCompletion,
@@ -521,62 +520,6 @@ describe("Worker HTTP contract", () => {
         prioritizeAgent: true,
       }),
     ).toEqual({ model: "mentioned-agent-skill", effort: "xhigh" });
-  });
-
-  it("classifies a malformed project workflow separately from checkpoint policy errors", () => {
-    expect(() =>
-      parseProjectSettingsInput({
-        velenOrg: null,
-        dataSource: null,
-        linear: { enabled: false, source: null, teamKey: null },
-        githubRepository: null,
-        workflow: {
-          version: 2,
-          requirements: [],
-          stages: [{ id: "implementing", label: "Implement", required: true }],
-          execution: {},
-          completion: { requiredStages: ["implementing"] },
-        },
-      })
-    ).toThrow(expect.objectContaining({
-      code: "INVALID_PROJECT_WORKFLOW",
-      issues: ["version 2 execution.checkpoints is required"],
-    }));
-  });
-
-  it("preserves structured issues for project workflow shape errors", () => {
-    const invalidWorkflow = {
-      version: 2,
-      strategy: "path",
-      commands: { setup: null, test: "bun test", typecheck: null },
-      stages: [{ id: "verify", label: "Verify", required: true }],
-      execution: {
-        mode: "checkpointed",
-        checkpoints: [{
-          key: "Invalid Key",
-          title: "Invalid checkpoint",
-          stage: "verify",
-          required: true,
-          command: "bun test",
-        }],
-      },
-      completion: { requiredStages: ["verify"] },
-    };
-
-    try {
-      parseProjectSettingsInput({ workflow: invalidWorkflow });
-      throw new Error("Expected parseProjectSettingsInput to fail");
-    } catch (error) {
-      expect(error).toMatchObject({
-        code: "INVALID_PROJECT_WORKFLOW",
-        message: "Invalid project workflow",
-        issues: expect.arrayContaining([
-          expect.objectContaining({
-            path: ["workflow", "execution", "checkpoints", 0, "key"],
-          }),
-        ]),
-      });
-    }
   });
 
   it("validates idempotent workflow stage lifecycle requests", () => {

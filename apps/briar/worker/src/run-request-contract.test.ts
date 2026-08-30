@@ -6,25 +6,6 @@ import {
 } from "./run-request-contract";
 
 describe("run request contract", () => {
-  it("preserves omitted nullable project settings", () => {
-    const settings = parseProjectSettingsInput({
-      linear: { enabled: false, source: null, teamKey: null },
-    });
-
-    expect(settings).toMatchObject({
-      linear: { enabled: false, source: null, teamKey: null },
-    });
-    expect(settings).not.toHaveProperty("velenOrg");
-    expect(settings).not.toHaveProperty("dataSource");
-    expect(settings).not.toHaveProperty("githubRepository");
-  });
-
-  it("maps non-workflow schema failures to request decode errors", () => {
-    expect(() => parseProjectSettingsInput({ velenOrg: 42 })).toThrow(
-      RequestDecodeError,
-    );
-  });
-
   it("canonicalizes project-owned workflow fields at the request boundary", () => {
     const settings = parseProjectSettingsInput({
       linear: { enabled: false, source: null, teamKey: null },

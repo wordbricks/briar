@@ -1,4 +1,3 @@
-import { canonicalizeCheckpointSet } from "../../src/lib/auto-hunt-contract";
 import { collectStorageMetrics } from "./archive";
 import type { BriarAuth } from "./auth";
 import {
@@ -15,41 +14,13 @@ import {
 import { getMergeQueueStatus } from "./merge-queue-status";
 import { hasOrganizationCapability } from "./organization-access";
 import { getProject } from "./project-command-repository";
-import {
-  getProjectSettings,
-  updateProjectMandatoryCheckpoints,
-  updateProjectSettings,
-  updateUserWorkflowCheckpointDefaults,
-} from "./project-settings-repository";
-import { settingsJson } from "./project-settings-json";
+import { validationCommandsFromStage } from "./project-configuration-application";
+import { getProjectSettings } from "./project-settings-repository";
 import { readJson } from "./request-readers";
-import {
-  decodeCheckpointPolicyInput,
-  parseProjectSettingsInput,
-} from "./run-request-contract";
 import { requireSession } from "./session-auth";
-import {
-  assertStoredCheckpointPoliciesCompatible,
-  checkpointPolicyJson,
-  isStoredWorkflowUnchanged,
-  loadWorkflowCheckpointPolicy,
-} from "./workflow-policy";
-import { decodeExecutionWorkerPolicy } from "./worker-request-contract";
-import {
-  getProjectExecutionWorkerPolicy,
-  updateProjectExecutionWorkerPolicy,
-} from "./workers";
 
 const DEFAULT_MERGE_QUEUE_QUIET_WINDOW_MS = 300_000;
 const DEFAULT_MERGE_QUEUE_MAX_BATCH_SIZE = 5;
-
-const validationCommandsFromStage = (
-  stage: { checks?: unknown } | undefined,
-) => stage && Array.isArray(stage.checks)
-  ? stage.checks.filter((check): check is string =>
-      typeof check === "string" && check.trim().length > 0
-    ).map((check) => check.trim())
-  : [];
 
 const mergeQueueProfileJson = (row: MergeQueueProfileRow | null) => row
   ? {
@@ -79,7 +50,6 @@ export async function handleProjectSettingsRoute(
   const { request, url, auth, db } = routeInput;
   const { pathname } = url;
 
-  const settingsMatch = pathname.match(/^\/projects\/([0-9a-f-]+)\/settings$/u);
   const mergeQueueProfileMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/merge-queue-profile$/u,
   );
@@ -218,69 +188,6 @@ export async function handleProjectSettingsRoute(
     return json({ profile: mergeQueueProfileJson(configured.profile) });
   }
 
-  const checkpointPolicyMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/checkpoint-policy$/u,
-  );
-  if (checkpointPolicyMatch && ["GET", "PUT"].includes(request.method)) {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      checkpointPolicyMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (request.method === "GET") {
-      return json({
-        checkpointPolicy: checkpointPolicyJson(
-          await loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
-        ),
-      });
-    }
-    const input = decodeCheckpointPolicyInput(await readJson(request));
-    if (
-      input.scope === "project" &&
-      !hasOrganizationCapability(project.member_role, "development:manage")
-    ) {
-      throw new HttpError(403, "Development management permission required");
-    }
-    const current = await loadWorkflowCheckpointPolicy(
-      db,
-      project.id,
-      session.user.id,
-    );
-    const checkpoints = canonicalizeCheckpointSet(
-      current.workflow,
-      input.checkpoints,
-      input.scope,
-    );
-    const updated = input.scope === "project"
-      ? await updateProjectMandatoryCheckpoints(
-          db,
-          project.id,
-          checkpoints,
-          input.expectedRevision,
-        )
-      : await updateUserWorkflowCheckpointDefaults(
-          db,
-          project.id,
-          session.user.id,
-          checkpoints,
-          input.expectedRevision,
-        );
-    if (!updated) {
-      throw new HttpError(
-        409,
-        "Checkpoint policy changed; reload before saving",
-        "CHECKPOINT_POLICY_CONFLICT",
-      );
-    }
-    return json({
-      checkpointPolicy: checkpointPolicyJson(
-        await loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
-      ),
-    });
-  }
-
   const storageMetricsMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/storage-metrics$/u,
   );
@@ -298,148 +205,4 @@ export async function handleProjectSettingsRoute(
     return json({ metrics: await collectStorageMetrics(db, project.id) });
   }
 
-  if (settingsMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, settingsMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const [settings, policy] = await Promise.all([
-      getProjectSettings(db, project.id),
-      loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
-    ]);
-    return json({
-      settings: settingsJson(settings, checkpointPolicyJson(policy)),
-    });
-  }
-  if (settingsMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, settingsMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
-      throw new HttpError(403, "Development management permission required");
-    }
-    const input = parseProjectSettingsInput(await readJson(request));
-    const currentSettings = await getProjectSettings(db, project.id);
-    const mergeQueueProfile = await getMergeQueueProfile(db, project.id);
-    if (
-      mergeQueueProfile?.enabled === 1 &&
-      !input.workflow.stages.some((stage) =>
-        stage.id === mergeQueueProfile.readiness_stage_id
-      )
-    ) {
-      throw new HttpError(
-        409,
-        "Disable the merge queue before removing its workflow boundary stage",
-        "MERGE_QUEUE_WORKFLOW_BOUNDARY_CONFLICT",
-      );
-    }
-    if (mergeQueueProfile?.enabled === 1) {
-      const boundary = input.workflow.stages.find((stage) =>
-        stage.id === mergeQueueProfile.readiness_stage_id
-      );
-      const storedCommands = JSON.parse(
-        mergeQueueProfile.validation_commands_json,
-      ) as string[];
-      if (
-        JSON.stringify(validationCommandsFromStage(boundary)) !==
-          JSON.stringify(storedCommands)
-      ) {
-        throw new HttpError(
-          409,
-          "Disable the merge queue before changing its workflow validation commands",
-          "MERGE_QUEUE_WORKFLOW_VALIDATION_CONFLICT",
-        );
-      }
-    }
-    if (
-      !isStoredWorkflowUnchanged(
-        currentSettings?.workflow_json,
-        input.workflow,
-      )
-    ) {
-      await assertStoredCheckpointPoliciesCompatible(
-        db,
-        project.id,
-        input.workflow,
-      );
-    }
-    const githubRepository = input.githubRepository
-      ? await (async () => {
-          const connection = await getGithubConnectionForOrganization(
-            db,
-            project.organization_id,
-          );
-          if (!connection) {
-            throw new HttpError(
-              409,
-              "Connect the organization GitHub App before selecting a project repository",
-              "GITHUB_APP_NOT_CONNECTED",
-            );
-          }
-          const repository = (await listGithubConnectionRepositories(
-            db,
-            connection.installation_id,
-          )).find((candidate) =>
-            candidate.full_name.toLowerCase() ===
-              input.githubRepository!.toLowerCase()
-          );
-          if (!repository) {
-            throw new HttpError(
-              409,
-              "The selected repository is not included in the GitHub App installation",
-              "GITHUB_REPOSITORY_NOT_INSTALLED",
-            );
-          }
-          return repository;
-        })()
-      : null;
-    const settings = await updateProjectSettings(db, project.id, {
-      velenOrg: input.velenOrg ?? null,
-      dataSource: input.dataSource ?? null,
-      linear: input.linear,
-      githubRepositoryId: githubRepository?.repository_id ?? null,
-      githubRepository: githubRepository?.full_name ?? null,
-      workflow: input.workflow,
-    });
-    const policy = await loadWorkflowCheckpointPolicy(
-      db,
-      project.id,
-      session.user.id,
-    );
-    return json({ settings: settingsJson(settings, checkpointPolicyJson(policy)) });
-  }
-
-  const executionPolicyMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/execution-policy$/u,
-  );
-  if (executionPolicyMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      executionPolicyMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    return json({
-      policy: await getProjectExecutionWorkerPolicy(db, project.id),
-    });
-  }
-  if (executionPolicyMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      executionPolicyMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
-      throw new HttpError(403, "Development management permission required");
-    }
-    const input = decodeExecutionWorkerPolicy(await readJson(request));
-    const policy = await updateProjectExecutionWorkerPolicy(db, project.id, {
-      ...input,
-      updatedByUserId: session.user.id,
-      observedAt: new Date().toISOString(),
-    });
-    return json({ policy });
-  }
 }

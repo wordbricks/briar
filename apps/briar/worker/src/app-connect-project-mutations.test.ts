@@ -1,6 +1,13 @@
 import { Code, createClient, ConnectError } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
-import { ProjectService } from "@briar/contracts/gen/briar/app/v1/project_pb";
+import {
+  ProjectExecutionWorkerPolicy_SelectionMode,
+  ProjectService,
+  UpdateCheckpointPolicyRequest_Scope,
+} from "@briar/contracts/gen/briar/app/v1/project_pb";
+import {
+  WorkflowCheckpoint_Position,
+} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
@@ -189,6 +196,126 @@ describe("ProjectService mutations", () => {
     const remaining = await owner.listProjects({}, options(tokens.owner));
     expect(remaining.projects).not.toContainEqual(
       expect.objectContaining({ id: projectId }),
+    );
+  });
+
+  it("guards configuration capabilities, revisions, and worker references", async () => {
+    const owner = client(tokens.owner);
+    const created = await owner.createProject(
+      { name: "Configured Project", organizationId },
+      options(tokens.owner),
+    );
+    const projectId = created.project?.id;
+    expect(projectId).toBeTruthy();
+    await db.batch(
+      [developerId, viewerId].map((userId) =>
+        db
+          .prepare(
+            `insert into briar_project_members (
+             project_id, organization_id, user_id, created_at, updated_at
+           ) values (?, ?, ?, ?, ?)`,
+          )
+          .bind(projectId, organizationId, userId, now, now),
+      ),
+    );
+
+    const settingsInput = {
+      projectId: projectId!,
+      linear: { enabled: false },
+      workflow: {
+        version: 2,
+        requirements: [],
+        stages: [{
+          id: "implementing",
+          label: "Implement",
+          required: true,
+          checks: ["bun test"],
+        }],
+        execution: { checkpoints: [] },
+        completion: { requiredStages: ["implementing"] },
+      },
+    };
+    const deniedSettings = await client(tokens.viewer)
+      .updateProjectSettings(settingsInput, options(tokens.viewer))
+      .catch((error: unknown) => error);
+    expect(deniedSettings).toBeInstanceOf(ConnectError);
+    expect((deniedSettings as ConnectError).code).toBe(Code.PermissionDenied);
+
+    const configured = await client(tokens.developer).updateProjectSettings(
+      settingsInput,
+      options(tokens.developer),
+    );
+    expect(configured.settings?.workflow?.stages).toEqual([
+      expect.objectContaining({ id: "implementing", checks: ["bun test"] }),
+    ]);
+    const revision = configured.settings?.checkpointPolicy?.projectRevision;
+    expect(revision).toBeDefined();
+    const checkpointUpdate = {
+      projectId: projectId!,
+      scope: UpdateCheckpointPolicyRequest_Scope.PROJECT,
+      checkpoints: [{
+        key: "review",
+        stage: "implementing",
+        position: WorkflowCheckpoint_Position.AFTER,
+      }],
+      expectedRevision: revision!,
+    };
+    const checkpointPolicy = await client(tokens.developer)
+      .updateCheckpointPolicy(checkpointUpdate, options(tokens.developer));
+    expect(checkpointPolicy.checkpointPolicy?.projectMandatory).toEqual([
+      expect.objectContaining({
+        key: "project-after-implementing",
+        stage: "implementing",
+        position: WorkflowCheckpoint_Position.AFTER,
+      }),
+    ]);
+    const staleCheckpointUpdate = await client(tokens.developer)
+      .updateCheckpointPolicy(checkpointUpdate, options(tokens.developer))
+      .catch((error: unknown) => error);
+    expect(staleCheckpointUpdate).toBeInstanceOf(ConnectError);
+    expect((staleCheckpointUpdate as ConnectError).code).toBe(
+      Code.FailedPrecondition,
+    );
+
+    await expect(
+      client(tokens.viewer).getProjectExecutionWorkerPolicy(
+        { projectId: projectId! },
+        options(tokens.viewer),
+      ),
+    ).resolves.toMatchObject({
+      policy: {
+        selectionMode: ProjectExecutionWorkerPolicy_SelectionMode.ANY,
+        allowedWorkerIds: [],
+      },
+    });
+    const deniedWorkerPolicy = await client(tokens.viewer)
+      .updateProjectExecutionWorkerPolicy(
+        {
+          projectId: projectId!,
+          selectionMode: ProjectExecutionWorkerPolicy_SelectionMode.ANY,
+        },
+        options(tokens.viewer),
+      )
+      .catch((error: unknown) => error);
+    expect(deniedWorkerPolicy).toBeInstanceOf(ConnectError);
+    expect((deniedWorkerPolicy as ConnectError).code).toBe(
+      Code.PermissionDenied,
+    );
+    const unknownWorker = await client(tokens.developer)
+      .updateProjectExecutionWorkerPolicy(
+        {
+          projectId: projectId!,
+          selectionMode:
+            ProjectExecutionWorkerPolicy_SelectionMode.ALLOWLIST,
+          defaultWorkerId: "missing-worker",
+          allowedWorkerIds: ["missing-worker"],
+        },
+        options(tokens.developer),
+      )
+      .catch((error: unknown) => error);
+    expect(unknownWorker).toBeInstanceOf(ConnectError);
+    expect((unknownWorker as ConnectError).code).toBe(
+      Code.FailedPrecondition,
     );
   });
 });

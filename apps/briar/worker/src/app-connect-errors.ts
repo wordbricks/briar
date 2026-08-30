@@ -5,6 +5,7 @@ import {
 import * as SchemaIssue from "effect/SchemaIssue";
 import { HttpError } from "./http-response";
 import { RequestDecodeError } from "./request-schema";
+import { ProjectWorkflowInputError } from "./run-request-contract";
 
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 
@@ -52,6 +53,15 @@ export const toConnectError = (error: unknown): ConnectError => {
         desc: ValidationErrorDetailSchema,
         value: { violations },
       }],
+      error,
+    );
+  }
+  if (error instanceof ProjectWorkflowInputError) {
+    return new ConnectError(
+      error.message,
+      Code.InvalidArgument,
+      undefined,
+      undefined,
       error,
     );
   }

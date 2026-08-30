@@ -40,17 +40,19 @@ import {
   DashboardWorker_State,
   DashboardWorkerSchema,
   IssueDependencyReferenceSchema,
-  LinearSettingsSchema,
-  ProjectExecutionWorkerPolicy_SelectionMode,
-  ProjectExecutionWorkerPolicySchema,
-  ProjectSettingsSchema,
   RunEventSchema,
   TrackerReferenceSchema,
   WaitingCheckpointSchema,
   WorkerIcon_Kind,
   WorkerIconSchema,
 } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
-import { ProjectSchema } from "@briar/contracts/gen/briar/app/v1/project_pb";
+import {
+  LinearSettingsSchema,
+  ProjectExecutionWorkerPolicy_SelectionMode,
+  ProjectExecutionWorkerPolicySchema,
+  ProjectSchema,
+  ProjectSettingsSchema,
+} from "@briar/contracts/gen/briar/app/v1/project_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
   AgentEffortCapabilitySchema,
@@ -377,6 +379,23 @@ type ProjectSettingsJson = ReturnType<typeof settingsJson> & {
   readonly checkpointPolicy?: ReturnType<typeof checkpointPolicyJson>;
 };
 
+export const appCheckpointPolicy = (
+  policy: ReturnType<typeof checkpointPolicyJson>,
+) => create(CheckpointPolicySchema, {
+  availableBoundaries: policy.availableBoundaries.map(
+    (boundary) => create(CheckpointBoundarySchema, {
+      stage: boundary.stage,
+      stageLabel: boundary.stageLabel,
+      position: checkpointPosition[boundary.position],
+    }),
+  ),
+  projectMandatory: policy.projectMandatory.map(appCheckpointSpec),
+  userDefaults: policy.userDefaults.map(appCheckpointSpec),
+  effective: policy.effective.map(appCheckpointSpec),
+  projectRevision: BigInt(policy.projectRevision),
+  userRevision: BigInt(policy.userRevision),
+});
+
 export const appProjectSettings = (
   settings: ProjectSettingsJson,
 ) => create(ProjectSettingsSchema, {
@@ -393,26 +412,7 @@ export const appProjectSettings = (
   githubRepository: settings.githubRepository ?? undefined,
   workflow: appWorkflow(settings.workflow),
   checkpointPolicy: settings.checkpointPolicy
-    ? create(CheckpointPolicySchema, {
-        availableBoundaries: settings.checkpointPolicy.availableBoundaries.map(
-          (boundary) => create(CheckpointBoundarySchema, {
-            stage: boundary.stage,
-            stageLabel: boundary.stageLabel,
-            position: checkpointPosition[boundary.position],
-          }),
-        ),
-        projectMandatory: settings.checkpointPolicy.projectMandatory.map(
-          appCheckpointSpec,
-        ),
-        userDefaults: settings.checkpointPolicy.userDefaults.map(
-          appCheckpointSpec,
-        ),
-        effective: settings.checkpointPolicy.effective.map(
-          appCheckpointSpec,
-        ),
-        projectRevision: BigInt(settings.checkpointPolicy.projectRevision),
-        userRevision: BigInt(settings.checkpointPolicy.userRevision),
-      })
+    ? appCheckpointPolicy(settings.checkpointPolicy)
     : undefined,
 });
 
