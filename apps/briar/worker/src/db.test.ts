@@ -30,7 +30,6 @@ import {
   claimNextProjectAgentTask,
   claimNextQueuedHuntRun,
   claimDueProjectAgentScheduleRun,
-  addOrganizationMember,
   completeProjectAgentScheduleRun,
   completeIssueResultReview,
   createOrganization,
@@ -3235,7 +3234,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(getProjectSettings(db, project.id)).resolves.toBeNull();
   });
 
-  it("shares organization projects with members without granting owner deletion", async () => {
+  it("scopes organization members to explicitly granted projects", async () => {
     await updateProjectSettings(db, projectId, {
       velenOrg: "example",
       dataSource: null,
@@ -3248,11 +3247,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       `
       insert into user (id, name, email, emailVerified, createdAt, updatedAt)
       values ('member', 'Member', 'member@example.com', 1, '${atMinute(0)}', '${atMinute(0)}');
+      insert into briar_organization_members
+        (organization_id, user_id, role, created_at, updated_at)
+      values ('${projectId}', 'member', 'developer', '${atMinute(0)}', '${atMinute(0)}');
+      insert into briar_project_members
+        (project_id, organization_id, user_id, created_at, updated_at)
+      values ('${projectId}', '${projectId}', 'member', '${atMinute(0)}', '${atMinute(0)}');
     `,
     );
-    await expect(
-      addOrganizationMember(db, projectId, "member@example.com", "developer"),
-    ).resolves.toBe("member");
 
     const projects = await listProjects(db, "member");
     expect(projects.map((project) => project.id)).toContain(projectId);
@@ -3609,9 +3611,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       organizationIds: [organization.id],
       projectIds: [project.id],
     });
-    await expect(
-      addOrganizationMember(db, organization.id, memberEmail, "developer"),
-    ).resolves.toBe(memberId);
+    await db.prepare(
+      `insert into briar_organization_members
+       (organization_id, user_id, role, created_at, updated_at)
+       values (?, ?, 'developer', ?, ?)`,
+    ).bind(organization.id, memberId, atMinute(0), atMinute(0)).run();
 
     await expect(deleteAccountData(db, {
       userId: ownerId,
@@ -3916,9 +3920,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       handle: "account-deletion-shared",
       ownerUserId: ownerId,
     });
-    await expect(
-      addOrganizationMember(db, organization.id, memberEmail, "developer"),
-    ).resolves.toBe(memberId);
+    await db.prepare(
+      `insert into briar_organization_members
+       (organization_id, user_id, role, created_at, updated_at)
+       values (?, ?, 'developer', ?, ?)`,
+    ).bind(organization.id, memberId, atMinute(0), atMinute(0)).run();
     const sharedProject = await createProject(db, {
       ownerUserId: ownerId,
       organizationId: organization.id,

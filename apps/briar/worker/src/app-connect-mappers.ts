@@ -53,6 +53,12 @@ import {
   ProjectSchema,
   ProjectSettingsSchema,
 } from "@briar/contracts/gen/briar/app/v1/project_pb";
+import {
+  OrganizationInvitationPreviewSchema,
+  OrganizationInvitationSchema,
+  OrganizationInvitationStatus,
+  OrganizationSchema,
+} from "@briar/contracts/gen/briar/app/v1/organization_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
   AgentEffortCapabilitySchema,
@@ -93,8 +99,10 @@ import type {
   issueConversationNotificationJson,
 } from "./issue-conversation-json";
 import type {
+  OrganizationInvitationRow,
   OrganizationMemberRow,
   OrganizationRole,
+  OrganizationRow,
 } from "./organization-repository";
 import type { ProjectRow } from "./project-repository";
 import type { settingsJson } from "./project-settings-json";
@@ -190,6 +198,74 @@ export const appOrganizationMember = (
     role: projectRole[member.role],
     createdAt: timestamp(member.created_at),
     projectIds: [...projectIds],
+  });
+
+export const appOrganization = (organization: OrganizationRow) =>
+  create(OrganizationSchema, {
+    id: organization.id,
+    name: organization.name,
+    handle: organization.handle,
+    logo: organization.logo ?? undefined,
+    role: projectRole[organization.role],
+    createdAt: timestamp(organization.created_at),
+  });
+
+const organizationInvitationStatus = (
+  invitation: OrganizationInvitationRow,
+  observedAt: string,
+) =>
+  invitation.revoked_at
+    ? OrganizationInvitationStatus.REVOKED
+    : invitation.accepted_at
+      ? OrganizationInvitationStatus.ACCEPTED
+      : invitation.expires_at <= observedAt
+        ? OrganizationInvitationStatus.EXPIRED
+        : OrganizationInvitationStatus.PENDING;
+
+const maskInvitationEmail = (email: string) => {
+  const [local = "", domain = ""] = email.split("@");
+  return `${local.slice(0, 1) || "*"}***@${domain}`;
+};
+
+export const appOrganizationInvitation = (
+  invitation: OrganizationInvitationRow,
+  observedAt: string,
+) =>
+  create(OrganizationInvitationSchema, {
+    id: invitation.id,
+    organizationId: invitation.organization_id,
+    organizationName: invitation.organization_name,
+    initialProjectId: invitation.initial_project_id,
+    initialProjectName: invitation.initial_project_name,
+    email: invitation.email_normalized,
+    emailHint: maskInvitationEmail(invitation.email_normalized),
+    role: projectRole[invitation.role],
+    status: organizationInvitationStatus(invitation, observedAt),
+    expiresAt: timestamp(invitation.expires_at),
+    acceptedAt: invitation.accepted_at
+      ? timestamp(invitation.accepted_at)
+      : undefined,
+    createdAt: timestamp(invitation.created_at),
+  });
+
+export const appOrganizationInvitationPreview = (
+  invitation: OrganizationInvitationRow,
+  observedAt: string,
+) =>
+  create(OrganizationInvitationPreviewSchema, {
+    id: invitation.id,
+    organizationId: invitation.organization_id,
+    organizationName: invitation.organization_name,
+    initialProjectId: invitation.initial_project_id,
+    initialProjectName: invitation.initial_project_name,
+    emailHint: maskInvitationEmail(invitation.email_normalized),
+    role: projectRole[invitation.role],
+    status: organizationInvitationStatus(invitation, observedAt),
+    expiresAt: timestamp(invitation.expires_at),
+    acceptedAt: invitation.accepted_at
+      ? timestamp(invitation.accepted_at)
+      : undefined,
+    createdAt: timestamp(invitation.created_at),
   });
 
 export const appStructuredResult = (result: StructuredAgentResult) =>

@@ -234,7 +234,6 @@ export {
   updateOrganization,
   updateOrganizationLogo,
   isOrganizationHandleAvailable,
-  addOrganizationMember,
   createOrganizationInvitation,
   revokeOrganizationInvitation,
   acceptOrganizationInvitation,

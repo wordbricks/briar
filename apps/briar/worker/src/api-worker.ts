@@ -19,7 +19,7 @@ import { handleChannelWebhookManagementRoute } from "./channel-webhook-managemen
 import { handleManagedComputerRoute } from "./managed-computer-routes";
 import { handleOrganizationChannelRoute } from "./organization-channel-routes";
 import { handleOrganizationWorkerRoute } from "./organization-worker-routes";
-import { handleOrganizationRoute } from "./organization-routes";
+import { handleOrganizationUsageRoute } from "./organization-usage-routes";
 import { handleProjectAgentRoute } from "./project-agent-routes";
 import { handleProjectAgentTaskWorkerRoute } from "./project-agent-task-worker-routes";
 import { handleProjectGithubRoute } from "./project-github-routes";
@@ -188,7 +188,7 @@ async function route(
   });
   if (managedComputerResponse !== undefined) return managedComputerResponse;
 
-  const organizationResponse = await handleOrganizationRoute({
+  const organizationResponse = await handleOrganizationUsageRoute({
     request,
     url,
     auth,

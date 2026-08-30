@@ -59,7 +59,6 @@ import {
   syncOrganizationChannels,
 } from "./organization-channel-routes";
 import { hasOrganizationCapability } from "./organization-access";
-import { organizationMemberJson } from "./organization-json";
 import {
   getOrganizationRole,
   listOrganizationMembers,
@@ -77,6 +76,7 @@ import { decodeRequestSync } from "./request-schema";
 import { UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
 import { toConnectError } from "./app-connect-errors";
+import { appOrganizationMember } from "./app-connect-mappers";
 
 export type AppConnectChannelInput = {
   readonly request: Request;
@@ -430,7 +430,7 @@ const createAppChannelService = (
     return responseMessage(
       ChannelService.method.listDirectMessageRecipients.output,
       {
-        members: members.map((member) => organizationMemberJson(member)),
+        members: members.map((member) => appOrganizationMember(member)),
         agents: agents.map(organizationAgentJson),
       },
     );

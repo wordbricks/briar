@@ -110,44 +110,6 @@ export async function isOrganizationHandleAvailable(
   return organization === null;
 }
 
-export async function addOrganizationMember(
-  db: D1Database,
-  organizationId: string,
-  email: string,
-  role: OrganizationAssignableRole,
-) {
-  const user = await db
-    .prepare(`select id from "user" where lower(email) = lower(?)`)
-    .bind(email)
-    .first<{ id: string }>();
-  if (!user) return null;
-  const now = new Date().toISOString();
-  await db.batch([
-    db.prepare(
-      `insert into briar_organization_members
-       (organization_id, user_id, role, created_at, updated_at)
-     values (?, ?, ?, ?, ?)
-     on conflict(organization_id, user_id) do update set
-       role = excluded.role, updated_at = excluded.updated_at
-     where briar_organization_members.role != 'owner'`,
-    )
-      .bind(organizationId, user.id, role, now, now),
-    db.prepare(
-      `insert into briar_project_members (
-         project_id, organization_id, user_id, created_at, updated_at
-       )
-       select project.id, project.organization_id, ?, ?, ?
-       from briar_projects project
-       join briar_organization_members member
-         on member.organization_id = project.organization_id
-        and member.user_id = ?
-       where project.organization_id = ?
-       on conflict (project_id, user_id) do nothing`,
-    ).bind(user.id, now, now, user.id, organizationId),
-  ]);
-  return user.id;
-}
-
 export async function createOrganizationInvitation(
   db: D1Database,
   input: {

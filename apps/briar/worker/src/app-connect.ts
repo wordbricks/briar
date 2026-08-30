@@ -8,6 +8,7 @@ import { registerAppChannelService } from "./app-connect-channel";
 import { registerAppDashboardService } from "./app-connect-dashboard";
 import { registerAppInboxService } from "./app-connect-inbox";
 import { registerAppIssueService } from "./app-connect-issue";
+import { registerAppOrganizationService } from "./app-connect-organization";
 import { registerAppRealtimeService } from "./app-connect-realtime";
 import {
   appConnectProjectServices,
@@ -50,6 +51,7 @@ export async function handleAppConnectRequest(
     db: input.env.DB,
   };
   registerAppAccountService(router, sharedInput);
+  registerAppOrganizationService(router, sharedInput);
   registerAppDashboardService(router, {
     ...sharedInput,
     archivesBucket: input.env.ARCHIVES,

@@ -1,8 +1,6 @@
 import { Code, createClient, ConnectError } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
-import {
-  AccountService,
-} from "@briar/contracts/gen/briar/app/v1/account_pb";
+import { ProjectService } from "@briar/contracts/gen/briar/app/v1/project_pb";
 import {
   ValidationErrorDetailSchema,
 } from "@briar/contracts/gen/briar/types/v1/error_pb";
@@ -18,8 +16,10 @@ describe("App Connect errors", () => {
   it("preserves validation details across the HTTP boundary", async () => {
     const services: AppConnectServices = {
       ...appConnectProjectServices,
-      requireSession: vi.fn(),
-      listProjects: vi.fn(),
+      requireSession: vi.fn(async () => ({
+        user: { id: "user-1" },
+      }) as never),
+      updateTabs: vi.fn(),
     };
     const transport = createConnectTransport({
       baseUrl: "https://api.example.test",
@@ -37,10 +37,11 @@ describe("App Connect errors", () => {
         return response ?? new Response(null, { status: 404 });
       },
     });
-    const client = createClient(AccountService, transport);
+    const client = createClient(ProjectService, transport);
 
-    const connectError = await client.listOrganizationMembers({
-      organizationId: "not-a-uuid",
+    const connectError = await client.updateProjectTabs({
+      projectId: "not-a-uuid",
+      schedule: true,
     }).catch((error: unknown) => error);
 
     expect(connectError).toBeInstanceOf(ConnectError);
@@ -51,11 +52,12 @@ describe("App Connect errors", () => {
         .findDetails(ValidationErrorDetailSchema),
     ).toMatchObject([{
       violations: [{
-        path: "organizationId",
+        path: "",
         rule: "schema",
         message: expect.any(String),
       }],
     }]);
-    expect(services.requireSession).not.toHaveBeenCalled();
+    expect(services.requireSession).toHaveBeenCalledOnce();
+    expect(services.updateTabs).not.toHaveBeenCalled();
   });
 });
