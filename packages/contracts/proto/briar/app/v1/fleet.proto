@@ -4,6 +4,7 @@ package briar.app.v1;
 
 import "briar/app/v1/dashboard.proto";
 import "briar/types/v1/provider.proto";
+import "briar/types/v1/worker.proto";
 import "google/protobuf/timestamp.proto";
 
 option swift_prefix = "BriarAPI_";
@@ -12,6 +13,9 @@ option swift_prefix = "BriarAPI_";
 // WebSocket upgrades for remote desktop and guided setup remain ordinary HTTP;
 // this service owns only their unary control-plane requests and tickets.
 service FleetService {
+  rpc RegisterProjectExecutionWorker(RegisterProjectExecutionWorkerRequest) returns (RegisterProjectExecutionWorkerResponse);
+  rpc BindProjectExecutionWorker(BindProjectExecutionWorkerRequest) returns (BindProjectExecutionWorkerResponse);
+  rpc UnbindProjectExecutionWorker(UnbindProjectExecutionWorkerRequest) returns (UnbindProjectExecutionWorkerResponse);
   rpc ListExecutionWorkers(ListExecutionWorkersRequest) returns (ListExecutionWorkersResponse);
   rpc RequestExecutionWorkerUpdate(RequestExecutionWorkerUpdateRequest) returns (RequestExecutionWorkerUpdateResponse);
   rpc UpdateExecutionWorker(UpdateExecutionWorkerRequest) returns (UpdateExecutionWorkerResponse);
@@ -27,6 +31,50 @@ service FleetService {
   rpc EndManagedComputerRemoteSession(EndManagedComputerRemoteSessionRequest) returns (EndManagedComputerRemoteSessionResponse);
   rpc CreateManagedComputerSetupSession(CreateManagedComputerSetupSessionRequest) returns (CreateManagedComputerSetupSessionResponse);
   rpc GetManagedComputerSetupStatus(GetManagedComputerSetupStatusRequest) returns (GetManagedComputerSetupStatusResponse);
+}
+
+message RegisterProjectExecutionWorkerRequest {
+  string project_id = 1;
+  string label = 2;
+  string device_identity = 3;
+  briar.types.v1.WorkerRuntimeAdvertisement runtime = 4;
+  optional uint32 max_concurrent_sessions = 5;
+}
+
+message RegisterProjectExecutionWorkerResponse {
+  string organization_id = 1;
+  string device_id = 2;
+  DashboardWorker worker = 3;
+  string worker_token = 4;
+}
+
+message BindProjectExecutionWorkerRequest {
+  string project_id = 1;
+  string device_identity = 2;
+  briar.types.v1.WorkerRuntimeAdvertisement runtime = 3;
+}
+
+message BindProjectExecutionWorkerResponse {
+  string organization_id = 1;
+  string device_id = 2;
+  DashboardWorker worker = 3;
+}
+
+message UnbindProjectExecutionWorkerRequest {
+  enum Reason {
+    REASON_UNSPECIFIED = 0;
+    REASON_EXPLICIT_USER_UNLINK = 1;
+    REASON_MANAGED_DEPROVISION = 2;
+  }
+
+  string project_id = 1;
+  string worker_id = 2;
+  string request_id = 3;
+  Reason reason = 4;
+}
+
+message UnbindProjectExecutionWorkerResponse {
+  bool already_unbound = 1;
 }
 
 enum ExecutionWorkerUpdateStatus {

@@ -15,6 +15,15 @@ import SwiftProtobuf
 public protocol BriarAPI_FleetServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
+    func `registerProjectExecutionWorker`(request: BriarAPI_RegisterProjectExecutionWorkerRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_RegisterProjectExecutionWorkerResponse>
+
+    @available(iOS 13, *)
+    func `bindProjectExecutionWorker`(request: BriarAPI_BindProjectExecutionWorkerRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_BindProjectExecutionWorkerResponse>
+
+    @available(iOS 13, *)
+    func `unbindProjectExecutionWorker`(request: BriarAPI_UnbindProjectExecutionWorkerRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UnbindProjectExecutionWorkerResponse>
+
+    @available(iOS 13, *)
     func `listExecutionWorkers`(request: BriarAPI_ListExecutionWorkersRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListExecutionWorkersResponse>
 
     @available(iOS 13, *)
@@ -66,6 +75,21 @@ public final class BriarAPI_FleetServiceClient: BriarAPI_FleetServiceClientInter
 
     public init(client: Connect.ProtocolClientInterface) {
         self.client = client
+    }
+
+    @available(iOS 13, *)
+    public func `registerProjectExecutionWorker`(request: BriarAPI_RegisterProjectExecutionWorkerRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RegisterProjectExecutionWorkerResponse> {
+        return await self.client.unary(path: "/briar.app.v1.FleetService/RegisterProjectExecutionWorker", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `bindProjectExecutionWorker`(request: BriarAPI_BindProjectExecutionWorkerRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_BindProjectExecutionWorkerResponse> {
+        return await self.client.unary(path: "/briar.app.v1.FleetService/BindProjectExecutionWorker", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `unbindProjectExecutionWorker`(request: BriarAPI_UnbindProjectExecutionWorkerRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UnbindProjectExecutionWorkerResponse> {
+        return await self.client.unary(path: "/briar.app.v1.FleetService/UnbindProjectExecutionWorker", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
@@ -145,6 +169,9 @@ public final class BriarAPI_FleetServiceClient: BriarAPI_FleetServiceClientInter
 
     public enum Metadata {
         public enum Methods {
+            public static let registerProjectExecutionWorker = Connect.MethodSpec(name: "RegisterProjectExecutionWorker", service: "briar.app.v1.FleetService", type: .unary)
+            public static let bindProjectExecutionWorker = Connect.MethodSpec(name: "BindProjectExecutionWorker", service: "briar.app.v1.FleetService", type: .unary)
+            public static let unbindProjectExecutionWorker = Connect.MethodSpec(name: "UnbindProjectExecutionWorker", service: "briar.app.v1.FleetService", type: .unary)
             public static let listExecutionWorkers = Connect.MethodSpec(name: "ListExecutionWorkers", service: "briar.app.v1.FleetService", type: .unary)
             public static let requestExecutionWorkerUpdate = Connect.MethodSpec(name: "RequestExecutionWorkerUpdate", service: "briar.app.v1.FleetService", type: .unary)
             public static let updateExecutionWorker = Connect.MethodSpec(name: "UpdateExecutionWorker", service: "briar.app.v1.FleetService", type: .unary)

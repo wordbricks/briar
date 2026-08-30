@@ -3,9 +3,12 @@ syntax = "proto3";
 package briar.worker.v1;
 
 import "briar/app/v1/issue.proto";
+import "briar/app/v1/dashboard.proto";
+import "briar/app/v1/fleet.proto";
 import "briar/types/v1/agent_event.proto";
 import "briar/types/v1/agent_execution.proto";
 import "briar/types/v1/provider.proto";
+import "briar/types/v1/worker.proto";
 import "briar/types/v1/workflow.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
@@ -19,6 +22,16 @@ service WorkerQueueService {
   rpc RenewWorkLease(RenewWorkLeaseRequest) returns (RenewWorkLeaseResponse);
   rpc HandoffWork(HandoffWorkRequest) returns (HandoffWorkResponse);
   rpc CompleteProjectAgentTask(CompleteProjectAgentTaskRequest) returns (CompleteProjectAgentTaskResponse);
+}
+
+// Worker-credential runtime control plane. Enrollment and project binding are
+// user-authenticated FleetService operations instead.
+service WorkerControlService {
+  rpc HeartbeatWorker(HeartbeatWorkerRequest) returns (HeartbeatWorkerResponse);
+  rpc UpdateWorkerLabel(UpdateWorkerLabelRequest) returns (UpdateWorkerLabelResponse);
+  rpc PrepareWorkerUpdateHandoff(PrepareWorkerUpdateHandoffRequest) returns (PrepareWorkerUpdateHandoffResponse);
+  rpc GetWorkerUpdateHandoff(GetWorkerUpdateHandoffRequest) returns (GetWorkerUpdateHandoffResponse);
+  rpc FailWorkerUpdateHandoff(FailWorkerUpdateHandoffRequest) returns (FailWorkerUpdateHandoffResponse);
 }
 
 // Execution-credential operations shared by the interactive CLI and the
@@ -223,6 +236,68 @@ message ProjectAgentTaskFailure {
 message CompleteProjectAgentTaskResponse {
   bool replayed = 1;
 }
+
+enum WorkerReadinessState {
+  WORKER_READINESS_STATE_UNSPECIFIED = 0;
+  WORKER_READINESS_STATE_READY = 1;
+  WORKER_READINESS_STATE_BUSY = 2;
+  WORKER_READINESS_STATE_NEEDS_ATTENTION = 3;
+}
+
+message HeartbeatWorkerRequest {
+  string worker_id = 1;
+  briar.types.v1.WorkerRuntimeAdvertisement runtime = 2;
+  bool refresh_maintenance = 3;
+  bool accepting_work = 4;
+  WorkerReadinessState readiness_state = 5;
+  optional string readiness_detail = 6;
+}
+
+message HeartbeatWorkerResponse {
+  briar.app.v1.DashboardWorker worker = 1;
+  repeated briar.types.v1.WorkflowRequirement workflow_requirements = 2;
+  optional briar.app.v1.ExecutionWorkerUpdateRequestState update_directive = 3;
+}
+
+message UpdateWorkerLabelRequest {
+  string worker_id = 1;
+  string label = 2;
+}
+
+message UpdateWorkerLabelResponse {
+  string device_id = 1;
+  string label = 2;
+}
+
+message PrepareWorkerUpdateHandoffRequest {
+  string worker_id = 1;
+  string target_version = 2;
+}
+
+message PrepareWorkerUpdateHandoffResponse {
+  briar.app.v1.ExecutionWorkerUpdateRequestState update = 1;
+  uint32 active_work_count = 2;
+  bool ready = 3;
+}
+
+message GetWorkerUpdateHandoffRequest {
+  string worker_id = 1;
+  optional string request_id = 2;
+}
+
+message GetWorkerUpdateHandoffResponse {
+  optional briar.app.v1.ExecutionWorkerUpdateRequestState update = 1;
+  uint32 active_work_count = 2;
+  bool ready = 3;
+}
+
+message FailWorkerUpdateHandoffRequest {
+  string worker_id = 1;
+  string request_id = 2;
+  string error = 3;
+}
+
+message FailWorkerUpdateHandoffResponse {}
 
 message ClaimedHandoffContext {
   enum WorkKind {

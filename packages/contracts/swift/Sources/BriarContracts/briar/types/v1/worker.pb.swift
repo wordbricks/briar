@@ -152,6 +152,72 @@ public nonisolated struct BriarTypes_RemoteUpdateCapability: Sendable {
   fileprivate var _protocol: UInt32? = nil
 }
 
+public nonisolated struct BriarTypes_AgentProviderHealth: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var provider: BriarTypes_AgentProvider = .unspecified
+
+  public var installed: Bool = false
+
+  public var authenticated: Bool = false
+
+  public var healthy: Bool = false
+
+  public var reason: String {
+    get {_reason ?? String()}
+    set {_reason = newValue}
+  }
+  /// Returns true if `reason` has been explicitly set.
+  public var hasReason: Bool {self._reason != nil}
+  /// Clears the value of `reason`. Subsequent reads from it will return its default value.
+  public mutating func clearReason() {self._reason = nil}
+
+  public var usageExhausted: Bool = false
+
+  public var maxUsedPercent: Double {
+    get {_maxUsedPercent ?? 0}
+    set {_maxUsedPercent = newValue}
+  }
+  /// Returns true if `maxUsedPercent` has been explicitly set.
+  public var hasMaxUsedPercent: Bool {self._maxUsedPercent != nil}
+  /// Clears the value of `maxUsedPercent`. Subsequent reads from it will return its default value.
+  public mutating func clearMaxUsedPercent() {self._maxUsedPercent = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _reason: String? = nil
+  fileprivate var _maxUsedPercent: Double? = nil
+}
+
+public nonisolated struct BriarTypes_WorkflowRequirementHealth: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String = String()
+
+  public var healthy: Bool = false
+
+  public var detail: String {
+    get {_detail ?? String()}
+    set {_detail = newValue}
+  }
+  /// Returns true if `detail` has been explicitly set.
+  public var hasDetail: Bool {self._detail != nil}
+  /// Clears the value of `detail`. Subsequent reads from it will return its default value.
+  public mutating func clearDetail() {self._detail = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _detail: String? = nil
+}
+
 public nonisolated struct BriarTypes_WorkerCapabilities: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -168,11 +234,54 @@ public nonisolated struct BriarTypes_WorkerCapabilities: Sendable {
   /// Clears the value of `remoteUpdates`. Subsequent reads from it will return its default value.
   public mutating func clearRemoteUpdates() {self._remoteUpdates = nil}
 
+  public var worktrees: Bool = false
+
+  public var organizationAgentContextProtocol: UInt32 {
+    get {_organizationAgentContextProtocol ?? 0}
+    set {_organizationAgentContextProtocol = newValue}
+  }
+  /// Returns true if `organizationAgentContextProtocol` has been explicitly set.
+  public var hasOrganizationAgentContextProtocol: Bool {self._organizationAgentContextProtocol != nil}
+  /// Clears the value of `organizationAgentContextProtocol`. Subsequent reads from it will return its default value.
+  public mutating func clearOrganizationAgentContextProtocol() {self._organizationAgentContextProtocol = nil}
+
+  public var workflowRequirements: [BriarTypes_WorkflowRequirementHealth] = []
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _remoteUpdates: BriarTypes_RemoteUpdateCapability? = nil
+  fileprivate var _organizationAgentContextProtocol: UInt32? = nil
+}
+
+public nonisolated struct BriarTypes_WorkerRuntimeAdvertisement: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var agentProvider: BriarTypes_AgentProvider = .unspecified
+
+  public var providers: [BriarTypes_AgentProvider] = []
+
+  public var providerHealth: [BriarTypes_AgentProviderHealth] = []
+
+  public var capabilities: BriarTypes_WorkerCapabilities {
+    get {_capabilities ?? BriarTypes_WorkerCapabilities()}
+    set {_capabilities = newValue}
+  }
+  /// Returns true if `capabilities` has been explicitly set.
+  public var hasCapabilities: Bool {self._capabilities != nil}
+  /// Clears the value of `capabilities`. Subsequent reads from it will return its default value.
+  public mutating func clearCapabilities() {self._capabilities = nil}
+
+  public var versions: Dictionary<String,String> = [:]
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _capabilities: BriarTypes_WorkerCapabilities? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -375,9 +484,117 @@ nonisolated extension BriarTypes_RemoteUpdateCapability: SwiftProtobuf.Message, 
   }
 }
 
+nonisolated extension BriarTypes_AgentProviderHealth: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".AgentProviderHealth"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}provider\0\u{1}installed\0\u{1}authenticated\0\u{1}healthy\0\u{1}reason\0\u{3}usage_exhausted\0\u{3}max_used_percent\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.installed) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.authenticated) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.healthy) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._reason) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.usageExhausted) }()
+      case 7: try { try decoder.decodeSingularDoubleField(value: &self._maxUsedPercent) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 1)
+    }
+    if self.installed != false {
+      try visitor.visitSingularBoolField(value: self.installed, fieldNumber: 2)
+    }
+    if self.authenticated != false {
+      try visitor.visitSingularBoolField(value: self.authenticated, fieldNumber: 3)
+    }
+    if self.healthy != false {
+      try visitor.visitSingularBoolField(value: self.healthy, fieldNumber: 4)
+    }
+    try { if let v = self._reason {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
+    if self.usageExhausted != false {
+      try visitor.visitSingularBoolField(value: self.usageExhausted, fieldNumber: 6)
+    }
+    try { if let v = self._maxUsedPercent {
+      try visitor.visitSingularDoubleField(value: v, fieldNumber: 7)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarTypes_AgentProviderHealth, rhs: BriarTypes_AgentProviderHealth) -> Bool {
+    if lhs.provider != rhs.provider {return false}
+    if lhs.installed != rhs.installed {return false}
+    if lhs.authenticated != rhs.authenticated {return false}
+    if lhs.healthy != rhs.healthy {return false}
+    if lhs._reason != rhs._reason {return false}
+    if lhs.usageExhausted != rhs.usageExhausted {return false}
+    if lhs._maxUsedPercent != rhs._maxUsedPercent {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarTypes_WorkflowRequirementHealth: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WorkflowRequirementHealth"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}healthy\0\u{1}detail\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.healthy) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._detail) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if self.healthy != false {
+      try visitor.visitSingularBoolField(value: self.healthy, fieldNumber: 2)
+    }
+    try { if let v = self._detail {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarTypes_WorkflowRequirementHealth, rhs: BriarTypes_WorkflowRequirementHealth) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.healthy != rhs.healthy {return false}
+    if lhs._detail != rhs._detail {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WorkerCapabilities"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}provider_capabilities\0\u{3}remote_updates\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}provider_capabilities\0\u{3}remote_updates\0\u{1}worktrees\0\u{3}organization_agent_context_protocol\0\u{3}workflow_requirements\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -387,6 +604,9 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedMessageField(value: &self.providerCapabilities) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._remoteUpdates) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.worktrees) }()
+      case 4: try { try decoder.decodeSingularUInt32Field(value: &self._organizationAgentContextProtocol) }()
+      case 5: try { try decoder.decodeRepeatedMessageField(value: &self.workflowRequirements) }()
       default: break
       }
     }
@@ -403,12 +623,78 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
     try { if let v = self._remoteUpdates {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
+    if self.worktrees != false {
+      try visitor.visitSingularBoolField(value: self.worktrees, fieldNumber: 3)
+    }
+    try { if let v = self._organizationAgentContextProtocol {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 4)
+    } }()
+    if !self.workflowRequirements.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.workflowRequirements, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarTypes_WorkerCapabilities, rhs: BriarTypes_WorkerCapabilities) -> Bool {
     if lhs.providerCapabilities != rhs.providerCapabilities {return false}
     if lhs._remoteUpdates != rhs._remoteUpdates {return false}
+    if lhs.worktrees != rhs.worktrees {return false}
+    if lhs._organizationAgentContextProtocol != rhs._organizationAgentContextProtocol {return false}
+    if lhs.workflowRequirements != rhs.workflowRequirements {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarTypes_WorkerRuntimeAdvertisement: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WorkerRuntimeAdvertisement"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}agent_provider\0\u{1}providers\0\u{3}provider_health\0\u{1}capabilities\0\u{1}versions\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.agentProvider) }()
+      case 2: try { try decoder.decodeRepeatedEnumField(value: &self.providers) }()
+      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.providerHealth) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._capabilities) }()
+      case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.versions) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.agentProvider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.agentProvider, fieldNumber: 1)
+    }
+    if !self.providers.isEmpty {
+      try visitor.visitPackedEnumField(value: self.providers, fieldNumber: 2)
+    }
+    if !self.providerHealth.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.providerHealth, fieldNumber: 3)
+    }
+    try { if let v = self._capabilities {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    if !self.versions.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.versions, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarTypes_WorkerRuntimeAdvertisement, rhs: BriarTypes_WorkerRuntimeAdvertisement) -> Bool {
+    if lhs.agentProvider != rhs.agentProvider {return false}
+    if lhs.providers != rhs.providers {return false}
+    if lhs.providerHealth != rhs.providerHealth {return false}
+    if lhs._capabilities != rhs._capabilities {return false}
+    if lhs.versions != rhs.versions {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

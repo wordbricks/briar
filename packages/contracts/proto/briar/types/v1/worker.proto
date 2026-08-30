@@ -34,7 +34,34 @@ message RemoteUpdateCapability {
   optional uint32 protocol = 2;
 }
 
+message AgentProviderHealth {
+  AgentProvider provider = 1;
+  bool installed = 2;
+  bool authenticated = 3;
+  bool healthy = 4;
+  optional string reason = 5;
+  bool usage_exhausted = 6;
+  optional double max_used_percent = 7;
+}
+
+message WorkflowRequirementHealth {
+  string id = 1;
+  bool healthy = 2;
+  optional string detail = 3;
+}
+
 message WorkerCapabilities {
   repeated AgentProviderCapability provider_capabilities = 1;
   optional RemoteUpdateCapability remote_updates = 2;
+  bool worktrees = 3;
+  optional uint32 organization_agent_context_protocol = 4;
+  repeated WorkflowRequirementHealth workflow_requirements = 5;
+}
+
+message WorkerRuntimeAdvertisement {
+  AgentProvider agent_provider = 1;
+  repeated AgentProvider providers = 2;
+  repeated AgentProviderHealth provider_health = 3;
+  WorkerCapabilities capabilities = 4;
+  map<string, string> versions = 5;
 }

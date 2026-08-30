@@ -22,6 +22,12 @@ import SwiftProtobuf
 /// `@unchecked Sendable` conformance to simplify testing and mocking.
 @available(iOS 13, *)
 open class BriarAPI_FleetServiceClientMock: BriarAPI_FleetServiceClientInterface, @unchecked Sendable {
+    /// Mocked for async calls to `registerProjectExecutionWorker()`.
+    public var mockAsyncRegisterProjectExecutionWorker = { (_: BriarAPI_RegisterProjectExecutionWorkerRequest) -> ResponseMessage<BriarAPI_RegisterProjectExecutionWorkerResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `bindProjectExecutionWorker()`.
+    public var mockAsyncBindProjectExecutionWorker = { (_: BriarAPI_BindProjectExecutionWorkerRequest) -> ResponseMessage<BriarAPI_BindProjectExecutionWorkerResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `unbindProjectExecutionWorker()`.
+    public var mockAsyncUnbindProjectExecutionWorker = { (_: BriarAPI_UnbindProjectExecutionWorkerRequest) -> ResponseMessage<BriarAPI_UnbindProjectExecutionWorkerResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `listExecutionWorkers()`.
     public var mockAsyncListExecutionWorkers = { (_: BriarAPI_ListExecutionWorkersRequest) -> ResponseMessage<BriarAPI_ListExecutionWorkersResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `requestExecutionWorkerUpdate()`.
@@ -54,6 +60,18 @@ open class BriarAPI_FleetServiceClientMock: BriarAPI_FleetServiceClientInterface
     public var mockAsyncGetManagedComputerSetupStatus = { (_: BriarAPI_GetManagedComputerSetupStatusRequest) -> ResponseMessage<BriarAPI_GetManagedComputerSetupStatusResponse> in .init(result: .success(.init())) }
 
     public init() {}
+
+    open func `registerProjectExecutionWorker`(request: BriarAPI_RegisterProjectExecutionWorkerRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RegisterProjectExecutionWorkerResponse> {
+        return self.mockAsyncRegisterProjectExecutionWorker(request)
+    }
+
+    open func `bindProjectExecutionWorker`(request: BriarAPI_BindProjectExecutionWorkerRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_BindProjectExecutionWorkerResponse> {
+        return self.mockAsyncBindProjectExecutionWorker(request)
+    }
+
+    open func `unbindProjectExecutionWorker`(request: BriarAPI_UnbindProjectExecutionWorkerRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UnbindProjectExecutionWorkerResponse> {
+        return self.mockAsyncUnbindProjectExecutionWorker(request)
+    }
 
     open func `listExecutionWorkers`(request: BriarAPI_ListExecutionWorkersRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListExecutionWorkersResponse> {
         return self.mockAsyncListExecutionWorkers(request)

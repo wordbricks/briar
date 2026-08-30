@@ -7502,6 +7502,475 @@ pub const __REMOTE_UPDATE_CAPABILITY_JSON_ANY: ::buffa::type_registry::JsonAnyEn
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
+pub struct AgentProviderHealth {
+    /// Field 1: `provider`
+    #[serde(
+        rename = "provider",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub provider: ::buffa::EnumValue<AgentProvider>,
+    /// Field 2: `installed`
+    #[serde(
+        rename = "installed",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub installed: bool,
+    /// Field 3: `authenticated`
+    #[serde(
+        rename = "authenticated",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub authenticated: bool,
+    /// Field 4: `healthy`
+    #[serde(
+        rename = "healthy",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub healthy: bool,
+    /// Field 5: `reason`
+    #[serde(rename = "reason", skip_serializing_if = "::core::option::Option::is_none")]
+    pub reason: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 6: `usage_exhausted`
+    #[serde(
+        rename = "usageExhausted",
+        alias = "usage_exhausted",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub usage_exhausted: bool,
+    /// Field 7: `max_used_percent`
+    #[serde(
+        rename = "maxUsedPercent",
+        alias = "max_used_percent",
+        with = "::buffa::json_helpers::opt_double",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub max_used_percent: ::core::option::Option<f64>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AgentProviderHealth {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AgentProviderHealth")
+            .field("provider", &self.provider)
+            .field("installed", &self.installed)
+            .field("authenticated", &self.authenticated)
+            .field("healthy", &self.healthy)
+            .field("reason", &self.reason)
+            .field("usage_exhausted", &self.usage_exhausted)
+            .field("max_used_percent", &self.max_used_percent)
+            .finish()
+    }
+}
+impl AgentProviderHealth {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentProviderHealth";
+}
+impl AgentProviderHealth {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::reason`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_reason(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.reason = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::max_used_percent`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_max_used_percent(mut self, value: f64) -> Self {
+        self.max_used_percent = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(AgentProviderHealth);
+impl ::buffa::MessageName for AgentProviderHealth {
+    const PACKAGE: &'static str = "briar.types.v1";
+    const NAME: &'static str = "AgentProviderHealth";
+    const FULL_NAME: &'static str = "briar.types.v1.AgentProviderHealth";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentProviderHealth";
+}
+impl ::buffa::Message for AgentProviderHealth {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        {
+            let val = self.provider.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.installed {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.authenticated {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.healthy {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if let Some(ref v) = self.reason {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if self.usage_exhausted {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.max_used_percent.is_some() {
+            size += 1u64 + ::buffa::types::FIXED64_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.provider.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if self.installed {
+            ::buffa::types::put_bool_field(2u32, self.installed, buf);
+        }
+        if self.authenticated {
+            ::buffa::types::put_bool_field(3u32, self.authenticated, buf);
+        }
+        if self.healthy {
+            ::buffa::types::put_bool_field(4u32, self.healthy, buf);
+        }
+        if let Some(ref v) = self.reason {
+            ::buffa::types::put_string_field(5u32, v, buf);
+        }
+        if self.usage_exhausted {
+            ::buffa::types::put_bool_field(6u32, self.usage_exhausted, buf);
+        }
+        if let Some(v) = self.max_used_percent {
+            ::buffa::types::put_double_field(7u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.provider = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.installed = ::buffa::types::decode_bool(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.authenticated = ::buffa::types::decode_bool(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.healthy = ::buffa::types::decode_bool(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.reason.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.usage_exhausted = ::buffa::types::decode_bool(buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.max_used_percent = ::core::option::Option::Some(
+                    ::buffa::types::decode_double(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.provider = ::buffa::EnumValue::from(0);
+        self.installed = false;
+        self.authenticated = false;
+        self.healthy = false;
+        self.reason = ::core::option::Option::None;
+        self.usage_exhausted = false;
+        self.max_used_percent = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AgentProviderHealth {
+    const PROTO_FQN: &'static str = "briar.types.v1.AgentProviderHealth";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AgentProviderHealth {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __AGENT_PROVIDER_HEALTH_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.types.v1.AgentProviderHealth",
+    to_json: ::buffa::type_registry::any_to_json::<AgentProviderHealth>,
+    from_json: ::buffa::type_registry::any_from_json::<AgentProviderHealth>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct WorkflowRequirementHealth {
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// Field 2: `healthy`
+    #[serde(
+        rename = "healthy",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub healthy: bool,
+    /// Field 3: `detail`
+    #[serde(rename = "detail", skip_serializing_if = "::core::option::Option::is_none")]
+    pub detail: ::core::option::Option<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for WorkflowRequirementHealth {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("WorkflowRequirementHealth")
+            .field("id", &self.id)
+            .field("healthy", &self.healthy)
+            .field("detail", &self.detail)
+            .finish()
+    }
+}
+impl WorkflowRequirementHealth {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkflowRequirementHealth";
+}
+impl WorkflowRequirementHealth {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::detail`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_detail(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.detail = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(WorkflowRequirementHealth);
+impl ::buffa::MessageName for WorkflowRequirementHealth {
+    const PACKAGE: &'static str = "briar.types.v1";
+    const NAME: &'static str = "WorkflowRequirementHealth";
+    const FULL_NAME: &'static str = "briar.types.v1.WorkflowRequirementHealth";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkflowRequirementHealth";
+}
+impl ::buffa::Message for WorkflowRequirementHealth {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if self.healthy {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if let Some(ref v) = self.detail {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        if self.healthy {
+            ::buffa::types::put_bool_field(2u32, self.healthy, buf);
+        }
+        if let Some(ref v) = self.detail {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.healthy = ::buffa::types::decode_bool(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.detail.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.healthy = false;
+        self.detail = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for WorkflowRequirementHealth {
+    const PROTO_FQN: &'static str = "briar.types.v1.WorkflowRequirementHealth";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for WorkflowRequirementHealth {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __WORKFLOW_REQUIREMENT_HEALTH_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.types.v1.WorkflowRequirementHealth",
+    to_json: ::buffa::type_registry::any_to_json::<WorkflowRequirementHealth>,
+    from_json: ::buffa::type_registry::any_from_json::<WorkflowRequirementHealth>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
 pub struct WorkerCapabilities {
     /// Field 1: `provider_capabilities`
     #[serde(
@@ -7521,6 +7990,29 @@ pub struct WorkerCapabilities {
         RemoteUpdateCapability,
         ::buffa::Inline<RemoteUpdateCapability>,
     >,
+    /// Field 3: `worktrees`
+    #[serde(
+        rename = "worktrees",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub worktrees: bool,
+    /// Field 4: `organization_agent_context_protocol`
+    #[serde(
+        rename = "organizationAgentContextProtocol",
+        alias = "organization_agent_context_protocol",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub organization_agent_context_protocol: ::core::option::Option<u32>,
+    /// Field 5: `workflow_requirements`
+    #[serde(
+        rename = "workflowRequirements",
+        alias = "workflow_requirements",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub workflow_requirements: ::buffa::alloc::vec::Vec<WorkflowRequirementHealth>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -7530,6 +8022,12 @@ impl ::core::fmt::Debug for WorkerCapabilities {
         f.debug_struct("WorkerCapabilities")
             .field("provider_capabilities", &self.provider_capabilities)
             .field("remote_updates", &self.remote_updates)
+            .field("worktrees", &self.worktrees)
+            .field(
+                "organization_agent_context_protocol",
+                &self.organization_agent_context_protocol,
+            )
+            .field("workflow_requirements", &self.workflow_requirements)
             .finish()
     }
 }
@@ -7539,6 +8037,15 @@ impl WorkerCapabilities {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkerCapabilities";
+}
+impl WorkerCapabilities {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::organization_agent_context_protocol`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_organization_agent_context_protocol(mut self, value: u32) -> Self {
+        self.organization_agent_context_protocol = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(WorkerCapabilities);
 impl ::buffa::MessageName for WorkerCapabilities {
@@ -7576,6 +8083,20 @@ impl ::buffa::Message for WorkerCapabilities {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.worktrees {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if let Some(v) = self.organization_agent_context_protocol {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+        }
+        for v in &self.workflow_requirements {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -7601,6 +8122,20 @@ impl ::buffa::Message for WorkerCapabilities {
                 buf,
             );
             self.remote_updates.write_to(__cache, buf);
+        }
+        if self.worktrees {
+            ::buffa::types::put_bool_field(3u32, self.worktrees, buf);
+        }
+        if let Some(v) = self.organization_agent_context_protocol {
+            ::buffa::types::put_uint32_field(4u32, v, buf);
+        }
+        for v in &self.workflow_requirements {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7638,6 +8173,34 @@ impl ::buffa::Message for WorkerCapabilities {
                     ctx,
                 )?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.worktrees = ::buffa::types::decode_bool(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.organization_agent_context_protocol = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.workflow_requirements.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7648,6 +8211,9 @@ impl ::buffa::Message for WorkerCapabilities {
     fn clear(&mut self) {
         self.provider_capabilities.clear();
         self.remote_updates = ::buffa::MessageField::none();
+        self.worktrees = false;
+        self.organization_agent_context_protocol = ::core::option::Option::None;
+        self.workflow_requirements.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -7678,6 +8244,317 @@ pub const __WORKER_CAPABILITIES_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
     type_url: "type.googleapis.com/briar.types.v1.WorkerCapabilities",
     to_json: ::buffa::type_registry::any_to_json::<WorkerCapabilities>,
     from_json: ::buffa::type_registry::any_from_json::<WorkerCapabilities>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct WorkerRuntimeAdvertisement {
+    /// Field 1: `agent_provider`
+    #[serde(
+        rename = "agentProvider",
+        alias = "agent_provider",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub agent_provider: ::buffa::EnumValue<AgentProvider>,
+    /// Field 2: `providers`
+    #[serde(
+        rename = "providers",
+        with = "::buffa::json_helpers::repeated_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub providers: ::buffa::alloc::vec::Vec<::buffa::EnumValue<AgentProvider>>,
+    /// Field 3: `provider_health`
+    #[serde(
+        rename = "providerHealth",
+        alias = "provider_health",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub provider_health: ::buffa::alloc::vec::Vec<AgentProviderHealth>,
+    /// Field 4: `capabilities`
+    #[serde(
+        rename = "capabilities",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub capabilities: ::buffa::MessageField<
+        WorkerCapabilities,
+        ::buffa::Inline<WorkerCapabilities>,
+    >,
+    /// Field 5: `versions`
+    #[serde(
+        rename = "versions",
+        skip_serializing_if = "::buffa::__private::HashMap::is_empty",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub versions: ::buffa::__private::HashMap<
+        ::buffa::alloc::string::String,
+        ::buffa::alloc::string::String,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for WorkerRuntimeAdvertisement {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("WorkerRuntimeAdvertisement")
+            .field("agent_provider", &self.agent_provider)
+            .field("providers", &self.providers)
+            .field("provider_health", &self.provider_health)
+            .field("capabilities", &self.capabilities)
+            .field("versions", &self.versions)
+            .finish()
+    }
+}
+impl WorkerRuntimeAdvertisement {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkerRuntimeAdvertisement";
+}
+::buffa::impl_default_instance!(WorkerRuntimeAdvertisement);
+impl ::buffa::MessageName for WorkerRuntimeAdvertisement {
+    const PACKAGE: &'static str = "briar.types.v1";
+    const NAME: &'static str = "WorkerRuntimeAdvertisement";
+    const FULL_NAME: &'static str = "briar.types.v1.WorkerRuntimeAdvertisement";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkerRuntimeAdvertisement";
+}
+impl ::buffa::Message for WorkerRuntimeAdvertisement {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        {
+            let val = self.agent_provider.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if !self.providers.is_empty() {
+            let payload: u64 = self
+                .providers
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                .sum::<u64>();
+            size += 1u64 + ::buffa::encoding::varint_len(payload) as u64 + payload;
+        }
+        for v in &self.provider_health {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.capabilities.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.capabilities.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size
+            += ::buffa::map_codec::field_len::<
+                ::buffa::map_codec::Str,
+                ::buffa::map_codec::Str,
+                _,
+            >(&self.versions, 1u64);
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.agent_provider.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if !self.providers.is_empty() {
+            let payload: u64 = self
+                .providers
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                .sum::<u64>();
+            ::buffa::types::put_len_delimited_header(2u32, payload, buf);
+            for v in &self.providers {
+                ::buffa::types::encode_int32(v.to_i32(), buf);
+            }
+        }
+        for v in &self.provider_health {
+            ::buffa::types::put_len_delimited_header(
+                3u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        if self.capabilities.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                4u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.capabilities.write_to(__cache, buf);
+        }
+        ::buffa::map_codec::write_field::<
+            ::buffa::map_codec::Str,
+            ::buffa::map_codec::Str,
+            _,
+        >(&self.versions, 5u32, buf);
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.agent_provider = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.providers.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.providers
+                            .push(
+                                ::buffa::EnumValue::from(
+                                    ::buffa::types::decode_int32_packed(&mut limited)?,
+                                ),
+                            );
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.providers
+                        .push(
+                            ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                        );
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.provider_health.push(elem);
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.capabilities.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::map_codec::merge_entry::<
+                    ::buffa::map_codec::Str,
+                    ::buffa::map_codec::Str,
+                    _,
+                >(&mut self.versions, buf, ctx)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.agent_provider = ::buffa::EnumValue::from(0);
+        self.providers.clear();
+        self.provider_health.clear();
+        self.capabilities = ::buffa::MessageField::none();
+        self.versions.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for WorkerRuntimeAdvertisement {
+    const PROTO_FQN: &'static str = "briar.types.v1.WorkerRuntimeAdvertisement";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for WorkerRuntimeAdvertisement {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __WORKER_RUNTIME_ADVERTISEMENT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.types.v1.WorkerRuntimeAdvertisement",
+    to_json: ::buffa::type_registry::any_to_json::<WorkerRuntimeAdvertisement>,
+    from_json: ::buffa::type_registry::any_from_json::<WorkerRuntimeAdvertisement>,
     is_wkt: false,
 };
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -19957,6 +20834,748 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
+        pub struct AgentProviderHealthView<'a> {
+            /// Field 1: `provider`
+            pub provider: ::buffa::EnumValue<super::super::AgentProvider>,
+            /// Field 2: `installed`
+            pub installed: bool,
+            /// Field 3: `authenticated`
+            pub authenticated: bool,
+            /// Field 4: `healthy`
+            pub healthy: bool,
+            /// Field 5: `reason`
+            pub reason: ::core::option::Option<&'a str>,
+            /// Field 6: `usage_exhausted`
+            pub usage_exhausted: bool,
+            /// Field 7: `max_used_percent`
+            pub max_used_percent: ::core::option::Option<f64>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for AgentProviderHealthView<'a> {
+            type Owned = super::super::AgentProviderHealth;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.provider = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.installed = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.authenticated = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.healthy = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.reason = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.usage_exhausted = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.max_used_percent = Some(
+                            ::buffa::types::decode_double(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AgentProviderHealth,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AgentProviderHealth,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AgentProviderHealth {
+                    provider: self.provider,
+                    installed: self.installed,
+                    authenticated: self.authenticated,
+                    healthy: self.healthy,
+                    reason: self.reason.map(|s| s.to_string()),
+                    usage_exhausted: self.usage_exhausted,
+                    max_used_percent: self.max_used_percent,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for AgentProviderHealthView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                {
+                    let val = self.provider.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if self.installed {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if self.authenticated {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if self.healthy {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if let Some(ref v) = self.reason {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if self.usage_exhausted {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if self.max_used_percent.is_some() {
+                    size += 1u64 + ::buffa::types::FIXED64_ENCODED_LEN as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.provider.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if self.installed {
+                    ::buffa::types::put_bool_field(2u32, self.installed, buf);
+                }
+                if self.authenticated {
+                    ::buffa::types::put_bool_field(3u32, self.authenticated, buf);
+                }
+                if self.healthy {
+                    ::buffa::types::put_bool_field(4u32, self.healthy, buf);
+                }
+                if let Some(ref v) = self.reason {
+                    ::buffa::types::put_string_field(5u32, v, buf);
+                }
+                if self.usage_exhausted {
+                    ::buffa::types::put_bool_field(6u32, self.usage_exhausted, buf);
+                }
+                if let Some(v) = self.max_used_percent {
+                    ::buffa::types::put_double_field(7u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AgentProviderHealthView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.provider,
+                ) {
+                    __map.serialize_entry("provider", &self.provider)?;
+                }
+                if self.installed {
+                    __map.serialize_entry("installed", &self.installed)?;
+                }
+                if self.authenticated {
+                    __map.serialize_entry("authenticated", &self.authenticated)?;
+                }
+                if self.healthy {
+                    __map.serialize_entry("healthy", &self.healthy)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.reason {
+                    __map.serialize_entry("reason", __v)?;
+                }
+                if self.usage_exhausted {
+                    __map.serialize_entry("usageExhausted", &self.usage_exhausted)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.max_used_percent {
+                    __map
+                        .serialize_entry(
+                            "maxUsedPercent",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AgentProviderHealthView<'a> {
+            const PACKAGE: &'static str = "briar.types.v1";
+            const NAME: &'static str = "AgentProviderHealth";
+            const FULL_NAME: &'static str = "briar.types.v1.AgentProviderHealth";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentProviderHealth";
+        }
+        ::buffa::impl_default_view_instance!(AgentProviderHealthView);
+        ::buffa::impl_view_reborrow!(AgentProviderHealthView);
+        /** Self-contained, `'static` owned view of a `AgentProviderHealth` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AgentProviderHealthView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AgentProviderHealthView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AgentProviderHealthOwnedView(
+            ::buffa::OwnedView<AgentProviderHealthView<'static>>,
+        );
+        impl AgentProviderHealthOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AgentProviderHealthOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AgentProviderHealthOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AgentProviderHealth,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AgentProviderHealthOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`AgentProviderHealthView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AgentProviderHealthView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::AgentProviderHealth {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `provider`
+            #[must_use]
+            pub fn provider(&self) -> ::buffa::EnumValue<super::super::AgentProvider> {
+                self.0.reborrow().provider
+            }
+            /// Field 2: `installed`
+            #[must_use]
+            pub fn installed(&self) -> bool {
+                self.0.reborrow().installed
+            }
+            /// Field 3: `authenticated`
+            #[must_use]
+            pub fn authenticated(&self) -> bool {
+                self.0.reborrow().authenticated
+            }
+            /// Field 4: `healthy`
+            #[must_use]
+            pub fn healthy(&self) -> bool {
+                self.0.reborrow().healthy
+            }
+            /// Field 5: `reason`
+            #[must_use]
+            pub fn reason(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().reason
+            }
+            /// Field 6: `usage_exhausted`
+            #[must_use]
+            pub fn usage_exhausted(&self) -> bool {
+                self.0.reborrow().usage_exhausted
+            }
+            /// Field 7: `max_used_percent`
+            #[must_use]
+            pub fn max_used_percent(&self) -> ::core::option::Option<f64> {
+                self.0.reborrow().max_used_percent
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<AgentProviderHealthView<'static>>>
+        for AgentProviderHealthOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<AgentProviderHealthView<'static>>,
+            ) -> Self {
+                AgentProviderHealthOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AgentProviderHealthOwnedView>
+        for ::buffa::OwnedView<AgentProviderHealthView<'static>> {
+            fn from(wrapper: AgentProviderHealthOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<AgentProviderHealthView<'static>>>
+        for AgentProviderHealthOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<AgentProviderHealthView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::AgentProviderHealth {
+            type View<'a> = AgentProviderHealthView<'a>;
+            type ViewHandle = AgentProviderHealthOwnedView;
+        }
+        impl ::serde::Serialize for AgentProviderHealthOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct WorkflowRequirementHealthView<'a> {
+            /// Field 1: `id`
+            pub id: &'a str,
+            /// Field 2: `healthy`
+            pub healthy: bool,
+            /// Field 3: `detail`
+            pub detail: ::core::option::Option<&'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for WorkflowRequirementHealthView<'a> {
+            type Owned = super::super::WorkflowRequirementHealth;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.healthy = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.detail = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::WorkflowRequirementHealth,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::WorkflowRequirementHealth,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::WorkflowRequirementHealth {
+                    id: self.id.to_string(),
+                    healthy: self.healthy,
+                    detail: self.detail.map(|s| s.to_string()),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for WorkflowRequirementHealthView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.id.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+                }
+                if self.healthy {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if let Some(ref v) = self.detail {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.id, buf);
+                }
+                if self.healthy {
+                    ::buffa::types::put_bool_field(2u32, self.healthy, buf);
+                }
+                if let Some(ref v) = self.detail {
+                    ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for WorkflowRequirementHealthView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+                    __map.serialize_entry("id", self.id)?;
+                }
+                if self.healthy {
+                    __map.serialize_entry("healthy", &self.healthy)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.detail {
+                    __map.serialize_entry("detail", __v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for WorkflowRequirementHealthView<'a> {
+            const PACKAGE: &'static str = "briar.types.v1";
+            const NAME: &'static str = "WorkflowRequirementHealth";
+            const FULL_NAME: &'static str = "briar.types.v1.WorkflowRequirementHealth";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkflowRequirementHealth";
+        }
+        ::buffa::impl_default_view_instance!(WorkflowRequirementHealthView);
+        ::buffa::impl_view_reborrow!(WorkflowRequirementHealthView);
+        /** Self-contained, `'static` owned view of a `WorkflowRequirementHealth` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`WorkflowRequirementHealthView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`WorkflowRequirementHealthView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct WorkflowRequirementHealthOwnedView(
+            ::buffa::OwnedView<WorkflowRequirementHealthView<'static>>,
+        );
+        impl WorkflowRequirementHealthOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    WorkflowRequirementHealthOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    WorkflowRequirementHealthOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::WorkflowRequirementHealth,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    WorkflowRequirementHealthOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`WorkflowRequirementHealthView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &WorkflowRequirementHealthView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::WorkflowRequirementHealth {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> &'_ str {
+                self.0.reborrow().id
+            }
+            /// Field 2: `healthy`
+            #[must_use]
+            pub fn healthy(&self) -> bool {
+                self.0.reborrow().healthy
+            }
+            /// Field 3: `detail`
+            #[must_use]
+            pub fn detail(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().detail
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<WorkflowRequirementHealthView<'static>>,
+        > for WorkflowRequirementHealthOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<WorkflowRequirementHealthView<'static>>,
+            ) -> Self {
+                WorkflowRequirementHealthOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<WorkflowRequirementHealthOwnedView>
+        for ::buffa::OwnedView<WorkflowRequirementHealthView<'static>> {
+            fn from(wrapper: WorkflowRequirementHealthOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<WorkflowRequirementHealthView<'static>>,
+        > for WorkflowRequirementHealthOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<WorkflowRequirementHealthView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::WorkflowRequirementHealth {
+            type View<'a> = WorkflowRequirementHealthView<'a>;
+            type ViewHandle = WorkflowRequirementHealthOwnedView;
+        }
+        impl ::serde::Serialize for WorkflowRequirementHealthOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
         pub struct WorkerCapabilitiesView<'a> {
             /// Field 1: `provider_capabilities`
             pub provider_capabilities: ::buffa::RepeatedView<
@@ -19966,6 +21585,15 @@ pub mod __buffa {
             /// Field 2: `remote_updates`
             pub remote_updates: ::buffa::MessageFieldView<
                 super::super::__buffa::view::RemoteUpdateCapabilityView<'a>,
+            >,
+            /// Field 3: `worktrees`
+            pub worktrees: bool,
+            /// Field 4: `organization_agent_context_protocol`
+            pub organization_agent_context_protocol: ::core::option::Option<u32>,
+            /// Field 5: `workflow_requirements`
+            pub workflow_requirements: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::WorkflowRequirementHealthView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -20026,6 +21654,22 @@ pub mod __buffa {
                             }
                         }
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.worktrees = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.organization_agent_context_protocol = Some(
+                            ::buffa::types::decode_uint32(&mut cur)?,
+                        );
+                    }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -20041,6 +21685,26 @@ pub mod __buffa {
                         view.provider_capabilities
                             .push(
                                 <super::super::__buffa::view::AgentProviderCapabilityView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::WorkflowRequirementHealthView,
+                            >(),
+                        )?;
+                        view.workflow_requirements
+                            .push(
+                                <super::super::__buffa::view::WorkflowRequirementHealthView as ::buffa::MessageView>::decode_view_ctx(
                                     sub,
                                     __sub_ctx,
                                 )?,
@@ -20089,6 +21753,14 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    worktrees: self.worktrees,
+                    organization_agent_context_protocol: self
+                        .organization_agent_context_protocol,
+                    workflow_requirements: self
+                        .workflow_requirements
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -20114,6 +21786,20 @@ pub mod __buffa {
                 if self.remote_updates.is_set() {
                     let __slot = __cache.reserve();
                     let inner_size = self.remote_updates.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.worktrees {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if let Some(v) = self.organization_agent_context_protocol {
+                    size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+                }
+                for v in &self.workflow_requirements {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -20145,6 +21831,20 @@ pub mod __buffa {
                         buf,
                     );
                     self.remote_updates.write_to(__cache, buf);
+                }
+                if self.worktrees {
+                    ::buffa::types::put_bool_field(3u32, self.worktrees, buf);
+                }
+                if let Some(v) = self.organization_agent_context_protocol {
+                    ::buffa::types::put_uint32_field(4u32, v, buf);
+                }
+                for v in &self.workflow_requirements {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -20181,6 +21881,25 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("remoteUpdates", __v)?;
                     }
+                }
+                if self.worktrees {
+                    __map.serialize_entry("worktrees", &self.worktrees)?;
+                }
+                if let ::core::option::Option::Some(__v) = self
+                    .organization_agent_context_protocol
+                {
+                    __map
+                        .serialize_entry(
+                            "organizationAgentContextProtocol",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !self.workflow_requirements.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "workflowRequirements",
+                            &*self.workflow_requirements,
+                        )?;
                 }
                 __map.end()
             }
@@ -20296,6 +22015,28 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().remote_updates
             }
+            /// Field 3: `worktrees`
+            #[must_use]
+            pub fn worktrees(&self) -> bool {
+                self.0.reborrow().worktrees
+            }
+            /// Field 4: `organization_agent_context_protocol`
+            #[must_use]
+            pub fn organization_agent_context_protocol(
+                &self,
+            ) -> ::core::option::Option<u32> {
+                self.0.reborrow().organization_agent_context_protocol
+            }
+            /// Field 5: `workflow_requirements`
+            #[must_use]
+            pub fn workflow_requirements(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::WorkflowRequirementHealthView<'_>,
+            > {
+                &self.0.reborrow().workflow_requirements
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<WorkerCapabilitiesView<'static>>>
         for WorkerCapabilitiesOwnedView {
@@ -20320,6 +22061,603 @@ pub mod __buffa {
             type ViewHandle = WorkerCapabilitiesOwnedView;
         }
         impl ::serde::Serialize for WorkerCapabilitiesOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct WorkerRuntimeAdvertisementView<'a> {
+            /// Field 1: `agent_provider`
+            pub agent_provider: ::buffa::EnumValue<super::super::AgentProvider>,
+            /// Field 2: `providers`
+            pub providers: ::buffa::RepeatedView<
+                'a,
+                ::buffa::EnumValue<super::super::AgentProvider>,
+            >,
+            /// Field 3: `provider_health`
+            pub provider_health: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::AgentProviderHealthView<'a>,
+            >,
+            /// Field 4: `capabilities`
+            pub capabilities: ::buffa::MessageFieldView<
+                super::super::__buffa::view::WorkerCapabilitiesView<'a>,
+            >,
+            /// Field 5: `versions` (map)
+            pub versions: ::buffa::MapView<'a, &'a str, &'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for WorkerRuntimeAdvertisementView<'a> {
+            type Owned = super::super::WorkerRuntimeAdvertisement;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.agent_provider = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.capabilities.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.capabilities = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::WorkerCapabilitiesView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.providers
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.providers
+                                    .push(
+                                        ::buffa::EnumValue::from(
+                                            ::buffa::types::decode_int32_packed(&mut pcur)?,
+                                        ),
+                                    );
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.providers
+                                .push(
+                                    ::buffa::EnumValue::from(
+                                        ::buffa::types::decode_int32(&mut cur)?,
+                                    ),
+                                );
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::AgentProviderHealthView,
+                            >(),
+                        )?;
+                        view.provider_health
+                            .push(
+                                <super::super::__buffa::view::AgentProviderHealthView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let entry_bytes = ::buffa::types::borrow_bytes(&mut cur)?;
+                        let mut entry_cur: &'a [u8] = entry_bytes;
+                        let mut key = "";
+                        let mut val = "";
+                        ctx.register_element_memory(
+                            ::buffa::__private::element_footprint(&key)
+                                + ::buffa::__private::element_footprint(&val),
+                        )?;
+                        while !entry_cur.is_empty() {
+                            let entry_tag = ::buffa::encoding::Tag::decode(
+                                &mut entry_cur,
+                            )?;
+                            match entry_tag.field_number() {
+                                1 => {
+                                    ::buffa::encoding::check_wire_type(
+                                        entry_tag,
+                                        ::buffa::encoding::WireType::LengthDelimited,
+                                    )?;
+                                    key = ::buffa::types::borrow_str(&mut entry_cur)?;
+                                }
+                                2 => {
+                                    ::buffa::encoding::check_wire_type(
+                                        entry_tag,
+                                        ::buffa::encoding::WireType::LengthDelimited,
+                                    )?;
+                                    val = ::buffa::types::borrow_str(&mut entry_cur)?;
+                                }
+                                _ => {
+                                    ::buffa::encoding::skip_field_depth(
+                                        entry_tag,
+                                        &mut entry_cur,
+                                        ctx.depth(),
+                                    )?;
+                                }
+                            }
+                        }
+                        view.versions.push(key, val);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::WorkerRuntimeAdvertisement,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::WorkerRuntimeAdvertisement,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::WorkerRuntimeAdvertisement {
+                    agent_provider: self.agent_provider,
+                    providers: self.providers.to_vec(),
+                    provider_health: self
+                        .provider_health
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    capabilities: match self.capabilities.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::WorkerCapabilities,
+                                ::buffa::Inline<super::super::WorkerCapabilities>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    versions: self
+                        .versions
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                        .collect(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for WorkerRuntimeAdvertisementView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                {
+                    let val = self.agent_provider.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if !self.providers.is_empty() {
+                    let payload: u64 = self
+                        .providers
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                        .sum::<u64>();
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(payload) as u64
+                            + payload;
+                }
+                for v in &self.provider_health {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.capabilities.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.capabilities.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                #[allow(clippy::for_kv_map)]
+                for (k, v) in &self.versions {
+                    let entry_size: u64 = 1u64
+                        + ::buffa::types::string_encoded_len(k) as u64 + 1u64
+                        + ::buffa::types::string_encoded_len(v) as u64;
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(entry_size) as u64
+                            + entry_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.agent_provider.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if !self.providers.is_empty() {
+                    let payload: u64 = self
+                        .providers
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                        .sum::<u64>();
+                    ::buffa::types::put_len_delimited_header(2u32, payload, buf);
+                    for v in &self.providers {
+                        ::buffa::types::encode_int32(v.to_i32(), buf);
+                    }
+                }
+                for v in &self.provider_health {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if self.capabilities.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.capabilities.write_to(__cache, buf);
+                }
+                for (k, v) in &self.versions {
+                    let entry_size: u64 = 1u64
+                        + ::buffa::types::string_encoded_len(k) as u64 + 1u64
+                        + ::buffa::types::string_encoded_len(v) as u64;
+                    ::buffa::encoding::Tag::new(
+                            5u32,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )
+                        .encode(buf);
+                    ::buffa::encoding::encode_varint(entry_size, buf);
+                    ::buffa::encoding::Tag::new(
+                            1u32,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )
+                        .encode(buf);
+                    ::buffa::types::encode_string(k, buf);
+                    ::buffa::encoding::Tag::new(
+                            2u32,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )
+                        .encode(buf);
+                    ::buffa::types::encode_string(v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for WorkerRuntimeAdvertisementView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.agent_provider,
+                ) {
+                    __map.serialize_entry("agentProvider", &self.agent_provider)?;
+                }
+                if !self.providers.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "providers",
+                            &::buffa::json_helpers::EnumSeqJson(&self.providers),
+                        )?;
+                }
+                if !self.provider_health.is_empty() {
+                    __map.serialize_entry("providerHealth", &*self.provider_health)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .capabilities
+                        .as_option()
+                    {
+                        __map.serialize_entry("capabilities", __v)?;
+                    }
+                }
+                if !self.versions.is_empty() {
+                    struct _WM<'__a, '__x>(
+                        &'__x ::buffa::MapView<'__x, &'__a str, &'__a str>,
+                    );
+                    impl<'__a> ::serde::Serialize for _WM<'__a, '_> {
+                        fn serialize<__S: ::serde::Serializer>(
+                            &self,
+                            __s: __S,
+                        ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                            use ::serde::ser::SerializeMap as _;
+                            let mut __m = __s
+                                .serialize_map(::core::option::Option::Some(self.0.len()))?;
+                            for (k, v) in self.0.iter_unique() {
+                                __m.serialize_entry(k, v)?;
+                            }
+                            __m.end()
+                        }
+                    }
+                    __map.serialize_entry("versions", &_WM(&self.versions))?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for WorkerRuntimeAdvertisementView<'a> {
+            const PACKAGE: &'static str = "briar.types.v1";
+            const NAME: &'static str = "WorkerRuntimeAdvertisement";
+            const FULL_NAME: &'static str = "briar.types.v1.WorkerRuntimeAdvertisement";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkerRuntimeAdvertisement";
+        }
+        ::buffa::impl_default_view_instance!(WorkerRuntimeAdvertisementView);
+        ::buffa::impl_view_reborrow!(WorkerRuntimeAdvertisementView);
+        /** Self-contained, `'static` owned view of a `WorkerRuntimeAdvertisement` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`WorkerRuntimeAdvertisementView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`WorkerRuntimeAdvertisementView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct WorkerRuntimeAdvertisementOwnedView(
+            ::buffa::OwnedView<WorkerRuntimeAdvertisementView<'static>>,
+        );
+        impl WorkerRuntimeAdvertisementOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    WorkerRuntimeAdvertisementOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    WorkerRuntimeAdvertisementOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::WorkerRuntimeAdvertisement,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    WorkerRuntimeAdvertisementOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`WorkerRuntimeAdvertisementView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &WorkerRuntimeAdvertisementView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::WorkerRuntimeAdvertisement {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `agent_provider`
+            #[must_use]
+            pub fn agent_provider(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::AgentProvider> {
+                self.0.reborrow().agent_provider
+            }
+            /// Field 2: `providers`
+            #[must_use]
+            pub fn providers(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                ::buffa::EnumValue<super::super::AgentProvider>,
+            > {
+                &self.0.reborrow().providers
+            }
+            /// Field 3: `provider_health`
+            #[must_use]
+            pub fn provider_health(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::AgentProviderHealthView<'_>,
+            > {
+                &self.0.reborrow().provider_health
+            }
+            /// Field 4: `capabilities`
+            #[must_use]
+            pub fn capabilities(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::WorkerCapabilitiesView<'_>,
+            > {
+                &self.0.reborrow().capabilities
+            }
+            /// Field 5: `versions` (map)
+            #[must_use]
+            pub fn versions(&self) -> &::buffa::MapView<'_, &'_ str, &'_ str> {
+                &self.0.reborrow().versions
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<WorkerRuntimeAdvertisementView<'static>>,
+        > for WorkerRuntimeAdvertisementOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<WorkerRuntimeAdvertisementView<'static>>,
+            ) -> Self {
+                WorkerRuntimeAdvertisementOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<WorkerRuntimeAdvertisementOwnedView>
+        for ::buffa::OwnedView<WorkerRuntimeAdvertisementView<'static>> {
+            fn from(wrapper: WorkerRuntimeAdvertisementOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<WorkerRuntimeAdvertisementView<'static>>,
+        > for WorkerRuntimeAdvertisementOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<WorkerRuntimeAdvertisementView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::WorkerRuntimeAdvertisement {
+            type View<'a> = WorkerRuntimeAdvertisementView<'a>;
+            type ViewHandle = WorkerRuntimeAdvertisementOwnedView;
+        }
+        impl ::serde::Serialize for WorkerRuntimeAdvertisementOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -23025,7 +25363,10 @@ pub mod __buffa {
         reg.register_json_any(super::__AGENT_MODEL_CAPABILITY_JSON_ANY);
         reg.register_json_any(super::__AGENT_PROVIDER_CAPABILITY_JSON_ANY);
         reg.register_json_any(super::__REMOTE_UPDATE_CAPABILITY_JSON_ANY);
+        reg.register_json_any(super::__AGENT_PROVIDER_HEALTH_JSON_ANY);
+        reg.register_json_any(super::__WORKFLOW_REQUIREMENT_HEALTH_JSON_ANY);
         reg.register_json_any(super::__WORKER_CAPABILITIES_JSON_ANY);
+        reg.register_json_any(super::__WORKER_RUNTIME_ADVERTISEMENT_JSON_ANY);
         reg.register_json_any(super::__FIELD_VIOLATION_JSON_ANY);
         reg.register_json_any(super::__VALIDATION_ERROR_DETAIL_JSON_ANY);
         reg.register_json_any(super::__CURSOR_EXPIRED_DETAIL_JSON_ANY);
@@ -23136,9 +25477,21 @@ pub use self::__buffa::view::RemoteUpdateCapabilityView;
 #[doc(inline)]
 pub use self::__buffa::view::RemoteUpdateCapabilityOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::AgentProviderHealthView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentProviderHealthOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::WorkflowRequirementHealthView;
+#[doc(inline)]
+pub use self::__buffa::view::WorkflowRequirementHealthOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::WorkerCapabilitiesView;
 #[doc(inline)]
 pub use self::__buffa::view::WorkerCapabilitiesOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::WorkerRuntimeAdvertisementView;
+#[doc(inline)]
+pub use self::__buffa::view::WorkerRuntimeAdvertisementOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::FieldViolationView;
 #[doc(inline)]

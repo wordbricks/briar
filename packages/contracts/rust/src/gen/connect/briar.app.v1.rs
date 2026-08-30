@@ -18810,6 +18810,42 @@ where
     }
 }
 
+///Shorthand for `OwnedView<RegisterProjectExecutionWorkerRequestView<'static>>`.
+pub type OwnedRegisterProjectExecutionWorkerRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RegisterProjectExecutionWorkerRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RegisterProjectExecutionWorkerResponseView<'static>>`.
+pub type OwnedRegisterProjectExecutionWorkerResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RegisterProjectExecutionWorkerResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<BindProjectExecutionWorkerRequestView<'static>>`.
+pub type OwnedBindProjectExecutionWorkerRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::BindProjectExecutionWorkerRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<BindProjectExecutionWorkerResponseView<'static>>`.
+pub type OwnedBindProjectExecutionWorkerResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::BindProjectExecutionWorkerResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UnbindProjectExecutionWorkerRequestView<'static>>`.
+pub type OwnedUnbindProjectExecutionWorkerRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UnbindProjectExecutionWorkerRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UnbindProjectExecutionWorkerResponseView<'static>>`.
+pub type OwnedUnbindProjectExecutionWorkerResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UnbindProjectExecutionWorkerResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<ListExecutionWorkersRequestView<'static>>`.
 pub type OwnedListExecutionWorkersRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::ListExecutionWorkersRequestView<'static>,
@@ -18980,6 +19016,132 @@ pub type OwnedGetManagedComputerSetupStatusResponseView = ::buffa::view::OwnedVi
         'static,
     >,
 >;
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RegisterProjectExecutionWorkerResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::RegisterProjectExecutionWorkerResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RegisterProjectExecutionWorkerResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RegisterProjectExecutionWorkerResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::BindProjectExecutionWorkerResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::BindProjectExecutionWorkerResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::BindProjectExecutionWorkerResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::BindProjectExecutionWorkerResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UnbindProjectExecutionWorkerResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::UnbindProjectExecutionWorkerResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UnbindProjectExecutionWorkerResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UnbindProjectExecutionWorkerResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListExecutionWorkersResponse>
 for crate::proto::briar::app::v1::__buffa::view::ListExecutionWorkersResponseView<'_> {
     fn encode(
@@ -19568,6 +19730,24 @@ for ::buffa::view::OwnedView<
 }
 /// Full service name for this service.
 pub const FLEET_SERVICE_SERVICE_NAME: &str = "briar.app.v1.FleetService";
+/// Static [`Spec`](::connectrpc::Spec) for the `RegisterProjectExecutionWorker` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_REGISTER_PROJECT_EXECUTION_WORKER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/RegisterProjectExecutionWorker",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `BindProjectExecutionWorker` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_BIND_PROJECT_EXECUTION_WORKER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/BindProjectExecutionWorker",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UnbindProjectExecutionWorker` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_UNBIND_PROJECT_EXECUTION_WORKER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/UnbindProjectExecutionWorker",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `ListExecutionWorkers` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const FLEET_SERVICE_LIST_EXECUTION_WORKERS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.FleetService/ListExecutionWorkers",
@@ -19711,6 +19891,75 @@ pub const FLEET_SERVICE_GET_MANAGED_COMPUTER_SETUP_STATUS_SPEC: ::connectrpc::Sp
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait FleetService: Send + Sync + 'static {
+    /// Handle the RegisterProjectExecutionWorker RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn register_project_execution_worker<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::RegisterProjectExecutionWorkerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::RegisterProjectExecutionWorkerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the BindProjectExecutionWorker RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn bind_project_execution_worker<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::BindProjectExecutionWorkerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::BindProjectExecutionWorkerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UnbindProjectExecutionWorker RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn unbind_project_execution_worker<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UnbindProjectExecutionWorkerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UnbindProjectExecutionWorkerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
     /// Handle the ListExecutionWorkers RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -20088,6 +20337,93 @@ impl<S: FleetService> FleetServiceExt for S {
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router {
         router
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "RegisterProjectExecutionWorker",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::RegisterProjectExecutionWorkerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::RegisterProjectExecutionWorkerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.register_project_execution_worker(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::RegisterProjectExecutionWorkerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_REGISTER_PROJECT_EXECUTION_WORKER_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "BindProjectExecutionWorker",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::BindProjectExecutionWorkerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::BindProjectExecutionWorkerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.bind_project_execution_worker(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::BindProjectExecutionWorkerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_BIND_PROJECT_EXECUTION_WORKER_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "UnbindProjectExecutionWorker",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UnbindProjectExecutionWorkerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UnbindProjectExecutionWorkerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.unbind_project_execution_worker(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UnbindProjectExecutionWorkerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_UNBIND_PROJECT_EXECUTION_WORKER_SPEC)
             .route_view(
                 FLEET_SERVICE_SERVICE_NAME,
                 "ListExecutionWorkers",
@@ -20577,6 +20913,24 @@ impl<T: FleetService> ::connectrpc::Dispatcher for FleetServiceServer<T> {
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
         let method = path.strip_prefix("briar.app.v1.FleetService/")?;
         match method {
+            "RegisterProjectExecutionWorker" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_REGISTER_PROJECT_EXECUTION_WORKER_SPEC),
+                )
+            }
+            "BindProjectExecutionWorker" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_BIND_PROJECT_EXECUTION_WORKER_SPEC),
+                )
+            }
+            "UnbindProjectExecutionWorker" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_UNBIND_PROJECT_EXECUTION_WORKER_SPEC),
+                )
+            }
             "ListExecutionWorkers" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -20690,6 +21044,72 @@ impl<T: FleetService> ::connectrpc::Dispatcher for FleetServiceServer<T> {
         };
         let _ = (&ctx, &request, &format);
         match method {
+            "RegisterProjectExecutionWorker" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::RegisterProjectExecutionWorkerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::RegisterProjectExecutionWorkerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::RegisterProjectExecutionWorkerRequest,
+                    >::from_parts(&req, &body);
+                    svc.register_project_execution_worker(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::RegisterProjectExecutionWorkerResponse,
+                        >(format)
+                })
+            }
+            "BindProjectExecutionWorker" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::BindProjectExecutionWorkerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::BindProjectExecutionWorkerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::BindProjectExecutionWorkerRequest,
+                    >::from_parts(&req, &body);
+                    svc.bind_project_execution_worker(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::BindProjectExecutionWorkerResponse,
+                        >(format)
+                })
+            }
+            "UnbindProjectExecutionWorker" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UnbindProjectExecutionWorkerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UnbindProjectExecutionWorkerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UnbindProjectExecutionWorkerRequest,
+                    >::from_parts(&req, &body);
+                    svc.unbind_project_execution_worker(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UnbindProjectExecutionWorkerResponse,
+                        >(format)
+                })
+            }
             "ListExecutionWorkers" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -21087,7 +21507,7 @@ impl<T: FleetService> ::connectrpc::Dispatcher for FleetServiceServer<T> {
 /// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
 ///
 /// let client = FleetServiceClient::new(conn, config);
-/// let response = client.list_execution_workers(request).await?;
+/// let response = client.register_project_execution_worker(request).await?;
 /// ```
 ///
 /// # Example (Connect / HTTP/1.1 or ALPN)
@@ -21099,7 +21519,7 @@ impl<T: FleetService> ::connectrpc::Dispatcher for FleetServiceServer<T> {
 /// let config = ClientConfig::new("http://localhost:8080".parse()?);
 ///
 /// let client = FleetServiceClient::new(http, config);
-/// let response = client.list_execution_workers(request).await?;
+/// let response = client.register_project_execution_worker(request).await?;
 /// ```
 ///
 /// # Working with the response
@@ -21109,7 +21529,7 @@ impl<T: FleetService> ::connectrpc::Dispatcher for FleetServiceServer<T> {
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.list_execution_workers(request).await?;
+/// let resp = client.register_project_execution_worker(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -21117,7 +21537,7 @@ impl<T: FleetService> ::connectrpc::Dispatcher for FleetServiceServer<T> {
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.list_execution_workers(request).await?.into_owned();
+/// let owned = client.register_project_execution_worker(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -21149,6 +21569,141 @@ where
     /// Get a mutable reference to the client configuration.
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
+    }
+    /// Call the RegisterProjectExecutionWorker RPC. Sends a request to /briar.app.v1.FleetService/RegisterProjectExecutionWorker.
+    pub async fn register_project_execution_worker(
+        &self,
+        request: crate::proto::briar::app::v1::RegisterProjectExecutionWorkerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RegisterProjectExecutionWorkerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.register_project_execution_worker_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RegisterProjectExecutionWorker RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn register_project_execution_worker_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::RegisterProjectExecutionWorkerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RegisterProjectExecutionWorkerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_REGISTER_PROJECT_EXECUTION_WORKER_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the BindProjectExecutionWorker RPC. Sends a request to /briar.app.v1.FleetService/BindProjectExecutionWorker.
+    pub async fn bind_project_execution_worker(
+        &self,
+        request: crate::proto::briar::app::v1::BindProjectExecutionWorkerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::BindProjectExecutionWorkerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.bind_project_execution_worker_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the BindProjectExecutionWorker RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn bind_project_execution_worker_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::BindProjectExecutionWorkerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::BindProjectExecutionWorkerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_BIND_PROJECT_EXECUTION_WORKER_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UnbindProjectExecutionWorker RPC. Sends a request to /briar.app.v1.FleetService/UnbindProjectExecutionWorker.
+    pub async fn unbind_project_execution_worker(
+        &self,
+        request: crate::proto::briar::app::v1::UnbindProjectExecutionWorkerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UnbindProjectExecutionWorkerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.unbind_project_execution_worker_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UnbindProjectExecutionWorker RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn unbind_project_execution_worker_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UnbindProjectExecutionWorkerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UnbindProjectExecutionWorkerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_UNBIND_PROJECT_EXECUTION_WORKER_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
     }
     /// Call the ListExecutionWorkers RPC. Sends a request to /briar.app.v1.FleetService/ListExecutionWorkers.
     pub async fn list_execution_workers(

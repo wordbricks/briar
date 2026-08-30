@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/types/v1/worker.proto.
  */
 export const file_briar_types_v1_worker: GenFile = /*@__PURE__*/
-  fileDesc("Chticmlhci90eXBlcy92MS93b3JrZXIucHJvdG8SDmJyaWFyLnR5cGVzLnYxIoQBChVBZ2VudEVmZm9ydENhcGFiaWxpdHkSCgoCaWQYASABKAkSDQoFbGFiZWwYAiABKAkSGAoLZGVzY3JpcHRpb24YAyABKAlIAIgBARIXCgppc19kZWZhdWx0GAQgASgISAGIAQFCDgoMX2Rlc2NyaXB0aW9uQg0KC19pc19kZWZhdWx0IscBChRBZ2VudE1vZGVsQ2FwYWJpbGl0eRIKCgJpZBgBIAEoCRINCgVsYWJlbBgCIAEoCRIXCgppc19kZWZhdWx0GAMgASgISACIAQESHgoRZGVmYXVsdF9lZmZvcnRfaWQYBCABKAlIAYgBARI2CgdlZmZvcnRzGAUgAygLMiUuYnJpYXIudHlwZXMudjEuQWdlbnRFZmZvcnRDYXBhYmlsaXR5Qg0KC19pc19kZWZhdWx0QhQKEl9kZWZhdWx0X2VmZm9ydF9pZCKYAgoXQWdlbnRQcm92aWRlckNhcGFiaWxpdHkSLwoIcHJvdmlkZXIYASABKA4yHS5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVyEjQKBm1vZGVscxgCIAMoCzIkLmJyaWFyLnR5cGVzLnYxLkFnZW50TW9kZWxDYXBhYmlsaXR5Ej4KD2RlZmF1bHRfZWZmb3J0cxgDIAMoCzIlLmJyaWFyLnR5cGVzLnYxLkFnZW50RWZmb3J0Q2FwYWJpbGl0eRIgChNhbGxvd19jdXN0b21fbW9kZWxzGAQgASgISACIAQESEgoFZXJyb3IYBSABKAlIAYgBAUIWChRfYWxsb3dfY3VzdG9tX21vZGVsc0IICgZfZXJyb3IiTwoWUmVtb3RlVXBkYXRlQ2FwYWJpbGl0eRIRCglzdXBwb3J0ZWQYASABKAgSFQoIcHJvdG9jb2wYAiABKA1IAIgBAUILCglfcHJvdG9jb2witAEKEldvcmtlckNhcGFiaWxpdGllcxJGChVwcm92aWRlcl9jYXBhYmlsaXRpZXMYASADKAsyJy5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVyQ2FwYWJpbGl0eRJDCg5yZW1vdGVfdXBkYXRlcxgCIAEoCzImLmJyaWFyLnR5cGVzLnYxLlJlbW90ZVVwZGF0ZUNhcGFiaWxpdHlIAIgBAUIRCg9fcmVtb3RlX3VwZGF0ZXNCDroCC0JyaWFyVHlwZXNfYgZwcm90bzM", [file_briar_types_v1_provider]);
+  fileDesc("Chticmlhci90eXBlcy92MS93b3JrZXIucHJvdG8SDmJyaWFyLnR5cGVzLnYxIoQBChVBZ2VudEVmZm9ydENhcGFiaWxpdHkSCgoCaWQYASABKAkSDQoFbGFiZWwYAiABKAkSGAoLZGVzY3JpcHRpb24YAyABKAlIAIgBARIXCgppc19kZWZhdWx0GAQgASgISAGIAQFCDgoMX2Rlc2NyaXB0aW9uQg0KC19pc19kZWZhdWx0IscBChRBZ2VudE1vZGVsQ2FwYWJpbGl0eRIKCgJpZBgBIAEoCRINCgVsYWJlbBgCIAEoCRIXCgppc19kZWZhdWx0GAMgASgISACIAQESHgoRZGVmYXVsdF9lZmZvcnRfaWQYBCABKAlIAYgBARI2CgdlZmZvcnRzGAUgAygLMiUuYnJpYXIudHlwZXMudjEuQWdlbnRFZmZvcnRDYXBhYmlsaXR5Qg0KC19pc19kZWZhdWx0QhQKEl9kZWZhdWx0X2VmZm9ydF9pZCKYAgoXQWdlbnRQcm92aWRlckNhcGFiaWxpdHkSLwoIcHJvdmlkZXIYASABKA4yHS5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVyEjQKBm1vZGVscxgCIAMoCzIkLmJyaWFyLnR5cGVzLnYxLkFnZW50TW9kZWxDYXBhYmlsaXR5Ej4KD2RlZmF1bHRfZWZmb3J0cxgDIAMoCzIlLmJyaWFyLnR5cGVzLnYxLkFnZW50RWZmb3J0Q2FwYWJpbGl0eRIgChNhbGxvd19jdXN0b21fbW9kZWxzGAQgASgISACIAQESEgoFZXJyb3IYBSABKAlIAYgBAUIWChRfYWxsb3dfY3VzdG9tX21vZGVsc0IICgZfZXJyb3IiTwoWUmVtb3RlVXBkYXRlQ2FwYWJpbGl0eRIRCglzdXBwb3J0ZWQYASABKAgSFQoIcHJvdG9jb2wYAiABKA1IAIgBAUILCglfcHJvdG9jb2wi7gEKE0FnZW50UHJvdmlkZXJIZWFsdGgSLwoIcHJvdmlkZXIYASABKA4yHS5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVyEhEKCWluc3RhbGxlZBgCIAEoCBIVCg1hdXRoZW50aWNhdGVkGAMgASgIEg8KB2hlYWx0aHkYBCABKAgSEwoGcmVhc29uGAUgASgJSACIAQESFwoPdXNhZ2VfZXhoYXVzdGVkGAYgASgIEh0KEG1heF91c2VkX3BlcmNlbnQYByABKAFIAYgBAUIJCgdfcmVhc29uQhMKEV9tYXhfdXNlZF9wZXJjZW50IlgKGVdvcmtmbG93UmVxdWlyZW1lbnRIZWFsdGgSCgoCaWQYASABKAkSDwoHaGVhbHRoeRgCIAEoCBITCgZkZXRhaWwYAyABKAlIAIgBAUIJCgdfZGV0YWlsIusCChJXb3JrZXJDYXBhYmlsaXRpZXMSRgoVcHJvdmlkZXJfY2FwYWJpbGl0aWVzGAEgAygLMicuYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlckNhcGFiaWxpdHkSQwoOcmVtb3RlX3VwZGF0ZXMYAiABKAsyJi5icmlhci50eXBlcy52MS5SZW1vdGVVcGRhdGVDYXBhYmlsaXR5SACIAQESEQoJd29ya3RyZWVzGAMgASgIEjAKI29yZ2FuaXphdGlvbl9hZ2VudF9jb250ZXh0X3Byb3RvY29sGAQgASgNSAGIAQESSAoVd29ya2Zsb3dfcmVxdWlyZW1lbnRzGAUgAygLMikuYnJpYXIudHlwZXMudjEuV29ya2Zsb3dSZXF1aXJlbWVudEhlYWx0aEIRCg9fcmVtb3RlX3VwZGF0ZXNCJgokX29yZ2FuaXphdGlvbl9hZ2VudF9jb250ZXh0X3Byb3RvY29sIvoCChpXb3JrZXJSdW50aW1lQWR2ZXJ0aXNlbWVudBI1Cg5hZ2VudF9wcm92aWRlchgBIAEoDjIdLmJyaWFyLnR5cGVzLnYxLkFnZW50UHJvdmlkZXISMAoJcHJvdmlkZXJzGAIgAygOMh0uYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlchI8Cg9wcm92aWRlcl9oZWFsdGgYAyADKAsyIy5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVySGVhbHRoEjgKDGNhcGFiaWxpdGllcxgEIAEoCzIiLmJyaWFyLnR5cGVzLnYxLldvcmtlckNhcGFiaWxpdGllcxJKCgh2ZXJzaW9ucxgFIAMoCzI4LmJyaWFyLnR5cGVzLnYxLldvcmtlclJ1bnRpbWVBZHZlcnRpc2VtZW50LlZlcnNpb25zRW50cnkaLwoNVmVyc2lvbnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBQg66AgtCcmlhclR5cGVzX2IGcHJvdG8z", [file_briar_types_v1_provider]);
 
 /**
  * @generated from message briar.types.v1.AgentEffortCapability
@@ -143,6 +143,80 @@ export const RemoteUpdateCapabilitySchema: GenMessage<RemoteUpdateCapability> = 
   messageDesc(file_briar_types_v1_worker, 3);
 
 /**
+ * @generated from message briar.types.v1.AgentProviderHealth
+ */
+export type AgentProviderHealth = Message<"briar.types.v1.AgentProviderHealth"> & {
+  /**
+   * @generated from field: briar.types.v1.AgentProvider provider = 1;
+   */
+  provider: AgentProvider;
+
+  /**
+   * @generated from field: bool installed = 2;
+   */
+  installed: boolean;
+
+  /**
+   * @generated from field: bool authenticated = 3;
+   */
+  authenticated: boolean;
+
+  /**
+   * @generated from field: bool healthy = 4;
+   */
+  healthy: boolean;
+
+  /**
+   * @generated from field: optional string reason = 5;
+   */
+  reason?: string | undefined;
+
+  /**
+   * @generated from field: bool usage_exhausted = 6;
+   */
+  usageExhausted: boolean;
+
+  /**
+   * @generated from field: optional double max_used_percent = 7;
+   */
+  maxUsedPercent?: number | undefined;
+};
+
+/**
+ * Describes the message briar.types.v1.AgentProviderHealth.
+ * Use `create(AgentProviderHealthSchema)` to create a new message.
+ */
+export const AgentProviderHealthSchema: GenMessage<AgentProviderHealth> = /*@__PURE__*/
+  messageDesc(file_briar_types_v1_worker, 4);
+
+/**
+ * @generated from message briar.types.v1.WorkflowRequirementHealth
+ */
+export type WorkflowRequirementHealth = Message<"briar.types.v1.WorkflowRequirementHealth"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: bool healthy = 2;
+   */
+  healthy: boolean;
+
+  /**
+   * @generated from field: optional string detail = 3;
+   */
+  detail?: string | undefined;
+};
+
+/**
+ * Describes the message briar.types.v1.WorkflowRequirementHealth.
+ * Use `create(WorkflowRequirementHealthSchema)` to create a new message.
+ */
+export const WorkflowRequirementHealthSchema: GenMessage<WorkflowRequirementHealth> = /*@__PURE__*/
+  messageDesc(file_briar_types_v1_worker, 5);
+
+/**
  * @generated from message briar.types.v1.WorkerCapabilities
  */
 export type WorkerCapabilities = Message<"briar.types.v1.WorkerCapabilities"> & {
@@ -155,6 +229,21 @@ export type WorkerCapabilities = Message<"briar.types.v1.WorkerCapabilities"> & 
    * @generated from field: optional briar.types.v1.RemoteUpdateCapability remote_updates = 2;
    */
   remoteUpdates?: RemoteUpdateCapability | undefined;
+
+  /**
+   * @generated from field: bool worktrees = 3;
+   */
+  worktrees: boolean;
+
+  /**
+   * @generated from field: optional uint32 organization_agent_context_protocol = 4;
+   */
+  organizationAgentContextProtocol?: number | undefined;
+
+  /**
+   * @generated from field: repeated briar.types.v1.WorkflowRequirementHealth workflow_requirements = 5;
+   */
+  workflowRequirements: WorkflowRequirementHealth[];
 };
 
 /**
@@ -162,5 +251,42 @@ export type WorkerCapabilities = Message<"briar.types.v1.WorkerCapabilities"> & 
  * Use `create(WorkerCapabilitiesSchema)` to create a new message.
  */
 export const WorkerCapabilitiesSchema: GenMessage<WorkerCapabilities> = /*@__PURE__*/
-  messageDesc(file_briar_types_v1_worker, 4);
+  messageDesc(file_briar_types_v1_worker, 6);
+
+/**
+ * @generated from message briar.types.v1.WorkerRuntimeAdvertisement
+ */
+export type WorkerRuntimeAdvertisement = Message<"briar.types.v1.WorkerRuntimeAdvertisement"> & {
+  /**
+   * @generated from field: briar.types.v1.AgentProvider agent_provider = 1;
+   */
+  agentProvider: AgentProvider;
+
+  /**
+   * @generated from field: repeated briar.types.v1.AgentProvider providers = 2;
+   */
+  providers: AgentProvider[];
+
+  /**
+   * @generated from field: repeated briar.types.v1.AgentProviderHealth provider_health = 3;
+   */
+  providerHealth: AgentProviderHealth[];
+
+  /**
+   * @generated from field: briar.types.v1.WorkerCapabilities capabilities = 4;
+   */
+  capabilities?: WorkerCapabilities | undefined;
+
+  /**
+   * @generated from field: map<string, string> versions = 5;
+   */
+  versions: { [key: string]: string };
+};
+
+/**
+ * Describes the message briar.types.v1.WorkerRuntimeAdvertisement.
+ * Use `create(WorkerRuntimeAdvertisementSchema)` to create a new message.
+ */
+export const WorkerRuntimeAdvertisementSchema: GenMessage<WorkerRuntimeAdvertisement> = /*@__PURE__*/
+  messageDesc(file_briar_types_v1_worker, 7);
 
