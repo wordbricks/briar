@@ -25,20 +25,10 @@ import {
   validateIssueAttachments,
 } from "../../src/lib/issue-attachments";
 import {
-  normalizeAgentReplyAttachmentFile,
-  validateAgentReplyAttachments,
-} from "../../src/lib/agent-reply-attachments";
-import {
   isIssueAttachmentReference,
   issueAttachmentReferences,
 } from "../../src/lib/issue-markdown";
-import {
-  channelReplyCompleteInputSchema,
-} from "../../src/lib/channels-contract";
 import { HttpError } from "./http-response";
-import {
-  decodeIssueAgentReplyCompletion,
-} from "./issue-request-contract";
 import { decodeRequestSync } from "./request-schema";
 import { decodeRunEvidenceInput } from "./run-request-contract";
 import {
@@ -48,10 +38,6 @@ import {
   createIssueMessageApplicationRequest,
   updateIssueApplicationRequest,
 } from "./app-mutation-request-mappers";
-
-const decodeChannelReplyCompleteInput = decodeRequestSync(
-  channelReplyCompleteInputSchema,
-);
 
 async function readBoundedMultipartForm(
   request: Request,
@@ -218,65 +204,6 @@ export async function readRunEvidenceRequest(request: Request) {
     validateEvidenceImages,
   );
   return { input: decodeRunEvidenceInput(input), images };
-}
-
-async function readReplyCompleteRequest<Input>(
-  request: Request,
-  input: {
-    decode: (value: unknown) => Input;
-    replyLabel: string;
-  },
-) {
-  const form = await readBoundedMultipartForm(
-    request,
-    maxIssueMultipartBytes,
-    `${input.replyLabel} attachments exceed the 25MB total limit`,
-  );
-  if (!form) {
-    return {
-      input: input.decode(await readJson(request)),
-      attachments: [] as File[],
-    };
-  }
-  const payload = form.get("complete");
-  if (typeof payload !== "string") {
-    throw new HttpError(400, `Multipart ${input.replyLabel.toLowerCase()} JSON is required`);
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(payload);
-  } catch {
-    throw new HttpError(400, `Invalid multipart ${input.replyLabel.toLowerCase()} JSON`);
-  }
-  const attachments = readMultipartFiles(
-    form,
-    "attachments",
-    `${input.replyLabel} attachments must be files`,
-    validateAgentReplyAttachments,
-    normalizeAgentReplyAttachmentFile,
-  );
-  const decoded = input.decode(parsed);
-  if (
-    typeof decoded === "object" && decoded !== null &&
-    "error" in decoded && decoded.error && attachments.length > 0
-  ) {
-    throw new HttpError(400, "A failed reply cannot include attachments");
-  }
-  return { input: decoded, attachments };
-}
-
-export function readChannelReplyCompleteRequest(request: Request) {
-  return readReplyCompleteRequest(request, {
-    decode: decodeChannelReplyCompleteInput,
-    replyLabel: "Channel reply",
-  });
-}
-
-export function readIssueReplyCompleteRequest(request: Request) {
-  return readReplyCompleteRequest(request, {
-    decode: decodeIssueAgentReplyCompletion,
-    replyLabel: "Issue reply",
-  });
 }
 
 export async function readIssueMessageRequest(

@@ -1,59 +1,30 @@
-import { issueAttachmentMarkdown } from "../../src/lib/issue-markdown";
 import { workLogEntryTranscriptEvent } from "./agent-worklog";
 import { readLatestWorkLogForRunWithArchive } from "./agent-worklog-service";
 import {
   agentSkillJson,
 } from "./agent-skills";
-import {
-  prepareStoredAttachments,
-  uploadStoredAttachments,
-} from "./attachment-storage";
 import { sha256 } from "./crypto-digest";
 import { dashboardEventJson, dashboardRunJson } from "./dashboard-json";
 import {
-  agentSkillExecutionApprovalTablesAvailable,
   claimNextIssueAgentReply,
-  completeIssueAgentReplyOutput,
-  failIssueAgentReply,
-  getClaimedIssueAgentReply,
   getHuntRunForProject,
   getProjectAgent,
-  issueExecutionApprovalTablesAvailable,
   listHuntRunEvents,
-  listIssueActionProposals,
-  listIssueAgentSkillExecutionProposals,
   listIssueAttachments,
-  listIssueExecutionProposals,
-  listIssueReworkProposals,
   listRunEvidence,
-  type AgentSkillExecutionProposalRow,
-  type IssueExecutionProposalRow,
 } from "./db";
 import {
   issueReplyExecutionConfig,
   legacyAgentSkillInstructions,
 } from "./agent-execution-config";
-import { HttpError, json } from "./http-response";
-import {
-  deleteUnreferencedUploadedIssueObjects,
-} from "./issue-attachment-service";
-import {
-  claimConversationJson,
-  issueAgentReplyJson,
-  issueMessageJson,
-  type IssueProposalRow,
-} from "./issue-conversation-json";
+import { HttpError } from "./http-response";
+import { claimConversationJson } from "./issue-conversation-json";
 import { listIssueMessagesWithArchive } from "./issue-conversation-service";
-import { readIssueReplyCompleteRequest } from "./request-readers";
 import {
   issueActivityCredential,
-  scheduleIssueActivityClear,
   scheduleProjectRealtimePublish,
 } from "./realtime-scheduling";
-import {
-  type AuthenticatedWorkerProject,
-  requireWorkerProjectBinding,
-} from "./worker-route-auth";
+import { type AuthenticatedWorkerProject } from "./worker-route-auth";
 import { latestExecutionWorkerUpdateHandoff } from "./worker-update-repository";
 import {
   executionWorkerProviders,
@@ -314,220 +285,4 @@ export async function claimNextIssueReplyWork(input: {
           })),
         },
     };
-}
-
-export async function handleIssueReplyWorkerRoute(input: {
-  request: Request;
-  url: URL;
-  db: D1Database;
-  attachmentsBucket: R2Bucket;
-  env: Env;
-  context?: ExecutionContext;
-}): Promise<Response | undefined> {
-  const { request, url, db, attachmentsBucket, env, context } = input;
-
-  const issueReplyClaimMatch = url.pathname.match(
-    /^\/issue-reply-claims\/([0-9a-f-]+)\/complete$/u,
-  );
-  if (issueReplyClaimMatch && request.method === "POST") {
-    const { input, attachments } = await readIssueReplyCompleteRequest(request);
-    if (
-      (input.executionProposal ||
-        (input.proposedAction?.type === "request_issue_create" &&
-          input.proposedAction.executeAfterCreate)) &&
-      !(await issueExecutionApprovalTablesAvailable(db))
-    ) {
-      throw new HttpError(
-        503,
-        "Issue execution approval is not available during this upgrade",
-        "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
-      );
-    }
-    if (
-      input.skillExecutionProposal &&
-      !(await agentSkillExecutionApprovalTablesAvailable(db))
-    ) {
-      throw new HttpError(
-        503,
-        "Agent Skill execution approval is not available during this upgrade",
-        "AGENT_SKILL_EXECUTION_APPROVAL_UNAVAILABLE",
-      );
-    }
-    const worker = await requireWorkerProjectBinding(
-      db,
-      request,
-      input.projectId,
-      input.workerId,
-    );
-    const claimTokenHash = await sha256(input.claimToken);
-    const observedAt = new Date().toISOString();
-    const job = await getClaimedIssueAgentReply(
-      db,
-      input.projectId,
-      issueReplyClaimMatch[1],
-      { workerId: worker.binding.id, claimTokenHash, observedAt },
-    );
-    if (!job) throw new HttpError(409, "Reply claim is no longer active");
-    if (input.error) {
-      const failed = await failIssueAgentReply(
-        db,
-        input.projectId,
-        job.id,
-        {
-          workerId: worker.binding.id,
-          claimTokenHash,
-          error: input.error,
-          updatedAt: observedAt,
-        },
-      );
-      if (!failed) throw new HttpError(409, "Reply claim is no longer active");
-      scheduleProjectRealtimePublish(env, db, input.projectId, context);
-      scheduleIssueActivityClear(
-        env,
-        worker.principal.organizationId,
-        failed,
-        context,
-      );
-      return json({ agentReply: issueAgentReplyJson(failed) });
-    }
-    if (
-      input.skillExecutionProposal &&
-      (!job.skill_id || job.selected_skill_id_snapshot !== job.skill_id)
-    ) {
-      throw new HttpError(
-        409,
-        "Agent Skill execution requires the server-selected Skill",
-        "ISSUE_SKILL_EXECUTION_PROPOSAL_STALE",
-      );
-    }
-
-    const storedAttachments = prepareStoredAttachments(attachments, () => {
-      const id = crypto.randomUUID();
-      return {
-        id,
-        object_key: `issue-attachments/${input.projectId}/${job.run_id}/${id}`,
-      };
-    });
-    const completedAt = new Date().toISOString();
-    const replyBody = [
-      input.body!,
-      ...storedAttachments.map((attachment) =>
-        issueAttachmentMarkdown(attachment.id, attachment.filename)
-      ),
-    ].filter(Boolean).join("\n\n");
-    const uploadedKeys: string[] = [];
-    const discardUploadedReplyAttachments = () =>
-      deleteUnreferencedUploadedIssueObjects(
-        db,
-        attachmentsBucket,
-        uploadedKeys,
-      );
-    let completed: Awaited<ReturnType<typeof completeIssueAgentReplyOutput>> =
-      null;
-    try {
-      await uploadStoredAttachments(
-        attachmentsBucket,
-        storedAttachments,
-        uploadedKeys,
-        (attachment) => ({
-          attachmentId: attachment.id,
-          projectId: input.projectId,
-          runId: job.run_id,
-          messageId: job.reply_message_id,
-        }),
-      );
-      completed = await completeIssueAgentReplyOutput(
-        db,
-        input.projectId,
-        job.id,
-        {
-          workerId: worker.binding.id,
-          claimTokenHash,
-          completedAt,
-          output: {
-            body: replyBody,
-            proposedAction: input.proposedAction ?? null,
-            executionProposal: Boolean(input.executionProposal),
-            skillExecutionProposal: Boolean(input.skillExecutionProposal),
-            attachments: storedAttachments.map(
-              ({ file: _file, ...attachment }) => attachment,
-            ),
-          },
-        },
-      );
-    } catch (error) {
-      await discardUploadedReplyAttachments().catch(() => undefined);
-      throw error;
-    }
-    if (!completed) {
-      await discardUploadedReplyAttachments().catch(() => undefined);
-      throw new HttpError(409, "Reply claim is no longer active");
-    }
-    scheduleProjectRealtimePublish(env, db, input.projectId, context);
-    scheduleIssueActivityClear(
-      env,
-      worker.principal.organizationId,
-      completed,
-      context,
-    );
-    const [
-      messages,
-      reworkProposals,
-      actionProposals,
-      executionProposals,
-      skillExecutionProposals,
-    ] =
-      await Promise.all([
-        listIssueMessagesWithArchive(
-          db,
-          env.ARCHIVES,
-          input.projectId,
-          job.run_id,
-        ),
-        listIssueReworkProposals(db, input.projectId, job.run_id),
-        listIssueActionProposals(db, input.projectId, job.run_id),
-        listIssueExecutionProposals(db, input.projectId, job.run_id),
-        listIssueAgentSkillExecutionProposals(
-          db,
-          input.projectId,
-          job.run_id,
-        ),
-      ]);
-    const reply = messages.find(
-      (message) => message.id === job.reply_message_id,
-    ) ?? null;
-    if (!reply) throw new HttpError(409, "Agent reply could not be persisted");
-    const proposal: IssueProposalRow | null =
-      reworkProposals.find(
-        (candidate) => candidate.trigger_message_id === job.trigger_message_id,
-      ) ?? actionProposals.find(
-        (candidate) => candidate.trigger_message_id === job.trigger_message_id,
-      ) ?? null;
-    const executionProposal: IssueExecutionProposalRow | null =
-      executionProposals.find(
-        (candidate) => candidate.trigger_message_id === job.trigger_message_id,
-      ) ?? null;
-    const skillExecutionProposal: AgentSkillExecutionProposalRow | null =
-      skillExecutionProposals.find(
-        (candidate) => candidate.trigger_message_id === job.trigger_message_id,
-      ) ?? null;
-    return json({
-      agentReply: issueAgentReplyJson(completed),
-      message: issueMessageJson(
-        reply,
-        storedAttachments.map(({ file: _file, ...attachment }) => ({
-          ...attachment,
-          project_id: input.projectId,
-          run_id: job.run_id,
-          created_at: completedAt,
-        })),
-        proposal,
-        executionProposal,
-        skillExecutionProposal,
-      ),
-    });
-  }
-
-
-  return undefined;
 }

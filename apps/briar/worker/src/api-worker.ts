@@ -10,7 +10,6 @@ import { requireSession } from "./session-auth";
 import { handleAccountRoute } from "./account-routes";
 import { handleIssueConversationRoute } from "./issue-conversation-routes";
 import { handleIssueCoreRoute } from "./issue-core-routes";
-import { handleIssueReplyWorkerRoute } from "./issue-reply-worker-routes";
 import { handleChannelMessageRoute } from "./channel-message-routes";
 import { handleChannelOrganizationContextRoute } from "./channel-organization-context-routes";
 import { handleChannelReplyResultRoute } from "./channel-reply-result-routes";
@@ -244,16 +243,6 @@ async function route(
   });
   if (issueCoreResponse !== undefined) return issueCoreResponse;
 
-  const issueReplyWorkerResponse = await handleIssueReplyWorkerRoute({
-    request,
-    url,
-    db,
-    attachmentsBucket,
-    env,
-    context,
-  });
-  if (issueReplyWorkerResponse !== undefined) return issueReplyWorkerResponse;
-
   const channelOrganizationContextResponse =
     await handleChannelOrganizationContextRoute({
       request,
@@ -270,8 +259,6 @@ async function route(
     url,
     db,
     attachmentsBucket,
-    env,
-    context,
   });
   if (channelReplyResultResponse !== undefined) {
     return channelReplyResultResponse;

@@ -485,6 +485,43 @@ const recoverConcurrentReceipt = async (
   return completionResult(receipt, true);
 };
 
+const isReplyCompletionGuardAbort = (cause: unknown) =>
+  cause instanceof Error && [
+    "invalid reply completion receipt",
+    "invalid reply attachment upload state transition",
+  ].some((message) => cause.message.includes(message));
+
+const recoverReceiptOrGuardConflict = async (
+  db: D1Database,
+  input: ReplyClaimScope & {
+    requestId: string;
+    payloadHash: string;
+    observedAt: string;
+  },
+  services: ReplyCompletionApplicationServices,
+  originalCause: unknown,
+) => {
+  try {
+    return await recoverConcurrentReceipt(
+      db,
+      input,
+      services,
+      originalCause,
+    );
+  } catch (recoveredCause) {
+    if (recoveredCause !== originalCause) throw recoveredCause;
+    if (isReplyCompletionGuardAbort(originalCause)) throw claimConflict();
+    let claim;
+    try {
+      claim = await activeClaim(db, input, input.observedAt, services);
+    } catch {
+      throw originalCause;
+    }
+    if (!claim) throw claimConflict();
+    throw originalCause;
+  }
+};
+
 const issueAttachments = (attachments: ScopedReplyAttachmentUploadRow[]) =>
   attachments.map((attachment) => ({
     id: attachment.attachment_id,
@@ -493,6 +530,21 @@ const issueAttachments = (attachments: ScopedReplyAttachmentUploadRow[]) =>
     content_type: attachment.content_type,
     byte_size: attachment.byte_size,
   }));
+
+const channelExecutionTargetInSnapshot = (
+  claimed: { project_id: string | null; execution_target_ids_json?: string },
+  target: { projectId: string; runId: string },
+) => {
+  if (claimed.project_id !== target.projectId) return false;
+  try {
+    const values: unknown = JSON.parse(claimed.execution_target_ids_json ?? "");
+    return Array.isArray(values) &&
+      values.every((value) => typeof value === "string") &&
+      values.includes(target.runId);
+  } catch {
+    return false;
+  }
+};
 
 export async function completeIssueReplyApplication(
   input: {
@@ -612,10 +664,11 @@ export async function completeIssueReplyApplication(
     return { replayed: false, disposition, retainedUntil: null };
   } catch (cause) {
     if (cause instanceof ReplyCompletionApplicationError) throw cause;
-    return recoverConcurrentReceipt(input.db, {
+    return recoverReceiptOrGuardConflict(input.db, {
       ...scope,
       requestId: input.request.requestId,
       payloadHash,
+      observedAt,
     }, services, cause);
   }
 }
@@ -739,6 +792,15 @@ export async function completeChannelReplyApplication(
         );
       }
       if (
+        executionProposal &&
+        !channelExecutionTargetInSnapshot(claimed, executionProposal)
+      ) {
+        throw new ReplyCompletionApplicationError(
+          "claim_conflict",
+          "Issue execution target is outside the reply claim snapshot",
+        );
+      }
+      if (
         result.skillExecutionProposal &&
         (!claimed.skill_id ||
           claimed.selected_skill_id_snapshot !== claimed.skill_id ||
@@ -836,10 +898,11 @@ export async function completeChannelReplyApplication(
     return { replayed: false, disposition, retainedUntil };
   } catch (cause) {
     if (cause instanceof ReplyCompletionApplicationError) throw cause;
-    return recoverConcurrentReceipt(input.db, {
+    return recoverReceiptOrGuardConflict(input.db, {
       ...scope,
       requestId: input.request.requestId,
       payloadHash,
+      observedAt,
     }, services, cause);
   }
 }

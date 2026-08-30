@@ -25,6 +25,7 @@ import {
   createChannelMessage,
   enqueueChannelAgentReplies,
 } from "./channels";
+import type { IssueAgentReplyJobRow } from "./issue-agent-reply-repository";
 import {
   enqueueExpiredReplyAttachmentUploadCleanup,
   enqueueReplyUploadObjectCleanup,
@@ -774,6 +775,87 @@ describe("reply completion application", () => {
         ).bind(claim.workId).run();
       }
     }
+  });
+
+  it("preserves infrastructure failures while classifying a vanished claim", async () => {
+    for (const claimRemainsActive of [true, false]) {
+      const claim = await seedClaim();
+      const completion = completeIssueReplyInputFromProto(create(
+        CompleteIssueReplyRequestSchema,
+        {
+          requestId: crypto.randomUUID(),
+          projectId,
+          workerId,
+          work: identity(claim),
+          outcome: { case: "success", value: { body: "Done." } },
+        },
+      ));
+      const claimed = await db.prepare(
+        `select * from briar_issue_agent_reply_jobs where id = ?`,
+      ).bind(claim.workId).first<IssueAgentReplyJobRow>();
+      if (!claimed) throw new Error("Expected a claimed issue reply fixture");
+      const infrastructureFailure = new Error("D1 became unavailable");
+      const getClaimedIssueAgentReply = vi.fn()
+        .mockResolvedValueOnce(claimed)
+        .mockResolvedValueOnce(claimRemainsActive ? claimed : null);
+      const operation = completeIssueReplyApplication({
+        db,
+        env: env(),
+        worker,
+        request: completion,
+        observedAt: at(500 + sequence),
+      }, {
+        getClaimedIssueAgentReply,
+        findReplyCompletionReceipt: vi.fn(async () => null),
+        resolveReplyCompletionAttachments: vi.fn(async () => []),
+        completeIssueAgentReplyOutput: vi.fn(async () => {
+          throw infrastructureFailure;
+        }),
+      });
+      if (claimRemainsActive) {
+        await expect(operation).rejects.toBe(infrastructureFailure);
+      } else {
+        await expect(operation).rejects.toMatchObject({
+          reason: "claim_conflict",
+        });
+      }
+      expect(getClaimedIssueAgentReply).toHaveBeenCalledTimes(2);
+    }
+
+    const claim = await seedClaim();
+    const completion = completeIssueReplyInputFromProto(create(
+      CompleteIssueReplyRequestSchema,
+      {
+        requestId: crypto.randomUUID(),
+        projectId,
+        workerId,
+        work: identity(claim),
+        outcome: { case: "success", value: { body: "Done." } },
+      },
+    ));
+    const guardedAbort = new Error(
+      "D1_ERROR: invalid reply completion receipt: SQLITE_CONSTRAINT_TRIGGER",
+    );
+    const claimed = await db.prepare(
+      `select * from briar_issue_agent_reply_jobs where id = ?`,
+    ).bind(claim.workId).first<IssueAgentReplyJobRow>();
+    if (!claimed) throw new Error("Expected a claimed issue reply fixture");
+    const getClaimedIssueAgentReply = vi.fn(async () => claimed);
+    await expect(completeIssueReplyApplication({
+      db,
+      env: env(),
+      worker,
+      request: completion,
+      observedAt: at(500 + sequence),
+    }, {
+      getClaimedIssueAgentReply,
+      findReplyCompletionReceipt: vi.fn(async () => null),
+      resolveReplyCompletionAttachments: vi.fn(async () => []),
+      completeIssueAgentReplyOutput: vi.fn(async () => {
+        throw guardedAbort;
+      }),
+    })).rejects.toMatchObject({ reason: "claim_conflict" });
+    expect(getClaimedIssueAgentReply).toHaveBeenCalledOnce();
   });
 
   it("keeps failed R2 cleanup durable and retries with generation CAS", async () => {

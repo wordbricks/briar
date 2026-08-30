@@ -1,3 +1,9 @@
+import { create } from "@bufbuild/protobuf";
+import {
+  CompleteIssueReplyRequestSchema,
+  IssueReplyClaimIdentitySchema,
+  WorkClaimIdentitySchema,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { createHash } from "node:crypto";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -28,7 +34,6 @@ import {
   reserveIssueExecutionProposalApproval,
   transferIssue,
 } from "./db";
-import apiWorker from "./index";
 import {
   acceptOrganizationChannelExecutionProposal,
   acceptOrganizationChannelProposal,
@@ -41,6 +46,8 @@ import { HttpError } from "./http-response";
 import { createOrganizationAgent } from "./organization-agents";
 import { RequestDecodeError } from "./request-schema";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
+import { completeIssueReplyApplication } from "./worker-reply-completion-application";
+import { completeIssueReplyInputFromProto } from "./worker-reply-completion-mappers";
 import {
   dispatchHuntRun,
   registerExecutionWorker,
@@ -392,12 +399,10 @@ describe("conversational issue execution approval", () => {
 
   const worker = {
     fetch: (
-      input: Request | ChannelProposalApplicationCall | IssueProposalApplicationCall,
+      input: ChannelProposalApplicationCall | IssueProposalApplicationCall,
       runtimeEnv: Env,
     ) =>
-      input instanceof Request
-        ? apiWorker.fetch(input, runtimeEnv)
-        : "channelId" in input
+      "channelId" in input
         ? invokeChannelProposal(input, runtimeEnv)
         : invokeIssueProposal(input),
   };
@@ -540,29 +545,43 @@ describe("conversational issue execution approval", () => {
     };
   };
 
-  const completeIssueReplyRequest = (
+  const completeIssueReply = async (
     jobId: string,
+    runId: string,
     claimToken: string,
-    body: Record<string, unknown> = {
-      body: "실행 설정을 선택하고 승인해 주세요.",
-      executionProposal: { type: "request_issue_execute" },
+    body = "실행 설정을 선택하고 승인해 주세요.",
+  ) => completeIssueReplyApplication({
+    db,
+    env: env(),
+    worker: {
+      principal: { organizationId, deviceId: "execution-device" },
+      binding: { id: "execution-any-worker", project_id: projectAId },
     },
-  ) => new Request(
-    `https://briar.example/issue-reply-claims/${jobId}/complete`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${executionWorkerCredential}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
+    request: completeIssueReplyInputFromProto(create(
+      CompleteIssueReplyRequestSchema,
+      {
+        requestId: crypto.randomUUID(),
         projectId: projectAId,
         workerId: "execution-any-worker",
-        claimToken,
-        ...body,
-      }),
-    },
-  );
+        work: create(WorkClaimIdentitySchema, {
+          workId: jobId,
+          runId,
+          claimToken,
+          work: {
+            case: "issueReply",
+            value: create(IssueReplyClaimIdentitySchema),
+          },
+        }),
+        outcome: {
+          case: "success",
+          value: {
+            body,
+            action: { case: "execution", value: {} },
+          },
+        },
+      },
+    )),
+  });
 
   it("dispatches only after explicit approval and finalizes both audits atomically", async () => {
     const { runId, proposalId } = await seedIssueProposal();
@@ -679,23 +698,11 @@ describe("conversational issue execution approval", () => {
 
   it("atomically persists an Issue Agent execution card from its live lease", async () => {
     const seeded = await seedClaimedIssueReply();
-    const response = await worker.fetch(
-      completeIssueReplyRequest(seeded.jobId, seeded.claimToken),
-      env(),
+    await completeIssueReply(
+      seeded.jobId,
+      seeded.runId,
+      seeded.claimToken,
     );
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      agentReply: { status: "completed" },
-      message: {
-        id: seeded.replyMessageId,
-        executionProposal: {
-          type: "request_issue_execute",
-          status: "pending",
-          projectId: projectAId,
-          runId: seeded.runId,
-        },
-      },
-    });
     await expect(db.prepare(
       `select status, claim_token_hash, lease_expires_at
        from briar_issue_agent_reply_jobs where id = ?`,
@@ -756,11 +763,11 @@ describe("conversational issue execution approval", () => {
       seeded.jobId,
     ).run();
 
-    const stale = await worker.fetch(
-      completeIssueReplyRequest(seeded.jobId, oldToken),
-      env(),
-    );
-    expect(stale.status).toBe(409);
+    await expect(completeIssueReply(
+      seeded.jobId,
+      seeded.runId,
+      oldToken,
+    )).rejects.toMatchObject({ reason: "claim_conflict" });
     await expect(db.prepare(
       `select count(*) as count from briar_issue_messages where id = ?`,
     ).bind(seeded.replyMessageId).first()).resolves.toEqual({ count: 0 });
@@ -769,19 +776,22 @@ describe("conversational issue execution approval", () => {
        where reply_message_id = ?`,
     ).bind(seeded.replyMessageId).first()).resolves.toEqual({ count: 0 });
 
-    const current = await worker.fetch(
-      completeIssueReplyRequest(seeded.jobId, newToken, {
-        body: "새 claim이 만든 승인 카드입니다.",
-        executionProposal: { type: "request_issue_execute" },
-      }),
-      env(),
+    await completeIssueReply(
+      seeded.jobId,
+      seeded.runId,
+      newToken,
+      "새 claim이 만든 승인 카드입니다.",
     );
-    expect(current.status).toBe(200);
-    await expect(current.json()).resolves.toMatchObject({
-      message: {
-        body: "새 claim이 만든 승인 카드입니다.",
-        executionProposal: { status: "pending" },
-      },
+    await expect(db.prepare(
+      `select body from briar_issue_messages where id = ?`,
+    ).bind(seeded.replyMessageId).first()).resolves.toEqual({
+      body: "새 claim이 만든 승인 카드입니다.",
+    });
+    await expect(db.prepare(
+      `select status from briar_issue_execution_proposals
+       where reply_message_id = ?`,
+    ).bind(seeded.replyMessageId).first()).resolves.toEqual({
+      status: "pending",
     });
   });
 
