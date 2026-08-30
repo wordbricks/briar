@@ -42,17 +42,29 @@ struct CurrentUser: Equatable, Sendable {
 
 struct AuthenticatedMobileServices: Sendable {
     let account: any BriarAPI_AccountServiceClientInterface
+    let project: any BriarAPI_ProjectServiceClientInterface
     let dashboard: any BriarAPI_DashboardServiceClientInterface
     let inbox: any BriarAPI_InboxServiceClientInterface
+    let issue: any BriarAPI_IssueServiceClientInterface
+    let channel: any BriarAPI_ChannelServiceClientInterface
+    let agent: any BriarAPI_AgentServiceClientInterface
 
     init(
         account: any BriarAPI_AccountServiceClientInterface,
+        project: any BriarAPI_ProjectServiceClientInterface,
         dashboard: any BriarAPI_DashboardServiceClientInterface,
-        inbox: any BriarAPI_InboxServiceClientInterface
+        inbox: any BriarAPI_InboxServiceClientInterface,
+        issue: any BriarAPI_IssueServiceClientInterface,
+        channel: any BriarAPI_ChannelServiceClientInterface,
+        agent: any BriarAPI_AgentServiceClientInterface
     ) {
         self.account = account
+        self.project = project
         self.dashboard = dashboard
         self.inbox = inbox
+        self.issue = issue
+        self.channel = channel
+        self.agent = agent
     }
 
     init(baseURL: URL, session: URLSession, token: String) {
@@ -67,8 +79,12 @@ struct AuthenticatedMobileServices: Sendable {
             )
         )
         account = BriarAPI_AccountServiceClient(client: protocolClient)
+        project = BriarAPI_ProjectServiceClient(client: protocolClient)
         dashboard = BriarAPI_DashboardServiceClient(client: protocolClient)
         inbox = BriarAPI_InboxServiceClient(client: protocolClient)
+        issue = BriarAPI_IssueServiceClient(client: protocolClient)
+        channel = BriarAPI_ChannelServiceClient(client: protocolClient)
+        agent = BriarAPI_AgentServiceClient(client: protocolClient)
     }
 }
 

@@ -22,6 +22,7 @@ final class CompanionStore: ObservableObject {
 
     private let api: any MobileAPIClientProtocol
     private let accountService: (any BriarAPI_AccountServiceClientInterface)?
+    private let projectService: (any BriarAPI_ProjectServiceClientInterface)?
     private let defaults: UserDefaults
     private var activeToken: String?
     private var sessionGeneration = 0
@@ -35,10 +36,12 @@ final class CompanionStore: ObservableObject {
     init(
         api: any MobileAPIClientProtocol,
         accountService: (any BriarAPI_AccountServiceClientInterface)? = nil,
+        projectService: (any BriarAPI_ProjectServiceClientInterface)? = nil,
         defaults: UserDefaults = .standard
     ) {
         self.api = api
         self.accountService = accountService
+        self.projectService = projectService
         self.defaults = defaults
     }
 
@@ -59,17 +62,23 @@ final class CompanionStore: ObservableObject {
             }
         }
         do {
-            let account = try accountService ?? authenticatedMobileServices(
-                for: api,
-                token: token
-            ).account
+            let services = try (accountService == nil || projectService == nil)
+                ? authenticatedMobileServices(for: api, token: token)
+                : nil
+            guard let account = accountService ?? services?.account,
+                  let project = projectService ?? services?.project
+            else { throw MobileAPIError.invalidRequest }
             async let userResponse = account.getCurrentUser(
                 request: BriarAPI_GetCurrentUserRequest(),
                 headers: [:]
             )
-            async let projectResponse = api.listProjects(token: token)
+            async let projectResponse = project.listProjects(
+                request: BriarAPI_ListProjectsRequest(),
+                headers: [:]
+            )
             let (accountResponse, loadedProjects) = try await (userResponse, projectResponse)
             let loadedUser = try CurrentUser(connectMessage: accountResponse.briarValue())
+            let projects = try loadedProjects.briarValue().projects.map(Project.init(connectMessage:))
             guard
                 activeToken == token,
                 expectedGeneration == sessionGeneration,
@@ -77,10 +86,10 @@ final class CompanionStore: ObservableObject {
             else { throw CancellationError() }
             user = loadedUser
             if expectedCatalogRevision == projectCatalogRevision {
-                applyProjectCatalog(loadedProjects.projects)
+                applyProjectCatalog(projects)
             }
             let currentProjects = expectedCatalogRevision == projectCatalogRevision
-                ? loadedProjects.projects
+                ? projects
                 : projects
             let storedProjectID = Self.storedProjectID(
                 for: loadedUser.id,
@@ -112,13 +121,21 @@ final class CompanionStore: ObservableObject {
         projectCatalogRevision &+= 1
         let expectedCatalogRevision = projectCatalogRevision
         do {
-            let response = try await api.listProjects(token: token)
+            let project = try projectService ?? authenticatedMobileServices(
+                for: api,
+                token: token
+            ).project
+            let response = await project.listProjects(
+                request: BriarAPI_ListProjectsRequest(),
+                headers: [:]
+            )
+            let projects = try response.briarValue().projects.map(Project.init(connectMessage:))
             guard
                 activeToken == token,
                 expectedGeneration == sessionGeneration,
                 expectedCatalogRevision == projectCatalogRevision
             else { throw CancellationError() }
-            applyProjectCatalog(response.projects)
+            applyProjectCatalog(projects)
             if let selectedProjectID,
                !projects.contains(where: { $0.id == selectedProjectID }) {
                 self.selectedProjectID = Self.defaultProjectID(for: projects)
