@@ -1,4 +1,5 @@
 import Foundation
+import SwiftProtobuf
 
 struct ProjectAgent: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
@@ -9,6 +10,8 @@ struct ProjectAgent: Codable, Equatable, Identifiable, Sendable {
     let provider: AgentProvider
     let model: String?
     let effort: ModelEffort?
+    let designatedWorkerId: String?
+    let designatedWorkerLabel: String?
     let description: String?
     let responsibility: String
     let skill: String
@@ -16,6 +19,44 @@ struct ProjectAgent: Codable, Equatable, Identifiable, Sendable {
     let calendarColor: String
     let createdAt: Date
     let updatedAt: Date
+
+    init(
+        id: UUID,
+        projectId: UUID,
+        name: String,
+        avatar: String?,
+        codexPet: CodexPet?,
+        provider: AgentProvider,
+        model: String?,
+        effort: ModelEffort?,
+        designatedWorkerId: String? = nil,
+        designatedWorkerLabel: String? = nil,
+        description: String?,
+        responsibility: String,
+        skill: String,
+        skills: [Skill],
+        calendarColor: String,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.projectId = projectId
+        self.name = name
+        self.avatar = avatar
+        self.codexPet = codexPet
+        self.provider = provider
+        self.model = model
+        self.effort = effort
+        self.designatedWorkerId = designatedWorkerId
+        self.designatedWorkerLabel = designatedWorkerLabel
+        self.description = description
+        self.responsibility = responsibility
+        self.skill = skill
+        self.skills = skills
+        self.calendarColor = calendarColor
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
 
     var displayDescription: String? {
         guard let description = description?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -45,19 +86,76 @@ struct ProjectAgent: Codable, Equatable, Identifiable, Sendable {
         let model: String?
         let effort: ModelEffort?
         let kind: Kind
+        let description: String?
+        let executionMode: ExecutionMode
+        let approvalPolicy: ApprovalPolicy
         let position: Int
         let createdAt: Date
         let updatedAt: Date
+
+        init(
+            id: UUID,
+            agentId: UUID,
+            name: String,
+            instructions: String,
+            provider: AgentProvider,
+            model: String?,
+            effort: ModelEffort?,
+            kind: Kind,
+            description: String? = nil,
+            executionMode: ExecutionMode = .task,
+            approvalPolicy: ApprovalPolicy = .explicit,
+            position: Int,
+            createdAt: Date,
+            updatedAt: Date
+        ) {
+            self.id = id
+            self.agentId = agentId
+            self.name = name
+            self.instructions = instructions
+            self.provider = provider
+            self.model = model
+            self.effort = effort
+            self.kind = kind
+            self.description = description
+            self.executionMode = executionMode
+            self.approvalPolicy = approvalPolicy
+            self.position = position
+            self.createdAt = createdAt
+            self.updatedAt = updatedAt
+        }
 
         enum Kind: String, Codable, Sendable {
             case issueProcessing = "issue_processing"
             case custom
         }
+
+        enum ExecutionMode: String, Codable, Sendable {
+            case conversation
+            case task
+        }
+
+        enum ApprovalPolicy: String, Codable, Sendable {
+            case invokeIsConsent = "invoke_is_consent"
+            case explicit
+        }
     }
 }
 
-struct ProjectAgentsResponse: Codable, Equatable, Sendable {
-    let agents: [ProjectAgent]
+struct ProjectAgentSessionsSync: Equatable, Sendable {
+    let cursor: Int
+    let hasMore: Bool
+    let reset: Bool
+    let sessions: [ProjectAgentSession]
+    let deletedSessionIDs: [String]
+
+    init(connectMessage message: BriarAPI_SyncProjectAgentSessionsResponse) throws {
+        cursor = try agentSafeInt(message.cursor)
+        hasMore = message.hasMore_p
+        reset = message.reset
+        sessions = try message.sessions.map { try ProjectAgentSession(connectMessage: $0) }
+        deletedSessionIDs = message.deletedSessionIds
+    }
 }
 
 /// An Agent-authored request to run one immutable saved Skill. The Agent,
@@ -178,7 +276,7 @@ struct AgentSkillExecutionProposal: Codable, Equatable, Hashable, Identifiable, 
         self.delegatedByAgentName = delegatedByAgentName
     }
 
-    init(from decoder: Decoder) throws {
+    init(from decoder: Swift.Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         type = try container.decode(Kind.self, forKey: .type)
@@ -223,7 +321,7 @@ struct AgentSkillExecutionProposal: Codable, Equatable, Hashable, Identifiable, 
         )
     }
 
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Swift.Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(type, forKey: .type)
@@ -265,6 +363,7 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
     let scheduleRunId: String?
     let parentSessionId: String?
     let request: String?
+    let followUps: [FollowUp]?
     let status: Status
     let issues: [Issue]
     let startedAt: Date
@@ -278,6 +377,7 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
     let error: String?
     let events: [Event]?
     let updatedAt: Date?
+    let archived: Bool?
 
     init(
         id: String,
@@ -292,6 +392,7 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
         scheduleRunId: String?,
         parentSessionId: String?,
         request: String?,
+        followUps: [FollowUp]? = nil,
         status: Status,
         issues: [Issue],
         startedAt: Date,
@@ -304,7 +405,8 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
         error: String?,
         events: [Event]?,
         updatedAt: Date?,
-        requestedByUserId: String? = nil
+        requestedByUserId: String? = nil,
+        archived: Bool? = nil
     ) {
         self.id = id
         self.projectId = projectId
@@ -318,6 +420,7 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
         self.scheduleRunId = scheduleRunId
         self.parentSessionId = parentSessionId
         self.request = request
+        self.followUps = followUps
         self.status = status
         self.issues = issues
         self.startedAt = startedAt
@@ -331,6 +434,7 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
         self.error = error
         self.events = events
         self.updatedAt = updatedAt
+        self.archived = archived
     }
 
     enum SessionType: String, Codable, Sendable {
@@ -409,6 +513,12 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
         }
     }
 
+    struct FollowUp: Codable, Equatable, Identifiable, Sendable {
+        let id: String
+        let message: String
+        let sentAt: Date
+    }
+
     var title: String {
         if let request, !request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return request
@@ -430,38 +540,6 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-struct ProjectAgentTaskRequest: Codable, Equatable, Sendable {
-    let agentId: UUID
-    let skillId: UUID
-    let request: String
-    let workerId: String
-    let requestId: UUID
-
-    private enum CodingKeys: String, CodingKey {
-        case agentId
-        case skillId
-        case request
-        case workerId
-        case requestId
-    }
-
-    /// Agent and Skill IDs are stored as lowercase strings and compared
-    /// case-sensitively. Foundation's synthesized UUID encoding uses uppercase
-    /// characters, so keep every UUID request field in the API's canonical form.
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(agentId.uuidString.lowercased(), forKey: .agentId)
-        try container.encode(skillId.uuidString.lowercased(), forKey: .skillId)
-        try container.encode(request, forKey: .request)
-        try container.encode(workerId, forKey: .workerId)
-        try container.encode(requestId.uuidString.lowercased(), forKey: .requestId)
-    }
-}
-
-struct ProjectAgentTaskResponse: Codable, Equatable, Sendable {
-    let session: ProjectAgentSession
-}
-
 struct AcceptAgentSkillExecutionProposalRequest: Codable, Equatable, Sendable {
     let workerId: String?
 }
@@ -478,111 +556,426 @@ struct AcceptAgentSkillExecutionProposalResponse: Codable, Equatable, Sendable {
     }
 }
 
-struct ProjectAgentSessionsResponse: Codable, Equatable, Sendable {
-    let sessions: [ProjectAgentSession]
+extension ProjectAgent {
+    init(connectMessage message: BriarAPI_ProjectAgent) throws {
+        guard
+            let id = UUID(uuidString: message.id),
+            let projectID = UUID(uuidString: message.projectID),
+            message.hasCreatedAt,
+            message.hasUpdatedAt
+        else {
+            throw MobileAPIError.invalidResponse
+        }
+
+        self.init(
+            id: id,
+            projectId: projectID,
+            name: message.name,
+            avatar: message.hasAvatar ? message.avatar : nil,
+            codexPet: message.hasCodexPet
+                ? try CodexPet(connectMessage: message.codexPet)
+                : nil,
+            provider: try AgentProvider(connectMessage: message.provider),
+            model: message.hasModel ? message.model : nil,
+            effort: message.hasEffort ? ModelEffort(rawValue: message.effort) : nil,
+            designatedWorkerId: message.hasDesignatedWorkerID
+                ? message.designatedWorkerID
+                : nil,
+            designatedWorkerLabel: message.hasDesignatedWorkerLabel
+                ? message.designatedWorkerLabel
+                : nil,
+            description: message.hasDescription_p ? message.description_p : nil,
+            responsibility: message.responsibility,
+            skill: message.skill,
+            skills: try message.skills.map { try Skill(connectMessage: $0) },
+            calendarColor: message.calendarColor,
+            createdAt: message.createdAt.date,
+            updatedAt: message.updatedAt.date
+        )
+    }
 }
 
-struct ProjectAgentSessionResponse: Codable, Equatable, Sendable {
-    let session: ProjectAgentSession
+private extension ProjectAgent.CodexPet {
+    init(connectMessage message: BriarAPI_CodexPet) throws {
+        self.init(
+            slug: message.slug,
+            name: message.name,
+            author: message.hasAuthor ? message.author : nil,
+            license: message.hasLicense ? message.license : nil,
+            spriteVersion: message.hasSpriteVersion
+                ? try agentSafeInt(message.spriteVersion)
+                : nil,
+            spriteSheetUrl: message.hasSpriteSheetURL ? message.spriteSheetURL : nil
+        )
+    }
 }
 
-struct ProjectAgentSessionSyncRequest: Codable, Sendable {
-    let dispatchGroupId: String
-    let agentId: UUID?
-    let agentName: String?
-    let skillId: UUID?
-    let sessionType: ProjectAgentSession.SessionType
-    let trigger: ProjectAgentSession.Trigger?
-    let scheduleId: String?
-    let scheduleRunId: String?
-    let parentSessionId: String?
-    let request: String?
-    let status: ProjectAgentSession.Status
-    let issues: [ProjectAgentSession.Issue]
-    let startedAt: Date
-    let completedAt: Date?
-    let conversationId: String?
-    let summary: String?
-    let error: String?
-    let events: [ProjectAgentSession.Event]
-    let updatedAt: Date
-
-    init(session: ProjectAgentSession) {
-        dispatchGroupId = session.dispatchGroupId ?? session.id
-        agentId = session.agentId
-        agentName = session.agentName
-        skillId = session.skillId
-        sessionType = session.sessionType ?? .dispatch
-        trigger = session.trigger
-        scheduleId = session.scheduleId
-        scheduleRunId = session.scheduleRunId
-        parentSessionId = session.parentSessionId
-        request = session.request
-        status = session.status
-        issues = session.issues
-        startedAt = session.startedAt
-        completedAt = session.completedAt
-        conversationId = session.conversationId
-        summary = session.summary
-        error = session.error
-        events = session.events ?? []
-        updatedAt = session.updatedAt ?? session.completedAt ?? session.startedAt
+private extension ProjectAgent.Skill {
+    init(connectMessage message: BriarAPI_ProjectAgentSkill) throws {
+        guard
+            let id = UUID(uuidString: message.id),
+            let agentID = UUID(uuidString: message.agentID),
+            message.hasCreatedAt,
+            message.hasUpdatedAt
+        else {
+            throw MobileAPIError.invalidResponse
+        }
+        let kind: Kind
+        switch message.kind {
+        case .issueProcessing:
+            kind = .issueProcessing
+        case .custom:
+            kind = .custom
+        case .unspecified, .UNRECOGNIZED:
+            throw MobileAPIError.invalidResponse
+        }
+        let executionMode: ExecutionMode
+        switch message.executionMode {
+        case .conversation:
+            executionMode = .conversation
+        case .task:
+            executionMode = .task
+        case .unspecified, .UNRECOGNIZED:
+            throw MobileAPIError.invalidResponse
+        }
+        let approvalPolicy: ApprovalPolicy
+        switch message.approvalPolicy {
+        case .invokeIsConsent:
+            approvalPolicy = .invokeIsConsent
+        case .explicit:
+            approvalPolicy = .explicit
+        case .unspecified, .UNRECOGNIZED:
+            throw MobileAPIError.invalidResponse
+        }
+        self.init(
+            id: id,
+            agentId: agentID,
+            name: message.name,
+            instructions: message.body,
+            provider: try AgentProvider(connectMessage: message.provider),
+            model: message.hasModel ? message.model : nil,
+            effort: message.hasEffort ? ModelEffort(rawValue: message.effort) : nil,
+            kind: kind,
+            description: message.description_p.isEmpty ? nil : message.description_p,
+            executionMode: executionMode,
+            approvalPolicy: approvalPolicy,
+            position: try agentSafeInt(message.position),
+            createdAt: message.createdAt.date,
+            updatedAt: message.updatedAt.date
+        )
     }
+}
 
-    private enum CodingKeys: String, CodingKey {
-        case dispatchGroupId
-        case agentId
-        case agentName
-        case skillId
-        case sessionType
-        case trigger
-        case scheduleId
-        case scheduleRunId
-        case parentSessionId
-        case request
-        case status
-        case issues
-        case startedAt
-        case completedAt
-        case conversationId
-        case summary
-        case error
-        case events
-        case updatedAt
-    }
+extension ProjectAgentSession {
+    init(connectMessage message: BriarAPI_ProjectAgentSession) throws {
+        guard
+            !message.id.isEmpty,
+            let projectID = UUID(uuidString: message.projectID),
+            message.hasStartedAt
+        else {
+            throw MobileAPIError.invalidResponse
+        }
 
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(dispatchGroupId, forKey: .dispatchGroupId)
-        try encode(agentId, forKey: .agentId, into: &container)
-        try encode(agentName, forKey: .agentName, into: &container)
-        try encode(skillId, forKey: .skillId, into: &container)
-        try container.encode(sessionType, forKey: .sessionType)
-        try encode(trigger, forKey: .trigger, into: &container)
-        try encode(scheduleId, forKey: .scheduleId, into: &container)
-        try encode(scheduleRunId, forKey: .scheduleRunId, into: &container)
-        try encode(parentSessionId, forKey: .parentSessionId, into: &container)
-        try encode(request, forKey: .request, into: &container)
-        try container.encode(status, forKey: .status)
-        try container.encode(issues, forKey: .issues)
-        try container.encode(startedAt, forKey: .startedAt)
-        try encode(completedAt, forKey: .completedAt, into: &container)
-        try encode(conversationId, forKey: .conversationId, into: &container)
-        try encode(summary, forKey: .summary, into: &container)
-        try encode(error, forKey: .error, into: &container)
-        try container.encode(events, forKey: .events)
-        try container.encode(updatedAt, forKey: .updatedAt)
-    }
-
-    private func encode<Value: Encodable, Key: CodingKey>(
-        _ value: Value?,
-        forKey key: Key,
-        into container: inout KeyedEncodingContainer<Key>
-    ) throws {
-        if let value {
-            try container.encode(value, forKey: key)
+        let sessionType: SessionType?
+        if message.hasSessionType {
+            switch message.sessionType {
+            case .task:
+                sessionType = .task
+            case .dispatch:
+                sessionType = .dispatch
+            case .unspecified, .UNRECOGNIZED:
+                throw MobileAPIError.invalidResponse
+            }
         } else {
-            try container.encodeNil(forKey: key)
+            sessionType = nil
+        }
+
+        let trigger: Trigger?
+        if message.hasTrigger {
+            switch message.trigger {
+            case .manual:
+                trigger = .manual
+            case .scheduled:
+                trigger = .scheduled
+            case .unspecified, .UNRECOGNIZED:
+                throw MobileAPIError.invalidResponse
+            }
+        } else {
+            trigger = nil
+        }
+
+        let status: Status
+        switch message.status {
+        case .running:
+            status = .running
+        case .completed:
+            status = .completed
+        case .failed:
+            status = .failed
+        case .skipped:
+            status = .skipped
+        case .interrupted:
+            status = .interrupted
+        case .unspecified, .UNRECOGNIZED:
+            throw MobileAPIError.invalidResponse
+        }
+
+        self.init(
+            id: message.id,
+            projectId: projectID,
+            dispatchGroupId: message.hasDispatchGroupID ? message.dispatchGroupID : nil,
+            agentId: try agentOptionalUUID(message.agentID, isPresent: message.hasAgentID),
+            agentName: message.hasAgentName ? message.agentName : nil,
+            skillId: try agentOptionalUUID(message.skillID, isPresent: message.hasSkillID),
+            sessionType: sessionType,
+            trigger: trigger,
+            scheduleId: message.hasScheduleID ? message.scheduleID : nil,
+            scheduleRunId: message.hasScheduleRunID ? message.scheduleRunID : nil,
+            parentSessionId: message.hasParentSessionID ? message.parentSessionID : nil,
+            request: message.hasRequest ? message.request : nil,
+            followUps: try message.followUps.map { try FollowUp(connectMessage: $0) },
+            status: status,
+            issues: try message.issues.map { try Issue(connectMessage: $0) },
+            startedAt: message.startedAt.date,
+            completedAt: message.hasCompletedAt ? message.completedAt.date : nil,
+            conversationId: message.hasConversationID ? message.conversationID : nil,
+            workspaceRoot: nil,
+            requestedWorkerId: message.hasRequestedWorkerID ? message.requestedWorkerID : nil,
+            workerId: message.hasWorkerID ? message.workerID : nil,
+            summary: message.hasSummary ? message.summary : nil,
+            error: message.hasError ? message.error : nil,
+            events: try message.events.map { try Event(connectMessage: $0) },
+            updatedAt: message.hasUpdatedAt ? message.updatedAt.date : nil,
+            requestedByUserId: message.hasRequestedByUserID ? message.requestedByUserID : nil,
+            archived: message.archived
+        )
+    }
+
+    func putConnectRequest(projectID: UUID) throws -> BriarAPI_PutProjectAgentSessionRequest {
+        var request = BriarAPI_PutProjectAgentSessionRequest()
+        request.projectID = projectID.uuidString.lowercased()
+        request.sessionID = id
+        request.dispatchGroupID = dispatchGroupId ?? id
+        if let agentId { request.agentID = agentId.uuidString.lowercased() }
+        if let agentName { request.agentName = agentName }
+        if let skillId { request.skillID = skillId.uuidString.lowercased() }
+        request.sessionType = switch sessionType ?? .dispatch {
+        case .task: .task
+        case .dispatch: .dispatch
+        }
+        if let trigger {
+            request.trigger = switch trigger {
+            case .manual: .manual
+            case .scheduled: .scheduled
+            }
+        }
+        if let scheduleId { request.scheduleID = scheduleId }
+        if let scheduleRunId { request.scheduleRunID = scheduleRunId }
+        if let parentSessionId { request.parentSessionID = parentSessionId }
+        if let requestText = self.request { request.request = requestText }
+        request.followUps = try (followUps ?? []).map { try $0.connectMessage() }
+        request.status = switch status {
+        case .running: .running
+        case .completed: .completed
+        case .failed: .failed
+        case .skipped: .skipped
+        case .interrupted: .interrupted
+        }
+        request.issues = try issues.map { try $0.connectMessage() }
+        request.startedAt = .init(date: startedAt)
+        if let completedAt { request.completedAt = .init(date: completedAt) }
+        if let conversationId { request.conversationID = conversationId }
+        if let summary { request.summary = summary }
+        if let error { request.error = error }
+        if let requestedWorkerId { request.requestedWorkerID = requestedWorkerId }
+        if let workerId { request.workerID = workerId }
+        request.events = (events ?? []).map(\.connectMessage)
+        request.updatedAt = .init(date: updatedAt ?? completedAt ?? startedAt)
+        return request
+    }
+
+    func preservingLocalFields(from local: ProjectAgentSession) -> ProjectAgentSession {
+        guard workspaceRoot == nil, local.workspaceRoot != nil else { return self }
+        return ProjectAgentSession(
+            id: id,
+            projectId: projectId,
+            dispatchGroupId: dispatchGroupId,
+            agentId: agentId,
+            agentName: agentName,
+            skillId: skillId,
+            sessionType: sessionType,
+            trigger: trigger,
+            scheduleId: scheduleId,
+            scheduleRunId: scheduleRunId,
+            parentSessionId: parentSessionId,
+            request: request,
+            followUps: followUps,
+            status: status,
+            issues: issues,
+            startedAt: startedAt,
+            completedAt: completedAt,
+            conversationId: conversationId,
+            workspaceRoot: local.workspaceRoot,
+            requestedWorkerId: requestedWorkerId,
+            workerId: workerId,
+            summary: summary,
+            error: error,
+            events: events,
+            updatedAt: updatedAt,
+            requestedByUserId: requestedByUserId,
+            archived: archived
+        )
+    }
+}
+
+private extension ProjectAgentSession.FollowUp {
+    init(connectMessage message: BriarAPI_ProjectAgentSessionFollowUp) throws {
+        guard message.hasSentAt else { throw MobileAPIError.invalidResponse }
+        self.init(id: message.id, message: message.message, sentAt: message.sentAt.date)
+    }
+
+    func connectMessage() throws -> BriarAPI_ProjectAgentSessionFollowUp {
+        guard !id.isEmpty, !message.isEmpty else { throw MobileAPIError.invalidRequest }
+        var result = BriarAPI_ProjectAgentSessionFollowUp()
+        result.id = id
+        result.message = message
+        result.sentAt = .init(date: sentAt)
+        return result
+    }
+}
+
+private extension ProjectAgentSession.Issue {
+    init(connectMessage message: BriarAPI_ProjectAgentSessionIssue) throws {
+        let outcome: Outcome
+        switch message.outcome {
+        case .pending:
+            outcome = .pending
+        case .completed:
+            outcome = .completed
+        case .blocked:
+            outcome = .blocked
+        case .failed:
+            outcome = .failed
+        case .skipped:
+            outcome = .skipped
+        case .unspecified, .UNRECOGNIZED:
+            throw MobileAPIError.invalidResponse
+        }
+        self.init(
+            runId: message.runID,
+            runNumber: try agentSafeInt(message.runNumber),
+            sourceKey: message.sourceKey,
+            title: message.title,
+            outcome: outcome,
+            summary: message.hasSummary ? message.summary : nil
+        )
+    }
+
+    func connectMessage() throws -> BriarAPI_ProjectAgentSessionIssue {
+        var message = BriarAPI_ProjectAgentSessionIssue()
+        message.runID = runId
+        guard let runNumber = UInt32(exactly: runNumber) else {
+            throw MobileAPIError.invalidRequest
+        }
+        message.runNumber = runNumber
+        message.sourceKey = sourceKey
+        message.title = title
+        message.outcome = switch outcome {
+        case .pending: .pending
+        case .completed: .completed
+        case .blocked: .blocked
+        case .failed: .failed
+        case .skipped: .skipped
+        }
+        if let summary { message.summary = summary }
+        return message
+    }
+}
+
+private extension ProjectAgentSession.Event {
+    init(connectMessage message: BriarAPI_ProjectAgentSessionEvent) throws {
+        guard message.hasOccurredAt else { throw MobileAPIError.invalidResponse }
+        let type: EventType
+        switch message.type {
+        case .started:
+            type = .started
+        case .completed:
+            type = .completed
+        case .failed:
+            type = .failed
+        case .skipped:
+            type = .skipped
+        case .interrupted:
+            type = .interrupted
+        case .stopped:
+            type = .stopped
+        case .unspecified, .UNRECOGNIZED:
+            throw MobileAPIError.invalidResponse
+        }
+        self.init(id: message.id, type: type, occurredAt: message.occurredAt.date)
+    }
+
+    var connectMessage: BriarAPI_ProjectAgentSessionEvent {
+        var message = BriarAPI_ProjectAgentSessionEvent()
+        message.id = id
+        message.type = switch type {
+        case .started: .started
+        case .completed: .completed
+        case .failed: .failed
+        case .skipped: .skipped
+        case .interrupted: .interrupted
+        case .stopped: .stopped
+        }
+        message.occurredAt = .init(date: occurredAt)
+        return message
+    }
+}
+
+extension ChannelAgentSummary {
+    init(connectMessage message: BriarAPI_OrganizationAgent) throws {
+        guard
+            let agentID = UUID(uuidString: message.agentID),
+            message.hasCreatedAt
+        else {
+            throw MobileAPIError.invalidResponse
+        }
+        self.init(
+            agentId: agentID,
+            name: message.name,
+            avatar: message.hasAvatar ? message.avatar : nil,
+            provider: try AgentProvider(connectMessage: message.provider).rawValue,
+            model: message.hasModel ? message.model : nil,
+            projectId: try agentOptionalUUID(message.projectID, isPresent: message.hasProjectID),
+            description: message.hasDescription_p ? message.description_p : nil,
+            responsibility: message.responsibility,
+            createdAt: message.createdAt.date
+        )
+    }
+}
+
+private extension AgentProvider {
+    init(connectMessage provider: BriarTypes_AgentProvider) throws {
+        switch provider {
+        case .codex: self = .codex
+        case .claude: self = .claude
+        case .cursor: self = .cursor
+        case .grok: self = .grok
+        case .agy: self = .agy
+        case .opencode: self = .opencode
+        case .openrouter: self = .openrouter
+        case .unspecified, .UNRECOGNIZED:
+            throw MobileAPIError.invalidResponse
         }
     }
+}
+
+private func agentSafeInt<T: BinaryInteger>(_ value: T) throws -> Int {
+    guard let result = Int(exactly: value) else { throw MobileAPIError.invalidResponse }
+    return result
+}
+
+private func agentOptionalUUID(_ value: String, isPresent: Bool) throws -> UUID? {
+    guard isPresent else { return nil }
+    guard let id = UUID(uuidString: value) else { throw MobileAPIError.invalidResponse }
+    return id
 }

@@ -310,6 +310,162 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
     func createdIssueStatus() -> DashboardRun.Status? { issueStatus }
     func createdDependencyAdded() -> Bool { dependencyAdded }
 
+    func listOrganizationAgents(
+        organizationID: UUID,
+        token: String
+    ) async throws -> [ChannelAgentSummary] {
+        [ChannelAgentSummary(
+            agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+            name: "Honey",
+            avatar: nil,
+            provider: "codex",
+            model: "gpt-5.4",
+            projectId: nil,
+            description: "제품 작업을 돕는 Organization Agent",
+            responsibility: "제품 작업 지원",
+            createdAt: Date(timeIntervalSince1970: 1_775_260_800)
+        )]
+    }
+
+    func listProjectAgents(
+        projectID: UUID,
+        token: String
+    ) async throws -> [ProjectAgent] {
+        let agentID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let createdAt = Date(timeIntervalSince1970: 1_775_260_800)
+        return [ProjectAgent(
+            id: agentID,
+            projectId: projectID,
+            name: "Issue processing agent",
+            avatar: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+            codexPet: nil,
+            provider: .codex,
+            model: "gpt-5.4",
+            effort: nil,
+            description: nil,
+            responsibility: "Owns the project's development and code-related work.",
+            skill: "# Issue processing agent",
+            skills: [
+                ProjectAgent.Skill(
+                    id: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
+                    agentId: agentID,
+                    name: "Issue processing",
+                    instructions: "Owns the project's development and code-related work.",
+                    provider: .codex,
+                    model: "gpt-5.4",
+                    effort: .high,
+                    kind: .issueProcessing,
+                    position: 0,
+                    createdAt: createdAt,
+                    updatedAt: createdAt
+                ),
+                ProjectAgent.Skill(
+                    id: UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!,
+                    agentId: agentID,
+                    name: "iOS release",
+                    instructions: "Release the iOS app.",
+                    provider: .claude,
+                    model: "sonnet",
+                    effort: .high,
+                    kind: .custom,
+                    position: 1,
+                    createdAt: createdAt,
+                    updatedAt: createdAt
+                ),
+            ],
+            calendarColor: "#3275d5",
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )]
+    }
+
+    func listProjectAgentSessions(
+        projectID: UUID,
+        token: String
+    ) async throws -> [ProjectAgentSession] {
+        let startedAt = Date(timeIntervalSince1970: 1_775_260_800)
+        let completedAt = startedAt.addingTimeInterval(300)
+        return [ProjectAgentSession(
+            id: "session-fixture-1",
+            projectId: projectID,
+            dispatchGroupId: "dispatch-1",
+            agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            agentName: "Briar Agent",
+            sessionType: .task,
+            trigger: .manual,
+            scheduleId: nil,
+            scheduleRunId: nil,
+            parentSessionId: nil,
+            request: "Complete native inbox work",
+            status: .completed,
+            issues: [.init(
+                runId: "33333333-3333-4333-8333-333333333333",
+                runNumber: 3832,
+                sourceKey: "briar-issue:ui-test",
+                title: "iOS Native Companion",
+                outcome: .completed,
+                summary: "Done"
+            )],
+            startedAt: startedAt,
+            completedAt: completedAt,
+            conversationId: nil,
+            workspaceRoot: nil,
+            summary: "Completed",
+            error: nil,
+            events: [
+                .init(id: "event-1", type: .started, occurredAt: startedAt),
+                .init(id: "event-2", type: .completed, occurredAt: completedAt),
+            ],
+            updatedAt: completedAt
+        )]
+    }
+
+    func putProjectAgentSession(
+        _ session: ProjectAgentSession,
+        projectID: UUID,
+        token: String
+    ) async throws -> ProjectAgentSession {
+        session
+    }
+
+    func runProjectAgentTask(
+        projectID: UUID,
+        agentID: UUID,
+        skillID: UUID,
+        request: String,
+        workerID: String,
+        requestID: UUID,
+        token: String
+    ) async throws -> ProjectAgentSession {
+        let startedAt = Date(timeIntervalSince1970: 1_775_261_400)
+        return ProjectAgentSession(
+            id: requestID.uuidString.lowercased(),
+            projectId: projectID,
+            dispatchGroupId: requestID.uuidString.lowercased(),
+            agentId: agentID,
+            agentName: "Briar Agent",
+            skillId: skillID,
+            sessionType: .task,
+            trigger: .manual,
+            scheduleId: nil,
+            scheduleRunId: nil,
+            parentSessionId: nil,
+            request: request,
+            status: .running,
+            issues: [],
+            startedAt: startedAt,
+            completedAt: nil,
+            conversationId: nil,
+            workspaceRoot: nil,
+            requestedWorkerId: workerID,
+            workerId: workerID,
+            summary: nil,
+            error: nil,
+            events: [.init(id: "event-direct-1", type: .started, occurredAt: startedAt)],
+            updatedAt: startedAt
+        )
+    }
+
     func send<Response: Decodable & Sendable>(
         _ path: String,
         method: String,
@@ -432,29 +588,13 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             payload = #"{"messages":[]}"#
         } else if path.hasSuffix("/evidence") {
             payload = #"{"evidence":[{"key":"ui-test:evidence:image","attempt":1,"revision":1,"stage":"reviewing","type":"review findings","status":"passed","detail":"완성 화면","url":null,"actor":"codex","observedAt":"2026-08-02T01:03:00Z","images":[{"id":"bbbbbbbb-2222-4222-8222-222222222222","filename":"result-screen.png","contentType":"image/png","byteSize":68,"url":"/ui-test/result-screen.png"}],"canonical":true}]}"#
-        } else if path.hasSuffix("/agent-tasks") && method == "POST" {
-            payload = ##"""
-            {"session":{"id":"session-direct-1","projectId":"11111111-1111-4111-8111-111111111111","dispatchGroupId":"session-direct-1","agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","agentName":"Briar Agent","sessionType":"task","trigger":"manual","scheduleId":null,"scheduleRunId":null,"parentSessionId":null,"request":"Summarize the current repository status.","status":"running","issues":[],"startedAt":"2026-08-02T01:10:00Z","completedAt":null,"conversationId":null,"workspaceRoot":null,"requestedWorkerId":"worker-1","workerId":"worker-1","summary":null,"error":null,"events":[{"id":"event-direct-1","type":"started","occurredAt":"2026-08-02T01:10:00Z"}],"dispatchEvents":[],"workers":[],"updatedAt":"2026-08-02T01:10:00Z"}}
-            """##
         } else if path.hasSuffix("/members") && method == "GET" {
             payload = ##"""
             {"members":[{"userId":"fixture-user","name":"Briar User","email":"user@example.com","image":null,"role":"owner","createdAt":"2026-08-02T01:00:00Z"},{"userId":"teammate-user","name":"Alex Kim","email":"alex@example.com","image":null,"role":"member","createdAt":"2026-08-02T01:00:00Z"}]}
             """##
-        } else if path.hasSuffix("/agents") && path.contains("/organizations/") {
-            payload = ##"""
-            {"agents":[{"agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Honey","avatar":null,"provider":"codex","model":"gpt-5.4","projectId":null,"description":"제품 작업을 돕는 Organization Agent","responsibility":"제품 작업 지원","createdAt":"2026-08-02T01:00:00Z"}],"canManage":true}
-            """##
         } else if path.hasSuffix("/dms") && method == "POST" {
             payload = ##"""
             {"channel":{"id":"15151515-1515-4515-8515-151515151515","organizationId":"22222222-2222-4222-8222-222222222222","kind":"dm","slug":"dm-new","name":"Honey","topic":null,"visibility":"private","defaultProjectId":null,"archivedAt":null,"memberCount":1,"agentCount":1,"createdAt":"2026-08-22T09:30:00Z","updatedAt":"2026-08-22T09:30:00Z","lastMessageAt":null,"lastMessagePreview":null,"lastReadAt":null,"hasUnread":false,"dmParticipants":[{"type":"user","id":"fixture-user","name":"Briar User","image":null},{"type":"agent","id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Honey","image":null}]}}
-            """##
-        } else if path.contains("/agents") {
-            payload = ##"""
-            {"agents":[{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","projectId":"11111111-1111-4111-8111-111111111111","name":"Issue processing agent","avatar":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","codexPet":null,"provider":"codex","model":"gpt-5.4","responsibility":"Owns the project's development and code-related work.","skill":"# Issue processing agent","skills":[{"id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Issue processing","instructions":"Owns the project's development and code-related work.","provider":"codex","model":"gpt-5.4","effort":"high","kind":"issue_processing","position":0,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"},{"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"iOS release","instructions":"Release the iOS app.","provider":"claude","model":"sonnet","effort":"high","kind":"custom","position":1,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"}],"calendarColor":"#3275d5","createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"}]}
-            """##
-        } else if path.contains("/agent-sessions") {
-            payload = ##"""
-            {"sessions":[{"id":"session-fixture-1","projectId":"11111111-1111-4111-8111-111111111111","dispatchGroupId":"dispatch-1","agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","agentName":"Briar Agent","sessionType":"task","trigger":"manual","scheduleId":null,"scheduleRunId":null,"parentSessionId":null,"request":"Complete native inbox work","status":"completed","issues":[{"runId":"33333333-3333-4333-8333-333333333333","runNumber":3832,"sourceKey":"briar-issue:ui-test","title":"iOS Native Companion","outcome":"completed","summary":"Done"}],"startedAt":"2026-08-02T01:00:00Z","completedAt":"2026-08-02T01:05:00Z","conversationId":null,"workspaceRoot":null,"summary":"Completed","error":null,"events":[{"id":"event-1","type":"started","occurredAt":"2026-08-02T01:00:00Z"},{"id":"event-2","type":"completed","occurredAt":"2026-08-02T01:05:00Z"}],"dispatchEvents":[],"workers":[],"updatedAt":"2026-08-02T01:05:00Z"}]}
             """##
         } else {
             throw MobileAPIError.invalidRequest

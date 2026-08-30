@@ -750,10 +750,6 @@ struct DirectMessageRecipientsResponse: Codable, Sendable {
     let members: [OrganizationMember]
 }
 
-struct OrganizationAgentsResponse: Codable, Sendable {
-    let agents: [ChannelAgentSummary]
-}
-
 struct CreateDirectMessageRequest: Encodable, Sendable {
     let memberIds: [String]
     let agentIds: [String]

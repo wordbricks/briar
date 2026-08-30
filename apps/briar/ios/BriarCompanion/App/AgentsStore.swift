@@ -74,26 +74,22 @@ final class AgentsStore: ObservableObject {
             }
         }
         do {
-            async let agentsResponse: ProjectAgentsResponse = api.send(
-                MobileAPIContract.Endpoint.projectAgents(projectID: projectID, locale: locale),
-                method: "GET",
-                token: token,
-                body: nil,
-                as: ProjectAgentsResponse.self
-            )
-            async let sessionsResponse: ProjectAgentSessionsResponse = api.send(
-                MobileAPIContract.Endpoint.projectAgentSessions(projectID: projectID),
-                method: "GET",
-                token: token,
-                body: nil,
-                as: ProjectAgentSessionsResponse.self
+            async let agentsResponse = api.listProjectAgents(projectID: projectID, token: token)
+            async let sessionsResponse = api.listProjectAgentSessions(
+                projectID: projectID,
+                token: token
             )
             let (loadedAgents, loadedSessions) = try await (agentsResponse, sessionsResponse)
             guard generation == self.generation else { return }
-            agents = loadedAgents.agents.sorted {
+            agents = loadedAgents.sorted {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
-            let authoritativeSessions = Self.collapseLinked(loadedSessions.sessions)
+            let authoritativeSessions = Self.collapseLinked(loadedSessions).map { incoming in
+                guard let local = sessions.first(where: { $0.id == incoming.id }) else {
+                    return incoming
+                }
+                return incoming.preservingLocalFields(from: local)
+            }
             sessions = if expectedSessionMutationRevision == sessionMutationRevision {
                 Self.sortedSessions(authoritativeSessions)
             } else {
@@ -130,30 +126,26 @@ final class AgentsStore: ObservableObject {
 
         executionError = nil
         do {
-            let response: ProjectAgentTaskResponse = try await api.send(
-                MobileAPIContract.Endpoint.projectAgentTasks(projectID: projectID),
-                method: "POST",
-                token: token,
-                body: ProjectAgentTaskRequest(
-                    agentId: agent.id,
-                    skillId: skill.id,
-                    request: request,
-                    workerId: workerID,
-                    requestId: UUID()
-                ),
-                as: ProjectAgentTaskResponse.self
+            let session = try await api.runProjectAgentTask(
+                projectID: projectID,
+                agentID: agent.id,
+                skillID: skill.id,
+                request: request,
+                workerID: workerID,
+                requestID: UUID(),
+                token: token
             )
-            insertOrReplace(response.session)
+            insertOrReplace(session)
             errorMessage = nil
-            return response.session
+            return session
         } catch {
             executionError = CompanionStore.message(for: error)
             throw error
         }
     }
 
-    /// Legacy issue-dispatch entry point retained for existing native callers.
-    /// Direct saved-Agent runs use the overload above and do not require a queued issue.
+    /// Issue-dispatch entry point. Direct saved-Agent runs use the overload
+    /// above and do not require a queued issue.
     func run(
         agent: ProjectAgent,
         runs: [DashboardRun],
@@ -430,22 +422,26 @@ final class AgentsStore: ObservableObject {
     ) -> ProjectAgentSession {
         let currentTimestamp = current.displayTimestamp
         let candidateTimestamp = candidate.displayTimestamp
+        let preferred: ProjectAgentSession
         if candidateTimestamp != currentTimestamp {
-            return candidateTimestamp > currentTimestamp ? candidate : current
+            preferred = candidateTimestamp > currentTimestamp ? candidate : current
+        } else {
+            let currentIsTerminal = current.status != .running
+            let candidateIsTerminal = candidate.status != .running
+            if currentIsTerminal != candidateIsTerminal {
+                preferred = candidateIsTerminal ? candidate : current
+            } else {
+                let currentEvidenceCount = current.events?.count ?? 0
+                let candidateEvidenceCount = candidate.events?.count ?? 0
+                preferred = if candidateEvidenceCount != currentEvidenceCount {
+                    candidateEvidenceCount > currentEvidenceCount ? candidate : current
+                } else {
+                    candidate
+                }
+            }
         }
-
-        let currentIsTerminal = current.status != .running
-        let candidateIsTerminal = candidate.status != .running
-        if currentIsTerminal != candidateIsTerminal {
-            return candidateIsTerminal ? candidate : current
-        }
-
-        let currentEvidenceCount = current.events?.count ?? 0
-        let candidateEvidenceCount = candidate.events?.count ?? 0
-        if candidateEvidenceCount != currentEvidenceCount {
-            return candidateEvidenceCount > currentEvidenceCount ? candidate : current
-        }
-        return candidate
+        let local = current.workspaceRoot != nil ? current : candidate
+        return preferred.preservingLocalFields(from: local)
     }
 
     private static func sortedSessions(
@@ -522,12 +518,14 @@ final class AgentsStore: ObservableObject {
             dispatchGroupId: session.dispatchGroupId,
             agentId: session.agentId,
             agentName: session.agentName,
+            skillId: session.skillId,
             sessionType: session.sessionType,
             trigger: session.trigger,
             scheduleId: session.scheduleId,
             scheduleRunId: session.scheduleRunId,
             parentSessionId: session.parentSessionId,
             request: session.request,
+            followUps: session.followUps,
             status: replacementStatus,
             issues: replacementIssues,
             startedAt: session.startedAt,
@@ -540,7 +538,8 @@ final class AgentsStore: ObservableObject {
             error: error,
             events: replacementEvents,
             updatedAt: replacementUpdatedAt,
-            requestedByUserId: session.requestedByUserId
+            requestedByUserId: session.requestedByUserId,
+            archived: session.archived
         )
     }
 
@@ -554,17 +553,11 @@ final class AgentsStore: ObservableObject {
         projectID: UUID,
         token: String
     ) async throws -> ProjectAgentSession {
-        let response: ProjectAgentSessionResponse = try await api.send(
-            MobileAPIContract.Endpoint.projectAgentSession(
-                projectID: projectID,
-                sessionID: session.id
-            ),
-            method: "PUT",
-            token: token,
-            body: ProjectAgentSessionSyncRequest(session: session),
-            as: ProjectAgentSessionResponse.self
+        try await api.putProjectAgentSession(
+            session,
+            projectID: projectID,
+            token: token
         )
-        return response.session
     }
 
     private func startPolling() {

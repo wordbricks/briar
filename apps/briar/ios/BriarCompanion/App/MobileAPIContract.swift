@@ -54,10 +54,6 @@ enum MobileAPIContract {
             "/organizations/\(organizationID.uuidString.lowercased())/members"
         }
 
-        static func organizationAgents(organizationID: UUID) -> String {
-            "/organizations/\(organizationID.uuidString.lowercased())/agents"
-        }
-
         static func channelChanges(organizationID: UUID, cursor: Int) -> String {
             "/organizations/\(organizationID.uuidString.lowercased())/channel-changes?since=\(cursor)"
         }
@@ -242,21 +238,6 @@ enum MobileAPIContract {
             "\(run(projectID: projectID, runID: conversationRunID))/skill-execution-proposals/\(proposalID.uuidString.lowercased())/accept"
         }
 
-        static func projectAgents(projectID: UUID, locale: String) -> String {
-            "/projects/\(projectID.uuidString.lowercased())/agents?locale=\(locale)"
-        }
-
-        static func projectAgentSessions(projectID: UUID) -> String {
-            "/projects/\(projectID.uuidString.lowercased())/agent-sessions"
-        }
-
-        static func projectAgentTasks(projectID: UUID) -> String {
-            "/projects/\(projectID.uuidString.lowercased())/agent-tasks"
-        }
-
-        static func projectAgentSession(projectID: UUID, sessionID: String) -> String {
-            "\(projectAgentSessions(projectID: projectID))/\(sessionID)"
-        }
     }
 }
 
@@ -501,6 +482,49 @@ private extension MobileAPIError {
 protocol MobileAPIClientProtocol: Sendable {
     func listProjects(token: String) async throws -> ProjectsResponse
 
+    func listOrganizationAgents(
+        organizationID: UUID,
+        token: String
+    ) async throws -> [ChannelAgentSummary]
+
+    func listProjectAgents(
+        projectID: UUID,
+        token: String
+    ) async throws -> [ProjectAgent]
+
+    func listProjectAgentSessions(
+        projectID: UUID,
+        token: String
+    ) async throws -> [ProjectAgentSession]
+
+    func syncProjectAgentSessions(
+        projectID: UUID,
+        cursor: Int?,
+        token: String
+    ) async throws -> ProjectAgentSessionsSync
+
+    func getProjectAgentSession(
+        projectID: UUID,
+        sessionID: String,
+        token: String
+    ) async throws -> ProjectAgentSession
+
+    func putProjectAgentSession(
+        _ session: ProjectAgentSession,
+        projectID: UUID,
+        token: String
+    ) async throws -> ProjectAgentSession
+
+    func runProjectAgentTask(
+        projectID: UUID,
+        agentID: UUID,
+        skillID: UUID,
+        request: String,
+        workerID: String,
+        requestID: UUID,
+        token: String
+    ) async throws -> ProjectAgentSession
+
     func send<Response: Decodable & Sendable>(
         _ path: String,
         method: String,
@@ -622,6 +646,63 @@ extension MobileAPIClientProtocol {
         throw MobileAPIError.invalidRequest
     }
 
+    func listOrganizationAgents(
+        organizationID: UUID,
+        token: String
+    ) async throws -> [ChannelAgentSummary] {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func listProjectAgents(
+        projectID: UUID,
+        token: String
+    ) async throws -> [ProjectAgent] {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func listProjectAgentSessions(
+        projectID: UUID,
+        token: String
+    ) async throws -> [ProjectAgentSession] {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func syncProjectAgentSessions(
+        projectID: UUID,
+        cursor: Int?,
+        token: String
+    ) async throws -> ProjectAgentSessionsSync {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func getProjectAgentSession(
+        projectID: UUID,
+        sessionID: String,
+        token: String
+    ) async throws -> ProjectAgentSession {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func putProjectAgentSession(
+        _ session: ProjectAgentSession,
+        projectID: UUID,
+        token: String
+    ) async throws -> ProjectAgentSession {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func runProjectAgentTask(
+        projectID: UUID,
+        agentID: UUID,
+        skillID: UUID,
+        request: String,
+        workerID: String,
+        requestID: UUID,
+        token: String
+    ) async throws -> ProjectAgentSession {
+        throw MobileAPIError.invalidRequest
+    }
+
     func get<Response: Decodable & Sendable>(
         _ path: String,
         token: String? = nil,
@@ -679,21 +760,22 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
     let baseURL: URL
     let session: URLSession
     private let projectService: BriarAPI_ProjectServiceClient
+    private let agentService: BriarAPI_AgentServiceClient
 
     init(baseURL: URL, session: URLSession = .shared) {
         self.baseURL = baseURL
         self.session = session
-        projectService = BriarAPI_ProjectServiceClient(
-            client: ProtocolClient(
-                httpClient: URLSessionHTTPClient(configuration: session.configuration),
-                config: ProtocolClientConfig(
-                    host: baseURL.absoluteString,
-                    networkProtocol: .connect,
-                    codec: ProtoCodec(),
-                    unaryGET: .disabled
-                )
+        let protocolClient = ProtocolClient(
+            httpClient: URLSessionHTTPClient(configuration: session.configuration),
+            config: ProtocolClientConfig(
+                host: baseURL.absoluteString,
+                networkProtocol: .connect,
+                codec: ProtoCodec(),
+                unaryGET: .disabled
             )
         )
+        projectService = BriarAPI_ProjectServiceClient(client: protocolClient)
+        agentService = BriarAPI_AgentServiceClient(client: protocolClient)
     }
 
     func listProjects(token: String) async throws -> ProjectsResponse {
@@ -707,6 +789,139 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
                 projects: try message.projects.map { try Project(connectMessage: $0) }
             )
         } catch let error as ConnectError {
+            throw MobileAPIError.connect(error)
+        }
+    }
+
+    func listOrganizationAgents(
+        organizationID: UUID,
+        token: String
+    ) async throws -> [ChannelAgentSummary] {
+        var request = BriarAPI_ListOrganizationAgentsRequest()
+        request.organizationID = organizationID.uuidString.lowercased()
+        let response = await agentService.listOrganizationAgents(
+            request: request,
+            headers: authorizationHeaders(token)
+        )
+        let message = try connectMessage(response)
+        return try message.agents.map { try ChannelAgentSummary(connectMessage: $0) }
+    }
+
+    func listProjectAgents(
+        projectID: UUID,
+        token: String
+    ) async throws -> [ProjectAgent] {
+        var request = BriarAPI_ListProjectAgentsRequest()
+        request.projectID = projectID.uuidString.lowercased()
+        let response = await agentService.listProjectAgents(
+            request: request,
+            headers: authorizationHeaders(token)
+        )
+        let message = try connectMessage(response)
+        return try message.agents.map { try ProjectAgent(connectMessage: $0) }
+    }
+
+    func listProjectAgentSessions(
+        projectID: UUID,
+        token: String
+    ) async throws -> [ProjectAgentSession] {
+        var request = BriarAPI_ListProjectAgentSessionsRequest()
+        request.projectID = projectID.uuidString.lowercased()
+        let response = await agentService.listProjectAgentSessions(
+            request: request,
+            headers: authorizationHeaders(token)
+        )
+        let message = try connectMessage(response)
+        return try message.sessions.map { try ProjectAgentSession(connectMessage: $0) }
+    }
+
+    func syncProjectAgentSessions(
+        projectID: UUID,
+        cursor: Int?,
+        token: String
+    ) async throws -> ProjectAgentSessionsSync {
+        var request = BriarAPI_SyncProjectAgentSessionsRequest()
+        request.projectID = projectID.uuidString.lowercased()
+        if let cursor {
+            guard let cursor = UInt64(exactly: cursor) else {
+                throw MobileAPIError.invalidRequest
+            }
+            request.cursor = cursor
+        }
+        let response = await agentService.syncProjectAgentSessions(
+            request: request,
+            headers: authorizationHeaders(token)
+        )
+        return try ProjectAgentSessionsSync(connectMessage: connectMessage(response))
+    }
+
+    func getProjectAgentSession(
+        projectID: UUID,
+        sessionID: String,
+        token: String
+    ) async throws -> ProjectAgentSession {
+        var request = BriarAPI_GetProjectAgentSessionRequest()
+        request.projectID = projectID.uuidString.lowercased()
+        request.sessionID = sessionID
+        let response = await agentService.getProjectAgentSession(
+            request: request,
+            headers: authorizationHeaders(token)
+        )
+        let message = try connectMessage(response)
+        guard message.hasSession else { throw MobileAPIError.invalidResponse }
+        return try ProjectAgentSession(connectMessage: message.session)
+    }
+
+    func putProjectAgentSession(
+        _ session: ProjectAgentSession,
+        projectID: UUID,
+        token: String
+    ) async throws -> ProjectAgentSession {
+        let response = await agentService.putProjectAgentSession(
+            request: try session.putConnectRequest(projectID: projectID),
+            headers: authorizationHeaders(token)
+        )
+        let message = try connectMessage(response)
+        guard message.hasSession else { throw MobileAPIError.invalidResponse }
+        return try ProjectAgentSession(connectMessage: message.session)
+            .preservingLocalFields(from: session)
+    }
+
+    func runProjectAgentTask(
+        projectID: UUID,
+        agentID: UUID,
+        skillID: UUID,
+        request requestText: String,
+        workerID: String,
+        requestID: UUID,
+        token: String
+    ) async throws -> ProjectAgentSession {
+        var request = BriarAPI_RunProjectAgentTaskRequest()
+        request.projectID = projectID.uuidString.lowercased()
+        request.agentID = agentID.uuidString.lowercased()
+        request.skillID = skillID.uuidString.lowercased()
+        request.request = requestText
+        request.workerID = workerID
+        request.requestID = requestID.uuidString.lowercased()
+        let response = await agentService.runProjectAgentTask(
+            request: request,
+            headers: authorizationHeaders(token)
+        )
+        let message = try connectMessage(response)
+        guard message.hasSession else { throw MobileAPIError.invalidResponse }
+        return try ProjectAgentSession(connectMessage: message.session)
+    }
+
+    private func authorizationHeaders(_ token: String) -> Connect.Headers {
+        ["authorization": ["Bearer \(token)"]]
+    }
+
+    private func connectMessage<Message: Sendable>(
+        _ response: ResponseMessage<Message>
+    ) throws -> Message {
+        do {
+            return try response.result.get()
+        } catch {
             throw MobileAPIError.connect(error)
         }
     }

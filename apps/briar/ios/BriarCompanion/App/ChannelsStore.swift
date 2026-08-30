@@ -326,13 +326,12 @@ final class ChannelsStore: ObservableObject {
             token: token,
             as: DirectMessageRecipientsResponse.self
         )
-        async let agentsResponse: OrganizationAgentsResponse = api.get(
-            MobileAPIContract.Endpoint.organizationAgents(organizationID: organizationID),
-            token: token,
-            as: OrganizationAgentsResponse.self
+        async let agentsResponse = api.listOrganizationAgents(
+            organizationID: organizationID,
+            token: token
         )
         let (loadedMembers, loadedAgents) = try await (membersResponse, agentsResponse)
-        return (loadedMembers.members, loadedAgents.agents)
+        return (loadedMembers.members, loadedAgents)
     }
 
     func createDirectMessage(
