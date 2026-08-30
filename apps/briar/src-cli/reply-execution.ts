@@ -28,6 +28,7 @@ import {
 import { materializeDetachedAgentSkillCatalog } from "./agent-skill-discovery";
 import { ChannelActivityPublisher } from "./channel-activity-publisher";
 import { createReplyActivityClient } from "./reply-activity-client";
+import { createReplyCompletionClient } from "./reply-completion-client";
 import { createWorkerQueueClient } from "./worker-queue-client";
 import { createWorkerTranscriptBatcher } from "./worker-transcript-client";
 import {
@@ -47,13 +48,11 @@ import {
   removeAnalysisWorktree,
 } from "./worktree";
 import {
-  channelReplyCompleteRequestBody,
   collectChannelReplyAttachments,
   parseChannelReplyAgentResult,
 } from "./channel-reply-attachments";
 import {
   collectIssueReplyAttachments,
-  issueReplyCompleteRequestBody,
   parseIssueReplyAgentResult,
 } from "./issue-reply-attachments";
 import { ReplyGeneratedImageCollector } from "./reply-generated-images";
@@ -86,7 +85,6 @@ import {
   value,
   has,
   required,
-  request,
   runGit,
   worktreeSettings,
   worktreesEnabled,
@@ -309,6 +307,10 @@ async function runClaimedIssueReply(
   let imagesCleaned = false;
   let lastActivityErrorAt = Number.NEGATIVE_INFINITY;
   const replyActivity = createReplyActivityClient(config.apiUrl);
+  const replyCompletion = createReplyCompletionClient(
+    config.apiUrl,
+    workerToken,
+  );
   const activityPublisher = new ChannelActivityPublisher({
     credential: issue.activity,
     send: (credential, activity) =>
@@ -486,21 +488,13 @@ async function runClaimedIssueReply(
     // Private downloaded images must be removed before the durable reply
     // succeeds. Worktree cache bookkeeping is best-effort in the outer cleanup.
     await cleanupContext();
-    await request(
-      config.apiUrl,
-      `/issue-reply-claims/${issue.workId}/complete`,
-      workerToken,
-      {
-        method: "POST",
-        body: issueReplyCompleteRequestBody({
-          projectId: project.id,
-          workerId: registered.workerId,
-          claimToken: issue.claimToken,
-          result,
-          attachments: replyAttachments,
-        }),
-      },
-    );
+    await replyCompletion.completeIssueReply({
+      projectId: project.id,
+      workerId: registered.workerId,
+      work: issue,
+      outcome: { case: "success", result, attachments: replyAttachments },
+      signal,
+    });
   } finally {
     activityPublisher.stop();
     if (activeReplyActivityPublishers.get(issue.workId) === activityPublisher) {
@@ -539,20 +533,16 @@ async function failClaimedIssueReply(
 ) {
   const workerId = project.executionWorker?.workerId;
   if (!workerId) throw error;
-  await request(
-    config.apiUrl,
-    `/issue-reply-claims/${issue.workId}/complete`,
-    workerToken,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        projectId: project.id,
-        workerId,
-        claimToken: issue.claimToken,
+  await createReplyCompletionClient(config.apiUrl, workerToken)
+    .completeIssueReply({
+      projectId: project.id,
+      workerId,
+      work: issue,
+      outcome: {
+        case: "failure",
         error: error instanceof Error ? error.message : String(error),
-      }),
-    },
-  );
+      },
+    });
 }
 
 async function runClaimedChannelReply(
@@ -635,6 +625,11 @@ async function runClaimedChannelReply(
   let lastActivityErrorAt = Number.NEGATIVE_INFINITY;
   const replyActivity = createReplyActivityClient(config.apiUrl);
   const workerQueue = createWorkerQueueClient(config.apiUrl, workerToken);
+  const replyCompletion = createReplyCompletionClient(
+    config.apiUrl,
+    workerToken,
+    { queue: workerQueue },
+  );
   const activityPublisher = new ChannelActivityPublisher({
     credential: reply.activity,
     send: (credential, activity) =>
@@ -908,25 +903,19 @@ async function runClaimedChannelReply(
       ...generatedImages.files(),
     ], "Channel reply");
     await cleanupContext();
-    const completion = await request<{
-      session?: { retained_until?: string } | null;
-    }>(
-      config.apiUrl,
-      `/channel-reply-claims/${reply.workId}/complete`,
-      workerToken,
-      {
-        method: "POST",
-        body: channelReplyCompleteRequestBody({
-          organizationId: reply.organizationId,
-          workerId: registered.workerId,
-          claimToken: reply.claimToken,
-          conversationId,
-          result,
-          attachments: replyAttachments,
-        }),
+    const completion = await replyCompletion.completeChannelReply({
+      projectId: project.id,
+      workerId: registered.workerId,
+      work: reply,
+      outcome: {
+        case: "success",
+        conversationId,
+        result,
+        attachments: replyAttachments,
       },
-    );
-    retainedUntil = completion.session?.retained_until ?? retainedUntil;
+      signal,
+    });
+    retainedUntil = completion.retainedUntil;
   } finally {
     activityPublisher.stop();
     if (activeReplyActivityPublishers.get(reply.workId) === activityPublisher) {
@@ -971,20 +960,16 @@ async function failClaimedChannelReply(
 ) {
   const workerId = project.executionWorker?.workerId;
   if (!workerId) throw error;
-  await request(
-    config.apiUrl,
-    `/channel-reply-claims/${reply.workId}/complete`,
-    workerToken,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        organizationId: reply.organizationId,
-        workerId,
-        claimToken: reply.claimToken,
+  await createReplyCompletionClient(config.apiUrl, workerToken)
+    .completeChannelReply({
+      projectId: project.id,
+      workerId,
+      work: reply,
+      outcome: {
+        case: "failure",
         error: error instanceof Error ? error.message : String(error),
-      }),
-    },
-  );
+      },
+    });
 }
 
 export {

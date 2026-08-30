@@ -4,7 +4,6 @@ import { channelReplyCompletionSchema } from "../src/lib/channels-contract";
 import {
   collectReplyAttachments,
   decodeReplyAttachmentPaths,
-  replyCompleteRequestBody,
 } from "./reply-attachments";
 
 const decodeChannelReplyCompletion = Schema.decodeUnknownSync(
@@ -42,26 +41,6 @@ export function parseChannelReplyAgentResult(
     result: decodeChannelReplyCompletion(rest),
     attachmentPaths,
   };
-}
-
-export function channelReplyCompleteRequestBody(input: {
-  organizationId: string;
-  workerId: string;
-  claimToken: string;
-  conversationId?: string | null;
-  result: ChannelReplyCompletion;
-  attachments: readonly File[];
-}) {
-  return replyCompleteRequestBody({
-    payload: {
-      organizationId: input.organizationId,
-      workerId: input.workerId,
-      claimToken: input.claimToken,
-      conversationId: input.conversationId ?? null,
-      result: input.result,
-    },
-    attachments: input.attachments,
-  });
 }
 
 /**

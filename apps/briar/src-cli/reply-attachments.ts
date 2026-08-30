@@ -34,19 +34,6 @@ export function validateReplyAttachments(
   return normalized;
 }
 
-export function replyCompleteRequestBody(input: {
-  payload: Record<string, unknown>;
-  attachments: readonly File[];
-}) {
-  if (input.attachments.length === 0) return JSON.stringify(input.payload);
-  const form = new FormData();
-  form.append("complete", JSON.stringify(input.payload));
-  for (const file of input.attachments) {
-    form.append("attachments", file, file.name);
-  }
-  return form;
-}
-
 /**
  * Read reply attachments before a disposable workspace is deleted. Paths must stay
  * inside that workspace so provider output cannot attach arbitrary host files.

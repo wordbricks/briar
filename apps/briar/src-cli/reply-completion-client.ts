@@ -1,0 +1,498 @@
+import { create } from "@bufbuild/protobuf";
+import { EmptySchema, timestampDate } from "@bufbuild/protobuf/wkt";
+import { Code, ConnectError } from "@connectrpc/connect";
+import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
+import {
+  ChannelReplySuccessSchema,
+  CompleteChannelReplyRequestSchema,
+  CompleteIssueReplyRequestSchema,
+  IssueReplySuccessSchema,
+  PrepareReplyAttachmentUploadsRequestSchema,
+  ReplyCompletionDisposition,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import type { DetachedIssueReplyResult } from "./agent-runner";
+import type { ParsedChannelReplyAgentResult } from "./channel-reply-attachments";
+import {
+  createWorkerQueueClient,
+  workClaimIdentityToProto,
+} from "./worker-queue-client";
+import type {
+  ClaimedChannelReply,
+  ClaimedIssueReply,
+} from "./worker-queue-contract";
+
+type ChannelReplyResult = ParsedChannelReplyAgentResult["result"];
+type CompletionDisposition = "completed" | "requeued" | "failed";
+
+const retryableCodes = new Set([
+  Code.DeadlineExceeded,
+  Code.ResourceExhausted,
+  Code.Internal,
+  Code.Unavailable,
+]);
+
+const isRetryable = (error: unknown) =>
+  !(error instanceof ConnectError) || retryableCodes.has(error.code);
+
+const exactRpc = async <Value>(
+  operation: () => Promise<Value>,
+  signal?: AbortSignal,
+) => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (signal?.aborted || !isRetryable(error) || attempt === 2) throw error;
+    }
+  }
+  throw lastError;
+};
+
+const disposition = (value: ReplyCompletionDisposition): CompletionDisposition => {
+  switch (value) {
+    case ReplyCompletionDisposition.COMPLETED: return "completed";
+    case ReplyCompletionDisposition.REQUEUED: return "requeued";
+    case ReplyCompletionDisposition.FAILED: return "failed";
+    case ReplyCompletionDisposition.UNSPECIFIED:
+    default:
+      throw new Error("Worker reply completion returned an unknown disposition");
+  }
+};
+
+const outcomeDisposition = (
+  value: ReplyCompletionDisposition,
+  outcome: "success" | "failure",
+) => {
+  const decoded = disposition(value);
+  if (
+    (outcome === "success" && decoded !== "completed") ||
+    (outcome === "failure" && decoded === "completed")
+  ) {
+    throw new Error("Worker reply completion returned an invalid outcome disposition");
+  }
+  return decoded;
+};
+
+const requiredTimestamp = (
+  value: Parameters<typeof timestampDate>[0] | undefined,
+  field: string,
+) => {
+  if (!value) throw new Error(`Worker reply completion omitted ${field}`);
+  const date = timestampDate(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Worker reply completion returned invalid ${field}`);
+  }
+  return date.toISOString();
+};
+
+const issueStatus = (value: "backlog" | "queued") =>
+  value === "backlog" ? RunStatus.BACKLOG : RunStatus.QUEUED;
+
+const issueSuccess = (
+  result: DetachedIssueReplyResult,
+  attachmentIds: readonly string[],
+) => {
+  const base = {
+    body: result.reply,
+    attachments: attachmentIds.map((attachmentId) => ({ attachmentId })),
+  };
+  if (result.proposedAction) {
+    switch (result.proposedAction.type) {
+      case "request_issue_rework":
+        return create(IssueReplySuccessSchema, {
+          ...base,
+          action: {
+            case: "rework",
+            value: {
+              workflowStage: result.proposedAction.workflowStage,
+              reason: result.proposedAction.reason,
+            },
+          },
+        });
+      case "request_issue_update": {
+        const changes = result.proposedAction.changes;
+        const description = (() => {
+          if (!Object.prototype.hasOwnProperty.call(changes, "description")) {
+            return { case: undefined } as const;
+          }
+          if (changes.description === null) {
+            return {
+              case: "clearDescription" as const,
+              value: create(EmptySchema),
+            };
+          }
+          if (changes.description === undefined) {
+            throw new Error("Issue reply update description is undefined");
+          }
+          return { case: "setDescription" as const, value: changes.description };
+        })();
+        const priority = (() => {
+          if (!Object.prototype.hasOwnProperty.call(changes, "priority")) {
+            return { case: undefined } as const;
+          }
+          if (changes.priority === null) {
+            return {
+              case: "clearPriority" as const,
+              value: create(EmptySchema),
+            };
+          }
+          if (changes.priority === undefined) {
+            throw new Error("Issue reply update priority is undefined");
+          }
+          return { case: "setPriority" as const, value: changes.priority };
+        })();
+        return create(IssueReplySuccessSchema, {
+          ...base,
+          action: {
+            case: "update",
+            value: {
+              title: changes.title,
+              description,
+              priority,
+            },
+          },
+        });
+      }
+      case "request_issue_create":
+        return create(IssueReplySuccessSchema, {
+          ...base,
+          action: {
+            case: "create",
+            value: {
+              issue: {
+                title: result.proposedAction.issue.title,
+                description: result.proposedAction.issue.description ?? undefined,
+                priority: result.proposedAction.issue.priority ?? undefined,
+                status: issueStatus(result.proposedAction.issue.status),
+              },
+              executeAfterCreate: result.proposedAction.executeAfterCreate,
+            },
+          },
+        });
+    }
+  }
+  if (result.executionProposal) {
+    return create(IssueReplySuccessSchema, {
+      ...base,
+      action: { case: "execution", value: {} },
+    });
+  }
+  if (result.skillExecutionProposal) {
+    return create(IssueReplySuccessSchema, {
+      ...base,
+      action: { case: "skillExecution", value: {} },
+    });
+  }
+  return create(IssueReplySuccessSchema, base);
+};
+
+const channelSuccess = (
+  result: ChannelReplyResult,
+  conversationId: string | null,
+  attachmentIds: readonly string[],
+) => {
+  const base = {
+    body: result.body,
+    conversationId: conversationId ?? undefined,
+    attachments: attachmentIds.map((attachmentId) => ({ attachmentId })),
+  };
+  const artifactProposalCount = [
+    result.issueProposal,
+    result.issueBatchProposal,
+    result.executionProposal,
+  ].filter(Boolean).length;
+  if (
+    artifactProposalCount > 1 ||
+    (result.delegation &&
+      (result.document || artifactProposalCount > 0 ||
+        result.skillExecutionProposal)) ||
+    (result.skillExecutionProposal &&
+      (result.document || artifactProposalCount > 0))
+  ) {
+    throw new Error("Channel reply action variants are mutually exclusive");
+  }
+  if (result.delegation) {
+    return create(ChannelReplySuccessSchema, {
+      ...base,
+      action: {
+        case: "delegation",
+        value: {
+          projectId: result.delegation.projectId,
+          agentId: result.delegation.agentId,
+          request: result.delegation.request,
+        },
+      },
+    });
+  }
+  if (result.skillExecutionProposal) {
+    return create(ChannelReplySuccessSchema, {
+      ...base,
+      action: { case: "skillExecution", value: {} },
+    });
+  }
+  if (
+    result.document || result.issueProposal || result.issueBatchProposal ||
+    result.executionProposal
+  ) {
+    const proposal = result.issueProposal
+      ? {
+          case: "issue" as const,
+          value: {
+            projectId: result.issueProposal.projectId ?? undefined,
+            issue: {
+              title: result.issueProposal.issue.title,
+              description: result.issueProposal.issue.description ?? undefined,
+              priority: result.issueProposal.issue.priority ?? undefined,
+              status: RunStatus.BACKLOG,
+            },
+            executeAfterCreate: result.issueProposal.executeAfterCreate,
+          },
+        }
+      : result.issueBatchProposal
+        ? {
+            case: "issueBatch" as const,
+            value: {
+              projectId: result.issueBatchProposal.projectId ?? undefined,
+              items: result.issueBatchProposal.batch.items.map((item) => ({
+                key: item.key,
+                issue: {
+                  title: item.issue.title,
+                  description: item.issue.description ?? undefined,
+                  priority: item.issue.priority ?? undefined,
+                  status: RunStatus.BACKLOG,
+                },
+              })),
+              dependencies: result.issueBatchProposal.batch.dependencies,
+            },
+          }
+        : result.executionProposal
+          ? {
+              case: "execution" as const,
+              value: {
+                projectId: result.executionProposal.projectId,
+                runId: result.executionProposal.runId,
+              },
+            }
+          : { case: undefined as undefined };
+    return create(ChannelReplySuccessSchema, {
+      ...base,
+      action: {
+        case: "artifacts",
+        value: {
+          document: result.document
+            ? {
+                title: result.document.title,
+                markdown: result.document.markdown,
+                projectId: result.document.projectId ?? undefined,
+              }
+            : undefined,
+          proposal,
+        },
+      },
+    });
+  }
+  return create(ChannelReplySuccessSchema, base);
+};
+
+export function createReplyCompletionClient(
+  apiUrl: string,
+  token: string,
+  dependencies: {
+    queue?: ReturnType<typeof createWorkerQueueClient>;
+    fetch?: typeof globalThis.fetch;
+    randomUUID?: typeof crypto.randomUUID;
+  } = {},
+) {
+  const queue = dependencies.queue ?? createWorkerQueueClient(apiUrl, token);
+  const fetch = dependencies.fetch ?? globalThis.fetch;
+  const randomUUID = dependencies.randomUUID ?? crypto.randomUUID;
+
+  const prepareAttachments = async (input: {
+    projectId: string;
+    workerId: string;
+    work: ClaimedIssueReply | ClaimedChannelReply;
+    attachments: readonly File[];
+    signal?: AbortSignal;
+  }) => {
+    if (input.attachments.length === 0) return [];
+    const files = await Promise.all(input.attachments.map(async (file, index) => ({
+      clientId: `attachment-${index + 1}`,
+      file,
+      digest: new Uint8Array(await crypto.subtle.digest(
+        "SHA-256",
+        await file.arrayBuffer(),
+      )),
+    })));
+    const request = create(PrepareReplyAttachmentUploadsRequestSchema, {
+      requestId: randomUUID(),
+      projectId: input.projectId,
+      workerId: input.workerId,
+      work: workClaimIdentityToProto(input.work),
+      attachments: files.map(({ clientId, file, digest }) => ({
+        clientId,
+        filename: file.name,
+        contentType: file.type,
+        byteSize: BigInt(file.size),
+        sha256: digest,
+      })),
+    });
+    const prepared = await exactRpc(
+      () => queue.client.prepareReplyAttachmentUploads(request, {
+        ...queue.options,
+        signal: input.signal,
+      }),
+      input.signal,
+    );
+    if (prepared.uploads.length !== files.length) {
+      throw new Error("Worker reply prepare returned the wrong upload count");
+    }
+    const uploads = new Map(prepared.uploads.map((upload) => [upload.clientId, upload]));
+    if (uploads.size !== files.length) {
+      throw new Error("Worker reply prepare returned duplicate client IDs");
+    }
+    const apiOrigin = new URL(apiUrl).origin;
+    const attachmentIds: string[] = [];
+    for (const { clientId, file } of files) {
+      const upload = uploads.get(clientId);
+      if (
+        !upload?.reference?.attachmentId || !upload.uploadCapability ||
+        !upload.uploadUrl
+      ) {
+        throw new Error("Worker reply prepare returned an incomplete upload");
+      }
+      requiredTimestamp(upload.expiresAt, "upload expiry");
+      const uploadUrl = new URL(upload.uploadUrl);
+      if (uploadUrl.origin !== apiOrigin) {
+        throw new Error("Worker reply prepare returned an unsafe upload URL");
+      }
+      const response = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${upload.uploadCapability}`,
+          "Content-Type": file.type,
+        },
+        body: file,
+        signal: input.signal,
+      });
+      if (response.status !== 204) {
+        throw new Error(`Worker reply attachment upload failed (${response.status})`);
+      }
+      attachmentIds.push(upload.reference.attachmentId);
+    }
+    return attachmentIds;
+  };
+
+  return {
+    completeIssueReply: async (input: {
+      projectId: string;
+      workerId: string;
+      work: ClaimedIssueReply;
+      signal?: AbortSignal;
+    } & (
+      | {
+          outcome: {
+            case: "success";
+            result: DetachedIssueReplyResult;
+            attachments: readonly File[];
+          };
+        }
+      | { outcome: { case: "failure"; error: string } }
+    )) => {
+      const attachmentIds = input.outcome.case === "success"
+        ? await prepareAttachments({
+            ...input,
+            attachments: input.outcome.attachments,
+          })
+        : [];
+      const request = create(CompleteIssueReplyRequestSchema, {
+        requestId: randomUUID(),
+        projectId: input.projectId,
+        workerId: input.workerId,
+        work: workClaimIdentityToProto(input.work),
+        outcome: input.outcome.case === "success"
+          ? {
+              case: "success",
+              value: issueSuccess(input.outcome.result, attachmentIds),
+            }
+          : {
+              case: "failure",
+              value: { error: input.outcome.error },
+            },
+      });
+      const response = await exactRpc(
+        () => queue.client.completeIssueReply(request, {
+          ...queue.options,
+          signal: input.signal,
+        }),
+        input.signal,
+      );
+      return {
+        replayed: response.replayed,
+        disposition: outcomeDisposition(
+          response.disposition,
+          input.outcome.case,
+        ),
+      };
+    },
+
+    completeChannelReply: async (input: {
+      projectId: string;
+      workerId: string;
+      work: ClaimedChannelReply;
+      signal?: AbortSignal;
+    } & (
+      | {
+          outcome: {
+            case: "success";
+            result: ChannelReplyResult;
+            conversationId: string | null;
+            attachments: readonly File[];
+          };
+        }
+      | { outcome: { case: "failure"; error: string } }
+    )) => {
+      const attachmentIds = input.outcome.case === "success"
+        ? await prepareAttachments({
+            ...input,
+            attachments: input.outcome.attachments,
+          })
+        : [];
+      const request = create(CompleteChannelReplyRequestSchema, {
+        requestId: randomUUID(),
+        projectId: input.projectId,
+        workerId: input.workerId,
+        work: workClaimIdentityToProto(input.work),
+        outcome: input.outcome.case === "success"
+          ? {
+              case: "success",
+              value: channelSuccess(
+                input.outcome.result,
+                input.outcome.conversationId,
+                attachmentIds,
+              ),
+            }
+          : {
+              case: "failure",
+              value: { error: input.outcome.error },
+            },
+      });
+      const response = await exactRpc(
+        () => queue.client.completeChannelReply(request, {
+          ...queue.options,
+          signal: input.signal,
+        }),
+        input.signal,
+      );
+      return {
+        replayed: response.replayed,
+        disposition: outcomeDisposition(
+          response.disposition,
+          input.outcome.case,
+        ),
+        retainedUntil: requiredTimestamp(response.retainedUntil, "retainedUntil"),
+      };
+    },
+  };
+}

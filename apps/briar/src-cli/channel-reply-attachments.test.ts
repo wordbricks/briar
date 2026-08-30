@@ -1,10 +1,8 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import * as Predicate from "effect/Predicate";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  channelReplyCompleteRequestBody,
   collectChannelReplyAttachments,
   parseChannelReplyAgentResult,
 } from "./channel-reply-attachments";
@@ -188,7 +186,7 @@ describe("channel reply agent attachments", () => {
     ).toThrow();
   });
 
-  it("reads workspace images and HTML artifacts and keeps JSON when none exist", async () => {
+  it("reads validated workspace images and HTML artifacts", async () => {
     const workspacePath = await temporaryWorkspace();
     const imagePath = join(workspacePath, "screenshot.png");
     await writeFile(imagePath, new Uint8Array([137, 80, 78, 71]));
@@ -210,38 +208,6 @@ describe("channel reply agent attachments", () => {
       size: 15,
     });
 
-    const jsonBody = channelReplyCompleteRequestBody({
-      organizationId: "11111111-1111-4111-8111-111111111111",
-      workerId: "worker-1",
-      claimToken: "briar_channel_claim_secret",
-      result: parseChannelReplyAgentResult({
-        body: "No image",
-        document: null,
-        issueProposal: null,
-      }).result,
-      attachments: [],
-    });
-    if (!Predicate.isString(jsonBody)) {
-      throw new Error("attachment-free channel replies must use a JSON body");
-    }
-    expect(JSON.parse(jsonBody)).not.toHaveProperty("attachments");
-
-    const form = channelReplyCompleteRequestBody({
-      organizationId: "11111111-1111-4111-8111-111111111111",
-      workerId: "worker-1",
-      claimToken: "briar_channel_claim_secret",
-      result: parseChannelReplyAgentResult({
-        body: "Here is the screen.",
-        document: null,
-        issueProposal: null,
-      }).result,
-      attachments: files,
-    });
-    expect(form).toBeInstanceOf(FormData);
-    const payload = JSON.parse(String((form as FormData).get("complete")));
-    expect(payload.result.body).toBe("Here is the screen.");
-    expect(payload.result).not.toHaveProperty("attachments");
-    expect((form as FormData).getAll("attachments")).toHaveLength(2);
   });
 
   it("rejects missing, escaped, or unsupported workspace paths", async () => {

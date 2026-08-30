@@ -6,7 +6,6 @@ import {
 import {
   collectReplyAttachments,
   decodeReplyAttachmentPaths,
-  replyCompleteRequestBody,
 } from "./reply-attachments";
 
 export type ParsedIssueReplyAgentResult = {
@@ -40,27 +39,6 @@ export function parseIssueReplyAgentResult(
     result: parseDetachedIssueReplyResult(JSON.stringify(result), options),
     attachmentPaths,
   };
-}
-
-export function issueReplyCompleteRequestBody(input: {
-  projectId: string;
-  workerId: string;
-  claimToken: string;
-  result: DetachedIssueReplyResult;
-  attachments: readonly File[];
-}) {
-  return replyCompleteRequestBody({
-    payload: {
-      projectId: input.projectId,
-      workerId: input.workerId,
-      claimToken: input.claimToken,
-      body: input.result.reply,
-      proposedAction: input.result.proposedAction,
-      executionProposal: input.result.executionProposal,
-      skillExecutionProposal: input.result.skillExecutionProposal,
-    },
-    attachments: input.attachments,
-  });
 }
 
 export function collectIssueReplyAttachments(input: {
