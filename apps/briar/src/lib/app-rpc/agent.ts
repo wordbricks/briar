@@ -21,6 +21,7 @@ import {
   type ProjectAgentSession as ProjectAgentSessionMessage,
   type ProjectAgentSkill as ProjectAgentSkillMessage,
 } from "@briar/contracts/gen/briar/app/v1/agent_pb";
+import type { GetProjectAgentTranscriptRequest } from "@briar/contracts/gen/briar/app/v1/agent_transcript_pb";
 import type {
   AutoHuntSession,
   AutoHuntSessionEventType,
@@ -700,6 +701,21 @@ export async function loadProjectAgents(token: string, projectId: string): Promi
     const response = await client.listProjectAgents({ projectId }, appCallOptions(token));
     return response.agents.map(projectAgentFromMessage);
   });
+}
+
+export async function loadProjectAgentTranscript(
+  token: string,
+  projectId: string,
+  selector: GetProjectAgentTranscriptRequest["selector"],
+  signal?: AbortSignal,
+) {
+  const client = requireAgentClient();
+  return appRpc(() =>
+    client.getProjectAgentTranscript(
+      { projectId, selector },
+      appCallOptions(token, signal),
+    )
+  );
 }
 
 export async function createProjectAgent(

@@ -66,6 +66,7 @@ export {
   deleteProjectAgentSchedule,
   listOrganizationAgents,
   loadProjectAgents,
+  loadProjectAgentTranscript,
   loadProjectAgentScheduleRuns,
   loadProjectAgentSchedules,
   loadProjectAgentSession,
@@ -190,7 +191,6 @@ import {
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
-import type { AgentProvider } from "./agent-provider";
 import type { InboxMessage } from "../hooks/useInbox";
 import type { ChannelMessageAttachment } from "./channels-contract";
 import type {
@@ -399,37 +399,6 @@ export async function loadRunEvents(
   runId: string,
 ): Promise<HuntEvent[]> {
   return listRunEventsRpc(token, projectId, runId);
-}
-
-export type ProjectAgentTranscript = {
-  session: {
-    sessionId: string;
-    runId: string | null;
-    workerId: string | null;
-    agentProvider: AgentProvider;
-    startedAt: string;
-    lastEventAt: string;
-    eventCount: number;
-    projection?: "worklog";
-  };
-  events: Array<{
-    sequence: number;
-    direction: "client" | "server";
-    message: unknown;
-    recordedAt: string;
-  }>;
-};
-
-export async function loadProjectAgentTranscript(
-  token: string,
-  projectId: string,
-  sessionId: string,
-  afterSequence = 0,
-): Promise<ProjectAgentTranscript> {
-  return request<ProjectAgentTranscript>(
-    `/projects/${projectId}/sessions/${encodeURIComponent(sessionId)}/transcript?afterSequence=${afterSequence}`,
-    token,
-  );
 }
 
 export async function loadProjectAgentSpriteSheet(
