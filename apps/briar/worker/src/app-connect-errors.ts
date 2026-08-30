@@ -6,6 +6,7 @@ import * as SchemaIssue from "effect/SchemaIssue";
 import { HttpError } from "./http-response";
 import { RequestDecodeError } from "./request-schema";
 import { ProjectWorkflowInputError } from "./run-request-contract";
+import { TranscriptLimitError, WorkerConflictError } from "./workers";
 
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 
@@ -60,6 +61,24 @@ export const toConnectError = (error: unknown): ConnectError => {
     return new ConnectError(
       error.message,
       Code.InvalidArgument,
+      undefined,
+      undefined,
+      error,
+    );
+  }
+  if (error instanceof TranscriptLimitError) {
+    return new ConnectError(
+      error.message,
+      Code.ResourceExhausted,
+      undefined,
+      undefined,
+      error,
+    );
+  }
+  if (error instanceof WorkerConflictError) {
+    return new ConnectError(
+      error.message,
+      Code.FailedPrecondition,
       undefined,
       undefined,
       error,

@@ -545,14 +545,15 @@ describe("conversational Agent Skill execution approval", () => {
   ), env());
 
   const claimTask = () => apiWorker.fetch(new Request(
-    "https://briar.example/agent-task-claims",
+    "https://briar.example/briar.worker.v1.WorkerQueueService/ClaimWork",
     {
       method: "POST",
       headers: {
         authorization: "Bearer briar_worker_skill_credential_one",
+        "connect-protocol-version": "1",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ projectId, workerId }),
+      body: JSON.stringify({ projectId, workerId, claimedBy: "test-worker" }),
     },
   ), env());
 
@@ -1295,37 +1296,40 @@ describe("conversational Agent Skill execution approval", () => {
     const claim = await claimTask();
     expect(claim.status).toBe(200);
     const work = ((await claim.json()) as {
-      work: {
+      work?: { projectAgentTask?: {
         workId: string;
+        runId: string;
         claimToken: string;
         claimAttempts: number;
-      } | null;
-    }).work!;
+      } };
+    }).work?.projectAgentTask!;
     expect(work.workId).toBe(taskId);
+    expect(work.runId).toBe(taskId);
     expect(work.claimAttempts).toBe(1);
     const transcript = await apiWorker.fetch(new Request(
-      "https://briar.example/transcripts",
+      "https://briar.example/briar.worker.v1.WorkerExecutionService/AppendTranscriptEvents",
       {
         method: "POST",
         headers: {
           authorization: "Bearer briar_worker_skill_credential_one",
+          "connect-protocol-version": "1",
           "content-type": "application/json",
         },
         body: JSON.stringify({
           projectId,
           sessionId: taskId,
-          workType: "projectAgentTask",
-          workId: taskId,
-          claimToken: work.claimToken,
-          workerId,
-          agentProvider: "codex",
+          work: {
+            workId: taskId,
+            runId: work.runId,
+            claimToken: work.claimToken,
+            projectAgentTask: {},
+          },
+          agentProvider: "AGENT_PROVIDER_CODEX",
           events: [{
-            sequence: 1,
-            direction: "server",
-            payload: {
-              type: "event",
-              event: {
-                type: "messageCompleted",
+            sequence: "1",
+            direction: "AGENT_EVENT_DIRECTION_SERVER",
+            normalized: {
+              messageCompleted: {
                 id: "task-progress-1",
                 phase: "commentary",
                 text: "Direct task progress was persisted.",
@@ -1335,20 +1339,31 @@ describe("conversational Agent Skill execution approval", () => {
         }),
       },
     ), env());
-    expect(transcript.status).toBe(202);
+    expect(transcript.status).toBe(200);
     const storedTranscript = await apiWorker.fetch(new Request(
-      `https://briar.example/projects/${projectId}/sessions/${taskId}/transcript`,
-      { headers: { authorization: `Bearer ${ownerToken}` } },
+      "https://briar.example/briar.app.v1.AgentService/GetProjectAgentTranscript",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerToken}`,
+          "connect-protocol-version": "1",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ projectId, sessionId: taskId }),
+      },
     ), env());
     expect(storedTranscript.status).toBe(200);
-    await expect(storedTranscript.json()).resolves.toMatchObject({
-      session: { sessionId: taskId, runId: null },
-      events: [{
+    const storedTranscriptBody = await storedTranscript.json() as {
+      session: Record<string, unknown>;
+      entries: unknown[];
+    };
+    expect(storedTranscriptBody.session).toMatchObject({ sessionId: taskId });
+    expect(storedTranscriptBody.session).not.toHaveProperty("runId");
+    expect(storedTranscriptBody).toMatchObject({
+      entries: [{
+        status: "PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_COMPLETED",
         message: {
-          event: {
-            type: "messageCompleted",
-            text: "Direct task progress was persisted.",
-          },
+          text: "Direct task progress was persisted.",
         },
       }],
     });
@@ -1422,12 +1437,20 @@ describe("conversational Agent Skill execution approval", () => {
       expect(simultaneous.map((response) => response.status)).toEqual([200, 200]);
       const claimBodies = await Promise.all(simultaneous.map((response) =>
         response.json() as Promise<{
-          work: { workId: string; claimToken: string } | null;
+          work?: {
+            projectAgentTask?: { workId: string; claimToken: string };
+          };
         }>
       ));
-      expect(claimBodies.filter((body) => body.work !== null)).toHaveLength(1);
-      expect(claimBodies.filter((body) => body.work === null)).toHaveLength(1);
-      const activeTask = claimBodies.find((body) => body.work)!.work!;
+      expect(
+        claimBodies.filter((body) => body.work?.projectAgentTask),
+      ).toHaveLength(1);
+      expect(
+        claimBodies.filter((body) => !body.work?.projectAgentTask),
+      ).toHaveLength(1);
+      const activeTask = claimBodies.find((body) =>
+        body.work?.projectAgentTask
+      )!.work!.projectAgentTask!;
       const queuedTaskId = activeTask.workId === firstTaskId
         ? secondTaskId
         : firstTaskId;
@@ -1493,19 +1516,21 @@ describe("conversational Agent Skill execution approval", () => {
       )).resolves.toBe(1);
       const huntBlocksTask = await claimTask();
       expect(huntBlocksTask.status).toBe(200);
-      expect(await huntBlocksTask.json()).toEqual({ work: null });
+      expect(await huntBlocksTask.json()).toEqual({});
 
       await db.prepare(`delete from briar_hunt_runs where id = ?`)
         .bind(capacityRunId).run();
       const finalTaskClaim = await claimTask();
       expect(finalTaskClaim.status).toBe(200);
       const finalTask = (await finalTaskClaim.json()) as {
-        work: { workId: string; claimToken: string } | null;
+        work?: {
+          projectAgentTask?: { workId: string; claimToken: string };
+        };
       };
-      expect(finalTask.work?.workId).toBe(queuedTaskId);
+      expect(finalTask.work?.projectAgentTask?.workId).toBe(queuedTaskId);
       expect((await completeTask(
-        finalTask.work!.workId,
-        finalTask.work!.claimToken,
+        finalTask.work!.projectAgentTask!.workId,
+        finalTask.work!.projectAgentTask!.claimToken,
         { summary: "Queued capacity task completed.", conversationId: null },
       )).status).toBe(200);
     } finally {

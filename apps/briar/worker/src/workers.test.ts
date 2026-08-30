@@ -3740,56 +3740,54 @@ describe("detached execution workers", () => {
       totalTokens: 1_250,
       durationMs: 90_000,
     };
-    const transcriptBody = {
-      sessionId: "terminal-metrics-session",
-      runId,
-      runAttempt: claim!.current_attempt,
-      executionId: claim!.last_execution_id,
+    const telemetryBody = {
       projectId,
-      workerId: worker.worker.id,
-      agentProvider: "codex",
-      workType: "issue",
-      workId: runId,
-      claimToken,
-      executionMetrics,
-      usageRecords: [{
+      work: {
+        workId: runId,
+        runId,
+        claimToken,
+        issue: {},
+      },
+      executionId: claim!.last_execution_id,
+      agentProvider: "AGENT_PROVIDER_CODEX",
+      executionMetrics: {
+        inputTokens: "1000",
+        outputTokens: "250",
+        cacheReadTokens: "800",
+        reasoningOutputTokens: "100",
+        totalTokens: "1250",
+        durationMs: "90000",
+      },
+      usageObservations: [{
         usageKey: "codex:terminal-metrics:usage",
         sessionId: "terminal-metrics-session",
         scopeId: "terminal",
         turnId: "terminal",
-        agentProvider: "codex",
+        agentProvider: "AGENT_PROVIDER_CODEX",
         modelProvider: "openai",
         model: "gpt-5.6-sol",
-        canonicalModel: null,
-        modelSource: "providerReported",
+        modelSource: "AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_REPORTED",
         source: "codex.terminal.metrics",
-        uncachedInputTokens: 1_000,
-        cacheReadTokens: 800,
-        cacheWriteTokens: null,
-        outputTokens: 250,
-        reasoningOutputTokens: 100,
-        totalTokens: 1_250,
+        uncachedInputTokens: "1000",
+        cacheReadTokens: "800",
+        outputTokens: "250",
+        reasoningOutputTokens: "100",
+        totalTokens: "1250",
         observedAt: atMinute(4),
       }],
-      costRecords: [{
+      costObservations: [{
         costKey: "codex:terminal-metrics:cost",
         usageKey: "codex:terminal-metrics:usage",
         sessionId: "terminal-metrics-session",
         scopeId: "terminal",
         turnId: "terminal",
-        agentProvider: "codex",
+        agentProvider: "AGENT_PROVIDER_CODEX",
         modelProvider: "openai",
         model: "gpt-5.6-sol",
-        canonicalModel: null,
-        modelSource: "providerReported",
+        modelSource: "AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_REPORTED",
         source: "codex.terminal.metrics",
-        amountUsdTicks: 12_345_678,
+        amountUsdTicks: "12345678",
         observedAt: atMinute(4),
-      }],
-      events: [{
-        sequence: 1,
-        direction: "server",
-        payload: { type: "execution.metrics", executionMetrics },
       }],
     };
     const env = {
@@ -3799,34 +3797,40 @@ describe("detached execution workers", () => {
       GOOGLE_CLIENT_ID: "google-client-test",
       GOOGLE_CLIENT_SECRET: "google-secret-test",
     } as unknown as Env;
-    const postTranscript = (body: Record<string, unknown>) =>
+    const postWorkerRpc = (method: string, body: Record<string, unknown>) =>
       apiWorker.fetch(
-        new Request("https://briar-api.example/transcripts", {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${credential}`,
-            "content-type": "application/json",
+        new Request(
+          `https://briar-api.example/briar.worker.v1.WorkerExecutionService/${method}`,
+          {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${credential}`,
+              "connect-protocol-version": "1",
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(body),
           },
-          body: JSON.stringify(body),
-        }),
+        ),
         env,
       );
 
-    const accepted = await postTranscript(transcriptBody);
-    expect(accepted.status).toBe(202);
+    const accepted = await postWorkerRpc(
+      "ReportIssueExecutionTelemetry",
+      telemetryBody,
+    );
+    expect(accepted.status).toBe(200);
     expect(await accepted.json()).toMatchObject({
-      stored: 1,
-      usageStored: 1,
-      costStored: 1,
+      executionMetricsUpdated: true,
+      usageObservationsStored: 1,
+      costObservationsStored: 1,
     });
 
-    const retry = await postTranscript(transcriptBody);
-    expect(retry.status).toBe(202);
-    expect(await retry.json()).toMatchObject({
-      stored: 0,
-      usageStored: 0,
-      costStored: 0,
-    });
+    const retry = await postWorkerRpc(
+      "ReportIssueExecutionTelemetry",
+      telemetryBody,
+    );
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual({ executionMetricsUpdated: true });
 
     const storedMetrics = await db
       .prepare(
@@ -3844,32 +3848,49 @@ describe("detached execution workers", () => {
       listOrganizationUsageCostRecords(db, projectId, atMinute(0)),
     ).resolves.toHaveLength(1);
 
-    const ordinaryLateTranscript = await postTranscript({
-      ...transcriptBody,
-      sessionId: "terminal-metrics-ordinary-late-write",
-      executionMetrics: undefined,
-      usageRecords: undefined,
-      costRecords: undefined,
-      events: [{
-        sequence: 2,
-        direction: "server",
-        payload: { type: "ordinary.transcript" },
-      }],
+    const ordinaryLateTranscript = await postWorkerRpc(
+      "AppendTranscriptEvents",
+      {
+        projectId,
+        sessionId: "terminal-metrics-ordinary-late-write",
+        work: telemetryBody.work,
+        agentProvider: "AGENT_PROVIDER_CODEX",
+        events: [{
+          sequence: "2",
+          direction: "AGENT_EVENT_DIRECTION_SERVER",
+          rawPayload: { type: "ordinary.transcript" },
+        }],
+      },
+    );
+    expect(ordinaryLateTranscript.status).toBe(400);
+    await expect(ordinaryLateTranscript.json()).resolves.toMatchObject({
+      code: "failed_precondition",
     });
-    expect(ordinaryLateTranscript.status).toBe(409);
 
-    const wrongClaim = await postTranscript({
-      ...transcriptBody,
-      claimToken: "briar_claim_terminal_metrics_wrong",
+    const wrongClaim = await postWorkerRpc("ReportIssueExecutionTelemetry", {
+      ...telemetryBody,
+      work: {
+        ...telemetryBody.work,
+        claimToken: "briar_claim_terminal_metrics_wrong",
+      },
     });
-    expect(wrongClaim.status).toBe(409);
+    expect(wrongClaim.status).toBe(400);
+    await expect(wrongClaim.json()).resolves.toMatchObject({
+      code: "failed_precondition",
+    });
 
     await db
       .prepare(`update briar_hunt_runs set completed_at = ? where id = ?`)
       .bind(atMinute(20), runId)
       .run();
-    const expiredCompletion = await postTranscript(transcriptBody);
-    expect(expiredCompletion.status).toBe(409);
+    const expiredCompletion = await postWorkerRpc(
+      "ReportIssueExecutionTelemetry",
+      telemetryBody,
+    );
+    expect(expiredCompletion.status).toBe(400);
+    await expect(expiredCompletion.json()).resolves.toMatchObject({
+      code: "failed_precondition",
+    });
   });
 
   it("keeps cost-only runs and attempts inside the usage range", async () => {
