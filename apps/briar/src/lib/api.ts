@@ -27,7 +27,6 @@ import {
   decodeProjectAgentScheduleRunResponse,
   decodeProjectAgentScheduleRunsResponse,
   decodeProjectAgentSchedulesResponse,
-  decodeProjectAgentSessionResponse,
 } from "./api/project-agent-contract";
 import {
   decodeProjectResponse,
@@ -73,8 +72,39 @@ export {
   toggleChannelMessageReaction,
   updateChannelThreadSubscription,
 } from "./app-rpc/channel";
+export {
+  acceptIssueActionProposal,
+  acceptIssueExecutionProposal,
+  acceptIssueReworkProposal,
+  acceptIssueSkillExecutionProposal,
+  addIssueDependency,
+  cancelHuntRun,
+  completeIssueResultReview,
+  createIssue,
+  createIssueMessage,
+  deleteIssue,
+  dispatchHuntRun,
+  loadIssueAgentReply,
+  loadIssueConversationDelta,
+  loadIssueConversationSnapshot,
+  loadIssueMessages,
+  loadRunEvidence,
+  moveHuntRun,
+  removeIssueDependency,
+  resumeHuntRun,
+  retryHuntRun,
+  transferIssue,
+  type CreateIssueResult,
+  type HuntDispatchResult,
+  type HuntMoveResult,
+  type HuntRecoveryResult,
+  type HuntResumeResult,
+  type TransferIssueResult,
+  updateIssue,
+  updateIssueExecutionPreferences,
+  updateIssueSubscription,
+} from "./app-rpc/issue";
 import type { StructuredAgentResult } from "./agent-result";
-import { validateIssueAttachments } from "./issue-attachments";
 import {
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
@@ -88,7 +118,6 @@ import type {
   ProjectUsagePeriod,
 } from "./project-usage-summary";
 import { LITELLM_MAIN_PRICING_SOURCE } from "./agent-usage-pricing";
-import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type { InboxMessage } from "../hooks/useInbox";
 import type {
   ChannelAgentSkillInput,
@@ -107,7 +136,6 @@ import type {
   LinearImportStatesResult,
 } from "./linear-import";
 import type {
-  CreateIssueInput,
   CreateProjectAgentInput,
   CreateProjectAgentScheduleInput,
   AgentUsageReport,
@@ -123,20 +151,9 @@ import type {
   MergeQueueProfile,
   MergeQueueStatus,
   ProjectExecutionWorkerPolicy,
-  HuntRunPlacement,
   HuntEvent,
   IssueAttachment,
-  IssueAgentReplyState,
-  IssueConversationDelta,
-  IssueConversationSnapshot,
   IssueMessage,
-  IssueProposedAction,
-  IssueExecutionPreferences,
-  IssueExecutionApprovalInput,
-  AgentSkillExecutionApprovalInput,
-  AgentSkillExecutionProposal,
-  IssueExecutionProposal,
-  IssueResultReview,
   ClaimedProjectAgentScheduleRun,
   Project,
   ProjectAgent,
@@ -149,13 +166,10 @@ import type {
   OrganizationAssignableRole,
   ProjectSettings,
   ProjectUsageSummary,
-  RunEvidence,
   RunEvidenceImage,
   StatusTrayRunsPayload,
   UpdateProjectAgentInput,
   UpdateProjectAgentScheduleInput,
-  UpdateIssueInput,
-  UpdateIssueResult,
   WorkerIcon,
 } from "../types";
 
@@ -1223,66 +1237,6 @@ function projectAgentInputJson(input: CreateProjectAgentInput) {
   };
 }
 
-export async function createIssue(
-  token: string,
-  projectId: string,
-  input: CreateIssueInput,
-) {
-  if (input.attachments.length === 0) {
-    const {
-      attachments: _attachments,
-      attachmentReferences: _attachmentReferences,
-      ...issue
-    } = input;
-    return request<{
-      runId: string;
-      sourceKey: string;
-      stage: "queued";
-      status: "backlog" | "queued";
-      assigneeUserId: string | null;
-      createdByUserId: string;
-      difficulty: CreateIssueInput["difficulty"];
-      attachments: IssueAttachment[];
-    }>(`/projects/${projectId}/issues`, token, {
-      method: "POST",
-      body: JSON.stringify(issue),
-    });
-  }
-  const attachmentError = validateIssueAttachments(input.attachments);
-  if (attachmentError) throw new Error(attachmentError);
-  const form = new FormData();
-  form.set("title", input.title);
-  form.set("description", input.description ?? "");
-  form.set("priority", input.priority === null ? "" : String(input.priority));
-  form.set("difficulty", input.difficulty ?? "");
-  form.set("assigneeUserId", input.assigneeUserId ?? "");
-  form.set("status", input.status);
-  form.set("preferredProvider", input.preferredProvider ?? "");
-  form.set("preferredModel", input.preferredModel ?? "");
-  form.set("preferredEffort", input.preferredEffort ?? "");
-  form.set("fullAuto", input.fullAuto ? "true" : "false");
-  if (input.checkpoints?.length) {
-    form.set("checkpoints", JSON.stringify(input.checkpoints));
-  }
-  if (input.attachmentReferences?.length) {
-    form.set(
-      "attachmentReferences",
-      JSON.stringify(input.attachmentReferences),
-    );
-  }
-  for (const attachment of input.attachments) {
-    form.append("attachments", attachment, attachment.name);
-  }
-  return request<{
-    runId: string;
-    sourceKey: string;
-    stage: "queued";
-    status: "backlog" | "queued";
-    assigneeUserId: string | null;
-    attachments: IssueAttachment[];
-  }>(`/projects/${projectId}/issues`, token, { method: "POST", body: form });
-}
-
 export async function createChannel(
   token: string,
   organizationId: string,
@@ -1468,97 +1422,6 @@ export async function revokeChannelWebhook(
   );
 }
 
-type AgentSkillExecutionAcceptResponse = {
-  proposal: AgentSkillExecutionProposal;
-  outcome: "accepted" | "already_accepted";
-  projectId: string;
-  session: unknown;
-};
-
-function assertPendingAgentSkillExecutionApproval(
-  proposal: AgentSkillExecutionProposal,
-  input: AgentSkillExecutionApprovalInput,
-) {
-  if (
-    proposal.status !== "pending" ||
-    proposal.acceptedAt !== null ||
-    proposal.requestedWorkerId !== null ||
-    proposal.requestedWorkerLabel !== null ||
-    proposal.resultSessionId !== null ||
-    (proposal.executionMode === "task" &&
-      (!input.workerId || input.workerId !== input.workerId.trim())) ||
-    (proposal.executionMode === "conversation" && input.workerId !== undefined)
-  ) {
-    throw new Error(
-      "Skill execution approval requires one exact Worker and a pending proposal.",
-    );
-  }
-}
-
-const skillExecutionSnapshotKeys = [
-  "id",
-  "type",
-  "projectId",
-  "agentId",
-  "agentName",
-  "skillId",
-  "skillName",
-  "request",
-  "provider",
-  "model",
-  "effort",
-  "executionMode",
-  "approvalPolicy",
-  "createdAt",
-  "delegatedByAgentId",
-  "delegatedByAgentName",
-] as const satisfies readonly (keyof AgentSkillExecutionProposal)[];
-
-function validateAgentSkillExecutionAcceptance(
-  result: AgentSkillExecutionAcceptResponse,
-  expected: AgentSkillExecutionProposal,
-  input: AgentSkillExecutionApprovalInput,
-) {
-  const session = result.session === null
-    ? null
-    : {
-      ...decodeProjectAgentSessionResponse(result.session),
-      localOwner: false,
-    } as AutoHuntSession;
-  const snapshotChanged = skillExecutionSnapshotKeys.some(
-    (key) => result.proposal[key] !== expected[key],
-  );
-  if (
-    snapshotChanged ||
-    (result.outcome !== "accepted" && result.outcome !== "already_accepted") ||
-    result.projectId !== expected.projectId ||
-    result.proposal.status !== "accepted" ||
-    !result.proposal.acceptedAt ||
-    !result.proposal.requestedWorkerLabel?.trim() ||
-    (expected.executionMode === "conversation"
-      ? session !== null ||
-        !result.proposal.requestedWorkerId ||
-        !result.proposal.resultMessageId
-      : session === null ||
-        result.proposal.requestedWorkerId !== input.workerId ||
-        result.proposal.resultSessionId !== session.id ||
-        session.projectId !== expected.projectId ||
-        session.agentId !== expected.agentId ||
-        session.agentName !== expected.agentName ||
-        session.skillId !== expected.skillId ||
-        session.sessionType !== "task" ||
-        session.trigger !== "manual" ||
-        session.request !== expected.request ||
-        session.requestedWorkerId !== input.workerId ||
-        session.workerId !== input.workerId)
-  ) {
-    throw new Error(
-      "Skill execution approval returned inconsistent immutable evidence.",
-    );
-  }
-  return { ...result, session };
-}
-
 export async function createOrganizationAgent(
   token: string,
   organizationId: string,
@@ -1612,88 +1475,6 @@ export async function deleteOrganizationAgent(
   );
 }
 
-export async function updateIssue(
-  token: string,
-  projectId: string,
-  runId: string,
-  input: UpdateIssueInput,
-) {
-  if (input.attachments.length === 0) {
-    const {
-      attachments: _attachments,
-      attachmentReferences: _attachmentReferences,
-      ...issue
-    } = input;
-    return request<UpdateIssueResult>(
-      `/projects/${projectId}/runs/${runId}`,
-      token,
-      {
-        method: "PATCH",
-        body: JSON.stringify(
-          input.keptAttachmentIds === undefined
-            ? issue
-            : { ...issue, keptAttachmentIds: input.keptAttachmentIds },
-        ),
-      },
-    );
-  }
-  const attachmentError = validateIssueAttachments(input.attachments);
-  if (attachmentError) throw new Error(attachmentError);
-  const form = new FormData();
-  form.set("title", input.title);
-  form.set("description", input.description ?? "");
-  form.set("priority", input.priority === null ? "" : String(input.priority));
-  form.set("difficulty", input.difficulty ?? "");
-  form.set("assigneeUserId", input.assigneeUserId ?? "");
-  if (input.attachmentReferences?.length) {
-    form.set(
-      "attachmentReferences",
-      JSON.stringify(input.attachmentReferences),
-    );
-  }
-  if (input.keptAttachmentIds !== undefined) {
-    form.set("keptAttachmentIds", JSON.stringify(input.keptAttachmentIds));
-  }
-  for (const attachment of input.attachments) {
-    form.append("attachments", attachment, attachment.name);
-  }
-  return request<UpdateIssueResult>(
-    `/projects/${projectId}/runs/${runId}`,
-    token,
-    { method: "PATCH", body: form },
-  );
-}
-
-export async function updateIssueSubscription(
-  token: string,
-  projectId: string,
-  runId: string,
-  subscribed: boolean,
-) {
-  return request<{
-    runId: string;
-    subscribers: Array<{ userId: string; subscribedAt: string }>;
-  }>(`/projects/${projectId}/runs/${runId}/subscription`, token, {
-    method: subscribed ? "PUT" : "DELETE",
-  });
-}
-
-export async function updateIssueExecutionPreferences(
-  token: string,
-  projectId: string,
-  runId: string,
-  input: IssueExecutionPreferences,
-) {
-  return request<{ runId: string } & IssueExecutionPreferences>(
-    `/projects/${projectId}/runs/${runId}/preferences`,
-    token,
-    {
-      method: "PUT",
-      body: JSON.stringify(input),
-    },
-  );
-}
-
 export async function updateIssueCheckpoints(
   token: string,
   projectId: string,
@@ -1707,81 +1488,6 @@ export async function updateIssueCheckpoints(
     method: "PUT",
     body: JSON.stringify({ checkpoints }),
   });
-}
-
-export async function completeIssueResultReview(
-  token: string,
-  projectId: string,
-  runId: string,
-) {
-  return request<IssueResultReview>(
-    `/projects/${projectId}/runs/${runId}/result-reviews`,
-    token,
-    { method: "POST" },
-  );
-}
-
-export async function addIssueDependency(
-  token: string,
-  projectId: string,
-  dependentRunId: string,
-  prerequisiteRunId: string,
-) {
-  return request<{
-    prerequisiteRunId: string;
-    dependentRunId: string;
-    outcome: "created" | "already_exists";
-  }>(
-    `/projects/${projectId}/runs/${dependentRunId}/dependencies/${prerequisiteRunId}`,
-    token,
-    { method: "PUT" },
-  );
-}
-
-export async function removeIssueDependency(
-  token: string,
-  projectId: string,
-  dependentRunId: string,
-  prerequisiteRunId: string,
-) {
-  await request<void>(
-    `/projects/${projectId}/runs/${dependentRunId}/dependencies/${prerequisiteRunId}`,
-    token,
-    { method: "DELETE" },
-  );
-}
-
-export async function deleteIssue(
-  token: string,
-  projectId: string,
-  runId: string,
-) {
-  await request<void>(`/projects/${projectId}/runs/${runId}`, token, {
-    method: "DELETE",
-  });
-}
-
-export type TransferIssueResult = {
-  runId: string;
-  sourceProjectId: string;
-  targetProjectId: string;
-  outcome: "transferred";
-};
-
-export async function transferIssue(
-  token: string,
-  projectId: string,
-  runId: string,
-  targetProjectId: string,
-) {
-  return request<TransferIssueResult>(
-    `/projects/${projectId}/runs/${runId}/transfer`,
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify({ targetProjectId }),
-    },
-  );
 }
 
 export async function loadIssueAttachment(
@@ -1805,52 +1511,6 @@ export async function loadIssueAttachment(
   return response.blob();
 }
 
-export async function loadIssueMessages(
-  token: string,
-  projectId: string,
-  runId: string,
-) {
-  const result = await loadIssueConversationSnapshot(token, projectId, runId);
-  return result.messages;
-}
-
-export async function loadIssueConversationSnapshot(
-  token: string,
-  projectId: string,
-  runId: string,
-) {
-  return request<IssueConversationSnapshot>(
-    `/projects/${projectId}/runs/${runId}/messages`,
-    token,
-  );
-}
-
-export async function loadIssueConversationDelta(
-  token: string,
-  projectId: string,
-  runId: string,
-  cursor: number,
-) {
-  return request<IssueConversationDelta>(
-    `/projects/${projectId}/runs/${runId}/messages/delta?cursor=${cursor}`,
-    token,
-  );
-}
-
-export async function loadRunEvidence(
-  token: string,
-  projectId: string,
-  runId: string,
-) {
-  const result = await request<{
-    runId: string;
-    attempt: number;
-    revision: number;
-    evidence: RunEvidence[];
-  }>(`/projects/${projectId}/runs/${runId}/evidence`, token);
-  return result.evidence;
-}
-
 export async function loadRunEvidenceImage(
   token: string,
   image: RunEvidenceImage,
@@ -1865,65 +1525,6 @@ export async function loadRunEvidenceImage(
     throw new Error(`증빙 이미지를 열 수 없습니다. (${response.status})`);
   }
   return response.blob();
-}
-
-export async function createIssueMessage(
-  token: string,
-  projectId: string,
-  runId: string,
-  input: {
-    body: string;
-    clientMessageId?: string;
-    parentMessageId: string | null;
-    mentionedUserIds?: string[];
-    mentionedAgentIds?: string[];
-    agentConversationId?: string | null;
-    attachments?: File[];
-    attachmentReferences?: string[];
-  },
-) {
-  const attachments = input.attachments ?? [];
-  const clientMessageId = input.clientMessageId?.toLowerCase();
-  const parentMessageId = input.parentMessageId?.toLowerCase() ?? null;
-  let body: BodyInit;
-  if (attachments.length > 0) {
-    const attachmentError = validateIssueAttachments(attachments);
-    if (attachmentError) throw new Error(attachmentError);
-    const form = new FormData();
-    form.set("body", input.body);
-    if (clientMessageId) {
-      form.set("clientMessageId", clientMessageId);
-    }
-    form.set("parentMessageId", parentMessageId ?? "");
-    form.set("mentionedUserIds", JSON.stringify(input.mentionedUserIds ?? []));
-    form.set("mentionedAgentIds", JSON.stringify(input.mentionedAgentIds ?? []));
-    form.set("agentConversationId", input.agentConversationId ?? "");
-    form.set(
-      "attachmentReferences",
-      JSON.stringify(input.attachmentReferences ?? []),
-    );
-    for (const attachment of attachments) {
-      form.append("attachments", attachment, attachment.name);
-    }
-    body = form;
-  } else {
-    const {
-      attachments: _attachments,
-      attachmentReferences: _attachmentReferences,
-      ...message
-    } = input;
-    body = JSON.stringify({ ...message, clientMessageId, parentMessageId });
-  }
-  const result = await request<{
-    message: IssueMessage;
-    agentReply: IssueAgentReplyState | null;
-    agentReplies?: IssueAgentReplyState[];
-  }>(
-    `/projects/${projectId}/runs/${runId}/messages`,
-    token,
-    { method: "POST", body },
-  );
-  return result;
 }
 
 export async function editIssueMessage(
@@ -1954,138 +1555,6 @@ export async function deleteIssueMessage(
     `/projects/${projectId}/runs/${runId}/messages/${messageId}`,
     token,
     { method: "DELETE" },
-  );
-}
-
-export async function acceptIssueReworkProposal(
-  token: string,
-  projectId: string,
-  runId: string,
-  proposalId: string,
-) {
-  return request<{
-    proposal: Extract<IssueProposedAction, { type: "request_issue_rework" }>;
-    outcome: "accepted" | "already_accepted";
-    attempt: number;
-    revision: number;
-    workflowStage: string;
-  }>(
-    `/projects/${projectId}/runs/${runId}/rework-proposals/${proposalId}/accept`,
-    token,
-    { method: "POST", body: JSON.stringify({}) },
-  );
-}
-
-export async function acceptIssueActionProposal(
-  token: string,
-  projectId: string,
-  runId: string,
-  proposalId: string,
-) {
-  return request<{
-    proposal: Exclude<IssueProposedAction, { type: "request_issue_rework" }>;
-    executionProposal?: IssueExecutionProposal | null;
-    outcome: "accepted" | "already_accepted";
-    resultRunId: string | null;
-  }>(
-    `/projects/${projectId}/runs/${runId}/issue-action-proposals/${proposalId}/accept`,
-    token,
-    { method: "POST", body: JSON.stringify({}) },
-  );
-}
-
-export async function acceptIssueExecutionProposal(
-  token: string,
-  projectId: string,
-  conversationRunId: string,
-  proposalId: string,
-  input: IssueExecutionApprovalInput,
-) {
-  return request<{
-    proposal: IssueExecutionProposal;
-    outcome: "accepted" | "already_accepted";
-    projectId: string;
-    runId: string;
-    dispatch: HuntDispatchResult;
-  }>(
-    `/projects/${projectId}/runs/${conversationRunId}/issue-execution-proposals/${proposalId}/accept`,
-    token,
-    { method: "POST", body: JSON.stringify(input) },
-  );
-}
-
-export async function acceptIssueSkillExecutionProposal(
-  token: string,
-  projectId: string,
-  conversationRunId: string,
-  expectedProposal: AgentSkillExecutionProposal,
-  input: AgentSkillExecutionApprovalInput,
-) {
-  assertPendingAgentSkillExecutionApproval(expectedProposal, input);
-  const result = await request<{
-    proposal: AgentSkillExecutionProposal;
-    outcome: "accepted" | "already_accepted";
-    projectId: string;
-    session: unknown;
-  }>(
-    `/projects/${projectId}/runs/${conversationRunId}/skill-execution-proposals/${expectedProposal.id}/accept`,
-    token,
-    { method: "POST", body: JSON.stringify(input) },
-  );
-  return validateAgentSkillExecutionAcceptance(
-    result,
-    expectedProposal,
-    input,
-  );
-}
-
-export type HuntRecoveryResult = {
-  runId: string;
-  outcome: "retried" | "cancelled" | "already_retried" | "already_cancelled";
-  attempt: number;
-  stage: "queued" | "cancelled";
-};
-
-export type HuntResumeResult = {
-  runId: string;
-  outcome:
-    | "resumed"
-    | "already_resumed"
-    | "approved"
-    | "already_approved"
-    | "not_found"
-    | "ineligible";
-  workflowStage: string | null;
-  startStage: string | null;
-  checkpointKey: string | null;
-  attempt: number | null;
-  revision: number | null;
-  terminalReviewOnly: boolean;
-};
-
-export async function resumeHuntRun(
-  token: string,
-  projectId: string,
-  runId: string,
-  checkpoint: {
-    key: string;
-    attempt: number;
-    revision: number;
-  },
-  requestId: string = crypto.randomUUID(),
-) {
-  return request<HuntResumeResult>(
-    `/projects/${projectId}/runs/${runId}/resume`,
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        requestId,
-        checkpointKey: checkpoint.key,
-        attempt: checkpoint.attempt,
-        revision: checkpoint.revision,
-      }),
-    },
   );
 }
 
@@ -2148,82 +1617,6 @@ export async function updateCheckpointPolicy(
   });
 }
 
-async function recoverHuntRun(
-  token: string,
-  projectId: string,
-  runId: string,
-  action: "retry" | "cancel",
-  reason: string | null,
-) {
-  return request<HuntRecoveryResult>(
-    `/projects/${projectId}/runs/${runId}/${action}`,
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify({ requestId: crypto.randomUUID(), reason }),
-    },
-  );
-}
-
-export const retryHuntRun = (
-  token: string,
-  projectId: string,
-  runId: string,
-  reason: string | null = null,
-) => recoverHuntRun(token, projectId, runId, "retry", reason);
-
-export const cancelHuntRun = (
-  token: string,
-  projectId: string,
-  runId: string,
-  reason: string | null = null,
-) => recoverHuntRun(token, projectId, runId, "cancel", reason);
-
-export type HuntDispatchResult = {
-  runId: string;
-  agentId: string | null;
-  provider: AgentProvider;
-  model: string | null;
-  effort: ModelEffort | null;
-  requestedWorkerId: string | null;
-  requestedByUserId: string;
-  dispatchMode: "any" | "specific";
-  dispatchedAt: string;
-  outcome: "dispatched" | "already_dispatched";
-};
-
-export async function dispatchHuntRun(
-  token: string,
-  projectId: string,
-  runId: string,
-  input: {
-    agentId?: string | null;
-    provider: AgentProvider;
-    model: string | null;
-    effort: ModelEffort | null;
-    workerId: string | null;
-    reassign?: boolean;
-    persistPreferences?: boolean;
-  },
-) {
-  return request<HuntDispatchResult>(
-    `/projects/${projectId}/runs/${runId}/${input.reassign ? "reassign" : "dispatch"}`,
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        ...(input.agentId ? { agentId: input.agentId } : {}),
-        provider: input.provider,
-        model: input.model,
-        effort: input.effort,
-        persistPreferences: input.persistPreferences,
-        workerId: input.workerId,
-        requestId: crypto.randomUUID(),
-      }),
-    },
-  );
-}
-
 export async function unassignHuntRun(token: string, projectId: string, runId: string) {
   return request<{
     runId: string;
@@ -2272,32 +1665,6 @@ export async function updateProjectExecutionWorkerPolicy(
     `/projects/${projectId}/execution-policy`,
     token,
     { method: "PUT", body: JSON.stringify(policy) },
-  );
-}
-
-export type HuntMoveResult = {
-  runId: string;
-  outcome: "moved" | "unchanged" | "already_moved";
-  status: HuntRunPlacement["status"];
-  workflowStage: string | null;
-};
-
-export async function moveHuntRun(
-  token: string,
-  projectId: string,
-  runId: string,
-  placement: HuntRunPlacement,
-) {
-  return request<HuntMoveResult>(
-    `/projects/${projectId}/runs/${runId}/status`,
-    token,
-    {
-      method: "PUT",
-      body: JSON.stringify({
-        requestId: crypto.randomUUID(),
-        ...placement,
-      }),
-    },
   );
 }
 

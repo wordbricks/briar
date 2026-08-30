@@ -248,6 +248,7 @@ export type IssueConversationDelta = {
   cursor: number;
   hasMore: boolean;
   changed: boolean;
+  reset: boolean;
   messages?: IssueMessage[];
   agentReplies?: IssueAgentReplyState[];
 };

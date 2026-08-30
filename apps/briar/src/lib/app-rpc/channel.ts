@@ -388,7 +388,7 @@ const proposalStatusFromProto = (
   }
 };
 
-const activeProposalStatusFromProto = (
+export const activeProposalStatusFromProto = (
   value: ProtoProposalStatus,
 ): ChannelExecutionProposal["status"] => {
   switch (value) {
@@ -611,7 +611,7 @@ export const channelMessageFromMessage = (
   deletedAt: optionalTimestamp(value.deletedAt),
 });
 
-const channelReplyStatusFromProto = (
+export const channelReplyStatusFromProto = (
   value: ProtoReplyJobStatus,
 ): ChannelReplyStatus => {
   switch (value) {
@@ -644,7 +644,7 @@ const channelAgentReplyFromMessage = (
   updatedAt: requiredTimestamp(value.updatedAt, "channelAgentReply.updatedAt"),
 });
 
-const cursorToProto = (value: number, field: string): bigint => {
+export const cursorToProto = (value: number, field: string): bigint => {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error(`${field} is outside JavaScript's safe integer range`);
   }
@@ -659,7 +659,9 @@ const timestampFromIso = (value: string, field: string) => {
   return timestampFromDate(date);
 };
 
-const agentProviderToProto = (value: AgentProvider): ProtoAgentProvider => {
+export const agentProviderToProto = (
+  value: AgentProvider,
+): ProtoAgentProvider => {
   switch (value) {
     case "codex":
       return ProtoAgentProvider.CODEX;
@@ -678,14 +680,14 @@ const agentProviderToProto = (value: AgentProvider): ProtoAgentProvider => {
   }
 };
 
-const approvalToMessage = (input: IssueExecutionApprovalInput) => ({
+export const approvalToMessage = (input: IssueExecutionApprovalInput) => ({
   provider: agentProviderToProto(input.provider),
   model: input.model ?? undefined,
   effort: input.effort ?? undefined,
   workerId: input.workerId ?? undefined,
 });
 
-const approvalOutcomeFromProto = (value: ProtoApprovalOutcome) => {
+export const approvalOutcomeFromProto = (value: ProtoApprovalOutcome) => {
   switch (value) {
     case ProtoApprovalOutcome.ACCEPTED:
       return "accepted" as const;
@@ -696,7 +698,7 @@ const approvalOutcomeFromProto = (value: ProtoApprovalOutcome) => {
   }
 };
 
-const dispatchFromMessage = (value: IssueExecutionDispatchMessage) => {
+export const dispatchFromMessage = (value: IssueExecutionDispatchMessage) => {
   const dispatchMode = (() => {
     switch (value.dispatchMode) {
       case ProtoDispatchMode.ANY:
@@ -1106,7 +1108,7 @@ export async function acceptChannelExecutionProposal(
   });
 }
 
-const assertPendingAgentSkillExecutionApproval = (
+export const assertPendingAgentSkillExecutionApproval = (
   proposal: AgentSkillExecutionProposal,
   input: AgentSkillExecutionApprovalInput,
 ) => {
@@ -1145,7 +1147,7 @@ const skillExecutionSnapshotKeys = [
   "delegatedByAgentName",
 ] as const satisfies readonly (keyof AgentSkillExecutionProposal)[];
 
-const validateAgentSkillExecutionAcceptance = (
+export const validateAgentSkillExecutionAcceptance = (
   result: {
     proposal: AgentSkillExecutionProposal;
     outcome: "accepted" | "already_accepted";

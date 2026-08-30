@@ -231,7 +231,7 @@ describe("IssueConversation", () => {
     expect(container.querySelector(".issue-message-list")?.textContent).toContain(loadedMessage.body);
     await cleanup();
   });
-  it("uses Inbox conversation changes as a delta recovery signal", async () => {
+  it("uses Inbox conversation changes to replace reset snapshots", async () => {
     const run = demoDashboard.runs[0];
     const createdAt = "2026-08-15T00:00:00.000Z";
     const trigger: IssueMessage = {
@@ -282,19 +282,26 @@ describe("IssueConversation", () => {
       agentId: "agent-reviewer",
       agentName: "Reviewer"
     };
+    const staleMessage = {
+      ...trigger,
+      id: "stale-message",
+      body: "stale conversation state"
+    };
     const loadSnapshot = vi.spyOn(api, "loadIssueConversationSnapshot").mockResolvedValue({
       cursor: 7,
-      messages: [trigger],
+      messages: [trigger, staleMessage],
       agentReplies: [replyJob, reviewerReplyJob]
     });
     const loadDelta = vi.spyOn(api, "loadIssueConversationDelta").mockResolvedValueOnce({
       cursor: 7,
       hasMore: false,
-      changed: false
+      changed: false,
+      reset: false
     }).mockResolvedValueOnce({
       cursor: 8,
       hasMore: false,
       changed: true,
+      reset: true,
       messages: [trigger, reply],
       agentReplies: [replyJob, reviewerReplyJob].map(job => ({
         ...job,
@@ -341,6 +348,7 @@ describe("IssueConversation", () => {
     expect(container.textContent).toContain("Developer · 원인을 확인하고 있습니다.");
     expect(container.textContent).not.toContain("Briar · 원인을 확인하고 있습니다.");
     expect(container.textContent).toContain("Reviewer님이 답변을 작성하고 있습니다…");
+    expect(container.textContent).toContain(staleMessage.body);
     await act(async () => {
       root.render(renderPage("conversation:message-reply"));
       await Promise.resolve();
@@ -348,6 +356,7 @@ describe("IssueConversation", () => {
     });
     expect(loadDelta).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain(reply.body);
+    expect(container.textContent).not.toContain(staleMessage.body);
     expect(container.textContent).not.toContain("Agent가 답변을 작성하고 있습니다");
     await cleanup();
     createTransport.mockRestore();

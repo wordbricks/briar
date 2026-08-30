@@ -27,8 +27,8 @@ const statusForConnectCode = (code: Code): number => {
       return 404;
     case Code.AlreadyExists:
     case Code.Aborted:
-      return 409;
     case Code.FailedPrecondition:
+      return 409;
     case Code.OutOfRange:
       return 410;
     case Code.ResourceExhausted:

@@ -276,7 +276,12 @@ export function IssueConversation({
             if (disposed || activeRunIdRef.current !== run.id) return;
             conversationCursorRef.current = delta.cursor;
             if (delta.changed && delta.messages && delta.agentReplies) {
-              setMessages(current => mergeIssueMessages(current, delta.messages!));
+              if (delta.reset) {
+                trackedAgentRepliesRef.current.clear();
+                agentRepliesByIdRef.current.clear();
+                setAgentReplyStates({});
+              }
+              setMessages(current => delta.reset ? delta.messages! : mergeIssueMessages(current, delta.messages!));
               reconcileAgentReplies(delta.agentReplies, delta.messages);
             }
             hasMore = delta.hasMore;
