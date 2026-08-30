@@ -9,6 +9,9 @@ mod descriptor_fingerprint;
 
 pub use descriptor_fingerprint::CONTRACTS_DESCRIPTOR_FINGERPRINT;
 
+// Buffa owns these checked-in implementations. Keep generator output untouched even when
+// Clippy prefers derived enum defaults or simplified unknown-field decoder matches.
+#[allow(clippy::derivable_impls, clippy::match_single_binding)]
 pub mod proto {
     pub mod briar {
         pub mod local {
@@ -67,6 +70,9 @@ pub mod proto {
     }
 }
 
+// connect-rust generates exhaustive dispatcher shells whose empty streaming branches reduce
+// to single-binding matches until a service declares a streaming RPC.
+#[allow(clippy::match_single_binding)]
 pub mod connect {
     pub mod briar {
         pub mod app {
