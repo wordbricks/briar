@@ -10,6 +10,10 @@ import {
   type ServiceImpl,
 } from "@connectrpc/connect";
 import * as Schema from "effect/Schema";
+import {
+  deleteAccountApplication,
+  updateAccountProfileApplication,
+} from "./account-application";
 import type { BriarAuth } from "./auth";
 import { withConnectErrors } from "./app-connect-errors";
 import { appUser } from "./app-connect-mappers";
@@ -24,16 +28,23 @@ export type AppConnectAccountInput = {
   readonly request: Request;
   readonly auth: BriarAuth;
   readonly db: D1Database;
+  readonly env: Env;
+  readonly attachmentsBucket: R2Bucket;
+  readonly context?: ExecutionContext;
 };
 
 export type AppConnectAccountServices = {
   readonly requireSession: typeof requireSession;
+  readonly updateAccountProfile: typeof updateAccountProfileApplication;
+  readonly deleteAccount: typeof deleteAccountApplication;
   readonly registerMobilePushDevice: typeof upsertMobilePushRegistration;
   readonly unregisterMobilePushDevice: typeof deleteMobilePushRegistration;
 };
 
 export const appConnectAccountServices: AppConnectAccountServices = {
   requireSession,
+  updateAccountProfile: updateAccountProfileApplication,
+  deleteAccount: deleteAccountApplication,
   registerMobilePushDevice: upsertMobilePushRegistration,
   unregisterMobilePushDevice: deleteMobilePushRegistration,
 };
@@ -55,6 +66,38 @@ const decodeMobilePushLocale = decodeRequestSync(mobilePushLocaleSchema);
 const decodeMobilePushPreferences = decodeRequestSync(
   mobilePushPreferencesSchema,
 );
+
+const nullableUsername = (
+  update: Parameters<ServiceImpl<typeof AccountService>["updateAccountProfile"]>[0]["usernameUpdate"],
+) => {
+  switch (update.case) {
+    case "username":
+      return update.value;
+    case "clearUsername":
+      return null;
+    case undefined:
+      throw new ConnectError(
+        "username update is required",
+        Code.InvalidArgument,
+      );
+  }
+};
+
+const nullableImage = (
+  update: Parameters<ServiceImpl<typeof AccountService>["updateAccountProfile"]>[0]["imageUpdate"],
+) => {
+  switch (update.case) {
+    case "image":
+      return update.value;
+    case "clearImage":
+      return null;
+    case undefined:
+      throw new ConnectError(
+        "image update is required",
+        Code.InvalidArgument,
+      );
+  }
+};
 
 const mobilePushEndpoint = (endpoint: MobilePushEndpoint) => {
   switch (endpoint) {
@@ -103,13 +146,42 @@ const mobilePushLocale = (locale: MobilePushLocale) => {
 };
 
 export const createAppAccountService = (
-  { request, auth, db }: AppConnectAccountInput,
+  { request, auth, db, env, attachmentsBucket, context }: AppConnectAccountInput,
   services: AppConnectAccountServices = appConnectAccountServices,
 ): ServiceImpl<typeof AccountService> => ({
   getCurrentUser: async () => withConnectErrors(async () => {
     const session = await services.requireSession(auth, request);
     return { user: appUser(session.user) };
   }),
+
+  updateAccountProfile: async (rpcRequest) =>
+    withConnectErrors(async () => {
+      const session = await services.requireSession(auth, request);
+      const user = await services.updateAccountProfile({
+        db,
+        session,
+        profile: {
+          username: nullableUsername(rpcRequest.usernameUpdate),
+          name: rpcRequest.name,
+          image: nullableImage(rpcRequest.imageUpdate),
+        },
+      });
+      return { user: appUser(user) };
+    }),
+
+  deleteAccount: async (rpcRequest) =>
+    withConnectErrors(async () => {
+      const session = await services.requireSession(auth, request);
+      await services.deleteAccount({
+        db,
+        env,
+        attachmentsBucket,
+        context,
+        session,
+        confirmation: rpcRequest.confirmation,
+      });
+      return {};
+    }),
 
   registerMobilePushDevice: async (rpcRequest) =>
     withConnectErrors(async () => {

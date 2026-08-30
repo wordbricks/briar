@@ -55,7 +55,12 @@ export async function handleAppConnectRequest(
     auth: input.auth,
     db: input.env.DB,
   };
-  registerAppAccountService(router, sharedInput);
+  registerAppAccountService(router, {
+    ...sharedInput,
+    env: input.env,
+    attachmentsBucket: input.env.ATTACHMENTS,
+    context: input.context,
+  });
   registerAppOrganizationService(router, sharedInput);
   registerAppLinearImportService(router, sharedInput);
   registerAppMergeQueueService(router, sharedInput);

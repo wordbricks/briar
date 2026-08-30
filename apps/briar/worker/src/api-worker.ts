@@ -158,9 +158,7 @@ async function route(
     request,
     auth,
     db,
-    attachmentsBucket,
     env,
-    context,
   });
   if (accountResponse) return accountResponse;
 

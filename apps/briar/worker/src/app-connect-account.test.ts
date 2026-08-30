@@ -13,7 +13,7 @@ import {
   executeD1Sql,
 } from "./test-helpers/d1";
 
-describe("AccountService mobile push devices", () => {
+describe("AccountService", () => {
   const now = "2026-08-31T00:00:00.000Z";
   const ownerToken = "account-push-owner-token";
   const memberToken = "account-push-member-token";
@@ -89,7 +89,75 @@ describe("AccountService mobile push devices", () => {
   const deviceToken = "a".repeat(64);
   const fcmToken = "f".repeat(96);
 
+  it("updates nullable profile fields through typed oneofs", async () => {
+    const response = await client.updateAccountProfile(
+      {
+        usernameUpdate: { case: "username", value: "owner_dev" },
+        name: "Owner Renamed",
+        imageUpdate: { case: "clearImage", value: {} },
+      },
+      options(ownerToken),
+    );
+    expect(response.user).toMatchObject({
+      id: "owner",
+      username: "owner_dev",
+      name: "Owner Renamed",
+      email: "owner@example.com",
+    });
+    await expect(db.prepare(
+      `select username, name, image from "user" where id = 'owner'`,
+    ).first()).resolves.toEqual({
+      username: "owner_dev",
+      name: "Owner Renamed",
+      image: null,
+    });
+
+    const error = await client.updateAccountProfile(
+      {
+        name: "Incomplete",
+        imageUpdate: { case: "clearImage", value: {} },
+      },
+      options(ownerToken),
+    ).catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(ConnectError);
+    expect((error as ConnectError).code).toBe(Code.InvalidArgument);
+  });
+
+  it("enforces confirmation and recent-auth deletion invariants", async () => {
+    const createdAt = new Date().toISOString();
+    const deleteToken = "account-delete-token";
+    await executeD1Sql(db, `
+      insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+      values ('delete-user', 'Delete', 'delete@example.com', 1, '${createdAt}', '${createdAt}');
+      insert into "session" (
+        id, expiresAt, token, createdAt, updatedAt, userId
+      ) values (
+        'delete-session', '2099-01-01T00:00:00.000Z', '${deleteToken}',
+        '${createdAt}', '${createdAt}', 'delete-user'
+      );
+    `);
+
+    const mismatch = await client.deleteAccount(
+      { confirmation: "other@example.com" },
+      options(deleteToken),
+    ).catch((cause: unknown) => cause);
+    expect(mismatch).toBeInstanceOf(ConnectError);
+    expect((mismatch as ConnectError).code).toBe(Code.InvalidArgument);
+
+    await client.deleteAccount(
+      { confirmation: "delete@example.com" },
+      options(deleteToken),
+    );
+    await expect(db.prepare(
+      `select id from "user" where id = 'delete-user'`,
+    ).first()).resolves.toBeNull();
+  });
+
   it("normalizes endpoints and keeps token ownership scoped to the session", async () => {
+    const inboxState = await db.prepare(
+      `select current_version from briar_organization_inbox_sync_state
+       where organization_id = '11111111-1111-4111-8111-111111111111'`,
+    ).first<{ current_version: number }>();
     await client.registerMobilePushDevice(
       {
         endpoint: MobilePushEndpoint.APNS_DEVELOPMENT,
@@ -118,7 +186,7 @@ describe("AccountService mobile push devices", () => {
       locale: "ko",
       play_sound: 1,
       notify_important: 0,
-      baseline_version: 7,
+      baseline_version: inboxState?.current_version,
     });
 
     await client.registerMobilePushDevice(
@@ -143,7 +211,7 @@ describe("AccountService mobile push devices", () => {
       registered_at: initial?.registered_at,
       environment: "production",
       play_sound: 0,
-      baseline_version: 7,
+      baseline_version: inboxState?.current_version,
     });
 
     await client.unregisterMobilePushDevice(
