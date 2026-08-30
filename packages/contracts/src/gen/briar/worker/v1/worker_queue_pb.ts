@@ -2575,7 +2575,7 @@ export const WorkerQueueService: GenService<{
   serviceDesc(file_briar_worker_v1_worker_queue, 0);
 
 /**
- * Execution-credential reads that are shared by the interactive CLI and the
+ * Execution-credential operations shared by the interactive CLI and the
  * desktop-hosted Auto Hunt runtime. Result mutation and uploads remain on
  * their dedicated transports.
  *

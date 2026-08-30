@@ -907,7 +907,7 @@ pub const WORKER_EXECUTION_SERVICE_LIST_RUN_EVIDENCE_SPEC: ::connectrpc::Spec = 
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Execution-credential reads that are shared by the interactive CLI and the
+/// Execution-credential operations shared by the interactive CLI and the
 /// desktop-hosted Auto Hunt runtime. Result mutation and uploads remain on
 /// their dedicated transports.
 ///
