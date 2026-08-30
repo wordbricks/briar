@@ -42,120 +42,24 @@ enum MobileAPIContract {
         }
 
 
-        static func channels(organizationID: UUID) -> String {
-            "/organizations/\(organizationID.uuidString.lowercased())/channels"
-        }
-
-        static func directMessages(organizationID: UUID) -> String {
-            "/organizations/\(organizationID.uuidString.lowercased())/dms"
-        }
-
-        static func organizationMembers(organizationID: UUID) -> String {
-            "/organizations/\(organizationID.uuidString.lowercased())/members"
-        }
-
-        static func channelChanges(organizationID: UUID, cursor: Int) -> String {
-            "/organizations/\(organizationID.uuidString.lowercased())/channel-changes?since=\(cursor)"
-        }
-
         static func channelEvents(organizationID: UUID, cursor: Int) -> String {
             "/organizations/\(organizationID.uuidString.lowercased())/channel-events?cursor=\(cursor)"
         }
 
         static func channelActivityEvents(organizationID: UUID, channelID: UUID) -> String {
-            "\(channel(organizationID: organizationID, channelID: channelID))/agent-activity-events"
+            "/organizations/\(organizationID.uuidString.lowercased())/channels/\(channelID.uuidString.lowercased())/agent-activity-events"
         }
 
         static func issueActivityEvents(projectID: UUID, runID: UUID) -> String {
             "\(run(projectID: projectID, runID: runID))/agent-activity-events"
         }
 
-        static func channel(
+        /// Multipart is intentionally kept as HTTP because Connect requests do not carry file bytes.
+        static func channelMessageUpload(
             organizationID: UUID,
-            channelID: UUID,
-            messageLimit: Int? = nil
+            channelID: UUID
         ) -> String {
-            let base = "\(channels(organizationID: organizationID))/\(channelID.uuidString.lowercased())"
-            guard let messageLimit else { return base }
-            return "\(base)?limit=\(messageLimit)"
-        }
-
-        static func channelRead(organizationID: UUID, channelID: UUID) -> String {
-            "\(channel(organizationID: organizationID, channelID: channelID))/read"
-        }
-
-        static func channelMessages(
-            organizationID: UUID,
-            channelID: UUID,
-            parentMessageID: UUID? = nil,
-            cursor: UUID? = nil,
-            limit: Int? = nil
-        ) -> String {
-            let base = "\(channel(organizationID: organizationID, channelID: channelID))/messages"
-            var query: [String] = []
-            if let parentMessageID {
-                query.append("parentMessageId=\(parentMessageID.uuidString.lowercased())")
-            }
-            if let limit { query.append("limit=\(limit)") }
-            if let cursor { query.append("cursor=\(cursor.uuidString.lowercased())") }
-            guard !query.isEmpty else { return base }
-            return "\(base)?\(query.joined(separator: "&"))"
-        }
-
-        static func channelMessageReactions(
-            organizationID: UUID,
-            channelID: UUID,
-            messageID: UUID
-        ) -> String {
-            "\(channelMessages(organizationID: organizationID, channelID: channelID))/\(messageID.uuidString.lowercased())/reactions"
-        }
-
-        static func channelMessage(
-            organizationID: UUID,
-            channelID: UUID,
-            messageID: UUID
-        ) -> String {
-            "\(channelMessages(organizationID: organizationID, channelID: channelID))/\(messageID.uuidString.lowercased())"
-        }
-
-        static func channelThreadSubscription(
-            organizationID: UUID,
-            channelID: UUID,
-            messageID: UUID
-        ) -> String {
-            "\(channelMessages(organizationID: organizationID, channelID: channelID))/\(messageID.uuidString.lowercased())/subscription"
-        }
-
-        static func acceptChannelProposal(
-            organizationID: UUID,
-            channelID: UUID,
-            proposalID: UUID
-        ) -> String {
-            "\(channel(organizationID: organizationID, channelID: channelID))/proposals/\(proposalID.uuidString.lowercased())/accept"
-        }
-
-        static func acceptChannelExecutionProposal(
-            organizationID: UUID,
-            channelID: UUID,
-            proposalID: UUID
-        ) -> String {
-            "\(channel(organizationID: organizationID, channelID: channelID))/proposals/\(proposalID.uuidString.lowercased())/accept-execution"
-        }
-
-        static func declineChannelProposal(
-            organizationID: UUID,
-            channelID: UUID,
-            proposalID: UUID
-        ) -> String {
-            "\(channel(organizationID: organizationID, channelID: channelID))/proposals/\(proposalID.uuidString.lowercased())/decline"
-        }
-
-        static func acceptChannelSkillExecutionProposal(
-            organizationID: UUID,
-            channelID: UUID,
-            proposalID: UUID
-        ) -> String {
-            "\(channel(organizationID: organizationID, channelID: channelID))/skill-execution-proposals/\(proposalID.uuidString.lowercased())/accept"
+            "/organizations/\(organizationID.uuidString.lowercased())/channels/\(channelID.uuidString.lowercased())/messages"
         }
 
         static func runEvents(projectID: UUID, runID: UUID) -> String {
@@ -456,7 +360,7 @@ enum MobileAPIError: LocalizedError, Equatable {
     }
 }
 
-private extension MobileAPIError {
+extension MobileAPIError {
     static func connect(_ error: ConnectError) -> MobileAPIError {
         let status: Int
         switch error.code {
@@ -481,6 +385,119 @@ private extension MobileAPIError {
 
 protocol MobileAPIClientProtocol: Sendable {
     func listProjects(token: String) async throws -> ProjectsResponse
+
+    func listChannels(
+        organizationID: UUID,
+        token: String
+    ) async throws -> ChannelsResponse
+
+    func syncChannels(
+        organizationID: UUID,
+        cursor: Int,
+        token: String
+    ) async throws -> ChannelDeltaResponse
+
+    func listDirectMessageRecipients(
+        organizationID: UUID,
+        token: String
+    ) async throws -> DirectMessageRecipients
+
+    func createDirectMessage(
+        organizationID: UUID,
+        memberIDs: [String],
+        agentIDs: [UUID],
+        token: String
+    ) async throws -> ChannelSummary
+
+    func getChannel(
+        organizationID: UUID,
+        channelID: UUID,
+        messageLimit: Int?,
+        token: String
+    ) async throws -> ChannelDetailResponse
+
+    func markChannelRead(
+        organizationID: UUID,
+        channelID: UUID,
+        lastReadAt: Date?,
+        token: String
+    ) async throws -> ChannelSummary
+
+    func listChannelMessages(
+        organizationID: UUID,
+        channelID: UUID,
+        parentMessageID: UUID?,
+        cursor: UUID?,
+        limit: Int?,
+        token: String
+    ) async throws -> ChannelMessagesResponse
+
+    func createChannelMessage(
+        organizationID: UUID,
+        channelID: UUID,
+        clientMessageID: UUID,
+        body: String,
+        parentMessageID: UUID?,
+        mentionedUserIDs: [String],
+        mentionedAgentIDs: [UUID],
+        attachmentReferences: [String],
+        token: String
+    ) async throws -> CreateChannelMessageResponse
+
+    func deleteChannelMessage(
+        organizationID: UUID,
+        channelID: UUID,
+        messageID: UUID,
+        token: String
+    ) async throws -> DeleteChannelMessageResponse
+
+    func toggleChannelMessageReaction(
+        organizationID: UUID,
+        channelID: UUID,
+        messageID: UUID,
+        emoji: String,
+        token: String
+    ) async throws -> ToggleChannelMessageReactionResponse
+
+    func setChannelThreadSubscription(
+        organizationID: UUID,
+        channelID: UUID,
+        rootMessageID: UUID,
+        subscribed: Bool,
+        token: String
+    ) async throws -> ChannelThreadSubscriptionResponse
+
+    func acceptChannelProposal(
+        organizationID: UUID,
+        channelID: UUID,
+        proposalID: UUID,
+        projectID: UUID?,
+        execution: AcceptIssueExecutionProposalRequest?,
+        token: String
+    ) async throws -> AcceptChannelProposalResponse
+
+    func acceptChannelExecutionProposal(
+        organizationID: UUID,
+        channelID: UUID,
+        proposalID: UUID,
+        approval: AcceptIssueExecutionProposalRequest,
+        token: String
+    ) async throws -> AcceptChannelExecutionProposalResponse
+
+    func declineChannelProposal(
+        organizationID: UUID,
+        channelID: UUID,
+        proposalID: UUID,
+        token: String
+    ) async throws -> DeclineChannelProposalResponse
+
+    func acceptChannelSkillExecutionProposal(
+        organizationID: UUID,
+        channelID: UUID,
+        proposalID: UUID,
+        workerID: String?,
+        token: String
+    ) async throws -> AcceptAgentSkillExecutionProposalResponse
 
     func listOrganizationAgents(
         organizationID: UUID,
@@ -646,6 +663,149 @@ extension MobileAPIClientProtocol {
         throw MobileAPIError.invalidRequest
     }
 
+    func listChannels(
+        organizationID: UUID,
+        token: String
+    ) async throws -> ChannelsResponse {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func syncChannels(
+        organizationID: UUID,
+        cursor: Int,
+        token: String
+    ) async throws -> ChannelDeltaResponse {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func listDirectMessageRecipients(
+        organizationID: UUID,
+        token: String
+    ) async throws -> DirectMessageRecipients {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func createDirectMessage(
+        organizationID: UUID,
+        memberIDs: [String],
+        agentIDs: [UUID],
+        token: String
+    ) async throws -> ChannelSummary {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func getChannel(
+        organizationID: UUID,
+        channelID: UUID,
+        messageLimit: Int?,
+        token: String
+    ) async throws -> ChannelDetailResponse {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func markChannelRead(
+        organizationID: UUID,
+        channelID: UUID,
+        lastReadAt: Date?,
+        token: String
+    ) async throws -> ChannelSummary {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func listChannelMessages(
+        organizationID: UUID,
+        channelID: UUID,
+        parentMessageID: UUID?,
+        cursor: UUID?,
+        limit: Int?,
+        token: String
+    ) async throws -> ChannelMessagesResponse {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func createChannelMessage(
+        organizationID: UUID,
+        channelID: UUID,
+        clientMessageID: UUID,
+        body: String,
+        parentMessageID: UUID?,
+        mentionedUserIDs: [String],
+        mentionedAgentIDs: [UUID],
+        attachmentReferences: [String],
+        token: String
+    ) async throws -> CreateChannelMessageResponse {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func deleteChannelMessage(
+        organizationID: UUID,
+        channelID: UUID,
+        messageID: UUID,
+        token: String
+    ) async throws -> DeleteChannelMessageResponse {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func toggleChannelMessageReaction(
+        organizationID: UUID,
+        channelID: UUID,
+        messageID: UUID,
+        emoji: String,
+        token: String
+    ) async throws -> ToggleChannelMessageReactionResponse {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func setChannelThreadSubscription(
+        organizationID: UUID,
+        channelID: UUID,
+        rootMessageID: UUID,
+        subscribed: Bool,
+        token: String
+    ) async throws -> ChannelThreadSubscriptionResponse {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func acceptChannelProposal(
+        organizationID: UUID,
+        channelID: UUID,
+        proposalID: UUID,
+        projectID: UUID?,
+        execution: AcceptIssueExecutionProposalRequest?,
+        token: String
+    ) async throws -> AcceptChannelProposalResponse {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func acceptChannelExecutionProposal(
+        organizationID: UUID,
+        channelID: UUID,
+        proposalID: UUID,
+        approval: AcceptIssueExecutionProposalRequest,
+        token: String
+    ) async throws -> AcceptChannelExecutionProposalResponse {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func declineChannelProposal(
+        organizationID: UUID,
+        channelID: UUID,
+        proposalID: UUID,
+        token: String
+    ) async throws -> DeclineChannelProposalResponse {
+        throw MobileAPIError.invalidRequest
+    }
+
+    func acceptChannelSkillExecutionProposal(
+        organizationID: UUID,
+        channelID: UUID,
+        proposalID: UUID,
+        workerID: String?,
+        token: String
+    ) async throws -> AcceptAgentSkillExecutionProposalResponse {
+        throw MobileAPIError.invalidRequest
+    }
+
     func listOrganizationAgents(
         organizationID: UUID,
         token: String
@@ -761,6 +921,7 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
     let session: URLSession
     private let projectService: BriarAPI_ProjectServiceClient
     private let agentService: BriarAPI_AgentServiceClient
+    let channelService: BriarAPI_ChannelServiceClient
 
     init(baseURL: URL, session: URLSession = .shared) {
         self.baseURL = baseURL
@@ -776,6 +937,7 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
         )
         projectService = BriarAPI_ProjectServiceClient(client: protocolClient)
         agentService = BriarAPI_AgentServiceClient(client: protocolClient)
+        channelService = BriarAPI_ChannelServiceClient(client: protocolClient)
     }
 
     func listProjects(token: String) async throws -> ProjectsResponse {

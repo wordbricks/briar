@@ -179,119 +179,6 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(mappedIssue.runId.uuidString.lowercased(), issueScope.runID)
     }
 
-    func testChannelIssueProposalPayloadDecodesCanonicalDetails() throws {
-        let detailed = try JSONDecoder.mobileContract.decode(
-            ChannelMessage.Proposal.self,
-            from: Data(
-                #"""
-                {
-                  "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-                  "actionType": "request_issue_create",
-                  "status": "pending",
-                  "projectId": null,
-                  "payload": {
-                    "issue": {
-                      "title": "Build onboarding",
-                      "description": "Ship the guided setup.",
-                      "priority": 2,
-                      "status": "queued"
-                    }
-                  },
-                  "resultRunId": null
-                }
-                """#.utf8
-            )
-        )
-        XCTAssertEqual(detailed.payload?.issue?.title, "Build onboarding")
-        XCTAssertEqual(detailed.payload?.issue?.description, "Ship the guided setup.")
-        XCTAssertEqual(detailed.payload?.issue?.priority, 2)
-        XCTAssertEqual(detailed.payload?.issue?.status, .queued)
-    }
-
-    func testChannelIssueBatchProposalAndAcceptedMappingsDecode() throws {
-        let proposal = try JSONDecoder.mobileContract.decode(
-            ChannelMessage.Proposal.self,
-            from: Data(
-                #"""
-                {
-                  "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-                  "actionType": "request_issue_create",
-                  "status": "accepted",
-                  "projectId": "11111111-1111-4111-8111-111111111111",
-                  "payload": {
-                    "batch": {
-                      "items": [
-                        {
-                          "key": "api",
-                          "issue": {
-                            "title": "Add API",
-                            "description": null,
-                            "priority": 2,
-                            "status": "backlog"
-                          }
-                        },
-                        {
-                          "key": "ui",
-                          "issue": {
-                            "title": "Add UI",
-                            "description": "Show the mapping.",
-                            "priority": 3,
-                            "status": "backlog"
-                          }
-                        }
-                      ],
-                      "dependencies": [
-                        {"prerequisiteKey": "api", "dependentKey": "ui"}
-                      ]
-                    },
-                    "executeAfterCreate": false
-                  },
-                  "resultRunId": "33333333-3333-4333-8333-333333333333",
-                  "resultItems": [
-                    {
-                      "localKey": "api",
-                      "runId": "33333333-3333-4333-8333-333333333333"
-                    },
-                    {
-                      "localKey": "ui",
-                      "runId": "44444444-4444-4444-8444-444444444444"
-                    }
-                  ]
-                }
-                """#.utf8
-            )
-        )
-
-        XCTAssertNil(proposal.payload?.issue)
-        XCTAssertEqual(proposal.payload?.batch?.items.map(\.key), ["api", "ui"])
-        XCTAssertEqual(proposal.payload?.batch?.dependencies.count, 1)
-        XCTAssertEqual(proposal.resultItems.map(\.localKey), ["api", "ui"])
-
-        let response = try JSONDecoder.mobileContract.decode(
-            AcceptChannelProposalResponse.self,
-            from: Data(
-                #"""
-                {
-                  "outcome": "accepted",
-                  "projectId": "11111111-1111-4111-8111-111111111111",
-                  "resultRunId": "33333333-3333-4333-8333-333333333333",
-                  "resultItems": [
-                    {
-                      "localKey": "api",
-                      "runId": "33333333-3333-4333-8333-333333333333"
-                    },
-                    {
-                      "localKey": "ui",
-                      "runId": "44444444-4444-4444-8444-444444444444"
-                    }
-                  ]
-                }
-                """#.utf8
-            )
-        )
-        XCTAssertEqual(response.resultItems?.map(\.localKey), ["api", "ui"])
-    }
-
     func testExecutionProposalIsSeparateAndRequiresCanonicalServerSnapshot() throws {
         let proposal = try JSONDecoder.mobileContract.decode(
             IssueExecutionProposal.self,
@@ -441,21 +328,11 @@ final class MobileAPIContractTests: XCTestCase {
         )
     }
 
-    func testAgentSkillExecutionApprovalUsesDedicatedEndpointsAndExactWorkerBody() throws {
-        let organizationID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
-        let channelID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
+    func testAgentSkillExecutionApprovalUsesIssueEndpointAndExactWorkerBody() throws {
         let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
         let runID = UUID(uuidString: "44444444-4444-4444-8444-444444444444")!
         let proposalID = UUID(uuidString: "abababab-abab-4bab-8bab-abababababab")!
 
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.acceptChannelSkillExecutionProposal(
-                organizationID: organizationID,
-                channelID: channelID,
-                proposalID: proposalID
-            ),
-            "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/skill-execution-proposals/abababab-abab-4bab-8bab-abababababab/accept"
-        )
         XCTAssertEqual(
             MobileAPIContract.Endpoint.acceptIssueSkillExecutionProposal(
                 projectID: projectID,

@@ -77,6 +77,7 @@
 		F132013FB482B8BFC9068619 /* DashboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34368CFC402513DE2753ABCA /* DashboardModels.swift */; };
 		F1EB7DA39B3DD9F56913BB5F /* SessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 216793AD86019D1D7BDF5133 /* SessionStoreTests.swift */; };
 		F38E1B7D07B426CAE1D564CC /* AttachmentPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAFDF35566633FE61184320D /* AttachmentPipeline.swift */; };
+		F6D25BEDC11E9A135A8CAB4D /* ChannelConnect.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF0C75EAB55FAAAA32687ED /* ChannelConnect.swift */; };
 		F9332C45B88E08DF3DD02853 /* account.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EE2B12E6B698652CEEAB149 /* account.pb.swift */; };
 		FB2544C570F7F54F2030C0AF /* DirectMessagesViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54CCA2946DCE0666A5C40619 /* DirectMessagesViews.swift */; };
 		FD4429CD60C9466559948984 /* dashboard.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0766FA1ED79BFA0D453CD4B2 /* dashboard.pb.swift */; };
@@ -167,6 +168,7 @@
 		DAFDF35566633FE61184320D /* AttachmentPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentPipeline.swift; sourceTree = "<group>"; };
 		DD272B5B12C58571A215C0E8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DF612FD7D34E422E51B3A302 /* AttachmentPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentPreview.swift; sourceTree = "<group>"; };
+		DFF0C75EAB55FAAAA32687ED /* ChannelConnect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelConnect.swift; sourceTree = "<group>"; };
 		E053DD49CC4745FE43822E27 /* agent.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = agent.pb.swift; sourceTree = "<group>"; };
 		E40375D18D66D8F485EC3BD0 /* ChannelsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelsModels.swift; sourceTree = "<group>"; };
 		E5B09312DFFC46FAAE2A0CFD /* channel.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = channel.pb.swift; sourceTree = "<group>"; };
@@ -267,6 +269,7 @@
 				DF612FD7D34E422E51B3A302 /* AttachmentPreview.swift */,
 				BE4A7257E57301E7AE968D86 /* BriarCompanion.entitlements */,
 				5004E20D26F2AC91C541EE9A /* BriarCompanionApp.swift */,
+				DFF0C75EAB55FAAAA32687ED /* ChannelConnect.swift */,
 				E40375D18D66D8F485EC3BD0 /* ChannelsModels.swift */,
 				F137DEE3E6FF7F8A153AC8F6 /* ChannelsStore.swift */,
 				951BB81B83C74CEDE2ECEC15 /* ChannelsViews.swift */,
@@ -306,13 +309,6 @@
 				BB64606EDC2F17DFF988E223 /* v1 */,
 			);
 			path = types;
-			sourceTree = "<group>";
-		};
-		8F3A4F7D4ECE6ABFE7A77C96 /* sidecar */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = sidecar;
 			sourceTree = "<group>";
 		};
 		995DC18713CA2D81749A5F1C = {
@@ -358,7 +354,6 @@
 			children = (
 				CE55CE837346F54B84DC95F2 /* app */,
 				4A89CCB016CD519505B9939D /* realtime */,
-				8F3A4F7D4ECE6ABFE7A77C96 /* sidecar */,
 				61D9E3B5E9F7B89B13EF11BA /* types */,
 			);
 			path = briar;
@@ -543,6 +538,7 @@
 				F38E1B7D07B426CAE1D564CC /* AttachmentPipeline.swift in Sources */,
 				8F3D3B8B9C201AD8938E12AA /* AttachmentPreview.swift in Sources */,
 				00CD54C44CB1141D697446B6 /* BriarCompanionApp.swift in Sources */,
+				F6D25BEDC11E9A135A8CAB4D /* ChannelConnect.swift in Sources */,
 				1272FBDF6C710D9D7158A44C /* ChannelsModels.swift in Sources */,
 				EFFC0470BF14D0642F70F03E /* ChannelsStore.swift in Sources */,
 				2AF90E1B4483EB04BF943C3C /* ChannelsViews.swift in Sources */,

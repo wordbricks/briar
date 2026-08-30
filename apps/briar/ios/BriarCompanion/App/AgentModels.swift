@@ -589,8 +589,8 @@ extension ProjectAgent {
             skill: message.skill,
             skills: try message.skills.map { try Skill(connectMessage: $0) },
             calendarColor: message.calendarColor,
-            createdAt: message.createdAt.date,
-            updatedAt: message.updatedAt.date
+            createdAt: try agentDate(message.createdAt),
+            updatedAt: try agentDate(message.updatedAt)
         )
     }
 }
@@ -660,8 +660,8 @@ private extension ProjectAgent.Skill {
             executionMode: executionMode,
             approvalPolicy: approvalPolicy,
             position: try agentSafeInt(message.position),
-            createdAt: message.createdAt.date,
-            updatedAt: message.updatedAt.date
+            createdAt: try agentDate(message.createdAt),
+            updatedAt: try agentDate(message.updatedAt)
         )
     }
 }
@@ -736,8 +736,8 @@ extension ProjectAgentSession {
             followUps: try message.followUps.map { try FollowUp(connectMessage: $0) },
             status: status,
             issues: try message.issues.map { try Issue(connectMessage: $0) },
-            startedAt: message.startedAt.date,
-            completedAt: message.hasCompletedAt ? message.completedAt.date : nil,
+            startedAt: try agentDate(message.startedAt),
+            completedAt: message.hasCompletedAt ? try agentDate(message.completedAt) : nil,
             conversationId: message.hasConversationID ? message.conversationID : nil,
             workspaceRoot: nil,
             requestedWorkerId: message.hasRequestedWorkerID ? message.requestedWorkerID : nil,
@@ -745,7 +745,7 @@ extension ProjectAgentSession {
             summary: message.hasSummary ? message.summary : nil,
             error: message.hasError ? message.error : nil,
             events: try message.events.map { try Event(connectMessage: $0) },
-            updatedAt: message.hasUpdatedAt ? message.updatedAt.date : nil,
+            updatedAt: message.hasUpdatedAt ? try agentDate(message.updatedAt) : nil,
             requestedByUserId: message.hasRequestedByUserID ? message.requestedByUserID : nil,
             archived: message.archived
         )
@@ -831,7 +831,7 @@ extension ProjectAgentSession {
 private extension ProjectAgentSession.FollowUp {
     init(connectMessage message: BriarAPI_ProjectAgentSessionFollowUp) throws {
         guard message.hasSentAt else { throw MobileAPIError.invalidResponse }
-        self.init(id: message.id, message: message.message, sentAt: message.sentAt.date)
+        self.init(id: message.id, message: message.message, sentAt: try agentDate(message.sentAt))
     }
 
     func connectMessage() throws -> BriarAPI_ProjectAgentSessionFollowUp {
@@ -912,7 +912,7 @@ private extension ProjectAgentSession.Event {
         case .unspecified, .UNRECOGNIZED:
             throw MobileAPIError.invalidResponse
         }
-        self.init(id: message.id, type: type, occurredAt: message.occurredAt.date)
+        self.init(id: message.id, type: type, occurredAt: try agentDate(message.occurredAt))
     }
 
     var connectMessage: BriarAPI_ProjectAgentSessionEvent {
@@ -948,7 +948,7 @@ extension ChannelAgentSummary {
             projectId: try agentOptionalUUID(message.projectID, isPresent: message.hasProjectID),
             description: message.hasDescription_p ? message.description_p : nil,
             responsibility: message.responsibility,
-            createdAt: message.createdAt.date
+            createdAt: try agentDate(message.createdAt)
         )
     }
 }
@@ -972,6 +972,13 @@ private extension AgentProvider {
 private func agentSafeInt<T: BinaryInteger>(_ value: T) throws -> Int {
     guard let result = Int(exactly: value) else { throw MobileAPIError.invalidResponse }
     return result
+}
+
+private func agentDate(_ value: Google_Protobuf_Timestamp) throws -> Date {
+    guard (-62_135_596_800 ... 253_402_300_799).contains(value.seconds),
+          (0 ... 999_999_999).contains(value.nanos)
+    else { throw MobileAPIError.invalidResponse }
+    return value.date
 }
 
 private func agentOptionalUUID(_ value: String, isPresent: Bool) throws -> UUID? {

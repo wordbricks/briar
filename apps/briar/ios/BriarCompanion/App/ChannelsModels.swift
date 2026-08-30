@@ -194,14 +194,6 @@ enum DirectMessageOrdering {
     }
 }
 
-struct ChannelReadRequest: Encodable, Sendable {
-    var lastReadAt: Date?
-}
-
-struct ChannelReadResponse: Decodable, Sendable {
-    let channel: ChannelSummary
-}
-
 struct ChannelMessageAttachment: Codable, Hashable, Identifiable, Sendable {
     let id: UUID
     let filename: String
@@ -277,6 +269,22 @@ struct ChannelRichTextElement: Codable, Hashable, Sendable {
         case offset
     }
 
+    init(
+        type: Kind,
+        elements: [ChannelRichTextInline]?,
+        sections: [ChannelRichTextSection]?,
+        style: String?,
+        indent: Int?,
+        offset: Int?
+    ) {
+        self.type = type
+        self.elements = elements
+        self.sections = sections
+        self.style = style
+        self.indent = indent
+        self.offset = offset
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         type = try container.decode(Kind.self, forKey: .type)
@@ -326,6 +334,20 @@ struct ChannelMessageBlock: Codable, Hashable, Sendable {
         case type
         case text
         case elements
+    }
+
+    init(
+        type: Kind,
+        textObject: ChannelBlockText?,
+        markdownText: String?,
+        contextElements: [ChannelBlockText]?,
+        richTextElements: [ChannelRichTextElement]?
+    ) {
+        self.type = type
+        self.textObject = textObject
+        self.markdownText = markdownText
+        self.contextElements = contextElements
+        self.richTextElements = richTextElements
     }
 
     init(from decoder: Decoder) throws {
@@ -739,24 +761,14 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-struct ChannelsResponse: Codable, Sendable {
+struct ChannelsResponse: Sendable {
     let channels: [ChannelSummary]
-    /// Organization-wide change cursor returned with the channel snapshot.
-    /// Optional decoding keeps older development fixtures readable.
     let cursor: Int?
 }
 
-struct DirectMessageRecipientsResponse: Codable, Sendable {
+struct DirectMessageRecipients: Sendable {
     let members: [OrganizationMember]
-}
-
-struct CreateDirectMessageRequest: Encodable, Sendable {
-    let memberIds: [String]
-    let agentIds: [String]
-}
-
-struct CreateDirectMessageResponse: Codable, Sendable {
-    let channel: ChannelSummary
+    let agents: [ChannelAgentSummary]
 }
 
 struct ChannelAgentReply: Codable, Equatable, Identifiable, Sendable {
@@ -984,9 +996,10 @@ enum AgentReplyActivityFrame: Equatable, Sendable {
     }
 }
 
-struct ChannelDeltaResponse: Codable, Equatable, Sendable {
+struct ChannelDeltaResponse: Equatable, Sendable {
     let cursor: Int
     let hasMore: Bool
+    var reset = false
     let channels: [ChannelSummary]
     let removedChannelIds: [UUID]
     let messages: [ChannelMessage]
@@ -994,7 +1007,7 @@ struct ChannelDeltaResponse: Codable, Equatable, Sendable {
     var agentReplies: [ChannelAgentReply]? = nil
 }
 
-struct ChannelDetailResponse: Codable, Sendable {
+struct ChannelDetailResponse: Sendable {
     let channel: ChannelSummary
     let members: [ChannelMember]
     let agents: [ChannelAgentSummary]
@@ -1003,60 +1016,9 @@ struct ChannelDetailResponse: Codable, Sendable {
     var nextCursor: UUID? = nil
 }
 
-struct ChannelMessagesResponse: Codable, Sendable {
+struct ChannelMessagesResponse: Sendable {
     let messages: [ChannelMessage]
     var nextCursor: UUID? = nil
-}
-
-struct CreateChannelMessageRequest: Codable, Sendable {
-    let body: String
-    let clientMessageId: UUID?
-    let parentMessageId: UUID?
-    let mentionedUserIds: [String]
-    let mentionedAgentIds: [UUID]
-
-    enum CodingKeys: String, CodingKey {
-        case body
-        case clientMessageId
-        case parentMessageId
-        case mentionedUserIds
-        case mentionedAgentIds
-    }
-
-    init(
-        body: String,
-        clientMessageId: UUID? = nil,
-        parentMessageId: UUID?,
-        mentionedUserIds: [String],
-        mentionedAgentIds: [UUID]
-    ) {
-        self.body = body
-        self.clientMessageId = clientMessageId
-        self.parentMessageId = parentMessageId
-        self.mentionedUserIds = mentionedUserIds
-        self.mentionedAgentIds = mentionedAgentIds
-    }
-
-    /// Channel and Agent IDs are stored as lowercase strings and compared
-    /// case-sensitively. Foundation's synthesized UUID encoding uses uppercase
-    /// characters, so keep every UUID request field in the API's canonical form.
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(body, forKey: .body)
-        try container.encodeIfPresent(
-            clientMessageId?.uuidString.lowercased(),
-            forKey: .clientMessageId
-        )
-        try container.encodeIfPresent(
-            parentMessageId?.uuidString.lowercased(),
-            forKey: .parentMessageId
-        )
-        try container.encode(mentionedUserIds, forKey: .mentionedUserIds)
-        try container.encode(
-            mentionedAgentIds.map { $0.uuidString.lowercased() },
-            forKey: .mentionedAgentIds
-        )
-    }
 }
 
 struct CreateChannelMessageResponse: Codable, Sendable {
@@ -1083,51 +1045,17 @@ struct CreateChannelMessageResponse: Codable, Sendable {
     }
 }
 
-struct ToggleChannelMessageReactionRequest: Codable, Sendable {
-    let emoji: String
-}
-
-struct ToggleChannelMessageReactionResponse: Codable, Sendable {
+struct ToggleChannelMessageReactionResponse: Sendable {
     let message: ChannelMessage
 }
 
-struct DeleteChannelMessageResponse: Codable, Sendable {
+struct DeleteChannelMessageResponse: Sendable {
     let deleted: Bool
     let message: ChannelMessage?
     let parentMessage: ChannelMessage?
 }
 
-struct AcceptChannelProposalRequest: Codable, Equatable, Sendable {
-    let projectId: UUID?
-    let execution: AcceptIssueExecutionProposalRequest?
-
-    init(
-        projectId: UUID?,
-        execution: AcceptIssueExecutionProposalRequest? = nil
-    ) {
-        self.projectId = projectId
-        self.execution = execution
-    }
-
-    /// Approval compares project IDs as lowercase strings. Foundation's
-    /// synthesized UUID encoding uses uppercase characters, which the worker
-    /// used to reject as a different project.
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        if let projectId {
-            try container.encode(projectId.uuidString.lowercased(), forKey: .projectId)
-        } else {
-            try container.encodeNil(forKey: .projectId)
-        }
-        try container.encodeIfPresent(execution, forKey: .execution)
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case projectId, execution
-    }
-}
-
-struct AcceptChannelProposalResponse: Codable, Equatable, Sendable {
+struct AcceptChannelProposalResponse: Equatable, Sendable {
     let outcome: Outcome
     let projectId: UUID
     let resultRunId: UUID
@@ -1159,7 +1087,7 @@ struct AcceptChannelProposalResponse: Codable, Equatable, Sendable {
     }
 }
 
-struct DeclineChannelProposalResponse: Codable, Equatable, Sendable {
+struct DeclineChannelProposalResponse: Equatable, Sendable {
     let outcome: Outcome
 
     enum Outcome: String, Codable, Equatable, Sendable {
@@ -1191,7 +1119,7 @@ struct AcceptIssueExecutionProposalRequest: Codable, Equatable, Sendable {
     }
 }
 
-struct AcceptChannelExecutionProposalResponse: Codable, Sendable {
+struct AcceptChannelExecutionProposalResponse: Sendable {
     let proposal: IssueExecutionProposal
     let outcome: Outcome
     let projectId: UUID

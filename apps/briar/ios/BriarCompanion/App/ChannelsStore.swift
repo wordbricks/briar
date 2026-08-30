@@ -287,10 +287,9 @@ final class ChannelsStore: ObservableObject {
             }
         }
         do {
-            let response: ChannelsResponse = try await api.get(
-                MobileAPIContract.Endpoint.channels(organizationID: organizationID),
-                token: token,
-                as: ChannelsResponse.self
+            let response = try await api.listChannels(
+                organizationID: organizationID,
+                token: token
             )
             guard
                 !Task.isCancelled,
@@ -321,17 +320,11 @@ final class ChannelsStore: ObservableObject {
         guard let organizationID, let token else {
             throw MobileAPIError.invalidRequest
         }
-        async let membersResponse: DirectMessageRecipientsResponse = api.get(
-            MobileAPIContract.Endpoint.organizationMembers(organizationID: organizationID),
-            token: token,
-            as: DirectMessageRecipientsResponse.self
-        )
-        async let agentsResponse = api.listOrganizationAgents(
+        let response = try await api.listDirectMessageRecipients(
             organizationID: organizationID,
             token: token
         )
-        let (loadedMembers, loadedAgents) = try await (membersResponse, agentsResponse)
-        return (loadedMembers.members, loadedAgents)
+        return (response.members, response.agents)
     }
 
     func createDirectMessage(
@@ -342,18 +335,14 @@ final class ChannelsStore: ObservableObject {
               !memberIDs.isEmpty || !agentIDs.isEmpty else {
             throw MobileAPIError.invalidRequest
         }
-        let response: CreateDirectMessageResponse = try await api.send(
-            MobileAPIContract.Endpoint.directMessages(organizationID: organizationID),
-            method: "POST",
+        let channel = try await api.createDirectMessage(
+            organizationID: organizationID,
+            memberIDs: memberIDs,
+            agentIDs: agentIDs,
             token: token,
-            body: CreateDirectMessageRequest(
-                memberIds: memberIDs,
-                agentIds: agentIDs.map { $0.uuidString.lowercased() }
-            ),
-            as: CreateDirectMessageResponse.self
         )
-        upsertChannel(response.channel)
-        return response.channel
+        upsertChannel(channel)
+        return channel
     }
 
     func openChannel(_ channelID: UUID) async {
@@ -402,14 +391,11 @@ final class ChannelsStore: ObservableObject {
             }
         }
         do {
-            let response: ChannelDetailResponse = try await api.get(
-                MobileAPIContract.Endpoint.channel(
-                    organizationID: organizationID,
-                    channelID: channelID,
-                    messageLimit: Self.messagePageSize
-                ),
-                token: token,
-                as: ChannelDetailResponse.self
+            let response = try await api.getChannel(
+                organizationID: organizationID,
+                channelID: channelID,
+                messageLimit: Self.messagePageSize,
+                token: token
             )
             guard
                 !Task.isCancelled,
@@ -493,15 +479,13 @@ final class ChannelsStore: ObservableObject {
             }
         }
         do {
-            let response: ChannelMessagesResponse = try await api.get(
-                MobileAPIContract.Endpoint.channelMessages(
-                    organizationID: organizationID,
-                    channelID: channelID,
-                    cursor: cursor,
-                    limit: Self.messagePageSize
-                ),
-                token: token,
-                as: ChannelMessagesResponse.self
+            let response = try await api.listChannelMessages(
+                organizationID: organizationID,
+                channelID: channelID,
+                parentMessageID: nil,
+                cursor: cursor,
+                limit: Self.messagePageSize,
+                token: token
             )
             guard
                 !Task.isCancelled,
@@ -553,14 +537,13 @@ final class ChannelsStore: ObservableObject {
         let expectedGeneration = generation
         let expectedLoadRevision = authoritativeLoadRevision
         do {
-            let response: ChannelMessagesResponse = try await api.get(
-                MobileAPIContract.Endpoint.channelMessages(
-                    organizationID: organizationID,
-                    channelID: channelID,
-                    parentMessageID: messageID
-                ),
-                token: token,
-                as: ChannelMessagesResponse.self
+            let response = try await api.listChannelMessages(
+                organizationID: organizationID,
+                channelID: channelID,
+                parentMessageID: messageID,
+                cursor: nil,
+                limit: nil,
+                token: token
             )
             guard
                 !Task.isCancelled,
@@ -643,14 +626,13 @@ final class ChannelsStore: ObservableObject {
             }
         }
         do {
-            let response: ChannelMessagesResponse = try await api.get(
-                MobileAPIContract.Endpoint.channelMessages(
-                    organizationID: organizationID,
-                    channelID: channelID,
-                    parentMessageID: parentMessageID
-                ),
-                token: token,
-                as: ChannelMessagesResponse.self
+            let response = try await api.listChannelMessages(
+                organizationID: organizationID,
+                channelID: channelID,
+                parentMessageID: parentMessageID,
+                cursor: nil,
+                limit: nil,
+                token: token
             )
             guard
                 !Task.isCancelled,
@@ -704,13 +686,10 @@ final class ChannelsStore: ObservableObject {
         do {
             for _ in 0..<maxDeltaPagesPerRefresh {
                 guard let requestedCursor = syncCursor else { return }
-                let response: ChannelDeltaResponse = try await api.get(
-                    MobileAPIContract.Endpoint.channelChanges(
-                        organizationID: organizationID,
-                        cursor: requestedCursor
-                    ),
-                    token: token,
-                    as: ChannelDeltaResponse.self
+                let response = try await api.syncChannels(
+                    organizationID: organizationID,
+                    cursor: requestedCursor,
+                    token: token
                 )
                 guard
                     !Task.isCancelled,
@@ -723,14 +702,17 @@ final class ChannelsStore: ObservableObject {
                     changesRefreshRequested = true
                     return
                 }
-                guard response.cursor >= requestedCursor else {
+                guard response.reset || response.cursor >= requestedCursor else {
                     throw MobileAPIError.invalidResponse
                 }
 
                 apply(response)
                 syncCursor = response.cursor
                 errorMessage = nil
-                guard response.hasMore, response.cursor > requestedCursor else { return }
+                guard response.hasMore else { return }
+                guard response.cursor != requestedCursor else {
+                    throw MobileAPIError.invalidResponse
+                }
             }
         } catch {
             guard !Task.isCancelled, expectedGeneration == generation else { return }
@@ -796,11 +778,13 @@ final class ChannelsStore: ObservableObject {
         body: String,
         currentUserID: String? = nil,
         mentions: [ChannelMentionTarget],
-        attachments: [PendingIssueAttachment] = []
+        attachments: [PendingIssueAttachment] = [],
+        attachmentReferences existingAttachmentReferences: [String] = []
     ) async {
         guard let organizationID, let token else { return }
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty || !attachments.isEmpty else { return }
+        guard !trimmed.isEmpty || !attachments.isEmpty || !existingAttachmentReferences.isEmpty
+        else { return }
         if let message = PendingIssueAttachment.validationMessage(for: attachments) {
             errorMessage = message
             return
@@ -810,13 +794,13 @@ final class ChannelsStore: ObservableObject {
             return
         }
         let clientMessageID = UUID()
-        let attachmentReferences = attachments.map { _ in attachmentReference() }
+        let uploadAttachmentReferences = attachments.map { _ in attachmentReference() }
         let payload = attachments.isEmpty
             ? nil
             : try? AttachmentMessagePayload(
                 body: trimmed,
                 attachments: attachments,
-                references: attachmentReferences,
+                references: uploadAttachmentReferences,
                 referenceGenerator: attachmentReference
             )
         let optimisticBody = payload?.body ?? trimmed
@@ -855,7 +839,7 @@ final class ChannelsStore: ObservableObject {
         sending = true
         defer { sending = false }
         do {
-            let path = MobileAPIContract.Endpoint.channelMessages(
+            let path = MobileAPIContract.Endpoint.channelMessageUpload(
                 organizationID: organizationID,
                 channelID: channelID
             )
@@ -867,21 +851,25 @@ final class ChannelsStore: ObservableObject {
             }
             let response: CreateChannelMessageResponse
             if attachments.isEmpty {
-                response = try await api.send(
-                    path,
-                    method: "POST",
+                response = try await api.createChannelMessage(
+                    organizationID: organizationID,
+                    channelID: channelID,
+                    clientMessageID: clientMessageID,
+                    body: trimmed,
+                    parentMessageID: parentMessageID,
+                    mentionedUserIDs: mentionedUserIds,
+                    mentionedAgentIDs: mentionedAgentIds,
+                    attachmentReferences: existingAttachmentReferences,
                     token: token,
-                    body: CreateChannelMessageRequest(
-                        body: trimmed,
-                        clientMessageId: clientMessageID,
-                        parentMessageId: parentMessageID,
-                        mentionedUserIds: mentionedUserIds,
-                        mentionedAgentIds: mentionedAgentIds
-                    ),
-                    as: CreateChannelMessageResponse.self
                 )
             } else {
                 guard let payload else { throw MobileAPIError.invalidRequest }
+                let attachmentReferencesJSON = String(
+                    data: try JSONEncoder().encode(
+                        existingAttachmentReferences + payload.references
+                    ),
+                    encoding: .utf8
+                ) ?? "[]"
                 response = try await api.upload(
                     path,
                     fields: [
@@ -898,7 +886,7 @@ final class ChannelsStore: ObservableObject {
                             ),
                             encoding: .utf8
                         ) ?? "[]",
-                        "attachmentReferences": payload.referencesJSON,
+                        "attachmentReferences": attachmentReferencesJSON,
                     ],
                     files: payload.files,
                     token: token,
@@ -936,16 +924,12 @@ final class ChannelsStore: ObservableObject {
         subscriptionPending = true
         defer { subscriptionPending = false }
         do {
-            let response: ChannelThreadSubscriptionResponse = try await api.send(
-                MobileAPIContract.Endpoint.channelThreadSubscription(
-                    organizationID: organizationID,
-                    channelID: channelID,
-                    messageID: messageID
-                ),
-                method: subscribed ? "PUT" : "DELETE",
+            let response = try await api.setChannelThreadSubscription(
+                organizationID: organizationID,
+                channelID: channelID,
+                rootMessageID: messageID,
+                subscribed: subscribed,
                 token: token,
-                body: nil,
-                as: ChannelThreadSubscriptionResponse.self
             )
             let apply: (ChannelMessage) -> ChannelMessage = { candidate in
                 guard candidate.id == response.rootMessageId else { return candidate }
@@ -967,16 +951,12 @@ final class ChannelsStore: ObservableObject {
         let trimmed = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         do {
-            let response: ToggleChannelMessageReactionResponse = try await api.send(
-                MobileAPIContract.Endpoint.channelMessageReactions(
-                    organizationID: organizationID,
-                    channelID: channelID,
-                    messageID: messageID
-                ),
-                method: "PUT",
+            let response = try await api.toggleChannelMessageReaction(
+                organizationID: organizationID,
+                channelID: channelID,
+                messageID: messageID,
+                emoji: trimmed,
                 token: token,
-                body: ToggleChannelMessageReactionRequest(emoji: trimmed),
-                as: ToggleChannelMessageReactionResponse.self
             )
             guard response.message.channelId == channelID,
                   response.message.id == messageID
@@ -1019,16 +999,11 @@ final class ChannelsStore: ObservableObject {
                 self.focusedThreadParentID == expectedThreadParentID
         }
         do {
-            let response: DeleteChannelMessageResponse = try await api.send(
-                MobileAPIContract.Endpoint.channelMessage(
-                    organizationID: organizationID,
-                    channelID: channelID,
-                    messageID: messageID
-                ),
-                method: "DELETE",
-                token: token,
-                body: nil,
-                as: DeleteChannelMessageResponse.self
+            let response = try await api.deleteChannelMessage(
+                organizationID: organizationID,
+                channelID: channelID,
+                messageID: messageID,
+                token: token
             )
             guard response.message?.channelId == nil ||
                     (response.message?.channelId == channelID &&
@@ -1139,19 +1114,13 @@ final class ChannelsStore: ObservableObject {
                     request: execution
                 )
             }
-            let response: AcceptChannelProposalResponse = try await api.send(
-                MobileAPIContract.Endpoint.acceptChannelProposal(
-                    organizationID: organizationID,
-                    channelID: channelID,
-                    proposalID: proposalID
-                ),
-                method: "POST",
+            let response = try await api.acceptChannelProposal(
+                organizationID: organizationID,
+                channelID: channelID,
+                proposalID: proposalID,
+                projectID: projectID,
+                execution: execution,
                 token: token,
-                body: AcceptChannelProposalRequest(
-                    projectId: projectID,
-                    execution: execution
-                ),
-                as: AcceptChannelProposalResponse.self
             )
             guard
                 expectedGeneration == generation,
@@ -1306,16 +1275,11 @@ final class ChannelsStore: ObservableObject {
             }
         }
         do {
-            let _: DeclineChannelProposalResponse = try await api.send(
-                MobileAPIContract.Endpoint.declineChannelProposal(
-                    organizationID: organizationID,
-                    channelID: channelID,
-                    proposalID: proposalID
-                ),
-                method: "POST",
-                token: token,
-                body: nil,
-                as: DeclineChannelProposalResponse.self
+            _ = try await api.declineChannelProposal(
+                organizationID: organizationID,
+                channelID: channelID,
+                proposalID: proposalID,
+                token: token
             )
             guard expectedGeneration == generation,
                   expectedFocusRevision == authoritativeLoadRevision,
@@ -1399,16 +1363,12 @@ final class ChannelsStore: ObservableObject {
                 request: request
             )
 
-            let response: AcceptChannelExecutionProposalResponse = try await api.send(
-                MobileAPIContract.Endpoint.acceptChannelExecutionProposal(
-                    organizationID: organizationID,
-                    channelID: channelID,
-                    proposalID: proposalID
-                ),
-                method: "POST",
+            let response = try await api.acceptChannelExecutionProposal(
+                organizationID: organizationID,
+                channelID: channelID,
+                proposalID: proposalID,
+                approval: request,
                 token: token,
-                body: request,
-                as: AcceptChannelExecutionProposalResponse.self
             )
             guard
                 expectedGeneration == generation,
@@ -1690,16 +1650,12 @@ final class ChannelsStore: ObservableObject {
                 request: request
             )
 
-            let response: AcceptAgentSkillExecutionProposalResponse = try await api.send(
-                MobileAPIContract.Endpoint.acceptChannelSkillExecutionProposal(
-                    organizationID: organizationID,
-                    channelID: channelID,
-                    proposalID: proposalID
-                ),
-                method: "POST",
+            let response = try await api.acceptChannelSkillExecutionProposal(
+                organizationID: organizationID,
+                channelID: channelID,
+                proposalID: proposalID,
+                workerID: request.workerId,
                 token: token,
-                body: request,
-                as: AcceptAgentSkillExecutionProposalResponse.self
             )
             guard expectedGeneration == generation,
                   expectedAcceptanceRevision == acceptanceRevision,
@@ -2046,6 +2002,10 @@ final class ChannelsStore: ObservableObject {
     }
 
     private func apply(_ delta: ChannelDeltaResponse) {
+        if delta.reset {
+            applyAuthoritativeReset(delta)
+            return
+        }
         if let incomingReplies = delta.agentReplies {
             mergeAgentReplies(incomingReplies)
         }
@@ -2142,6 +2102,81 @@ final class ChannelsStore: ObservableObject {
             },
             removing: removedMessageIDs
         )
+    }
+
+    private func applyAuthoritativeReset(_ delta: ChannelDeltaResponse) {
+        invalidateProposalAcceptancePresentation()
+        cachedConversations = [:]
+        cachedConversationOrder = []
+        cachedThreads = [:]
+        cachedThreadOrder = []
+        optimisticMessageIDs = []
+        agentReplyTombstones = []
+        proposalRevisions = [:]
+        latestProposals = [:]
+        latestExecutionProposals = [:]
+        executionProposalIDsByMessage = [:]
+        skillExecutionProposalRevisions = [:]
+        latestSkillExecutionProposals = [:]
+        skillExecutionProposalIDsByMessage = [:]
+
+        let removedChannelIDs = Set(delta.removedChannelIds)
+        channels = delta.channels.filter { !removedChannelIDs.contains($0.id) }
+        guard let focusedChannelID,
+              channels.contains(where: { $0.id == focusedChannelID })
+        else {
+            authoritativeLoadRevision &+= 1
+            self.focusedChannelID = nil
+            focusedThreadParentID = nil
+            messages = []
+            thread = []
+            members = []
+            agents = []
+            agentReplies = []
+            activityFrames = [:]
+            activityTask?.cancel()
+            activityTask = nil
+            activityExpiryTask?.cancel()
+            activityExpiryTask = nil
+            return
+        }
+
+        let removedMessageIDs = Set(delta.removedMessageIds)
+        let relevant = delta.messages.filter {
+            $0.channelId == focusedChannelID && !removedMessageIDs.contains($0.id)
+        }
+        recordProposalMessages(relevant)
+        if isDirectMessage(channelID: focusedChannelID) {
+            messages = relevant.sorted(by: Self.messageChronology)
+        } else {
+            messages = relevant
+                .filter { $0.parentMessageId == nil }
+                .sorted(by: Self.messageChronology)
+        }
+        if let focusedThreadParentID {
+            thread = relevant.filter {
+                $0.id == focusedThreadParentID ||
+                    $0.parentMessageId == focusedThreadParentID
+            }.sorted(by: Self.messageChronology)
+        } else {
+            thread = []
+        }
+        agentReplies = (delta.agentReplies ?? []).filter {
+            $0.channelId == focusedChannelID
+        }
+        for reply in agentReplies where Self.agentReplyIsTerminal(reply) {
+            agentReplyTombstones.insert(reply.id)
+        }
+        nextMessageCursor = nil
+        hasEarlierMessages = false
+        loadingEarlierMessages = false
+        cacheFocusedConversation()
+        cacheFocusedThread()
+    }
+
+    private static func messageChronology(_ left: ChannelMessage, _ right: ChannelMessage) -> Bool {
+        if left.createdAt != right.createdAt { return left.createdAt < right.createdAt }
+        return left.id.uuidString < right.id.uuidString
     }
 
     /// Deltas may have been produced before this client approved the proposal.
@@ -2291,17 +2326,13 @@ final class ChannelsStore: ObservableObject {
             channels[index] = updated
         }
         do {
-            let response: ChannelReadResponse = try await api.send(
-                MobileAPIContract.Endpoint.channelRead(
-                    organizationID: organizationID,
-                    channelID: channelID
-                ),
-                method: "PUT",
-                token: token,
-                body: ChannelReadRequest(lastReadAt: Date()),
-                as: ChannelReadResponse.self
+            let channel = try await api.markChannelRead(
+                organizationID: organizationID,
+                channelID: channelID,
+                lastReadAt: Date(),
+                token: token
             )
-            upsertChannel(response.channel)
+            upsertChannel(channel)
         } catch {
             // The next catalog snapshot restores unread if the write failed.
         }
