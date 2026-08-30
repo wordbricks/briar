@@ -6,6 +6,7 @@ import "briar/app/v1/issue.proto";
 import "briar/app/v1/common.proto";
 import "briar/app/v1/dashboard.proto";
 import "briar/app/v1/fleet.proto";
+import "briar/realtime/v1/realtime.proto";
 import "briar/types/v1/agent_event.proto";
 import "briar/types/v1/agent_execution.proto";
 import "briar/types/v1/provider.proto";
@@ -21,6 +22,7 @@ import "google/protobuf/timestamp.proto";
 service WorkerQueueService {
   rpc ClaimWork(ClaimWorkRequest) returns (ClaimWorkResponse);
   rpc RenewWorkLease(RenewWorkLeaseRequest) returns (RenewWorkLeaseResponse);
+  rpc CheckpointChannelReplySession(CheckpointChannelReplySessionRequest) returns (CheckpointChannelReplySessionResponse);
   rpc HandoffWork(HandoffWorkRequest) returns (HandoffWorkResponse);
   rpc CompleteProjectAgentTask(CompleteProjectAgentTaskRequest) returns (CompleteProjectAgentTaskResponse);
   rpc RecordMergeBatchCandidateEnqueued(RecordMergeBatchCandidateEnqueuedRequest) returns (RecordMergeBatchCandidateEnqueuedResponse);
@@ -28,6 +30,13 @@ service WorkerQueueService {
   rpc RecordMergeBatchValidation(RecordMergeBatchValidationRequest) returns (RecordMergeBatchValidationResponse);
   rpc CompleteMergeBatchPublication(CompleteMergeBatchPublicationRequest) returns (CompleteMergeBatchPublicationResponse);
   rpc BlockMergeBatch(BlockMergeBatchRequest) returns (BlockMergeBatchResponse);
+}
+
+// Ephemeral reply activity uses the short-lived capability returned with a
+// reply claim, not the Worker's long-lived credential. The server derives the
+// authoritative scope and attempt from that signed capability.
+service ReplyActivityService {
+  rpc PublishReplyActivity(PublishReplyActivityRequest) returns (PublishReplyActivityResponse);
 }
 
 // Worker-credential runtime control plane. Enrollment and project binding are
@@ -255,6 +264,29 @@ message RenewWorkLeaseResponse {
     MergeBatchLeaseRenewal merge_batch = 14;
   }
 }
+
+message CheckpointChannelReplySessionRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  // Must contain the exact active channel_reply claim. Other work variants and
+  // unknown oneof cases are rejected rather than inferred from scalar fields.
+  WorkClaimIdentity work = 3;
+  optional string conversation_id = 4;
+}
+
+message CheckpointChannelReplySessionResponse {
+  google.protobuf.Timestamp retained_until = 1;
+}
+
+message PublishReplyActivityRequest {
+  string reply_job_id = 1;
+  uint64 sequence = 2;
+  // Absence clears the visible activity. Implementations reject unspecified or
+  // unrecognized AgentActivityKind values instead of treating them as a default.
+  optional briar.realtime.v1.AgentActivity activity = 3;
+}
+
+message PublishReplyActivityResponse {}
 
 message IssueLeaseRenewal {}
 message ProjectAgentTaskLeaseRenewal {}

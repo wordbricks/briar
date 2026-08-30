@@ -9129,6 +9129,678 @@ pub mod renew_work_lease_response {
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
+pub struct CheckpointChannelReplySessionRequest {
+    /// Field 1: `project_id`
+    #[serde(
+        rename = "projectId",
+        alias = "project_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub project_id: ::buffa::alloc::string::String,
+    /// Field 2: `worker_id`
+    #[serde(
+        rename = "workerId",
+        alias = "worker_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub worker_id: ::buffa::alloc::string::String,
+    /// Must contain the exact active channel_reply claim. Other work variants and
+    /// unknown oneof cases are rejected rather than inferred from scalar fields.
+    ///
+    /// Field 3: `work`
+    #[serde(
+        rename = "work",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub work: ::buffa::MessageField<
+        WorkClaimIdentity,
+        ::buffa::Inline<WorkClaimIdentity>,
+    >,
+    /// Field 4: `conversation_id`
+    #[serde(
+        rename = "conversationId",
+        alias = "conversation_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub conversation_id: ::core::option::Option<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CheckpointChannelReplySessionRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CheckpointChannelReplySessionRequest")
+            .field("project_id", &self.project_id)
+            .field("worker_id", &self.worker_id)
+            .field("work", &self.work)
+            .field("conversation_id", &self.conversation_id)
+            .finish()
+    }
+}
+impl CheckpointChannelReplySessionRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.CheckpointChannelReplySessionRequest";
+}
+impl CheckpointChannelReplySessionRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::conversation_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_conversation_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.conversation_id = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(CheckpointChannelReplySessionRequest);
+impl ::buffa::MessageName for CheckpointChannelReplySessionRequest {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "CheckpointChannelReplySessionRequest";
+    const FULL_NAME: &'static str = "briar.worker.v1.CheckpointChannelReplySessionRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.CheckpointChannelReplySessionRequest";
+}
+impl ::buffa::Message for CheckpointChannelReplySessionRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.project_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        }
+        if !self.worker_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.worker_id) as u64;
+        }
+        if self.work.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.work.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if let Some(ref v) = self.conversation_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.project_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        }
+        if !self.worker_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.worker_id, buf);
+        }
+        if self.work.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                3u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.work.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.conversation_id {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.worker_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.work.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .conversation_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.project_id.clear();
+        self.worker_id.clear();
+        self.work = ::buffa::MessageField::none();
+        self.conversation_id = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CheckpointChannelReplySessionRequest {
+    const PROTO_FQN: &'static str = "briar.worker.v1.CheckpointChannelReplySessionRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CheckpointChannelReplySessionRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CHECKPOINT_CHANNEL_REPLY_SESSION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.CheckpointChannelReplySessionRequest",
+    to_json: ::buffa::type_registry::any_to_json::<CheckpointChannelReplySessionRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        CheckpointChannelReplySessionRequest,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CheckpointChannelReplySessionResponse {
+    /// Field 1: `retained_until`
+    #[serde(
+        rename = "retainedUntil",
+        alias = "retained_until",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub retained_until: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CheckpointChannelReplySessionResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CheckpointChannelReplySessionResponse")
+            .field("retained_until", &self.retained_until)
+            .finish()
+    }
+}
+impl CheckpointChannelReplySessionResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.CheckpointChannelReplySessionResponse";
+}
+::buffa::impl_default_instance!(CheckpointChannelReplySessionResponse);
+impl ::buffa::MessageName for CheckpointChannelReplySessionResponse {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "CheckpointChannelReplySessionResponse";
+    const FULL_NAME: &'static str = "briar.worker.v1.CheckpointChannelReplySessionResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.CheckpointChannelReplySessionResponse";
+}
+impl ::buffa::Message for CheckpointChannelReplySessionResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.retained_until.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.retained_until.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.retained_until.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.retained_until.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.retained_until.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.retained_until = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CheckpointChannelReplySessionResponse {
+    const PROTO_FQN: &'static str = "briar.worker.v1.CheckpointChannelReplySessionResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CheckpointChannelReplySessionResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CHECKPOINT_CHANNEL_REPLY_SESSION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.CheckpointChannelReplySessionResponse",
+    to_json: ::buffa::type_registry::any_to_json::<
+        CheckpointChannelReplySessionResponse,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        CheckpointChannelReplySessionResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PublishReplyActivityRequest {
+    /// Field 1: `reply_job_id`
+    #[serde(
+        rename = "replyJobId",
+        alias = "reply_job_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub reply_job_id: ::buffa::alloc::string::String,
+    /// Field 2: `sequence`
+    #[serde(
+        rename = "sequence",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub sequence: u64,
+    /// Absence clears the visible activity. Implementations reject unspecified or
+    /// unrecognized AgentActivityKind values instead of treating them as a default.
+    ///
+    /// Field 3: `activity`
+    #[serde(
+        rename = "activity",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub activity: ::buffa::MessageField<
+        super::super::realtime::v1::AgentActivity,
+        ::buffa::Inline<super::super::realtime::v1::AgentActivity>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PublishReplyActivityRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PublishReplyActivityRequest")
+            .field("reply_job_id", &self.reply_job_id)
+            .field("sequence", &self.sequence)
+            .field("activity", &self.activity)
+            .finish()
+    }
+}
+impl PublishReplyActivityRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PublishReplyActivityRequest";
+}
+::buffa::impl_default_instance!(PublishReplyActivityRequest);
+impl ::buffa::MessageName for PublishReplyActivityRequest {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "PublishReplyActivityRequest";
+    const FULL_NAME: &'static str = "briar.worker.v1.PublishReplyActivityRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PublishReplyActivityRequest";
+}
+impl ::buffa::Message for PublishReplyActivityRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.reply_job_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.reply_job_id) as u64;
+        }
+        if self.sequence != 0u64 {
+            size += 1u64 + ::buffa::types::uint64_encoded_len(self.sequence) as u64;
+        }
+        if self.activity.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.activity.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.reply_job_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.reply_job_id, buf);
+        }
+        if self.sequence != 0u64 {
+            ::buffa::types::put_uint64_field(2u32, self.sequence, buf);
+        }
+        if self.activity.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                3u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.activity.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.reply_job_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.sequence = ::buffa::types::decode_uint64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.activity.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.reply_job_id.clear();
+        self.sequence = 0u64;
+        self.activity = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PublishReplyActivityRequest {
+    const PROTO_FQN: &'static str = "briar.worker.v1.PublishReplyActivityRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PublishReplyActivityRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PUBLISH_REPLY_ACTIVITY_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.PublishReplyActivityRequest",
+    to_json: ::buffa::type_registry::any_to_json::<PublishReplyActivityRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<PublishReplyActivityRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PublishReplyActivityResponse {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PublishReplyActivityResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PublishReplyActivityResponse").finish()
+    }
+}
+impl PublishReplyActivityResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PublishReplyActivityResponse";
+}
+::buffa::impl_default_instance!(PublishReplyActivityResponse);
+impl ::buffa::MessageName for PublishReplyActivityResponse {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "PublishReplyActivityResponse";
+    const FULL_NAME: &'static str = "briar.worker.v1.PublishReplyActivityResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PublishReplyActivityResponse";
+}
+impl ::buffa::Message for PublishReplyActivityResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PublishReplyActivityResponse {
+    const PROTO_FQN: &'static str = "briar.worker.v1.PublishReplyActivityResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PublishReplyActivityResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PUBLISH_REPLY_ACTIVITY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.PublishReplyActivityResponse",
+    to_json: ::buffa::type_registry::any_to_json::<PublishReplyActivityResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<PublishReplyActivityResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
 pub struct IssueLeaseRenewal {
     #[serde(skip)]
     #[doc(hidden)]
@@ -36634,6 +37306,1376 @@ pub mod __buffa {
             type ViewHandle = RenewWorkLeaseResponseOwnedView;
         }
         impl ::serde::Serialize for RenewWorkLeaseResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct CheckpointChannelReplySessionRequestView<'a> {
+            /// Field 1: `project_id`
+            pub project_id: &'a str,
+            /// Field 2: `worker_id`
+            pub worker_id: &'a str,
+            /// Must contain the exact active channel_reply claim. Other work variants and
+            /// unknown oneof cases are rejected rather than inferred from scalar fields.
+            ///
+            /// Field 3: `work`
+            pub work: ::buffa::MessageFieldView<
+                super::super::__buffa::view::WorkClaimIdentityView<'a>,
+            >,
+            /// Field 4: `conversation_id`
+            pub conversation_id: ::core::option::Option<&'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for CheckpointChannelReplySessionRequestView<'a> {
+            type Owned = super::super::CheckpointChannelReplySessionRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.worker_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.work.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.work = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::WorkClaimIdentityView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.conversation_id = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CheckpointChannelReplySessionRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CheckpointChannelReplySessionRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CheckpointChannelReplySessionRequest {
+                    project_id: self.project_id.to_string(),
+                    worker_id: self.worker_id.to_string(),
+                    work: match self.work.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::WorkClaimIdentity,
+                                ::buffa::Inline<super::super::WorkClaimIdentity>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    conversation_id: self.conversation_id.map(|s| s.to_string()),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for CheckpointChannelReplySessionRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.project_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.project_id)
+                                as u64;
+                }
+                if !self.worker_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.worker_id) as u64;
+                }
+                if self.work.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.work.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if let Some(ref v) = self.conversation_id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.project_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                }
+                if !self.worker_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.worker_id, buf);
+                }
+                if self.work.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.work.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.conversation_id {
+                    ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for CheckpointChannelReplySessionRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
+                    __map.serialize_entry("projectId", self.project_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.worker_id) {
+                    __map.serialize_entry("workerId", self.worker_id)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.work.as_option() {
+                        __map.serialize_entry("work", __v)?;
+                    }
+                }
+                if let ::core::option::Option::Some(__v) = self.conversation_id {
+                    __map.serialize_entry("conversationId", __v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CheckpointChannelReplySessionRequestView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "CheckpointChannelReplySessionRequest";
+            const FULL_NAME: &'static str = "briar.worker.v1.CheckpointChannelReplySessionRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.CheckpointChannelReplySessionRequest";
+        }
+        ::buffa::impl_default_view_instance!(CheckpointChannelReplySessionRequestView);
+        ::buffa::impl_view_reborrow!(CheckpointChannelReplySessionRequestView);
+        /** Self-contained, `'static` owned view of a `CheckpointChannelReplySessionRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CheckpointChannelReplySessionRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CheckpointChannelReplySessionRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CheckpointChannelReplySessionRequestOwnedView(
+            ::buffa::OwnedView<CheckpointChannelReplySessionRequestView<'static>>,
+        );
+        impl CheckpointChannelReplySessionRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CheckpointChannelReplySessionRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CheckpointChannelReplySessionRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CheckpointChannelReplySessionRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CheckpointChannelReplySessionRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CheckpointChannelReplySessionRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CheckpointChannelReplySessionRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::CheckpointChannelReplySessionRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `project_id`
+            #[must_use]
+            pub fn project_id(&self) -> &'_ str {
+                self.0.reborrow().project_id
+            }
+            /// Field 2: `worker_id`
+            #[must_use]
+            pub fn worker_id(&self) -> &'_ str {
+                self.0.reborrow().worker_id
+            }
+            /// Must contain the exact active channel_reply claim. Other work variants and
+            /// unknown oneof cases are rejected rather than inferred from scalar fields.
+            ///
+            /// Field 3: `work`
+            #[must_use]
+            pub fn work(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::WorkClaimIdentityView<'_>,
+            > {
+                &self.0.reborrow().work
+            }
+            /// Field 4: `conversation_id`
+            #[must_use]
+            pub fn conversation_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().conversation_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CheckpointChannelReplySessionRequestView<'static>>,
+        > for CheckpointChannelReplySessionRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    CheckpointChannelReplySessionRequestView<'static>,
+                >,
+            ) -> Self {
+                CheckpointChannelReplySessionRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CheckpointChannelReplySessionRequestOwnedView>
+        for ::buffa::OwnedView<CheckpointChannelReplySessionRequestView<'static>> {
+            fn from(wrapper: CheckpointChannelReplySessionRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CheckpointChannelReplySessionRequestView<'static>>,
+        > for CheckpointChannelReplySessionRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CheckpointChannelReplySessionRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::CheckpointChannelReplySessionRequest {
+            type View<'a> = CheckpointChannelReplySessionRequestView<'a>;
+            type ViewHandle = CheckpointChannelReplySessionRequestOwnedView;
+        }
+        impl ::serde::Serialize for CheckpointChannelReplySessionRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct CheckpointChannelReplySessionResponseView<'a> {
+            /// Field 1: `retained_until`
+            pub retained_until: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for CheckpointChannelReplySessionResponseView<'a> {
+            type Owned = super::super::CheckpointChannelReplySessionResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.retained_until.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.retained_until = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CheckpointChannelReplySessionResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CheckpointChannelReplySessionResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CheckpointChannelReplySessionResponse {
+                    retained_until: match self.retained_until.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for CheckpointChannelReplySessionResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.retained_until.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.retained_until.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.retained_until.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.retained_until.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for CheckpointChannelReplySessionResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .retained_until
+                        .as_option()
+                    {
+                        __map.serialize_entry("retainedUntil", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CheckpointChannelReplySessionResponseView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "CheckpointChannelReplySessionResponse";
+            const FULL_NAME: &'static str = "briar.worker.v1.CheckpointChannelReplySessionResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.CheckpointChannelReplySessionResponse";
+        }
+        ::buffa::impl_default_view_instance!(CheckpointChannelReplySessionResponseView);
+        ::buffa::impl_view_reborrow!(CheckpointChannelReplySessionResponseView);
+        /** Self-contained, `'static` owned view of a `CheckpointChannelReplySessionResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CheckpointChannelReplySessionResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CheckpointChannelReplySessionResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CheckpointChannelReplySessionResponseOwnedView(
+            ::buffa::OwnedView<CheckpointChannelReplySessionResponseView<'static>>,
+        );
+        impl CheckpointChannelReplySessionResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CheckpointChannelReplySessionResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CheckpointChannelReplySessionResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CheckpointChannelReplySessionResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CheckpointChannelReplySessionResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CheckpointChannelReplySessionResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CheckpointChannelReplySessionResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::CheckpointChannelReplySessionResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `retained_until`
+            #[must_use]
+            pub fn retained_until(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().retained_until
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CheckpointChannelReplySessionResponseView<'static>>,
+        > for CheckpointChannelReplySessionResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    CheckpointChannelReplySessionResponseView<'static>,
+                >,
+            ) -> Self {
+                CheckpointChannelReplySessionResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CheckpointChannelReplySessionResponseOwnedView>
+        for ::buffa::OwnedView<CheckpointChannelReplySessionResponseView<'static>> {
+            fn from(wrapper: CheckpointChannelReplySessionResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CheckpointChannelReplySessionResponseView<'static>>,
+        > for CheckpointChannelReplySessionResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                CheckpointChannelReplySessionResponseView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::CheckpointChannelReplySessionResponse {
+            type View<'a> = CheckpointChannelReplySessionResponseView<'a>;
+            type ViewHandle = CheckpointChannelReplySessionResponseOwnedView;
+        }
+        impl ::serde::Serialize for CheckpointChannelReplySessionResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct PublishReplyActivityRequestView<'a> {
+            /// Field 1: `reply_job_id`
+            pub reply_job_id: &'a str,
+            /// Field 2: `sequence`
+            pub sequence: u64,
+            /// Absence clears the visible activity. Implementations reject unspecified or
+            /// unrecognized AgentActivityKind values instead of treating them as a default.
+            ///
+            /// Field 3: `activity`
+            pub activity: ::buffa::MessageFieldView<
+                super::super::super::super::realtime::v1::__buffa::view::AgentActivityView<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for PublishReplyActivityRequestView<'a> {
+            type Owned = super::super::PublishReplyActivityRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.reply_job_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.sequence = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.activity.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.activity = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::realtime::v1::__buffa::view::AgentActivityView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PublishReplyActivityRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PublishReplyActivityRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PublishReplyActivityRequest {
+                    reply_job_id: self.reply_job_id.to_string(),
+                    sequence: self.sequence,
+                    activity: match self.activity.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::realtime::v1::AgentActivity,
+                                ::buffa::Inline<
+                                    super::super::super::super::realtime::v1::AgentActivity,
+                                >,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for PublishReplyActivityRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.reply_job_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.reply_job_id)
+                                as u64;
+                }
+                if self.sequence != 0u64 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint64_encoded_len(self.sequence) as u64;
+                }
+                if self.activity.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.activity.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.reply_job_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.reply_job_id, buf);
+                }
+                if self.sequence != 0u64 {
+                    ::buffa::types::put_uint64_field(2u32, self.sequence, buf);
+                }
+                if self.activity.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.activity.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for PublishReplyActivityRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.reply_job_id) {
+                    __map.serialize_entry("replyJobId", self.reply_job_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.sequence) {
+                    __map
+                        .serialize_entry(
+                            "sequence",
+                            &::buffa::json_helpers::ProtoJson(&self.sequence),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.activity.as_option()
+                    {
+                        __map.serialize_entry("activity", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for PublishReplyActivityRequestView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "PublishReplyActivityRequest";
+            const FULL_NAME: &'static str = "briar.worker.v1.PublishReplyActivityRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PublishReplyActivityRequest";
+        }
+        ::buffa::impl_default_view_instance!(PublishReplyActivityRequestView);
+        ::buffa::impl_view_reborrow!(PublishReplyActivityRequestView);
+        /** Self-contained, `'static` owned view of a `PublishReplyActivityRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PublishReplyActivityRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PublishReplyActivityRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PublishReplyActivityRequestOwnedView(
+            ::buffa::OwnedView<PublishReplyActivityRequestView<'static>>,
+        );
+        impl PublishReplyActivityRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PublishReplyActivityRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PublishReplyActivityRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PublishReplyActivityRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PublishReplyActivityRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`PublishReplyActivityRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PublishReplyActivityRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::PublishReplyActivityRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `reply_job_id`
+            #[must_use]
+            pub fn reply_job_id(&self) -> &'_ str {
+                self.0.reborrow().reply_job_id
+            }
+            /// Field 2: `sequence`
+            #[must_use]
+            pub fn sequence(&self) -> u64 {
+                self.0.reborrow().sequence
+            }
+            /// Absence clears the visible activity. Implementations reject unspecified or
+            /// unrecognized AgentActivityKind values instead of treating them as a default.
+            ///
+            /// Field 3: `activity`
+            #[must_use]
+            pub fn activity(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::realtime::v1::__buffa::view::AgentActivityView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().activity
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<PublishReplyActivityRequestView<'static>>,
+        > for PublishReplyActivityRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<PublishReplyActivityRequestView<'static>>,
+            ) -> Self {
+                PublishReplyActivityRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PublishReplyActivityRequestOwnedView>
+        for ::buffa::OwnedView<PublishReplyActivityRequestView<'static>> {
+            fn from(wrapper: PublishReplyActivityRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<PublishReplyActivityRequestView<'static>>,
+        > for PublishReplyActivityRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<PublishReplyActivityRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::PublishReplyActivityRequest {
+            type View<'a> = PublishReplyActivityRequestView<'a>;
+            type ViewHandle = PublishReplyActivityRequestOwnedView;
+        }
+        impl ::serde::Serialize for PublishReplyActivityRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct PublishReplyActivityResponseView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for PublishReplyActivityResponseView<'a> {
+            type Owned = super::super::PublishReplyActivityResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PublishReplyActivityResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PublishReplyActivityResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PublishReplyActivityResponse {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for PublishReplyActivityResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for PublishReplyActivityResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for PublishReplyActivityResponseView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "PublishReplyActivityResponse";
+            const FULL_NAME: &'static str = "briar.worker.v1.PublishReplyActivityResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PublishReplyActivityResponse";
+        }
+        ::buffa::impl_default_view_instance!(PublishReplyActivityResponseView);
+        ::buffa::impl_view_reborrow!(PublishReplyActivityResponseView);
+        /** Self-contained, `'static` owned view of a `PublishReplyActivityResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PublishReplyActivityResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PublishReplyActivityResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PublishReplyActivityResponseOwnedView(
+            ::buffa::OwnedView<PublishReplyActivityResponseView<'static>>,
+        );
+        impl PublishReplyActivityResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PublishReplyActivityResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PublishReplyActivityResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PublishReplyActivityResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PublishReplyActivityResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`PublishReplyActivityResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PublishReplyActivityResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::PublishReplyActivityResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<PublishReplyActivityResponseView<'static>>,
+        > for PublishReplyActivityResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<PublishReplyActivityResponseView<'static>>,
+            ) -> Self {
+                PublishReplyActivityResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PublishReplyActivityResponseOwnedView>
+        for ::buffa::OwnedView<PublishReplyActivityResponseView<'static>> {
+            fn from(wrapper: PublishReplyActivityResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<PublishReplyActivityResponseView<'static>>,
+        > for PublishReplyActivityResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<PublishReplyActivityResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::PublishReplyActivityResponse {
+            type View<'a> = PublishReplyActivityResponseView<'a>;
+            type ViewHandle = PublishReplyActivityResponseOwnedView;
+        }
+        impl ::serde::Serialize for PublishReplyActivityResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -65222,6 +67264,14 @@ pub mod __buffa {
         reg.register_json_any(super::__MERGE_BATCH_CLAIM_IDENTITY_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_REPLY_CLAIM_IDENTITY_JSON_ANY);
         reg.register_json_any(super::__RENEW_WORK_LEASE_RESPONSE_JSON_ANY);
+        reg.register_json_any(
+            super::__CHECKPOINT_CHANNEL_REPLY_SESSION_REQUEST_JSON_ANY,
+        );
+        reg.register_json_any(
+            super::__CHECKPOINT_CHANNEL_REPLY_SESSION_RESPONSE_JSON_ANY,
+        );
+        reg.register_json_any(super::__PUBLISH_REPLY_ACTIVITY_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__PUBLISH_REPLY_ACTIVITY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ISSUE_LEASE_RENEWAL_JSON_ANY);
         reg.register_json_any(super::__PROJECT_AGENT_TASK_LEASE_RENEWAL_JSON_ANY);
         reg.register_json_any(super::__ISSUE_REPLY_LEASE_RENEWAL_JSON_ANY);
@@ -65394,6 +67444,22 @@ pub use self::__buffa::view::ChannelReplyClaimIdentityOwnedView;
 pub use self::__buffa::view::RenewWorkLeaseResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::RenewWorkLeaseResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CheckpointChannelReplySessionRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CheckpointChannelReplySessionRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CheckpointChannelReplySessionResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CheckpointChannelReplySessionResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishReplyActivityRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishReplyActivityRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishReplyActivityResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishReplyActivityResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::IssueLeaseRenewalView;
 #[doc(inline)]
