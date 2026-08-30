@@ -237,8 +237,14 @@ message RetryRunRequest {
 }
 
 message RetryRunResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_RETRIED = 1;
+    OUTCOME_ALREADY_RETRIED = 2;
+  }
+
   string run_id = 1;
-  string outcome = 2;
+  Outcome outcome = 2;
   uint32 attempt = 3;
   RunStatus status = 4;
 }
@@ -251,8 +257,14 @@ message CancelRunRequest {
 }
 
 message CancelRunResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_CANCELLED = 1;
+    OUTCOME_ALREADY_CANCELLED = 2;
+  }
+
   string run_id = 1;
-  string outcome = 2;
+  Outcome outcome = 2;
   uint32 attempt = 3;
   RunStatus status = 4;
 }

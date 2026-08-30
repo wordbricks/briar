@@ -37314,10 +37314,10 @@ pub struct RetryRunResponse {
     /// Field 2: `outcome`
     #[serde(
         rename = "outcome",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub outcome: ::buffa::alloc::string::String,
+    pub outcome: ::buffa::EnumValue<retry_run_response::Outcome>,
     /// Field 3: `attempt`
     #[serde(
         rename = "attempt",
@@ -37376,8 +37376,11 @@ impl ::buffa::Message for RetryRunResponse {
         if !self.run_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.run_id) as u64;
         }
-        if !self.outcome.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.outcome) as u64;
+        {
+            let val = self.outcome.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
         }
         if self.attempt != 0u32 {
             size += 1u64 + ::buffa::types::uint32_encoded_len(self.attempt) as u64;
@@ -37401,8 +37404,11 @@ impl ::buffa::Message for RetryRunResponse {
         if !self.run_id.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.run_id, buf);
         }
-        if !self.outcome.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.outcome, buf);
+        {
+            let val = self.outcome.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
         }
         if self.attempt != 0u32 {
             ::buffa::types::put_uint32_field(3u32, self.attempt, buf);
@@ -37436,9 +37442,11 @@ impl ::buffa::Message for RetryRunResponse {
             2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.outcome, buf)?;
+                self.outcome = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -37465,7 +37473,7 @@ impl ::buffa::Message for RetryRunResponse {
     }
     fn clear(&mut self) {
         self.run_id.clear();
-        self.outcome.clear();
+        self.outcome = ::buffa::EnumValue::from(0);
         self.attempt = 0u32;
         self.status = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
@@ -37500,6 +37508,158 @@ pub const __RETRY_RUN_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
     from_json: ::buffa::type_registry::any_from_json::<RetryRunResponse>,
     is_wkt: false,
 };
+pub mod retry_run_response {
+    #[allow(unused_imports)]
+    use super::*;
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    #[repr(i32)]
+    pub enum Outcome {
+        OUTCOME_UNSPECIFIED = 0i32,
+        OUTCOME_RETRIED = 1i32,
+        OUTCOME_ALREADY_RETRIED = 2i32,
+    }
+    impl Outcome {
+        ///Idiomatic alias for [`Self::OUTCOME_UNSPECIFIED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Unspecified: Self = Self::OUTCOME_UNSPECIFIED;
+        ///Idiomatic alias for [`Self::OUTCOME_RETRIED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Retried: Self = Self::OUTCOME_RETRIED;
+        ///Idiomatic alias for [`Self::OUTCOME_ALREADY_RETRIED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const AlreadyRetried: Self = Self::OUTCOME_ALREADY_RETRIED;
+    }
+    impl ::core::default::Default for Outcome {
+        fn default() -> Self {
+            Self::OUTCOME_UNSPECIFIED
+        }
+    }
+    impl ::serde::Serialize for Outcome {
+        fn serialize<S: ::serde::Serializer>(
+            &self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            s.serialize_str(::buffa::Enumeration::proto_name(self))
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Outcome {
+        fn deserialize<D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            struct _V;
+            impl ::serde::de::Visitor<'_> for _V {
+                type Value = Outcome;
+                fn expecting(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.write_str(
+                        concat!("a string, integer, or null for ", stringify!(Outcome)),
+                    )
+                }
+                fn visit_str<E: ::serde::de::Error>(
+                    self,
+                    v: &str,
+                ) -> ::core::result::Result<Outcome, E> {
+                    <Outcome as ::buffa::Enumeration>::from_proto_name(v)
+                        .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+                }
+                fn visit_i64<E: ::serde::de::Error>(
+                    self,
+                    v: i64,
+                ) -> ::core::result::Result<Outcome, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Outcome as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_u64<E: ::serde::de::Error>(
+                    self,
+                    v: u64,
+                ) -> ::core::result::Result<Outcome, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Outcome as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_unit<E: ::serde::de::Error>(
+                    self,
+                ) -> ::core::result::Result<Outcome, E> {
+                    ::core::result::Result::Ok(::core::default::Default::default())
+                }
+            }
+            d.deserialize_any(_V)
+        }
+    }
+    impl ::buffa::json_helpers::ProtoElemJson for Outcome {
+        fn serialize_proto_json<S: ::serde::Serializer>(
+            v: &Self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            ::serde::Serialize::serialize(v, s)
+        }
+        fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            <Self as ::serde::Deserialize>::deserialize(d)
+        }
+    }
+    impl ::buffa::Enumeration for Outcome {
+        fn from_i32(value: i32) -> ::core::option::Option<Self> {
+            match value {
+                0i32 => ::core::option::Option::Some(Self::OUTCOME_UNSPECIFIED),
+                1i32 => ::core::option::Option::Some(Self::OUTCOME_RETRIED),
+                2i32 => ::core::option::Option::Some(Self::OUTCOME_ALREADY_RETRIED),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn to_i32(&self) -> i32 {
+            *self as i32
+        }
+        fn proto_name(&self) -> &'static str {
+            match self {
+                Self::OUTCOME_UNSPECIFIED => "OUTCOME_UNSPECIFIED",
+                Self::OUTCOME_RETRIED => "OUTCOME_RETRIED",
+                Self::OUTCOME_ALREADY_RETRIED => "OUTCOME_ALREADY_RETRIED",
+            }
+        }
+        fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+            match name {
+                "OUTCOME_UNSPECIFIED" => {
+                    ::core::option::Option::Some(Self::OUTCOME_UNSPECIFIED)
+                }
+                "OUTCOME_RETRIED" => ::core::option::Option::Some(Self::OUTCOME_RETRIED),
+                "OUTCOME_ALREADY_RETRIED" => {
+                    ::core::option::Option::Some(Self::OUTCOME_ALREADY_RETRIED)
+                }
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn values() -> &'static [Self] {
+            &[
+                Self::OUTCOME_UNSPECIFIED,
+                Self::OUTCOME_RETRIED,
+                Self::OUTCOME_ALREADY_RETRIED,
+            ]
+        }
+    }
+}
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -37721,10 +37881,10 @@ pub struct CancelRunResponse {
     /// Field 2: `outcome`
     #[serde(
         rename = "outcome",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub outcome: ::buffa::alloc::string::String,
+    pub outcome: ::buffa::EnumValue<cancel_run_response::Outcome>,
     /// Field 3: `attempt`
     #[serde(
         rename = "attempt",
@@ -37783,8 +37943,11 @@ impl ::buffa::Message for CancelRunResponse {
         if !self.run_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.run_id) as u64;
         }
-        if !self.outcome.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.outcome) as u64;
+        {
+            let val = self.outcome.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
         }
         if self.attempt != 0u32 {
             size += 1u64 + ::buffa::types::uint32_encoded_len(self.attempt) as u64;
@@ -37808,8 +37971,11 @@ impl ::buffa::Message for CancelRunResponse {
         if !self.run_id.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.run_id, buf);
         }
-        if !self.outcome.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.outcome, buf);
+        {
+            let val = self.outcome.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
         }
         if self.attempt != 0u32 {
             ::buffa::types::put_uint32_field(3u32, self.attempt, buf);
@@ -37843,9 +38009,11 @@ impl ::buffa::Message for CancelRunResponse {
             2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.outcome, buf)?;
+                self.outcome = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -37872,7 +38040,7 @@ impl ::buffa::Message for CancelRunResponse {
     }
     fn clear(&mut self) {
         self.run_id.clear();
-        self.outcome.clear();
+        self.outcome = ::buffa::EnumValue::from(0);
         self.attempt = 0u32;
         self.status = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
@@ -37907,6 +38075,160 @@ pub const __CANCEL_RUN_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
     from_json: ::buffa::type_registry::any_from_json::<CancelRunResponse>,
     is_wkt: false,
 };
+pub mod cancel_run_response {
+    #[allow(unused_imports)]
+    use super::*;
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    #[repr(i32)]
+    pub enum Outcome {
+        OUTCOME_UNSPECIFIED = 0i32,
+        OUTCOME_CANCELLED = 1i32,
+        OUTCOME_ALREADY_CANCELLED = 2i32,
+    }
+    impl Outcome {
+        ///Idiomatic alias for [`Self::OUTCOME_UNSPECIFIED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Unspecified: Self = Self::OUTCOME_UNSPECIFIED;
+        ///Idiomatic alias for [`Self::OUTCOME_CANCELLED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Cancelled: Self = Self::OUTCOME_CANCELLED;
+        ///Idiomatic alias for [`Self::OUTCOME_ALREADY_CANCELLED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const AlreadyCancelled: Self = Self::OUTCOME_ALREADY_CANCELLED;
+    }
+    impl ::core::default::Default for Outcome {
+        fn default() -> Self {
+            Self::OUTCOME_UNSPECIFIED
+        }
+    }
+    impl ::serde::Serialize for Outcome {
+        fn serialize<S: ::serde::Serializer>(
+            &self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            s.serialize_str(::buffa::Enumeration::proto_name(self))
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Outcome {
+        fn deserialize<D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            struct _V;
+            impl ::serde::de::Visitor<'_> for _V {
+                type Value = Outcome;
+                fn expecting(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.write_str(
+                        concat!("a string, integer, or null for ", stringify!(Outcome)),
+                    )
+                }
+                fn visit_str<E: ::serde::de::Error>(
+                    self,
+                    v: &str,
+                ) -> ::core::result::Result<Outcome, E> {
+                    <Outcome as ::buffa::Enumeration>::from_proto_name(v)
+                        .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+                }
+                fn visit_i64<E: ::serde::de::Error>(
+                    self,
+                    v: i64,
+                ) -> ::core::result::Result<Outcome, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Outcome as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_u64<E: ::serde::de::Error>(
+                    self,
+                    v: u64,
+                ) -> ::core::result::Result<Outcome, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Outcome as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_unit<E: ::serde::de::Error>(
+                    self,
+                ) -> ::core::result::Result<Outcome, E> {
+                    ::core::result::Result::Ok(::core::default::Default::default())
+                }
+            }
+            d.deserialize_any(_V)
+        }
+    }
+    impl ::buffa::json_helpers::ProtoElemJson for Outcome {
+        fn serialize_proto_json<S: ::serde::Serializer>(
+            v: &Self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            ::serde::Serialize::serialize(v, s)
+        }
+        fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            <Self as ::serde::Deserialize>::deserialize(d)
+        }
+    }
+    impl ::buffa::Enumeration for Outcome {
+        fn from_i32(value: i32) -> ::core::option::Option<Self> {
+            match value {
+                0i32 => ::core::option::Option::Some(Self::OUTCOME_UNSPECIFIED),
+                1i32 => ::core::option::Option::Some(Self::OUTCOME_CANCELLED),
+                2i32 => ::core::option::Option::Some(Self::OUTCOME_ALREADY_CANCELLED),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn to_i32(&self) -> i32 {
+            *self as i32
+        }
+        fn proto_name(&self) -> &'static str {
+            match self {
+                Self::OUTCOME_UNSPECIFIED => "OUTCOME_UNSPECIFIED",
+                Self::OUTCOME_CANCELLED => "OUTCOME_CANCELLED",
+                Self::OUTCOME_ALREADY_CANCELLED => "OUTCOME_ALREADY_CANCELLED",
+            }
+        }
+        fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+            match name {
+                "OUTCOME_UNSPECIFIED" => {
+                    ::core::option::Option::Some(Self::OUTCOME_UNSPECIFIED)
+                }
+                "OUTCOME_CANCELLED" => {
+                    ::core::option::Option::Some(Self::OUTCOME_CANCELLED)
+                }
+                "OUTCOME_ALREADY_CANCELLED" => {
+                    ::core::option::Option::Some(Self::OUTCOME_ALREADY_CANCELLED)
+                }
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn values() -> &'static [Self] {
+            &[
+                Self::OUTCOME_UNSPECIFIED,
+                Self::OUTCOME_CANCELLED,
+                Self::OUTCOME_ALREADY_CANCELLED,
+            ]
+        }
+    }
+}
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -174334,7 +174656,7 @@ pub mod __buffa {
             /// Field 1: `run_id`
             pub run_id: &'a str,
             /// Field 2: `outcome`
-            pub outcome: &'a str,
+            pub outcome: ::buffa::EnumValue<super::super::retry_run_response::Outcome>,
             /// Field 3: `attempt`
             pub attempt: u32,
             /// Field 4: `status`
@@ -174383,9 +174705,11 @@ pub mod __buffa {
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.outcome = ::buffa::types::borrow_str(&mut cur)?;
+                        view.outcome = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -174433,7 +174757,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::RetryRunResponse {
                     run_id: self.run_id.to_string(),
-                    outcome: self.outcome.to_string(),
+                    outcome: self.outcome,
                     attempt: self.attempt,
                     status: self.status,
                     __buffa_unknown_fields: self
@@ -174455,10 +174779,11 @@ pub mod __buffa {
                         += 1u64
                             + ::buffa::types::string_encoded_len(&self.run_id) as u64;
                 }
-                if !self.outcome.is_empty() {
-                    size
-                        += 1u64
-                            + ::buffa::types::string_encoded_len(&self.outcome) as u64;
+                {
+                    let val = self.outcome.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
                 }
                 if self.attempt != 0u32 {
                     size
@@ -174485,8 +174810,11 @@ pub mod __buffa {
                 if !self.run_id.is_empty() {
                     ::buffa::types::put_string_field(1u32, &self.run_id, buf);
                 }
-                if !self.outcome.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.outcome, buf);
+                {
+                    let val = self.outcome.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
                 }
                 if self.attempt != 0u32 {
                     ::buffa::types::put_uint32_field(3u32, self.attempt, buf);
@@ -174521,8 +174849,10 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.run_id) {
                     __map.serialize_entry("runId", self.run_id)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.outcome) {
-                    __map.serialize_entry("outcome", self.outcome)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.outcome,
+                ) {
+                    __map.serialize_entry("outcome", &self.outcome)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u32(&self.attempt) {
                     __map
@@ -174636,7 +174966,9 @@ pub mod __buffa {
             }
             /// Field 2: `outcome`
             #[must_use]
-            pub fn outcome(&self) -> &'_ str {
+            pub fn outcome(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::retry_run_response::Outcome> {
                 self.0.reborrow().outcome
             }
             /// Field 3: `attempt`
@@ -175026,7 +175358,7 @@ pub mod __buffa {
             /// Field 1: `run_id`
             pub run_id: &'a str,
             /// Field 2: `outcome`
-            pub outcome: &'a str,
+            pub outcome: ::buffa::EnumValue<super::super::cancel_run_response::Outcome>,
             /// Field 3: `attempt`
             pub attempt: u32,
             /// Field 4: `status`
@@ -175075,9 +175407,11 @@ pub mod __buffa {
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.outcome = ::buffa::types::borrow_str(&mut cur)?;
+                        view.outcome = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -175125,7 +175459,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CancelRunResponse {
                     run_id: self.run_id.to_string(),
-                    outcome: self.outcome.to_string(),
+                    outcome: self.outcome,
                     attempt: self.attempt,
                     status: self.status,
                     __buffa_unknown_fields: self
@@ -175147,10 +175481,11 @@ pub mod __buffa {
                         += 1u64
                             + ::buffa::types::string_encoded_len(&self.run_id) as u64;
                 }
-                if !self.outcome.is_empty() {
-                    size
-                        += 1u64
-                            + ::buffa::types::string_encoded_len(&self.outcome) as u64;
+                {
+                    let val = self.outcome.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
                 }
                 if self.attempt != 0u32 {
                     size
@@ -175177,8 +175512,11 @@ pub mod __buffa {
                 if !self.run_id.is_empty() {
                     ::buffa::types::put_string_field(1u32, &self.run_id, buf);
                 }
-                if !self.outcome.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.outcome, buf);
+                {
+                    let val = self.outcome.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
                 }
                 if self.attempt != 0u32 {
                     ::buffa::types::put_uint32_field(3u32, self.attempt, buf);
@@ -175213,8 +175551,10 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.run_id) {
                     __map.serialize_entry("runId", self.run_id)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.outcome) {
-                    __map.serialize_entry("outcome", self.outcome)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.outcome,
+                ) {
+                    __map.serialize_entry("outcome", &self.outcome)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u32(&self.attempt) {
                     __map
@@ -175328,7 +175668,9 @@ pub mod __buffa {
             }
             /// Field 2: `outcome`
             #[must_use]
-            pub fn outcome(&self) -> &'_ str {
+            pub fn outcome(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::cancel_run_response::Outcome> {
                 self.0.reborrow().outcome
             }
             /// Field 3: `attempt`

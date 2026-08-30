@@ -818,13 +818,51 @@ public nonisolated struct BriarAPI_RetryRunResponse: Sendable {
 
   public var runID: String = String()
 
-  public var outcome: String = String()
+  public var outcome: BriarAPI_RetryRunResponse.Outcome = .unspecified
 
   public var attempt: UInt32 = 0
 
   public var status: BriarAPI_RunStatus = .unspecified
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum Outcome: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+    case unspecified // = 0
+    case retried // = 1
+    case alreadyRetried // = 2
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .retried
+      case 2: self = .alreadyRetried
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .retried: return 1
+      case .alreadyRetried: return 2
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [BriarAPI_RetryRunResponse.Outcome] = [
+      .unspecified,
+      .retried,
+      .alreadyRetried,
+    ]
+
+  }
 
   public init() {}
 }
@@ -863,13 +901,51 @@ public nonisolated struct BriarAPI_CancelRunResponse: Sendable {
 
   public var runID: String = String()
 
-  public var outcome: String = String()
+  public var outcome: BriarAPI_CancelRunResponse.Outcome = .unspecified
 
   public var attempt: UInt32 = 0
 
   public var status: BriarAPI_RunStatus = .unspecified
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum Outcome: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+    case unspecified // = 0
+    case cancelled // = 1
+    case alreadyCancelled // = 2
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .cancelled
+      case 2: self = .alreadyCancelled
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .cancelled: return 1
+      case .alreadyCancelled: return 2
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [BriarAPI_CancelRunResponse.Outcome] = [
+      .unspecified,
+      .cancelled,
+      .alreadyCancelled,
+    ]
+
+  }
 
   public init() {}
 }
@@ -3864,7 +3940,7 @@ nonisolated extension BriarAPI_RetryRunResponse: SwiftProtobuf.Message, SwiftPro
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.runID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.outcome) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self.outcome) }()
       case 3: try { try decoder.decodeSingularUInt32Field(value: &self.attempt) }()
       case 4: try { try decoder.decodeSingularEnumField(value: &self.status) }()
       default: break
@@ -3876,8 +3952,8 @@ nonisolated extension BriarAPI_RetryRunResponse: SwiftProtobuf.Message, SwiftPro
     if !self.runID.isEmpty {
       try visitor.visitSingularStringField(value: self.runID, fieldNumber: 1)
     }
-    if !self.outcome.isEmpty {
-      try visitor.visitSingularStringField(value: self.outcome, fieldNumber: 2)
+    if self.outcome != .unspecified {
+      try visitor.visitSingularEnumField(value: self.outcome, fieldNumber: 2)
     }
     if self.attempt != 0 {
       try visitor.visitSingularUInt32Field(value: self.attempt, fieldNumber: 3)
@@ -3896,6 +3972,10 @@ nonisolated extension BriarAPI_RetryRunResponse: SwiftProtobuf.Message, SwiftPro
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
+}
+
+nonisolated extension BriarAPI_RetryRunResponse.Outcome: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0OUTCOME_UNSPECIFIED\0\u{1}OUTCOME_RETRIED\0\u{1}OUTCOME_ALREADY_RETRIED\0")
 }
 
 nonisolated extension BriarAPI_CancelRunRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -3958,7 +4038,7 @@ nonisolated extension BriarAPI_CancelRunResponse: SwiftProtobuf.Message, SwiftPr
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.runID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.outcome) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self.outcome) }()
       case 3: try { try decoder.decodeSingularUInt32Field(value: &self.attempt) }()
       case 4: try { try decoder.decodeSingularEnumField(value: &self.status) }()
       default: break
@@ -3970,8 +4050,8 @@ nonisolated extension BriarAPI_CancelRunResponse: SwiftProtobuf.Message, SwiftPr
     if !self.runID.isEmpty {
       try visitor.visitSingularStringField(value: self.runID, fieldNumber: 1)
     }
-    if !self.outcome.isEmpty {
-      try visitor.visitSingularStringField(value: self.outcome, fieldNumber: 2)
+    if self.outcome != .unspecified {
+      try visitor.visitSingularEnumField(value: self.outcome, fieldNumber: 2)
     }
     if self.attempt != 0 {
       try visitor.visitSingularUInt32Field(value: self.attempt, fieldNumber: 3)
@@ -3990,6 +4070,10 @@ nonisolated extension BriarAPI_CancelRunResponse: SwiftProtobuf.Message, SwiftPr
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
+}
+
+nonisolated extension BriarAPI_CancelRunResponse.Outcome: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0OUTCOME_UNSPECIFIED\0\u{1}OUTCOME_CANCELLED\0\u{1}OUTCOME_ALREADY_CANCELLED\0")
 }
 
 nonisolated extension BriarAPI_ResumeRunRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
