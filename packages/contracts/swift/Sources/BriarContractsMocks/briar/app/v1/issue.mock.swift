@@ -34,6 +34,8 @@ open class BriarAPI_IssueServiceClientMock: BriarAPI_IssueServiceClientInterface
     public var mockAsyncSetIssueSubscription = { (_: BriarAPI_SetIssueSubscriptionRequest) -> ResponseMessage<BriarAPI_SetIssueSubscriptionResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `updateIssuePreferences()`.
     public var mockAsyncUpdateIssuePreferences = { (_: BriarAPI_UpdateIssuePreferencesRequest) -> ResponseMessage<BriarAPI_UpdateIssuePreferencesResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateIssueCheckpoints()`.
+    public var mockAsyncUpdateIssueCheckpoints = { (_: BriarAPI_UpdateIssueCheckpointsRequest) -> ResponseMessage<BriarAPI_UpdateIssueCheckpointsResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `setIssueDependency()`.
     public var mockAsyncSetIssueDependency = { (_: BriarAPI_SetIssueDependencyRequest) -> ResponseMessage<BriarAPI_SetIssueDependencyResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `moveRun()`.
@@ -44,6 +46,10 @@ open class BriarAPI_IssueServiceClientMock: BriarAPI_IssueServiceClientInterface
     public var mockAsyncCancelRun = { (_: BriarAPI_CancelRunRequest) -> ResponseMessage<BriarAPI_CancelRunResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `resumeRun()`.
     public var mockAsyncResumeRun = { (_: BriarAPI_ResumeRunRequest) -> ResponseMessage<BriarAPI_ResumeRunResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `reworkRun()`.
+    public var mockAsyncReworkRun = { (_: BriarAPI_ReworkRunRequest) -> ResponseMessage<BriarAPI_ReworkRunResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `unassignRun()`.
+    public var mockAsyncUnassignRun = { (_: BriarAPI_UnassignRunRequest) -> ResponseMessage<BriarAPI_UnassignRunResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `dispatchRun()`.
     public var mockAsyncDispatchRun = { (_: BriarAPI_DispatchRunRequest) -> ResponseMessage<BriarAPI_DispatchRunResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `reassignRun()`.
@@ -56,6 +62,10 @@ open class BriarAPI_IssueServiceClientMock: BriarAPI_IssueServiceClientInterface
     public var mockAsyncSyncIssueMessages = { (_: BriarAPI_SyncIssueMessagesRequest) -> ResponseMessage<BriarAPI_SyncIssueMessagesResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `createIssueMessage()`.
     public var mockAsyncCreateIssueMessage = { (_: BriarAPI_CreateIssueMessageRequest) -> ResponseMessage<BriarAPI_CreateIssueMessageResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateIssueMessage()`.
+    public var mockAsyncUpdateIssueMessage = { (_: BriarAPI_UpdateIssueMessageRequest) -> ResponseMessage<BriarAPI_UpdateIssueMessageResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `deleteIssueMessage()`.
+    public var mockAsyncDeleteIssueMessage = { (_: BriarAPI_DeleteIssueMessageRequest) -> ResponseMessage<BriarAPI_DeleteIssueMessageResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `getIssueAgentReply()`.
     public var mockAsyncGetIssueAgentReply = { (_: BriarAPI_GetIssueAgentReplyRequest) -> ResponseMessage<BriarAPI_GetIssueAgentReplyResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `listRunEvidence()`.
@@ -95,6 +105,10 @@ open class BriarAPI_IssueServiceClientMock: BriarAPI_IssueServiceClientInterface
         return self.mockAsyncUpdateIssuePreferences(request)
     }
 
+    open func `updateIssueCheckpoints`(request: BriarAPI_UpdateIssueCheckpointsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateIssueCheckpointsResponse> {
+        return self.mockAsyncUpdateIssueCheckpoints(request)
+    }
+
     open func `setIssueDependency`(request: BriarAPI_SetIssueDependencyRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SetIssueDependencyResponse> {
         return self.mockAsyncSetIssueDependency(request)
     }
@@ -113,6 +127,14 @@ open class BriarAPI_IssueServiceClientMock: BriarAPI_IssueServiceClientInterface
 
     open func `resumeRun`(request: BriarAPI_ResumeRunRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ResumeRunResponse> {
         return self.mockAsyncResumeRun(request)
+    }
+
+    open func `reworkRun`(request: BriarAPI_ReworkRunRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ReworkRunResponse> {
+        return self.mockAsyncReworkRun(request)
+    }
+
+    open func `unassignRun`(request: BriarAPI_UnassignRunRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UnassignRunResponse> {
+        return self.mockAsyncUnassignRun(request)
     }
 
     open func `dispatchRun`(request: BriarAPI_DispatchRunRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DispatchRunResponse> {
@@ -137,6 +159,14 @@ open class BriarAPI_IssueServiceClientMock: BriarAPI_IssueServiceClientInterface
 
     open func `createIssueMessage`(request: BriarAPI_CreateIssueMessageRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateIssueMessageResponse> {
         return self.mockAsyncCreateIssueMessage(request)
+    }
+
+    open func `updateIssueMessage`(request: BriarAPI_UpdateIssueMessageRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateIssueMessageResponse> {
+        return self.mockAsyncUpdateIssueMessage(request)
+    }
+
+    open func `deleteIssueMessage`(request: BriarAPI_DeleteIssueMessageRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteIssueMessageResponse> {
+        return self.mockAsyncDeleteIssueMessage(request)
     }
 
     open func `getIssueAgentReply`(request: BriarAPI_GetIssueAgentReplyRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetIssueAgentReplyResponse> {

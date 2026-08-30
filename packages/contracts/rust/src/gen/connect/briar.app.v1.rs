@@ -4990,6 +4990,18 @@ pub type OwnedUpdateIssuePreferencesResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<UpdateIssueCheckpointsRequestView<'static>>`.
+pub type OwnedUpdateIssueCheckpointsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateIssueCheckpointsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateIssueCheckpointsResponseView<'static>>`.
+pub type OwnedUpdateIssueCheckpointsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateIssueCheckpointsResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<SetIssueDependencyRequestView<'static>>`.
 pub type OwnedSetIssueDependencyRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::SetIssueDependencyRequestView<'static>,
@@ -5029,6 +5041,22 @@ pub type OwnedResumeRunRequestView = ::buffa::view::OwnedView<
 ///Shorthand for `OwnedView<ResumeRunResponseView<'static>>`.
 pub type OwnedResumeRunResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::ResumeRunResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ReworkRunRequestView<'static>>`.
+pub type OwnedReworkRunRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ReworkRunRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ReworkRunResponseView<'static>>`.
+pub type OwnedReworkRunResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ReworkRunResponseView<'static>,
+>;
+///Shorthand for `OwnedView<UnassignRunRequestView<'static>>`.
+pub type OwnedUnassignRunRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UnassignRunRequestView<'static>,
+>;
+///Shorthand for `OwnedView<UnassignRunResponseView<'static>>`.
+pub type OwnedUnassignRunResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UnassignRunResponseView<'static>,
 >;
 ///Shorthand for `OwnedView<DispatchRunRequestView<'static>>`.
 pub type OwnedDispatchRunRequestView = ::buffa::view::OwnedView<
@@ -5079,6 +5107,22 @@ pub type OwnedCreateIssueMessageRequestView = ::buffa::view::OwnedView<
 ///Shorthand for `OwnedView<CreateIssueMessageResponseView<'static>>`.
 pub type OwnedCreateIssueMessageResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::CreateIssueMessageResponseView<'static>,
+>;
+///Shorthand for `OwnedView<UpdateIssueMessageRequestView<'static>>`.
+pub type OwnedUpdateIssueMessageRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateIssueMessageRequestView<'static>,
+>;
+///Shorthand for `OwnedView<UpdateIssueMessageResponseView<'static>>`.
+pub type OwnedUpdateIssueMessageResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateIssueMessageResponseView<'static>,
+>;
+///Shorthand for `OwnedView<DeleteIssueMessageRequestView<'static>>`.
+pub type OwnedDeleteIssueMessageRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteIssueMessageRequestView<'static>,
+>;
+///Shorthand for `OwnedView<DeleteIssueMessageResponseView<'static>>`.
+pub type OwnedDeleteIssueMessageResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteIssueMessageResponseView<'static>,
 >;
 ///Shorthand for `OwnedView<GetIssueAgentReplyRequestView<'static>>`.
 pub type OwnedGetIssueAgentReplyRequestView = ::buffa::view::OwnedView<
@@ -5356,6 +5400,46 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateIssueCheckpointsResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::UpdateIssueCheckpointsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateIssueCheckpointsResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateIssueCheckpointsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::SetIssueDependencyResponse>
 for crate::proto::briar::app::v1::__buffa::view::SetIssueDependencyResponseView<'_> {
     fn encode(
@@ -5504,6 +5588,74 @@ for crate::proto::briar::app::v1::__buffa::view::ResumeRunResponseView<'_> {
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ResumeRunResponse>
 for ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::ResumeRunResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ReworkRunResponse>
+for crate::proto::briar::app::v1::__buffa::view::ReworkRunResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ReworkRunResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ReworkRunResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UnassignRunResponse>
+for crate::proto::briar::app::v1::__buffa::view::UnassignRunResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UnassignRunResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UnassignRunResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -5710,6 +5862,74 @@ for crate::proto::briar::app::v1::__buffa::view::CreateIssueMessageResponseView<
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateIssueMessageResponse>
 for ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::CreateIssueMessageResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateIssueMessageResponse>
+for crate::proto::briar::app::v1::__buffa::view::UpdateIssueMessageResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateIssueMessageResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateIssueMessageResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteIssueMessageResponse>
+for crate::proto::briar::app::v1::__buffa::view::DeleteIssueMessageResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteIssueMessageResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteIssueMessageResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -6006,6 +6226,12 @@ pub const ISSUE_SERVICE_UPDATE_ISSUE_PREFERENCES_SPEC: ::connectrpc::Spec = ::co
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateIssueCheckpoints` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ISSUE_SERVICE_UPDATE_ISSUE_CHECKPOINTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.IssueService/UpdateIssueCheckpoints",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `SetIssueDependency` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const ISSUE_SERVICE_SET_ISSUE_DEPENDENCY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.IssueService/SetIssueDependency",
@@ -6033,6 +6259,18 @@ pub const ISSUE_SERVICE_CANCEL_RUN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec
 /// Static [`Spec`](::connectrpc::Spec) for the `ResumeRun` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const ISSUE_SERVICE_RESUME_RUN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.IssueService/ResumeRun",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ReworkRun` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ISSUE_SERVICE_REWORK_RUN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.IssueService/ReworkRun",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UnassignRun` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ISSUE_SERVICE_UNASSIGN_RUN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.IssueService/UnassignRun",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -6069,6 +6307,18 @@ pub const ISSUE_SERVICE_SYNC_ISSUE_MESSAGES_SPEC: ::connectrpc::Spec = ::connect
 /// Static [`Spec`](::connectrpc::Spec) for the `CreateIssueMessage` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const ISSUE_SERVICE_CREATE_ISSUE_MESSAGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.IssueService/CreateIssueMessage",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateIssueMessage` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ISSUE_SERVICE_UPDATE_ISSUE_MESSAGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.IssueService/UpdateIssueMessage",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `DeleteIssueMessage` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ISSUE_SERVICE_DELETE_ISSUE_MESSAGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.IssueService/DeleteIssueMessage",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -6297,6 +6547,29 @@ pub trait IssueService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// Handle the UpdateIssueCheckpoints RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_issue_checkpoints<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdateIssueCheckpointsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdateIssueCheckpointsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
     /// Handle the SetIssueDependency RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -6409,6 +6682,52 @@ pub trait IssueService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::ResumeRunResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ReworkRun RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn rework_run<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ReworkRunRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ReworkRunResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UnassignRun RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn unassign_run<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UnassignRunRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UnassignRunResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -6547,6 +6866,52 @@ pub trait IssueService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::CreateIssueMessageResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UpdateIssueMessage RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_issue_message<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdateIssueMessageRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdateIssueMessageResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the DeleteIssueMessage RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn delete_issue_message<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::DeleteIssueMessageRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::DeleteIssueMessageResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -6897,6 +7262,35 @@ impl<S: IssueService> IssueServiceExt for S {
             .with_spec(ISSUE_SERVICE_UPDATE_ISSUE_PREFERENCES_SPEC)
             .route_view(
                 ISSUE_SERVICE_SERVICE_NAME,
+                "UpdateIssueCheckpoints",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateIssueCheckpointsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdateIssueCheckpointsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_issue_checkpoints(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdateIssueCheckpointsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ISSUE_SERVICE_UPDATE_ISSUE_CHECKPOINTS_SPEC)
+            .route_view(
+                ISSUE_SERVICE_SERVICE_NAME,
                 "SetIssueDependency",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -7040,6 +7434,64 @@ impl<S: IssueService> IssueServiceExt for S {
                 },
             )
             .with_spec(ISSUE_SERVICE_RESUME_RUN_SPEC)
+            .route_view(
+                ISSUE_SERVICE_SERVICE_NAME,
+                "ReworkRun",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ReworkRunRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ReworkRunRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.rework_run(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ReworkRunResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ISSUE_SERVICE_REWORK_RUN_SPEC)
+            .route_view(
+                ISSUE_SERVICE_SERVICE_NAME,
+                "UnassignRun",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UnassignRunRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UnassignRunRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.unassign_run(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UnassignRunResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ISSUE_SERVICE_UNASSIGN_RUN_SPEC)
             .route_view(
                 ISSUE_SERVICE_SERVICE_NAME,
                 "DispatchRun",
@@ -7214,6 +7666,64 @@ impl<S: IssueService> IssueServiceExt for S {
                 },
             )
             .with_spec(ISSUE_SERVICE_CREATE_ISSUE_MESSAGE_SPEC)
+            .route_view(
+                ISSUE_SERVICE_SERVICE_NAME,
+                "UpdateIssueMessage",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateIssueMessageRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdateIssueMessageRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_issue_message(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdateIssueMessageResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ISSUE_SERVICE_UPDATE_ISSUE_MESSAGE_SPEC)
+            .route_view(
+                ISSUE_SERVICE_SERVICE_NAME,
+                "DeleteIssueMessage",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::DeleteIssueMessageRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::DeleteIssueMessageRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.delete_issue_message(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::DeleteIssueMessageResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ISSUE_SERVICE_DELETE_ISSUE_MESSAGE_SPEC)
             .route_view(
                 ISSUE_SERVICE_SERVICE_NAME,
                 "GetIssueAgentReply",
@@ -7478,6 +7988,12 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
                         .with_spec(ISSUE_SERVICE_UPDATE_ISSUE_PREFERENCES_SPEC),
                 )
             }
+            "UpdateIssueCheckpoints" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ISSUE_SERVICE_UPDATE_ISSUE_CHECKPOINTS_SPEC),
+                )
+            }
             "SetIssueDependency" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -7506,6 +8022,18 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(ISSUE_SERVICE_RESUME_RUN_SPEC),
+                )
+            }
+            "ReworkRun" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ISSUE_SERVICE_REWORK_RUN_SPEC),
+                )
+            }
+            "UnassignRun" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ISSUE_SERVICE_UNASSIGN_RUN_SPEC),
                 )
             }
             "DispatchRun" => {
@@ -7542,6 +8070,18 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(ISSUE_SERVICE_CREATE_ISSUE_MESSAGE_SPEC),
+                )
+            }
+            "UpdateIssueMessage" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ISSUE_SERVICE_UPDATE_ISSUE_MESSAGE_SPEC),
+                )
+            }
+            "DeleteIssueMessage" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ISSUE_SERVICE_DELETE_ISSUE_MESSAGE_SPEC),
                 )
             }
             "GetIssueAgentReply" => {
@@ -7729,6 +8269,28 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
                         >(format)
                 })
             }
+            "UpdateIssueCheckpoints" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdateIssueCheckpointsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateIssueCheckpointsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdateIssueCheckpointsRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_issue_checkpoints(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdateIssueCheckpointsResponse,
+                        >(format)
+                })
+            }
             "SetIssueDependency" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -7832,6 +8394,50 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::ResumeRunResponse,
+                        >(format)
+                })
+            }
+            "ReworkRun" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ReworkRunRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ReworkRunRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ReworkRunRequest,
+                    >::from_parts(&req, &body);
+                    svc.rework_run(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ReworkRunResponse,
+                        >(format)
+                })
+            }
+            "UnassignRun" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UnassignRunRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UnassignRunRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UnassignRunRequest,
+                    >::from_parts(&req, &body);
+                    svc.unassign_run(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UnassignRunResponse,
                         >(format)
                 })
             }
@@ -7964,6 +8570,50 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::CreateIssueMessageResponse,
+                        >(format)
+                })
+            }
+            "UpdateIssueMessage" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdateIssueMessageRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateIssueMessageRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdateIssueMessageRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_issue_message(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdateIssueMessageResponse,
+                        >(format)
+                })
+            }
+            "DeleteIssueMessage" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::DeleteIssueMessageRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::DeleteIssueMessageRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::DeleteIssueMessageRequest,
+                    >::from_parts(&req, &body);
+                    svc.delete_issue_message(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::DeleteIssueMessageResponse,
                         >(format)
                 })
             }
@@ -8499,6 +9149,51 @@ where
             )
             .await
     }
+    /// Call the UpdateIssueCheckpoints RPC. Sends a request to /briar.app.v1.IssueService/UpdateIssueCheckpoints.
+    pub async fn update_issue_checkpoints(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateIssueCheckpointsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateIssueCheckpointsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_issue_checkpoints_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateIssueCheckpoints RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_issue_checkpoints_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateIssueCheckpointsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateIssueCheckpointsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ISSUE_SERVICE_UPDATE_ISSUE_CHECKPOINTS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
     /// Call the SetIssueDependency RPC. Sends a request to /briar.app.v1.IssueService/SetIssueDependency.
     pub async fn set_issue_dependency(
         &self,
@@ -8711,6 +9406,96 @@ where
                 &self.transport,
                 &self.config,
                 ISSUE_SERVICE_RESUME_RUN_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ReworkRun RPC. Sends a request to /briar.app.v1.IssueService/ReworkRun.
+    pub async fn rework_run(
+        &self,
+        request: crate::proto::briar::app::v1::ReworkRunRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ReworkRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.rework_run_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ReworkRun RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn rework_run_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ReworkRunRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ReworkRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ISSUE_SERVICE_REWORK_RUN_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UnassignRun RPC. Sends a request to /briar.app.v1.IssueService/UnassignRun.
+    pub async fn unassign_run(
+        &self,
+        request: crate::proto::briar::app::v1::UnassignRunRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UnassignRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.unassign_run_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UnassignRun RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn unassign_run_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UnassignRunRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UnassignRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ISSUE_SERVICE_UNASSIGN_RUN_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
@@ -8981,6 +9766,96 @@ where
                 &self.transport,
                 &self.config,
                 ISSUE_SERVICE_CREATE_ISSUE_MESSAGE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdateIssueMessage RPC. Sends a request to /briar.app.v1.IssueService/UpdateIssueMessage.
+    pub async fn update_issue_message(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateIssueMessageRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateIssueMessageResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_issue_message_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateIssueMessage RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_issue_message_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateIssueMessageRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateIssueMessageResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ISSUE_SERVICE_UPDATE_ISSUE_MESSAGE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DeleteIssueMessage RPC. Sends a request to /briar.app.v1.IssueService/DeleteIssueMessage.
+    pub async fn delete_issue_message(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteIssueMessageRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteIssueMessageResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.delete_issue_message_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DeleteIssueMessage RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_issue_message_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteIssueMessageRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteIssueMessageResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ISSUE_SERVICE_DELETE_ISSUE_MESSAGE_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

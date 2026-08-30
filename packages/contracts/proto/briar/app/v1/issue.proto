@@ -18,17 +18,22 @@ service IssueService {
   rpc TransferIssue(TransferIssueRequest) returns (TransferIssueResponse);
   rpc SetIssueSubscription(SetIssueSubscriptionRequest) returns (SetIssueSubscriptionResponse);
   rpc UpdateIssuePreferences(UpdateIssuePreferencesRequest) returns (UpdateIssuePreferencesResponse);
+  rpc UpdateIssueCheckpoints(UpdateIssueCheckpointsRequest) returns (UpdateIssueCheckpointsResponse);
   rpc SetIssueDependency(SetIssueDependencyRequest) returns (SetIssueDependencyResponse);
   rpc MoveRun(MoveRunRequest) returns (MoveRunResponse);
   rpc RetryRun(RetryRunRequest) returns (RetryRunResponse);
   rpc CancelRun(CancelRunRequest) returns (CancelRunResponse);
   rpc ResumeRun(ResumeRunRequest) returns (ResumeRunResponse);
+  rpc ReworkRun(ReworkRunRequest) returns (ReworkRunResponse);
+  rpc UnassignRun(UnassignRunRequest) returns (UnassignRunResponse);
   rpc DispatchRun(DispatchRunRequest) returns (DispatchRunResponse);
   rpc ReassignRun(ReassignRunRequest) returns (ReassignRunResponse);
   rpc CompleteResultReview(CompleteResultReviewRequest) returns (CompleteResultReviewResponse);
   rpc ListIssueMessages(ListIssueMessagesRequest) returns (ListIssueMessagesResponse);
   rpc SyncIssueMessages(SyncIssueMessagesRequest) returns (SyncIssueMessagesResponse);
   rpc CreateIssueMessage(CreateIssueMessageRequest) returns (CreateIssueMessageResponse);
+  rpc UpdateIssueMessage(UpdateIssueMessageRequest) returns (UpdateIssueMessageResponse);
+  rpc DeleteIssueMessage(DeleteIssueMessageRequest) returns (DeleteIssueMessageResponse);
   rpc GetIssueAgentReply(GetIssueAgentReplyRequest) returns (GetIssueAgentReplyResponse);
   // Shared intentionally with WorkerExecutionService so evidence has one DTO.
   // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
@@ -163,6 +168,17 @@ message UpdateIssuePreferencesResponse {
   optional string effort = 4;
 }
 
+message UpdateIssueCheckpointsRequest {
+  string project_id = 1;
+  string run_id = 2;
+  repeated briar.types.v1.WorkflowCheckpointSpec checkpoints = 3;
+}
+
+message UpdateIssueCheckpointsResponse {
+  string run_id = 1;
+  repeated briar.types.v1.WorkflowCheckpointSpec checkpoints = 2;
+}
+
 message SetIssueDependencyRequest {
   reserved 5;
 
@@ -264,6 +280,52 @@ message ResumeRunResponse {
   bool terminal_review_only = 8;
 }
 
+message ReworkRunCheckpointIdentity {
+  string key = 1;
+  uint32 attempt = 2;
+  uint32 revision = 3;
+}
+
+message ReworkRunRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string request_id = 3;
+  string workflow_stage = 4;
+  string reason = 5;
+  ReworkRunCheckpointIdentity checkpoint = 6;
+}
+
+message ReworkRunResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_REWORKED = 1;
+    OUTCOME_ALREADY_REWORKED = 2;
+  }
+
+  string run_id = 1;
+  Outcome outcome = 2;
+  uint32 attempt = 3;
+  uint32 revision = 4;
+  string workflow_stage = 5;
+}
+
+message UnassignRunRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string request_id = 3;
+}
+
+message UnassignRunResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_UNASSIGNED = 1;
+    OUTCOME_NOT_ASSIGNED = 2;
+  }
+
+  string run_id = 1;
+  Outcome outcome = 2;
+}
+
 message DispatchRunInput {
   string request_id = 1;
   optional string agent_id = 2;
@@ -349,6 +411,28 @@ message CreateIssueMessageResponse {
   IssueMessage message = 1;
   repeated IssueAgentReply agent_replies = 2;
   optional IssueAgentReply agent_reply = 3;
+}
+
+message UpdateIssueMessageRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string message_id = 3;
+  string body = 4;
+  repeated string mentioned_user_ids = 5;
+}
+
+message UpdateIssueMessageResponse {
+  IssueMessage message = 1;
+}
+
+message DeleteIssueMessageRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string message_id = 3;
+}
+
+message DeleteIssueMessageResponse {
+  bool deleted = 1;
 }
 
 message GetIssueAgentReplyRequest {

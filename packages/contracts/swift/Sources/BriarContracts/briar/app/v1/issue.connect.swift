@@ -30,6 +30,9 @@ public protocol BriarAPI_IssueServiceClientInterface: Sendable {
     func `updateIssuePreferences`(request: BriarAPI_UpdateIssuePreferencesRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateIssuePreferencesResponse>
 
     @available(iOS 13, *)
+    func `updateIssueCheckpoints`(request: BriarAPI_UpdateIssueCheckpointsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateIssueCheckpointsResponse>
+
+    @available(iOS 13, *)
     func `setIssueDependency`(request: BriarAPI_SetIssueDependencyRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_SetIssueDependencyResponse>
 
     @available(iOS 13, *)
@@ -43,6 +46,12 @@ public protocol BriarAPI_IssueServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
     func `resumeRun`(request: BriarAPI_ResumeRunRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ResumeRunResponse>
+
+    @available(iOS 13, *)
+    func `reworkRun`(request: BriarAPI_ReworkRunRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ReworkRunResponse>
+
+    @available(iOS 13, *)
+    func `unassignRun`(request: BriarAPI_UnassignRunRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UnassignRunResponse>
 
     @available(iOS 13, *)
     func `dispatchRun`(request: BriarAPI_DispatchRunRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_DispatchRunResponse>
@@ -61,6 +70,12 @@ public protocol BriarAPI_IssueServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
     func `createIssueMessage`(request: BriarAPI_CreateIssueMessageRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateIssueMessageResponse>
+
+    @available(iOS 13, *)
+    func `updateIssueMessage`(request: BriarAPI_UpdateIssueMessageRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateIssueMessageResponse>
+
+    @available(iOS 13, *)
+    func `deleteIssueMessage`(request: BriarAPI_DeleteIssueMessageRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_DeleteIssueMessageResponse>
 
     @available(iOS 13, *)
     func `getIssueAgentReply`(request: BriarAPI_GetIssueAgentReplyRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_GetIssueAgentReplyResponse>
@@ -122,6 +137,11 @@ public final class BriarAPI_IssueServiceClient: BriarAPI_IssueServiceClientInter
     }
 
     @available(iOS 13, *)
+    public func `updateIssueCheckpoints`(request: BriarAPI_UpdateIssueCheckpointsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateIssueCheckpointsResponse> {
+        return await self.client.unary(path: "/briar.app.v1.IssueService/UpdateIssueCheckpoints", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
     public func `setIssueDependency`(request: BriarAPI_SetIssueDependencyRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SetIssueDependencyResponse> {
         return await self.client.unary(path: "/briar.app.v1.IssueService/SetIssueDependency", idempotencyLevel: .unknown, request: request, headers: headers)
     }
@@ -144,6 +164,16 @@ public final class BriarAPI_IssueServiceClient: BriarAPI_IssueServiceClientInter
     @available(iOS 13, *)
     public func `resumeRun`(request: BriarAPI_ResumeRunRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ResumeRunResponse> {
         return await self.client.unary(path: "/briar.app.v1.IssueService/ResumeRun", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `reworkRun`(request: BriarAPI_ReworkRunRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ReworkRunResponse> {
+        return await self.client.unary(path: "/briar.app.v1.IssueService/ReworkRun", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `unassignRun`(request: BriarAPI_UnassignRunRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UnassignRunResponse> {
+        return await self.client.unary(path: "/briar.app.v1.IssueService/UnassignRun", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
@@ -174,6 +204,16 @@ public final class BriarAPI_IssueServiceClient: BriarAPI_IssueServiceClientInter
     @available(iOS 13, *)
     public func `createIssueMessage`(request: BriarAPI_CreateIssueMessageRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateIssueMessageResponse> {
         return await self.client.unary(path: "/briar.app.v1.IssueService/CreateIssueMessage", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `updateIssueMessage`(request: BriarAPI_UpdateIssueMessageRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateIssueMessageResponse> {
+        return await self.client.unary(path: "/briar.app.v1.IssueService/UpdateIssueMessage", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `deleteIssueMessage`(request: BriarAPI_DeleteIssueMessageRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteIssueMessageResponse> {
+        return await self.client.unary(path: "/briar.app.v1.IssueService/DeleteIssueMessage", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
@@ -214,17 +254,22 @@ public final class BriarAPI_IssueServiceClient: BriarAPI_IssueServiceClientInter
             public static let transferIssue = Connect.MethodSpec(name: "TransferIssue", service: "briar.app.v1.IssueService", type: .unary)
             public static let setIssueSubscription = Connect.MethodSpec(name: "SetIssueSubscription", service: "briar.app.v1.IssueService", type: .unary)
             public static let updateIssuePreferences = Connect.MethodSpec(name: "UpdateIssuePreferences", service: "briar.app.v1.IssueService", type: .unary)
+            public static let updateIssueCheckpoints = Connect.MethodSpec(name: "UpdateIssueCheckpoints", service: "briar.app.v1.IssueService", type: .unary)
             public static let setIssueDependency = Connect.MethodSpec(name: "SetIssueDependency", service: "briar.app.v1.IssueService", type: .unary)
             public static let moveRun = Connect.MethodSpec(name: "MoveRun", service: "briar.app.v1.IssueService", type: .unary)
             public static let retryRun = Connect.MethodSpec(name: "RetryRun", service: "briar.app.v1.IssueService", type: .unary)
             public static let cancelRun = Connect.MethodSpec(name: "CancelRun", service: "briar.app.v1.IssueService", type: .unary)
             public static let resumeRun = Connect.MethodSpec(name: "ResumeRun", service: "briar.app.v1.IssueService", type: .unary)
+            public static let reworkRun = Connect.MethodSpec(name: "ReworkRun", service: "briar.app.v1.IssueService", type: .unary)
+            public static let unassignRun = Connect.MethodSpec(name: "UnassignRun", service: "briar.app.v1.IssueService", type: .unary)
             public static let dispatchRun = Connect.MethodSpec(name: "DispatchRun", service: "briar.app.v1.IssueService", type: .unary)
             public static let reassignRun = Connect.MethodSpec(name: "ReassignRun", service: "briar.app.v1.IssueService", type: .unary)
             public static let completeResultReview = Connect.MethodSpec(name: "CompleteResultReview", service: "briar.app.v1.IssueService", type: .unary)
             public static let listIssueMessages = Connect.MethodSpec(name: "ListIssueMessages", service: "briar.app.v1.IssueService", type: .unary)
             public static let syncIssueMessages = Connect.MethodSpec(name: "SyncIssueMessages", service: "briar.app.v1.IssueService", type: .unary)
             public static let createIssueMessage = Connect.MethodSpec(name: "CreateIssueMessage", service: "briar.app.v1.IssueService", type: .unary)
+            public static let updateIssueMessage = Connect.MethodSpec(name: "UpdateIssueMessage", service: "briar.app.v1.IssueService", type: .unary)
+            public static let deleteIssueMessage = Connect.MethodSpec(name: "DeleteIssueMessage", service: "briar.app.v1.IssueService", type: .unary)
             public static let getIssueAgentReply = Connect.MethodSpec(name: "GetIssueAgentReply", service: "briar.app.v1.IssueService", type: .unary)
             public static let listRunEvidence = Connect.MethodSpec(name: "ListRunEvidence", service: "briar.app.v1.IssueService", type: .unary)
             public static let acceptIssueReworkProposal = Connect.MethodSpec(name: "AcceptIssueReworkProposal", service: "briar.app.v1.IssueService", type: .unary)
