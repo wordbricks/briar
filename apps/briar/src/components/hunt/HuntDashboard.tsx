@@ -22,8 +22,7 @@ import { errorDiagnosticOccurrenceKey, errorDiagnosticsForMessage } from "@/lib/
 import { runMeta } from "@/lib/stages";
 import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
 import { type IssueDetailTab } from "@/lib/issue-detail-tab";
-import { readKanbanCollapsedColumnIds, toggleKanbanCollapsedColumnId, writeKanbanCollapsedColumnIds } from "@/lib/kanban-column-collapse";
-import { readKanbanHiddenColumnIds, toggleKanbanHiddenColumnId, writeKanbanHiddenColumnIds } from "@/lib/kanban-column-hide";
+import { readKanbanColumnIds, toggleKanbanColumnId, writeKanbanColumnIds } from "@/lib/kanban-column-storage";
 import { formatIssueKey } from "@/lib/issue-key";
 import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, CreateIssueInput, DashboardPayload, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, Project, ProjectAgent, RelatedMessageReference, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
 import { sortAgentProviders, type AgentProvider } from "@/lib/project-llm";
@@ -523,22 +522,22 @@ function HuntDashboardContent({
   }, [onIssueViewed, selected?.id, selectedInboxVersion]);
   const projectId = dashboard?.project.id ?? null;
   useEffect(() => {
-    setCollapsedColumnIds(readKanbanCollapsedColumnIds(currentUserId, projectId));
-    setHiddenColumnIds(readKanbanHiddenColumnIds(currentUserId, projectId));
+    setCollapsedColumnIds(readKanbanColumnIds("collapse", currentUserId, projectId));
+    setHiddenColumnIds(readKanbanColumnIds("hide", currentUserId, projectId));
   }, [currentUserId, projectId]);
   const collapsedColumnIdSet = useMemo(() => new Set(collapsedColumnIds), [collapsedColumnIds]);
   const hiddenColumnIdSet = useMemo(() => new Set(hiddenColumnIds), [hiddenColumnIds]);
   const toggleKanbanColumnCollapsed = useCallback((columnId: string) => {
     setCollapsedColumnIds(current => {
-      const next = toggleKanbanCollapsedColumnId(current, columnId);
-      writeKanbanCollapsedColumnIds(currentUserId, projectId, next);
+      const next = toggleKanbanColumnId(current, columnId);
+      writeKanbanColumnIds("collapse", currentUserId, projectId, next);
       return next;
     });
   }, [currentUserId, projectId]);
   const toggleKanbanColumnHidden = useCallback((columnId: string) => {
     setHiddenColumnIds(current => {
-      const next = toggleKanbanHiddenColumnId(current, columnId);
-      writeKanbanHiddenColumnIds(currentUserId, projectId, next);
+      const next = toggleKanbanColumnId(current, columnId);
+      writeKanbanColumnIds("hide", currentUserId, projectId, next);
       return next;
     });
   }, [currentUserId, projectId]);
