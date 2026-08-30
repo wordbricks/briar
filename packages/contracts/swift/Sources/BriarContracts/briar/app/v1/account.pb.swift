@@ -135,6 +135,109 @@ public nonisolated struct BriarAPI_GetCurrentUserResponse: Sendable {
   fileprivate var _user: BriarAPI_User? = nil
 }
 
+public nonisolated struct BriarAPI_UpdateAccountProfileRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var usernameUpdate: BriarAPI_UpdateAccountProfileRequest.OneOf_UsernameUpdate? = nil
+
+  public var username: String {
+    get {
+      if case .username(let v)? = usernameUpdate {return v}
+      return String()
+    }
+    set {usernameUpdate = .username(newValue)}
+  }
+
+  public var clearUsername_p: SwiftProtobuf.Google_Protobuf_Empty {
+    get {
+      if case .clearUsername_p(let v)? = usernameUpdate {return v}
+      return SwiftProtobuf.Google_Protobuf_Empty()
+    }
+    set {usernameUpdate = .clearUsername_p(newValue)}
+  }
+
+  public var name: String = String()
+
+  public var imageUpdate: BriarAPI_UpdateAccountProfileRequest.OneOf_ImageUpdate? = nil
+
+  public var image: String {
+    get {
+      if case .image(let v)? = imageUpdate {return v}
+      return String()
+    }
+    set {imageUpdate = .image(newValue)}
+  }
+
+  public var clearImage_p: SwiftProtobuf.Google_Protobuf_Empty {
+    get {
+      if case .clearImage_p(let v)? = imageUpdate {return v}
+      return SwiftProtobuf.Google_Protobuf_Empty()
+    }
+    set {imageUpdate = .clearImage_p(newValue)}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum OneOf_UsernameUpdate: Equatable, Sendable {
+    case username(String)
+    case clearUsername_p(SwiftProtobuf.Google_Protobuf_Empty)
+
+  }
+
+  public nonisolated enum OneOf_ImageUpdate: Equatable, Sendable {
+    case image(String)
+    case clearImage_p(SwiftProtobuf.Google_Protobuf_Empty)
+
+  }
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_UpdateAccountProfileResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var user: BriarAPI_User {
+    get {_user ?? BriarAPI_User()}
+    set {_user = newValue}
+  }
+  /// Returns true if `user` has been explicitly set.
+  public var hasUser: Bool {self._user != nil}
+  /// Clears the value of `user`. Subsequent reads from it will return its default value.
+  public mutating func clearUser() {self._user = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _user: BriarAPI_User? = nil
+}
+
+public nonisolated struct BriarAPI_DeleteAccountRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var confirmation: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_DeleteAccountResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 public nonisolated struct BriarAPI_MobilePushPreferences: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -276,6 +379,189 @@ nonisolated extension BriarAPI_GetCurrentUserResponse: SwiftProtobuf.Message, Sw
 
   public static func ==(lhs: BriarAPI_GetCurrentUserResponse, rhs: BriarAPI_GetCurrentUserResponse) -> Bool {
     if lhs._user != rhs._user {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateAccountProfileRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateAccountProfileRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}username\0\u{3}clear_username\0\u{1}name\0\u{1}image\0\u{3}clear_image\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.usernameUpdate != nil {try decoder.handleConflictingOneOf()}
+          self.usernameUpdate = .username(v)
+        }
+      }()
+      case 2: try {
+        var v: SwiftProtobuf.Google_Protobuf_Empty?
+        var hadOneofValue = false
+        if let current = self.usernameUpdate {
+          hadOneofValue = true
+          if case .clearUsername_p(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.usernameUpdate = .clearUsername_p(v)
+        }
+      }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 4: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.imageUpdate != nil {try decoder.handleConflictingOneOf()}
+          self.imageUpdate = .image(v)
+        }
+      }()
+      case 5: try {
+        var v: SwiftProtobuf.Google_Protobuf_Empty?
+        var hadOneofValue = false
+        if let current = self.imageUpdate {
+          hadOneofValue = true
+          if case .clearImage_p(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.imageUpdate = .clearImage_p(v)
+        }
+      }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    switch self.usernameUpdate {
+    case .username?: try {
+      guard case .username(let v)? = self.usernameUpdate else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+    }()
+    case .clearUsername_p?: try {
+      guard case .clearUsername_p(let v)? = self.usernameUpdate else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    }()
+    case nil: break
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 3)
+    }
+    switch self.imageUpdate {
+    case .image?: try {
+      guard case .image(let v)? = self.imageUpdate else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    }()
+    case .clearImage_p?: try {
+      guard case .clearImage_p(let v)? = self.imageUpdate else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    }()
+    case nil: break
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateAccountProfileRequest, rhs: BriarAPI_UpdateAccountProfileRequest) -> Bool {
+    if lhs.usernameUpdate != rhs.usernameUpdate {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.imageUpdate != rhs.imageUpdate {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateAccountProfileResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateAccountProfileResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}user\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._user) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._user {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateAccountProfileResponse, rhs: BriarAPI_UpdateAccountProfileResponse) -> Bool {
+    if lhs._user != rhs._user {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DeleteAccountRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteAccountRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}confirmation\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.confirmation) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.confirmation.isEmpty {
+      try visitor.visitSingularStringField(value: self.confirmation, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DeleteAccountRequest, rhs: BriarAPI_DeleteAccountRequest) -> Bool {
+    if lhs.confirmation != rhs.confirmation {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DeleteAccountResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteAccountResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DeleteAccountResponse, rhs: BriarAPI_DeleteAccountResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

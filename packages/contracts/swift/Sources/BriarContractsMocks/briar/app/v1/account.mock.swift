@@ -24,6 +24,10 @@ import SwiftProtobuf
 open class BriarAPI_AccountServiceClientMock: BriarAPI_AccountServiceClientInterface, @unchecked Sendable {
     /// Mocked for async calls to `getCurrentUser()`.
     public var mockAsyncGetCurrentUser = { (_: BriarAPI_GetCurrentUserRequest) -> ResponseMessage<BriarAPI_GetCurrentUserResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateAccountProfile()`.
+    public var mockAsyncUpdateAccountProfile = { (_: BriarAPI_UpdateAccountProfileRequest) -> ResponseMessage<BriarAPI_UpdateAccountProfileResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `deleteAccount()`.
+    public var mockAsyncDeleteAccount = { (_: BriarAPI_DeleteAccountRequest) -> ResponseMessage<BriarAPI_DeleteAccountResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `registerMobilePushDevice()`.
     public var mockAsyncRegisterMobilePushDevice = { (_: BriarAPI_RegisterMobilePushDeviceRequest) -> ResponseMessage<BriarAPI_RegisterMobilePushDeviceResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `unregisterMobilePushDevice()`.
@@ -33,6 +37,14 @@ open class BriarAPI_AccountServiceClientMock: BriarAPI_AccountServiceClientInter
 
     open func `getCurrentUser`(request: BriarAPI_GetCurrentUserRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetCurrentUserResponse> {
         return self.mockAsyncGetCurrentUser(request)
+    }
+
+    open func `updateAccountProfile`(request: BriarAPI_UpdateAccountProfileRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateAccountProfileResponse> {
+        return self.mockAsyncUpdateAccountProfile(request)
+    }
+
+    open func `deleteAccount`(request: BriarAPI_DeleteAccountRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteAccountResponse> {
+        return self.mockAsyncDeleteAccount(request)
     }
 
     open func `registerMobilePushDevice`(request: BriarAPI_RegisterMobilePushDeviceRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RegisterMobilePushDeviceResponse> {

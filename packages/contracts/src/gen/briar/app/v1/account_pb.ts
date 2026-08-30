@@ -6,13 +6,15 @@ import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobu
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { User } from "./common_pb";
 import { file_briar_app_v1_common } from "./common_pb";
+import type { Empty } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_empty } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file briar/app/v1/account.proto.
  */
 export const file_briar_app_v1_account: GenFile = /*@__PURE__*/
-  fileDesc("Chpicmlhci9hcHAvdjEvYWNjb3VudC5wcm90bxIMYnJpYXIuYXBwLnYxIhcKFUdldEN1cnJlbnRVc2VyUmVxdWVzdCI6ChZHZXRDdXJyZW50VXNlclJlc3BvbnNlEiAKBHVzZXIYASABKAsyEi5icmlhci5hcHAudjEuVXNlciJ5ChVNb2JpbGVQdXNoUHJlZmVyZW5jZXMSEgoKcGxheV9zb3VuZBgBIAEoCBIOCgZ1cmdlbnQYAiABKAgSFwoPYWN0aW9uX3JlcXVpcmVkGAMgASgIEhEKCWltcG9ydGFudBgEIAEoCBIQCghhY3Rpdml0eRgFIAEoCCLOAQofUmVnaXN0ZXJNb2JpbGVQdXNoRGV2aWNlUmVxdWVzdBIyCghlbmRwb2ludBgBIAEoDjIgLmJyaWFyLmFwcC52MS5Nb2JpbGVQdXNoRW5kcG9pbnQSDQoFdG9rZW4YAiABKAkSLgoGbG9jYWxlGAMgASgOMh4uYnJpYXIuYXBwLnYxLk1vYmlsZVB1c2hMb2NhbGUSOAoLcHJlZmVyZW5jZXMYBCABKAsyIy5icmlhci5hcHAudjEuTW9iaWxlUHVzaFByZWZlcmVuY2VzIiIKIFJlZ2lzdGVyTW9iaWxlUHVzaERldmljZVJlc3BvbnNlImYKIVVucmVnaXN0ZXJNb2JpbGVQdXNoRGV2aWNlUmVxdWVzdBIyCghlbmRwb2ludBgBIAEoDjIgLmJyaWFyLmFwcC52MS5Nb2JpbGVQdXNoRW5kcG9pbnQSDQoFdG9rZW4YAiABKAkiJAoiVW5yZWdpc3Rlck1vYmlsZVB1c2hEZXZpY2VSZXNwb25zZSqtAQoSTW9iaWxlUHVzaEVuZHBvaW50EiQKIE1PQklMRV9QVVNIX0VORFBPSU5UX1VOU1BFQ0lGSUVEEAASKQolTU9CSUxFX1BVU0hfRU5EUE9JTlRfQVBOU19ERVZFTE9QTUVOVBABEigKJE1PQklMRV9QVVNIX0VORFBPSU5UX0FQTlNfUFJPRFVDVElPThACEhwKGE1PQklMRV9QVVNIX0VORFBPSU5UX0ZDTRADKocBChBNb2JpbGVQdXNoTG9jYWxlEiIKHk1PQklMRV9QVVNIX0xPQ0FMRV9VTlNQRUNJRklFRBAAEhkKFU1PQklMRV9QVVNIX0xPQ0FMRV9LTxABEhkKFU1PQklMRV9QVVNIX0xPQ0FMRV9FThACEhkKFU1PQklMRV9QVVNIX0xPQ0FMRV9aSBADMukCCg5BY2NvdW50U2VydmljZRJbCg5HZXRDdXJyZW50VXNlchIjLmJyaWFyLmFwcC52MS5HZXRDdXJyZW50VXNlclJlcXVlc3QaJC5icmlhci5hcHAudjEuR2V0Q3VycmVudFVzZXJSZXNwb25zZRJ5ChhSZWdpc3Rlck1vYmlsZVB1c2hEZXZpY2USLS5icmlhci5hcHAudjEuUmVnaXN0ZXJNb2JpbGVQdXNoRGV2aWNlUmVxdWVzdBouLmJyaWFyLmFwcC52MS5SZWdpc3Rlck1vYmlsZVB1c2hEZXZpY2VSZXNwb25zZRJ/ChpVbnJlZ2lzdGVyTW9iaWxlUHVzaERldmljZRIvLmJyaWFyLmFwcC52MS5VbnJlZ2lzdGVyTW9iaWxlUHVzaERldmljZVJlcXVlc3QaMC5icmlhci5hcHAudjEuVW5yZWdpc3Rlck1vYmlsZVB1c2hEZXZpY2VSZXNwb25zZUIMugIJQnJpYXJBUElfYgZwcm90bzM", [file_briar_app_v1_common]);
+  fileDesc("Chpicmlhci9hcHAvdjEvYWNjb3VudC5wcm90bxIMYnJpYXIuYXBwLnYxIhcKFUdldEN1cnJlbnRVc2VyUmVxdWVzdCI6ChZHZXRDdXJyZW50VXNlclJlc3BvbnNlEiAKBHVzZXIYASABKAsyEi5icmlhci5hcHAudjEuVXNlciLUAQobVXBkYXRlQWNjb3VudFByb2ZpbGVSZXF1ZXN0EhIKCHVzZXJuYW1lGAEgASgJSAASMAoOY2xlYXJfdXNlcm5hbWUYAiABKAsyFi5nb29nbGUucHJvdG9idWYuRW1wdHlIABIMCgRuYW1lGAMgASgJEg8KBWltYWdlGAQgASgJSAESLQoLY2xlYXJfaW1hZ2UYBSABKAsyFi5nb29nbGUucHJvdG9idWYuRW1wdHlIAUIRCg91c2VybmFtZV91cGRhdGVCDgoMaW1hZ2VfdXBkYXRlIkAKHFVwZGF0ZUFjY291bnRQcm9maWxlUmVzcG9uc2USIAoEdXNlchgBIAEoCzISLmJyaWFyLmFwcC52MS5Vc2VyIiwKFERlbGV0ZUFjY291bnRSZXF1ZXN0EhQKDGNvbmZpcm1hdGlvbhgBIAEoCSIXChVEZWxldGVBY2NvdW50UmVzcG9uc2UieQoVTW9iaWxlUHVzaFByZWZlcmVuY2VzEhIKCnBsYXlfc291bmQYASABKAgSDgoGdXJnZW50GAIgASgIEhcKD2FjdGlvbl9yZXF1aXJlZBgDIAEoCBIRCglpbXBvcnRhbnQYBCABKAgSEAoIYWN0aXZpdHkYBSABKAgizgEKH1JlZ2lzdGVyTW9iaWxlUHVzaERldmljZVJlcXVlc3QSMgoIZW5kcG9pbnQYASABKA4yIC5icmlhci5hcHAudjEuTW9iaWxlUHVzaEVuZHBvaW50Eg0KBXRva2VuGAIgASgJEi4KBmxvY2FsZRgDIAEoDjIeLmJyaWFyLmFwcC52MS5Nb2JpbGVQdXNoTG9jYWxlEjgKC3ByZWZlcmVuY2VzGAQgASgLMiMuYnJpYXIuYXBwLnYxLk1vYmlsZVB1c2hQcmVmZXJlbmNlcyIiCiBSZWdpc3Rlck1vYmlsZVB1c2hEZXZpY2VSZXNwb25zZSJmCiFVbnJlZ2lzdGVyTW9iaWxlUHVzaERldmljZVJlcXVlc3QSMgoIZW5kcG9pbnQYASABKA4yIC5icmlhci5hcHAudjEuTW9iaWxlUHVzaEVuZHBvaW50Eg0KBXRva2VuGAIgASgJIiQKIlVucmVnaXN0ZXJNb2JpbGVQdXNoRGV2aWNlUmVzcG9uc2UqrQEKEk1vYmlsZVB1c2hFbmRwb2ludBIkCiBNT0JJTEVfUFVTSF9FTkRQT0lOVF9VTlNQRUNJRklFRBAAEikKJU1PQklMRV9QVVNIX0VORFBPSU5UX0FQTlNfREVWRUxPUE1FTlQQARIoCiRNT0JJTEVfUFVTSF9FTkRQT0lOVF9BUE5TX1BST0RVQ1RJT04QAhIcChhNT0JJTEVfUFVTSF9FTkRQT0lOVF9GQ00QAyqHAQoQTW9iaWxlUHVzaExvY2FsZRIiCh5NT0JJTEVfUFVTSF9MT0NBTEVfVU5TUEVDSUZJRUQQABIZChVNT0JJTEVfUFVTSF9MT0NBTEVfS08QARIZChVNT0JJTEVfUFVTSF9MT0NBTEVfRU4QAhIZChVNT0JJTEVfUFVTSF9MT0NBTEVfWkgQAzKyBAoOQWNjb3VudFNlcnZpY2USWwoOR2V0Q3VycmVudFVzZXISIy5icmlhci5hcHAudjEuR2V0Q3VycmVudFVzZXJSZXF1ZXN0GiQuYnJpYXIuYXBwLnYxLkdldEN1cnJlbnRVc2VyUmVzcG9uc2USbQoUVXBkYXRlQWNjb3VudFByb2ZpbGUSKS5icmlhci5hcHAudjEuVXBkYXRlQWNjb3VudFByb2ZpbGVSZXF1ZXN0GiouYnJpYXIuYXBwLnYxLlVwZGF0ZUFjY291bnRQcm9maWxlUmVzcG9uc2USWAoNRGVsZXRlQWNjb3VudBIiLmJyaWFyLmFwcC52MS5EZWxldGVBY2NvdW50UmVxdWVzdBojLmJyaWFyLmFwcC52MS5EZWxldGVBY2NvdW50UmVzcG9uc2USeQoYUmVnaXN0ZXJNb2JpbGVQdXNoRGV2aWNlEi0uYnJpYXIuYXBwLnYxLlJlZ2lzdGVyTW9iaWxlUHVzaERldmljZVJlcXVlc3QaLi5icmlhci5hcHAudjEuUmVnaXN0ZXJNb2JpbGVQdXNoRGV2aWNlUmVzcG9uc2USfwoaVW5yZWdpc3Rlck1vYmlsZVB1c2hEZXZpY2USLy5icmlhci5hcHAudjEuVW5yZWdpc3Rlck1vYmlsZVB1c2hEZXZpY2VSZXF1ZXN0GjAuYnJpYXIuYXBwLnYxLlVucmVnaXN0ZXJNb2JpbGVQdXNoRGV2aWNlUmVzcG9uc2VCDLoCCUJyaWFyQVBJX2IGcHJvdG8z", [file_briar_app_v1_common, file_google_protobuf_empty]);
 
 /**
  * @generated from message briar.app.v1.GetCurrentUserRequest
@@ -43,6 +45,104 @@ export type GetCurrentUserResponse = Message<"briar.app.v1.GetCurrentUserRespons
  */
 export const GetCurrentUserResponseSchema: GenMessage<GetCurrentUserResponse> = /*@__PURE__*/
   messageDesc(file_briar_app_v1_account, 1);
+
+/**
+ * @generated from message briar.app.v1.UpdateAccountProfileRequest
+ */
+export type UpdateAccountProfileRequest = Message<"briar.app.v1.UpdateAccountProfileRequest"> & {
+  /**
+   * @generated from oneof briar.app.v1.UpdateAccountProfileRequest.username_update
+   */
+  usernameUpdate: {
+    /**
+     * @generated from field: string username = 1;
+     */
+    value: string;
+    case: "username";
+  } | {
+    /**
+     * @generated from field: google.protobuf.Empty clear_username = 2;
+     */
+    value: Empty;
+    case: "clearUsername";
+  } | { case: undefined; value?: undefined };
+
+  /**
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * @generated from oneof briar.app.v1.UpdateAccountProfileRequest.image_update
+   */
+  imageUpdate: {
+    /**
+     * @generated from field: string image = 4;
+     */
+    value: string;
+    case: "image";
+  } | {
+    /**
+     * @generated from field: google.protobuf.Empty clear_image = 5;
+     */
+    value: Empty;
+    case: "clearImage";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message briar.app.v1.UpdateAccountProfileRequest.
+ * Use `create(UpdateAccountProfileRequestSchema)` to create a new message.
+ */
+export const UpdateAccountProfileRequestSchema: GenMessage<UpdateAccountProfileRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_account, 2);
+
+/**
+ * @generated from message briar.app.v1.UpdateAccountProfileResponse
+ */
+export type UpdateAccountProfileResponse = Message<"briar.app.v1.UpdateAccountProfileResponse"> & {
+  /**
+   * @generated from field: briar.app.v1.User user = 1;
+   */
+  user?: User | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.UpdateAccountProfileResponse.
+ * Use `create(UpdateAccountProfileResponseSchema)` to create a new message.
+ */
+export const UpdateAccountProfileResponseSchema: GenMessage<UpdateAccountProfileResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_account, 3);
+
+/**
+ * @generated from message briar.app.v1.DeleteAccountRequest
+ */
+export type DeleteAccountRequest = Message<"briar.app.v1.DeleteAccountRequest"> & {
+  /**
+   * @generated from field: string confirmation = 1;
+   */
+  confirmation: string;
+};
+
+/**
+ * Describes the message briar.app.v1.DeleteAccountRequest.
+ * Use `create(DeleteAccountRequestSchema)` to create a new message.
+ */
+export const DeleteAccountRequestSchema: GenMessage<DeleteAccountRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_account, 4);
+
+/**
+ * @generated from message briar.app.v1.DeleteAccountResponse
+ */
+export type DeleteAccountResponse = Message<"briar.app.v1.DeleteAccountResponse"> & {
+};
+
+/**
+ * Describes the message briar.app.v1.DeleteAccountResponse.
+ * Use `create(DeleteAccountResponseSchema)` to create a new message.
+ */
+export const DeleteAccountResponseSchema: GenMessage<DeleteAccountResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_account, 5);
 
 /**
  * @generated from message briar.app.v1.MobilePushPreferences
@@ -79,7 +179,7 @@ export type MobilePushPreferences = Message<"briar.app.v1.MobilePushPreferences"
  * Use `create(MobilePushPreferencesSchema)` to create a new message.
  */
 export const MobilePushPreferencesSchema: GenMessage<MobilePushPreferences> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_account, 2);
+  messageDesc(file_briar_app_v1_account, 6);
 
 /**
  * @generated from message briar.app.v1.RegisterMobilePushDeviceRequest
@@ -111,7 +211,7 @@ export type RegisterMobilePushDeviceRequest = Message<"briar.app.v1.RegisterMobi
  * Use `create(RegisterMobilePushDeviceRequestSchema)` to create a new message.
  */
 export const RegisterMobilePushDeviceRequestSchema: GenMessage<RegisterMobilePushDeviceRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_account, 3);
+  messageDesc(file_briar_app_v1_account, 7);
 
 /**
  * @generated from message briar.app.v1.RegisterMobilePushDeviceResponse
@@ -124,7 +224,7 @@ export type RegisterMobilePushDeviceResponse = Message<"briar.app.v1.RegisterMob
  * Use `create(RegisterMobilePushDeviceResponseSchema)` to create a new message.
  */
 export const RegisterMobilePushDeviceResponseSchema: GenMessage<RegisterMobilePushDeviceResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_account, 4);
+  messageDesc(file_briar_app_v1_account, 8);
 
 /**
  * @generated from message briar.app.v1.UnregisterMobilePushDeviceRequest
@@ -146,7 +246,7 @@ export type UnregisterMobilePushDeviceRequest = Message<"briar.app.v1.Unregister
  * Use `create(UnregisterMobilePushDeviceRequestSchema)` to create a new message.
  */
 export const UnregisterMobilePushDeviceRequestSchema: GenMessage<UnregisterMobilePushDeviceRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_account, 5);
+  messageDesc(file_briar_app_v1_account, 9);
 
 /**
  * @generated from message briar.app.v1.UnregisterMobilePushDeviceResponse
@@ -159,7 +259,7 @@ export type UnregisterMobilePushDeviceResponse = Message<"briar.app.v1.Unregiste
  * Use `create(UnregisterMobilePushDeviceResponseSchema)` to create a new message.
  */
 export const UnregisterMobilePushDeviceResponseSchema: GenMessage<UnregisterMobilePushDeviceResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_account, 6);
+  messageDesc(file_briar_app_v1_account, 10);
 
 /**
  * @generated from enum briar.app.v1.MobilePushEndpoint
@@ -234,6 +334,22 @@ export const AccountService: GenService<{
     methodKind: "unary";
     input: typeof GetCurrentUserRequestSchema;
     output: typeof GetCurrentUserResponseSchema;
+  },
+  /**
+   * @generated from rpc briar.app.v1.AccountService.UpdateAccountProfile
+   */
+  updateAccountProfile: {
+    methodKind: "unary";
+    input: typeof UpdateAccountProfileRequestSchema;
+    output: typeof UpdateAccountProfileResponseSchema;
+  },
+  /**
+   * @generated from rpc briar.app.v1.AccountService.DeleteAccount
+   */
+  deleteAccount: {
+    methodKind: "unary";
+    input: typeof DeleteAccountRequestSchema;
+    output: typeof DeleteAccountResponseSchema;
   },
   /**
    * @generated from rpc briar.app.v1.AccountService.RegisterMobilePushDevice

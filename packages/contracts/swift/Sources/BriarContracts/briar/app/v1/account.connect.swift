@@ -15,6 +15,12 @@ public protocol BriarAPI_AccountServiceClientInterface: Sendable {
     func `getCurrentUser`(request: BriarAPI_GetCurrentUserRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_GetCurrentUserResponse>
 
     @available(iOS 13, *)
+    func `updateAccountProfile`(request: BriarAPI_UpdateAccountProfileRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateAccountProfileResponse>
+
+    @available(iOS 13, *)
+    func `deleteAccount`(request: BriarAPI_DeleteAccountRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_DeleteAccountResponse>
+
+    @available(iOS 13, *)
     func `registerMobilePushDevice`(request: BriarAPI_RegisterMobilePushDeviceRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_RegisterMobilePushDeviceResponse>
 
     @available(iOS 13, *)
@@ -35,6 +41,16 @@ public final class BriarAPI_AccountServiceClient: BriarAPI_AccountServiceClientI
     }
 
     @available(iOS 13, *)
+    public func `updateAccountProfile`(request: BriarAPI_UpdateAccountProfileRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateAccountProfileResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AccountService/UpdateAccountProfile", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `deleteAccount`(request: BriarAPI_DeleteAccountRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteAccountResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AccountService/DeleteAccount", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
     public func `registerMobilePushDevice`(request: BriarAPI_RegisterMobilePushDeviceRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RegisterMobilePushDeviceResponse> {
         return await self.client.unary(path: "/briar.app.v1.AccountService/RegisterMobilePushDevice", idempotencyLevel: .unknown, request: request, headers: headers)
     }
@@ -47,6 +63,8 @@ public final class BriarAPI_AccountServiceClient: BriarAPI_AccountServiceClientI
     public enum Metadata {
         public enum Methods {
             public static let getCurrentUser = Connect.MethodSpec(name: "GetCurrentUser", service: "briar.app.v1.AccountService", type: .unary)
+            public static let updateAccountProfile = Connect.MethodSpec(name: "UpdateAccountProfile", service: "briar.app.v1.AccountService", type: .unary)
+            public static let deleteAccount = Connect.MethodSpec(name: "DeleteAccount", service: "briar.app.v1.AccountService", type: .unary)
             public static let registerMobilePushDevice = Connect.MethodSpec(name: "RegisterMobilePushDevice", service: "briar.app.v1.AccountService", type: .unary)
             public static let unregisterMobilePushDevice = Connect.MethodSpec(name: "UnregisterMobilePushDevice", service: "briar.app.v1.AccountService", type: .unary)
         }

@@ -8,6 +8,24 @@ pub type OwnedGetCurrentUserRequestView = ::buffa::view::OwnedView<
 pub type OwnedGetCurrentUserResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::GetCurrentUserResponseView<'static>,
 >;
+///Shorthand for `OwnedView<UpdateAccountProfileRequestView<'static>>`.
+pub type OwnedUpdateAccountProfileRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateAccountProfileRequestView<'static>,
+>;
+///Shorthand for `OwnedView<UpdateAccountProfileResponseView<'static>>`.
+pub type OwnedUpdateAccountProfileResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateAccountProfileResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<DeleteAccountRequestView<'static>>`.
+pub type OwnedDeleteAccountRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteAccountRequestView<'static>,
+>;
+///Shorthand for `OwnedView<DeleteAccountResponseView<'static>>`.
+pub type OwnedDeleteAccountResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteAccountResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<RegisterMobilePushDeviceRequestView<'static>>`.
 pub type OwnedRegisterMobilePushDeviceRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::RegisterMobilePushDeviceRequestView<
@@ -44,6 +62,76 @@ for crate::proto::briar::app::v1::__buffa::view::GetCurrentUserResponseView<'_> 
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::GetCurrentUserResponse>
 for ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::GetCurrentUserResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateAccountProfileResponse>
+for crate::proto::briar::app::v1::__buffa::view::UpdateAccountProfileResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateAccountProfileResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateAccountProfileResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteAccountResponse>
+for crate::proto::briar::app::v1::__buffa::view::DeleteAccountResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteAccountResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteAccountResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -158,6 +246,18 @@ pub const ACCOUNT_SERVICE_GET_CURRENT_USER_SPEC: ::connectrpc::Spec = ::connectr
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateAccountProfile` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ACCOUNT_SERVICE_UPDATE_ACCOUNT_PROFILE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AccountService/UpdateAccountProfile",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `DeleteAccount` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ACCOUNT_SERVICE_DELETE_ACCOUNT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AccountService/DeleteAccount",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `RegisterMobilePushDevice` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const ACCOUNT_SERVICE_REGISTER_MOBILE_PUSH_DEVICE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.AccountService/RegisterMobilePushDevice",
@@ -241,6 +341,52 @@ pub trait AccountService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::GetCurrentUserResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UpdateAccountProfile RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_account_profile<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdateAccountProfileRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdateAccountProfileResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the DeleteAccount RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn delete_account<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::DeleteAccountRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::DeleteAccountResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -351,6 +497,64 @@ impl<S: AccountService> AccountServiceExt for S {
                 },
             )
             .with_spec(ACCOUNT_SERVICE_GET_CURRENT_USER_SPEC)
+            .route_view(
+                ACCOUNT_SERVICE_SERVICE_NAME,
+                "UpdateAccountProfile",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateAccountProfileRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdateAccountProfileRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_account_profile(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdateAccountProfileResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ACCOUNT_SERVICE_UPDATE_ACCOUNT_PROFILE_SPEC)
+            .route_view(
+                ACCOUNT_SERVICE_SERVICE_NAME,
+                "DeleteAccount",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::DeleteAccountRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::DeleteAccountRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.delete_account(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::DeleteAccountResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ACCOUNT_SERVICE_DELETE_ACCOUNT_SPEC)
             .route_view(
                 ACCOUNT_SERVICE_SERVICE_NAME,
                 "RegisterMobilePushDevice",
@@ -469,6 +673,18 @@ impl<T: AccountService> ::connectrpc::Dispatcher for AccountServiceServer<T> {
                         .with_spec(ACCOUNT_SERVICE_GET_CURRENT_USER_SPEC),
                 )
             }
+            "UpdateAccountProfile" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ACCOUNT_SERVICE_UPDATE_ACCOUNT_PROFILE_SPEC),
+                )
+            }
+            "DeleteAccount" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ACCOUNT_SERVICE_DELETE_ACCOUNT_SPEC),
+                )
+            }
             "RegisterMobilePushDevice" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -515,6 +731,50 @@ impl<T: AccountService> ::connectrpc::Dispatcher for AccountServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::GetCurrentUserResponse,
+                        >(format)
+                })
+            }
+            "UpdateAccountProfile" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdateAccountProfileRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateAccountProfileRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdateAccountProfileRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_account_profile(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdateAccountProfileResponse,
+                        >(format)
+                })
+            }
+            "DeleteAccount" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::DeleteAccountRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::DeleteAccountRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::DeleteAccountRequest,
+                    >::from_parts(&req, &body);
+                    svc.delete_account(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::DeleteAccountResponse,
                         >(format)
                 })
             }
@@ -731,6 +991,96 @@ where
                 &self.transport,
                 &self.config,
                 ACCOUNT_SERVICE_GET_CURRENT_USER_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdateAccountProfile RPC. Sends a request to /briar.app.v1.AccountService/UpdateAccountProfile.
+    pub async fn update_account_profile(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateAccountProfileRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateAccountProfileResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_account_profile_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateAccountProfile RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_account_profile_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateAccountProfileRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateAccountProfileResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ACCOUNT_SERVICE_UPDATE_ACCOUNT_PROFILE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DeleteAccount RPC. Sends a request to /briar.app.v1.AccountService/DeleteAccount.
+    pub async fn delete_account(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteAccountRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteAccountResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.delete_account_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DeleteAccount RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_account_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteAccountRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteAccountResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ACCOUNT_SERVICE_DELETE_ACCOUNT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
