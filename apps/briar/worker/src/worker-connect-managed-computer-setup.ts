@@ -32,6 +32,18 @@ export type WorkerConnectManagedComputerSetupInput = {
   readonly env: Env;
 };
 
+export type ManagedComputerSetupServices = {
+  readonly bindSetup: typeof bindManagedComputerSetupApplication;
+  readonly getSetupContext: typeof getManagedComputerSetupContextApplication;
+  readonly requireWorkerCredential: typeof requireWorkerCredential;
+};
+
+export const managedComputerSetupServices: ManagedComputerSetupServices = {
+  bindSetup: bindManagedComputerSetupApplication,
+  getSetupContext: getManagedComputerSetupContextApplication,
+  requireWorkerCredential,
+};
+
 const decodeUuid = decodeRequestSync(UuidString);
 const setupTokenPattern = /^briar_setup_[A-Za-z0-9_-]{43}$/u;
 
@@ -42,9 +54,11 @@ const setupToken = (value: string) => {
   return value;
 };
 
-const withManagedComputerSetupErrors = async <A>(operation: Promise<A>) => {
+const withManagedComputerSetupErrors = async <A>(
+  operation: () => Promise<A>,
+) => {
   try {
-    return await operation;
+    return await operation();
   } catch (error) {
     if (error instanceof WorkerRuntimeValidationError) {
       throw new HttpError(400, error.message);
@@ -58,14 +72,15 @@ const withManagedComputerSetupErrors = async <A>(operation: Promise<A>) => {
 
 export const createManagedComputerSetupService = (
   { request, db, env }: WorkerConnectManagedComputerSetupInput,
+  services: ManagedComputerSetupServices = managedComputerSetupServices,
 ): ServiceImpl<typeof ManagedComputerSetupService> => ({
   getManagedComputerSetupContext: (input, context) =>
     withConnectErrors(async () => {
       context.responseHeader.set("Cache-Control", "private, no-store");
-      const principal = await requireWorkerCredential(db, request);
+      const principal = await services.requireWorkerCredential(db, request);
       const managedComputerId = decodeUuid(input.managedComputerId);
       const result = await withManagedComputerSetupErrors(
-        getManagedComputerSetupContextApplication({
+        () => services.getSetupContext({
           db,
           env,
           principal,
@@ -94,11 +109,11 @@ export const createManagedComputerSetupService = (
   bindManagedComputerSetup: (input, context) =>
     withConnectErrors(async () => {
       context.responseHeader.set("Cache-Control", "private, no-store");
-      const principal = await requireWorkerCredential(db, request);
+      const principal = await services.requireWorkerCredential(db, request);
       const observedAt = new Date().toISOString();
       const managedComputerId = decodeUuid(input.managedComputerId);
       const result = await withManagedComputerSetupErrors(
-        bindManagedComputerSetupApplication({
+        () => services.bindSetup({
           db,
           principal,
           managedComputerId,
