@@ -1,6 +1,7 @@
 import * as Option from "effect/Option";
 import {
-  decodeAgentReplyActivityFrameOption,
+  decodeAgentReplyActivityFrameBinaryOption,
+  encodeAgentReplyActivityFrameBinary,
   type AgentReplyActivityFrame,
   type ChannelAgentActivityFrame,
   type IssueAgentActivityFrame,
@@ -48,8 +49,8 @@ async function publishActivity(
   const hub = env.CHANNEL_ACTIVITY_REALTIME.getByName(hubName);
   const response = await hub.fetch("https://channel-activity.internal/publish", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(frame),
+    headers: { "Content-Type": "application/protobuf" },
+    body: encodeAgentReplyActivityFrameBinary(frame),
   });
   if (!response.ok) {
     throw new Error(`${failureMessage} (${response.status})`);
@@ -92,7 +93,9 @@ export class ChannelActivityHub {
     }
     if (url.pathname === "/publish" && request.method === "POST") {
       const parsed = Option.getOrNull(
-        decodeAgentReplyActivityFrameOption(await request.json<unknown>()),
+        decodeAgentReplyActivityFrameBinaryOption(
+          new Uint8Array(await request.arrayBuffer()),
+        ),
       );
       if (parsed === null) {
         return new Response("Invalid activity frame", { status: 400 });
@@ -120,7 +123,7 @@ export class ChannelActivityHub {
         this.latestByReply.delete(replyJobId);
         continue;
       }
-      server.send(JSON.stringify(frame));
+      server.send(encodeAgentReplyActivityFrameBinary(frame));
     }
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -145,7 +148,7 @@ export class ChannelActivityHub {
     // already in flight cannot resurrect activity after reply completion.
     this.latestByReply.set(frame.replyJobId, frame);
 
-    const payload = JSON.stringify(frame);
+    const payload = encodeAgentReplyActivityFrameBinary(frame);
     for (const socket of this.state.getWebSockets()) {
       const attachment = socket.deserializeAttachment() as
         | ChannelActivitySocketAttachment

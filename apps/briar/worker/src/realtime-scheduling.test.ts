@@ -1,7 +1,8 @@
+import * as Option from "effect/Option";
 import { describe, expect, it, vi } from "vitest";
 import {
   CHANNEL_AGENT_ACTIVITY_STALE_MS,
-  CHANNEL_AGENT_ACTIVITY_VERSION,
+  decodeAgentReplyActivityFrameBinaryOption,
 } from "../../src/lib/channel-agent-activity";
 import {
   channelActivityCredential,
@@ -55,7 +56,6 @@ describe("activity scheduling adapters", () => {
     };
 
     expect(channelActivityFrame(channelJob(null), input, now)).toEqual({
-      version: CHANNEL_AGENT_ACTIVITY_VERSION,
       replyJobId,
       attempt: 2,
       sequence: 4,
@@ -68,7 +68,6 @@ describe("activity scheduling adapters", () => {
       expiresAt: new Date(now + CHANNEL_AGENT_ACTIVITY_STALE_MS).toISOString(),
     });
     expect(issueActivityFrame(issueJob(null), input, now)).toEqual({
-      version: CHANNEL_AGENT_ACTIVITY_VERSION,
       replyJobId,
       attempt: 3,
       sequence: 4,
@@ -121,9 +120,14 @@ describe("activity scheduling adapters", () => {
       CHANNEL_ACTIVITY_REALTIME: {
         getByName: vi.fn((name: string) => ({
           fetch: vi.fn(async (_url: string, init: RequestInit) => {
+            if (!(init.body instanceof Uint8Array)) {
+              throw new Error("Expected a protobuf activity frame");
+            }
             requests.push({
               name,
-              body: JSON.parse(String(init.body)),
+              body: Option.getOrThrow(
+                decodeAgentReplyActivityFrameBinaryOption(init.body),
+              ),
             });
             return new Response(null, { status: 204 });
           }),

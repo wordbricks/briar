@@ -300,7 +300,6 @@ final class CompanionReadTests: XCTestCase {
             error: nil
         ))
         store.applyActivityFrame(IssueAgentActivityFrame(
-            version: 1,
             replyJobId: replyID,
             attempt: 1,
             sequence: 1,

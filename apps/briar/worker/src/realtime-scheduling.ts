@@ -1,6 +1,5 @@
 import {
   CHANNEL_AGENT_ACTIVITY_STALE_MS,
-  CHANNEL_AGENT_ACTIVITY_VERSION,
   type ChannelAgentActivityFrame,
   type IssueAgentActivityFrame,
 } from "../../src/lib/channel-agent-activity";
@@ -71,7 +70,6 @@ function activityFrame<Scope extends object>(
   now: number,
 ) {
   return {
-    version: CHANNEL_AGENT_ACTIVITY_VERSION,
     replyJobId: job.id,
     attempt: job.attempts,
     sequence: input.sequence,

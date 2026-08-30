@@ -1,11 +1,16 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  encodeAgentReplyActivityFrameBinary,
+  type AgentReplyActivityFrame,
+} from "./channel-agent-activity";
 import { ChannelActivityRealtimeTransport } from "./channel-activity-realtime";
 import { IssueActivityRealtimeTransport } from "./issue-activity-realtime";
 
 class FakeWebSocket {
   private readonly listeners = new Map<string, Array<(event: Event) => void>>();
+  binaryType = "blob";
   close = vi.fn();
 
   addEventListener(type: string, listener: EventListener) {
@@ -31,7 +36,6 @@ const projectId = "11111111-1111-4111-8111-111111111111";
 const runId = "22222222-2222-4222-8222-222222222222";
 
 const frameBase = {
-  version: 1,
   replyJobId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
   attempt: 1,
   sequence: 1,
@@ -45,6 +49,13 @@ const frameBase = {
   sentAt: "2026-08-16T00:00:00.000Z",
   expiresAt: "2099-01-01T00:00:00.000Z",
 } as const;
+
+const emitFrame = (socket: FakeWebSocket, frame: AgentReplyActivityFrame) => {
+  const bytes = encodeAgentReplyActivityFrameBinary(frame);
+  socket.emit("message", new MessageEvent("message", {
+    data: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+  }));
+};
 
 const scenarios = [
   {
@@ -123,19 +134,16 @@ describe.each(scenarios)("$name activity realtime", (scenario) => {
         },
       },
     );
-    socket.emit("message", new MessageEvent("message", { data: "not-json" }));
+    socket.emit("message", new MessageEvent("message", { data: "not-binary" }));
     socket.emit("message", new MessageEvent("message", {
-      data: JSON.stringify({ nope: true }),
+      data: new ArrayBuffer(1),
     }));
-    socket.emit("message", new MessageEvent("message", {
-      data: JSON.stringify(scenario.crossScope),
-    }));
-    socket.emit("message", new MessageEvent("message", {
-      data: JSON.stringify(scenario.frame),
-    }));
+    emitFrame(socket, scenario.crossScope);
+    emitFrame(socket, scenario.frame);
 
     expect(listener).toHaveBeenCalledOnce();
     expect(listener).toHaveBeenCalledWith(scenario.frame);
+    expect(socket.binaryType).toBe("arraybuffer");
     transport.stop();
     expect(socket.close).toHaveBeenCalledWith(1000, scenario.stopReason);
   });

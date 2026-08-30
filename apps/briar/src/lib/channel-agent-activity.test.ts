@@ -2,9 +2,10 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 import {
-  AgentReplyActivityFrame,
   ChannelAgentActivityPublishInput,
-  decodeAgentReplyActivityFrameOption,
+  decodeAgentReplyActivityFrameBinaryOption,
+  encodeAgentReplyActivityFrameBinary,
+  type AgentReplyActivityFrame,
 } from "./channel-agent-activity";
 
 describe("channel Agent activity contract", () => {
@@ -34,42 +35,38 @@ describe("channel Agent activity contract", () => {
     ).toThrow();
   });
 
-  it("keeps strict frame boundaries and UTC timestamps", () => {
-    const frame = {
-      version: 1,
+  it("round-trips generated channel and issue scope oneofs", () => {
+    const common = {
       replyJobId: "11111111-1111-4111-8111-111111111111",
       attempt: 1,
       sequence: 1,
-      agentId: "22222222-2222-4222-8222-222222222222",
-      channelId: "33333333-3333-4333-8333-333333333333",
       triggerMessageId: "44444444-4444-4444-8444-444444444444",
       parentMessageId: "55555555-5555-4555-8555-555555555555",
-      activity: null,
+      activity: {
+        id: "command-1",
+        kind: "command" as const,
+        headline: "Running tests",
+      },
       sentAt: "2026-08-20T07:00:00.000Z",
       expiresAt: "2026-08-20T07:00:30.000Z",
     };
+    const frames: AgentReplyActivityFrame[] = [
+      {
+        ...common,
+        agentId: "22222222-2222-4222-8222-222222222222",
+        channelId: "33333333-3333-4333-8333-333333333333",
+      },
+      {
+        ...common,
+        projectId: "66666666-6666-4666-8666-666666666666",
+        runId: "77777777-7777-4777-8777-777777777777",
+      },
+    ];
 
-    expect(
-      Option.getOrNull(decodeAgentReplyActivityFrameOption(frame)),
-    ).toEqual(frame);
-    expect(
-      Option.isNone(
-        decodeAgentReplyActivityFrameOption({ ...frame, traceId: "future" }),
+    expect(frames.map((frame) => Option.getOrNull(
+      decodeAgentReplyActivityFrameBinaryOption(
+        encodeAgentReplyActivityFrameBinary(frame),
       ),
-    ).toBe(true);
-    expect(
-      Option.isNone(
-        decodeAgentReplyActivityFrameOption({
-          ...frame,
-          sentAt: "2026-08-20T16:00:00+09:00",
-        }),
-      ),
-    ).toBe(true);
-    expect(() =>
-      Schema.decodeUnknownSync(AgentReplyActivityFrame)({
-        ...frame,
-        sequence: 0,
-      })
-    ).toThrow();
+    ))).toEqual(frames);
   });
 });

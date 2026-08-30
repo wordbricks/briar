@@ -5,7 +5,7 @@ type Listener<Frame> = (frame: Frame) => void;
 export type AgentActivityRealtimeAdapter<Frame> = {
   label: "Channel" | "Issue";
   ticketPath: string;
-  decodeFrame: (value: unknown) => Frame | null;
+  decodeFrame: (value: Uint8Array) => Frame | null;
   matchesScope: (frame: Frame) => boolean;
 };
 
@@ -76,6 +76,7 @@ export class AgentActivityRealtimeTransport<Frame> {
       const createSocket = this.input.createWebSocket ??
         ((url: string) => new WebSocket(url));
       const socket = createSocket(body.url);
+      socket.binaryType = "arraybuffer";
       this.socket = socket;
       let finished = false;
       const finish = () => {
@@ -91,13 +92,8 @@ export class AgentActivityRealtimeTransport<Frame> {
       });
       socket.addEventListener("message", (event) => {
         if (!this.active || generation !== this.generation) return;
-        let value: unknown;
-        try {
-          value = JSON.parse(typeof event.data === "string" ? event.data : "");
-        } catch {
-          return;
-        }
-        const parsed = adapter.decodeFrame(value);
+        if (!(event.data instanceof ArrayBuffer)) return;
+        const parsed = adapter.decodeFrame(new Uint8Array(event.data));
         if (parsed === null || !adapter.matchesScope(parsed)) return;
         for (const listener of this.listeners) listener(parsed);
       });

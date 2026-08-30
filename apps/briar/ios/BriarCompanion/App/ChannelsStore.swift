@@ -2447,7 +2447,6 @@ final class ChannelsStore: ObservableObject {
                               expectedGeneration == self.generation,
                               self.focusedChannelID == channelID,
                               self.isForeground,
-                              frame.version == 1,
                               frame.channelId == channelID
                         else { return }
                         reconnectAttempt = 0

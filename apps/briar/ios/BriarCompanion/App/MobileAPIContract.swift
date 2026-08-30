@@ -869,10 +869,13 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
         token: String
     ) -> AsyncThrowingStream<ChannelAgentActivityFrame, Error> {
         webSocketEvents(path, token: token) { data in
-            try JSONDecoder.mobileContract.decode(
-                ChannelAgentActivityFrame.self,
-                from: data
+            let message = try BriarRealtime_AgentReplyActivityFrame(
+                serializedBytes: data
             )
+            guard case .channel(let frame) = try AgentReplyActivityFrame(
+                protobuf: message
+            ) else { throw MobileAPIError.invalidResponse }
+            return frame
         }
     }
 
@@ -881,10 +884,13 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
         token: String
     ) -> AsyncThrowingStream<IssueAgentActivityFrame, Error> {
         webSocketEvents(path, token: token) { data in
-            try JSONDecoder.mobileContract.decode(
-                IssueAgentActivityFrame.self,
-                from: data
+            let message = try BriarRealtime_AgentReplyActivityFrame(
+                serializedBytes: data
             )
+            guard case .issue(let frame) = try AgentReplyActivityFrame(
+                protobuf: message
+            ) else { throw MobileAPIError.invalidResponse }
+            return frame
         }
     }
 
@@ -919,8 +925,8 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
                             switch message {
                             case .data(let value):
                                 data = value
-                            case .string(let value):
-                                data = Data(value.utf8)
+                            case .string:
+                                throw MobileAPIError.invalidResponse
                             @unknown default:
                                 continue
                             }

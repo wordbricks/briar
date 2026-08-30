@@ -1,6 +1,9 @@
+import * as Option from "effect/Option";
 import { describe, expect, it, vi } from "vitest";
 import {
-  CHANNEL_AGENT_ACTIVITY_VERSION,
+  decodeAgentReplyActivityFrameBinaryOption,
+  encodeAgentReplyActivityFrameBinary,
+  type AgentReplyActivityFrame,
   type ChannelAgentActivityFrame,
   type IssueAgentActivityFrame,
 } from "../../src/lib/channel-agent-activity";
@@ -13,7 +16,7 @@ import {
 } from "./channel-activity-realtime";
 
 class FakeSocket {
-  sent: string[] = [];
+  sent: Uint8Array[] = [];
   close = vi.fn();
 
   constructor(
@@ -27,13 +30,12 @@ class FakeSocket {
     return this.attachment;
   }
 
-  send(value: string) {
-    this.sent.push(value);
+  send(value: Uint8Array) {
+    this.sent.push(value.slice());
   }
 }
 
 const frame = (sequence: number): ChannelAgentActivityFrame => ({
-  version: CHANNEL_AGENT_ACTIVITY_VERSION,
   replyJobId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
   attempt: 1,
   sequence,
@@ -46,6 +48,17 @@ const frame = (sequence: number): ChannelAgentActivityFrame => ({
   expiresAt: new Date(Date.now() + 30_000).toISOString(),
 });
 
+const publishRequest = (value: AgentReplyActivityFrame) =>
+  new Request("https://activity.test/publish", {
+    method: "POST",
+    headers: { "Content-Type": "application/protobuf" },
+    body: encodeAgentReplyActivityFrameBinary(value),
+  });
+
+const decodeFrame = (value: Uint8Array) => Option.getOrThrow(
+  decodeAgentReplyActivityFrameBinaryOption(value),
+);
+
 describe("ChannelActivityHub", () => {
   it("fans out the latest sequence and rejects stale updates", async () => {
     const socket = new FakeSocket({
@@ -57,15 +70,11 @@ describe("ChannelActivityHub", () => {
       {} as Env,
     );
     for (const sequence of [2, 1]) {
-      const response = await hub.fetch(new Request("https://activity.test/publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(frame(sequence)),
-      }));
+      const response = await hub.fetch(publishRequest(frame(sequence)));
       expect(response.status).toBe(204);
     }
     expect(socket.sent).toHaveLength(1);
-    expect(JSON.parse(socket.sent[0])).toMatchObject({ sequence: 2 });
+    expect(decodeFrame(socket.sent[0])).toMatchObject({ sequence: 2 });
   });
 
   it("closes expired subscribers before sending private activity", async () => {
@@ -77,11 +86,7 @@ describe("ChannelActivityHub", () => {
       { getWebSockets: () => [socket] } as unknown as DurableObjectState,
       {} as Env,
     );
-    await hub.fetch(new Request("https://activity.test/publish", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(frame(1)),
-    }));
+    await hub.fetch(publishRequest(frame(1)));
     expect(socket.sent).toEqual([]);
     expect(socket.close).toHaveBeenCalledWith(
       4003,
@@ -103,14 +108,10 @@ describe("ChannelActivityHub", () => {
       activity: null,
     } satisfies ChannelAgentActivityFrame;
     for (const update of [cleared, frame(3)]) {
-      await hub.fetch(new Request("https://activity.test/publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(update),
-      }));
+      await hub.fetch(publishRequest(update));
     }
     expect(socket.sent).toHaveLength(1);
-    expect(JSON.parse(socket.sent[0])).toMatchObject({
+    expect(decodeFrame(socket.sent[0])).toMatchObject({
       sequence: Number.MAX_SAFE_INTEGER,
       activity: null,
     });
@@ -126,7 +127,6 @@ describe("ChannelActivityHub", () => {
       {} as Env,
     );
     const issueFrame: IssueAgentActivityFrame = {
-      version: CHANNEL_AGENT_ACTIVITY_VERSION,
       replyJobId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
       attempt: 1,
       sequence: 1,
@@ -142,13 +142,9 @@ describe("ChannelActivityHub", () => {
       sentAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 30_000).toISOString(),
     };
-    const response = await hub.fetch(new Request("https://activity.test/publish", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(issueFrame),
-    }));
+    const response = await hub.fetch(publishRequest(issueFrame));
     expect(response.status).toBe(204);
-    expect(JSON.parse(socket.sent[0])).toMatchObject({
+    expect(decodeFrame(socket.sent[0])).toMatchObject({
       projectId: issueFrame.projectId,
       activity: { kind: "message" },
     });
@@ -199,7 +195,6 @@ describe("activity hub adapters", () => {
     } as unknown as Env;
     const channelFrame = frame(1);
     const issueFrame: IssueAgentActivityFrame = {
-      version: channelFrame.version,
       replyJobId: channelFrame.replyJobId,
       attempt: channelFrame.attempt,
       sequence: channelFrame.sequence,

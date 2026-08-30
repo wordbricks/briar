@@ -1,6 +1,6 @@
 import * as Option from "effect/Option";
 import {
-  decodeIssueAgentActivityFrameOption,
+  decodeIssueAgentActivityFrameBinaryOption,
   type IssueAgentActivityFrame,
 } from "./channel-agent-activity";
 import { AgentActivityRealtimeTransport } from "./agent-activity-realtime";
@@ -23,7 +23,7 @@ export class IssueActivityRealtimeTransport
         ticketPath: `/projects/${input.projectId}/runs/${input.runId}/` +
           "agent-activity-events",
         decodeFrame: (value) =>
-          Option.getOrNull(decodeIssueAgentActivityFrameOption(value)),
+          Option.getOrNull(decodeIssueAgentActivityFrameBinaryOption(value)),
         matchesScope: (frame) =>
           frame.projectId === input.projectId && frame.runId === input.runId,
       },

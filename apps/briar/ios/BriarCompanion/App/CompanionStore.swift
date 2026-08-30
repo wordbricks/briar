@@ -676,7 +676,6 @@ final class RunDetailStore: ObservableObject {
                     for try await frame in events {
                         guard !Task.isCancelled,
                               expectedGeneration == self.activityGeneration,
-                              frame.version == 1,
                               frame.projectId == self.projectID,
                               frame.runId == self.runID
                         else { return }

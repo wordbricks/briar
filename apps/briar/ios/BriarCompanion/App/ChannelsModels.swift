@@ -858,8 +858,7 @@ struct ChannelAgentActivity: Codable, Equatable, Sendable {
     }
 }
 
-struct ChannelAgentActivityFrame: Codable, Equatable, Sendable {
-    let version: Int
+struct ChannelAgentActivityFrame: Equatable, Sendable {
     let replyJobId: UUID
     let attempt: Int
     let sequence: Int
@@ -872,8 +871,7 @@ struct ChannelAgentActivityFrame: Codable, Equatable, Sendable {
     let expiresAt: Date
 }
 
-struct IssueAgentActivityFrame: Codable, Equatable, Sendable {
-    let version: Int
+struct IssueAgentActivityFrame: Equatable, Sendable {
     let replyJobId: UUID
     let attempt: Int
     let sequence: Int
@@ -884,6 +882,110 @@ struct IssueAgentActivityFrame: Codable, Equatable, Sendable {
     let activity: ChannelAgentActivity?
     let sentAt: Date
     let expiresAt: Date
+}
+
+enum AgentReplyActivityFrame: Equatable, Sendable {
+    case channel(ChannelAgentActivityFrame)
+    case issue(IssueAgentActivityFrame)
+
+    init(protobuf message: BriarRealtime_AgentReplyActivityFrame) throws {
+        let fields = try CommonFields(protobuf: message)
+        guard let scope = message.scope else { throw MobileAPIError.invalidResponse }
+        switch scope {
+        case .channel(let channel):
+            guard let agentID = UUID(uuidString: channel.agentID),
+                  let channelID = UUID(uuidString: channel.channelID)
+            else { throw MobileAPIError.invalidResponse }
+            self = .channel(ChannelAgentActivityFrame(
+                replyJobId: fields.replyJobID,
+                attempt: fields.attempt,
+                sequence: fields.sequence,
+                agentId: agentID,
+                channelId: channelID,
+                triggerMessageId: fields.triggerMessageID,
+                parentMessageId: fields.parentMessageID,
+                activity: fields.activity,
+                sentAt: fields.sentAt,
+                expiresAt: fields.expiresAt
+            ))
+        case .issue(let issue):
+            guard let projectID = UUID(uuidString: issue.projectID),
+                  let runID = UUID(uuidString: issue.runID)
+            else { throw MobileAPIError.invalidResponse }
+            self = .issue(IssueAgentActivityFrame(
+                replyJobId: fields.replyJobID,
+                attempt: fields.attempt,
+                sequence: fields.sequence,
+                projectId: projectID,
+                runId: runID,
+                triggerMessageId: fields.triggerMessageID,
+                parentMessageId: fields.parentMessageID,
+                activity: fields.activity,
+                sentAt: fields.sentAt,
+                expiresAt: fields.expiresAt
+            ))
+        }
+    }
+
+    private struct CommonFields {
+        let replyJobID: UUID
+        let attempt: Int
+        let sequence: Int
+        let triggerMessageID: UUID
+        let parentMessageID: UUID
+        let activity: ChannelAgentActivity?
+        let sentAt: Date
+        let expiresAt: Date
+
+        init(protobuf message: BriarRealtime_AgentReplyActivityFrame) throws {
+            guard let replyJobID = UUID(uuidString: message.replyJobID),
+                  message.attempt > 0,
+                  message.sequence > 0,
+                  message.sequence <= UInt64(Int.max),
+                  let triggerMessageID = UUID(uuidString: message.triggerMessageID),
+                  let parentMessageID = UUID(uuidString: message.parentMessageID),
+                  message.hasSentAt,
+                  message.hasExpiresAt
+            else { throw MobileAPIError.invalidResponse }
+            self.replyJobID = replyJobID
+            self.attempt = Int(message.attempt)
+            self.sequence = Int(message.sequence)
+            self.triggerMessageID = triggerMessageID
+            self.parentMessageID = parentMessageID
+            self.sentAt = message.sentAt.date
+            self.expiresAt = message.expiresAt.date
+            self.activity = try Self.activity(protobuf: message)
+        }
+
+        private static func activity(
+            protobuf message: BriarRealtime_AgentReplyActivityFrame
+        ) throws -> ChannelAgentActivity? {
+            guard message.hasActivity else { return nil }
+            let kind: ChannelAgentActivity.Kind
+            switch message.activity.kind {
+            case .message:
+                kind = .message
+            case .command:
+                kind = .command
+            case .fileChange:
+                kind = .fileChange
+            case .webSearch:
+                kind = .webSearch
+            case .tool:
+                kind = .tool
+            case .unspecified, .UNRECOGNIZED:
+                throw MobileAPIError.invalidResponse
+            }
+            guard !message.activity.id.isEmpty,
+                  !message.activity.headline.isEmpty
+            else { throw MobileAPIError.invalidResponse }
+            return ChannelAgentActivity(
+                id: message.activity.id,
+                kind: kind,
+                headline: message.activity.headline
+            )
+        }
+    }
 }
 
 struct ChannelDeltaResponse: Codable, Equatable, Sendable {

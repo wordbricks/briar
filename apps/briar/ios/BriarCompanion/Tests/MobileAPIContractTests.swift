@@ -39,6 +39,59 @@ final class MobileAPIContractTests: XCTestCase {
         )
     }
 
+    func testAgentActivityProtobufChannelAndIssueScopes() throws {
+        var activity = BriarRealtime_AgentActivity()
+        activity.id = "command-1"
+        activity.kind = .command
+        activity.headline = "Running tests"
+
+        var common = BriarRealtime_AgentReplyActivityFrame()
+        common.replyJobID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+        common.attempt = 2
+        common.sequence = 7
+        common.triggerMessageID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        common.parentMessageID = "ffffffff-ffff-4fff-8fff-ffffffffffff"
+        common.activity = activity
+        common.sentAt = Google_Protobuf_Timestamp(
+            date: Date(timeIntervalSince1970: 1_787_184_000)
+        )
+        common.expiresAt = Google_Protobuf_Timestamp(
+            date: Date(timeIntervalSince1970: 1_787_184_030)
+        )
+
+        var channel = common
+        var channelScope = BriarRealtime_ChannelActivityScope()
+        channelScope.agentID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+        channelScope.channelID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+        channel.channel = channelScope
+        let channelFrame = try AgentReplyActivityFrame(
+            protobuf: BriarRealtime_AgentReplyActivityFrame(
+                serializedBytes: channel.serializedData()
+            )
+        )
+        guard case .channel(let mappedChannel) = channelFrame else {
+            return XCTFail("Expected a channel activity scope")
+        }
+        XCTAssertEqual(mappedChannel.channelId.uuidString.lowercased(), channelScope.channelID)
+        XCTAssertEqual(mappedChannel.activity?.kind, .command)
+
+        var issue = common
+        var issueScope = BriarRealtime_IssueActivityScope()
+        issueScope.projectID = "11111111-1111-4111-8111-111111111111"
+        issueScope.runID = "22222222-2222-4222-8222-222222222222"
+        issue.issue = issueScope
+        let issueFrame = try AgentReplyActivityFrame(
+            protobuf: BriarRealtime_AgentReplyActivityFrame(
+                serializedBytes: issue.serializedData()
+            )
+        )
+        guard case .issue(let mappedIssue) = issueFrame else {
+            return XCTFail("Expected an issue activity scope")
+        }
+        XCTAssertEqual(mappedIssue.projectId.uuidString.lowercased(), issueScope.projectID)
+        XCTAssertEqual(mappedIssue.runId.uuidString.lowercased(), issueScope.runID)
+    }
+
     func testChannelIssueProposalPayloadDecodesCanonicalDetails() throws {
         let detailed = try JSONDecoder.mobileContract.decode(
             ChannelMessage.Proposal.self,
