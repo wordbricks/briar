@@ -34,7 +34,7 @@ const projects: Project[] = [
     icon: "data:image/webp;base64,sprout-icon",
     organizationId: "organization-1",
     organizationName: "Briar",
-    role: "member",
+    role: "developer",
     createdAt: "2026-07-02T00:00:00.000Z",
   },
 ];
@@ -187,6 +187,81 @@ describe("Inbox", () => {
     expect(click).not.toHaveBeenCalled();
   });
 
+  it("shows only unread messages within the selected project and categories", async () => {
+    const messages = [
+      issue("briar-unread", "Unread Briar failure", {
+        status: "failed",
+        priority: 1,
+      }),
+      issue("briar-read", "Read Briar failure", {
+        isUnread: false,
+        status: "failed",
+        priority: 1,
+      }),
+      issue("briar-activity", "Unread Briar activity", {
+        priority: 4,
+      }),
+      issue("sprout-unread", "Unread Sprout failure", {
+        projectId: "project-2",
+        projectName: "Sprout",
+        status: "failed",
+        priority: 1,
+      }),
+    ];
+
+    await renderReactTestRoot(
+      root,
+      <TestProviders>
+        <Inbox
+          isSidebarOpen
+          messages={messages}
+          onMarkAllRead={vi.fn()}
+          onMarkRead={vi.fn()}
+          onOpen={vi.fn()}
+          projects={projects}
+          unreadCount={3}
+        />
+      </TestProviders>,
+    );
+
+    const unreadOnlyFilter = container.querySelector<HTMLButtonElement>(
+      ".inbox-filter.unread-only",
+    );
+    expect(unreadOnlyFilter?.getAttribute("aria-label")).toBe(
+      "읽지 않은 메시지만 보기",
+    );
+    expect(unreadOnlyFilter?.getAttribute("aria-pressed")).toBe("false");
+
+    await act(async () => unreadOnlyFilter?.click());
+
+    expect(unreadOnlyFilter?.getAttribute("aria-pressed")).toBe("true");
+    expect(container.textContent).toContain("Unread Briar failure");
+    expect(container.textContent).not.toContain("Read Briar failure");
+    expect(container.textContent).not.toContain("Unread Briar activity");
+    expect(container.textContent).toContain("Unread Sprout failure");
+    expect(container.textContent).toContain("2개 표시");
+
+    const projectFilter = container.querySelector<HTMLButtonElement>(
+      '[aria-label="프로젝트 필터"]',
+    );
+    await act(async () => projectFilter?.click());
+    const briarOption = document.querySelector<HTMLButtonElement>(
+      '[role="option"][data-value="project-1"]',
+    );
+    await act(async () => briarOption?.click());
+
+    expect(container.textContent).toContain("Unread Briar failure");
+    expect(container.textContent).not.toContain("Unread Sprout failure");
+    expect(container.textContent).toContain("1개 표시");
+
+    await act(async () => unreadOnlyFilter?.click());
+
+    expect(container.textContent).toContain("Unread Briar failure");
+    expect(container.textContent).toContain("Read Briar failure");
+    expect(container.textContent).not.toContain("Unread Briar activity");
+    expect(container.textContent).toContain("2개 표시");
+  });
+
   it("marks one message as read without opening its destination", async () => {
     const message = issue("unread", "Review this update", {
       priority: 1,
@@ -223,6 +298,41 @@ describe("Inbox", () => {
     const openButton = container.querySelector(".inbox-message-open");
     expect(document.activeElement).toBe(openButton);
     expect(openButton?.hasAttribute("data-keyboard-list-current")).toBe(true);
+  });
+
+  it("shows one unread-count badge for a collapsed thread", async () => {
+    const message = issue("conversation:first", "Grouped thread", {
+      kind: "conversation",
+      targetId: "run-1",
+      messageId: "first",
+      rootMessageId: "root-1",
+      body: "Oldest unread reply",
+      authorName: "Member",
+      reason: "thread_reply",
+      threadMessageCount: 3,
+      threadUnreadCount: 3,
+    });
+
+    await renderReactTestRoot(
+      root,
+      <TestProviders>
+        <Inbox
+          isSidebarOpen
+          messages={[message]}
+          onMarkAllRead={vi.fn()}
+          onMarkRead={vi.fn()}
+          onOpen={vi.fn()}
+          projects={projects}
+          unreadCount={1}
+        />
+      </TestProviders>,
+    );
+
+    const badge = container.querySelector(
+      '[aria-label="읽지 않은 메시지 3개"]',
+    );
+    expect(badge?.textContent).toBe("3");
+    expect(container.querySelectorAll(".inbox-message")).toHaveLength(1);
   });
 
   it("marks one read message as unread without opening its destination", async () => {

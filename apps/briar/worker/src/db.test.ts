@@ -1067,6 +1067,56 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    // The compact lifecycle schema predates channel thread subscriptions and
+    // issue execution approvals. Supply the empty channel tables referenced by
+    // the production role migration's membership foreign keys and triggers.
+    await executeSql(
+      db,
+      `create table briar_channel_sync_state (
+         organization_id text primary key not null,
+         current_version integer not null default 0
+       );
+       create table briar_channel_changes (
+         version integer primary key autoincrement,
+         organization_id text not null,
+         channel_id text not null,
+         entity_type text not null,
+         entity_id text,
+         operation text not null,
+         created_at text not null
+       );
+       create table briar_channel_thread_subscriptions (
+         root_message_id text not null
+           references briar_channel_messages (id) on delete cascade,
+         channel_id text not null
+           references briar_channels (id) on delete cascade,
+         organization_id text not null,
+         user_id text not null,
+         created_at text not null,
+         primary key (root_message_id, user_id),
+         foreign key (organization_id, user_id)
+           references briar_organization_members (organization_id, user_id)
+           on delete cascade
+       );`,
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0146_organization_capability_roles.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0147_project_github_repository_identity.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      `drop trigger briar_issue_execution_org_member_remove_invalidate;`,
+    );
     // The lifecycle suite intentionally uses a compact migration history, so
     // add the issue-reply job columns that production migration 0116 supplies
     // before exercising the shared DB helpers below.
@@ -3201,12 +3251,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     `,
     );
     await expect(
-      addOrganizationMember(db, projectId, "member@example.com", "member"),
+      addOrganizationMember(db, projectId, "member@example.com", "developer"),
     ).resolves.toBe("member");
 
     const projects = await listProjects(db, "member");
     expect(projects.map((project) => project.id)).toContain(projectId);
-    expect(projects[0]?.member_role).toBe("member");
+    expect(projects[0]?.member_role).toBe("developer");
     expect(await getProject(db, projectId, "member")).not.toBeNull();
     await expect(deleteProject(db, projectId, "member")).resolves.toBe(false);
     const memberTokenHash = "e".repeat(64);
@@ -3241,7 +3291,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(listProjects(db, "member")).resolves.toEqual([]);
     await expect(getProject(db, projectId, "member")).resolves.toBeNull();
     await expect(
-      updateOrganizationMemberRole(db, projectId, "member", "member"),
+      updateOrganizationMemberRole(db, projectId, "member", "developer"),
     ).resolves.toBe(true);
     await expect(getProject(db, projectId, "member")).resolves.toBeNull();
     await expect(
@@ -3256,7 +3306,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(getProject(db, projectId, "member")).resolves.not.toBeNull();
 
     await expect(
-      updateOrganizationMemberRole(db, projectId, "member", "admin"),
+      updateOrganizationMemberRole(db, projectId, "member", "co-owner"),
     ).resolves.toBe(true);
     await expect(
       updateOrganizationMemberProjects(db, projectId, "member", []),
@@ -3267,10 +3317,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "member@example.com",
     ]);
     expect(members.find((member) => member.user_id === "member")?.role).toBe(
-      "admin",
+      "co-owner",
     );
     await expect(
-      updateOrganizationMemberRole(db, projectId, "owner", "member"),
+      updateOrganizationMemberRole(db, projectId, "owner", "developer"),
     ).resolves.toBe(false);
     const assignedRunId = await recordHuntEvent(
       db,
@@ -3304,7 +3354,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       organizationId: projectId,
       initialProjectId: projectId,
       emailNormalized: "new-invitee@example.com",
-      role: "member",
+      role: "editor",
       tokenHash,
       invitedByUserId: "owner",
       expiresAt: atMinute(100),
@@ -3347,7 +3397,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).resolves.toMatchObject({ outcome: "accepted" });
     const invitedProjects = await listProjects(db, "new-invitee");
     expect(invitedProjects).toEqual([
-      expect.objectContaining({ id: projectId, member_role: "member" }),
+      expect.objectContaining({ id: projectId, member_role: "editor" }),
     ]);
     expect(invitedProjects.map((project) => project.id)).not.toContain(
       secondProject.id,
@@ -3371,7 +3421,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       organizationId: projectId,
       initialProjectId: projectId,
       emailNormalized: "replace-invite@example.com",
-      role: "member",
+      role: "viewer",
       tokenHash: "2".repeat(64),
       invitedByUserId: "owner",
       expiresAt: atMinute(100),
@@ -3383,7 +3433,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       organizationId: projectId,
       initialProjectId: projectId,
       emailNormalized: "replace-invite@example.com",
-      role: "admin",
+      role: "co-owner",
       tokenHash: "3".repeat(64),
       invitedByUserId: "owner",
       expiresAt: atMinute(110),
@@ -3391,7 +3441,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     });
     expect(replacement).toMatchObject({
       outcome: "created",
-      invitation: { id: "invitation-replacement", role: "admin" },
+      invitation: { id: "invitation-replacement", role: "co-owner" },
     });
     await expect(
       getOrganizationInvitationByTokenHash(db, "2".repeat(64)),
@@ -3560,7 +3610,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       projectIds: [project.id],
     });
     await expect(
-      addOrganizationMember(db, organization.id, memberEmail, "member"),
+      addOrganizationMember(db, organization.id, memberEmail, "developer"),
     ).resolves.toBe(memberId);
 
     await expect(deleteAccountData(db, {
@@ -3867,7 +3917,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ownerUserId: ownerId,
     });
     await expect(
-      addOrganizationMember(db, organization.id, memberEmail, "member"),
+      addOrganizationMember(db, organization.id, memberEmail, "developer"),
     ).resolves.toBe(memberId);
     const sharedProject = await createProject(db, {
       ownerUserId: ownerId,
@@ -4138,7 +4188,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
       ) values (
-        '${projectId}', 'issue-message-mention', 'member',
+        '${projectId}', 'issue-message-mention', 'editor',
         '${atMinute(0)}', '${atMinute(0)}'
       );`,
     );
@@ -4207,11 +4257,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         organization_id, user_id, role, created_at, updated_at
       ) values
         (
-          '${projectId}', 'conversation-member', 'member',
+          '${projectId}', 'conversation-member', 'editor',
           '${atMinute(0)}', '${atMinute(0)}'
         ),
         (
-          '${projectId}', 'mentioned-member', 'member',
+          '${projectId}', 'mentioned-member', 'editor',
           '${atMinute(0)}', '${atMinute(0)}'
         );`,
     );
@@ -4366,7 +4416,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
       ) values (
-        '${projectId}', 'subscription-member', 'member',
+        '${projectId}', 'subscription-member', 'editor',
         '${atMinute(0)}', '${atMinute(0)}'
       );
       insert into briar_project_members (
@@ -4452,7 +4502,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
       ) values (
-        '${projectId}', 'channel-member', 'member',
+        '${projectId}', 'channel-member', 'editor',
         '${atMinute(0)}', '${atMinute(0)}'
       );
       insert into briar_channels (

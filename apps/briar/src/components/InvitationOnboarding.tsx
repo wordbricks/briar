@@ -5,6 +5,7 @@ import {
   FolderKanban,
   LogOut,
   Mail,
+  ShieldCheck,
 } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 import { useEffect, useState } from "react";
@@ -128,6 +129,16 @@ export function InvitationOnboarding({
                 <FolderKanban className="text-primary" size={18} />
                 <Typography as="span" variant="bodySm">
                   {invitation.initialProjectName}
+                </Typography>
+              </div>
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="text-primary" size={18} />
+                <Typography as="span" variant="bodySm">
+                  {t(`organization.role.${invitation.role}` as
+                    | "organization.role.co-owner"
+                    | "organization.role.developer"
+                    | "organization.role.editor"
+                    | "organization.role.viewer")}
                 </Typography>
               </div>
               <div className="flex items-center gap-3">

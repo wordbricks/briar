@@ -33,7 +33,7 @@ Dense desktop product UI. Prefer semantic roles over raw pixel sizes.
 Font weights: **400 / 500 / 600 / 700** only (no 520–760).
 
 ```tsx
-import { Typography } from "@/components/ui";
+import { Typography } from "@/components/ui/typography";
 
 <Typography variant="title">Project settings</Typography>
 <Typography variant="caption" tone="muted">
@@ -64,30 +64,27 @@ Legacy aliases still work for `styles.css`: `--ink`, `--line`, `--surface`, `--f
 ## Components
 
 ```tsx
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChoiceCard } from "@/components/ui/choice-card";
 import {
-  Button,
-  Input,
-  Label,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  ChoiceCard,
-  Badge,
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  Typography,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
   StatusPanel,
   StatusPanelContent,
   StatusPanelDescription,
   StatusPanelIcon,
   StatusPanelTitle,
-} from "@/components/ui";
+} from "@/components/ui/status-panel";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Typography } from "@/components/ui/typography";
 ```
 
 ### Feedback surfaces
@@ -131,7 +128,7 @@ Shared page layout primitives live in `apps/briar/src/components/layout/`:
 
 Migrated product surfaces include Login, Inbox, Auto Hunt, Agents, Schedule,
 Issue queue/dashboard, Organization create, Companion chrome, and settings.
-Remaining dialogs/forms should prefer `@/components/ui` controls as they are touched.
+Remaining dialogs/forms should prefer `@/components/ui/*` controls as they are touched.
 
 Legacy `apps/briar/src/styles.css` is tokenized for type scale and common colors so older
 class-based screens inherit the system even before full JSX rewrites.
@@ -156,7 +153,7 @@ Migrated screens:
 
 ## Migration guide
 
-1. **New UI** — build only with `@/components/ui` + Tailwind utilities + tokens.
+1. **New UI** — build only with concrete `@/components/ui/*` modules + Tailwind utilities + tokens.
 2. **Touching a screen** — replace one-off `font-size: 9px` / `11.5px` with `var(--text-*)` or semantic classes.
 3. **Buttons / inputs / dialogs** — prefer primitives over duplicated CSS.
 4. **Settings-like pages** — reuse `@/components/settings` layout primitives.

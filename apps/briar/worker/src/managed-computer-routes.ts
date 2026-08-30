@@ -12,6 +12,7 @@ import {
   decodeManagedComputerRemoteSessionRequest,
   decodeManagedComputerRetry,
   decodeManagedComputerSetupBind,
+  decodeManagedComputerSetupAccess,
   decodeManagedComputerSetupSession,
 } from "./managed-computer-request-contract";
 import { managedComputerConfig, managedComputerJson } from "./managed-computer-model";
@@ -30,6 +31,7 @@ import {
   enrollManagedComputer,
   issueManagedComputerSetupSession,
   managedComputerProductResponse,
+  managedComputerSetupContext,
   managedComputerSetupStatus,
   retryManagedComputerProvisioning,
   validateManagedComputerPromotion,
@@ -44,12 +46,21 @@ import {
   managedComputerRemoteAgentToken,
   recordManagedComputerRemoteRejection,
 } from "./managed-computer-remote-service";
-import { canManageOrganization } from "./organization-access";
+import {
+  connectManagedComputerSetupAgent,
+  connectManagedComputerSetupClient,
+  managedComputerSetupAgentStatus,
+  managedComputerSetupAgentToken,
+  managedComputerSetupClientSocket,
+} from "./managed-computer-setup-relay-service";
+import { hasOrganizationCapability } from "./organization-access";
 import { getOrganizationRole } from "./organization-repository";
 import { readJson } from "./request-readers";
 import { requireSession } from "./session-auth";
 import { requireWorkerCredential } from "./worker-auth";
 import { workerJson } from "./worker-json";
+import { createGithubInstallationToken } from "./github-app-api";
+import { projectGithubIdentity } from "./project-github-routes";
 
 export type ManagedComputerRouteInput = {
   request: Request;
@@ -103,6 +114,98 @@ export async function handleManagedComputerRoute(
     }, {
       status: result.duplicate ? 200 : 201,
       headers: { ...corsHeaders, "Cache-Control": "private, no-store" },
+    });
+  }
+
+  const managedComputerSetupContextMatch = pathname.match(
+    /^\/managed-computers\/([0-9a-f-]+)\/setup\/context$/u,
+  );
+  if (managedComputerSetupContextMatch && request.method === "POST") {
+    const principal = await requireWorkerCredential(db, request);
+    const input = decodeManagedComputerSetupAccess(await readJson(request));
+    const setupContext = await managedComputerSetupContext(db, {
+      managedComputerId: managedComputerSetupContextMatch[1],
+      organizationId: principal.organizationId,
+      deviceId: principal.deviceId,
+      setupToken: input.setupToken,
+      observedAt: new Date().toISOString(),
+    });
+    let repositoryCredential: Record<string, unknown> | undefined;
+    if (setupContext.settings.githubRepository) {
+      const identity = await projectGithubIdentity(db, {
+        id: setupContext.project.id,
+        organization_id: principal.organizationId,
+      });
+      const credential = await createGithubInstallationToken(env, identity);
+      repositoryCredential = {
+        project: {
+          id: setupContext.project.id,
+          organizationId: principal.organizationId,
+        },
+        repository: {
+          id: identity.repositoryId,
+          fullName: identity.repository,
+          cloneUrl: `https://github.com/${identity.repository}.git`,
+        },
+        username: "x-access-token",
+        password: credential.token,
+        expiresAt: credential.expiresAt,
+      };
+    }
+    return privateNoStoreJson({
+      ...setupContext,
+      ...(repositoryCredential ? { repositoryCredential } : {}),
+    });
+  }
+
+  const managedComputerSetupAgentMatch = pathname.match(
+    /^\/managed-computers\/([0-9a-f-]+)\/setup-agent$/u,
+  );
+  if (managedComputerSetupAgentMatch && request.method === "GET") {
+    const agent = managedComputerSetupAgentToken(request);
+    if (!agent) {
+      throw new HttpError(
+        401,
+        "Invalid managed setup agent credential",
+        "MANAGED_COMPUTER_SETUP_AGENT_TOKEN_INVALID",
+      );
+    }
+    const credentialHeaders = new Headers(request.headers);
+    credentialHeaders.set("Authorization", `Bearer ${agent.token}`);
+    const principal = await requireWorkerCredential(
+      db,
+      new Request(request, { headers: credentialHeaders }),
+    );
+    const computer = await managedComputerById(
+      db,
+      managedComputerSetupAgentMatch[1],
+    );
+    if (
+      !computer || computer.organization_id !== principal.organizationId ||
+      computer.briar_device_id !== principal.deviceId ||
+      !["needs_setup", "ready"].includes(computer.state)
+    ) {
+      throw new HttpError(
+        403,
+        "Worker is not authorized for this managed computer",
+        "MANAGED_COMPUTER_SETUP_AGENT_REJECTED",
+      );
+    }
+    return connectManagedComputerSetupAgent(env, {
+      managedComputerId: computer.id,
+      request,
+    });
+  }
+
+  const managedComputerSetupClientMatch = pathname.match(
+    /^\/managed-computers\/([0-9a-f-]+)\/setup-sessions\/([0-9a-f-]+)\/connect$/u,
+  );
+  if (managedComputerSetupClientMatch && request.method === "GET") {
+    return connectManagedComputerSetupClient(db, env, {
+      managedComputerId: managedComputerSetupClientMatch[1],
+      sessionId: managedComputerSetupClientMatch[2],
+      request,
+      observedAt: new Date().toISOString(),
     });
   }
 
@@ -164,10 +267,12 @@ export async function handleManagedComputerRoute(
     const session = await requireSession(auth, request);
     const organizationId = managedComputerProductMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     return json({
       ...managedComputerProductResponse(env),
-      canApply: canManageOrganization(role),
+      canApply: hasOrganizationCapability(role, "development:manage"),
     });
   }
 
@@ -178,8 +283,8 @@ export async function handleManagedComputerRoute(
     const session = await requireSession(auth, request);
     const organizationId = managedComputerPromotionMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const input = decodeManagedComputerPromotionValidation(
       await readJson(request),
@@ -199,7 +304,9 @@ export async function handleManagedComputerRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationManagedComputersMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     const observedAt = new Date().toISOString();
     const computers = await listOrganizationManagedComputers(db, organizationId);
     const refreshed = await Promise.all(computers.map((computer) =>
@@ -218,8 +325,8 @@ export async function handleManagedComputerRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationManagedComputersMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const input = decodeManagedComputerApplication(await readJson(request));
     const idempotencyKey = request.headers.get("idempotency-key")?.trim();
@@ -265,8 +372,7 @@ export async function handleManagedComputerRoute(
     );
     if (
       !computer ||
-      (!canManageOrganization(role) &&
-        computer.requester_user_id !== session.user.id)
+      !hasOrganizationCapability(role, "development:manage")
     ) {
       throw new HttpError(
         403,
@@ -291,6 +397,15 @@ export async function handleManagedComputerRoute(
       requestId: input.requestId,
       observedAt: new Date().toISOString(),
     });
+    const socket = managedComputerSetupClientSocket(request.url, {
+      managedComputerId,
+      sessionId: result.session.id,
+      setupToken: result.setupToken,
+    });
+    const agentConnected = await managedComputerSetupAgentStatus(
+      env,
+      managedComputerId,
+    );
     return Response.json({
       session: {
         id: result.session.id,
@@ -301,6 +416,8 @@ export async function handleManagedComputerRoute(
         expiresAt: result.session.expires_at,
       },
       setupToken: result.setupToken,
+      socket,
+      agentConnected,
       duplicate: result.duplicate,
     }, {
       status: result.duplicate ? 200 : 201,
@@ -323,8 +440,7 @@ export async function handleManagedComputerRoute(
     );
     if (
       !computer ||
-      (!canManageOrganization(role) &&
-        computer.requester_user_id !== session.user.id)
+      !hasOrganizationCapability(role, "development:manage")
     ) {
       throw new HttpError(
         403,
@@ -354,8 +470,7 @@ export async function handleManagedComputerRoute(
     const observedAt = new Date().toISOString();
     if (
       !computer ||
-      (!canManageOrganization(role) &&
-        computer.requester_user_id !== session.user.id)
+      !hasOrganizationCapability(role, "development:manage")
     ) {
       const attemptedComputer = computer ??
         await managedComputerById(db, managedComputerId);
@@ -431,8 +546,7 @@ export async function handleManagedComputerRoute(
     const observedAt = new Date().toISOString();
     if (
       !computer ||
-      (!canManageOrganization(role) &&
-        computer.requester_user_id !== session.user.id)
+      !hasOrganizationCapability(role, "development:manage")
     ) {
       const attemptedComputer = computer ??
         await managedComputerById(db, managedComputerId);
@@ -492,8 +606,8 @@ export async function handleManagedComputerRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationManagedComputerRetryMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const input = decodeManagedComputerRetry(await readJson(request));
     const idempotencyKey = request.headers.get("idempotency-key")?.trim();
@@ -531,8 +645,8 @@ export async function handleManagedComputerRoute(
     const organizationId = organizationManagedComputerMatch[1];
     const managedComputerId = organizationManagedComputerMatch[2];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const existing = await organizationManagedComputer(
       db,
@@ -606,7 +720,8 @@ export async function handleManagedComputerRoute(
   if (organizationManagedComputerMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
     const organizationId = organizationManagedComputerMatch[1];
-    if (!(await getOrganizationRole(db, organizationId, session.user.id))) {
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!hasOrganizationCapability(role, "organization:read")) {
       throw new HttpError(404, "Organization not found");
     }
     let computer = await organizationManagedComputer(

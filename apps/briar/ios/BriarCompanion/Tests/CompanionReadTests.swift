@@ -50,6 +50,25 @@ final class CompanionReadTests: XCTestCase {
         XCTAssertEqual(completed.map(\.title), ["Finished contract"])
     }
 
+    func testProjectLobbySummaryCountsStatusBucketsAndLimitsRecentRuns() {
+        let extraRuns = (0..<4).map { index in
+            DashboardRun(
+                id: UUID(),
+                title: "Backlog \(index)",
+                status: .backlog,
+                updatedAt: newer.addingTimeInterval(TimeInterval(index + 1))
+            )
+        }
+        let summary = ProjectLobbySummary(runs: runs + extraRuns)
+
+        XCTAssertEqual(summary.total, 7)
+        XCTAssertEqual(summary.active, 1)
+        XCTAssertEqual(summary.attention, 1)
+        XCTAssertEqual(summary.completed, 1)
+        XCTAssertEqual(summary.recent.count, 5)
+        XCTAssertEqual(summary.recent.first?.title, "Backlog 3")
+    }
+
     func testSearchCoversTitleDescriptionDetailAndResult() {
         XCTAssertEqual(TaskSearch.results(in: runs, query: "native").count, 1)
         XCTAssertEqual(TaskSearch.results(in: runs, query: "Markdown").count, 1)
@@ -228,6 +247,15 @@ final class CompanionReadTests: XCTestCase {
         XCTAssertTrue(workerCanRunAgentSkill(legacyProvider, provider: .codex))
     }
 
+    func testHostReadinessLabelsCoverEveryDashboardState() {
+        XCTAssertEqual(hostReadinessLabel("available", locale: .ko), "사용 가능")
+        XCTAssertEqual(hostReadinessLabel("busy", locale: .en), "Running")
+        XCTAssertEqual(hostReadinessLabel("offline", locale: .en), "Offline")
+        XCTAssertEqual(hostReadinessLabel("needs_attention", locale: .zh), "需要处理")
+        XCTAssertEqual(hostReadinessLabel("disabled", locale: .en), "Sharing disabled")
+        XCTAssertEqual(hostReadinessLabel("future_state", locale: .ko), "future_state")
+    }
+
     @MainActor
     func testRunDetailAuthoritativeNullInvalidatesPendingExecutionContext() async throws {
         let proposal = executionProposal()
@@ -400,6 +428,45 @@ final class CompanionReadTests: XCTestCase {
         XCTAssertEqual(requestCount, 2)
         XCTAssertNil(store.messages.first?.executionProposal)
         XCTAssertNil(store.captureExecutionProposal(proposalID: proposal.id))
+    }
+
+    @MainActor
+    func testRunDetailAppliesConversationDeltaWithoutReloadingTheSnapshot() async throws {
+        let initial = issueMessage(body: "처음 대화")
+        let appended = issueMessage(
+            id: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
+            body: "실시간으로 도착한 대화"
+        )
+        let api = RunDetailSnapshotAPI(
+            messageSnapshots: [
+                IssueMessagesResponse(messages: [initial], cursor: 41),
+            ],
+            messageDeltas: [
+                IssueMessagesDeltaResponse(
+                    cursor: 42,
+                    hasMore: false,
+                    changed: true,
+                    messages: [appended],
+                    agentReplies: []
+                ),
+            ]
+        )
+        let store = RunDetailStore(
+            api: api,
+            projectID: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
+            runID: initial.runId,
+            token: "token"
+        )
+
+        await store.load()
+        await store.syncConversationChanges()
+
+        let snapshotRequestCount = await api.messageRequestCount()
+        let deltaRequestCount = await api.deltaRequestCount()
+        XCTAssertEqual(snapshotRequestCount, 1)
+        XCTAssertEqual(deltaRequestCount, 1)
+        XCTAssertFalse(store.loading)
+        XCTAssertEqual(store.messages.map(\.body), ["처음 대화", "실시간으로 도착한 대화"])
     }
 
     @MainActor
@@ -728,19 +795,27 @@ final class CompanionReadTests: XCTestCase {
 
 private actor RunDetailSnapshotAPI: MobileAPIClientProtocol {
     private var messageSnapshots: [IssueMessagesResponse]
+    private var messageDeltas: [IssueMessagesDeltaResponse]
     private let messageDelay: Duration?
     private var messageRequests = 0
+    private var deltaRequests = 0
 
     init(
         messageSnapshots: [IssueMessagesResponse],
+        messageDeltas: [IssueMessagesDeltaResponse] = [],
         messageDelay: Duration? = nil
     ) {
         self.messageSnapshots = messageSnapshots
+        self.messageDeltas = messageDeltas
         self.messageDelay = messageDelay
     }
 
     func messageRequestCount() -> Int {
         messageRequests
+    }
+
+    func deltaRequestCount() -> Int {
+        deltaRequests
     }
 
     func send<Response: Decodable & Sendable>(
@@ -753,6 +828,12 @@ private actor RunDetailSnapshotAPI: MobileAPIClientProtocol {
         let data: Data
         if path.hasSuffix("/events") {
             data = try JSONEncoder.mobileContract.encode(RunEventsResponse(events: []))
+        } else if path.contains("/messages/delta?cursor=") {
+            guard !messageDeltas.isEmpty else { throw MobileAPIError.invalidRequest }
+            deltaRequests += 1
+            let response = messageDeltas.removeFirst()
+            if let messageDelay { try await Task.sleep(for: messageDelay) }
+            data = try JSONEncoder.mobileContract.encode(response)
         } else if path.hasSuffix("/messages") {
             guard !messageSnapshots.isEmpty else { throw MobileAPIError.invalidRequest }
             messageRequests += 1

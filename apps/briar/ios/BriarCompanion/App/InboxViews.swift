@@ -72,11 +72,29 @@ struct InboxHomeView: View {
                 inboxIcon(message)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(message.title)
-                        .font(.body.weight(showsUnreadIndicator(message) ? .semibold : .medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .multilineTextAlignment(.leading)
+                    HStack(spacing: 6) {
+                        Text(message.title)
+                            .font(.body.weight(showsUnreadIndicator(message) ? .semibold : .medium))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                            .multilineTextAlignment(.leading)
+
+                        if message.threadUnreadCount > 1 {
+                            Text("\(message.threadUnreadCount)")
+                                .font(.caption2.monospacedDigit().weight(.semibold))
+                                .foregroundStyle(Color.accentColor)
+                                .padding(.horizontal, 6)
+                                .frame(minWidth: 20, minHeight: 20)
+                                .background(Color.accentColor.opacity(0.12), in: Capsule())
+                                .accessibilityLabel(
+                                    L10n.format(
+                                        "읽지 않은 메시지 %d개",
+                                        locale: locale,
+                                        message.threadUnreadCount
+                                    )
+                                )
+                        }
+                    }
 
                     HStack(spacing: 5) {
                         Text(secondaryText(message))

@@ -15,8 +15,10 @@ struct Project: Codable, Equatable, Sendable {
 
     enum Role: String, Codable, Sendable {
         case owner
-        case admin
-        case member
+        case coOwner = "co-owner"
+        case developer
+        case editor
+        case viewer
     }
 
     init(

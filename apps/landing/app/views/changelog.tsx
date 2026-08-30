@@ -30,6 +30,55 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.173",
+        date: "2026년 8월 30일",
+        title: "조직의 내 이슈와 저장소 작업을 한곳에서 확인합니다",
+        summary:
+          "조직별 내 이슈 화면과 GitHub 저장소 연결 흐름을 추가하고, 온보딩과 모바일 작업 경험을 다듬었습니다.",
+        items: [
+          "조직 사이드바에서 내가 맡은 이슈를 프로젝트별로 검색하고, 진행 중·확인이 필요한·완료된 항목으로 나눠 바로 열 수 있습니다.",
+          "관리형 컴퓨터 설정에서 GitHub CLI 없이 GitHub 연결을 시작하고, 선택한 저장소의 ID를 보존해 이름이 바뀌거나 재사용된 저장소를 잘못 가리키지 않게 했습니다.",
+          "조직 역할을 owner, co-owner, developer, editor, viewer 권한으로 나누고 기존 admin/member 권한을 안전하게 옮깁니다.",
+          "이슈 공유 페이지에서 Briar 앱을 열거나 웹에서 이슈를 볼 수 있습니다.",
+          "초기 온보딩에서 macOS 알림 권한을 확인하고, 시스템 설정으로 이동하거나 나중에 설정할 수 있습니다.",
+          "모바일에 호스트 상태 메뉴를 추가해 Worker 상태와 최근 실행을 확인할 수 있습니다.",
+          "이슈 대화에 답장을 제출하면 최신 메시지로 스크롤하고 입력창에 포커스를 돌려 작업을 이어갑니다.",
+          "iOS 이슈 대화가 불필요하게 주기적으로 다시 로드되지 않도록 동기화를 조정했습니다.",
+        ],
+      },
+      {
+        version: "1.2.172",
+        date: "2026년 8월 29일",
+        title: "채널, Inbox, 모바일 홈을 한 흐름으로 연결합니다",
+        summary:
+          "채널 스레드 맥락과 Inbox 탐색을 다듬고, 모바일 프로젝트 홈과 관리형 컴퓨터 설정을 추가했습니다.",
+        items: [
+          "Inbox 채널 스레드 알림에 채널 이름과 공개 범위를 표시하고, 채널로 이동해 같은 스레드 맥락을 이어갈 수 있습니다.",
+          "같은 이슈 대화나 채널 스레드의 Inbox 알림을 하나로 묶고, 미확인 개수와 읽음 상태를 데스크톱·Android·iOS에서 동기화합니다.",
+          "Inbox에서 읽지 않은 메시지만 볼 수 있고, 채널 과거 메시지 로딩과 프로젝트 탭의 Lobby 이동을 안정화했습니다.",
+          "모바일 Home에 프로젝트 Lobby와 Agents 진입을 추가해 프로젝트 지표, 최근 실행, 이슈 상세로 바로 이동할 수 있습니다.",
+          "현재 사용자에게 보내는 self-DM을 만들고 기존 대화를 재사용할 수 있습니다.",
+          "Codex, Claude, Grok, OpenCode 인증과 GitHub 저장소 연결을 관리형 컴퓨터 설정 흐름에서 안전하게 진행하고 Worker를 자동으로 연결합니다.",
+          "HTML artifact 미리보기의 단계·탭·버튼을 Production CSP 안에서 다시 동작하게 하고, iframe 격리와 외부 네트워크 차단을 유지합니다.",
+          "대화에 사용한 Agent Skill catalog를 보존하고, 관리형 컴퓨터 새 프로비저닝이 검증된 Launch Template을 사용하도록 갱신했습니다.",
+        ],
+      },
+      {
+        version: "1.2.171",
+        date: "2026년 8월 29일",
+        title: "채널 작업과 관리형 컴퓨터 운영을 더 안정적으로 연결합니다",
+        summary:
+          "채널 제안·첨부·Agent 답변과 관리형 컴퓨터 운영의 안정성을 높이고 Worker 전달 경로를 보강합니다.",
+        items: [
+          "채널 이슈 제안 카드에서 이슈 만들기, 생성 및 실행, 거절을 독립적으로 선택하고 거절 상태를 안전하게 저장합니다.",
+          "채널 Agent가 세 번 시도해도 실패하면 중복 없이 안내 답장을 남기고 Inbox 알림과 스레드 흐름을 유지합니다.",
+          "HTML artifact 첨부를 text/html 형식으로 이슈와 채널에 저장할 수 있도록 D1 첨부 스키마를 보강했습니다.",
+          "Merge Queue의 claim 요청이 API Worker에 도달하도록 라우팅해 대기 중인 이슈를 안정적으로 가져옵니다.",
+          "관리형 컴퓨터가 부팅 시 서비스와 loopback 화면 리스너를 스스로 복구하고 일시적인 등록 실패를 재시도합니다.",
+          "iOS Companion과 공용 모바일 계약에도 채널 제안 거절 흐름을 반영했습니다.",
+        ],
+      },
+      {
         version: "1.2.170",
         date: "2026년 8월 28일",
         title: "Merge Queue가 기존 저장소 정책을 그대로 따릅니다",
@@ -1266,6 +1315,55 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.173",
+        date: "August 30, 2026",
+        title: "Keep your issues and repository work in one place",
+        summary:
+          "Add an organization-wide My Issues view and a GitHub setup flow without the CLI, while tightening onboarding and mobile work.",
+        items: [
+          "Search your assigned issues across an organization by project and open active, needs-attention, or completed work directly from the sidebar.",
+          "Start GitHub repository setup from managed-computer configuration without the GitHub CLI, while preserving the selected repository ID when names change or are reused.",
+          "Split organization access into owner, co-owner, developer, editor, and viewer roles and migrate existing admin and member access safely.",
+          "Let shared issue pages open Briar or show the issue in the web app.",
+          "Check macOS notification permission during initial onboarding, open System Settings when needed, or defer the choice.",
+          "Add a mobile host-status menu for checking Worker readiness and recent runs.",
+          "After submitting an issue reply, return focus to the composer and keep the latest message in view.",
+          "Stop iOS issue conversations from reloading on an unnecessary periodic loop.",
+        ],
+      },
+      {
+        version: "1.2.172",
+        date: "August 29, 2026",
+        title: "Connect channels, Inbox, and mobile project homes",
+        summary:
+          "Refine channel-thread context and Inbox navigation while adding mobile project homes and guided managed-computer setup.",
+        items: [
+          "Show the channel name and visibility in Inbox channel-thread alerts, then open the channel while preserving the selected thread context.",
+          "Group Inbox alerts from the same issue conversation or channel thread and sync unread counts and read state across desktop, Android, and iOS.",
+          "Filter Inbox to unread messages, stabilize channel history loading, and restore project-tab navigation to the project Lobby.",
+          "Add project Lobby and Agents entry points to mobile Home with project metrics, recent runs, and issue drill-down.",
+          "Create and reuse a self-DM for messages sent to the current user.",
+          "Guide Codex, Claude, Grok, and OpenCode authentication plus GitHub repository binding from managed-computer setup, then bind the Worker automatically.",
+          "Restore interactive HTML artifact previews under the Production CSP while keeping iframe isolation and external network access blocked.",
+          "Retain Agent Skill catalogs with conversations and point new managed-computer provisioning at the verified Launch Template.",
+        ],
+      },
+      {
+        version: "1.2.171",
+        date: "August 29, 2026",
+        title: "Make channel work and managed computers more reliable",
+        summary:
+          "Harden channel proposals, attachments, and Agent replies while strengthening managed-computer recovery and Worker routing.",
+        items: [
+          "Separate channel issue proposal choices into create, create and execute, or decline, and persist declines safely.",
+          "After three failed channel-Agent attempts, save one generic retry message without duplicates while preserving Inbox notifications and thread context.",
+          "Allow HTML artifact attachments to be stored as text/html in issue and channel attachment tables with a safer D1 schema.",
+          "Route Merge Queue claim requests to the API Worker so queued issues can be claimed reliably.",
+          "Recover managed-computer services and loopback display listeners at boot and retry transient enrollment failures.",
+          "Carry the channel-proposal decline flow through the iOS Companion and shared mobile contract.",
+        ],
+      },
       {
         version: "1.2.170",
         date: "August 28, 2026",
@@ -2594,7 +2692,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-170">
+          <a href="#v1-2-173">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2616,8 +2714,13 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.170" ||
-                      entry.version === "1.2.169"
+                      entry.version === "1.2.173"
+                        ? "2026-08-30"
+                        : entry.version === "1.2.172"
+                        ? "2026-08-29"
+                        : entry.version === "1.2.171" ||
+                          entry.version === "1.2.170" ||
+                          entry.version === "1.2.169"
                         ? "2026-08-28"
                         : entry.version === "1.2.168" ||
                       entry.version === "1.2.167" ||

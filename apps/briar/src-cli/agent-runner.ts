@@ -581,6 +581,8 @@ export function detachedAgentContext(
   }
   const skills = detachedAgentSkills(agent);
   const activeSkillId = agent.activeSkill?.id ?? null;
+  const retainedSkillCatalog =
+    invocation.skillCatalog?.lifetime === "retained-conversation";
   const catalogBySkillId = new Map(
     invocation.skillCatalog?.entries.map((entry) => [entry.skillId, entry]) ?? [],
   );
@@ -660,7 +662,7 @@ export function detachedAgentContext(
     delegationTargets,
     "## Available skills",
     invocation.skillCatalog
-      ? `Briar materialized an invocation-only discovery catalog at ${JSON.stringify(invocation.skillCatalog.rootPath)}. Its frontmatter descriptions are summarized below. Read selected Skill files only; do not edit, copy, or commit this generated catalog.`
+      ? `Briar materialized a ${retainedSkillCatalog ? "conversation-retained" : "provider-turn"} Skill discovery catalog at ${JSON.stringify(invocation.skillCatalog.rootPath)}. Its frontmatter descriptions are summarized below. Read selected Skill files only; do not edit, copy, or commit this generated catalog.`
       : null,
     formattedSkills,
   ].filter((section): section is string => section !== null).join("\n\n");

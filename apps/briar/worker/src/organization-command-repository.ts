@@ -1,6 +1,7 @@
 import {
   getOrganizationInvitationById,
   getOrganizationInvitationByTokenHash,
+  type OrganizationAssignableRole,
   type OrganizationRole,
   type OrganizationInvitationRow,
   type OrganizationRow,
@@ -113,7 +114,7 @@ export async function addOrganizationMember(
   db: D1Database,
   organizationId: string,
   email: string,
-  role: Exclude<OrganizationRole, "owner">,
+  role: OrganizationAssignableRole,
 ) {
   const user = await db
     .prepare(`select id from "user" where lower(email) = lower(?)`)
@@ -154,7 +155,7 @@ export async function createOrganizationInvitation(
     organizationId: string;
     initialProjectId: string;
     emailNormalized: string;
-    role: Exclude<OrganizationRole, "owner">;
+    role: OrganizationAssignableRole;
     tokenHash: string;
     invitedByUserId: string;
     expiresAt: string;
@@ -343,7 +344,7 @@ export async function updateOrganizationMemberRole(
   db: D1Database,
   organizationId: string,
   userId: string,
-  role: Exclude<OrganizationRole, "owner">,
+  role: OrganizationAssignableRole,
 ) {
   const updatedAt = new Date().toISOString();
   const updateRoleStatement = db.prepare(
@@ -352,7 +353,7 @@ export async function updateOrganizationMemberRole(
      where organization_id = ? and user_id = ? and role != 'owner'`,
   ).bind(role, updatedAt, organizationId, userId);
   const statements: D1PreparedStatement[] = [];
-  if (role === "member") {
+  if (role !== "co-owner") {
     statements.push(
       db.prepare(
         `insert into briar_project_members (
@@ -363,7 +364,8 @@ export async function updateOrganizationMemberRole(
          join briar_organization_members member
            on member.organization_id = project.organization_id
           and member.user_id = ?
-         where project.organization_id = ? and member.role = 'admin'
+         where project.organization_id = ?
+           and member.role in ('owner', 'co-owner')
          on conflict (project_id, user_id) do nothing`,
       ).bind(updatedAt, updatedAt, userId, organizationId),
     );
@@ -394,7 +396,9 @@ export async function updateOrganizationMemberProjects(
     .bind(organizationId, userId)
     .first<{ role: OrganizationRole }>();
   if (!member) return "member_not_found";
-  if (member.role !== "member") return "role_has_full_access";
+  if (member.role === "owner" || member.role === "co-owner") {
+    return "role_has_full_access";
+  }
 
   if (uniqueProjectIds.length > 0) {
     const placeholders = uniqueProjectIds.map(() => "?").join(", ");

@@ -81,6 +81,50 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-attention-filter")
     }
 
+    func testTaskFloatingMenuShowsHostStatus() {
+        let app = launchInsideCompanion()
+
+        let menu = app.buttons["task-floating-menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: transitionTimeout))
+        menu.tap()
+
+        let hostItem = app.buttons["host-status-menu-item"]
+        XCTAssertTrue(hostItem.waitForExistence(timeout: 5))
+        hostItem.tap()
+
+        XCTAssertTrue(
+            app.navigationBars["호스트 상태"]
+                .waitForExistence(timeout: transitionTimeout)
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["host-status-worker-worker-1"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(app.staticTexts["Mac Studio"].exists)
+        XCTAssertTrue(app.staticTexts["Release Mac"].exists)
+        captureScreenshot(named: "companion-host-status")
+    }
+
+    func testHomeOpensAgentsBelowProjectLobby() {
+        let app = launchInsideCompanion()
+
+        app.tabBars.buttons["홈"].tap()
+        let lobby = app.buttons["project-lobby-link"]
+        let agents = app.buttons["project-agents-link"]
+        XCTAssertTrue(lobby.waitForExistence(timeout: transitionTimeout))
+        XCTAssertTrue(agents.waitForExistence(timeout: transitionTimeout))
+        XCTAssertGreaterThan(agents.frame.minY, lobby.frame.minY)
+        captureScreenshot(named: "companion-home-agents-entry")
+
+        agents.tap()
+        XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout: transitionTimeout))
+        XCTAssertTrue(
+            app.buttons["agent-row-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]
+                .waitForExistence(timeout: transitionTimeout)
+        )
+        captureScreenshot(named: "companion-agents-page-from-home")
+    }
+
     func testChannelUsesNativeNavigationAndShowsParticipationCounts() {
         let app = launchInsideCompanion()
 
@@ -551,7 +595,13 @@ final class BriarCompanionUITests: XCTestCase {
             additionalArguments: ["--ui-testing-delayed-message-send"]
         )
 
-        app.buttons["create-issue-button"].tap()
+        let menu = app.buttons["task-floating-menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: transitionTimeout))
+        menu.tap()
+
+        let createIssue = app.buttons["create-issue-button"]
+        XCTAssertTrue(createIssue.waitForExistence(timeout: 5))
+        createIssue.tap()
         let title = app.textFields["create-issue-title"]
         XCTAssertTrue(title.waitForExistence(timeout: transitionTimeout))
         XCTAssertTrue(

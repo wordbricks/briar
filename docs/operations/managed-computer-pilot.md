@@ -19,7 +19,7 @@
 
 1. `/opt/briar/bin/briar` CLI와 여섯 provider runner bundle. `/opt/briar/bin`에는 버전이 고정된 Bun·Node.js·Rust(`rustfmt`, `clippy`)·`cargo-audit`·`gitleaks`, Codex·Claude·Cursor Agent·Grok·Antigravity·OpenCode CLI와 `agent-browser`를 설치한다. OpenRouter는 같은 OpenCode 실행파일을 사용한다. 로그인 terminal과 managed Worker 모두 이 경로와 같은 `CARGO_HOME`·`RUSTUP_HOME`을 사용한다.
 2. 승인 시점의 AWS Systems Manager Agent(`amazon-ssm-agent`). 버전과 설치 파일 SHA-256은 `image-lock.env`에 함께 고정한다.
-3. 비특권 `briar` 사용자와 XFCE, 실제 Google Chrome, GitHub CLI, TigerVNC, D-Bus, C/C++ build toolchain과 Noto CJK 글꼴. XFCE Terminal은 Korean glyph를 포함하는 `Noto Sans Mono CJK KR`을 기본으로 사용한다. `remote-desktop-packages.txt`의 각 Debian 패키지는 승인된 Debian 13 snapshot에서 `resolve-remote-desktop-packages`로 정확한 `package=version` lock을 만든 후 설치한다. `briar` 사용자 세션의 `GH_BROWSER`만 `/opt/briar/bin/briar-open-browser`로 설정하며, 다른 CLI 로그인을 방해하지 않도록 전역 `BROWSER`는 변경하지 않는다.
+3. 비특권 `briar` 사용자와 XFCE, 실제 Google Chrome, TigerVNC, D-Bus, C/C++ build toolchain과 Noto CJK 글꼴. GitHub CLI는 기본 이미지 요구사항이 아니다. XFCE Terminal은 Korean glyph를 포함하는 `Noto Sans Mono CJK KR`을 기본으로 사용한다. `remote-desktop-packages.txt`의 각 Debian 패키지는 승인된 Debian 13 snapshot에서 `resolve-remote-desktop-packages`로 정확한 `package=version` lock을 만든 후 설치한다.
 4. `briar-managed-computer.target`과 health timer를 설치하고 부팅 대상으로 활성화한다. target이 enrollment, signed runtime updater, Worker supervisor, loopback 원격 데스크톱과 outbound 원격 세션 서비스를 순서대로 묶는다. 개별 서비스는 target이 관리하므로 각각을 별도 multi-user 부팅 링크로 활성화하지 않는다. Worker supervisor는 `/var/lib/briar/worker-credential.json`의 machine credential을 값으로 복사하지 않고 파일에서 읽으며, 설정된 각 프로젝트에 Worker 프로세스를 하나씩 유지한다.
 5. `briar managed-computer setup`이 소유자의 사용자 세션과 이미 등록된 machine credential을 짧게 연결한다. 저장소와 provider가 준비되고 heartbeat 건강 검사를 통과하기 전에는 Worker가 `acceptingWork=false`, 동시 실행 수 1을 보고한다.
 
@@ -248,25 +248,15 @@ Identity public key는 AWS의 **해당 리전 RSA 인증서**를 공식 `regions
 
 ### 3.1 소유자 setup/bind
 
-Enrollment이 끝나면 `/var/lib/briar/worker-credential.json`에는 컴퓨터 전용 machine credential만 있고 사용자·저장소·provider 로그인은 없다. 컴퓨터 소유자가 원격 화면에서 대상 저장소를 clone하고 필요한 provider CLI에 로그인한 뒤 다음 명령을 실행한다.
+Enrollment이 끝나면 `/var/lib/briar/worker-credential.json`에는 컴퓨터 전용 machine credential만 있고 사용자·저장소·provider 로그인은 없다. 소유자는 Briar에서 `설정하기`를 누르고 프로젝트와 provider를 고른다. setup agent는 서버가 발급한 저장소 범위의 단기 GitHub App installation token으로 clone한 뒤 provider 인증과 Worker bind를 수행한다.
 
-GitHub 저장소를 사용할 때는 원격 Terminal의 `briar` 사용자 세션에서 다음 브라우저 인증을 먼저 실행한다. `gh`가 전달한 HTTPS URL은 `GH_BROWSER` helper가 Google Chrome 새 창으로 분리 실행하고 즉시 반환하며, Chrome 출력은 터미널이나 디스크에 남기지 않는다. 이 로그인은 AMI 빌드 중 실행하지 않으며 GitHub credential을 이미지에 포함하지 않는다.
+Codex·Grok은 화면에 표시된 device URL과 일회용 코드를 사용한다. Claude는 브라우저 로그인이 반환한 authorization code를, OpenCode는 계정에서 만든 API key를 설정창에 입력한다. 입력값은 기존 setup WebSocket relay를 통해 관리형 컴퓨터에만 전달하며 D1, 감사 로그, Durable Object storage에 저장하지 않는다.
 
-```bash
-gh auth login --hostname github.com --git-protocol https --web
-gh auth status --hostname github.com
-```
+setup agent는 고정된 provider 명령만 pseudo-terminal에서 실행한다. Git clone은 임시 `GIT_ASKPASS`에만 installation token을 넘기고 즉시 삭제하며, clone URL·`.git/config`·로그에 토큰을 남기지 않는다.
 
-```bash
-briar login
-briar managed-computer setup \
-  --project <briar-project-id> \
-  --repository <absolute-repository-path> \
-  --provider codex
-briar managed-computer status
-```
+사용자 인증으로 만든 10분짜리 setup ticket은 setup WebSocket과 machine context 요청을 승인하고 Worker bind 때 한 번만 소비한다. machine context는 immutable `githubRepositoryId`와 `owner/repo`, 단기 credential을 반환한다. setup agent는 `~/Briar/projects/<organization-id>/<project-id>/<repo>`를 사용하며 다른 원격이나 다른 ID가 있는 폴더를 덮어쓰지 않는다. 설정이 저장되면 Worker가 시작하고, 정상 heartbeat가 관찰된 뒤에만 `ready`가 된다.
 
-CLI는 로그인 사용자가 해당 컴퓨터의 신청자인지, credential의 컴퓨터·조직·device ID가 API와 같은지, 경로가 실제 Git 저장소인지, 선택한 provider CLI가 설치·인증·사용 가능한지 확인한다. 사용자 인증으로 10분짜리 setup ticket을 만들고 machine credential로 한 번만 소비한다. D1에는 ticket hash와 연결 결과만 남고 사용자 토큰·machine credential·provider 인증정보는 저장하지 않는다. 설정이 저장되면 `briar-managed-worker.service`가 프로젝트 Worker를 시작하고, 정상 heartbeat가 관찰된 뒤에만 컴퓨터가 `ready`가 된다.
+원격 화면과 기존 `briar managed-computer setup` 명령은 장애 분석용 고급 경로로 유지한다. 정상 사용자 setup에는 Briar 사용자 로그인, SSH, AWS 권한, 인바운드 포트가 필요하지 않다.
 
 ## 4. 스테이징 검증
 
@@ -278,14 +268,14 @@ CLI는 로그인 사용자가 해당 컴퓨터의 신청자인지, credential의
 4. EC2의 Launch Template 버전, `HttpTokens=required`, 암호화 EBS, 네 가지 Briar 태그, 빈 inbound 규칙, SSH key 미설정을 확인한다.
 5. SSM이 Online인 실제 인스턴스만 enrollment에 성공하고, nonce 만료·원본 document 변조·다른 instance identity·다른 조직 ID는 거절된다.
 6. 인스턴스에서 `/opt/briar/bin/verify-remote-desktop`을 실행한다. 관리 컴퓨터 target과 health timer가 enable·active이고, 5901 포트가 loopback에만 열리며 데스크톱·세션 에이전트가 `briar` 사용자로 실행되고 package lock checksum이 일치해야 한다. 인스턴스를 한 번 재부팅한 뒤 target이 모든 하위 서비스를 올리고 health timer의 첫 실행이 성공하는지도 확인한다.
-7. `sudo -u briar -H bash -lc 'command -v bun node cargo rustc cargo-audit gitleaks codex claude cursor-agent grok agy opencode agent-browser'`에서 모든 실행파일이 `/opt/briar/bin`으로 해석되는지 확인한다. `gh`는 `/usr/bin/gh`, `GH_BROWSER`는 실행 가능한 `/opt/briar/bin/briar-open-browser`로 해석되어야 한다. `gh auth login --help`에서 `--hostname`, `--git-protocol`, `--web`을, `gh auth status --help`에서 `--hostname`을 확인하되 AMI 검증 중에는 인증하지 않는다. 버전은 `/opt/briar/image-manifest.json`과 같아야 하며 provider와 GitHub는 아직 인증되지 않은 상태여야 한다.
+7. `sudo -u briar -H bash -lc 'command -v bun node cargo rustc cargo-audit gitleaks codex claude cursor-agent grok agy opencode agent-browser'`에서 모든 실행파일이 `/opt/briar/bin`으로 해석되는지 확인한다. GitHub CLI는 설치되지 않아도 된다. 버전은 `/opt/briar/image-manifest.json`과 같아야 하며 provider는 아직 인증되지 않은 상태여야 한다.
 8. 빈 테스트 저장소를 새 worktree로 clone한 뒤 `bun run ci:local`을 실행한다. `bun install --frozen-lockfile`로 `node_modules`를 bootstrap하고 C linker, Rust, `cargo-audit`, `gitleaks` 누락 없이 완료되는지 확인한다. `node_modules`나 사용자 저장소를 AMI 자체에 미리 넣지 않는다.
 9. 원격 Terminal과 Chrome에서 한글 안내 문구와 한글 파일명이 네모 상자 없이 보이는지 확인하고 `fc-match ':lang=ko'`가 Noto CJK KR 글꼴을 고르는지 확인한다.
 10. `aws ec2 describe-security-groups --group-ids <SecurityGroupId>`에서 `IpPermissions=[]`, `aws ec2 describe-instances --instance-ids <id>`에서 public IP 없음과 정확한 AMI ID를 독립적으로 확인한다. 원격 화면 서비스 때문에 SSH/VNC/RDP ingress를 추가하지 않는다.
 11. 조직 owner/admin 또는 신청자가 `화면 열기`로 1280×720 이상 화면을 연다. 일반 키, Ctrl/Alt 조합키, 마우스, 화면 맞춤, 전체 화면, 브라우저 새로고침 후 재연결을 포함해 10분 이상 조작한다.
 12. 같은 컴퓨터의 두 번째 제어자, 일반 멤버, 다른 조직, 60초가 지난 토큰과 한 번 사용한 토큰을 각각 거절한다. 네트워크 단절과 Durable Object 재시작에서는 재연결하거나 명시적으로 종료되어야 한다.
-13. 원격 화면에서 테스트 저장소와 테스트 모델 제공자에 로그인하고 같은 `/home/briar`를 사용하는 Worker 건강 검사가 `acceptingWork=true`가 되어 `사용 가능`으로 전환되는지 확인한다. 실제 작은 이슈 하나를 claim·수정·검증·완료해 CLI 설치 확인과 실제 Agent 실행을 구분한다.
-14. setup ticket 원문이 D1·Cloudflare 로그·systemd unit에 없고, 만료된 ticket·다른 컴퓨터의 machine credential·다른 조직 프로젝트가 모두 거절되는지 확인한다.
+13. `설정하기`에서 Codex, Claude, Grok, OpenCode가 처음부터 모두 표시되는지 확인한다. 각 provider를 한 번씩 선택해 외부 브라우저 인증, GitHub clone, Worker bind와 `사용 가능` 전환을 검증한다. 실제 작은 이슈 하나를 claim·수정·검증·완료해 CLI 설치 확인과 실제 Agent 실행을 구분한다.
+14. setup ticket, Claude authorization code, OpenCode API key 원문이 D1·Cloudflare 로그·Durable Object storage·systemd unit에 없고, 만료된 ticket·다른 컴퓨터의 machine credential·다른 조직 프로젝트가 모두 거절되는지 확인한다. setup relay가 binary frame과 64 KiB 초과 text frame을 거절하는지도 확인한다.
 15. D1 감사 테이블과 Cloudflare 로그에는 세션 ID, 상태, 사유 코드, 방향별 바이트 수만 남고 화면 바이트, 키 입력, 비밀번호, protocol token, Worker credential이 없음을 표본 검사한다.
 16. 스테이징에서 10분 세션의 평균/최대 대역폭, 왕복 지연, Durable Object 요청·기간·메모리와 예상 월 비용을 릴리스 기록에 남긴다. 승인 기준을 넘으면 공개 플래그를 켜지 않고 WebRTC 또는 승인된 전송 계층 검토로 넘긴다.
 17. 실패 후 재시도는 새 provisioning job의 EC2 `ClientToken`으로 새 인스턴스를 만들고, 이전 인스턴스는 `briar-managed` 및 컴퓨터 ID 태그를 확인한 뒤 종료하는지 확인한다. 같은 Workflow 안의 AWS 재시도에서는 동일 `ClientToken`이 중복 생성을 막는지 확인한다.

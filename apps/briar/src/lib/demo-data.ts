@@ -313,6 +313,7 @@ export const demoDashboard: DashboardPayload = {
       teamKey: "GG",
     },
     githubRepository: "wordbricks/briar",
+    githubRepositoryId: 123456789,
     workflow: demoWorkflowForUi,
     checkpointPolicy: {
       availableBoundaries: demoWorkflowForUi.stages.flatMap((stage) => [

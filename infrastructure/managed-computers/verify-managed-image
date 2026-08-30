@@ -41,7 +41,7 @@ test "$(dpkg-query --show --showformat='${Version}' amazon-ssm-agent)" = \
 /opt/briar/bin/cursor-agent --version | grep -Fxq "$CURSOR_AGENT_VERSION"
 /opt/briar/bin/agy --version | grep -Fxq "$ANTIGRAVITY_CLI_VERSION"
 command -v git >/dev/null
-command -v gh >/dev/null
+command -v script >/dev/null
 command -v setsid >/dev/null
 command -v xfdesktop >/dev/null
 command -v node >/dev/null
@@ -72,19 +72,10 @@ test "$(sudo -u briar -H bash -lc 'printf %s "$CARGO_HOME"')" = \
   "/home/briar/.cargo"
 test "$(sudo -u briar -H bash -lc 'printf %s "$RUSTUP_HOME"')" = \
   "/home/briar/.rustup"
-test "$(sudo -u briar -H bash -lc 'printf %s "$GH_BROWSER"')" = \
-  "/opt/briar/bin/briar-open-browser"
-test "$(sudo -u briar -H bash -lc 'command -v "$GH_BROWSER"')" = \
-  "/opt/briar/bin/briar-open-browser"
-test "$(sudo -u briar -H bash -lc 'command -v gh')" = "/usr/bin/gh"
-gh_auth_login_help="$(sudo -u briar -H env LC_ALL=C GH_PAGER=cat \
-  gh auth login --help)"
-for required_flag in --hostname --git-protocol --web; do
-  grep -Fq -- "$required_flag" <<< "$gh_auth_login_help"
+script_help="$(script --help)"
+for required_flag in --command --echo --flush --return; do
+  grep -Fq -- "$required_flag" <<< "$script_help"
 done
-gh_auth_status_help="$(sudo -u briar -H env LC_ALL=C GH_PAGER=cat \
-  gh auth status --help)"
-grep -Fq -- '--hostname' <<< "$gh_auth_status_help"
 sudo -u briar -H test -w /home/briar/.cargo
 sudo -u briar -H test -w /home/briar/.rustup/downloads
 sudo -u briar -H test -w /home/briar/.rustup/tmp
@@ -195,6 +186,8 @@ systemctl show briar-managed-worker.service --property=Environment --value \
   | grep -Fq 'RUSTUP_HOME=/home/briar/.rustup'
 systemctl show briar-managed-worker.service --property=Environment --value \
   | grep -Fq 'BRIAR_MANAGED_RUNTIME_UPDATER=/opt/briar/bin/briar-managed-runtime-update-request'
+systemctl show briar-remote-session-agent.service --property=ReadWritePaths --value \
+  | grep -Fq '/home/briar'
 if systemctl cat briar-managed-worker.service | grep -q 'briar_worker_'; then
   echo "Managed worker unit contains credential material" >&2
   exit 1

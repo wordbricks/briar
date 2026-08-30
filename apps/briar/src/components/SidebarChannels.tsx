@@ -23,6 +23,7 @@ import type {
   ChannelSummary,
   ChannelVisibility,
 } from "../lib/channels-contract";
+import type { OrganizationRole } from "../types";
 
 type SidebarChannelPage = string;
 type ChannelCreateStep = 1 | 2;
@@ -33,7 +34,6 @@ type ChannelCreateHandler = (
   visibility: ChannelVisibility,
   defaultProjectId?: string | null,
 ) => Promise<void>;
-type OrganizationRole = "owner" | "admin" | "member";
 
 function ChannelCreateDialog({
   onChannelCreate,
@@ -484,7 +484,9 @@ function SidebarChannelButton({
   const canDelete = Boolean(
     onDeleteChannel &&
       currentUserId &&
-      (channel.createdByUserId === currentUserId || organizationRole === "owner"),
+      (channel.createdByUserId === currentUserId ||
+        organizationRole === "owner" ||
+        organizationRole === "co-owner"),
   );
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);

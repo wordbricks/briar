@@ -297,7 +297,7 @@ export async function deleteSlackInstallation(
              select 1 from briar_organization_members membership
              where membership.organization_id = installation.organization_id
                and membership.user_id = ?
-               and membership.role in ('owner', 'admin')
+               and membership.role in ('owner', 'co-owner')
            )`,
       )
       .bind(

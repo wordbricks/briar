@@ -96,7 +96,6 @@ for (const required of [
   "curl",
   "fontconfig",
   "fonts-noto-cjk",
-  "gh",
   "git",
   "libayatana-appindicator3-dev",
   "librsvg2-dev",
@@ -252,7 +251,6 @@ const profile = await text(join(image, "briar-runtime-profile.sh"));
 for (const required of [
   "CARGO_HOME=/home/briar/.cargo",
   "RUSTUP_HOME=/home/briar/.rustup",
-  "export GH_BROWSER=/opt/briar/bin/briar-open-browser",
   "BRIAR_CI_SERIAL_CONTEXTS=true",
   "VITEST_MAX_WORKERS=2",
   "/opt/briar/bin",
@@ -387,15 +385,10 @@ if (!verifier.includes("command -v xfdesktop >/dev/null")) {
   fail("image verifier must require the XFCE desktop process");
 }
 for (const required of [
-  "command -v gh >/dev/null",
   "test -x /opt/briar/bin/briar-open-browser",
-  'printf %s "$GH_BROWSER"',
-  "gh auth login --help",
-  "for required_flag in --hostname --git-protocol --web",
-  "gh auth status --help",
 ]) {
   if (!verifier.includes(required)) {
-    fail(`image verifier omits GitHub browser-login check: ${required}`);
+    fail(`image verifier omits browser bridge check: ${required}`);
   }
 }
 for (const required of [
@@ -529,13 +522,11 @@ for (const required of [
   "briar-managed-computer.target",
   "briar-managed-computer-health.timer",
   "systemctl start briar-managed-computer.target",
-  "gh auth login --hostname github.com --git-protocol https --web",
-  "gh auth status --hostname github.com",
-  "GH_BROWSER",
-  "/opt/briar/bin/briar-open-browser",
+  "GitHub App",
+  "installation token",
 ]) {
   if (!pilotGuide.includes(required)) {
-    fail(`managed-computer guidance omits GitHub login detail: ${required}`);
+    fail(`managed-computer guidance omits GitHub App detail: ${required}`);
   }
 }
 if (pilotGuide.includes("--skip-ssh-key")) {

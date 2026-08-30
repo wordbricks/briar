@@ -126,7 +126,7 @@ export async function listOrganizationIssueSubscriptionRunIds(
         and project_membership.user_id = membership.user_id
        where subscription.organization_id = ? and subscription.user_id = ?
          and (
-           membership.role in ('owner', 'admin')
+           membership.role in ('owner', 'co-owner')
            or project_membership.user_id is not null
          )
        order by subscription.created_at, subscription.run_id`,
@@ -160,7 +160,7 @@ export async function subscribeIssue(
         and project_membership.user_id = membership.user_id
        where run.id = ? and run.project_id = ?
          and (
-           membership.role in ('owner', 'admin')
+           membership.role in ('owner', 'co-owner')
            or project_membership.user_id is not null
          )
        on conflict (run_id, user_id) do nothing

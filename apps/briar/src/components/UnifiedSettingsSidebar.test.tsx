@@ -37,7 +37,7 @@ const projects: Project[] = [
     icon: null,
     organizationId: organization.id,
     organizationName: organization.name,
-    role: "member",
+    role: "developer",
     createdAt: "2026-01-02T00:00:00.000Z",
   },
 ];

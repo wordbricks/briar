@@ -251,6 +251,8 @@ export type ChannelReplySessionRow = {
 };
 
 const MAX_REPLY_ATTEMPTS = 3;
+export const CHANNEL_REPLY_FAILURE_MESSAGE =
+  "답변을 생성하지 못했습니다. 다시 시도해 주세요.";
 export const CHANNEL_REPLY_SESSION_RETENTION_MS = 6 * 60 * 60 * 1_000;
 
 export function channelReplySessionRetentionUntil(observedAt: string) {
@@ -365,6 +367,25 @@ const channelSelectForUser = `${channelSelectColumns},
             and ifnull(message.author_user_id, '') != ?)
            as last_unread_message_at
   from briar_channels channel`;
+
+const channelParticipantCountSql = `(
+  (select count(*) from briar_channel_members
+   where channel_id = briar_channels.id) +
+  (select count(*) from briar_channel_agents
+   where channel_id = briar_channels.id)
+)`;
+
+// A self-DM has only its owner in the roster, while an ordinary one-to-one DM
+// has the owner plus one other participant. Clear either key as soon as its
+// roster no longer matches that shape so an expanded self-DM cannot be reused.
+const dmKeyAfterParticipantChangeSql = `case
+  when kind = 'dm' and (
+    (dm_key like 'self:%' and ${channelParticipantCountSql} <> 1)
+    or (dm_key is not null and dm_key not like 'self:%'
+      and ${channelParticipantCountSql} <> 2)
+  ) then null
+  else dm_key
+end`;
 
 /**
  * Public channels are readable by every organization member; private channels
@@ -1174,7 +1195,7 @@ export async function deleteChannel(
              where membership.organization_id = attachment.organization_id
                and membership.user_id = ?
                and (
-                 membership.role = 'owner'
+                 membership.role in ('owner', 'co-owner')
                  or attachment.channel_id in (
                    select channel.id from briar_channels channel
                    where channel.id = attachment.channel_id
@@ -1210,7 +1231,7 @@ export async function deleteChannel(
              where membership.organization_id = briar_channels.organization_id
                and membership.user_id = ?
                and (
-                 membership.role = 'owner'
+                 membership.role in ('owner', 'co-owner')
                  or briar_channels.created_by_user_id = ?
                )
            )
@@ -1269,15 +1290,7 @@ export async function addChannelMember(
     db.prepare(
       `update briar_channels
        set updated_at = ?,
-           dm_key = case
-             when kind = 'dm' and (
-               (select count(*) from briar_channel_members
-                where channel_id = briar_channels.id) +
-               (select count(*) from briar_channel_agents
-                where channel_id = briar_channels.id)
-             ) <> 2 then null
-             else dm_key
-           end
+           dm_key = ${dmKeyAfterParticipantChangeSql}
        where id = ?`,
     ).bind(input.createdAt, input.channelId),
   ]);
@@ -1297,15 +1310,7 @@ export async function removeChannelMember(
     db.prepare(
       `update briar_channels
        set updated_at = ?,
-           dm_key = case
-             when kind = 'dm' and (
-               (select count(*) from briar_channel_members
-                where channel_id = briar_channels.id) +
-               (select count(*) from briar_channel_agents
-                where channel_id = briar_channels.id)
-             ) <> 2 then null
-             else dm_key
-           end
+           dm_key = ${dmKeyAfterParticipantChangeSql}
        where id = ?`,
     ).bind(removedAt, channelId),
   ]);
@@ -1378,15 +1383,7 @@ export async function addChannelAgent(
     db.prepare(
       `update briar_channels
        set updated_at = ?,
-           dm_key = case
-             when kind = 'dm' and (
-               (select count(*) from briar_channel_members
-                where channel_id = briar_channels.id) +
-               (select count(*) from briar_channel_agents
-                where channel_id = briar_channels.id)
-             ) <> 2 then null
-             else dm_key
-           end
+           dm_key = ${dmKeyAfterParticipantChangeSql}
        where id = ?`,
     ).bind(input.createdAt, input.channelId),
   ]);
@@ -1414,15 +1411,7 @@ export async function removeChannelAgent(
     db.prepare(
       `update briar_channels
        set updated_at = ?,
-           dm_key = case
-             when kind = 'dm' and (
-               (select count(*) from briar_channel_members
-                where channel_id = briar_channels.id) +
-               (select count(*) from briar_channel_agents
-                where channel_id = briar_channels.id)
-             ) <> 2 then null
-             else dm_key
-           end
+           dm_key = ${dmKeyAfterParticipantChangeSql}
        where id = ?`,
     ).bind(removedAt, channelId),
   ]);
@@ -2074,7 +2063,7 @@ async function getChannelMessageDeletionTarget(
                 select 1 from briar_organization_members membership
                 where membership.organization_id = channel.organization_id
                   and membership.user_id = ?
-                  and membership.role in ('owner', 'admin')
+                  and membership.role in ('owner', 'co-owner')
               )
               or exists (
                 select 1 from briar_channel_members membership
@@ -2143,7 +2132,7 @@ export async function deleteChannelMessage(
           select 1 from briar_organization_members membership
           where membership.organization_id = channel.organization_id
             and membership.user_id = ?
-            and membership.role in ('owner', 'admin')
+            and membership.role in ('owner', 'co-owner')
         )
         or exists (
           select 1 from briar_channel_members membership
@@ -3924,6 +3913,7 @@ export async function failChannelReply(
            error = ?, claimed_device_id = null, claimed_worker_id = null,
            preferred_device_id = null,
            claim_token_hash = null, lease_expires_at = null,
+           completed_at = case when attempts >= ? then ? else completed_at end,
            updated_at = ?
        where id = ? and claimed_device_id = ? and claimed_worker_id = ?
          and claim_token_hash = ? and status = 'running'
@@ -3937,11 +3927,39 @@ export async function failChannelReply(
     ).bind(
       MAX_REPLY_ATTEMPTS,
       input.error.slice(0, 4000),
+      MAX_REPLY_ATTEMPTS,
+      input.updatedAt,
       input.updatedAt,
       input.jobId,
       input.deviceId,
       input.workerId,
       input.claimTokenHash,
+      input.updatedAt,
+    ),
+    db.prepare(
+      `insert into briar_channel_messages (
+         id, channel_id, parent_message_id, author_user_id, author_agent_id,
+         author_agent_name, author_agent_provider, body, created_at, updated_at
+       )
+       select job.reply_message_id, job.channel_id,
+              case when channel.kind = 'dm' then null
+                else coalesce(job.parent_message_id, job.trigger_message_id)
+              end,
+              null, job.agent_id,
+              coalesce(job.selected_agent_name_snapshot, agent.name),
+              job.agent_provider, ?, ?, ?
+       from briar_channel_agent_reply_jobs job
+       join briar_channels channel on channel.id = job.channel_id
+       join briar_project_agents agent on agent.id = job.agent_id
+       where job.id = ? and job.status = 'failed'
+         and job.completed_at = ? and job.updated_at = ?
+       on conflict (id) do nothing`,
+    ).bind(
+      CHANNEL_REPLY_FAILURE_MESSAGE,
+      input.updatedAt,
+      input.updatedAt,
+      input.jobId,
+      input.updatedAt,
       input.updatedAt,
     ),
     db.prepare(

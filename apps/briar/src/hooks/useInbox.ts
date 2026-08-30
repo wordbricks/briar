@@ -128,7 +128,18 @@ export type InboxMessage =
   | InboxSessionMessage
   | InboxConversationMessage
   | InboxChannelMessage;
-export type InboxMessageWithReadState = InboxMessage & { isUnread: boolean };
+export type InboxMessageWithReadState = InboxMessage & {
+  isUnread: boolean;
+  /** Stable identity used to replace an existing system alert for this thread. */
+  notificationGroupId?: string;
+  /** Raw feed rows represented by this thread alert and their read versions. */
+  groupedReadVersions?: Record<string, string>;
+  /** Total and unread reply counts represented by this thread alert. */
+  threadMessageCount?: number;
+  threadUnreadCount?: number;
+  /** True when any currently relevant reply needs attention. */
+  threadRequiresAction?: boolean;
+};
 export type InboxCategory =
   | "urgent"
   | "action_required"
@@ -480,6 +491,89 @@ export function isInboxMessageUnread(
   return readVersions[message.id] !== message.version;
 }
 
+function inboxThreadGroupId(message: InboxMessageWithReadState) {
+  if (message.kind === "conversation") {
+    return `conversation-thread:${message.projectId}:${message.targetId}:${message.rootMessageId}`;
+  }
+  if (message.kind === "channel") {
+    return `channel-thread:${message.targetId}:${message.rootMessageId}`;
+  }
+  return null;
+}
+
+function compareInboxMessagesNewestFirst(
+  left: InboxMessageWithReadState,
+  right: InboxMessageWithReadState,
+) {
+  const occurredAtDifference =
+    new Date(right.occurredAt).getTime() -
+    new Date(left.occurredAt).getTime();
+  return occurredAtDifference || left.id.localeCompare(right.id);
+}
+
+/**
+ * Collapses all notifications from one issue/channel thread into one row.
+ * The row opens the oldest unread reply, while its timestamp and version track
+ * the newest reply so subsequent updates replace the same system alert.
+ */
+export function collapseInboxThreadMessages(
+  messages: InboxMessageWithReadState[],
+): InboxMessageWithReadState[] {
+  const standalone: InboxMessageWithReadState[] = [];
+  const threads = new Map<string, InboxMessageWithReadState[]>();
+
+  for (const message of messages) {
+    const groupId = inboxThreadGroupId(message);
+    if (!groupId) {
+      standalone.push(message);
+      continue;
+    }
+    const group = threads.get(groupId) ?? [];
+    group.push(message);
+    threads.set(groupId, group);
+  }
+
+  const collapsed = [...threads].map(([notificationGroupId, group]) => {
+    const chronological = [...group].sort((left, right) =>
+      compareInboxMessagesNewestFirst(right, left)
+    );
+    const latest = chronological.at(-1)!;
+    const unread = chronological.filter((message) => message.isUnread);
+    const representative = unread[0] ?? latest;
+    const relevant = unread.length > 0 ? unread : chronological;
+
+    return {
+      ...representative,
+      occurredAt: latest.occurredAt,
+      version: latest.version,
+      isUnread: unread.length > 0,
+      notificationGroupId,
+      groupedReadVersions: Object.fromEntries(
+        chronological.map((message) => [message.id, message.version]),
+      ),
+      threadMessageCount: chronological.length,
+      threadUnreadCount: unread.length,
+      threadRequiresAction: relevant.some(
+        (message) =>
+          (message.kind === "conversation" || message.kind === "channel") &&
+          message.reason !== "subscription",
+      ),
+    } as InboxMessageWithReadState;
+  });
+
+  return [...standalone, ...collapsed].sort(compareInboxMessagesNewestFirst);
+}
+
+export function inboxNotificationIdentity(
+  message: InboxMessage & { notificationGroupId?: string },
+) {
+  return message.notificationGroupId ?? message.id;
+}
+
+function inboxMessageReadVersions(message: InboxMessageWithReadState) {
+  return message.groupedReadVersions ?? { [message.id]: message.version };
+}
+
 export function mergeInboxReadVersions(
   local: Record<string, string>,
   remote: Record<string, string>,
@@ -512,7 +606,11 @@ export function classifyInboxMessage(
     return "action_required";
   }
   if (message.kind === "conversation") {
-    return message.reason === "subscription" ? "activity" : "action_required";
+    return "threadRequiresAction" in message && message.threadRequiresAction
+      ? "action_required"
+      : message.reason === "subscription"
+        ? "activity"
+        : "action_required";
   }
   if (message.kind === "session") {
     return message.requiresAttention || message.status === "failed"
@@ -1154,81 +1252,109 @@ export function useInbox(
   const messages = useMemo<InboxMessageWithReadState[]>(
     () =>
       state.storageKey === storageKey
-        ? filterInboxMessagesByOrganization(
-            state.messages,
-            projects,
-            organizationId,
-          ).map((message) => ({
-              ...message,
-              isUnread:
-                initialSyncComplete &&
-                isInboxMessageUnread(message, state.readVersions),
-            }))
+        ? collapseInboxThreadMessages(
+            filterInboxMessagesByOrganization(
+              state.messages,
+              projects,
+              organizationId,
+            ).map((message) => ({
+                ...message,
+                isUnread:
+                  initialSyncComplete &&
+                  isInboxMessageUnread(message, state.readVersions),
+              })),
+          )
         : [],
     [initialSyncComplete, organizationId, projects, state, storageKey],
   );
 
   const markRead = useCallback(
     (messageId: string) => {
+      const displayMessage = messages.find(
+        (message) =>
+          message.id === messageId ||
+          Object.prototype.hasOwnProperty.call(
+            message.groupedReadVersions ?? {},
+            messageId,
+          ),
+      );
+      if (!displayMessage) return;
+      const versions = inboxMessageReadVersions(displayMessage);
       setState((current) => {
         if (current.storageKey !== storageKey) return current;
-        const message = current.messages.find(
-          (candidate) => candidate.id === messageId,
-        );
-        if (!message || current.readVersions[messageId] === message.version) {
+        if (
+          Object.entries(versions).every(
+            ([id, version]) => current.readVersions[id] === version,
+          )
+        ) {
           return current;
         }
         const next = {
           messages: current.messages,
           readVersions: {
             ...current.readVersions,
-            [messageId]: message.version,
+            ...versions,
           },
         };
         writeInboxStorage(storageKey, next);
-        queueReadStatePush({ [messageId]: message.version });
+        queueReadStatePush(versions);
         return { storageKey, ...next };
       });
     },
-    [queueReadStatePush, storageKey],
+    [messages, queueReadStatePush, storageKey],
   );
 
   const markUnread = useCallback(
     (messageId: string) => {
       if (!token) return;
+      const displayMessage = messages.find(
+        (message) =>
+          message.id === messageId ||
+          Object.prototype.hasOwnProperty.call(
+            message.groupedReadVersions ?? {},
+            messageId,
+          ),
+      );
+      if (!displayMessage) return;
+      const messageIds = Object.keys(inboxMessageReadVersions(displayMessage));
       setState((current) => {
         if (
           current.storageKey !== storageKey ||
-          !Object.prototype.hasOwnProperty.call(
-            current.readVersions,
-            messageId,
+          !messageIds.some((id) =>
+            Object.prototype.hasOwnProperty.call(current.readVersions, id)
           )
         ) {
           return current;
         }
-        const previousVersion = current.readVersions[messageId];
+        const previousVersions = Object.fromEntries(
+          messageIds.flatMap((id) => {
+            const version = current.readVersions[id];
+            return version === undefined ? [] : [[id, version]];
+          }),
+        );
         const readVersions = { ...current.readVersions };
-        delete readVersions[messageId];
+        for (const id of messageIds) delete readVersions[id];
         const next = { messages: current.messages, readVersions };
         writeInboxStorage(storageKey, next);
         const generation = readSyncGenerationRef.current;
         if (generation) {
           generation.remoteMutationGeneration += 1;
-          delete generation.remoteReadVersions[messageId];
+          for (const id of messageIds) delete generation.remoteReadVersions[id];
         }
-        void (dependencies.deleteReadState ?? deleteInboxReadState)(
-          token,
-          messageId,
+        void Promise.all(
+          messageIds.map((id) =>
+            (dependencies.deleteReadState ?? deleteInboxReadState)(token, id)
+          ),
         ).catch(() => {
           setState((latest) => {
-            if (latest.storageKey !== storageKey || !previousVersion) {
+            if (latest.storageKey !== storageKey) {
               return latest;
             }
             const restored = {
               messages: latest.messages,
               readVersions: {
                 ...latest.readVersions,
-                [messageId]: previousVersion,
+                ...previousVersions,
               },
             };
             writeInboxStorage(storageKey, restored);
@@ -1238,7 +1364,7 @@ export function useInbox(
         return { storageKey, ...next };
       });
     },
-    [dependencies, storageKey, token],
+    [dependencies, messages, storageKey, token],
   );
 
   const markIssueRead = useCallback(
@@ -1246,14 +1372,18 @@ export function useInbox(
       setState((current) => {
         if (current.storageKey !== storageKey) return current;
         const issueReadVersions = Object.fromEntries(
-          current.messages
+          messages
             .filter(
               (message) =>
                 message.targetId === runId &&
-                (message.kind === "issue" || message.kind === "conversation") &&
-                current.readVersions[message.id] !== message.version,
+                (message.kind === "issue" || message.kind === "conversation"),
             )
-            .map((message) => [message.id, message.version]),
+            .flatMap((message) =>
+              Object.entries(inboxMessageReadVersions(message)),
+            )
+            .filter(
+              ([id, version]) => current.readVersions[id] !== version,
+            ),
         );
         if (Object.keys(issueReadVersions).length === 0) return current;
         const next = {
@@ -1268,19 +1398,16 @@ export function useInbox(
         return { storageKey, ...next };
       });
     },
-    [queueReadStatePush, storageKey],
+    [messages, queueReadStatePush, storageKey],
   );
 
   const markAllRead = useCallback(() => {
     setState((current) => {
       if (current.storageKey !== storageKey) return current;
-      const organizationMessages = filterInboxMessagesByOrganization(
-        current.messages,
-        projects,
-        organizationId,
-      );
       const organizationReadVersions = Object.fromEntries(
-        organizationMessages.map((message) => [message.id, message.version]),
+        messages.flatMap((message) =>
+          Object.entries(inboxMessageReadVersions(message)),
+        ),
       );
       const next = {
         messages: current.messages,
@@ -1293,7 +1420,7 @@ export function useInbox(
       queueReadStatePush(organizationReadVersions);
       return { storageKey, ...next };
     });
-  }, [organizationId, projects, queueReadStatePush, storageKey]);
+  }, [messages, queueReadStatePush, storageKey]);
 
   return {
     initialSyncComplete,

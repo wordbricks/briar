@@ -198,6 +198,9 @@ describe("workflow v2 D1 persistence and transitions", () => {
         // 0143 replaces the Agent Skill approval trigger and therefore
         // depends on the approval tables deliberately excluded above.
         "0143_conversation_skill_session_runtime.sql",
+        // 0146 recreates an approval trigger that this fixture installs later
+        // in historical order with migration 0091.
+        "0146_organization_capability_roles.sql",
       ],
     });
 

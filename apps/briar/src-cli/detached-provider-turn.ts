@@ -53,6 +53,8 @@ export type DetachedProviderTurnInput = {
   attachments?: AgentAttachment[];
   organizationContextManifestPath?: string | null;
   delegationTargets?: readonly DetachedDelegationTarget[];
+  /** A caller-managed catalog is shared across provider turns and is not cleaned here. */
+  skillCatalog?: DetachedAgentSkillCatalog | null;
   outputSchema?: JsonSchema | null;
   environment: NodeJS.ProcessEnv;
   signal: AbortSignal;
@@ -183,11 +185,15 @@ export async function runDetachedProviderTurn(
     );
   }
   diagnose("turn.runner_selected", { runnerPath, agentBinary });
-  const skillCatalog = await materializeDetachedAgentSkillCatalog(input.agent, {
-    temporaryParentPath: input.workspacePath,
-  });
+  const ownsSkillCatalog = input.skillCatalog === undefined;
+  const skillCatalog = ownsSkillCatalog
+    ? await materializeDetachedAgentSkillCatalog(input.agent, {
+        temporaryParentPath: input.workspacePath,
+      })
+    : input.skillCatalog ?? null;
   diagnose("turn.skill_catalog_ready", {
     materialized: skillCatalog !== null,
+    lifetime: skillCatalog?.lifetime ?? null,
   });
   try {
     return await executeDetachedProviderTurn(
@@ -198,8 +204,14 @@ export async function runDetachedProviderTurn(
       diagnose,
     );
   } finally {
-    diagnose("turn.skill_catalog_cleanup");
-    await cleanupDetachedAgentSkillCatalog(skillCatalog);
+    if (ownsSkillCatalog) {
+      diagnose("turn.skill_catalog_cleanup");
+      await cleanupDetachedAgentSkillCatalog(skillCatalog);
+    } else {
+      diagnose("turn.skill_catalog_retained", {
+        lifetime: skillCatalog?.lifetime ?? null,
+      });
+    }
   }
 }
 

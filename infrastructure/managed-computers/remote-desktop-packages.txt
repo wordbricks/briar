@@ -2,6 +2,7 @@
 # list to exact package=version entries in remote-desktop-packages.lock before install.
 dbus-x11
 build-essential
+bsdutils
 ca-certificates
 curl
 desktop-file-utils
@@ -9,7 +10,6 @@ fontconfig
 fonts-liberation
 fonts-noto-cjk
 fonts-noto-color-emoji
-gh
 git
 iproute2
 jq

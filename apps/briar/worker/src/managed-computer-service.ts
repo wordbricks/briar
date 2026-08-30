@@ -41,6 +41,8 @@ import type { AgentProviderCapabilityCatalog } from "../../src/lib/agent-provide
 import type { AgentProvider } from "../../src/lib/agent-provider";
 import type { ProviderHealthMap } from "./workers";
 import { workerJson } from "./worker-json";
+import { getProjectSettings } from "./project-settings-repository";
+import { settingsJson } from "./project-settings-json";
 
 export class ManagedComputerServiceError extends Error {
   constructor(
@@ -636,38 +638,8 @@ export async function bindManagedComputerSetup(
     observedAt: string;
   },
 ) {
-  const computer = await managedComputerById(db, input.managedComputerId);
-  if (
-    !computer || computer.organization_id !== input.organizationId ||
-    computer.briar_device_id !== input.deviceId ||
-    !["needs_setup", "ready"].includes(computer.state)
-  ) {
-    throw new ManagedComputerServiceError(
-      403,
-      "MANAGED_COMPUTER_SETUP_DEVICE_FORBIDDEN",
-      "Worker is not authorized for this managed computer",
-    );
-  }
-  const tokenHash = await sha256Hex(input.setupToken);
-  const session = await managedComputerSetupSessionByTokenHash(
-    db,
-    computer.id,
-    tokenHash,
-  );
-  if (!session || session.organization_id !== input.organizationId) {
-    throw new ManagedComputerServiceError(
-      403,
-      "MANAGED_COMPUTER_SETUP_TOKEN_INVALID",
-      "Managed computer setup ticket is invalid",
-    );
-  }
-  if (session.status === "pending" && session.expires_at <= input.observedAt) {
-    throw new ManagedComputerServiceError(
-      410,
-      "MANAGED_COMPUTER_SETUP_EXPIRED",
-      "Managed computer setup ticket expired",
-    );
-  }
+  const { computer, session, tokenHash } =
+    await authorizeManagedComputerSetup(db, input);
   if (session.status === "consumed") {
     const worker = session.worker_id
       ? await managedComputerSetupWorker(db, session.worker_id, input.deviceId)
@@ -698,6 +670,99 @@ export async function bindManagedComputerSetup(
     );
   }
   return { ...result, duplicate: false };
+}
+
+export async function authorizeManagedComputerSetup(
+  db: D1Database,
+  input: {
+    managedComputerId: string;
+    organizationId: string;
+    deviceId?: string;
+    setupToken: string;
+    observedAt: string;
+    requirePending?: boolean;
+  },
+) {
+  const computer = await managedComputerById(db, input.managedComputerId);
+  if (
+    !computer || computer.organization_id !== input.organizationId ||
+    (input.deviceId && computer.briar_device_id !== input.deviceId) ||
+    !computer.briar_device_id ||
+    !["needs_setup", "ready"].includes(computer.state)
+  ) {
+    throw new ManagedComputerServiceError(
+      403,
+      "MANAGED_COMPUTER_SETUP_DEVICE_FORBIDDEN",
+      "Worker is not authorized for this managed computer",
+    );
+  }
+  const tokenHash = await sha256Hex(input.setupToken);
+  const session = await managedComputerSetupSessionByTokenHash(
+    db,
+    computer.id,
+    tokenHash,
+  );
+  if (!session || session.organization_id !== input.organizationId) {
+    throw new ManagedComputerServiceError(
+      403,
+      "MANAGED_COMPUTER_SETUP_TOKEN_INVALID",
+      "Managed computer setup ticket is invalid",
+    );
+  }
+  if (session.status === "pending" && session.expires_at <= input.observedAt) {
+    throw new ManagedComputerServiceError(
+      410,
+      "MANAGED_COMPUTER_SETUP_EXPIRED",
+      "Managed computer setup ticket expired",
+    );
+  }
+  if (input.requirePending && session.status !== "pending") {
+    throw new ManagedComputerServiceError(
+      409,
+      "MANAGED_COMPUTER_SETUP_COMPLETE",
+      "Managed computer setup is already complete",
+    );
+  }
+  return { computer, session, tokenHash };
+}
+
+export async function managedComputerSetupContext(
+  db: D1Database,
+  input: {
+    managedComputerId: string;
+    organizationId: string;
+    deviceId: string;
+    setupToken: string;
+    observedAt: string;
+  },
+) {
+  const { session } = await authorizeManagedComputerSetup(db, {
+    ...input,
+    requirePending: true,
+  });
+  const project = await db.prepare(
+    `select id, name from briar_projects
+     where id = ? and organization_id = ?`,
+  ).bind(session.project_id, input.organizationId).first<{
+    id: string;
+    name: string;
+  }>();
+  if (!project) {
+    throw new ManagedComputerServiceError(
+      404,
+      "MANAGED_COMPUTER_SETUP_PROJECT_NOT_FOUND",
+      "Project not found in this organization",
+    );
+  }
+  return {
+    session: {
+      id: session.id,
+      projectId: session.project_id,
+      expiresAt: session.expires_at,
+    },
+    project,
+    settings: settingsJson(await getProjectSettings(db, project.id)),
+  };
 }
 
 export async function managedComputerSetupStatus(

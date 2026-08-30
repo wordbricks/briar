@@ -6,6 +6,7 @@ import {
   fetchCodexPet,
 } from "./codex-pets";
 import { corsHeaders, HttpError, json } from "./http-response";
+import { hasOrganizationCapability } from "./organization-access";
 import { projectAgentJson } from "./project-agent-json";
 import type { ProjectAgentRow } from "./project-agent-model";
 import {
@@ -95,6 +96,9 @@ export async function handleProjectAgentRoute(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     const input = decodeProjectAgentInput(await readJson(request));
     if (input.codexPet !== undefined) {
       throw new HttpError(
@@ -134,6 +138,9 @@ export async function handleProjectAgentRoute(
     const session = await requireSession(auth, request);
     const project = await getProject(db, projectAgentMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     const input = decodeProjectAgentInput(await readJson(request));
     const existing = await getProjectAgent(
       db,
@@ -244,6 +251,9 @@ export async function handleProjectAgentRoute(
     const session = await requireSession(auth, request);
     const project = await getProject(db, projectAgentMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     const agent = await deleteProjectAgent(
       db,
       project.id,

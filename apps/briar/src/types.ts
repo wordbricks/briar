@@ -27,6 +27,7 @@ import type {
   ProjectAgentScheduleRecurrence,
 } from "./lib/project-agent-schedule";
 import type { IssueDifficulty } from "./lib/issue-difficulty";
+import type { ManagedComputerSetupProvider } from "./lib/managed-computer-setup-protocol";
 
 export type HuntStatus = AutoHuntRunStatus;
 export type HuntSource = AutoHuntSource;
@@ -674,6 +675,32 @@ export type ManagedComputerRemoteSessionTicket = {
   reconnected: boolean;
 };
 
+export type OrganizationRole =
+  | "owner"
+  | "co-owner"
+  | "developer"
+  | "editor"
+  | "viewer";
+
+export type OrganizationAssignableRole = Exclude<OrganizationRole, "owner">;
+
+export type ManagedComputerSetupSessionTicket = {
+  session: {
+    id: string;
+    managedComputerId: string;
+    organizationId: string;
+    projectId: string;
+    status: "pending" | "consumed";
+    expiresAt: string;
+  };
+  setupToken: string;
+  socket: { url: string; protocol: string };
+  agentConnected: boolean;
+  duplicate: boolean;
+};
+
+export type { ManagedComputerSetupProvider };
+
 export type HuntRunPlacement = {
   status: Exclude<HuntStatus, "paused">;
   workflowStage: AutoHuntWorkflowStageId | null;
@@ -834,7 +861,7 @@ export type Organization = {
   name: string;
   handle: string;
   logo: string | null;
-  role: "owner" | "admin" | "member";
+  role: OrganizationRole;
   createdAt: string;
 };
 
@@ -843,7 +870,7 @@ export type OrganizationMember = {
   name: string;
   email: string;
   image: string | null;
-  role: "owner" | "admin" | "member";
+  role: OrganizationRole;
   projectIds?: string[];
   createdAt: string;
 };
@@ -859,7 +886,7 @@ export type OrganizationInvitation = {
   initialProjectName: string;
   email: string;
   emailHint: string;
-  role: "admin" | "member";
+  role: OrganizationAssignableRole;
   status: OrganizationInvitationStatus;
   expiresAt: string;
   acceptedAt: string | null;
@@ -879,6 +906,7 @@ export type ProjectSettings = {
     source: string | null;
     teamKey: string | null;
   };
+  githubRepositoryId: number | null;
   githubRepository: string | null;
   workflow: AutoHuntWorkflow;
   checkpointPolicy?: {

@@ -11,7 +11,13 @@ export const OrganizationResponse = Schema.Struct({
   name: Schema.String,
   handle: Schema.String,
   logo: defaulted(Schema.NullOr(DataImageString), null),
-  role: Schema.Literals(["owner", "admin", "member"]),
+  role: Schema.Literals([
+    "owner",
+    "co-owner",
+    "developer",
+    "editor",
+    "viewer",
+  ]),
   createdAt: Schema.String,
 });
 export type OrganizationResponse = typeof OrganizationResponse.Type;

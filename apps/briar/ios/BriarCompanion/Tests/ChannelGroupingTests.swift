@@ -627,7 +627,7 @@ final class ChannelGroupingTests: XCTestCase {
             name: "Sam",
             email: "sam@example.com",
             image: nil,
-            role: "member",
+            role: "developer",
             createdAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
         let agent = ProjectAgent(

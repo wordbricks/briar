@@ -423,9 +423,14 @@ final class RunDetailStore: ObservableObject {
     private var skillExecutionProposalRevisions: [UUID: Int] = [:]
     private var skillExecutionProposalIDsByMessage: [UUID: UUID] = [:]
     private var authoritativeReloadPending = false
+    private var conversationCursor: Int?
+    private var conversationSyncInFlight = false
+    private var conversationSyncPending = false
     private var activityTask: Task<Void, Never>?
     private var activityExpiryTask: Task<Void, Never>?
     private var activityGeneration = 0
+
+    private static let maxConversationDeltaPagesPerSync = 20
 
     init(
         api: any MobileAPIClientProtocol,
@@ -482,6 +487,7 @@ final class RunDetailStore: ObservableObject {
                 let stabilizedMessages = preservingLocallyAcceptedSkillExecutionProposals(
                     in: loaded.1.messages
                 )
+                conversationCursor = loaded.1.cursor
                 reconcileExecutionProposals(stabilizedMessages, authoritative: true)
                 let incomingIDs = Set(stabilizedMessages.map(\.id))
                 let pending = messages.filter {
@@ -502,6 +508,90 @@ final class RunDetailStore: ObservableObject {
             }
         } while authoritativeReloadPending &&
             expectedLifecycleRevision == lifecycleRevision
+    }
+
+    /// Applies issue conversation changes without replacing the whole detail
+    /// screen. The organization socket only carries an invalidation, so the
+    /// cursor-based endpoint remains the authoritative source for messages
+    /// and Agent reply jobs.
+    func syncConversationChanges() async {
+        if loading {
+            // The initial snapshot is already authoritative. Queue one more
+            // snapshot behind it so a notification received during navigation
+            // cannot be lost before the cursor is established.
+            await load(queueIfLoading: true)
+            return
+        }
+        guard conversationCursor != nil else {
+            await load()
+            return
+        }
+        if conversationSyncInFlight {
+            conversationSyncPending = true
+            return
+        }
+
+        conversationSyncInFlight = true
+        let expectedLifecycleRevision = lifecycleRevision
+        var needsContinuation = false
+        defer {
+            conversationSyncInFlight = false
+            if expectedLifecycleRevision != lifecycleRevision {
+                conversationSyncPending = false
+            } else {
+                let shouldContinue = needsContinuation || conversationSyncPending
+                conversationSyncPending = false
+                if shouldContinue {
+                    Task { @MainActor [weak self] in
+                        await Task.yield()
+                        guard let self else { return }
+                        await self.syncConversationChanges()
+                    }
+                }
+            }
+        }
+
+        do {
+            var hasMore = false
+            for _ in 0..<Self.maxConversationDeltaPagesPerSync {
+                guard expectedLifecycleRevision == lifecycleRevision,
+                      let cursor = conversationCursor
+                else { return }
+                let delta: IssueMessagesDeltaResponse = try await api.send(
+                    MobileAPIContract.Endpoint.runMessagesDelta(
+                        projectID: projectID,
+                        runID: runID,
+                        cursor: cursor
+                    ),
+                    method: "GET",
+                    token: token,
+                    body: nil,
+                    as: IssueMessagesDeltaResponse.self
+                )
+                guard expectedLifecycleRevision == lifecycleRevision else { return }
+                conversationCursor = delta.cursor
+                if delta.changed {
+                    if let deltaMessages = delta.messages {
+                        appendMessages(deltaMessages)
+                    }
+                    if let deltaAgentReplies = delta.agentReplies {
+                        agentReplies = deltaAgentReplies
+                    }
+                }
+                hasMore = delta.hasMore
+                if !hasMore { break }
+            }
+            needsContinuation = hasMore
+        } catch let MobileAPIError.httpStatus(status, _) where status == 410 {
+            guard expectedLifecycleRevision == lifecycleRevision else { return }
+            // The retention window can expire while the app is backgrounded.
+            // Only this recovery path intentionally performs a full load.
+            await load()
+        } catch {
+            // Keep the current conversation visible on transient failures. A
+            // later project notification or Inbox fallback will retry the
+            // same cursor instead of replacing the screen with an error state.
+        }
     }
 
     func appendMessages(_ newMessages: [IssueMessage]) {
@@ -753,6 +843,9 @@ final class RunDetailStore: ObservableObject {
         activityExpiryTask = nil
         activityFrames = [:]
         authoritativeReloadPending = false
+        conversationCursor = nil
+        conversationSyncInFlight = false
+        conversationSyncPending = false
         loading = false
     }
 

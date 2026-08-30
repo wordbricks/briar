@@ -19,7 +19,7 @@ const organizations = [
     name: "Acme",
     handle: "acme",
     logo: null,
-    role: "member" as const,
+    role: "developer" as const,
     createdAt: "2026-07-24",
   },
 ];

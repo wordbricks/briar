@@ -49,7 +49,7 @@ describe("organization and project repositories", () => {
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
       ) values (
-        '${organizationId}', 'member', 'member', '${now}', '${now}'
+        '${organizationId}', 'member', 'developer', '${now}', '${now}'
       );
       insert into briar_projects (
         id, owner_user_id, organization_id, name, agent_token_hash,
@@ -96,7 +96,7 @@ describe("organization and project repositories", () => {
     ).resolves.toEqual([
       expect.objectContaining({
         id: projectId,
-        member_role: "member",
+        member_role: "viewer",
       }),
     ]);
     await expect(
@@ -127,7 +127,7 @@ describe("organization and project repositories", () => {
     ).bind(projectId, organizationId, now, now).run();
 
     await expect(listProjects(db, "member")).resolves.toEqual([
-      expect.objectContaining({ id: projectId, member_role: "member" }),
+      expect.objectContaining({ id: projectId, member_role: "developer" }),
     ]);
     await expect(
       listOrganizationInboxProjects(db, organizationId, "member"),
@@ -136,7 +136,7 @@ describe("organization and project repositories", () => {
     ]);
     await expect(listProjectMembers(db, projectId)).resolves.toEqual([
       expect.objectContaining({ user_id: "owner", role: "owner" }),
-      expect.objectContaining({ user_id: "member", role: "member" }),
+      expect.objectContaining({ user_id: "member", role: "developer" }),
     ]);
   });
 });

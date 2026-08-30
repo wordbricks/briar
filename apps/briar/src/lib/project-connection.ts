@@ -5,6 +5,9 @@ import {
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
 import { commands } from "../generated/tauri";
+import type { OrganizationRole } from "../types";
+import type { ProjectGithubCredential } from "./api";
+import { hasOrganizationCapability } from "./organization-role";
 
 export type LocalAutoHuntConfig = {
   velenOrg: string | null;
@@ -13,6 +16,7 @@ export type LocalAutoHuntConfig = {
   linearSource?: string | null;
   linearTeam?: string | null;
   githubRepository?: string | null;
+  githubRepositoryId?: number | null;
   workflow: AutoHuntWorkflow;
 };
 
@@ -29,7 +33,7 @@ export async function preflightThenCreateProject<T>(
 }
 
 export async function resolveProjectConnectionWorkflow(
-  role: "owner" | "admin" | "member" | undefined,
+  role: OrganizationRole | undefined,
   existingWorkflow: AutoHuntWorkflow | undefined,
   generateWorkflow: () => Promise<AutoHuntWorkflow>,
   compatiblePreset?: AutoHuntWorkflow,
@@ -43,9 +47,9 @@ export async function resolveProjectConnectionWorkflow(
       shouldPersistProjectSettings: false,
     };
   }
-  if (role === "member") {
+  if (!hasOrganizationCapability(role, "development:manage")) {
     throw new Error(
-      "An organization owner or admin must generate the project workflow before members can connect a repository.",
+      "An organization owner, co-owner, or developer must generate the project workflow before connecting a repository.",
     );
   }
   if (
@@ -98,6 +102,16 @@ export async function cloneGithubSshRepository(repositoryUrl: string) {
   return commands.cloneGithubSshRepository(repositoryUrl);
 }
 
+export async function prepareProjectRepository(
+  projectId: string,
+  credential: ProjectGithubCredential,
+) {
+  if (!isTauri()) {
+    throw new Error("이 컴퓨터에서 작업 시작은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  return commands.prepareProjectRepository(projectId, credential);
+}
+
 export async function inspectRepositoryReadiness(
   repositoryPath: string,
   workflow: AutoHuntWorkflow,
@@ -127,20 +141,6 @@ export async function discoverRepositoryIcon(
 export async function loadProjectRepositoryReadiness(projectId: string) {
   if (!isTauri()) return null;
   return commands.projectRepositoryReadiness(projectId);
-}
-
-export async function installProjectGithubCli(projectId: string) {
-  if (!isTauri()) {
-    throw new Error("GitHub CLI 설치는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
-  }
-  return commands.installProjectGithubCli(projectId);
-}
-
-export async function loginProjectGithub(projectId: string) {
-  if (!isTauri()) {
-    throw new Error("GitHub 로그인은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
-  }
-  return commands.loginProjectGithub(projectId);
 }
 
 export async function preflightLocalProjectConnection(input: {

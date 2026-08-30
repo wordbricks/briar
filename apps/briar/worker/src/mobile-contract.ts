@@ -46,7 +46,13 @@ export const mobileClientIdSchema = Schema.Literals(mobileClientIds);
 const mobileProviderSchema = Schema.Literals(agentProviders);
 const mobileIssueDifficultySchema = Schema.Literals(issueDifficulties);
 
-const mobileRoleSchema = Schema.Literals(["owner", "admin", "member"]);
+const mobileRoleSchema = Schema.Literals([
+  "owner",
+  "co-owner",
+  "developer",
+  "editor",
+  "viewer",
+]);
 const mobileRunStatusSchema = Schema.Literals([
   "backlog",
   "queued",
@@ -578,10 +584,21 @@ export const mobileIssueMessageSchema = mutableStruct({
 });
 
 export const mobileIssueMessagesResponseSchema = mutableStruct({
+  cursor: nonNegativeInteger,
   messages: mutableArray(mobileIssueMessageSchema),
   agentReplies: defaultedWith(
     mutableArray(Schema.suspend(() => mobileAgentReplySchema)),
     () => [],
+  ),
+});
+
+export const mobileIssueMessagesDeltaResponseSchema = mutableStruct({
+  cursor: nonNegativeInteger,
+  hasMore: Schema.Boolean,
+  changed: Schema.Boolean,
+  messages: optional(mutableArray(mobileIssueMessageSchema)),
+  agentReplies: optional(
+    mutableArray(Schema.suspend(() => mobileAgentReplySchema)),
   ),
 });
 
@@ -907,6 +924,11 @@ export const mobileRunEvidenceResponseSchema = mutableStruct({
 
 export const mobileDashboardCursorExpiredSchema = mutableStruct({
   code: Schema.Literal("dashboard_cursor_expired"),
+  message: Schema.String,
+});
+
+export const mobileIssueConversationCursorExpiredSchema = mutableStruct({
+  code: Schema.Literal("issue_conversation_cursor_expired"),
   message: Schema.String,
 });
 

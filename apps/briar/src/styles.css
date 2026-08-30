@@ -558,6 +558,21 @@ body { overflow: hidden; font-synthesis: none; }
 .issue-property-filter-separator { height:1px; margin:6px -6px; background:var(--border); }
 .issue-property-filter-clear { min-height:38px; padding:7px 9px; display:flex; align-items:center; gap:9px; border-radius:9px; outline:none; color:var(--muted-foreground); font-size:var(--text-sm); cursor:default; user-select:none; }
 .issue-property-filter-clear[data-disabled] { opacity:.45; }
+.sidebar-primary-subnav-link { width:100%; height:30px; padding:0 10px 0 36px; display:flex; align-items:center; gap:9px; border-radius:8px; color:var(--sidebar-foreground-secondary); text-decoration:none; font-size:var(--text-xs); }
+.sidebar-primary-subnav-link:hover { color:var(--sidebar-accent-foreground); background:var(--sidebar-hover); }
+.sidebar-primary-subnav-link.active { color:var(--sidebar-accent-foreground); background:var(--sidebar-active); font-weight:550; }
+.sidebar-primary-subnav-link svg { color:var(--sidebar-foreground-muted); }
+.sidebar-primary-subnav-link.active svg { color:var(--sidebar-accent-foreground); }
+.my-issues-project-filter-trigger { max-width:230px; }
+.my-issues-project-filter-trigger > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.my-issues-project-option { min-width:0; display:flex; align-items:center; gap:8px; }
+.my-issues-project-icon { width:16px; height:16px; flex:0 0 16px; }
+.my-issues-scroll { gap:0; padding:0 18px 24px; overflow:auto; }
+.my-issues-filter-bar { flex:0 0 auto; margin:0 -18px 18px; padding-left:18px; padding-right:18px; }
+.my-issues-load-error { margin:0 0 14px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid color-mix(in srgb,var(--destructive) 30%,var(--border)); border-radius:10px; color:var(--destructive); background:color-mix(in srgb,var(--destructive) 6%,var(--card)); font-size:var(--text-xs); }
+.my-issues-loading { min-height:260px; display:grid; place-items:center; }
+.my-issues-scroll > .empty-state { flex:1; }
+.my-issues-refresh-button { width:34px; height:34px; }
 .source-filter-group { display:flex; align-items:center; gap:7px; flex:0 0 auto; }
 .source-filter-group > span { color:var(--muted-foreground); font-size:var(--text-2xs); white-space:nowrap; }
 .source-filter { display:flex; gap:2px; }
@@ -762,6 +777,7 @@ body { overflow: hidden; font-synthesis: none; }
       0.45fr
     ) minmax(120px, 0.7fr) 22px; align-items:center; gap:16px; }.issue-list-header { height:38px; padding:0 14px; border:1px solid #e4e5df; border-bottom:0; border-radius:12px 12px 0 0; color:var(--muted-foreground); background:#f1f1ee; font-size:var(--text-2xs); font-weight:600; letter-spacing:.35px; text-transform:uppercase; }.issue-list-body { min-width:680px; overflow:hidden; border:1px solid #e4e5df; border-radius:0 0 12px 12px; background:var(--card); }.issue-list-row { min-height:72px; padding:10px 14px; border-bottom:1px solid #ecece7; color:#555750; cursor:pointer; transition:background-color .12s ease,border-color .12s ease; }.issue-list-row:last-child { border-bottom:0; }.issue-list-row:hover { background:#faf9fd; }.issue-list-row:focus-visible { position:relative; z-index:1; outline:2px solid #8068ce; outline-offset:-2px; background:#faf9fd; }.issue-list-row > svg { color:#aaa9b0; }.issue-list-task { min-width:0; display:grid; gap:3px; }.issue-list-task-kicker { min-width:0; display:flex; align-items:center; gap:7px; }.issue-list-task-kicker > small { min-width:0; overflow:hidden; color:#9a9c95; font:500 var(--text-2xs) "DM Mono",monospace; text-overflow:ellipsis; white-space:nowrap; }.issue-list-task-kicker .pull-request-icon-link { height:20px; min-width:20px; padding:0 4px; flex:0 0 auto; }.issue-list-task > strong { overflow:hidden; color:var(--foreground); font-size:var(--text-xs); text-overflow:ellipsis; white-space:nowrap; }.issue-list-task > span:not(.issue-list-task-kicker) { overflow:hidden; color:#898b84; font-size:var(--text-2xs); text-overflow:ellipsis; white-space:nowrap; }.issue-list-status { min-width:0; display:grid; justify-items:start; gap:5px; }.issue-list-status > small { display:flex; align-items:center; gap:5px; color:#969891; font-size:var(--text-2xs); }.issue-list-status .source-dot { width:7px; height:7px; flex-basis:7px; }.issue-list-priority { width:fit-content; min-width:28px; padding:4px 6px; border-radius:6px; color:#a2632d; background:#fff7e9; font:500 var(--text-2xs) "DM Mono",monospace; text-align:center; }.issue-list-updated { overflow:hidden; color:#90928b; font:500 var(--text-2xs) "DM Mono",monospace; text-overflow:ellipsis; white-space:nowrap; }.issue-list-empty { min-height:220px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; color:#aaaca5; text-align:center; }.issue-list-empty strong { color:var(--muted-foreground); font-size:var(--text-xs); }.issue-list-empty span { max-width:320px; font-size:var(--text-2xs); line-height:1.5; }
 .issue-context-menu { width:292px; max-height:min(560px,calc(100vh - 20px)); z-index:120; padding:6px; overflow-y:auto; overscroll-behavior:contain; border:1px solid var(--border); border-radius:14px; color:var(--popover-foreground); background:color-mix(in srgb,var(--popover) 98.5%,transparent); box-shadow:0 20px 50px rgba(0,0,0,.24),0 3px 10px rgba(0,0,0,.12); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); animation:issue-context-menu-in .12s cubic-bezier(.2,.8,.2,1); }
+.issue-list-project-icon { width:16px; height:16px; flex:0 0 16px; object-fit:contain; }
 .issue-list-task-kicker .issue-difficulty-icon { width:20px; height:20px; flex:0 0 20px; border:1px solid color-mix(in srgb,currentColor 24%,var(--border)); border-radius:6px; background:color-mix(in srgb,currentColor 8%,var(--card)); }
 .issue-context-submenu { width:244px; }
 @keyframes issue-context-menu-in { from { opacity:0; transform:translateY(-3px) scale(.985); } }
@@ -5534,8 +5550,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .html-artifact-dialog-header h2 { overflow:hidden; color:var(--foreground); font-size:var(--text-base); text-overflow:ellipsis; white-space:nowrap; }
 .html-artifact-dialog-header p { font-size:var(--text-2xs); }
 .html-artifact-dialog-body { min-width:0; min-height:0; display:grid; place-items:stretch; overflow:hidden; background:white; }
-.html-artifact-dialog-body iframe { width:100%; height:100%; border:0; background:white; }
-.html-artifact-state { min-height:100%; display:flex; align-items:center; justify-content:center; gap:8px; color:var(--muted-foreground); background:var(--card); font-size:var(--text-sm); }
+.html-artifact-dialog-body iframe { width:100%; height:100%; grid-area:1/1; border:0; background:white; }
+.html-artifact-dialog-body iframe.is-pending { visibility:hidden; }
+.html-artifact-state { min-height:100%; z-index:1; grid-area:1/1; display:flex; align-items:center; justify-content:center; gap:8px; color:var(--muted-foreground); background:var(--card); font-size:var(--text-sm); }
 .html-artifact-state.is-error { flex-direction:column; }
 .html-artifact-state.is-error p { margin:0; color:var(--destructive); }
 .html-artifact-state button { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:8px; background:var(--card); padding:7px 10px; color:var(--foreground); }
@@ -5822,6 +5839,35 @@ button.issue-message-state { width:100%; cursor:pointer; }
   font-weight: 650;
 }
 .channel-thread > header span { display: inline-flex; align-items: center; gap: 6px; }
+.channel-thread-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+.channel-thread-channel-link {
+  display: inline-flex;
+  min-width: 0;
+  max-width: min(240px, 32vw);
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground, #777168);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 550;
+}
+.channel-thread-channel-link > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.channel-thread-channel-link:hover { background: var(--accent, #f2efe9); color: var(--foreground, #24211d); }
+.channel-thread-channel-link:focus-visible { outline: 2px solid var(--ring, currentColor); outline-offset: 1px; }
 .channel-thread-header-actions,
 .channel-thread-subscribe { display: inline-flex; align-items: center; gap: 8px; }
 .channel-thread-header-actions > button[aria-label] {

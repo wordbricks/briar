@@ -191,7 +191,7 @@ final class InboxStoreSyncTests: XCTestCase {
             icon: nil,
             organizationId: project.organizationId,
             organizationName: project.organizationName,
-            role: .member,
+            role: .developer,
             createdAt: project.createdAt
         )
         let secondRunID = UUID(uuidString: "55555555-5555-4555-8555-555555555555")!

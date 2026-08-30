@@ -1,20 +1,25 @@
-import { House, Inbox, ListTodo, MessageCircle, Plus } from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import {
+  House,
+  Inbox,
+  ListTodo,
+  MessageCircle,
+  Monitor,
+  MoreHorizontal,
+  Plus,
+} from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
+import type { ExecutionWorker } from "../types";
+import { CompanionHostStatusDialog } from "./CompanionHostStatusDialog";
 
 export type CompanionStatusFilter =
-  | "all"
-  | "active"
-  | "attention"
-  | "completed";
+  "all" | "active" | "attention" | "completed";
 
-type CompanionDestination =
-  | CompanionStatusFilter
-  | "dms"
-  | "home"
-  | "inbox";
+type CompanionDestination = CompanionStatusFilter | "dms" | "home" | "inbox";
 
 export function CompanionBottomNavigation({
   activeDestination,
@@ -25,6 +30,7 @@ export function CompanionBottomNavigation({
   onStatusChange,
   unreadDmCount,
   unreadInboxCount,
+  workers = [],
 }: {
   activeDestination: CompanionDestination;
   onCreate?: () => void;
@@ -34,8 +40,10 @@ export function CompanionBottomNavigation({
   onStatusChange: (status: CompanionStatusFilter) => void;
   unreadDmCount: number;
   unreadInboxCount: number;
+  workers?: ExecutionWorker[];
 }) {
   const { t } = useI18n();
+  const [hostStatusOpen, setHostStatusOpen] = useState(false);
   const destinations: Array<{
     count?: number;
     icon: typeof ListTodo;
@@ -98,8 +106,7 @@ export function CompanionBottomNavigation({
                 className={cn(
                   "relative grid min-h-[26px] min-w-8 place-items-center",
                   "[.platform-android_&]:min-h-[30px] [.platform-android_&]:min-w-[54px] [.platform-android_&]:rounded-[18px]",
-                  isActive &&
-                    "[.platform-android_&]:bg-[#e7def9]",
+                  isActive && "[.platform-android_&]:bg-[#e7def9]",
                 )}
               >
                 <Icon size={22} />
@@ -117,19 +124,53 @@ export function CompanionBottomNavigation({
         })}
       </nav>
       {onCreate ? (
-        <Button
-          aria-label={t("dashboard.createIssue")}
-          className={cn(
-            "companion-fab pointer-events-auto absolute right-[3px] bottom-[72px] grid size-[52px] place-items-center rounded-full border border-[rgba(91,69,169,.2)] bg-[#654bb8] p-0 text-white shadow-[0_12px_30px_rgba(67,49,127,.26)] active:scale-[.94] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#765bd0]",
-            "[.platform-ios_&]:static [.platform-ios_&]:justify-self-end",
-            "[.platform-android_&]:right-[max(13px,env(safe-area-inset-right))] [.platform-android_&]:bottom-[calc(88px+env(safe-area-inset-bottom))] [.platform-android_&]:size-14 [.platform-android_&]:rounded-[17px] [.platform-android_&]:border-0 [.platform-android_&]:bg-[#ded2ff] [.platform-android_&]:text-[#32265b] [.platform-android_&]:shadow-[0_8px_20px_rgba(68,54,110,.22)]",
-          )}
-          onClick={onCreate}
-          size="icon"
-          type="button"
-        >
-          <Plus size={25} />
-        </Button>
+        <>
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <Button
+                aria-label={t("companion.moreActions")}
+                className={cn(
+                  "companion-fab pointer-events-auto absolute right-[3px] bottom-[72px] grid size-[52px] place-items-center rounded-full border border-[rgba(91,69,169,.2)] bg-[#654bb8] p-0 text-white shadow-[0_12px_30px_rgba(67,49,127,.26)] active:scale-[.94] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#765bd0]",
+                  "[.platform-ios_&]:static [.platform-ios_&]:justify-self-end",
+                  "[.platform-android_&]:right-[max(13px,env(safe-area-inset-right))] [.platform-android_&]:bottom-[calc(88px+env(safe-area-inset-bottom))] [.platform-android_&]:size-14 [.platform-android_&]:rounded-[17px] [.platform-android_&]:border-0 [.platform-android_&]:bg-[#ded2ff] [.platform-android_&]:text-[#32265b] [.platform-android_&]:shadow-[0_8px_20px_rgba(68,54,110,.22)]",
+                )}
+                size="icon"
+                type="button"
+              >
+                <MoreHorizontal size={27} />
+              </Button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                align="end"
+                className="z-[120] min-w-44 rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-xl"
+                collisionPadding={12}
+                side="top"
+                sideOffset={8}
+              >
+                <DropdownMenu.Item
+                  className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+                  onSelect={onCreate}
+                >
+                  <Plus aria-hidden size={18} />
+                  {t("dashboard.createIssue")}
+                </DropdownMenu.Item>
+                <DropdownMenu.Item
+                  className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+                  onSelect={() => setHostStatusOpen(true)}
+                >
+                  <Monitor aria-hidden size={18} />
+                  {t("companion.host")}
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+          <CompanionHostStatusDialog
+            onOpenChange={setHostStatusOpen}
+            open={hostStatusOpen}
+            workers={workers}
+          />
+        </>
       ) : null}
     </div>
   );

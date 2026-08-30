@@ -109,6 +109,7 @@ enum L10n {
         "라이트": "Light",
         "다크": "Dark",
         "모두 읽음": "Mark all read",
+        "읽지 않은 메시지 %d개": "%d unread messages",
         "새 알림 없음": "No new messages",
         "표시할 Agent 없음": "No agents available",
         "세션": "Sessions",
@@ -210,6 +211,17 @@ enum L10n {
         "작업 요청": "Task request",
         "에이전트 작업 요청": "Agent task request",
         "실행 호스트": "Execution host",
+        "호스트": "Host",
+        "호스트 상태": "Host status",
+        "이슈 메뉴": "Issue menu",
+        "활성 호스트": "Active hosts",
+        "연결된 호스트 없음": "No connected hosts",
+        "이 프로젝트에서 사용할 수 있는 Worker가 없습니다.": "No Worker is available for this project.",
+        "호스트 상태 새로고침": "Refresh host status",
+        "마지막 동기화": "Last synced",
+        "활성 세션 %d/%d": "%d of %d sessions active",
+        "사용 가능": "Available",
+        "공유 중지": "Sharing disabled",
         "먼저 실행할 Skill을 선택해 주세요.": "Select a skill first.",
         "선택한 Skill을 실행할 수 있는 Worker가 없습니다.": "No worker can run the selected skill.",
         "취소": "Cancel",
@@ -478,6 +490,7 @@ enum L10n {
         "라이트": "浅色",
         "다크": "深色",
         "모두 읽음": "全部标为已读",
+        "읽지 않은 메시지 %d개": "%d 条未读消息",
         "새 알림 없음": "没有新消息",
         "표시할 Agent 없음": "暂无可显示的 Agent",
         "세션": "会话",
@@ -531,6 +544,17 @@ enum L10n {
         "프로젝트에 연결된 Agent가 여기에 표시됩니다.": "与项目关联的 Agent 将显示在这里。",
         "아직 동기화된 세션이 없습니다.": "还没有同步的会话。",
         "실행 Worker": "执行 Worker",
+        "호스트": "主机",
+        "호스트 상태": "主机状态",
+        "이슈 메뉴": "问题菜单",
+        "활성 호스트": "活跃主机",
+        "연결된 호스트 없음": "没有已连接的主机",
+        "이 프로젝트에서 사용할 수 있는 Worker가 없습니다.": "此项目没有可用的 Worker。",
+        "호스트 상태 새로고침": "刷新主机状态",
+        "마지막 동기화": "上次同步",
+        "활성 세션 %d/%d": "%d/%d 个会话正在运行",
+        "사용 가능": "可用",
+        "공유 중지": "已停止共享",
         "실행 가능": "可执行",
         "실행 승인": "执行批准",
         "이슈 생성·실행 승인": "批准创建并执行问题",
@@ -795,6 +819,21 @@ enum L10n {
         case channelMessagePlaceholder
         case channelAgentTyping
         case channelHome
+        case projectLobbyOpen
+        case projectLobbyOpenDescription
+        case projectAgentsOpen
+        case projectAgentsOpenDescription
+        case projectLobbyTitle
+        case projectLobbyDescription
+        case projectLobbyAll
+        case projectLobbyActive
+        case projectLobbyAttention
+        case projectLobbyCompleted
+        case projectLobbyRecent
+        case projectLobbyRecentDescription
+        case projectLobbyViewAll
+        case projectLobbyEmpty
+        case projectLobbyRefresh
         case channelIssueProposal
         case channelIssueProposalAccepted
         case channelIssueProposalDeclined
@@ -863,6 +902,21 @@ enum L10n {
             case .channelMessagePlaceholder: "#%@에 메시지 보내기"
             case .channelAgentTyping: "%@님이 답변을 작성하고 있습니다…"
             case .channelHome: "홈"
+            case .projectLobbyOpen: "프로젝트 홈 보기"
+            case .projectLobbyOpenDescription: "주요 지표와 최근 작업을 확인하세요."
+            case .projectAgentsOpen: "Agents 보기"
+            case .projectAgentsOpenDescription: "Agent와 실행 세션을 확인하세요."
+            case .projectLobbyTitle: "프로젝트 현황"
+            case .projectLobbyDescription: "프로젝트의 현재 작업 상태를 한눈에 확인하세요."
+            case .projectLobbyAll: "전체 이슈"
+            case .projectLobbyActive: "진행 중"
+            case .projectLobbyAttention: "확인 필요"
+            case .projectLobbyCompleted: "완료"
+            case .projectLobbyRecent: "최근 작업"
+            case .projectLobbyRecentDescription: "최근에 업데이트된 이슈입니다."
+            case .projectLobbyViewAll: "전체 보기"
+            case .projectLobbyEmpty: "아직 작업 기록이 없습니다."
+            case .projectLobbyRefresh: "현황 새로고침"
             case .channelIssueProposal: "이슈 생성 제안"
             case .channelIssueProposalAccepted: "승인되어 이슈가 생성되었습니다."
             case .channelIssueProposalDeclined: "제안을 거절했습니다."
@@ -934,6 +988,21 @@ enum L10n {
             case .channelMessagePlaceholder: "Message #%@"
             case .channelAgentTyping: "%@ is writing a reply…"
             case .channelHome: "Home"
+            case .projectLobbyOpen: "View project home"
+            case .projectLobbyOpenDescription: "Check key metrics and recent work."
+            case .projectAgentsOpen: "View agents"
+            case .projectAgentsOpenDescription: "View agents and their execution sessions."
+            case .projectLobbyTitle: "Project overview"
+            case .projectLobbyDescription: "See the project's current work status at a glance."
+            case .projectLobbyAll: "All issues"
+            case .projectLobbyActive: "In progress"
+            case .projectLobbyAttention: "Needs attention"
+            case .projectLobbyCompleted: "Completed"
+            case .projectLobbyRecent: "Recent activity"
+            case .projectLobbyRecentDescription: "The most recently updated issues."
+            case .projectLobbyViewAll: "View all"
+            case .projectLobbyEmpty: "No activity yet."
+            case .projectLobbyRefresh: "Refresh overview"
             case .channelIssueProposal: "Issue proposal"
             case .channelIssueProposalAccepted: "Accepted — the issue was created."
             case .channelIssueProposalDeclined: "Declined."
@@ -1005,6 +1074,21 @@ enum L10n {
             case .channelMessagePlaceholder: "发送消息到 #%@"
             case .channelAgentTyping: "%@ 正在撰写回复…"
             case .channelHome: "主页"
+            case .projectLobbyOpen: "查看项目主页"
+            case .projectLobbyOpenDescription: "查看关键指标和最近工作。"
+            case .projectAgentsOpen: "查看智能体"
+            case .projectAgentsOpenDescription: "查看智能体及其运行会话。"
+            case .projectLobbyTitle: "项目概览"
+            case .projectLobbyDescription: "一目了然地查看项目当前工作状态。"
+            case .projectLobbyAll: "全部问题"
+            case .projectLobbyActive: "进行中"
+            case .projectLobbyAttention: "需要关注"
+            case .projectLobbyCompleted: "已完成"
+            case .projectLobbyRecent: "最近活动"
+            case .projectLobbyRecentDescription: "最近更新的问题。"
+            case .projectLobbyViewAll: "查看全部"
+            case .projectLobbyEmpty: "暂无活动。"
+            case .projectLobbyRefresh: "刷新概览"
             case .channelIssueProposal: "创建问题建议"
             case .channelIssueProposalAccepted: "已批准并创建问题。"
             case .channelIssueProposalDeclined: "已拒绝。"

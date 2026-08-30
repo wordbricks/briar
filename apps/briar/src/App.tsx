@@ -13,6 +13,7 @@ import {
   House,
   Inbox as InboxIcon,
   Keyboard as KeyboardIcon,
+  ListTodo,
   MessageCircle,
   MessagesSquare,
   PanelLeft,
@@ -30,9 +31,11 @@ import {
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
 import { CompanionSettings } from "./components/CompanionSettings";
 import { ConnectionHealth } from "./components/ConnectionHealth";
-import { HuntDashboard, RunPage } from "./components/HuntDashboard";
+import { HuntDashboard } from "./components/hunt/HuntDashboard";
+import { RunPage } from "./components/hunt/detail/RunPage";
 import { WorkerDispatchDialog } from "./components/WorkerDispatchDialog";
 import { Inbox } from "./components/Inbox";
+import { MyIssues } from "./components/MyIssues";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
 import {
   InboxDetailTargetBoundary,
@@ -160,6 +163,7 @@ import {
 } from "./lib/project-window";
 import {
   listenForBriarLinks,
+  parseWebAppIssuePath,
   type BriarLinkTarget,
 } from "./lib/issue-links";
 import { listenForClickedIssueLinks } from "./lib/external-links";
@@ -830,8 +834,9 @@ export function App({
       projectId = navigationActiveProjectIdRef.current,
     ) =>
       navigateToLocation(
-        page === "inbox" && briar.activeOrganizationId
-          ? organizationNavigationLocation(briar.activeOrganizationId)
+        (page === "inbox" || page === "my-issues") &&
+        briar.activeOrganizationId
+          ? organizationNavigationLocation(briar.activeOrganizationId, page)
           : (page === "channels" || page === "dms") &&
           briar.activeOrganizationId
           ? channelPageNavigationLocation(
@@ -1137,9 +1142,9 @@ export function App({
             fallbackProject?.id,
           ),
         );
-      } else if (activePage === "inbox") {
+      } else if (activePage === "inbox" || activePage === "my-issues") {
         replaceNavigationLocation(
-          organizationNavigationLocation(fallbackOrganization.id),
+          organizationNavigationLocation(fallbackOrganization.id, activePage),
         );
       } else {
         replaceNavigationLocation(
@@ -1297,7 +1302,11 @@ export function App({
     ],
   );
   const [pendingBriarLink, setPendingBriarLink] =
-    useState<BriarLinkTarget | null>(null);
+    useState<BriarLinkTarget | null>(() => {
+      if (!runsOnWeb) return null;
+      const target = parseWebAppIssuePath(window.location.pathname);
+      return target ? { kind: "issue", ...target } : null;
+    });
   const [pendingInboxNotificationTarget, setPendingInboxNotificationTarget] =
     useState<InboxNotificationTarget | null>(null);
   const setInboxDetailTarget = useAtomSet(inboxDetailTargetAtom);
@@ -1336,7 +1345,7 @@ export function App({
   >(null);
   const [dispatchRun, setDispatchRun] = useState<HuntRun | null>(null);
   const [companionPage, setCompanionPage] = useState<
-    "issues" | "dms" | "home" | "inbox" | "settings"
+    "issues" | "dms" | "home" | "inbox" | "lobby" | "settings"
   >("issues");
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
@@ -1644,7 +1653,7 @@ export function App({
         return true;
       }
       if (!briar.companionMode || companionPage === "issues") return false;
-      setCompanionPage("issues");
+      setCompanionPage(companionPage === "lobby" ? "home" : "issues");
       setRequestedRunId(null);
       setRequestedSessionId(null);
       return true;
@@ -1714,11 +1723,6 @@ export function App({
     });
 
     setRepositorySetupProjectId(null);
-    if (destination === "reconnect") {
-      beginProjectReconnect(projectId);
-      return;
-    }
-
     briar.setActiveProjectId(projectId);
     if (destination === "settings") {
       repositorySetupTriggerRef.current = null;
@@ -1741,7 +1745,6 @@ export function App({
     briar.remoteMode,
     briar.refreshProjectReadiness,
     briar.setActiveProjectId,
-    beginProjectReconnect,
     rememberRepositorySetupTrigger,
     navigateToPage,
   ]);
@@ -1763,6 +1766,44 @@ export function App({
           project.organizationId === briar.activeOrganizationId ||
           project.id === briar.activeProjectId,
       );
+  const activeDashboardRef = useRef(briar.dashboard);
+  activeDashboardRef.current = briar.dashboard;
+  const loadOrganizationProjectDashboard = useCallback(
+    (projectId: string, signal: AbortSignal) => {
+      const activeDashboard = activeDashboardRef.current;
+      if (activeDashboard?.project.id === projectId) {
+        return Promise.resolve(activeDashboard);
+      }
+      if (!briar.token) return Promise.resolve(null);
+      return loadDashboard(briar.token, projectId, signal);
+    },
+    [briar.token],
+  );
+  const openOrganizationIssue = useCallback(
+    (projectId: string, runId: string) => {
+      void (async () => {
+        setRequestedSessionId(null);
+        setRequestedRunMessageId(null);
+        setRequestedRunInitialTab(null);
+        setRequestedRunId(runId);
+        setIssueListRequestKey((key) => key + 1);
+        if (projectId !== briar.activeProjectId) {
+          await briar.ensureProjectSelected(projectId);
+        }
+        navigateToIssue(runId, projectId);
+      })().catch((caught) => {
+        toast(caught instanceof Error ? caught.message : String(caught), {
+          tone: "error",
+        });
+      });
+    },
+    [
+      briar.activeProjectId,
+      briar.ensureProjectSelected,
+      navigateToIssue,
+      toast,
+    ],
+  );
   const visibleOrganizationChannels = projectWindowProjectId
     ? organizationChannels.filter(
         (channel) =>
@@ -1790,6 +1831,7 @@ export function App({
       channels: t("sidebar.channels"),
       dms: t("sidebar.dms"),
       inbox: t("sidebar.inbox"),
+      "my-issues": t("sidebar.myIssues"),
       "organization-create": t("sidebar.addOrganization"),
       issues: t("sidebar.issues"),
       lobby: t("lobby.eyebrow"),
@@ -1823,6 +1865,7 @@ export function App({
       if (page === "agents") return <Bot aria-hidden="true" size={16} />;
       if (page === "schedule") return <CalendarDays aria-hidden="true" size={16} />;
       if (page === "inbox") return <InboxIcon aria-hidden="true" size={16} />;
+      if (page === "my-issues") return <ListTodo aria-hidden="true" size={16} />;
       if (page === "channels") return <Hash aria-hidden="true" size={16} />;
       if (page === "dms") return <MessageCircle aria-hidden="true" size={16} />;
       if (page === "organization-create") {
@@ -1921,12 +1964,12 @@ export function App({
         });
       }
 
-      if (page === "inbox") {
+      if (page === "inbox" || page === "my-issues") {
         return createItem(index, location, {
           context: null,
-          eyebrow: organization?.name ?? t("sidebar.inbox"),
-          icon: <InboxIcon aria-hidden="true" size={16} />,
-          label: t("sidebar.inbox"),
+          eyebrow: organization?.name ?? t("sidebar.myIssues"),
+          icon: pageIcon(page),
+          label: pageLabels[page],
         });
       }
 
@@ -2048,7 +2091,6 @@ export function App({
       : null;
   const shouldShowInitialOnboarding =
     !briar.remoteMode &&
-    !briar.user &&
     !hasCompletedOnboarding;
   const shouldShowFirstOrganizationSetup =
     resolveShouldShowFirstOrganizationSetup({
@@ -2303,12 +2345,6 @@ export function App({
     setCompletedDispatchRunId(null);
     setDispatchRun(null);
   }, [briar.activeProjectId]);
-
-  useEffect(() => {
-    if (!briar.user || hasCompletedOnboarding) return;
-    markInitialOnboardingComplete();
-    setHasCompletedOnboarding(true);
-  }, [briar.user, hasCompletedOnboarding]);
 
   const acceptCurrentInvitation = useCallback(async () => {
     if (!invitationToken) return;
@@ -2766,6 +2802,19 @@ export function App({
       priority: 180 + visibleInboxUnreadCount,
       scope: "navigation",
     }, paletteSections.continue);
+  }
+  if (!projectWindowProjectId && briar.activeOrganizationId) {
+    addPaletteItem({
+      active: activePage === "my-issues",
+      description: activeOrganization?.name,
+      icon: <ListTodo />,
+      id: `navigation:my-issues:${briar.activeOrganizationId}`,
+      keywords: ["my issues", "issues", "내 이슈", "我的问题"],
+      label: t("sidebar.myIssues"),
+      onSelect: () => navigateToPage("my-issues"),
+      priority: activePage === "my-issues" ? 120 : 50,
+      scope: "navigation",
+    }, paletteSections.navigation);
   }
 
   const paletteProjectIds = new Set(
@@ -3494,6 +3543,10 @@ export function App({
           setRequestedChannelMessage(null);
           setInboxDetailTarget(null);
         }}
+        onInboxChannelOpen={(channelId) => {
+          setInboxDetailTarget(null);
+          openOrganizationChannel(channelId);
+        }}
         onCreateAgent={() => {
           setSettingsTarget({
             scope: "organization",
@@ -3564,10 +3617,15 @@ export function App({
   } else if (shouldShowInitialOnboarding) {
     content = (
       <InitialOnboarding
+        authenticated={Boolean(briar.user)}
         error={briar.error}
         loading={briar.loading}
         loginCode={briar.loginCode}
         onCancelLogin={briar.cancelLogin}
+        onComplete={() => {
+          markInitialOnboardingComplete();
+          setHasCompletedOnboarding(true);
+        }}
         onLogin={(method) => void briar.login({ method, locale })}
       />
     );
@@ -3661,6 +3719,11 @@ export function App({
             onLobbyOpen={() => navigateToPage("lobby")}
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
+            onMyIssuesOpen={
+              briar.activeOrganizationId
+                ? () => navigateToPage("my-issues")
+                : undefined
+            }
             onDmsOpen={() => {
               const directMessage = organizationDirectMessages.find(
                 (channel) => channel.id === activeChannelId,
@@ -3757,16 +3820,8 @@ export function App({
               setRepositorySetupProjectId(null);
               restoreRepositorySetupTrigger();
             }}
-            onInstallGithub={() =>
-              briar.installGithubForProject(repositorySetupProjectId)
-            }
-            onLoginGithub={() =>
-              briar.loginGithubForProject(repositorySetupProjectId)
-            }
-            onReconnect={() => {
-              const projectId = repositorySetupProjectId;
-              setRepositorySetupProjectId(null);
-              beginProjectReconnect(projectId, false);
+            onStartWorking={async () => {
+              await briar.startWorkingOnProject(repositorySetupProjectId);
             }}
             onRefresh={() =>
               briar.refreshProjectReadiness(repositorySetupProjectId)
@@ -3912,6 +3967,16 @@ export function App({
               title={t("dm.empty")}
             />
           </MainContent>
+        ) : activePage === "my-issues" && briar.activeOrganizationId ? (
+          <MyIssues
+            currentUserId={briar.user?.id ?? null}
+            isSidebarOpen={isSidebarOpen}
+            loadProjectDashboard={loadOrganizationProjectDashboard}
+            onOpenIssue={openOrganizationIssue}
+            organizationId={briar.activeOrganizationId}
+            organizationName={activeOrganization?.name}
+            projects={activeOrganizationProjects}
+          />
         ) : activePage === "inbox" ? (
           <main
             aria-label={`${t("inbox.title")} · ${t("inbox.messages")}`}
@@ -4414,7 +4479,9 @@ export function App({
             onAccountSave={briar.updateAccountProfile}
             user={briar.user}
           />
-        ) : companionPage === "home" && briar.activeOrganizationId && briar.token ? (
+        ) : companionPage === "home" &&
+          briar.activeOrganizationId &&
+          (briar.token || briar.demoMode) ? (
           <>
             <CompanionChannels
               activeProjectId={activeProject?.id ?? null}
@@ -4424,7 +4491,7 @@ export function App({
               projects={activeOrganizationProjects}
               onSkillSessionAccepted={autoHunt.adoptRemoteSession}
               onViewingChannelChange={handleViewingChannelChange}
-              token={briar.token}
+              token={briar.token ?? ""}
               channelCache={companionChannelCache.current}
               requestedMessage={requestedChannelMessage}
               requestedChannelId={requestedChannelId}
@@ -4437,12 +4504,52 @@ export function App({
                 setCompanionStatus("all");
                 setCompanionPage("issues");
               }}
+              onLobbyOpen={() => setCompanionPage("lobby")}
             />
             <CompanionBottomNavigation
               activeDestination="home"
               onDmsOpen={() => setCompanionPage("dms")}
               onInboxOpen={() => setCompanionPage("inbox")}
               onHomeOpen={() => {}}
+              onStatusChange={(status) => {
+                setCompanionStatus(status);
+                setCompanionPage("issues");
+              }}
+              unreadDmCount={unreadDirectMessageCount}
+              unreadInboxCount={inbox.unreadCount}
+            />
+          </>
+        ) : companionPage === "lobby" && activeProject ? (
+          <>
+            <ProjectLobby
+              companionMode
+              connectionState={briar.activeProjectConnectionState}
+              dashboard={briar.dashboard}
+              isSidebarOpen={false}
+              onBack={() => setCompanionPage("home")}
+              onLoadUsageSummary={loadProjectHomeUsage}
+              onOpenAgents={() => setCompanionPage("issues")}
+              onOpenIssue={(runId) => {
+                setRequestedRunId(runId);
+                setCompanionStatus("all");
+                setCompanionPage("issues");
+              }}
+              onOpenIssues={() => {
+                setRequestedRunId(null);
+                setCompanionStatus("all");
+                setCompanionPage("issues");
+              }}
+              onOpenRepository={() => undefined}
+              onOpenSettings={() => setCompanionPage("settings")}
+              project={activeProject}
+              readiness={briar.projectReadiness[activeProject.id] ?? null}
+              requiresLocalReadiness={!briar.remoteMode}
+            />
+            <CompanionBottomNavigation
+              activeDestination="home"
+              onDmsOpen={() => setCompanionPage("dms")}
+              onInboxOpen={() => setCompanionPage("inbox")}
+              onHomeOpen={() => setCompanionPage("home")}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
                 setCompanionPage("issues");

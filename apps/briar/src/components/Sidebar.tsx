@@ -10,6 +10,7 @@ import {
   Ellipsis,
   ExternalLink,
   Inbox,
+  ListTodo,
   LogOut,
   Plus,
   Settings,
@@ -55,6 +56,7 @@ type SidebarPage =
   | "dms"
   | "schedule"
   | "inbox"
+  | "my-issues"
   | "project-settings"
   | "organization-create"
   | "organization-settings"
@@ -78,6 +80,7 @@ export function Sidebar({
   onLobbyOpen,
   onScheduleOpen,
   onInboxOpen,
+  onMyIssuesOpen,
   onDmsOpen = () => {},
   onChannelCreate,
   onChannelDelete,
@@ -119,6 +122,7 @@ export function Sidebar({
   onLobbyOpen: () => void;
   onScheduleOpen: () => void;
   onInboxOpen: () => void;
+  onMyIssuesOpen?: () => void;
   onDmsOpen?: () => void;
   onChannelCreate?: (
     name: string,
@@ -355,7 +359,7 @@ export function Sidebar({
   const selectProject = (projectId: string) => {
     if (projectId !== activeProjectId) onProjectChange(projectId);
     setProjectExpanded(projectId, true);
-    onIssuesOpen();
+    onLobbyOpen();
   };
 
   return (
@@ -532,6 +536,22 @@ export function Sidebar({
             />
           )}
         </a>
+        {!isProjectWindow && onMyIssuesOpen ? (
+          <a
+            aria-current={activePage === "my-issues" ? "page" : undefined}
+            className={`sidebar-primary-subnav-link${
+              activePage === "my-issues" ? " active" : ""
+            }`}
+            href="#my-issues"
+            onClick={(event) => {
+              event.preventDefault();
+              onMyIssuesOpen();
+            }}
+          >
+            <ListTodo aria-hidden="true" size={15} strokeWidth={1.7} />
+            <span>{t("sidebar.myIssues")}</span>
+          </a>
+        ) : null}
         {isProjectWindow && projectWindowProject && onChannelOpen ? (
           <SidebarProjectChannels
             activeChannelId={activeChannelId}

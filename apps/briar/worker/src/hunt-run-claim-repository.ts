@@ -432,7 +432,7 @@ export async function findProjectIdByAgentTokenHash(
         and project_membership.user_id = membership.user_id
        where token.token_hash = ?
          and (
-           membership.role in ('owner', 'admin')
+           membership.role in ('owner', 'co-owner')
            or project_membership.user_id is not null
          )
        union all
@@ -467,7 +467,7 @@ export async function issueProjectAgentToken(
         and project_membership.user_id = membership.user_id
        where project.id = ?
          and (
-           membership.role in ('owner', 'admin')
+           membership.role in ('owner', 'co-owner')
            or project_membership.user_id is not null
          )`,
     )

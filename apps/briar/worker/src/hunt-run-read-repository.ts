@@ -112,7 +112,7 @@ export async function listOrganizationStatusTrayRuns(
         and project_membership.user_id = membership.user_id
        where project.organization_id = ?
          and (
-           membership.role in ('owner', 'admin')
+           membership.role in ('owner', 'co-owner')
            or project_membership.user_id is not null
          )
          and run.status = 'running'

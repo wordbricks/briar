@@ -8,6 +8,7 @@ import {
 } from "../../src/lib/channels-contract";
 import apiWorker from "./index";
 import {
+  CHANNEL_REPLY_FAILURE_MESSAGE,
   addChannelAgent,
   addChannelMember,
   claimNextChannelAgentReply,
@@ -139,7 +140,7 @@ describe("organization channels", () => {
       .prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
-         ) values (?, ?, 'member', ?, ?)`,
+         ) values (?, ?, 'developer', ?, ?)`,
       )
       .bind(organizationId, outsiderId, at(0), at(0))
       .run();
@@ -1033,7 +1034,7 @@ describe("organization channels", () => {
     await expect(archives.head(objectKey)).resolves.toBeNull();
   });
 
-  it("does not delete or queue attachments after an admin role is removed", async () => {
+  it("does not delete or queue attachments after a co-owner role is removed", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000017";
     const messageId = "f0000000-0000-4000-8000-000000000017";
     const attachmentId = "fa000000-0000-4000-8000-000000000017";
@@ -1042,7 +1043,7 @@ describe("organization channels", () => {
     await db
       .prepare(
         `update briar_organization_members
-         set role = 'admin', updated_at = ?
+         set role = 'co-owner', updated_at = ?
          where organization_id = ? and user_id = ?`,
       )
       .bind(at(8), organizationId, outsiderId)
@@ -1080,6 +1081,15 @@ describe("organization channels", () => {
       createdAt: at(8),
     });
 
+    await db
+      .prepare(
+        `update briar_organization_members
+         set role = 'viewer', updated_at = ?
+         where organization_id = ? and user_id = ?`,
+      )
+      .bind(at(9), organizationId, outsiderId)
+      .run();
+
     const apiEnv = {
       DB: db,
       ARCHIVES: archives,
@@ -1087,31 +1097,20 @@ describe("organization channels", () => {
       GOOGLE_CLIENT_ID: "google-client-test",
       GOOGLE_CLIENT_SECRET: "google-secret-test",
     } as unknown as Env;
-    const adminResponse = await apiWorker.fetch(new Request(
+    const formerCoOwnerResponse = await apiWorker.fetch(new Request(
       `https://briar-api.example/organizations/${organizationId}/channels/${channelId}`,
       {
         method: "DELETE",
         headers: { authorization: `Bearer ${outsiderSessionToken}` },
       },
     ), apiEnv);
-    expect(adminResponse.status).toBe(403);
+    expect(formerCoOwnerResponse.status).toBe(403);
 
     await expect(
       deleteChannel(db, organizationId, channelId, outsiderId, at(8)),
     ).resolves.toBe(false);
     await expect(getChannelById(db, organizationId, channelId))
       .resolves.toMatchObject({ id: channelId });
-
-    // The route may have observed the prior admin role. The deletion batch must
-    // authorize again after the downgrade and leave both D1 resources intact.
-    await db
-      .prepare(
-        `update briar_organization_members
-         set role = 'member', updated_at = ?
-         where organization_id = ? and user_id = ?`,
-      )
-      .bind(at(9), organizationId, outsiderId)
-      .run();
 
     await expect(
       deleteChannel(db, organizationId, channelId, outsiderId, at(9)),
@@ -1137,6 +1136,14 @@ describe("organization channels", () => {
         .bind(objectKey)
         .first(),
     ).resolves.toBeNull();
+    await db
+      .prepare(
+        `update briar_organization_members
+         set role = 'developer', updated_at = ?
+         where organization_id = ? and user_id = ?`,
+      )
+      .bind(at(10), organizationId, outsiderId)
+      .run();
   });
 
   it("lets a channel creator delete through the authenticated API route", async () => {
@@ -3305,6 +3312,136 @@ describe("organization channels", () => {
     expect(again).toHaveLength(2);
   });
 
+  it("creates an isolated, idempotent self-DM and clears its key when expanded", async () => {
+    const apiEnv = {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "channels-context-test-secret-channels-context-test",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+    const directMessagesEndpoint =
+      `https://briar-api.example/organizations/${organizationId}/dms`;
+    const createSelfRequest = () => new Request(directMessagesEndpoint, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${ownerSessionToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ memberIds: [ownerId], agentIds: [] }),
+    });
+
+    const created = await apiWorker.fetch(createSelfRequest(), apiEnv);
+    expect(created.status).toBe(201);
+    const createdBody = await created.json() as {
+      channel: {
+        id: string;
+        kind: string;
+        name: string;
+        visibility: string;
+        memberCount: number;
+        agentCount: number;
+        dmParticipants: Array<{
+          type: string;
+          id: string;
+          name: string;
+          image: string | null;
+        }>;
+      };
+    };
+    expect(createdBody.channel).toMatchObject({
+      kind: "dm",
+      name: "Owner",
+      visibility: "private",
+      memberCount: 1,
+      agentCount: 0,
+      dmParticipants: [{
+        type: "user",
+        id: ownerId,
+        name: "Owner",
+        image: null,
+      }],
+    });
+
+    const repeated = await apiWorker.fetch(createSelfRequest(), apiEnv);
+    expect(repeated.status).toBe(200);
+    expect((await repeated.json() as { channel: { id: string } }).channel.id)
+      .toBe(createdBody.channel.id);
+
+    const listed = await apiWorker.fetch(new Request(
+      `https://briar-api.example/organizations/${organizationId}/channels`,
+      { headers: { authorization: `Bearer ${ownerSessionToken}` } },
+    ), apiEnv);
+    expect(listed.status).toBe(200);
+    expect((await listed.json() as {
+      channels: Array<{ id: string; kind: string; name: string }>;
+    }).channels).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: createdBody.channel.id,
+        kind: "dm",
+        name: "Owner",
+      }),
+    ]));
+
+    const message = await apiWorker.fetch(new Request(
+      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/messages`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerSessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ body: "A private note to myself" }),
+      },
+    ), apiEnv);
+    expect(message.status).toBe(201);
+    expect((await message.json() as {
+      message: { body: string; author: { type: string; id: string } };
+    }).message).toMatchObject({
+      body: "A private note to myself",
+      author: { type: "user", id: ownerId },
+    });
+
+    const timeline = await apiWorker.fetch(new Request(
+      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}?limit=20`,
+      { headers: { authorization: `Bearer ${ownerSessionToken}` } },
+    ), apiEnv);
+    expect(timeline.status).toBe(200);
+    expect((await timeline.json() as {
+      messages: Array<{ body: string }>;
+    }).messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ body: "A private note to myself" }),
+    ]));
+
+    const outsiderTimeline = await apiWorker.fetch(new Request(
+      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}?limit=20`,
+      { headers: { authorization: `Bearer ${outsiderSessionToken}` } },
+    ), apiEnv);
+    expect(outsiderTimeline.status).toBe(404);
+
+    const expanded = await apiWorker.fetch(new Request(
+      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/members/${outsiderId}`,
+      {
+        method: "PUT",
+        headers: {
+          authorization: `Bearer ${ownerSessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ role: "member" }),
+      },
+    ), apiEnv);
+    expect(expanded.status).toBe(200);
+    await expect(db.prepare(
+      "select dm_key from briar_channels where id = ?",
+    ).bind(createdBody.channel.id).first<{ dm_key: string | null }>()).resolves
+      .toEqual({ dm_key: null });
+
+    const recreated = await apiWorker.fetch(createSelfRequest(), apiEnv);
+    expect(recreated.status).toBe(201);
+    expect((await recreated.json() as { channel: { id: string } }).channel.id)
+      .not.toBe(createdBody.channel.id);
+  });
+
   it("creates idempotent DMs and lets a busy preferred Worker answer", async () => {
     const agentId = "aa000000-0000-4000-8000-000000000120";
     await createOrganizationAgent(db, {
@@ -3830,6 +3967,214 @@ describe("organization channels", () => {
       }),
     }), apiEnv);
     expect(rejected.status).toBe(403);
+  });
+
+  it("stores one ordinary reply and Inbox notification on final AI failure", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000701";
+    const triggerId = "f0000000-0000-4000-8000-000000000701";
+    const successTriggerId = "f0000000-0000-4000-8000-000000000702";
+    const agent = await createOrganizationAgent(db, {
+      id: "aa000000-0000-4000-8000-000000000701",
+      organizationId,
+      name: "Retry Agent",
+      provider: "claude",
+      model: null,
+      responsibility: "Verify final reply failures",
+      effort: null,
+      createdAt: at(80),
+    });
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "final-reply-failure",
+      name: "Final reply failure",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(80),
+    });
+    await addChannelAgent(db, {
+      channelId,
+      agentId: agent!.id,
+      addedByUserId: ownerId,
+      createdAt: at(80),
+    });
+    await createChannelMessage(db, {
+      id: triggerId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "@Retry-Agent answer this",
+      mentionedUserIds: [],
+      mentionedAgentIds: [agent!.id],
+      createdAt: at(81),
+    });
+    const [job] = await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId,
+      triggerMessageId: triggerId,
+      parentMessageId: triggerId,
+      agents: [{ id: agent!.id, projectId: null, provider: "claude" }],
+      createdAt: at(81),
+    });
+
+    await db.prepare(
+      `update briar_execution_workers set state = 'online' where id = ?`,
+    ).bind(otherWorkerId).run();
+    const armAttempt = async (
+      targetJob: typeof job,
+      attempt: number,
+      claimTokenHash: string,
+      claimedAt: string,
+      leaseExpiresAt: string,
+    ) => {
+      await db.batch([
+        db.prepare(
+          `update briar_channel_agent_reply_jobs
+           set status = 'running', attempts = ?, claimed_device_id = ?,
+               claimed_worker_id = ?, claim_token_hash = ?, claimed_at = ?,
+               lease_expires_at = ?, error = null, updated_at = ?
+           where id = ?`,
+        ).bind(
+          attempt,
+          deviceId,
+          otherWorkerId,
+          claimTokenHash,
+          claimedAt,
+          leaseExpiresAt,
+          claimedAt,
+          targetJob.id,
+        ),
+        db.prepare(
+          `update briar_channel_reply_sessions
+           set owner_device_id = ?, owner_worker_id = ?, updated_at = ?
+           where id = ?`,
+        ).bind(deviceId, otherWorkerId, claimedAt, targetJob.session_id),
+      ]);
+    };
+    const failAttempt = async (attempt: number, failureMinute: number) => {
+      const claimTokenHash = String(attempt).repeat(64);
+      await armAttempt(
+        job,
+        attempt,
+        claimTokenHash,
+        at(failureMinute - 1),
+        at(failureMinute + 1),
+      );
+      return await failChannelReply(db, {
+        jobId: job.id,
+        deviceId,
+        workerId: otherWorkerId,
+        claimTokenHash,
+        error: "sensitive provider trace must stay internal",
+        updatedAt: at(failureMinute),
+      });
+    };
+
+    await expect(failAttempt(1, 82)).resolves.toMatchObject({
+      status: "queued",
+      completed_at: null,
+    });
+    await expect(getChannelMessage(db, channelId, job.reply_message_id))
+      .resolves.toBeNull();
+    await expect(failAttempt(2, 84)).resolves.toMatchObject({
+      status: "queued",
+      completed_at: null,
+    });
+    await expect(getChannelMessage(db, channelId, job.reply_message_id))
+      .resolves.toBeNull();
+
+    const failed = await failAttempt(3, 86);
+    expect(failed).toMatchObject({ status: "failed", completed_at: at(86) });
+    await expect(
+      getChannelMessage(db, channelId, job.reply_message_id),
+    ).resolves.toMatchObject({
+      id: job.reply_message_id,
+      parentMessageId: triggerId,
+      body: CHANNEL_REPLY_FAILURE_MESSAGE,
+      author: { type: "agent", id: agent!.id, name: "Retry Agent" },
+    });
+    await expect(
+      listChannelConversationNotifications(db, organizationId, ownerId),
+    ).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: job.reply_message_id,
+        body: CHANNEL_REPLY_FAILURE_MESSAGE,
+        notification_reason: "thread_reply",
+      }),
+    ]));
+
+    await expect(failChannelReply(db, {
+      jobId: job.id,
+      deviceId,
+      workerId: otherWorkerId,
+      claimTokenHash: "3".repeat(64),
+      error: "duplicate final failure",
+      updatedAt: at(87),
+    })).resolves.toBeNull();
+    await expect(db.prepare(
+      `select count(*) as count from briar_channel_messages
+       where id = ? and body = ?`,
+    ).bind(job.reply_message_id, CHANNEL_REPLY_FAILURE_MESSAGE).first<{
+      count: number;
+    }>()).resolves.toEqual({ count: 1 });
+
+    await createChannelMessage(db, {
+      id: successTriggerId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "@Retry-Agent succeed this time",
+      mentionedUserIds: [],
+      mentionedAgentIds: [agent!.id],
+      createdAt: at(88),
+    });
+    const [successfulJob] = await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId,
+      triggerMessageId: successTriggerId,
+      parentMessageId: successTriggerId,
+      agents: [{ id: agent!.id, projectId: null, provider: "claude" }],
+      createdAt: at(88),
+    });
+    await armAttempt(
+      successfulJob,
+      1,
+      "4".repeat(64),
+      at(89),
+      at(91),
+    );
+    await expect(completeChannelReply(db, successfulJob, {
+      jobId: successfulJob.id,
+      deviceId,
+      workerId: otherWorkerId,
+      claimTokenHash: "4".repeat(64),
+      body: "The normal answer succeeded.",
+      document: null,
+      issueProposal: null,
+      executionProposal: null,
+      agentName: agent!.name,
+      agentProvider: "claude",
+      completedAt: at(90),
+    })).resolves.toMatchObject({ status: "completed" });
+    await expect(
+      getChannelMessage(db, channelId, successfulJob.reply_message_id),
+    ).resolves.toMatchObject({
+      body: "The normal answer succeeded.",
+      parentMessageId: successTriggerId,
+    });
+    await expect(db.prepare(
+      `select count(*) as count from briar_channel_messages
+       where channel_id = ? and body = ?`,
+    ).bind(channelId, CHANNEL_REPLY_FAILURE_MESSAGE).first<{ count: number }>())
+      .resolves.toEqual({ count: 1 });
   });
 
   it("persists an unavailable Worker as an immediate failed reply", async () => {

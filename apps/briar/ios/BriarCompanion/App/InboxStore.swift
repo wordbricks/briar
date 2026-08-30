@@ -8,6 +8,7 @@ final class InboxStore: ObservableObject {
     @Published private(set) var notificationBaselineID =
         "signed-out:no-organization:local"
 
+    private var sourceMessages: [InboxMessage] = []
     private var readVersions: [String: String] = [:]
     private var remoteReadVersions: [String: String] = [:]
     private var pendingPush: [String: String] = [:]
@@ -86,6 +87,7 @@ final class InboxStore: ObservableObject {
         let organizationScope =
             organizationID?.uuidString.lowercased() ?? "no-organization"
         notificationBaselineID = "\(accountScope):\(organizationScope):local"
+        sourceMessages = []
         messages = []
         unreadCount = 0
         recompute(persist: false)
@@ -93,6 +95,7 @@ final class InboxStore: ObservableObject {
         if self.token != nil, self.userID != nil, organizationID != nil {
             startFeedPolling()
         } else if self.userID == nil {
+            sourceMessages = []
             messages = []
             unreadCount = 0
         }
@@ -118,11 +121,17 @@ final class InboxStore: ObservableObject {
     }
 
     func markRead(id: String) {
-        guard let message = messages.first(where: { $0.id == id }) else { return }
-        guard readVersions[id] != message.version else { return }
-        readVersions[id] = message.version
+        guard let message = messages.first(where: {
+            $0.id == id || $0.groupedReadVersions[id] != nil
+        }) else { return }
+        let versions = readVersions(for: message)
+        let changed = versions.filter { readVersions[$0.key] != $0.value }
+        guard !changed.isEmpty else { return }
+        for (messageID, version) in changed {
+            readVersions[messageID] = version
+        }
         recompute()
-        queuePush([id: message.version])
+        queuePush(changed)
     }
 
     func markIssueRead(runID: UUID) {
@@ -131,9 +140,11 @@ final class InboxStore: ObservableObject {
         for message in messages where
             message.targetId == normalizedRunID &&
             (message.kind == .issue || message.kind == .conversation) {
-            guard readVersions[message.id] != message.version else { continue }
-            readVersions[message.id] = message.version
-            pushed[message.id] = message.version
+            for (messageID, version) in readVersions(for: message)
+                where readVersions[messageID] != version {
+                readVersions[messageID] = version
+                pushed[messageID] = version
+            }
         }
         guard !pushed.isEmpty else { return }
         recompute()
@@ -143,10 +154,12 @@ final class InboxStore: ObservableObject {
     func markAllRead() {
         var pushed: [String: String] = [:]
         for message in messages {
-            if readVersions[message.id] != message.version {
-                pushed[message.id] = message.version
+            for (messageID, version) in readVersions(for: message) {
+                if readVersions[messageID] != version {
+                    pushed[messageID] = version
+                }
+                readVersions[messageID] = version
             }
-            readVersions[message.id] = message.version
         }
         recompute()
         if !pushed.isEmpty {
@@ -209,7 +222,7 @@ final class InboxStore: ObservableObject {
                     let subscribed = Set(
                         subscribedIssueIds.map { $0.uuidString.lowercased() }
                     )
-                    self.messages.removeAll { message in
+                    self.sourceMessages.removeAll { message in
                         (message.kind == .issue || message.kind == .conversation) &&
                         !subscribed.contains(message.targetId)
                     }
@@ -219,12 +232,12 @@ final class InboxStore: ObservableObject {
                         message.kind == .session ? message.id : nil
                     }
                 )
-                self.messages.removeAll { message in
+                self.sourceMessages.removeAll { message in
                     message.kind == .session &&
                         !authorizedSessionMessageIDs.contains(message.id)
                 }
                 let storedByID = Dictionary(
-                    uniqueKeysWithValues: self.messages.map { ($0.id, $0) }
+                    uniqueKeysWithValues: self.sourceMessages.map { ($0.id, $0) }
                 )
                 let feedMessages = response.messages.map { feedMessage in
                     let message = feedMessage.inboxMessage()
@@ -299,42 +312,43 @@ final class InboxStore: ObservableObject {
     }
 
     private func mergeMessages(_ incoming: [InboxMessage]) {
-        var merged = Dictionary(uniqueKeysWithValues: messages.map { ($0.id, $0) })
+        var merged = Dictionary(uniqueKeysWithValues: sourceMessages.map { ($0.id, $0) })
         for message in incoming {
             merged[message.id] = message
         }
-        let nextMessages = merged.values
+        sourceMessages = merged.values
             .sorted {
                 $0.occurredAt == $1.occurredAt
                     ? $0.id < $1.id
                     : $0.occurredAt > $1.occurredAt
             }
-            .map { message in
+        recompute()
+    }
+
+    private func recompute(persist: Bool = true) {
+        let nextMessages = InboxMessageBuilder.collapseThreads(
+            sourceMessages.map { message in
                 var copy = message
                 copy.isUnread = isUnread(message)
                 return copy
             }
+        )
         let nextUnreadCount = nextMessages.filter(countsTowardUnread).count
         guard nextMessages != messages || nextUnreadCount != unreadCount else {
             return
         }
         messages = nextMessages
         unreadCount = nextUnreadCount
-        persistIfPossible()
-        Task { await AppBadgeService.sync(count: unreadCount) }
-    }
-
-    private func recompute(persist: Bool = true) {
-        messages = messages.map { message in
-            var copy = message
-            copy.isUnread = isUnread(message)
-            return copy
-        }
-        unreadCount = messages.filter(countsTowardUnread).count
         if persist {
             persistIfPossible()
         }
         Task { await AppBadgeService.sync(count: unreadCount) }
+    }
+
+    private func readVersions(for message: InboxMessage) -> [String: String] {
+        message.groupedReadVersions.isEmpty
+            ? [message.id: message.version]
+            : message.groupedReadVersions
     }
 
     private func isUnread(_ message: InboxMessage) -> Bool {

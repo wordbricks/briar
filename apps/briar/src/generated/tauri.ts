@@ -73,8 +73,7 @@ export const commands = {
 	updateLocalProjectVelenOrg: (projectId: string, org: string | null) => __TAURI_INVOKE<string | null>("update_local_project_velen_org", { projectId, org }),
 	preflightLocalProjectConnection: (repositoryPath: string, autoHunt: AutoHuntConfig_Deserialize) => __TAURI_INVOKE<LocalProjectConnectionPreflight>("preflight_local_project_connection", { repositoryPath, autoHunt }),
 	projectRepositoryReadiness: (projectId: string) => __TAURI_INVOKE<RepositoryReadiness>("project_repository_readiness", { projectId }),
-	installProjectGithubCli: (projectId: string) => __TAURI_INVOKE<RepositoryReadiness>("install_project_github_cli", { projectId }),
-	loginProjectGithub: (projectId: string) => __TAURI_INVOKE<RepositoryReadiness>("login_project_github", { projectId }),
+	prepareProjectRepository: (projectId: string, credential: ProjectGithubCredential) => __TAURI_INVOKE<PreparedProjectRepository>("prepare_project_repository", { projectId, credential }),
 	disconnectLocalProject: (projectId: string) => __TAURI_INVOKE<null>("disconnect_local_project", { projectId }),
 	connectLocalProject: (apiUrl: string, projectId: string, agentToken: string, repositoryPath: string, autoHunt: AutoHuntConfig_Deserialize) => __TAURI_INVOKE<ConnectedLocalProject_Serialize>("connect_local_project", { apiUrl, projectId, agentToken, repositoryPath, autoHunt }),
 	inspectVelen: (org: string | null) => __TAURI_INVOKE<VelenInspection>("inspect_velen", { org }),
@@ -250,6 +249,7 @@ export type AutoHuntConfig_Deserialize = {
 	linearEnabled: boolean,
 	linearSource?: string | null,
 	linearTeam?: string | null,
+	githubRepositoryId?: number | null,
 	githubRepository?: string | null,
 	workflow?: WorkflowConfig_Deserialize,
 };
@@ -260,6 +260,7 @@ export type AutoHuntConfig_Serialize = {
 	linearEnabled: boolean,
 	linearSource?: string | null,
 	linearTeam?: string | null,
+	githubRepositoryId?: number | null,
 	githubRepository?: string | null,
 	workflow: WorkflowConfig_Serialize,
 };
@@ -506,6 +507,14 @@ export type PlannedUpdateAgentRecovery = {
 	request: ProjectAgentRunRequest,
 };
 
+export type PreparedProjectRepository = {
+	repositoryPath: string,
+	repositoryId: number,
+	repository: string,
+	reused: boolean,
+	completedSteps: string[],
+};
+
 export type ProjectAgentRunAction = "respond" | "dispatch_auto_hunt" | "call_host_tool";
 
 export type ProjectAgentRunRequest = {
@@ -642,6 +651,25 @@ export type ProjectAutoHuntWorkerResponse = {
 	outcome: string,
 	summary: string,
 	evidence: JsonValue[],
+};
+
+export type ProjectGithubCredential = {
+	project: ProjectGithubCredentialProject,
+	repository: ProjectGithubCredentialRepository,
+	username: string,
+	password: string,
+	expiresAt: string,
+};
+
+export type ProjectGithubCredentialProject = {
+	id: string,
+	organizationId: string,
+};
+
+export type ProjectGithubCredentialRepository = {
+	id: number,
+	fullName: string,
+	cloneUrl: string,
 };
 
 export type ProjectLlmProgressPayload = {

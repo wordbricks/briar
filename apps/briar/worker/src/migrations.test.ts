@@ -18,10 +18,153 @@ import {
   transferIssue,
 } from "./db";
 import {
+  acceptOrganizationInvitation,
+  createOrganizationInvitation,
+} from "./organization-command-repository";
+import {
   applyD1Migrations,
   createIsolatedTestDatabase,
   executeD1Sql,
 } from "./test-helpers/d1";
+
+it("migrates legacy organization roles without reducing access", async () => {
+  const miniflare = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok') } }",
+    d1Databases: { DB: "organization-capability-role-migration" },
+  });
+  try {
+    const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+    await applyD1Migrations(db, {
+      through: "0145_cleanup_stale_workflow_schedule_leases.sql",
+    });
+    const now = "2026-08-29T00:00:00.000Z";
+    await executeD1Sql(db, `
+      insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+      values
+        ('legacy-owner', 'Owner', 'legacy-owner@example.com', 1, '${now}', '${now}'),
+        ('legacy-admin', 'Admin', 'legacy-admin@example.com', 1, '${now}', '${now}'),
+        ('legacy-member', 'Member', 'legacy-member@example.com', 1, '${now}', '${now}'),
+        ('new-editor', 'Editor', 'new-editor@example.com', 1, '${now}', '${now}'),
+        ('rejected-admin', 'Rejected', 'rejected-admin@example.com', 1, '${now}', '${now}'),
+        ('invited-viewer', 'Viewer', 'invited-viewer@example.com', 1, '${now}', '${now}');
+      insert into briar_organizations (id, name, handle, created_at, updated_at)
+      values ('legacy-org', 'Legacy Organization', 'legacy-org', '${now}', '${now}');
+      insert into briar_organization_members (
+        organization_id, user_id, role, created_at, updated_at
+      ) values
+        ('legacy-org', 'legacy-owner', 'owner', '${now}', '${now}'),
+        ('legacy-org', 'legacy-admin', 'admin', '${now}', '${now}'),
+        ('legacy-org', 'legacy-member', 'member', '${now}', '${now}');
+      insert into briar_projects (
+        id, owner_user_id, organization_id, name, agent_token_hash,
+        created_at, updated_at
+      ) values (
+        'legacy-project', 'legacy-owner', 'legacy-org', 'Legacy Project',
+        '${"a".repeat(64)}', '${now}', '${now}'
+      );
+      insert into briar_project_members (
+        project_id, organization_id, user_id, created_at, updated_at
+      ) values (
+        'legacy-project', 'legacy-org', 'legacy-member', '${now}', '${now}'
+      );
+      insert into briar_organization_invitations (
+        id, organization_id, initial_project_id, email_normalized, role,
+        token_hash, invited_by_user_id, expires_at, created_at, updated_at
+      ) values
+        ('legacy-admin-invite', 'legacy-org', 'legacy-project',
+         'admin-invite@example.com', 'admin', '${"b".repeat(64)}',
+         'legacy-owner', '2026-09-05T00:00:00.000Z', '${now}', '${now}'),
+        ('legacy-member-invite', 'legacy-org', 'legacy-project',
+         'member-invite@example.com', 'member', '${"c".repeat(64)}',
+         'legacy-owner', '2026-09-05T00:00:00.000Z', '${now}', '${now}');
+    `);
+
+    await applyD1Migrations(db, {
+      files: ["0146_organization_capability_roles.sql"],
+    });
+
+    const members = await db.prepare(
+      `select user_id, role from briar_organization_members
+       where organization_id = ? order by user_id`,
+    ).bind("legacy-org").all<{ user_id: string; role: string }>();
+    expect(members.results).toEqual([
+      { user_id: "legacy-admin", role: "co-owner" },
+      { user_id: "legacy-member", role: "developer" },
+      { user_id: "legacy-owner", role: "owner" },
+    ]);
+
+    const invitations = await db.prepare(
+      `select id, role from briar_organization_invitations order by id`,
+    ).all<{ id: string; role: string }>();
+    expect(invitations.results).toEqual([
+      { id: "legacy-admin-invite", role: "co-owner" },
+      { id: "legacy-member-invite", role: "developer" },
+    ]);
+
+    const viewerInvitation = await createOrganizationInvitation(db, {
+      id: "viewer-invite",
+      organizationId: "legacy-org",
+      initialProjectId: "legacy-project",
+      emailNormalized: "invited-viewer@example.com",
+      role: "viewer",
+      tokenHash: "d".repeat(64),
+      invitedByUserId: "legacy-owner",
+      expiresAt: "2026-09-05T00:00:00.000Z",
+      createdAt: now,
+    });
+    expect(viewerInvitation).toMatchObject({
+      outcome: "created",
+      invitation: { role: "viewer" },
+    });
+    await expect(acceptOrganizationInvitation(db, {
+      tokenHash: "d".repeat(64),
+      userId: "invited-viewer",
+      emailNormalized: "invited-viewer@example.com",
+      acceptedAt: "2026-08-29T00:01:00.000Z",
+    })).resolves.toMatchObject({
+      outcome: "accepted",
+      invitation: { role: "viewer" },
+    });
+    await expect(db.prepare(
+      `select role from briar_organization_members
+       where organization_id = ? and user_id = ?`,
+    ).bind("legacy-org", "invited-viewer").first()).resolves.toEqual({
+      role: "viewer",
+    });
+    await expect(db.prepare(
+      `select project_id from briar_project_members
+       where project_id = ? and user_id = ?`,
+    ).bind("legacy-project", "invited-viewer").first()).resolves.toEqual({
+      project_id: "legacy-project",
+    });
+    const legacyReferences = await db.prepare(
+      `select name from sqlite_master
+       where sql like '%_role_legacy%' or sql like '%organization_members_legacy%'`,
+    ).all<{ name: string }>();
+    expect(legacyReferences.results).toEqual([]);
+    const foreignKeyViolations = await db.prepare(
+      `pragma foreign_key_check`,
+    ).all();
+    expect(foreignKeyViolations.results).toEqual([]);
+
+    await expect(db.prepare(
+      `insert into briar_organization_members (
+         organization_id, user_id, role, created_at, updated_at
+       ) values (?, ?, 'editor', ?, ?)`,
+    ).bind("legacy-org", "new-editor", now, now).run()).resolves.toMatchObject({
+      success: true,
+    });
+
+    await expect(db.prepare(
+      `insert into briar_organization_members (
+         organization_id, user_id, role, created_at, updated_at
+       ) values (?, ?, 'admin', ?, ?)`,
+    ).bind("legacy-org", "rejected-admin", now, now).run()).rejects.toThrow();
+  } finally {
+    await miniflare.dispose();
+  }
+}, 60_000);
 
 it("disables legacy merge queues until repository validation is configured", async () => {
   const miniflare = new Miniflare({
@@ -714,7 +857,7 @@ describe("D1 migrations", () => {
            organization_id, user_id, role, created_at, updated_at
          ) values
            ('requester-org', 'requester-owner', 'owner', '${createdAt}', '${createdAt}'),
-           ('requester-org', 'requester-member', 'member', '${createdAt}', '${createdAt}');
+           ('requester-org', 'requester-member', 'developer', '${createdAt}', '${createdAt}');
          insert into briar_projects (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
@@ -1769,6 +1912,7 @@ describe("D1 migrations", () => {
           "0102_channel_read_states.sql",
           "0136_issue_difficulty.sql",
           "0140_issue_difficulty_optional.sql",
+          "0147_project_github_repository_identity.sql",
         ],
       });
       const userId = "channel-upgrade-owner";

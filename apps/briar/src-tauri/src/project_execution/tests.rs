@@ -165,6 +165,7 @@ fn app_settings_can_change_and_preserve_the_workspace_sandbox() {
                 linear_source: None,
                 linear_team: None,
                 github_repository: None,
+                github_repository_id: None,
                 workflow: repository_workflow_bootstrap(),
             },
         },

@@ -9,6 +9,11 @@ typealias ChannelIssueOpenHandler = (
 typealias SkillSessionMaterializedHandler = @MainActor (ProjectAgentSession) -> Void
 typealias SkillSessionOpenHandler = @MainActor (UUID, String) -> Void
 
+enum CompanionHomeRoute: Hashable {
+    case projectLobby
+    case agents
+}
+
 private struct ChannelExecutionApprovalError: LocalizedError, Sendable {
     let message: String
     var errorDescription: String? { message }
@@ -93,6 +98,48 @@ struct ChannelsHomeView: View {
 
     var body: some View {
         List {
+            Section {
+                NavigationLink(value: CompanionHomeRoute.projectLobby) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "rectangle.3.group")
+                            .font(.headline)
+                            .foregroundStyle(.tint)
+                            .frame(width: 36, height: 36)
+                            .background(.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(L10n.text(.projectLobbyOpen, locale: locale))
+                                .font(.subheadline.weight(.semibold))
+                            Text(L10n.text(.projectLobbyOpenDescription, locale: locale))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .accessibilityIdentifier("project-lobby-link")
+
+                NavigationLink(value: CompanionHomeRoute.agents) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "cpu")
+                            .font(.headline)
+                            .foregroundStyle(.tint)
+                            .frame(width: 36, height: 36)
+                            .background(.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(L10n.text(.projectAgentsOpen, locale: locale))
+                                .font(.subheadline.weight(.semibold))
+                            Text(L10n.text(.projectAgentsOpenDescription, locale: locale))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .accessibilityIdentifier("project-agents-link")
+            }
+
             ForEach(groups) { group in
                 Section {
                     ForEach(group.channels) { channel in
@@ -106,23 +153,25 @@ struct ChannelsHomeView: View {
                         .accessibilityIdentifier("channel-group-\(group.id)")
                 }
             }
-        }
-        .listStyle(.insetGrouped)
-        .overlay {
+
             if groups.isEmpty {
-                if channels.loading {
-                    ChannelLoadingIndicator(
-                        accessibilityID: "channel-list-loading-spinner",
-                        label: L10n.text("채널을 불러오는 중…", locale: locale)
-                    )
-                } else {
-                    ContentUnavailableView(
-                        L10n.text(.channelsEmpty, locale: locale),
-                        systemImage: "number"
-                    )
+                Section {
+                    if channels.loading {
+                        ChannelLoadingIndicator(
+                            accessibilityID: "channel-list-loading-spinner",
+                            label: L10n.text("채널을 불러오는 중…", locale: locale)
+                        )
+                    } else {
+                        Label(
+                            L10n.text(.channelsEmpty, locale: locale),
+                            systemImage: "number"
+                        )
+                        .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
+        .listStyle(.insetGrouped)
         .refreshable { await channels.refresh() }
         .navigationDestination(for: ChannelSummary.self) { channel in
             ChannelMessagesView(
@@ -137,6 +186,215 @@ struct ChannelsHomeView: View {
                 onSkillSessionMaterialized: onSkillSessionMaterialized,
                 onSkillSessionOpen: onSkillSessionOpen
             )
+        }
+    }
+}
+
+struct ProjectLobbySummary: Equatable {
+    let total: Int
+    let active: Int
+    let attention: Int
+    let completed: Int
+    let recent: [DashboardRun]
+
+    init(runs: [DashboardRun]) {
+        total = runs.count
+        active = runs.filter {
+            $0.status == .queued || $0.status == .running || $0.status == .paused
+        }.count
+        attention = runs.filter {
+            $0.status == .blocked || $0.status == .failed
+        }.count
+        completed = runs.filter { $0.status == .completed }.count
+        recent = Array(runs.sorted { $0.updatedAt > $1.updatedAt }.prefix(5))
+    }
+}
+
+struct ProjectLobbyView: View {
+    @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
+
+    let project: Project
+    let snapshot: DashboardSnapshot?
+    let errorMessage: String?
+    let refresh: () async -> Void
+    let onTasksOpen: () -> Void
+    let onIssueOpen: ChannelIssueOpenHandler
+
+    private var locale: CompanionLocale {
+        CompanionLocale(rawValue: localeRaw) ?? .ko
+    }
+
+    private var runs: [DashboardRun] {
+        snapshot?.project.id == project.id ? snapshot?.runs ?? [] : []
+    }
+
+    private var summary: ProjectLobbySummary {
+        ProjectLobbySummary(runs: runs)
+    }
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 12) {
+                        ProjectIconView(icon: project.icon, size: 42)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(project.name)
+                                .font(.headline)
+                            Text(project.organizationName)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Text(L10n.text(.projectLobbyTitle, locale: locale))
+                        .font(.largeTitle.bold())
+                    Text(L10n.text(.projectLobbyDescription, locale: locale))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                LazyVGrid(
+                    columns: [GridItem(.flexible()), GridItem(.flexible())],
+                    spacing: 12
+                ) {
+                    metricCard(
+                        title: L10n.text(.projectLobbyAll, locale: locale),
+                        value: summary.total,
+                        systemImage: "list.bullet"
+                    )
+                    metricCard(
+                        title: L10n.text(.projectLobbyActive, locale: locale),
+                        value: summary.active,
+                        systemImage: "clock"
+                    )
+                    metricCard(
+                        title: L10n.text(.projectLobbyAttention, locale: locale),
+                        value: summary.attention,
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    metricCard(
+                        title: L10n.text(.projectLobbyCompleted, locale: locale),
+                        value: summary.completed,
+                        systemImage: "checkmark.circle"
+                    )
+                }
+
+                if let errorMessage {
+                    Label(errorMessage, systemImage: "wifi.exclamationmark")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(spacing: 0) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(L10n.text(.projectLobbyRecent, locale: locale))
+                                .font(.headline)
+                            Text(L10n.text(.projectLobbyRecentDescription, locale: locale))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button(L10n.text(.projectLobbyViewAll, locale: locale), action: onTasksOpen)
+                            .font(.caption.weight(.semibold))
+                    }
+                    .padding()
+
+                    Divider()
+
+                    if summary.recent.isEmpty {
+                        ContentUnavailableView(
+                            L10n.text(.projectLobbyEmpty, locale: locale),
+                            systemImage: "checklist"
+                        )
+                        .frame(maxWidth: .infinity, minHeight: 150)
+                    } else {
+                        ForEach(Array(summary.recent.enumerated()), id: \.element.id) { index, run in
+                            if index > 0 { Divider().padding(.leading) }
+                            Button {
+                                Task {
+                                    await onIssueOpen(project.id, run.id, { true })
+                                }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Circle()
+                                        .fill(statusColor(run.status))
+                                        .frame(width: 8, height: 8)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(run.title)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(.primary)
+                                            .lineLimit(1)
+                                        Text(run.status.displayName(locale: locale))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .contentShape(Rectangle())
+                                .padding()
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier(
+                                "project-lobby-run-\(run.id.uuidString.lowercased())"
+                            )
+                        }
+                    }
+                }
+                .background(.background, in: RoundedRectangle(cornerRadius: 16))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color(uiColor: .separator).opacity(0.45), lineWidth: 0.5)
+                }
+            }
+            .padding()
+        }
+        .background(Color(uiColor: .systemGroupedBackground))
+        .navigationTitle(L10n.text(.projectLobbyTitle, locale: locale))
+        .navigationBarTitleDisplayMode(.inline)
+        .refreshable { await refresh() }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task { await refresh() }
+                } label: {
+                    Label(
+                        L10n.text(.projectLobbyRefresh, locale: locale),
+                        systemImage: "arrow.clockwise"
+                    )
+                }
+                .accessibilityIdentifier("project-lobby-refresh")
+            }
+        }
+    }
+
+    private func metricCard(title: String, value: Int, systemImage: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(value.formatted(.number.locale(Locale(identifier: locale.foundationIdentifier))))
+                .font(.title.bold().monospacedDigit())
+        }
+        .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+        .padding()
+        .background(.background, in: RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color(uiColor: .separator).opacity(0.45), lineWidth: 0.5)
+        }
+    }
+
+    private func statusColor(_ status: DashboardRun.Status) -> Color {
+        switch status {
+        case .running, .queued: .blue
+        case .paused: .orange
+        case .blocked, .failed: .red
+        case .completed: .green
+        case .backlog, .cancelled: .secondary
         }
     }
 }
@@ -1552,19 +1810,31 @@ private struct ChannelAttachmentCard: View {
     let open: @MainActor (URL) -> Void
 
     var body: some View {
-        AuthenticatedImagePreview(
-            sourceID: attachment.url,
-            filename: attachment.filename,
-            detail: ByteCountFormatter.string(
-                fromByteCount: Int64(attachment.byteSize),
-                countStyle: .file
-            ),
-            accessibilityID: "channel-message-attachment-\(attachment.id.uuidString.lowercased())",
-            load: {
-                try await load(attachment)
-            },
-            open: open
-        )
+        Group {
+            if IssueAttachmentMedia.isHTML(
+                contentType: attachment.contentType,
+                filename: attachment.filename
+            ) {
+                AuthenticatedHTMLArtifactPreview(
+                    filename: attachment.filename,
+                    byteSize: attachment.byteSize,
+                    accessibilityID: "channel-message-html-\(attachment.id.uuidString.lowercased())",
+                    load: { try await load(attachment) }
+                )
+            } else {
+                AuthenticatedImagePreview(
+                    sourceID: attachment.url,
+                    filename: attachment.filename,
+                    detail: ByteCountFormatter.string(
+                        fromByteCount: Int64(attachment.byteSize),
+                        countStyle: .file
+                    ),
+                    accessibilityID: "channel-message-attachment-\(attachment.id.uuidString.lowercased())",
+                    load: { try await load(attachment) },
+                    open: open
+                )
+            }
+        }
         .padding(10)
         .background(
             Color(.secondarySystemBackground),

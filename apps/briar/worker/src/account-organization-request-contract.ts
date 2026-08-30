@@ -123,17 +123,23 @@ export const OrganizationLogoInput = strictSchema(Schema.Struct({
 
 export const OrganizationMemberInput = Schema.Struct({
   email: Email,
-  role: defaulted(Schema.Literals(["admin", "member"]), "member"),
+  role: defaulted(
+    Schema.Literals(["co-owner", "developer", "editor", "viewer"]),
+    "viewer",
+  ),
 });
 
 export const OrganizationInvitationInput = strictSchema(Schema.Struct({
   email: LowercaseEmail,
-  role: defaulted(Schema.Literals(["admin", "member"]), "member"),
+  role: defaulted(
+    Schema.Literals(["co-owner", "developer", "editor", "viewer"]),
+    "viewer",
+  ),
   initialProjectId: UuidString,
 }));
 
 export const OrganizationMemberRoleInput = strictSchema(Schema.Struct({
-  role: Schema.Literals(["admin", "member"]),
+  role: Schema.Literals(["co-owner", "developer", "editor", "viewer"]),
 }));
 
 export const OrganizationMemberProjectsInput = strictSchema(Schema.Struct({

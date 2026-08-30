@@ -195,6 +195,8 @@ function commandFailure(name: string, result: MergeQueueCommandResult): never {
   );
 }
 
+const briarGithubCommand = () => ["briar", "github"];
+
 function runGraphQl<T>(
   repositoryPath: string,
   query: string,
@@ -203,14 +205,17 @@ function runGraphQl<T>(
   run: MergeQueueCommandRunner,
   name: string,
 ): T {
-  const command = ["gh", "api", "graphql", "-f", `query=${query}`];
-  for (const [key, value] of variables) {
-    if (value === null) continue;
-    command.push(
-      typeof value === "string" ? "-f" : "-F",
-      `${key}=${String(value)}`,
-    );
-  }
+  const variableObject = Object.fromEntries(
+    variables.filter((entry) => entry[1] !== null),
+  );
+  const command = [
+    ...briarGithubCommand(),
+    "graphql",
+    "--query",
+    query,
+    "--variables-json",
+    JSON.stringify(variableObject),
+  ];
   const result = run(command, localOptions(repositoryPath));
   if (result.exitCode !== 0) commandFailure(name, result);
   let parsed: unknown;
@@ -839,7 +844,7 @@ function verifyPublishedPrefix(
 function repositoryMergeMethod(input: NormalizedMergeBatchExecutionInput) {
   const methods = decodeCommandJson(
     input.runCommand(
-      ["gh", "api", `repos/${input.claim.repository}`],
+      [...briarGithubCommand(), "repository"],
       localOptions(input.repositoryPath),
     ),
     decodeRepositoryMergeMethodsResponse,
@@ -893,15 +898,15 @@ async function mergeBatchPullRequests(
     const merged = decodeCommandJson(
       input.runCommand(
         [
-          "gh",
-          "api",
-          `repos/${input.claim.repository}/pulls/${member.pullRequestNumber}/merge`,
+          ...briarGithubCommand(),
+          "pr",
+          "merge",
+          "--number",
+          String(member.pullRequestNumber),
+          "--head-sha",
+          member.headSha,
           "--method",
-          "PUT",
-          "-f",
-          `sha=${member.headSha}`,
-          "-f",
-          `merge_method=${mergeMethod}`,
+          mergeMethod,
         ],
         localOptions(input.repositoryPath, 120_000),
       ),
@@ -935,17 +940,16 @@ function publishStatus(
     ? `Briar exact integration validation passed: ${result.context}`
     : `Briar exact integration validation failed: ${result.context}`;
   const command = [
-    "gh",
-    "api",
-    `repos/${input.claim.repository}/statuses/${sha}`,
-    "--method",
-    "POST",
-    "-f",
-    `state=${state}`,
-    "-f",
-    `context=${context}`,
-    "-f",
-    `description=${description}`,
+    ...briarGithubCommand(),
+    "status",
+    "--sha",
+    sha,
+    "--state",
+    state,
+    "--context",
+    context,
+    "--description",
+    description,
   ];
   const published = input.runCommand(
     command,
@@ -1246,16 +1250,16 @@ export function inspectMergeQueueDoctor(input: {
   );
 
   const auth = run(
-    ["gh", "auth", "status", "--hostname", "github.com"],
+    [...briarGithubCommand(), "repository"],
     localOptions(input.repositoryPath),
   );
   doctorCheck(
     checks,
-    "gh-auth",
+    "github-app",
     auth.exitCode === 0,
     auth.exitCode === 0
-      ? "GitHub CLI authentication is ready"
-      : auth.stderr.trim() || "gh auth status failed",
+      ? "Project-scoped GitHub App access is ready"
+      : auth.stderr.trim() || "GitHub App repository access failed",
   );
 
   const remote = run(
@@ -1280,10 +1284,7 @@ export function inspectMergeQueueDoctor(input: {
   if (auth.exitCode === 0) {
     try {
       const repository = decodeCommandJson(
-        run(
-          ["gh", "api", `repos/${input.profile.repository}`],
-          localOptions(input.repositoryPath),
-        ),
+        auth,
         decodeGithubRepositoryResponse,
         "GitHub repository inspection",
       );
@@ -1313,7 +1314,7 @@ export function inspectMergeQueueDoctor(input: {
       checks,
       "github-repository",
       false,
-      "GitHub CLI authentication is unavailable",
+      "Project-scoped GitHub App access is unavailable",
     );
   }
 

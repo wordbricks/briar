@@ -6,10 +6,25 @@ import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 import { runD1 } from "./d1-runtime";
 import { createSqlQueryCache } from "./sql-query-cache";
 
-export const OrganizationRole = Schema.Literals(["owner", "admin", "member"]);
+export const OrganizationRole = Schema.Literals([
+  "owner",
+  "co-owner",
+  "developer",
+  "editor",
+  "viewer",
+]);
 export type OrganizationRole = typeof OrganizationRole.Type;
 
-const OrganizationInvitationRole = Schema.Literals(["admin", "member"]);
+export const OrganizationAssignableRole = Schema.Literals([
+  "co-owner",
+  "developer",
+  "editor",
+  "viewer",
+]);
+export type OrganizationAssignableRole =
+  typeof OrganizationAssignableRole.Type;
+
+const OrganizationInvitationRole = OrganizationAssignableRole;
 
 const OrganizationRow = Schema.Struct({
   id: Schema.mutableKey(Schema.String),
@@ -120,7 +135,13 @@ const makeOrganizationQueries = (sql: SqlClient.SqlClient) => {
       from briar_organization_members member
       join "user" on user.id = member.user_id
       where member.organization_id = ${organizationId}
-      order by case member.role when 'owner' then 0 when 'admin' then 1 else 2 end,
+      order by case member.role
+                 when 'owner' then 0
+                 when 'co-owner' then 1
+                 when 'developer' then 2
+                 when 'editor' then 3
+                 else 4
+               end,
                lower(user.name), lower(user.email)
     `,
   });
@@ -152,10 +173,16 @@ const makeOrganizationQueries = (sql: SqlClient.SqlClient) => {
        and project_membership.user_id = member.user_id
       where project.id = ${projectId}
         and (
-          member.role in ('owner', 'admin')
+          member.role in ('owner', 'co-owner')
           or project_membership.user_id is not null
         )
-      order by case member.role when 'owner' then 0 when 'admin' then 1 else 2 end,
+      order by case member.role
+                 when 'owner' then 0
+                 when 'co-owner' then 1
+                 when 'developer' then 2
+                 when 'editor' then 3
+                 else 4
+               end,
                lower(user.name), lower(user.email)
     `,
   });

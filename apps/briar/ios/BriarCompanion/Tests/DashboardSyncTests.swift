@@ -151,7 +151,7 @@ final class DashboardSyncTests: XCTestCase {
             icon: nil,
             organizationId: project.organizationId,
             organizationName: project.organizationName,
-            role: .member,
+            role: .developer,
             createdAt: project.createdAt
         )
         let targetRun = run(
@@ -257,7 +257,7 @@ final class DashboardSyncTests: XCTestCase {
             icon: nil,
             organizationId: project.organizationId,
             organizationName: project.organizationName,
-            role: .member,
+            role: .developer,
             createdAt: project.createdAt
         )
         let first = snapshot(cursor: 1, title: "Stale project")
@@ -413,7 +413,7 @@ final class DashboardSyncTests: XCTestCase {
             icon: nil,
             organizationId: project.organizationId,
             organizationName: project.organizationName,
-            role: .member,
+            role: .developer,
             createdAt: project.createdAt
         )
         let user = CurrentUserResponse(user: .init(

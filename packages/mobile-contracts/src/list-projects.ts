@@ -31,7 +31,13 @@ export const mobileProjectSchema = mutableStruct({
   icon: Schema.NullOr(Schema.String),
   organizationId: Schema.String.check(Schema.isUUID()),
   organizationName: Schema.String,
-  role: Schema.Literals(["owner", "admin", "member"]),
+  role: Schema.Literals([
+    "owner",
+    "co-owner",
+    "developer",
+    "editor",
+    "viewer",
+  ]),
   createdAt: IsoDateTimeUtc,
 }).annotate({ identifier: "Project" });
 

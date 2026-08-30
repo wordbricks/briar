@@ -81,6 +81,27 @@ const sidebarChannel = (
 });
 
 describe("Sidebar", () => {
+  it("shows My issues below Inbox and opens it", async () => {
+    const onMyIssuesOpen = vi.fn();
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar {...sidebarProps} onMyIssuesOpen={onMyIssuesOpen} />,
+    );
+
+    const inbox = container.querySelector<HTMLAnchorElement>('a[href="#inbox"]')!;
+    const myIssues = container.querySelector<HTMLAnchorElement>(
+      'a[href="#my-issues"]',
+    )!;
+    expect(myIssues.previousElementSibling).toBe(inbox);
+
+    await act(async () => myIssues.click());
+    expect(onMyIssuesOpen).toHaveBeenCalledTimes(1);
+    await cleanup();
+  });
+
   it("shows channels as an accordion and creates one from its context menu", async () => {
     const onChannelOpen = vi.fn();
     const onChannelCreate = vi.fn().mockResolvedValue(undefined);
@@ -368,7 +389,7 @@ describe("Sidebar", () => {
             icon: null,
             organizationId: "organization-1",
             organizationName: "Briar",
-            role: "member",
+            role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
         ]}
@@ -474,7 +495,7 @@ describe("Sidebar", () => {
             icon: null,
             organizationId: "organization-1",
             organizationName: "Briar",
-            role: "member",
+            role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
         ]}
@@ -504,9 +525,9 @@ describe("Sidebar", () => {
     await cleanup();
   });
 
-  it("opens project issues when the project name is clicked", async () => {
+  it("opens project lobby when the project name is clicked", async () => {
     const onProjectChange = vi.fn();
-    const onIssuesOpen = vi.fn();
+    const onLobbyOpen = vi.fn();
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
@@ -516,7 +537,7 @@ describe("Sidebar", () => {
         {...sidebarProps}
         activePage="issues"
         activeProjectId="project-1"
-        onIssuesOpen={onIssuesOpen}
+        onLobbyOpen={onLobbyOpen}
         onProjectChange={onProjectChange}
         projects={[
           ...sidebarProps.projects,
@@ -528,7 +549,7 @@ describe("Sidebar", () => {
             icon: null,
             organizationId: "organization-1",
             organizationName: "Briar",
-            role: "member",
+            role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
         ]}
@@ -547,11 +568,11 @@ describe("Sidebar", () => {
 
     await act(async () => briarHeading?.click());
     expect(onProjectChange).not.toHaveBeenCalled();
-    expect(onIssuesOpen).toHaveBeenCalledOnce();
+    expect(onLobbyOpen).toHaveBeenCalledOnce();
 
     await act(async () => consoleHeading?.click());
     expect(onProjectChange).toHaveBeenCalledWith("project-2");
-    expect(onIssuesOpen).toHaveBeenCalledTimes(2);
+    expect(onLobbyOpen).toHaveBeenCalledTimes(2);
 
     await cleanup();
   });
@@ -580,7 +601,7 @@ describe("Sidebar", () => {
             icon: null,
             organizationId: "organization-1",
             organizationName: "Briar",
-            role: "member",
+            role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
         ]}
@@ -685,7 +706,7 @@ describe("Sidebar", () => {
             name: "Wordbricks",
             handle: "wordbricks",
             logo: null,
-            role: "member",
+            role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
         ]}
@@ -699,7 +720,7 @@ describe("Sidebar", () => {
             icon: null,
             organizationId: "organization-2",
             organizationName: "Wordbricks",
-            role: "member",
+            role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
         ]}
@@ -1204,7 +1225,7 @@ describe("Sidebar", () => {
             icon: null,
             organizationId: "organization-1",
             organizationName: "Briar",
-            role: "member",
+            role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
         ]}

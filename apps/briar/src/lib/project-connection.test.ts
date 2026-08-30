@@ -22,11 +22,11 @@ const configuredWorkflow: AutoHuntWorkflow = {
 };
 
 describe("project connection workflow authorization", () => {
-  it("reuses an existing workflow for members without repository analysis", async () => {
+  it("reuses an existing workflow for viewers without repository analysis", async () => {
     const generateWorkflow = vi.fn<() => Promise<AutoHuntWorkflow>>();
 
     await expect(resolveProjectConnectionWorkflow(
-      "member",
+      "viewer",
       configuredWorkflow,
       generateWorkflow,
     )).resolves.toEqual({
@@ -36,14 +36,14 @@ describe("project connection workflow authorization", () => {
     expect(generateWorkflow).not.toHaveBeenCalled();
   });
 
-  it("blocks members while an administrator-owned workflow is pending", async () => {
+  it("blocks editors while a development workflow is pending", async () => {
     const generateWorkflow = vi.fn<() => Promise<AutoHuntWorkflow>>();
 
     await expect(resolveProjectConnectionWorkflow(
-      "member",
+      "editor",
       repositoryWorkflowBootstrap,
       generateWorkflow,
-    )).rejects.toThrow("owner or admin");
+    )).rejects.toThrow("owner, co-owner, or developer");
     expect(generateWorkflow).not.toHaveBeenCalled();
   });
 
@@ -51,7 +51,7 @@ describe("project connection workflow authorization", () => {
     const generateWorkflow = vi.fn<() => Promise<AutoHuntWorkflow>>();
 
     await expect(resolveProjectConnectionWorkflow(
-      "admin",
+      "developer",
       repositoryWorkflowBootstrap,
       generateWorkflow,
       configuredWorkflow,

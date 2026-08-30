@@ -41,11 +41,6 @@ const WORKTREE_INCLUDE_MAX_ENTRIES: usize = 200;
 #[cfg(all(desktop, not(dev)))]
 const WORKTREE_SWEEP_INTERVAL_SECS: u64 = 60 * 60;
 const AGENT_SESSION_STOPPED_ERROR: &str = "사용자가 에이전트 세션을 중지했습니다.";
-const GITHUB_DEVICE_LOGIN_URL: &str = "https://github.com/login/device";
-#[cfg(not(target_os = "windows"))]
-const GITHUB_CLI_NOOP_BROWSER: &str = "/usr/bin/true";
-#[cfg(target_os = "windows")]
-const GITHUB_CLI_NOOP_BROWSER: &str = "cmd.exe /D /C rem";
 const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1440.0, 900.0);
 const DEFAULT_MAIN_WINDOW_MIN_SIZE: (f64, f64) = (980.0, 680.0);
 const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (780.0, 580.0);

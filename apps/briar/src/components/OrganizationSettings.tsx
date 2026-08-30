@@ -56,8 +56,13 @@ import {
   organizationLogoAccept,
   organizationLogoFromFile,
 } from "../lib/organization-logo";
+import {
+  hasOrganizationCapability,
+  organizationAssignableRoles,
+} from "../lib/organization-role";
 import type {
   Organization,
+  OrganizationAssignableRole,
   OrganizationInvitation,
   OrganizationMember,
   Project,
@@ -117,7 +122,7 @@ export function OrganizationSettings({
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<"admin" | "member">("member");
+  const [role, setRole] = useState<OrganizationAssignableRole>("viewer");
   const organizationProjects = useMemo(
     () =>
       projects.filter((project) => project.organizationId === organization.id),
@@ -144,8 +149,10 @@ export function OrganizationSettings({
   const searchRef = useRef<HTMLInputElement | null>(null);
   const inviteEmailRef = useRef<HTMLInputElement | null>(null);
   const organizationId = organization.id;
-  const canManage =
-    organization.role === "owner" || organization.role === "admin";
+  const canManage = hasOrganizationCapability(
+    organization.role,
+    "members:manage",
+  );
   const dateLocale =
     locale === "ko" ? "ko-KR" : locale === "zh" ? "zh-CN" : "en-US";
   const normalizedOrganizationName = organizationName.trim();
@@ -226,8 +233,17 @@ export function OrganizationSettings({
   const roleLabel = (memberRole: OrganizationMember["role"]) =>
     t(`organization.role.${memberRole}` as
       | "organization.role.owner"
-      | "organization.role.admin"
-      | "organization.role.member");
+      | "organization.role.co-owner"
+      | "organization.role.developer"
+      | "organization.role.editor"
+      | "organization.role.viewer");
+
+  const assignableRoleOptions = organizationAssignableRoles.map(
+    (assignableRole) => ({
+      label: roleLabel(assignableRole),
+      value: assignableRole,
+    }),
+  );
 
   const exportMembers = () => {
     const rows = [
@@ -242,7 +258,7 @@ export function OrganizationSettings({
         member.name,
         member.email,
         roleLabel(member.role),
-        member.role === "owner" || member.role === "admin"
+        member.role === "owner" || member.role === "co-owner"
           ? t("organization.allProjects")
           : organizationProjects
             .filter((project) => member.projectIds?.includes(project.id))
@@ -578,8 +594,10 @@ export function OrganizationSettings({
                     options={[
                       { label: t("organization.filterAll"), value: "all" },
                       { label: t("organization.role.owner"), value: "owner" },
-                      { label: t("organization.role.admin"), value: "admin" },
-                      { label: t("organization.role.member"), value: "member" },
+                      { label: t("organization.role.co-owner"), value: "co-owner" },
+                      { label: t("organization.role.developer"), value: "developer" },
+                      { label: t("organization.role.editor"), value: "editor" },
+                      { label: t("organization.role.viewer"), value: "viewer" },
                     ]}
                     size="small"
                     value={roleFilter}
@@ -685,7 +703,7 @@ export function OrganizationSettings({
                                 token,
                                 organizationId,
                                 member.userId,
-                                value as "admin" | "member",
+                                value as OrganizationAssignableRole,
                               )
                                 .then((result) => setMembers(result.members))
                                 .catch((caught) =>
@@ -697,16 +715,7 @@ export function OrganizationSettings({
                                 )
                                 .finally(() => setUpdatingMemberId(null));
                             }}
-                            options={[
-                              {
-                                label: t("organization.role.member"),
-                                value: "member",
-                              },
-                              {
-                                label: t("organization.role.admin"),
-                                value: "admin",
-                              },
-                            ]}
+                            options={assignableRoleOptions}
                             size="small"
                             value={member.role}
                           />
@@ -716,14 +725,14 @@ export function OrganizationSettings({
                               "justify-center capitalize",
                               member.role === "owner" &&
                                 "bg-accent text-accent-foreground",
-                              member.role === "admin" && "bg-secondary",
+                              member.role === "co-owner" && "bg-secondary",
                             )}
                             variant="secondary"
                           >
                             {roleLabel(member.role)}
                           </Badge>
                         )}
-                        {member.role === "owner" || member.role === "admin" ? (
+                        {member.role === "owner" || member.role === "co-owner" ? (
                           <Typography as="span" tone="muted" variant="caption">
                             {t("organization.allProjects")}
                           </Typography>
@@ -774,7 +783,7 @@ export function OrganizationSettings({
                             year: "numeric",
                           }).format(new Date(member.createdAt))}
                         </time>
-                        {organization.role === "owner" && member.role !== "owner" ? (
+                        {canManage && member.role !== "owner" ? (
                           <Button
                             aria-label={t("organization.removeMember", {
                               name: member.name,
@@ -1179,20 +1188,18 @@ export function OrganizationSettings({
                   <SelectMenu
                     label={t("organization.inviteRole")}
                     onValueChange={(value) =>
-                      setRole(value as "admin" | "member")
+                      setRole(value as OrganizationAssignableRole)
                     }
-                    options={[
-                      {
-                        label: t("organization.role.member"),
-                        value: "member",
-                      },
-                      {
-                        label: t("organization.role.admin"),
-                        value: "admin",
-                      },
-                    ]}
+                    options={assignableRoleOptions}
                     value={role}
                   />
+                  <Typography tone="muted" variant="caption">
+                    {t(`organization.roleDescription.${role}` as
+                      | "organization.roleDescription.co-owner"
+                      | "organization.roleDescription.developer"
+                      | "organization.roleDescription.editor"
+                      | "organization.roleDescription.viewer")}
+                  </Typography>
                 </div>
                 {error ? (
                   <SettingsAlert className="mt-0">{error}</SettingsAlert>

@@ -43,7 +43,7 @@ const makeProjectQueries = (sql: SqlClient.SqlClient) => {
           on project_membership.project_id = project.id
          and project_membership.organization_id = project.organization_id
          and project_membership.user_id = membership.user_id
-        where membership.role in ('owner', 'admin')
+        where membership.role in ('owner', 'co-owner')
            or project_membership.user_id is not null
         order by organization.created_at, project.created_at
       `,
@@ -59,7 +59,7 @@ const makeProjectQueries = (sql: SqlClient.SqlClient) => {
                coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
                project.organization_id,
                organization.name as organization_name,
-               'member' as member_role, project.created_at
+               'viewer' as member_role, project.created_at
         from briar_projects project
         join briar_organizations organization
           on organization.id = project.organization_id
@@ -92,7 +92,7 @@ const makeProjectQueries = (sql: SqlClient.SqlClient) => {
          and project_membership.user_id = membership.user_id
         where project.organization_id = ${organizationId}
           and (
-            membership.role in ('owner', 'admin')
+            membership.role in ('owner', 'co-owner')
             or project_membership.user_id is not null
           )
         order by project.created_at, project.id

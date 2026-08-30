@@ -22,7 +22,7 @@ const organizations: Organization[] = [
     name: "Second",
     handle: "second",
     logo: null,
-    role: "member",
+    role: "developer",
     createdAt: "2026-07-25T00:00:00.000Z",
   },
 ];
@@ -47,7 +47,7 @@ const projects: Project[] = [
     icon: null,
     organizationId: "organization-2",
     organizationName: "Second",
-    role: "member",
+    role: "developer",
     createdAt: "2026-07-25T00:00:00.000Z",
   },
 ];

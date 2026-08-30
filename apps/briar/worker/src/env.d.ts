@@ -3,6 +3,10 @@ interface Env {
   GITHUB_WEBHOOK_SECRET?: string;
   /** GitHub App OAuth client ID (not the numeric App ID). */
   GITHUB_APP_CLIENT_ID?: string;
+  /** Numeric GitHub App ID used as the issuer for installation-token JWTs. */
+  GITHUB_APP_ID?: string;
+  /** Unencrypted PKCS#8 PEM used only to mint short-lived installation tokens. */
+  GITHUB_APP_PRIVATE_KEY?: string;
   /** GitHub App OAuth client secret. */
   GITHUB_APP_CLIENT_SECRET?: string;
   /** Public GitHub App slug used in /apps/{slug}/installations/new. */

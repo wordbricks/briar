@@ -14,6 +14,7 @@ import {
   completeIssueResultReview as completeRemoteIssueResultReview,
   connectLinearImport,
   createAgentToken,
+  createProjectGithubCredential,
   createOrganization as createRemoteOrganization,
   createIssue,
   createIssueMessage,
@@ -80,11 +81,10 @@ import {
   inspectLovableRepositoryCompatibility,
   inspectVelen,
   inspectRepositoryReadiness,
-  installProjectGithubCli,
   loadProjectRepositoryReadiness,
   loadAutoHuntHealth,
   loadConnectedProjectIds,
-  loginProjectGithub,
+  prepareProjectRepository,
   pickGitRepository,
   preflightLocalProjectConnection,
   repairAutoHunt,
@@ -313,6 +313,7 @@ const emptyDashboard = (project: Project): DashboardPayload => ({
     dataSource: null,
     linear: { enabled: false, source: null, teamKey: null },
     githubRepository: null,
+    githubRepositoryId: null,
     workflow: repositoryWorkflowBootstrap,
   },
   runs: [],
@@ -1825,6 +1826,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           source: autoHunt.linearSource ?? null,
           teamKey: autoHunt.linearTeam ?? null,
         },
+        githubRepositoryId: autoHunt.githubRepositoryId ?? null,
         githubRepository: autoHunt.githubRepository ?? null,
         workflow: generatedWorkflow,
       };
@@ -1907,10 +1909,12 @@ export function useBriar(options: UseBriarOptions = {}) {
     token,
   ]);
 
-  const installGithubForProject = useCallback(async (projectId: string) => {
-    const request = readinessCoordinator.begin(projectId);
-    const isCurrent = () =>
-      readinessCoordinator.isCurrent(projectId, request);
+  const startWorkingOnProject = useCallback(async (projectId: string) => {
+    if (!token) throw new Error("로그인이 필요합니다.");
+    const project = projects.find((candidate) => candidate.id === projectId);
+    if (!project) throw new Error("프로젝트를 찾지 못했습니다.");
+    const requestId = readinessCoordinator.begin(projectId);
+    const isCurrent = () => readinessCoordinator.isCurrent(projectId, requestId);
     setProjectReadinessLoading(projectId, true);
     setProjectReadinessError((current) => {
       const next = { ...current };
@@ -1918,48 +1922,74 @@ export function useBriar(options: UseBriarOptions = {}) {
       return next;
     });
     try {
-      const readiness = await installProjectGithubCli(projectId);
+      const projectDashboard = dashboard?.project.id === projectId
+        ? dashboard
+        : await loadDashboard(token, projectId);
+      const settings = projectDashboard.settings;
+      if (!settings.githubRepository || !settings.githubRepositoryId) {
+        throw new Error(
+          "조직의 GitHub App에서 프로젝트 저장소를 먼저 선택해 주세요.",
+        );
+      }
+      const credential = await createProjectGithubCredential(token, projectId);
+      const prepared = await prepareProjectRepository(projectId, credential);
+      if (
+        prepared.repositoryId !== settings.githubRepositoryId ||
+        prepared.repository.toLowerCase() !== settings.githubRepository.toLowerCase()
+      ) {
+        throw new Error("준비한 저장소가 프로젝트의 GitHub 저장소와 일치하지 않습니다.");
+      }
+      const agentToken = (await createAgentToken(token, projectId)).agentToken;
+      await connectLocalProject({
+        projectId,
+        agentToken,
+        repositoryPath: prepared.repositoryPath,
+        autoHunt: {
+          velenOrg: settings.velenOrg,
+          dataSource: settings.dataSource,
+          linearEnabled: settings.linear.enabled,
+          linearSource: settings.linear.source,
+          linearTeam: settings.linear.teamKey,
+          githubRepositoryId: settings.githubRepositoryId,
+          githubRepository: settings.githubRepository,
+          workflow: settings.workflow,
+        },
+      });
+      const inventory = await readinessCoordinator.inspectInventory(true);
+      const connected = applyLocalProjectInventoryObservation(inventory);
+      if (inventory.status === "error") throw inventory.error;
+      if (!connected?.includes(projectId)) {
+        throw new Error("저장소 연결 상태를 다시 확인하지 못했습니다.");
+      }
+      await configureLocalExecutionWorker(projectId, token, true);
+      const readiness = await loadProjectRepositoryReadiness(projectId);
+      if (!readiness) {
+        throw new Error("준비한 저장소 상태를 확인하지 못했습니다.");
+      }
       if (!isCurrent()) return null;
       setProjectReadiness((current) => ({ ...current, [projectId]: readiness }));
-      return readiness;
+      setDashboard((current) =>
+        current?.project.id === projectId
+          ? { ...current, settings: projectDashboard.settings }
+          : current
+      );
+      return { prepared, readiness };
     } catch (caught) {
       if (!isCurrent()) return null;
       const message = caught instanceof Error ? caught.message : String(caught);
       setProjectReadinessError((current) => ({ ...current, [projectId]: message }));
       throw caught;
     } finally {
-      if (isCurrent()) {
-        setProjectReadinessLoading(projectId, false);
-      }
+      if (isCurrent()) setProjectReadinessLoading(projectId, false);
     }
-  }, [readinessCoordinator, setProjectReadinessLoading]);
-
-  const loginGithubForProject = useCallback(async (projectId: string) => {
-    const request = readinessCoordinator.begin(projectId);
-    const isCurrent = () =>
-      readinessCoordinator.isCurrent(projectId, request);
-    setProjectReadinessLoading(projectId, true);
-    setProjectReadinessError((current) => {
-      const next = { ...current };
-      delete next[projectId];
-      return next;
-    });
-    try {
-      const readiness = await loginProjectGithub(projectId);
-      if (!isCurrent()) return null;
-      setProjectReadiness((current) => ({ ...current, [projectId]: readiness }));
-      return readiness;
-    } catch (caught) {
-      if (!isCurrent()) return null;
-      const message = caught instanceof Error ? caught.message : String(caught);
-      setProjectReadinessError((current) => ({ ...current, [projectId]: message }));
-      throw caught;
-    } finally {
-      if (isCurrent()) {
-        setProjectReadinessLoading(projectId, false);
-      }
-    }
-  }, [readinessCoordinator, setProjectReadinessLoading]);
+  }, [
+    applyLocalProjectInventoryObservation,
+    dashboard,
+    projects,
+    readinessCoordinator,
+    setProjectReadinessLoading,
+    token,
+  ]);
 
   const repairHealth = useCallback(async () => {
     const projectId = activeProjectId;
@@ -4013,8 +4043,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     inspectProjectRepository: inspectRepositoryReadiness,
     inspectLovableProject,
     preflightProjectConnection,
-    installGithubForProject,
-    loginGithubForProject,
+    startWorkingOnProject,
     repairHealth,
     retryRun: (runId: string) => recoverRun(runId, "retry"),
     cancelRun: (runId: string) => recoverRun(runId, "cancel"),

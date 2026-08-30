@@ -168,6 +168,10 @@ enum MobileAPIContract {
             "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/messages"
         }
 
+        static func runMessagesDelta(projectID: UUID, runID: UUID, cursor: Int) -> String {
+            "\(runMessages(projectID: projectID, runID: runID))/delta?cursor=\(cursor)"
+        }
+
         static func runEvidence(projectID: UUID, runID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/evidence"
         }

@@ -10,7 +10,7 @@ import { issueProjectAgentToken } from "./hunt-run-claim-repository";
 import { corsHeaders, HttpError, json } from "./http-response";
 import { authenticateMobileOperation } from "./mobile-contract-auth";
 import { mobileJson } from "./mobile-contract-response";
-import { canManageOrganization } from "./organization-access";
+import { hasOrganizationCapability } from "./organization-access";
 import { createOrganization } from "./organization-command-repository";
 import { listOrganizations } from "./organization-repository";
 import {
@@ -99,8 +99,11 @@ export async function handleProjectCoreRoute(
       organizations.find(
         (candidate) => candidate.id === input.organizationId,
       ) ?? (input.organizationId ? null : organizations[0]);
-    if (!organization || !canManageOrganization(organization.role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (
+      !organization ||
+      !hasOrganizationCapability(organization.role, "projects:manage")
+    ) {
+      throw new HttpError(403, "Project management permission required");
     }
     const agentToken = `briar_agent_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
     const tokenHash = await sha256(agentToken);
@@ -123,8 +126,8 @@ export async function handleProjectCoreRoute(
     const session = await requireSession(auth, request);
     const project = await getProject(db, projectMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    if (project.member_role !== "owner") {
-      throw new HttpError(403, "Organization owner access required");
+    if (!hasOrganizationCapability(project.member_role, "projects:manage")) {
+      throw new HttpError(403, "Project management permission required");
     }
     if (await getProjectRunChildMismatch(db, project.id)) {
       throw new HttpError(
@@ -188,8 +191,8 @@ export async function handleProjectCoreRoute(
     const session = await requireSession(auth, request);
     const project = await getProject(db, projectIconMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    if (!canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(project.member_role, "projects:manage")) {
+      throw new HttpError(403, "Project management permission required");
     }
     const input = decodeProjectIconInput(
       await readJson(request, maxProjectIconRequestBytes),
@@ -211,8 +214,8 @@ export async function handleProjectCoreRoute(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    if (!canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(project.member_role, "projects:manage")) {
+      throw new HttpError(403, "Project management permission required");
     }
     const input = decodeProjectIssueKeyPrefixInput(
       await readJson(request),
@@ -245,8 +248,8 @@ export async function handleProjectCoreRoute(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    if (!canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(project.member_role, "projects:manage")) {
+      throw new HttpError(403, "Project management permission required");
     }
     const input = decodeProjectTabsInput(await readJson(request));
     if (
@@ -273,6 +276,9 @@ export async function handleProjectCoreRoute(
     const session = await requireSession(auth, request);
     const project = await getProject(db, agentTokenMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     const agentToken = `briar_agent_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
     const issued = await issueProjectAgentToken(
       db,

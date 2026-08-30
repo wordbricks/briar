@@ -1,4 +1,8 @@
-import type { InboxCategory, InboxMessage } from "../hooks/useInbox";
+import {
+  inboxNotificationIdentity,
+  type InboxCategory,
+  type InboxMessage,
+} from "../hooks/useInbox";
 import {
   getMobilePlatform,
   isDesktopTauri,
@@ -512,7 +516,7 @@ export async function sendInboxNotification(
       "@tauri-apps/plugin-notification"
     );
     if (!(await isPermissionGranted())) return false;
-    const id = inboxNotificationId(message.id);
+    const id = inboxNotificationId(inboxNotificationIdentity(message));
     storeNotificationTarget(id, target);
     const mobilePlatform = getMobilePlatform();
     const channelId = playSound
@@ -552,7 +556,7 @@ export async function sendInboxNotification(
   }
   const notification = new Notification(title, {
     body,
-    tag: message.id,
+    tag: inboxNotificationIdentity(message),
     silent: !playSound,
   });
   notification.onclick = () => {

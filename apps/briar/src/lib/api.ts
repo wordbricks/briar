@@ -92,6 +92,7 @@ import type {
   ManagedComputer,
   ManagedComputerProduct,
   ManagedComputerRemoteSessionTicket,
+  ManagedComputerSetupSessionTicket,
   MergeQueueProfile,
   MergeQueueStatus,
   ProjectExecutionWorkerPolicy,
@@ -118,6 +119,7 @@ import type {
   OrganizationInvitation,
   OrganizationInvitationPreview,
   OrganizationMember,
+  OrganizationAssignableRole,
   ProjectSettings,
   ProjectUsageSummary,
   RunEvidence,
@@ -428,7 +430,7 @@ export async function createOrganizationInvitation(
   organizationId: string,
   input: {
     email: string;
-    role: "admin" | "member";
+    role: OrganizationAssignableRole;
     initialProjectId: string;
   },
 ) {
@@ -470,7 +472,7 @@ export async function acceptOrganizationInvitation(
   invitationToken: string,
 ) {
   return request<{
-    invitation: OrganizationInvitation;
+    invitation: OrganizationInvitationPreview;
     alreadyAccepted: boolean;
   }>(`/invitations/${encodeURIComponent(invitationToken)}`, sessionToken, {
     method: "POST",
@@ -594,6 +596,23 @@ export async function createManagedComputerRemoteSession(
   );
 }
 
+export async function createManagedComputerSetupSession(
+  token: string,
+  organizationId: string,
+  managedComputerId: string,
+  input: { projectId: string; requestId: string },
+) {
+  return request<ManagedComputerSetupSessionTicket>(
+    `/organizations/${organizationId}/managed-computers/${managedComputerId}/setup-sessions`,
+    token,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": input.requestId },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
 export async function endManagedComputerRemoteSession(
   token: string,
   organizationId: string,
@@ -673,7 +692,7 @@ export async function updateOrganizationExecutionWorkerIcon(
 export async function addOrganizationMember(
   token: string,
   organizationId: string,
-  input: { email: string; role: "admin" | "member" },
+  input: { email: string; role: OrganizationAssignableRole },
 ) {
   return request<{ members: OrganizationMember[] }>(
     `/organizations/${organizationId}/members`,
@@ -686,7 +705,7 @@ export async function updateOrganizationMemberRole(
   token: string,
   organizationId: string,
   userId: string,
-  role: "admin" | "member",
+  role: OrganizationAssignableRole,
 ) {
   return request<{ members: OrganizationMember[] }>(
     `/organizations/${organizationId}/members/${encodeURIComponent(userId)}`,
@@ -2824,6 +2843,25 @@ export async function updateProjectSettings(
       workflow: normalizeDashboardWorkflow(result.settings.workflow),
     },
   };
+}
+
+export type ProjectGithubCredential = {
+  project: { id: string; organizationId: string };
+  repository: { id: number; fullName: string; cloneUrl: string };
+  username: string;
+  password: string;
+  expiresAt: string;
+};
+
+export async function createProjectGithubCredential(
+  token: string,
+  projectId: string,
+) {
+  return request<ProjectGithubCredential>(
+    `/projects/${projectId}/github/credentials`,
+    token,
+    { method: "POST" },
+  );
 }
 
 export async function loadMergeQueueProfile(

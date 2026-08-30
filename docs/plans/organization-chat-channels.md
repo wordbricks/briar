@@ -75,7 +75,7 @@ flowchart LR
 | 액션 제안(사람이 수락해야 적용) | `apps/briar/migrations/0068_issue_action_proposals.sql` | 채널에서 이슈 생성 제안에 동일 패턴 적용 |
 | 계정 스코프 읽음 상태 | `apps/briar/migrations/0063_inbox_read_states.sql` | 채널 멘션·스레드 답글을 기존 Inbox에 합류 |
 | 델타 동기화 트리거 | `apps/briar/migrations/0049_dashboard_delta_sync.sql` | 조직 스코프 변경 피드의 원형 |
-| 대화 UI | `apps/briar/src/components/HuntDashboard.tsx` `IssueConversation`, `IssueMessageItem`, `MessageComposer` | 공용 컴포넌트로 추출 후 양쪽에서 사용 |
+| 대화 UI | `apps/briar/src/components/hunt/HuntDashboard.tsx` `IssueConversation`, `IssueMessageItem`, `MessageComposer` | 공용 컴포넌트로 추출 후 양쪽에서 사용 |
 
 이슈 메시지 테이블을 일반화하지 않고 채널용 테이블을 새로 만든다. 이슈
 메시지는 `run_id`에 강하게 묶여 있고(아카이브, 워크플로우 이벤트, 첨부

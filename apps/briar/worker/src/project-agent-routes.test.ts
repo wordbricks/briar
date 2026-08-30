@@ -9,8 +9,12 @@ describe("project Agent routes", () => {
   const projectId = "22222222-2222-4222-8222-222222222222";
   const ownerId = "project-agent-route-owner";
   const memberId = "project-agent-route-member";
+  const editorId = "project-agent-route-editor";
+  const viewerId = "project-agent-route-viewer";
   const sessionToken = "project-agent-route-session-token";
   const memberSessionToken = "project-agent-route-member-session-token";
+  const editorSessionToken = "project-agent-route-editor-session-token";
+  const viewerSessionToken = "project-agent-route-viewer-session-token";
   const now = "2026-08-10T00:00:00.000Z";
   let db: D1Database;
 
@@ -29,6 +33,12 @@ describe("project Agent routes", () => {
        values (?, 'Member', 'member@example.com', 1, ?, ?)`,
     ).bind(memberId, now, now).run();
     await db.prepare(
+      `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+       values
+         (?, 'Editor', 'editor@example.com', 1, ?, ?),
+         (?, 'Viewer', 'viewer@example.com', 1, ?, ?)`,
+    ).bind(editorId, now, now, viewerId, now, now).run();
+    await db.prepare(
       `insert into "session" (
          id, expiresAt, token, createdAt, updatedAt, userId
        ) values ('project-agent-route-session', '2099-01-01T00:00:00.000Z',
@@ -41,6 +51,24 @@ describe("project Agent routes", () => {
                  '2099-01-01T00:00:00.000Z', ?, ?, ?, ?)`,
     ).bind(memberSessionToken, now, now, memberId).run();
     await db.prepare(
+      `insert into "session" (
+         id, expiresAt, token, createdAt, updatedAt, userId
+       ) values
+         ('project-agent-route-editor-session', '2099-01-01T00:00:00.000Z',
+          ?, ?, ?, ?),
+         ('project-agent-route-viewer-session', '2099-01-01T00:00:00.000Z',
+          ?, ?, ?, ?)`,
+    ).bind(
+      editorSessionToken,
+      now,
+      now,
+      editorId,
+      viewerSessionToken,
+      now,
+      now,
+      viewerId,
+    ).run();
+    await db.prepare(
       `insert into briar_organizations (id, name, handle, created_at, updated_at)
        values (?, 'Agent Routes', 'agent-routes', ?, ?)`,
     ).bind(organizationId, now, now).run();
@@ -52,8 +80,24 @@ describe("project Agent routes", () => {
     await db.prepare(
       `insert into briar_organization_members (
          organization_id, user_id, role, created_at, updated_at
-       ) values (?, ?, 'member', ?, ?)`,
+       ) values (?, ?, 'developer', ?, ?)`,
     ).bind(organizationId, memberId, now, now).run();
+    await db.prepare(
+      `insert into briar_organization_members (
+         organization_id, user_id, role, created_at, updated_at
+       ) values
+         (?, ?, 'editor', ?, ?),
+         (?, ?, 'viewer', ?, ?)`,
+    ).bind(
+      organizationId,
+      editorId,
+      now,
+      now,
+      organizationId,
+      viewerId,
+      now,
+      now,
+    ).run();
     await db.prepare(
       `insert into briar_projects (
          id, owner_user_id, organization_id, name, agent_token_hash,
@@ -72,6 +116,24 @@ describe("project Agent routes", () => {
          project_id, organization_id, user_id, created_at, updated_at
        ) values (?, ?, ?, ?, ?)`,
     ).bind(projectId, organizationId, memberId, now, now).run();
+    await db.prepare(
+      `insert into briar_project_members (
+         project_id, organization_id, user_id, created_at, updated_at
+       ) values
+         (?, ?, ?, ?, ?),
+         (?, ?, ?, ?, ?)`,
+    ).bind(
+      projectId,
+      organizationId,
+      editorId,
+      now,
+      now,
+      projectId,
+      organizationId,
+      viewerId,
+      now,
+      now,
+    ).run();
   }, 60_000);
 
   afterAll(async () => {
@@ -100,6 +162,31 @@ describe("project Agent routes", () => {
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+
+  it("allows developers and rejects editor or viewer development changes", async () => {
+    const input = {
+      name: "Capability Agent",
+      provider: "codex",
+      responsibility: "Verify development authorization.",
+    };
+    const developerResponse = await worker.fetch(
+      request(`/projects/${projectId}/agents`, "POST", input, {
+        authorization: `Bearer ${memberSessionToken}`,
+      }),
+      env(),
+    );
+    expect(developerResponse.status).toBe(201);
+
+    for (const token of [editorSessionToken, viewerSessionToken]) {
+      const response = await worker.fetch(
+        request(`/projects/${projectId}/agents`, "POST", input, {
+          authorization: `Bearer ${token}`,
+        }),
+        env(),
+      );
+      expect(response.status).toBe(403);
+    }
+  });
 
   it("syncs lightweight summaries with cursors and loads detail on demand", async () => {
     const sessionId = "session-sync-1";

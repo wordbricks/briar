@@ -140,7 +140,7 @@ export async function getProject(
         and project_membership.user_id = membership.user_id
        where project.id = ?
          and (
-           membership.role in ('owner', 'admin')
+           membership.role in ('owner', 'co-owner')
            or project_membership.user_id is not null
          )`,
     )
@@ -237,7 +237,7 @@ export async function deleteProject(
     join briar_organization_members membership
       on membership.organization_id = target.organization_id
     where target.id = ? and membership.user_id = ?
-      and membership.role = 'owner'
+      and membership.role in ('owner', 'co-owner')
   )`;
   const results = await db.batch([
     db
@@ -356,7 +356,7 @@ export async function deleteProject(
         `delete from briar_projects
          where id = ? and organization_id in (
            select organization_id from briar_organization_members
-           where user_id = ? and role = 'owner'
+           where user_id = ? and role in ('owner', 'co-owner')
          )
          returning id`,
       )

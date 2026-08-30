@@ -28,6 +28,7 @@ import { handleProjectAgentSessionRoute } from "./project-agent-session-routes";
 import { handleProjectAgentTaskRoute } from "./project-agent-task-routes";
 import { handleProjectAgentTaskWorkerRoute } from "./project-agent-task-worker-routes";
 import { handleProjectCoreRoute } from "./project-core-routes";
+import { handleProjectGithubRoute } from "./project-github-routes";
 import { handleProjectLinearRoute } from "./project-linear-routes";
 import { handleProjectSettingsRoute } from "./project-settings-routes";
 import { handleProjectWorkerRoute } from "./project-worker-routes";
@@ -303,6 +304,15 @@ async function route(
     context,
   });
   if (projectCoreResponse !== undefined) return projectCoreResponse;
+
+  const projectGithubResponse = await handleProjectGithubRoute({
+    request,
+    url,
+    auth,
+    db,
+    env,
+  });
+  if (projectGithubResponse !== undefined) return projectGithubResponse;
 
   const projectSettingsResponse = await handleProjectSettingsRoute({
     request,

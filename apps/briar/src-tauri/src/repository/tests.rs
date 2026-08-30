@@ -1,6 +1,74 @@
 use super::*;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+fn project_github_credential(expires_at: &str) -> ProjectGithubCredential {
+    ProjectGithubCredential {
+        project: ProjectGithubCredentialProject {
+            id: "11111111-1111-4111-8111-111111111111".to_string(),
+            organization_id: "22222222-2222-4222-8222-222222222222".to_string(),
+        },
+        repository: ProjectGithubCredentialRepository {
+            id: 701,
+            full_name: "wordbricks/briar".to_string(),
+            clone_url: "https://github.com/wordbricks/briar.git".to_string(),
+        },
+        username: "x-access-token".to_string(),
+        password: "secret-installation-token".to_string(),
+        expires_at: expires_at.to_string(),
+    }
+}
+
+#[test]
+fn managed_repository_setup_rejects_an_expired_token_before_touching_disk() {
+    let home = tempfile::tempdir().expect("temporary home");
+    let result = prepare_project_repository_in(
+        Path::new("git"),
+        home.path(),
+        &project_github_credential("2020-01-01T00:00:00Z"),
+    );
+    assert!(result
+        .expect_err("expired credential should fail")
+        .contains("만료"));
+    assert!(!home.path().join("Briar").exists());
+}
+
+#[test]
+fn managed_repository_setup_never_overwrites_a_different_remote() {
+    let home = tempfile::tempdir().expect("temporary home");
+    let repository = home
+        .path()
+        .join("Briar/projects/22222222-2222-4222-8222-222222222222")
+        .join("11111111-1111-4111-8111-111111111111/briar");
+    fs::create_dir_all(&repository).expect("managed repository directory");
+    assert!(Command::new("git")
+        .args(["init", "-b", "main"])
+        .current_dir(&repository)
+        .status()
+        .expect("git init")
+        .success());
+    assert!(Command::new("git")
+        .args([
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/other/repository.git"
+        ])
+        .current_dir(&repository)
+        .status()
+        .expect("git remote")
+        .success());
+
+    let result = prepare_project_repository_in(
+        Path::new("git"),
+        home.path(),
+        &project_github_credential("2099-01-01T00:00:00Z"),
+    );
+    assert!(result
+        .expect_err("different remote should fail")
+        .contains("다른 저장소"));
+    assert!(repository.join(".git").is_dir());
+}
+
 #[test]
 fn discovers_repository_icons_using_t3code_candidate_priority() {
     let directory = tempfile::tempdir().expect("temporary repository");

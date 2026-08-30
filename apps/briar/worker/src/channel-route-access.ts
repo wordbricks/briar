@@ -1,4 +1,4 @@
-import { canManageOrganization } from "./organization-access";
+import { hasOrganizationCapability } from "./organization-access";
 import { getOrganizationRole } from "./organization-repository";
 import { HttpError } from "./http-response";
 import {
@@ -13,7 +13,27 @@ export async function requireChannelAccess(
   userId: string,
 ) {
   const role = await getOrganizationRole(db, organizationId, userId);
-  if (!role) throw new HttpError(404, "Organization not found");
+  if (!hasOrganizationCapability(role, "organization:read")) {
+    throw new HttpError(404, "Organization not found");
+  }
+  const channel = await getChannel(db, organizationId, channelId, userId);
+  if (!channel) throw new HttpError(404, "Channel not found");
+  return channel;
+}
+
+export async function requireChannelWriteAccess(
+  db: D1Database,
+  organizationId: string,
+  channelId: string,
+  userId: string,
+) {
+  const role = await getOrganizationRole(db, organizationId, userId);
+  if (!hasOrganizationCapability(role, "organization:read")) {
+    throw new HttpError(404, "Organization not found");
+  }
+  if (!hasOrganizationCapability(role, "conversations:write")) {
+    throw new HttpError(403, "Conversation editing permission required");
+  }
   const channel = await getChannel(db, organizationId, channelId, userId);
   if (!channel) throw new HttpError(404, "Channel not found");
   return channel;
@@ -26,10 +46,18 @@ export async function requireChannelDeletionAccess(
   userId: string,
 ) {
   const role = await getOrganizationRole(db, organizationId, userId);
-  if (!role) throw new HttpError(404, "Organization not found");
+  if (!hasOrganizationCapability(role, "organization:read")) {
+    throw new HttpError(404, "Organization not found");
+  }
   const channel = await getChannelById(db, organizationId, channelId);
   if (!channel) throw new HttpError(404, "Channel not found");
-  if (role !== "owner" && channel.created_by_user_id !== userId) {
+  if (!hasOrganizationCapability(role, "conversations:write")) {
+    throw new HttpError(403, "Conversation editing permission required");
+  }
+  if (
+    !hasOrganizationCapability(role, "organization:update") &&
+    channel.created_by_user_id !== userId
+  ) {
     throw new HttpError(
       403,
       "Channel creator or organization owner access required",
@@ -58,7 +86,12 @@ export async function requireChannelWebhookManagement(
     organizationId,
     userId,
   );
-  if (canManageOrganization(organizationRole)) return channel;
+  if (hasOrganizationCapability(organizationRole, "organization:update")) {
+    return channel;
+  }
+  if (!hasOrganizationCapability(organizationRole, "conversations:write")) {
+    throw new HttpError(403, "Conversation editing permission required");
+  }
   const membership = await db.prepare(
     `select role from briar_channel_members
      where channel_id = ? and user_id = ?`,

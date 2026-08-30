@@ -22,6 +22,11 @@ bun run ci:local
 After committing and pushing the exact revision that passed, publish all four
 statuses with `gh-signoff`:
 
+`gh-signoff` is a **Briar repository contributor/release tool**, not a runtime
+Worker or default Workflow dependency. Projects whose own validation scripts
+invoke `gh` must declare and provision that project-specific requirement; the
+Briar GitHub App flow itself never asks users to install or authenticate it.
+
 ```sh
 bun run ci:signoff
 ```

@@ -1,12 +1,14 @@
 import {
   Bot,
   ChevronLeft,
+  ChevronRight,
   Copy,
   FileText,
   Hash,
   Link2,
   Lock,
   MessageSquare,
+  PanelsTopLeft,
   Plus,
   Send,
   Trash2,
@@ -138,6 +140,7 @@ type CompanionChannelsProps = {
   currentUserId: string | null;
   projects: readonly ChannelGroupProject[];
   token: string;
+  onLobbyOpen?: () => void;
   onIssueOpen?: (projectId: string, runId: string) => void | Promise<void>;
   onSkillSessionAccepted?: (session: AutoHuntSession) => void;
   channelInboxSyncSignal?: string;
@@ -259,6 +262,7 @@ export function CompanionChannels({
   currentUserId,
   projects,
   token,
+  onLobbyOpen,
   onIssueOpen,
   onSkillSessionAccepted,
   channelInboxSyncSignal,
@@ -595,6 +599,12 @@ export function CompanionChannels({
     setThread(null);
     setThreadParentId(null);
     setError(null);
+    if (!token) {
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
     setLoading(true);
     void (async () => {
       try {
@@ -1090,9 +1100,29 @@ export function CompanionChannels({
   return (
     <ChannelMessageImageCacheProvider cache={imageCache}>
       <section aria-busy={loading} className="companion-channels">
-      {error ? <p className="companion-channel-error" role="alert">{error}</p> : null}
-      {loading && channels.length === 0 ? <CompanionChannelLoadingSpinner /> : null}
-      {groups.map((group) => (
+        {onLobbyOpen ? (
+          <button
+            className="mx-3 mt-3 mb-1 flex min-h-[72px] w-[calc(100%_-_24px)] items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-left text-foreground shadow-xs active:scale-[.99]"
+            onClick={onLobbyOpen}
+            type="button"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+              <PanelsTopLeft aria-hidden size={20} />
+            </span>
+            <span className="grid min-w-0 flex-1 gap-0.5">
+              <strong className="text-sm font-semibold">
+                {t("companion.viewLobby")}
+              </strong>
+              <small className="truncate text-xs text-muted-foreground">
+                {t("companion.viewLobbyDescription")}
+              </small>
+            </span>
+            <ChevronRight aria-hidden className="text-muted-foreground" size={18} />
+          </button>
+        ) : null}
+        {error ? <p className="companion-channel-error" role="alert">{error}</p> : null}
+        {loading && channels.length === 0 ? <CompanionChannelLoadingSpinner /> : null}
+        {groups.map((group) => (
         <div className="companion-channel-group" key={group.key}>
           <h2 className="companion-channel-divider">{group.label}</h2>
           <ul>
@@ -1120,10 +1150,10 @@ export function CompanionChannels({
             ))}
           </ul>
         </div>
-      ))}
-      {!loading && groups.length === 0 ? (
-        <p className="companion-channel-empty">{t("companion.channelsEmpty")}</p>
-      ) : null}
+        ))}
+        {!loading && groups.length === 0 ? (
+          <p className="companion-channel-empty">{t("companion.channelsEmpty")}</p>
+        ) : null}
       </section>
     </ChannelMessageImageCacheProvider>
   );

@@ -39,6 +39,7 @@ pub(super) fn config_with_cli_owned_settings(
                 data_source: None,
                 linear: None,
                 github_repository: None,
+                github_repository_id: None,
                 workflow: None,
                 worktrees,
                 sandbox,

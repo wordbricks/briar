@@ -1323,11 +1323,14 @@ describe("Worker HTTP contract", () => {
   });
 
   it("accepts only assignable organization member roles", () => {
-    expect(decodeOrganizationMemberRoleInput({ role: "admin" })).toEqual({
-      role: "admin",
-    });
+    for (const role of ["co-owner", "developer", "editor", "viewer"]) {
+      expect(decodeOrganizationMemberRoleInput({ role })).toEqual({ role });
+    }
     expect(() =>
       decodeOrganizationMemberRoleInput({ role: "owner" }),
+    ).toThrow();
+    expect(() =>
+      decodeOrganizationMemberRoleInput({ role: "admin" }),
     ).toThrow();
   });
 

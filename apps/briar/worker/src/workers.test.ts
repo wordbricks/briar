@@ -219,6 +219,7 @@ describe("detached execution workers", () => {
         "0049_dashboard_delta_sync.sql",
         "0051_log_archives.sql",
         "0054_run_execution_metrics.sql",
+        "0057_organization_invitations.sql",
         "0058_workflow_pause_after_stage.sql",
         "0059_workflow_v2_progress.sql",
         "0060_workflow_checkpoint_policies.sql",
@@ -233,12 +234,14 @@ describe("detached execution workers", () => {
         "0069_project_agent_effort.sql",
         "0070_project_issue_key_prefix.sql",
         "0073_organization_channels.sql",
+        "0074_channel_delta_sync.sql",
         "0076_execution_worker_updates.sql",
         "0077_project_agent_task_jobs.sql",
         "0079_agent_skills.sql",
         "0084_run_usage_ledger.sql",
         "0085_run_cost_ledger.sql",
         "0087_channel_reply_worker_scope.sql",
+        "0098_issue_subscriptions.sql",
         "0099_project_usage_analytics.sql",
         "0103_agent_worklog_projection.sql",
         "0113_project_schedule_tab.sql",
@@ -251,6 +254,7 @@ describe("detached execution workers", () => {
         "0133_channel_reply_sessions.sql",
         "0136_issue_difficulty.sql",
         "0137_execution_worker_lifecycle_telemetry.sql",
+        "0138_project_members.sql",
         "0140_issue_difficulty_optional.sql",
         "0141_agent_designated_workers.sql",
       ],
@@ -292,8 +296,33 @@ describe("detached execution workers", () => {
          add column agent_responsibility_snapshot text;
        alter table briar_issue_agent_reply_jobs
          add column skill_execution_request_snapshot text;
+       alter table briar_project_agent_task_jobs
+         add column skill_execution_proposal_id text;
        create unique index briar_issue_agent_reply_jobs_agent_test_idx
-         on briar_issue_agent_reply_jobs (project_id, trigger_message_id, agent_id);`,
+         on briar_issue_agent_reply_jobs (project_id, trigger_message_id, agent_id);
+       create table briar_channel_thread_subscriptions (
+         root_message_id text not null
+           references briar_channel_messages (id) on delete cascade,
+         channel_id text not null
+           references briar_channels (id) on delete cascade,
+         organization_id text not null,
+         user_id text not null,
+         created_at text not null,
+         primary key (root_message_id, user_id),
+         foreign key (organization_id, user_id)
+           references briar_organization_members (organization_id, user_id)
+           on delete cascade
+       );`,
+    );
+    await applyD1Migrations(db, {
+      files: [
+        "0146_organization_capability_roles.sql",
+        "0147_project_github_repository_identity.sql",
+      ],
+    });
+    await executeD1Sql(
+      db,
+      `drop trigger briar_issue_execution_org_member_remove_invalidate;`,
     );
     await executeD1Sql(
       db,
@@ -307,7 +336,7 @@ describe("detached execution workers", () => {
       insert into briar_organization_members (organization_id, user_id, role, created_at, updated_at)
       values ('${projectId}', 'owner', 'owner', '${atMinute(0)}', '${atMinute(0)}');
       insert into briar_organization_members (organization_id, user_id, role, created_at, updated_at)
-      values ('${projectId}', 'member', 'member', '${atMinute(0)}', '${atMinute(0)}');
+      values ('${projectId}', 'member', 'developer', '${atMinute(0)}', '${atMinute(0)}');
       insert into briar_projects (
         id, owner_user_id, organization_id, name, agent_token_hash, created_at, updated_at
       ) values (
@@ -375,8 +404,8 @@ describe("detached execution workers", () => {
        insert into briar_organization_members (
          organization_id, user_id, role, created_at, updated_at
        ) values (
-         '${projectId}', 'member', 'member', '${atMinute(0)}', '${atMinute(0)}'
-       ) on conflict (organization_id, user_id) do update set role = 'member';`,
+         '${projectId}', 'member', 'developer', '${atMinute(0)}', '${atMinute(0)}'
+       ) on conflict (organization_id, user_id) do update set role = 'developer';`,
     );
   });
 

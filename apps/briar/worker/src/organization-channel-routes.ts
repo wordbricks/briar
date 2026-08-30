@@ -8,6 +8,7 @@ import {
 import {
   requireChannelAccess,
   requireChannelDeletionAccess,
+  requireChannelWriteAccess,
 } from "./channel-route-access";
 import {
   decodeChannelInput,
@@ -39,6 +40,7 @@ import {
   updateChannel,
 } from "./channels";
 import { HttpError, json } from "./http-response";
+import { hasOrganizationCapability } from "./organization-access";
 import {
   getOrganizationAgent,
   listOrganizationAgents,
@@ -79,7 +81,9 @@ export async function handleOrganizationChannelRoute(
     const session = await requireSession(auth, request);
     const organizationId = channelChangesMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     const since = Number(url.searchParams.get("since") ?? "0");
     if (!Number.isSafeInteger(since) || since < 0) {
       throw new HttpError(400, "Invalid channel cursor");
@@ -100,14 +104,21 @@ export async function handleOrganizationChannelRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationDirectMessagesMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
+    if (!hasOrganizationCapability(role, "conversations:write")) {
+      throw new HttpError(403, "Conversation editing permission required");
+    }
     const input = decodeDirectMessageInput(await readJson(request));
-    const memberIds = [...new Set(input.memberIds)].filter(
+    const selectedMemberIds = [...new Set(input.memberIds)];
+    const selfSelected = selectedMemberIds.includes(session.user.id);
+    const memberIds = selectedMemberIds.filter(
       (userId) => userId !== session.user.id,
     );
     const agentIds = [...new Set(input.agentIds)];
-    if (memberIds.length + agentIds.length === 0) {
-      throw new HttpError(400, "At least one other participant is required");
+    if (selectedMemberIds.length + agentIds.length === 0) {
+      throw new HttpError(400, "At least one participant is required");
     }
 
     const [organizationMembers, organizationAgents] = await Promise.all([
@@ -120,7 +131,7 @@ export async function handleOrganizationChannelRoute(
     const agentsById = new Map(
       organizationAgents.map((agent) => [agent.id, agent]),
     );
-    for (const userId of memberIds) {
+    for (const userId of selectedMemberIds) {
       if (!membersById.has(userId)) {
         throw new HttpError(404, "Organization member not found");
       }
@@ -131,8 +142,11 @@ export async function handleOrganizationChannelRoute(
       }
     }
 
-    const dmKey = memberIds.length + agentIds.length === 1
-      ? memberIds.length === 1
+    const selectedParticipantCount = selectedMemberIds.length + agentIds.length;
+    const dmKey = selectedParticipantCount === 1
+      ? selfSelected
+        ? `self:${session.user.id}`
+        : memberIds.length === 1
         ? `users:${JSON.stringify([session.user.id, memberIds[0]!].sort())}`
         : `agent:${JSON.stringify([session.user.id, agentIds[0]!])}`
       : null;
@@ -147,7 +161,7 @@ export async function handleOrganizationChannelRoute(
     }
 
     const participantNames = [
-      ...memberIds.map((userId) => membersById.get(userId)!.name),
+      ...selectedMemberIds.map((userId) => membersById.get(userId)!.name),
       ...agentIds.map((agentId) => agentsById.get(agentId)!.name),
     ];
     const channelId = crypto.randomUUID();
@@ -190,7 +204,9 @@ export async function handleOrganizationChannelRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationChannelsMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     const snapshot = await loadChannelCatalogSnapshot(
       () => getChannelSyncCursor(db, organizationId),
       () => listChannels(db, organizationId, session.user.id),
@@ -204,7 +220,12 @@ export async function handleOrganizationChannelRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationChannelsMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
+    if (!hasOrganizationCapability(role, "conversations:write")) {
+      throw new HttpError(403, "Conversation editing permission required");
+    }
     const input = decodeChannelInput(await readJson(request));
     const channelId = crypto.randomUUID();
     const slug = input.slug ?? channelSlugFromName(input.name, channelId);
@@ -313,7 +334,7 @@ export async function handleOrganizationChannelRoute(
   }
   if (organizationChannelMatch && request.method === "PATCH") {
     const session = await requireSession(auth, request);
-    const currentChannel = await requireChannelAccess(
+    const currentChannel = await requireChannelWriteAccess(
       db,
       organizationChannelMatch[1],
       organizationChannelMatch[2],
@@ -400,7 +421,7 @@ export async function handleOrganizationChannelRoute(
   );
   if (channelMemberMatch && request.method === "PUT") {
     const session = await requireSession(auth, request);
-    const channel = await requireChannelAccess(
+    const channel = await requireChannelWriteAccess(
       db,
       channelMemberMatch[1],
       channelMemberMatch[2],
@@ -423,7 +444,7 @@ export async function handleOrganizationChannelRoute(
   }
   if (channelMemberMatch && request.method === "DELETE") {
     const session = await requireSession(auth, request);
-    const channel = await requireChannelAccess(
+    const channel = await requireChannelWriteAccess(
       db,
       channelMemberMatch[1],
       channelMemberMatch[2],
@@ -444,7 +465,7 @@ export async function handleOrganizationChannelRoute(
   );
   if (channelAgentMatch && request.method === "PUT") {
     const session = await requireSession(auth, request);
-    const channel = await requireChannelAccess(
+    const channel = await requireChannelWriteAccess(
       db,
       channelAgentMatch[1],
       channelAgentMatch[2],
@@ -476,7 +497,7 @@ export async function handleOrganizationChannelRoute(
   }
   if (channelAgentMatch && request.method === "DELETE") {
     const session = await requireSession(auth, request);
-    const channel = await requireChannelAccess(
+    const channel = await requireChannelWriteAccess(
       db,
       channelAgentMatch[1],
       channelAgentMatch[2],

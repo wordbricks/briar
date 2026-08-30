@@ -1,6 +1,6 @@
 import * as SchemaIssue from "effect/SchemaIssue";
 import type { BriarAuth } from "./auth";
-import { canManageOrganization } from "./organization-access";
+import { hasOrganizationCapability } from "./organization-access";
 import { getOrganizationRole } from "./organization-repository";
 import {
   claimGithubDelivery,
@@ -71,6 +71,8 @@ const githubCallbackOrigin = (env: Env) => {
 const githubConfigAvailable = (env: Env) =>
   Boolean(
     env.GITHUB_WEBHOOK_SECRET?.trim() &&
+      env.GITHUB_APP_ID?.trim() &&
+      env.GITHUB_APP_PRIVATE_KEY?.trim() &&
       env.GITHUB_APP_CLIENT_ID?.trim() &&
       env.GITHUB_APP_CLIENT_SECRET?.trim() &&
       /^[a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?$/u.test(
@@ -495,7 +497,7 @@ async function handleGithubOAuthCallback(request: Request, env: Env) {
     oauthState.organization_id,
     oauthState.user_id,
   );
-  if (!canManageOrganization(role)) {
+  if (!hasOrganizationCapability(role, "development:manage")) {
     return html(
       "GitHub 연결 권한 없음",
       "조직 관리자 권한이 없어 GitHub 연결을 완료할 수 없습니다.",
@@ -570,7 +572,9 @@ export async function handleOrganizationGithubRoute(input: {
     const session = await requireSession(auth, request);
     const organizationId = organizationGithubMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     const connection = await getGithubConnectionForOrganization(
       db,
       organizationId,
@@ -578,7 +582,7 @@ export async function handleOrganizationGithubRoute(input: {
     if (!connection) {
       return json({
         configured: githubConfigAvailable(env),
-        canManage: canManageOrganization(role),
+        canManage: hasOrganizationCapability(role, "development:manage"),
         connected: false,
       });
     }
@@ -588,7 +592,7 @@ export async function handleOrganizationGithubRoute(input: {
     );
     return json({
       configured: githubConfigAvailable(env),
-      canManage: canManageOrganization(role),
+      canManage: hasOrganizationCapability(role, "development:manage"),
       connected: true,
       accountLogin: connection.account_login,
       accountAvatarUrl: connection.account_avatar_url,
@@ -606,8 +610,8 @@ export async function handleOrganizationGithubRoute(input: {
     const session = await requireSession(auth, request);
     const organizationId = organizationGithubMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     await disconnectGithubInstallation(
       db,
@@ -624,8 +628,8 @@ export async function handleOrganizationGithubRoute(input: {
     const session = await requireSession(auth, request);
     const organizationId = organizationGithubInstallMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     if (!githubConfigAvailable(env)) {
       throw new HttpError(503, "GitHub integration is not configured");

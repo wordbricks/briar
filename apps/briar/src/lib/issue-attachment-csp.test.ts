@@ -31,4 +31,23 @@ describe("issue attachment preview CSP", () => {
     expect(directive(policy, "img-src").split(/\s+/u)).toContain("blob:");
     expect(directive(policy, "media-src").split(/\s+/u)).toContain("blob:");
   });
+
+  it.each([
+    ["desktop production", readConfig("tauri.conf.json").app.security.csp],
+    ["Android", readConfig("tauri.android.conf.json").app.security.csp],
+  ])("allows only the production API shell for HTML frames on %s", (_target, policy) => {
+    expect(directive(policy, "frame-src").split(/\s+/u)).toContain(
+      "https://briar-api.wbai.workers.dev/html-artifact-preview",
+    );
+    const scriptSources = directive(policy, "script-src").split(/\s+/u);
+    expect(scriptSources).toEqual(["script-src", "'self'"]);
+    expect(scriptSources).not.toContain("'unsafe-inline'");
+  });
+
+  it("allows the exact local shell only in desktop development", () => {
+    const policy = readConfig("tauri.conf.json").app.security.devCsp!;
+    expect(directive(policy, "frame-src").split(/\s+/u)).toContain(
+      "http://127.0.0.1:8787/html-artifact-preview",
+    );
+  });
 });

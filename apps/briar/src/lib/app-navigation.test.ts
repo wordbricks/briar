@@ -123,6 +123,19 @@ describe("app navigation locations", () => {
     );
   });
 
+  it("stores My issues with its organization context", () => {
+    const location = organizationNavigationLocation(
+      "organization/one",
+      "my-issues",
+    );
+
+    expect(location).toBe("organizations/organization%2Fone/my-issues");
+    expect(pageFromNavigationLocation(location)).toBe("my-issues");
+    expect(organizationIdFromNavigationLocation(location)).toBe(
+      "organization/one",
+    );
+  });
+
   it.each([
     { scope: "application", section: "keybindings" },
     {
