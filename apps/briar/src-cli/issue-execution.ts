@@ -60,10 +60,12 @@ import {
 import {
   decodeDetachedAgentEffortOption,
   decodeDetachedAgentSkillsOption,
+} from "./detached-agent-options";
+import {
   type ClaimedRun,
   type DetachedAgentClaim,
   type DetachedAgentSkill,
-} from "./worker-claim-contract";
+} from "./worker-queue-contract";
 import {
   providerExecutionEnvironment,
   configDirectory,

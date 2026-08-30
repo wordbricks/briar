@@ -78,7 +78,7 @@ import {
   type ClaimedChannelReply,
   type ClaimedIssueReply,
   type ClaimedProjectAgentTask,
-} from "./worker-claim-contract";
+} from "./worker-queue-contract";
 import {
   providerExecutionEnvironment,
   configDirectory,

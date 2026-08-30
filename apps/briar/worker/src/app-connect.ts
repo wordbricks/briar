@@ -13,6 +13,7 @@ import { registerAppIssueService } from "./app-connect-issue";
 import { appProject } from "./app-connect-mappers";
 import { listProjects } from "./project-repository";
 import { requireSession } from "./session-auth";
+import { registerWorkerQueueService } from "./worker-connect-queue";
 
 export type AppConnectRouteInput = {
   readonly request: Request;
@@ -84,6 +85,12 @@ export async function handleAppConnectRequest(
   registerAppChannelService(router, {
     ...sharedInput,
     attachmentsBucket: input.env.ATTACHMENTS,
+    env: input.env,
+    context: input.context,
+  });
+  registerWorkerQueueService(router, {
+    request: input.request,
+    db: input.env.DB,
     env: input.env,
     context: input.context,
   });

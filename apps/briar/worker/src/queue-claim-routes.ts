@@ -32,50 +32,22 @@ import {
   workerStateAt,
 } from "./workers";
 
-export async function handleQueueClaimRoute(input: {
-  request: Request;
-  url: URL;
+export async function claimNextQueueWork(input: {
   db: D1Database;
   env: Env;
+  projectId: string;
+  claimedBy: string;
+  runId?: string;
   authenticatedWorker?: AuthenticatedWorkerProject;
-  claimInput?: ReturnType<typeof decodeClaimInput>;
-}): Promise<Response | undefined> {
+}) {
   const {
-    request,
-    url,
     db,
     env,
-    authenticatedWorker: preauthenticatedWorker,
-    claimInput,
+    projectId,
+    authenticatedWorker,
   } = input;
-
-  if (
-    claimInput ||
-    (url.pathname === "/queue/claims" && request.method === "POST")
-  ) {
-    // Migration 0090 is applied by worker:deploy before this code can run.
-    const input = claimInput ?? decodeClaimInput(await readJson(request));
-    let authenticatedWorkerId: string | undefined;
-    let authenticatedWorker:
-      | Awaited<ReturnType<typeof requireWorkerProjectBinding>>
-      | undefined;
-    const projectId = input.workerId
-      ? (() => {
-          if (!input.projectId) {
-            throw new HttpError(400, "projectId is required for worker claims");
-          }
-          return input.projectId;
-        })()
-      : await requireAgentProject(db, request);
-    if (input.workerId) {
-      authenticatedWorker = await requireWorkerProjectBinding(
-        db,
-        request,
-        projectId,
-        input.workerId,
-        preauthenticatedWorker,
-      );
-      authenticatedWorkerId = authenticatedWorker.binding.id;
+    const authenticatedWorkerId = authenticatedWorker?.binding.id;
+    if (authenticatedWorker) {
       if (
         workerStateAt(
           authenticatedWorker.binding.last_heartbeat_at,
@@ -189,9 +161,9 @@ export async function handleQueueClaimRoute(input: {
           workId: run.id,
         })
       : null;
-    return json({
-      work: run
+    return run
         ? {
+            workType: "issue" as const,
             runId: run.id,
             runNumber: run.run_number,
             currentAttempt: run.current_attempt,
@@ -241,23 +213,31 @@ export async function handleQueueClaimRoute(input: {
                 }
               : null,
           }
-        : null,
-    });
-  }
-
-
-  return undefined;
+        : null;
 }
 
-export async function claimNextQueueWork(input: {
+export async function handleQueueClaimRoute(input: {
   request: Request;
   url: URL;
-  claimInput: ReturnType<typeof decodeClaimInput>;
   db: D1Database;
   env: Env;
-  authenticatedWorker: AuthenticatedWorkerProject;
-}): Promise<Response> {
-  const response = await handleQueueClaimRoute(input);
-  if (!response) throw new Error("Queue claim route did not respond");
-  return response;
+}): Promise<Response | undefined> {
+  const { request, url, db, env } = input;
+  if (url.pathname !== "/queue/claims" || request.method !== "POST") {
+    return undefined;
+  }
+  const claim = decodeClaimInput(await readJson(request));
+  if (claim.workerId || claim.projectId) {
+    throw new HttpError(400, "Worker claims use briar.worker.v1.WorkerQueueService");
+  }
+  const projectId = await requireAgentProject(db, request);
+  return json({
+    work: await claimNextQueueWork({
+      db,
+      env,
+      projectId,
+      claimedBy: claim.claimedBy,
+      runId: claim.runId,
+    }),
+  });
 }

@@ -62,7 +62,7 @@ export const MergeBatchAuthorityInput = strictSchema(Schema.Struct({
   baseSha: GitObjectId,
 }));
 
-const MergeBatchValidationResult = strictSchema(Schema.Struct({
+export const MergeBatchValidationResult = strictSchema(Schema.Struct({
   context: MergeGroupContext,
   passed: Schema.Boolean,
   exitCode: integerBetween(0, 255),
@@ -110,6 +110,11 @@ export const decodeMergeBatchAuthorityInput = decodeRequestSync(
 );
 export const decodeMergeBatchValidationInput = decodeRequestSync(
   MergeBatchValidationInput,
+);
+export const decodeMergeBatchValidationResults = decodeRequestSync(
+  mutableArray(MergeBatchValidationResult).check(
+    Schema.isLengthBetween(1, 1),
+  ),
 );
 export const decodeMergeBatchPublicationInput = decodeRequestSync(
   MergeBatchPublicationInput,

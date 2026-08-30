@@ -8,7 +8,7 @@ import {
 import {
   decodeClaimedMergeBatch,
   type ClaimedMergeBatch,
-} from "./worker-claim-contract";
+} from "./worker-queue-contract";
 
 const batchId = "11111111-1111-4111-8111-111111111111";
 const projectId = "22222222-2222-4222-8222-222222222222";
@@ -135,6 +135,19 @@ function recordingApi() {
   return { api, calls };
 }
 
+function recordingLeaseLifecycle() {
+  const calls: Array<"renew" | "release"> = [];
+  return {
+    calls,
+    renewLease: async () => {
+      calls.push("renew");
+    },
+    releaseLease: async () => {
+      calls.push("release");
+    },
+  };
+}
+
 describe("local provider-independent merge-queue worker", () => {
   it("seals an exact PR identity without calling GitHub merge-queue mutations", async () => {
     const commands: string[][] = [];
@@ -143,12 +156,14 @@ describe("local provider-independent merge-queue worker", () => {
       return successful(pullRequestResponse());
     };
     const api = recordingApi();
+    const lease = recordingLeaseLifecycle();
     await executeClaimedMergeBatch({
       claim: claimFixture("enqueue"),
       workerId: "worker-1",
       repositoryPath: "/repo",
       signal: new AbortController().signal,
       api: api.api,
+      ...lease,
       runCommand: run,
     });
     expect(commands.join("\n")).not.toContain("enqueuePullRequest");
@@ -176,12 +191,14 @@ describe("local provider-independent merge-queue worker", () => {
       throw new Error(`unexpected command: ${command.join(" ")}`);
     };
     const api = recordingApi();
+    const lease = recordingLeaseLifecycle();
     await executeClaimedMergeBatch({
       claim: claimFixture(),
       workerId: "worker-1",
       repositoryPath: "/repo",
       signal: new AbortController().signal,
       api: api.api,
+      ...lease,
       runCommand: run,
     });
     expect(commands.some((command) => command[1] === "merge-tree")).toBe(true);
@@ -215,12 +232,14 @@ describe("local provider-independent merge-queue worker", () => {
       throw new Error(`unexpected command: ${command.join(" ")}`);
     };
     const api = recordingApi();
+    const lease = recordingLeaseLifecycle();
     await executeClaimedMergeBatch({
       claim: claimFixture("validate"),
       workerId: "worker-1",
       repositoryPath: "/repo",
       signal: new AbortController().signal,
       api: api.api,
+      ...lease,
       runCommand: run,
     });
 
@@ -289,12 +308,14 @@ describe("local provider-independent merge-queue worker", () => {
       throw new Error(`unexpected command: ${command.join(" ")}`);
     };
     const api = recordingApi();
+    const lease = recordingLeaseLifecycle();
     await executeClaimedMergeBatch({
       claim: claimFixture("publish"),
       workerId: "worker-1",
       repositoryPath: "/repo",
       signal: new AbortController().signal,
       api: api.api,
+      ...lease,
       runCommand: run,
     });
     const statuses = commands.filter((command) =>
@@ -305,7 +326,7 @@ describe("local provider-independent merge-queue worker", () => {
       "--context",
       "briar/merge-queue",
     ]));
-    expect(api.calls.filter((call) => call.path.endsWith("/lease"))).toHaveLength(2);
+    expect(lease.calls.filter((call) => call === "renew")).toHaveLength(2);
     expect(commands.some((command) =>
       command[1] === "github" &&
       command.includes("merge") &&
@@ -331,12 +352,14 @@ describe("local provider-independent merge-queue worker", () => {
       throw new Error(`failed publication must not run git: ${command.join(" ")}`);
     };
     const api = recordingApi();
+    const lease = recordingLeaseLifecycle();
     await executeClaimedMergeBatch({
       claim: claimFixture("publish", failedProof),
       workerId: "worker-1",
       repositoryPath: "/repo",
       signal: new AbortController().signal,
       api: api.api,
+      ...lease,
       runCommand: run,
     });
     expect(commands.every((command) => command[1] === "github")).toBe(true);
@@ -372,12 +395,14 @@ describe("local provider-independent merge-queue worker", () => {
       throw new Error(`unexpected command: ${command.join(" ")}`);
     };
     const api = recordingApi();
+    const lease = recordingLeaseLifecycle();
     await executeClaimedMergeBatch({
       claim,
       workerId: "worker-1",
       repositoryPath: "/repo",
       signal: new AbortController().signal,
       api: api.api,
+      ...lease,
       runCommand: run,
     });
     expect(commands.filter((command) => command[1] === "fetch")).toHaveLength(1);

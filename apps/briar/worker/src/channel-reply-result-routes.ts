@@ -10,7 +10,6 @@ import { publishChannelActivity } from "./channel-activity-realtime";
 import { verifyChannelActivityPublishToken } from "./channel-activity-ticket";
 import {
   decodeChannelAgentActivityPublishInput,
-  decodeChannelReplyLeaseInput,
   decodeChannelReplySessionCheckpointInput,
 } from "./channel-route-decoders";
 import {
@@ -27,7 +26,6 @@ import {
   getOrganizationProject,
   getChannelReplySession,
   listChannelAgents,
-  renewChannelReplyLease,
 } from "./channels";
 import { sha256 } from "./crypto-digest";
 import { HttpError, json } from "./http-response";
@@ -37,12 +35,10 @@ import {
   readJson,
 } from "./request-readers";
 import {
-  channelActivityCredential,
   channelActivityFrame,
   scheduleChannelActivityClear,
   scheduleChannelRealtimePublish,
 } from "./realtime-scheduling";
-import { leaseExpiryFrom } from "./workers";
 import { requireWorkerOrganization } from "./worker-route-auth";
 
 export type ChannelReplyResultRouteInput = {
@@ -133,44 +129,9 @@ export async function handleChannelReplyResultRoute(
   }
 
   const channelReplyClaimMatch = pathname.match(
-    /^\/channel-reply-claims\/([0-9a-f-]+)\/(lease|session|complete)$/u,
+    /^\/channel-reply-claims\/([0-9a-f-]+)\/(session|complete)$/u,
   );
   if (channelReplyClaimMatch && request.method === "POST") {
-    if (channelReplyClaimMatch[2] === "lease") {
-      const input = decodeChannelReplyLeaseInput(await readJson(request));
-      const principal = await requireWorkerOrganization(
-        db,
-        request,
-        input.organizationId,
-      );
-      const observedAt = new Date().toISOString();
-      const renewed = await renewChannelReplyLease(db, {
-        jobId: channelReplyClaimMatch[1],
-        deviceId: principal.deviceId,
-        workerId: input.workerId,
-        claimTokenHash: await sha256(input.claimToken),
-        observedAt,
-        leaseExpiresAt: leaseExpiryFrom(observedAt),
-      });
-      if (!renewed) {
-        throw new HttpError(409, "Reply claim is no longer active");
-      }
-      const activity = env.CHANNEL_ACTIVITY_REALTIME
-        ? await channelActivityCredential(env, renewed, {
-            workerId: input.workerId,
-            deviceId: principal.deviceId,
-          })
-        : null;
-      const session = renewed.session_id
-        ? await getChannelReplySession(db, renewed.session_id)
-        : null;
-      return json({
-        leaseExpiresAt: renewed.lease_expires_at,
-        retainedUntil: session?.retained_until ?? null,
-        activity,
-      });
-    }
-
     if (channelReplyClaimMatch[2] === "session") {
       const input = decodeChannelReplySessionCheckpointInput(
         await readJson(request),

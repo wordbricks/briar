@@ -1,10 +1,10 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { platform } from "node:os";
 import { join } from "node:path";
 import { autoHuntRequirementKinds } from "../src/lib/auto-hunt-contract";
 import { organizationAgentContextCapability } from "../src/lib/organization-agent-context-contract";
 import { runProjectAgentTaskCompletionFlow } from "./agent-runner";
-import { type ChannelActivityCredential } from "./channel-activity-publisher";
 import { HttpRequestError } from "./execution-metrics-upload";
 import {
   inspectWorkflowRequirements,
@@ -18,10 +18,7 @@ import {
   runWorkerLoop,
 } from "./worker";
 import {
-  claimMergeBatchIfReady,
   executeClaimedMergeBatch,
-  releaseMergeBatchClaim,
-  renewMergeBatchClaim,
   type MergeBatchApi,
 } from "./merge-queue";
 import {
@@ -46,15 +43,18 @@ import {
 } from "./provider-health";
 import { discoverWorkerProviderCapabilities } from "./provider-capabilities";
 import {
+  decodeWorkerBinding,
+  decodeWorkerRegistration,
+  type WorkerRegistration,
+} from "./worker-registration-contract";
+import { createWorkerQueueClient } from "./worker-queue-client";
+import {
   decodeClaimedChannelReply,
   decodeClaimedIssueReply,
   decodeClaimedMergeBatch,
   decodeClaimedProjectAgentTask,
   decodeClaimedRun,
-  decodeWorkerBinding,
-  decodeWorkerRegistration,
-  type WorkerRegistration,
-} from "./worker-claim-contract";
+} from "./worker-queue-contract";
 import {
   configDirectory,
   cliVersion,
@@ -445,6 +445,7 @@ async function workerCommand() {
   }
 
   const maxIssues = Number.parseInt(value("--max-issues") ?? "", 10);
+  const workerQueue = createWorkerQueueClient(config.apiUrl, workerToken);
   const mergeBatchApi: MergeBatchApi = <T = unknown>(
     path: string,
     init: { method: "POST"; body: string },
@@ -455,101 +456,31 @@ async function workerCommand() {
   let lastTriggeredUpdateId: string | null = null;
   const result = await runWorkerLoop(
     {
-      claim: async (_options) => {
-        const mergeBatch = await claimMergeBatchIfReady({
-          api: mergeBatchApi,
+      claim: async (_options) => workerQueue.claimWork({
           projectId: project.id,
           workerId,
           claimedBy: label,
           repliesOnly: _options?.repliesOnly === true,
-        });
-        if (mergeBatch) return { work: mergeBatch };
-        // The combined API claim is ordered by reply queues first and applies
-        // the regular-session limit atomically to issue/task queues. The loop
-        // still passes its local reply-only hint without adding a wire-field,
-        // keeping this endpoint compatible with older API deployments during
-        // rollout.
-        const claim = await request<{
-          work: unknown;
-          retryAfterMs?: number;
-        }>(
-          config.apiUrl,
-          "/worker-claims",
-          workerToken,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              claimedBy: label,
-              workerId,
-              projectId: project.id,
-            }),
-          },
-        );
-        if (claim.work === null) {
-          return { work: null, retryAfterMs: claim.retryAfterMs };
-        }
-        const workType = typeof claim.work === "object" && claim.work !== null &&
-            "workType" in claim.work
-          ? claim.work.workType
-          : undefined;
-        const work = workType === "mergeBatch"
-          ? decodeClaimedMergeBatch(claim.work)
-          : workType === "issueReply"
-          ? decodeClaimedIssueReply(claim.work)
-          : workType === "projectAgentTask"
-            ? decodeClaimedProjectAgentTask(claim.work)
-            : workType === "channelReply"
-              ? decodeClaimedChannelReply(claim.work)
-              : decodeClaimedRun(claim.work);
-        return { work };
-      },
+        }),
       renewLease: async (issue) => {
-        if (issue.workType === "mergeBatch") {
-          await renewMergeBatchClaim(
-            mergeBatchApi,
-            decodeClaimedMergeBatch(issue),
-            workerId,
-          );
-          return;
-        }
-        if (issue.workType === "projectAgentTask") {
-          const task = decodeClaimedProjectAgentTask(issue);
-          await request(
-            config.apiUrl,
-            `/agent-task-claims/${task.workId}/lease`,
-            workerToken,
-            {
-              method: "POST",
-              body: JSON.stringify({
-                projectId: project.id,
-                workerId,
-                claimToken: task.claimToken,
-              }),
-            },
-          );
-          return;
-        }
+        const work = issue.workType === "mergeBatch"
+          ? decodeClaimedMergeBatch(issue)
+          : issue.workType === "projectAgentTask"
+            ? decodeClaimedProjectAgentTask(issue)
+            : issue.workType === "channelReply"
+              ? decodeClaimedChannelReply(issue)
+              : issue.workType === "issueReply"
+                ? decodeClaimedIssueReply(issue)
+                : decodeClaimedRun(issue);
+        const renewed = await workerQueue.renewWorkLease({
+          projectId: project.id,
+          workerId,
+          work,
+        });
         if (issue.workType === "channelReply") {
           const reply = decodeClaimedChannelReply(issue);
-          const renewed = await request<{
-            leaseExpiresAt: string;
-            retainedUntil?: string | null;
-            activity?: ChannelActivityCredential | null;
-          }>(
-            config.apiUrl,
-            `/channel-reply-claims/${reply.workId}/lease`,
-            workerToken,
-            {
-              method: "POST",
-              body: JSON.stringify({
-                organizationId: reply.organizationId,
-                workerId,
-                claimToken: reply.claimToken,
-              }),
-            },
-          );
           activeReplyActivityPublishers.get(reply.workId)?.updateCredential(
-            renewed.activity ?? null,
+            renewed.activity,
           );
           if (reply.session && renewed.retainedUntil) {
             if (reply.projectId) {
@@ -583,39 +514,10 @@ async function workerCommand() {
         }
         if (issue.workType === "issueReply") {
           const reply = decodeClaimedIssueReply(issue);
-          const renewed = await request<{
-            leaseExpiresAt: string;
-            activity?: ChannelActivityCredential | null;
-          }>(
-            config.apiUrl,
-            `/issue-reply-claims/${reply.workId}/lease`,
-            workerToken,
-            {
-              method: "POST",
-              body: JSON.stringify({
-                projectId: project.id,
-                workerId,
-                claimToken: reply.claimToken,
-              }),
-            },
-          );
           activeReplyActivityPublishers.get(reply.workId)?.updateCredential(
-            renewed.activity ?? null,
+            renewed.activity,
           );
-          return;
         }
-        await request(
-          config.apiUrl,
-          `/runs/${issue.runId}/lease`,
-          workerToken,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              claimToken: issue.claimToken,
-              projectId: project.id,
-            }),
-          },
-        );
       },
       heartbeat: async (readinessState = "ready") => {
         if (Date.now() - lastAnalysisWorktreeSweepAt >= 5 * 60_000) {
@@ -828,54 +730,48 @@ async function workerCommand() {
         });
       },
       handoff: async (issue, requestId, checkpoint) => {
-        if (issue.workType === "mergeBatch") {
-          try {
-            await releaseMergeBatchClaim(
-              mergeBatchApi,
-              decodeClaimedMergeBatch(issue),
-              workerId,
-            );
-          } catch (error) {
-            // A phase may have completed and atomically released just as the
-            // planned update aborted it. A missing old lease is already the
-            // safe handoff outcome.
-            if (!(error instanceof HttpRequestError) || error.status !== 409) {
-              throw error;
-            }
-          }
-          return;
-        }
-        const workType = issue.workType ?? "issue";
-        const workId = issue.workId ?? issue.runId;
-        await request(
-          config.apiUrl,
-          `/workers/${workerId}/update-handoff/claim`,
-          workerToken,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              requestId,
-              projectId: project.id,
-              workType,
-              workId,
-              runId: issue.runId,
-              claimToken: issue.claimToken,
-              checkpoint: {
-                conversationId: checkpoint.conversationId ?? null,
-                workspacePath: checkpoint.workspacePath ?? null,
-              },
-            }),
-          },
-        );
+        const work = issue.workType === "mergeBatch"
+          ? decodeClaimedMergeBatch(issue)
+          : issue.workType === "projectAgentTask"
+            ? decodeClaimedProjectAgentTask(issue)
+            : issue.workType === "channelReply"
+              ? decodeClaimedChannelReply(issue)
+              : issue.workType === "issueReply"
+                ? decodeClaimedIssueReply(issue)
+                : decodeClaimedRun(issue);
+        await workerQueue.handoffWork({
+          requestId,
+          projectId: project.id,
+          workerId,
+          work,
+          checkpoint,
+        });
       },
       runIssue: async (issue, signal, reportCheckpoint) => {
         if (issue.workType === "mergeBatch") {
+          const claim = decodeClaimedMergeBatch(issue);
           await executeClaimedMergeBatch({
-            claim: decodeClaimedMergeBatch(issue),
+            claim,
             workerId,
             repositoryPath: project.repositoryPath,
             signal,
             api: mergeBatchApi,
+            renewLease: async () => {
+              await workerQueue.renewWorkLease({
+                projectId: project.id,
+                workerId,
+                work: claim,
+              });
+            },
+            releaseLease: async () => {
+              await workerQueue.handoffWork({
+                requestId: randomUUID(),
+                projectId: project.id,
+                workerId,
+                work: claim,
+                checkpoint: {},
+              });
+            },
           });
           return;
         }

@@ -12,10 +12,7 @@ import {
   MERGE_QUEUE_VALIDATION_MAX_COMMANDS,
   MERGE_QUEUE_VALIDATION_SOURCE_REF_PREFIX,
 } from "../src/lib/merge-queue-validation-contract";
-import {
-  decodeClaimedMergeBatch,
-  type ClaimedMergeBatch,
-} from "./worker-claim-contract";
+import type { ClaimedMergeBatch } from "./worker-queue-contract";
 
 export type MergeQueueCommandResult = {
   exitCode: number;
@@ -144,16 +141,6 @@ const PullRequestMergeResponse = Schema.Struct({
 });
 const decodePullRequestMergeResponse = Schema.decodeUnknownSync(
   PullRequestMergeResponse,
-);
-
-const MergeBatchClaimResponse = Schema.Struct({
-  work: Schema.NullOr(Schema.Unknown),
-  retryAfterMs: Schema.optional(Schema.Int.check(
-    Schema.isGreaterThanOrEqualTo(0),
-  )),
-});
-const decodeMergeBatchClaimResponse = Schema.decodeUnknownSync(
-  MergeBatchClaimResponse,
 );
 
 const PULL_REQUEST_QUERY = `query BriarMergePullRequest(
@@ -336,60 +323,6 @@ async function postClaimAction<T>(
     method: "POST",
     body: JSON.stringify(body),
   });
-}
-
-export async function claimMergeBatchIfReady(input: {
-  api: MergeBatchApi;
-  projectId: string;
-  workerId: string;
-  claimedBy: string;
-  repliesOnly: boolean;
-}): Promise<ClaimedMergeBatch | null> {
-  if (input.repliesOnly) return null;
-  const raw = await input.api<unknown>("/merge-batch-claims", {
-    method: "POST",
-    body: JSON.stringify({
-      projectId: input.projectId,
-      workerId: input.workerId,
-      claimedBy: input.claimedBy,
-    }),
-  });
-  let response: typeof MergeBatchClaimResponse.Type;
-  try {
-    response = decodeMergeBatchClaimResponse(raw);
-  } catch (cause) {
-    throw new MergeQueueInfrastructureError(
-      "Merge batch claim response was invalid",
-      { cause },
-    );
-  }
-  return response.work === null ? null : decodeClaimedMergeBatch(response.work);
-}
-
-export async function renewMergeBatchClaim(
-  api: MergeBatchApi,
-  claim: ClaimedMergeBatch,
-  workerId: string,
-) {
-  await postClaimAction(
-    api,
-    claim,
-    "lease",
-    commonClaimBody(claim, workerId),
-  );
-}
-
-export async function releaseMergeBatchClaim(
-  api: MergeBatchApi,
-  claim: ClaimedMergeBatch,
-  workerId: string,
-) {
-  await postClaimAction(
-    api,
-    claim,
-    "release",
-    commonClaimBody(claim, workerId),
-  );
 }
 
 async function enqueueMember(
@@ -859,7 +792,7 @@ function repositoryMergeMethod(input: NormalizedMergeBatchExecutionInput) {
 }
 
 async function reFencePublication(input: NormalizedMergeBatchExecutionInput) {
-  await renewMergeBatchClaim(input.api, input.claim, input.workerId);
+  await input.renewLease();
   const authority = assertPublishAuthorityValues(input.claim);
   const mergedCount = mergedPrefixLength(input.claim);
   for (const member of input.claim.members) {
@@ -887,7 +820,7 @@ async function mergeBatchPullRequests(
     index += 1
   ) {
     if (input.signal.aborted) throw input.signal.reason;
-    await renewMergeBatchClaim(input.api, input.claim, input.workerId);
+    await input.renewLease();
     const member = input.claim.members[index];
     inspectPullRequest(
       input.claim,
@@ -983,7 +916,7 @@ async function publishMergeBatch(input: NormalizedMergeBatchExecutionInput) {
         );
       }
       if (renewBeforeEach) {
-        await renewMergeBatchClaim(input.api, input.claim, input.workerId);
+        await input.renewLease();
       }
       publishStatus(input, authority.mergeGroupSha, result);
     }
@@ -1053,6 +986,8 @@ export type MergeBatchExecutionInput = {
   repositoryPath: string;
   signal: AbortSignal;
   api: MergeBatchApi;
+  renewLease: () => Promise<void>;
+  releaseLease: () => Promise<void>;
   runCommand?: MergeQueueCommandRunner;
 };
 
@@ -1072,15 +1007,15 @@ export async function executeClaimedMergeBatch(
     switch (input.claim.phase) {
       case "enqueue":
         await enqueueMergeBatch(input);
-        await releaseMergeBatchClaim(input.api, input.claim, input.workerId);
+        await input.releaseLease();
         return;
       case "tail_authority":
         await establishTailAuthority(input);
-        await releaseMergeBatchClaim(input.api, input.claim, input.workerId);
+        await input.releaseLease();
         return;
       case "validate":
         await validateMergeBatch(input);
-        await releaseMergeBatchClaim(input.api, input.claim, input.workerId);
+        await input.releaseLease();
         return;
       case "publish":
         await publishMergeBatch(input);
@@ -1094,7 +1029,7 @@ export async function executeClaimedMergeBatch(
     // must not race this retry release with a second protocol.
     if (input.signal.aborted) throw error;
     try {
-      await releaseMergeBatchClaim(input.api, input.claim, input.workerId);
+      await input.releaseLease();
     } catch (releaseError) {
       throw new AggregateError(
         [error, releaseError],

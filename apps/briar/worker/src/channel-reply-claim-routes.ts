@@ -6,7 +6,6 @@ import {
   hydrateAgentSkills,
 } from "./agent-skills";
 import { legacyAgentSkillInstructions } from "./agent-execution-config";
-import { decodeChannelReplyClaimInput } from "./channel-route-decoders";
 import {
   channelExecutionProposalTablesAvailable,
   claimNextChannelAgentReply,
@@ -20,37 +19,29 @@ import {
   snapshotChannelReplyExecutionTargets,
 } from "./channels";
 import { sha256 } from "./crypto-digest";
-import { HttpError, json } from "./http-response";
+import { HttpError } from "./http-response";
 import { getOrganizationAgent } from "./organization-agents";
-import { readJson } from "./request-readers";
 import {
   channelActivityCredential,
   scheduleChannelRealtimePublish,
 } from "./realtime-scheduling";
 import {
-  executionWorkerBindingById,
   executionWorkerProviders,
   executionWorkerSupportsOrganizationAgentContext,
   leaseExpiryFrom,
   workerStateAt,
 } from "./workers";
-import { requireWorkerOrganization } from "./worker-route-auth";
 import { latestExecutionWorkerUpdateHandoff } from "./worker-update-repository";
+import type { AuthenticatedWorkerProject } from "./worker-route-auth";
 
-export type AuthenticatedChannelWorkerProject = {
-  principal: Awaited<ReturnType<typeof requireWorkerOrganization>>;
-  binding: NonNullable<
-    Awaited<ReturnType<typeof executionWorkerBindingById>>
-  >;
-};
+export type AuthenticatedChannelWorkerProject = AuthenticatedWorkerProject;
 
 export type ClaimNextChannelReplyWorkInput = {
-  request: Request;
-  input: ReturnType<typeof decodeChannelReplyClaimInput>;
+  input: { organizationId: string; workerId: string };
   db: D1Database;
   env: Env;
   context?: ExecutionContext;
-  authenticatedWorker?: AuthenticatedChannelWorkerProject;
+  authenticatedWorker: AuthenticatedChannelWorkerProject;
 };
 
 /**
@@ -60,17 +51,15 @@ export type ClaimNextChannelReplyWorkInput = {
  */
 export async function claimNextChannelReplyWork(
   claimInput: ClaimNextChannelReplyWorkInput,
-): Promise<Response> {
-  const { request, input, db, env, context, authenticatedWorker } = claimInput;
-  const principal = authenticatedWorker?.principal ??
-    await requireWorkerOrganization(db, request, input.organizationId);
+){
+  const { input, db, env, context, authenticatedWorker } = claimInput;
+  const principal = authenticatedWorker.principal;
   if (principal.organizationId !== input.organizationId) {
     throw new HttpError(403, "Worker is not enabled for this organization");
   }
   // Readiness and provider health still come from a project binding, which
   // every registered device has. Eligibility per job is enforced in the claim.
-  const binding = authenticatedWorker?.binding ??
-    await executionWorkerBindingById(db, principal.deviceId, input.workerId);
+  const binding = authenticatedWorker.binding;
   if (!binding || binding.id !== input.workerId || binding.state === "disabled") {
     throw new HttpError(403, "Worker is not enabled for this organization");
   }
@@ -108,7 +97,7 @@ export async function claimNextChannelReplyWork(
     claimedAt: observedAt,
     leaseExpiresAt: leaseExpiryFrom(observedAt),
   });
-  if (!job) return json({ work: null });
+  if (!job) return null;
   scheduleChannelRealtimePublish(env, db, input.organizationId, context);
   try {
     if (job.claimed_worker_id !== binding.id) {
@@ -317,9 +306,8 @@ export async function claimNextChannelReplyWork(
       workType: "channelReply",
       workId: job.id,
     });
-    return json({
-      work: {
-        workType: "channelReply",
+    return {
+        workType: "channelReply" as const,
         workId: job.id,
         organizationId: job.organization_id,
         channelId: job.channel_id,
@@ -425,8 +413,7 @@ export async function claimNextChannelReplyWork(
           })),
           messages: messages.map(channelReplyContextMessageJson),
         },
-      },
-    });
+    };
   } catch (error) {
     await failChannelReply(db, {
       jobId: job.id,
@@ -439,31 +426,4 @@ export async function claimNextChannelReplyWork(
     scheduleChannelRealtimePublish(env, db, input.organizationId, context);
     throw error;
   }
-}
-
-export type ChannelReplyClaimRouteInput = {
-  request: Request;
-  url: URL;
-  db: D1Database;
-  env: Env;
-  context?: ExecutionContext;
-  authenticatedWorker?: AuthenticatedChannelWorkerProject;
-};
-
-export async function handleChannelReplyClaimRoute(
-  routeInput: ChannelReplyClaimRouteInput,
-): Promise<Response | undefined> {
-  const { request, url, db, env, context, authenticatedWorker } = routeInput;
-  if (url.pathname !== "/channel-reply-claims" || request.method !== "POST") {
-    return undefined;
-  }
-  const input = decodeChannelReplyClaimInput(await readJson(request));
-  return claimNextChannelReplyWork({
-    request,
-    input,
-    db,
-    env,
-    context,
-    authenticatedWorker,
-  });
 }

@@ -35,7 +35,7 @@ import { fetchDashboard } from "./app-connect-client";
 import {
   decodeQueuedIssue,
   type QueuedAttachment,
-} from "./worker-claim-contract";
+} from "./queue-claim-contract";
 import {
   executionToken,
   configDirectory,

@@ -14,7 +14,6 @@ import { handleIssueControlRoute } from "./issue-control-routes";
 import { handleIssueReplyWorkerRoute } from "./issue-reply-worker-routes";
 import { handleChannelMessageRoute } from "./channel-message-routes";
 import { handleChannelOrganizationContextRoute } from "./channel-organization-context-routes";
-import { handleChannelReplyClaimRoute } from "./channel-reply-claim-routes";
 import { handleChannelReplyResultRoute } from "./channel-reply-result-routes";
 import { handleChannelWebhookManagementRoute } from "./channel-webhook-management-routes";
 import { handleManagedComputerRoute } from "./managed-computer-routes";
@@ -42,7 +41,6 @@ import { handleRunAgentRoute } from "./run-agent-routes";
 import { handleRunEvidenceRoute } from "./run-evidence-routes";
 import { handleTranscriptRoute } from "./transcript-routes";
 import { handleExecutionWorkerRoute } from "./execution-worker-routes";
-import { handleWorkerClaimRoute } from "./worker-claim-routes";
 import {
   handleGithubPublicRoute,
   handleOrganizationGithubRoute,
@@ -395,10 +393,7 @@ async function route(
     auth,
     db,
     env,
-    requireAgentProject: () => requireAgentProject(db, request),
     requireWorkerCredential: () => requireWorkerCredential(db, request),
-    requireWorkerProjectBinding: (projectId) =>
-      requireWorkerProjectBinding(db, request, projectId),
   });
   if (executionWorkerResponse !== undefined) return executionWorkerResponse;
 
@@ -435,16 +430,6 @@ async function route(
   });
   if (mergeBatchResponse !== undefined) return mergeBatchResponse;
 
-  const workerClaimResponse = await handleWorkerClaimRoute({
-    request,
-    url,
-    db,
-    attachmentsBucket,
-    env,
-    context,
-  });
-  if (workerClaimResponse !== undefined) return workerClaimResponse;
-
   const issueReplyWorkerResponse = await handleIssueReplyWorkerRoute({
     request,
     url,
@@ -454,17 +439,6 @@ async function route(
     context,
   });
   if (issueReplyWorkerResponse !== undefined) return issueReplyWorkerResponse;
-
-  const channelReplyClaimResponse = await handleChannelReplyClaimRoute({
-    request,
-    url,
-    db,
-    env,
-    context,
-  });
-  if (channelReplyClaimResponse !== undefined) {
-    return channelReplyClaimResponse;
-  }
 
   const channelOrganizationContextResponse =
     await handleChannelOrganizationContextRoute({

@@ -7,16 +7,13 @@ import {
   completeProjectAgentTaskWithReceipt,
   getProjectAgentSession,
   reapProjectAgentTaskJobs,
-  renewProjectAgentTaskLease,
   upsertProjectAgentSessionSummary,
 } from "./db";
 import { HttpError, json } from "./http-response";
 import { projectAgentSessionJson } from "./project-agent-session-json";
 import { syncProjectAgentTaskSession } from "./project-agent-task-session";
 import {
-  decodeProjectAgentTaskClaimInput,
   decodeProjectAgentTaskCompletion,
-  decodeProjectAgentTaskLease,
 } from "./project-request-contract";
 import { readJson } from "./request-readers";
 import {
@@ -36,38 +33,14 @@ import {
   workerStateAt,
 } from "./workers";
 
-export async function handleProjectAgentTaskWorkerRoute(input: {
-  request: Request;
-  url: URL;
+export async function claimNextProjectAgentTaskWork(input: {
+  projectId: string;
   db: D1Database;
   env: Env;
   context?: ExecutionContext;
-  authenticatedWorker?: AuthenticatedWorkerProject;
-  claimInput?: ReturnType<typeof decodeProjectAgentTaskClaimInput>;
-}): Promise<Response | undefined> {
-  const {
-    request,
-    url,
-    db,
-    env,
-    context,
-    authenticatedWorker: preauthenticatedWorker,
-    claimInput,
-  } = input;
-
-  if (
-    claimInput ||
-    (url.pathname === "/agent-task-claims" && request.method === "POST")
-  ) {
-    const input = claimInput ??
-      decodeProjectAgentTaskClaimInput(await readJson(request));
-    const authenticatedWorker = await requireWorkerProjectBinding(
-      db,
-      request,
-      input.projectId,
-      input.workerId,
-      preauthenticatedWorker,
-    );
+  authenticatedWorker: AuthenticatedWorkerProject;
+}) {
+    const { db, env, context, authenticatedWorker } = input;
     const observedAt = new Date().toISOString();
     if (
       workerStateAt(
@@ -156,7 +129,7 @@ export async function handleProjectAgentTaskWorkerRoute(input: {
       claimedAt: observedAt,
       leaseExpiresAt: leaseExpiryFrom(observedAt),
     });
-    if (!job) return json({ work: null });
+    if (!job) return null;
     const activeSkill = job.agent_skills.find(
       (skill) => skill.id === job.selected_skill_id,
     );
@@ -168,9 +141,8 @@ export async function handleProjectAgentTaskWorkerRoute(input: {
       workType: "projectAgentTask",
       workId: job.id,
     });
-    return json({
-      work: {
-        workType: "projectAgentTask",
+    return {
+        workType: "projectAgentTask" as const,
         workId: job.id,
         runId: job.id,
         sourceKey: `project-agent:${input.projectId}:${job.id}`,
@@ -192,37 +164,23 @@ export async function handleProjectAgentTaskWorkerRoute(input: {
           skill: job.agent_skill,
           skills: job.agent_skills.map(agentSkillJson),
         },
-      },
-    });
-  }
+    };
+}
+
+export async function handleProjectAgentTaskWorkerRoute(input: {
+  request: Request;
+  url: URL;
+  db: D1Database;
+  env: Env;
+  context?: ExecutionContext;
+}): Promise<Response | undefined> {
+  const { request, url, db, env, context } = input;
 
   const projectAgentTaskClaimMatch = url.pathname.match(
-    /^\/agent-task-claims\/([0-9a-f-]+)\/(lease|complete)$/u,
+    /^\/agent-task-claims\/([0-9a-f-]+)\/complete$/u,
   );
   if (projectAgentTaskClaimMatch && request.method === "POST") {
     const body = await readJson(request);
-    if (projectAgentTaskClaimMatch[2] === "lease") {
-      const input = decodeProjectAgentTaskLease(body);
-      const worker = await requireWorkerProjectBinding(
-        db,
-        request,
-        input.projectId,
-        input.workerId,
-      );
-      const renewed = await renewProjectAgentTaskLease(
-        db,
-        input.projectId,
-        projectAgentTaskClaimMatch[1],
-        {
-          workerId: worker.binding.id,
-          claimTokenHash: await sha256(input.claimToken),
-          leaseExpiresAt: leaseExpiryFrom(new Date().toISOString()),
-          updatedAt: new Date().toISOString(),
-        },
-      );
-      if (!renewed) throw new HttpError(409, "Agent task claim is no longer active");
-      return json({ leaseExpiresAt: renewed.lease_expires_at });
-    }
     const input = decodeProjectAgentTaskCompletion(body);
     const worker = await requireWorkerProjectBinding(
       db,
@@ -316,18 +274,4 @@ export async function handleProjectAgentTaskWorkerRoute(input: {
 
 
   return undefined;
-}
-
-export async function claimNextProjectAgentTaskWork(input: {
-  request: Request;
-  url: URL;
-  claimInput: ReturnType<typeof decodeProjectAgentTaskClaimInput>;
-  db: D1Database;
-  env: Env;
-  context?: ExecutionContext;
-  authenticatedWorker: AuthenticatedWorkerProject;
-}): Promise<Response> {
-  const response = await handleProjectAgentTaskWorkerRoute(input);
-  if (!response) throw new Error("Project Agent task claim route did not respond");
-  return response;
 }

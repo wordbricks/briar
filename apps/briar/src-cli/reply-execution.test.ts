@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Config, ProjectConfig } from "./config-contract";
 import type { DetachedProviderTurnResult } from "./detached-provider-turn";
 import { runClaimedProjectAgentTask } from "./reply-execution";
-import { decodeClaimedProjectAgentTask } from "./worker-claim-contract";
+import { decodeClaimedProjectAgentTask } from "./worker-queue-contract";
 import type { GitRunner } from "./worktree";
 
 const projectId = "11111111-1111-4111-8111-111111111111";

@@ -7,22 +7,19 @@ import {
   recordPreparedMergeBatch,
   recordMergeBatchCandidateEnqueued,
   recordMergeBatchValidationProof,
-  releaseMergeBatchLease,
-  renewMergeBatchLease,
 } from "./merge-batches";
 import {
   decodeMergeBatchAuthorityInput,
   decodeMergeBatchBlockInput,
-  decodeMergeBatchClaimInput,
   decodeMergeBatchEnqueueInput,
-  decodeMergeBatchLeaseInput,
   decodeMergeBatchPublicationInput,
   decodeMergeBatchValidationInput,
+  decodeMergeBatchValidationResults,
 } from "./merge-queue-contract";
 import { readJson } from "./request-readers";
 import { leaseExpiryFrom, workerStateAt } from "./workers";
 
-const mergeBatchWorkJson = (
+export const claimedMergeBatch = (
   claim: NonNullable<Awaited<ReturnType<typeof claimNextMergeBatch>>>,
   claimToken: string,
 ) => {
@@ -53,7 +50,9 @@ const mergeBatchWorkJson = (
       mergeGroupSha: claim.batch.merge_group_sha,
       mergeGroupBaseSha: claim.batch.merge_group_base_sha,
       validationResults: claim.batch.validation_results_json
-        ? JSON.parse(claim.batch.validation_results_json) as unknown
+        ? decodeMergeBatchValidationResults(
+            JSON.parse(claim.batch.validation_results_json),
+          )
         : null,
       validatedAt: claim.batch.validated_at,
       publishedAt: claim.batch.published_at,
@@ -86,6 +85,47 @@ const mergeBatchWorkJson = (
   };
 };
 
+export async function claimNextMergeBatchWork(input: {
+  db: D1Database;
+  projectId: string;
+  workerId: string;
+  claimedBy: string;
+  authenticatedWorker: {
+    principal: { deviceId: string };
+    binding: {
+      id: string;
+      last_heartbeat_at: string;
+      state: "online" | "stale" | "disabled";
+      accepting_work: number;
+      readiness_state: "ready" | "busy" | "needs_attention";
+    };
+  };
+}) {
+  const observedAt = new Date().toISOString();
+  if (
+    workerStateAt(
+        input.authenticatedWorker.binding.last_heartbeat_at,
+        observedAt,
+        input.authenticatedWorker.binding.state,
+      ) !== "online" ||
+    input.authenticatedWorker.binding.accepting_work !== 1 ||
+    input.authenticatedWorker.binding.readiness_state === "needs_attention"
+  ) {
+    throw new HttpError(409, "Worker is not ready to claim a merge batch");
+  }
+  const claimToken =
+    `briar_merge_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+  const claim = await claimNextMergeBatch(input.db, input.projectId, {
+    workerId: input.authenticatedWorker.binding.id,
+    deviceId: input.authenticatedWorker.principal.deviceId,
+    claimedBy: input.claimedBy,
+    claimTokenHash: await sha256(claimToken),
+    claimedAt: observedAt,
+    leaseExpiresAt: leaseExpiryFrom(observedAt),
+  });
+  return claim ? claimedMergeBatch(claim, claimToken) : null;
+}
+
 export type MergeBatchRouteInput = {
   request: Request;
   url: URL;
@@ -117,81 +157,14 @@ export async function handleMergeBatchRoute(
     workerId?: string,
   ) => routeInput.requireWorkerProjectBinding(projectId, workerId);
 
-  if (pathname === "/merge-batch-claims" && request.method === "POST") {
-    const input = decodeMergeBatchClaimInput(await readJson(request));
-    const authenticatedWorker = await requireWorkerProjectBinding(
-      db,
-      request,
-      input.projectId,
-      input.workerId,
-    );
-    const observedAt = new Date().toISOString();
-    if (
-      workerStateAt(
-          authenticatedWorker.binding.last_heartbeat_at,
-          observedAt,
-          authenticatedWorker.binding.state,
-        ) !== "online" ||
-      authenticatedWorker.binding.accepting_work !== 1 ||
-      authenticatedWorker.binding.readiness_state === "needs_attention"
-    ) {
-      throw new HttpError(409, "Worker is not ready to claim a merge batch");
-    }
-    const claimToken =
-      `briar_merge_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
-    const claim = await claimNextMergeBatch(db, input.projectId, {
-      workerId: authenticatedWorker.binding.id,
-      deviceId: authenticatedWorker.principal.deviceId,
-      claimedBy: input.claimedBy,
-      claimTokenHash: await sha256(claimToken),
-      claimedAt: observedAt,
-      leaseExpiresAt: leaseExpiryFrom(observedAt),
-    });
-    const response = {
-      work: claim ? mergeBatchWorkJson(claim, claimToken) : null,
-    };
-    if (!claim) Object.assign(response, { retryAfterMs: 15_000 });
-    return json(response);
-  }
-
   const mergeBatchClaimMatch = pathname.match(
-    /^\/merge-batch-claims\/([0-9a-f-]+)\/(lease|release|enqueued|authority|validation|published|block)$/u,
+    /^\/merge-batch-claims\/([0-9a-f-]+)\/(enqueued|authority|validation|published|block)$/u,
   );
   if (mergeBatchClaimMatch && request.method === "POST") {
     const batchId = mergeBatchClaimMatch[1];
     const action = mergeBatchClaimMatch[2];
     const rawInput = await readJson(request);
     const observedAt = new Date().toISOString();
-    if (action === "lease" || action === "release") {
-      const input = decodeMergeBatchLeaseInput(rawInput);
-      await requireWorkerProjectBinding(
-        db,
-        request,
-        input.projectId,
-        input.workerId,
-      );
-      const common = {
-        batchId,
-        projectId: input.projectId,
-        workerId: input.workerId,
-        claimTokenHash: await sha256(input.claimToken),
-        authenticatedAt: observedAt,
-      };
-      if (action === "lease") {
-        const leaseExpiresAt = await renewMergeBatchLease(db, {
-          ...common,
-          leaseExpiresAt: leaseExpiryFrom(observedAt),
-        });
-        if (!leaseExpiresAt) {
-          throw new HttpError(409, "Merge batch claim is no longer active");
-        }
-        return json({ batchId, leaseExpiresAt });
-      }
-      if (!(await releaseMergeBatchLease(db, common))) {
-        throw new HttpError(409, "Merge batch claim is no longer active");
-      }
-      return json({ batchId, released: true });
-    }
     if (action === "enqueued") {
       const input = decodeMergeBatchEnqueueInput(rawInput);
       await requireWorkerProjectBinding(

@@ -29,7 +29,6 @@ import {
   listIssueExecutionProposals,
   listIssueReworkProposals,
   listRunEvidence,
-  renewIssueAgentReplyLease,
   type AgentSkillExecutionProposalRow,
   type IssueExecutionProposalRow,
 } from "./db";
@@ -48,7 +47,6 @@ import {
   type IssueProposalRow,
 } from "./issue-conversation-json";
 import { listIssueMessagesWithArchive } from "./issue-conversation-service";
-import { decodeIssueAgentReplyLease } from "./issue-request-contract";
 import {
   readIssueReplyCompleteRequest,
   readJson,
@@ -64,7 +62,6 @@ import {
   type AuthenticatedWorkerProject,
   requireWorkerProjectBinding,
 } from "./worker-route-auth";
-import { decodeIssueReplyClaimInput } from "./worker-request-contract";
 import { latestExecutionWorkerUpdateHandoff } from "./worker-update-repository";
 import {
   executionWorkerProviders,
@@ -77,40 +74,19 @@ const decodeChannelAgentActivityPublishInput = decodeRequestSync(
   ChannelAgentActivityPublishInput,
 );
 
-export async function handleIssueReplyWorkerRoute(input: {
-  request: Request;
-  url: URL;
+export async function claimNextIssueReplyWork(input: {
+  projectId: string;
   db: D1Database;
-  attachmentsBucket: R2Bucket;
   env: Env;
   context?: ExecutionContext;
-  authenticatedWorker?: AuthenticatedWorkerProject;
-  claimInput?: ReturnType<typeof decodeIssueReplyClaimInput>;
-}): Promise<Response | undefined> {
+  authenticatedWorker: AuthenticatedWorkerProject;
+}) {
   const {
-    request,
-    url,
     db,
-    attachmentsBucket,
     env,
     context,
-    authenticatedWorker: preauthenticatedWorker,
-    claimInput,
+    authenticatedWorker,
   } = input;
-
-  if (
-    claimInput ||
-    (url.pathname === "/issue-reply-claims" && request.method === "POST")
-  ) {
-    const input = claimInput ??
-      decodeIssueReplyClaimInput(await readJson(request));
-    const authenticatedWorker = await requireWorkerProjectBinding(
-      db,
-      request,
-      input.projectId,
-      input.workerId,
-      preauthenticatedWorker,
-    );
     const observedAt = new Date().toISOString();
     if (
       workerStateAt(
@@ -144,7 +120,7 @@ export async function handleIssueReplyWorkerRoute(input: {
         Date.parse(observedAt) - WORKER_STALE_AFTER_MS,
       ).toISOString(),
     });
-    if (!job) return json({ work: null });
+    if (!job) return null;
     scheduleProjectRealtimePublish(env, db, input.projectId, context);
 
     const [run, events, attachments, messages, evidence, transcript] =
@@ -246,9 +222,8 @@ export async function handleIssueReplyWorkerRoute(input: {
       workType: "issueReply",
       workId: job.id,
     });
-    return json({
-      work: {
-        workType: "issueReply",
+    return {
+        workType: "issueReply" as const,
         workId: job.id,
         runId: run.id,
         sourceKey: `${run.source_key}:reply:${job.trigger_message_id}`,
@@ -350,9 +325,18 @@ export async function handleIssueReplyWorkerRoute(input: {
             observedAt: item.observed_at,
           })),
         },
-      },
-    });
-  }
+    };
+}
+
+export async function handleIssueReplyWorkerRoute(input: {
+  request: Request;
+  url: URL;
+  db: D1Database;
+  attachmentsBucket: R2Bucket;
+  env: Env;
+  context?: ExecutionContext;
+}): Promise<Response | undefined> {
+  const { request, url, db, attachmentsBucket, env, context } = input;
 
 
   const issueReplyActivityMatch = url.pathname.match(
@@ -387,44 +371,9 @@ export async function handleIssueReplyWorkerRoute(input: {
   }
 
   const issueReplyClaimMatch = url.pathname.match(
-    /^\/issue-reply-claims\/([0-9a-f-]+)\/(lease|complete)$/u,
+    /^\/issue-reply-claims\/([0-9a-f-]+)\/complete$/u,
   );
   if (issueReplyClaimMatch && request.method === "POST") {
-    if (issueReplyClaimMatch[2] === "lease") {
-      const input = decodeIssueAgentReplyLease(await readJson(request));
-      const worker = await requireWorkerProjectBinding(
-        db,
-        request,
-        input.projectId,
-        input.workerId,
-      );
-      const observedAt = new Date().toISOString();
-      const renewed = await renewIssueAgentReplyLease(
-        db,
-        input.projectId,
-        issueReplyClaimMatch[1],
-        {
-          workerId: worker.binding.id,
-          claimTokenHash: await sha256(input.claimToken),
-          leaseExpiresAt: leaseExpiryFrom(observedAt),
-          updatedAt: observedAt,
-        },
-      );
-      if (!renewed) throw new HttpError(409, "Reply claim is no longer active");
-      const activity = env.CHANNEL_ACTIVITY_REALTIME
-        ? await issueActivityCredential(
-            env,
-            worker.principal.organizationId,
-            renewed,
-            {
-              workerId: worker.binding.id,
-              deviceId: worker.principal.deviceId,
-            },
-          )
-        : null;
-      return json({ leaseExpiresAt: renewed.lease_expires_at, activity });
-    }
-
     const { input, attachments } = await readIssueReplyCompleteRequest(request);
     if (
       (input.executionProposal ||
@@ -625,19 +574,4 @@ export async function handleIssueReplyWorkerRoute(input: {
 
 
   return undefined;
-}
-
-export async function claimNextIssueReplyWork(input: {
-  request: Request;
-  url: URL;
-  claimInput: ReturnType<typeof decodeIssueReplyClaimInput>;
-  db: D1Database;
-  attachmentsBucket: R2Bucket;
-  env: Env;
-  context?: ExecutionContext;
-  authenticatedWorker: AuthenticatedWorkerProject;
-}): Promise<Response> {
-  const response = await handleIssueReplyWorkerRoute(input);
-  if (!response) throw new Error("Issue reply claim route did not respond");
-  return response;
 }
