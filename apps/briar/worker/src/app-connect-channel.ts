@@ -1,4 +1,5 @@
 import {
+  create,
   fromJson,
   type DescEnum,
   type DescField,
@@ -8,8 +9,25 @@ import {
 } from "@bufbuild/protobuf";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import {
+  AcceptChannelExecutionProposalResponseSchema,
+  AcceptChannelProposalResponseSchema,
+  AcceptChannelSkillExecutionProposalResponseSchema,
+  ChannelIssueBatchResultItemSchema,
   ChannelService,
+  DeclineChannelProposalResponse_Outcome,
+  DeclineChannelProposalResponseSchema,
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
+import {
+  AgentSkillExecutionProposalSchema,
+  ProjectAgentSessionSchema,
+} from "@briar/contracts/gen/briar/app/v1/agent_pb";
+import { ApprovalOutcome } from "@briar/contracts/gen/briar/app/v1/common_pb";
+import {
+  IssueExecutionDispatch_DispatchMode,
+  IssueExecutionDispatch_Outcome,
+  IssueExecutionDispatchSchema,
+  IssueExecutionProposalSchema,
+} from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
   Code,
@@ -19,10 +37,27 @@ import {
 } from "@connectrpc/connect";
 import * as Predicate from "effect/Predicate";
 import type { BriarAuth } from "./auth";
-import { handleChannelMessageRoute } from "./channel-message-routes";
-import { handleChannelProposalRoute } from "./channel-proposal-routes";
-import { HttpError } from "./http-response";
-import { handleOrganizationChannelRoute } from "./organization-channel-routes";
+import {
+  createOrganizationChannelMessage,
+  decodeChannelMessageApplicationInput,
+  deleteOrganizationChannelMessage,
+  listOrganizationChannelMessages,
+  setOrganizationChannelThreadSubscription,
+  toggleOrganizationChannelMessageReaction,
+} from "./channel-message-routes";
+import {
+  acceptOrganizationChannelExecutionProposal,
+  acceptOrganizationChannelProposal,
+  acceptOrganizationChannelSkillExecutionProposal,
+  declineOrganizationChannelProposal,
+} from "./channel-proposal-routes";
+import {
+  createOrganizationDirectMessage,
+  getOrganizationChannelDetail,
+  listOrganizationChannels,
+  markOrganizationChannelRead,
+  syncOrganizationChannels,
+} from "./organization-channel-routes";
 import { hasOrganizationCapability } from "./organization-access";
 import { organizationMemberJson } from "./organization-json";
 import {
@@ -52,18 +87,43 @@ export type AppConnectChannelInput = {
   readonly context?: ExecutionContext;
 };
 
-type ChannelRoute = "message" | "organization" | "proposal";
-
 export type AppConnectChannelServices = {
-  readonly handleMessageRoute: typeof handleChannelMessageRoute;
-  readonly handleOrganizationRoute: typeof handleOrganizationChannelRoute;
-  readonly handleProposalRoute: typeof handleChannelProposalRoute;
+  readonly acceptExecutionProposal:
+    typeof acceptOrganizationChannelExecutionProposal;
+  readonly acceptProposal: typeof acceptOrganizationChannelProposal;
+  readonly acceptSkillExecutionProposal:
+    typeof acceptOrganizationChannelSkillExecutionProposal;
+  readonly createDirectMessage: typeof createOrganizationDirectMessage;
+  readonly createMessage: typeof createOrganizationChannelMessage;
+  readonly declineProposal: typeof declineOrganizationChannelProposal;
+  readonly deleteMessage: typeof deleteOrganizationChannelMessage;
+  readonly getChannel: typeof getOrganizationChannelDetail;
+  readonly listChannels: typeof listOrganizationChannels;
+  readonly listMessages: typeof listOrganizationChannelMessages;
+  readonly markRead: typeof markOrganizationChannelRead;
+  readonly requireSession: typeof requireSession;
+  readonly setThreadSubscription:
+    typeof setOrganizationChannelThreadSubscription;
+  readonly syncChannels: typeof syncOrganizationChannels;
+  readonly toggleReaction: typeof toggleOrganizationChannelMessageReaction;
 };
 
-const appConnectChannelServices: AppConnectChannelServices = {
-  handleMessageRoute: handleChannelMessageRoute,
-  handleOrganizationRoute: handleOrganizationChannelRoute,
-  handleProposalRoute: handleChannelProposalRoute,
+export const appConnectChannelServices: AppConnectChannelServices = {
+  acceptExecutionProposal: acceptOrganizationChannelExecutionProposal,
+  acceptProposal: acceptOrganizationChannelProposal,
+  acceptSkillExecutionProposal: acceptOrganizationChannelSkillExecutionProposal,
+  createDirectMessage: createOrganizationDirectMessage,
+  createMessage: createOrganizationChannelMessage,
+  declineProposal: declineOrganizationChannelProposal,
+  deleteMessage: deleteOrganizationChannelMessage,
+  getChannel: getOrganizationChannelDetail,
+  listChannels: listOrganizationChannels,
+  listMessages: listOrganizationChannelMessages,
+  markRead: markOrganizationChannelRead,
+  requireSession,
+  setThreadSubscription: setOrganizationChannelThreadSubscription,
+  syncChannels: syncOrganizationChannels,
+  toggleReaction: toggleOrganizationChannelMessageReaction,
 };
 
 const decodeUuid = decodeRequestSync(UuidString);
@@ -243,80 +303,76 @@ const approvalJson = (approval: {
   workerId: approval.workerId ?? null,
 });
 
-const readResponseJson = async (response: Response): Promise<unknown> => {
-  const value = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message = Predicate.isObject(value) && typeof value.message === "string"
-      ? value.message
-      : `Channel request failed (${response.status})`;
-    throw new HttpError(response.status, message);
-  }
-  return value;
-};
+const approvalOutcome = (value: "accepted" | "already_accepted") =>
+  value === "accepted"
+    ? ApprovalOutcome.ACCEPTED
+    : ApprovalOutcome.ALREADY_ACCEPTED;
 
-const callChannelRoute = async (
-  input: AppConnectChannelInput,
-  services: AppConnectChannelServices,
-  route: ChannelRoute,
-  path: string,
-  method: "GET" | "POST" | "PUT" | "DELETE",
-  body?: unknown,
-) => {
-  const headers = new Headers(input.request.headers);
-  headers.delete("content-length");
-  headers.set("content-type", "application/json");
-  const request = new Request(new URL(path, input.request.url), {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const url = new URL(request.url);
-  const response = route === "message"
-    ? await services.handleMessageRoute({
-        request,
-        url,
-        auth: input.auth,
-        db: input.db,
-        attachmentsBucket: input.attachmentsBucket,
-        env: input.env,
-        context: input.context,
-      })
-    : route === "organization"
-    ? await services.handleOrganizationRoute({
-        request,
-        url,
-        auth: input.auth,
-        db: input.db,
-        attachmentsBucket: input.attachmentsBucket,
-        env: input.env,
-        context: input.context,
-      })
-    : await services.handleProposalRoute({
-        request,
-        url,
-        auth: input.auth,
-        db: input.db,
-        env: input.env,
-      });
-  if (!response) {
-    throw new ConnectError("Channel route is not implemented", Code.Internal);
-  }
-  return readResponseJson(response);
-};
+const executionDispatchMessage = (
+  value: Awaited<
+    ReturnType<typeof acceptOrganizationChannelExecutionProposal>
+  >["dispatch"],
+) => responseMessage(IssueExecutionDispatchSchema, {
+  ...value,
+  dispatchMode: value.dispatchMode === "specific"
+    ? IssueExecutionDispatch_DispatchMode.SPECIFIC
+    : IssueExecutionDispatch_DispatchMode.ANY,
+  outcome: value.outcome === "already_dispatched"
+    ? IssueExecutionDispatch_Outcome.ALREADY_DISPATCHED
+    : IssueExecutionDispatch_Outcome.DISPATCHED,
+});
 
-const organizationPath = (organizationId: string) =>
-  `/organizations/${canonicalUuid(organizationId)}`;
+const acceptProposalMessage = (
+  value: Awaited<ReturnType<typeof acceptOrganizationChannelProposal>>,
+) => create(AcceptChannelProposalResponseSchema, {
+  outcome: approvalOutcome(value.outcome),
+  projectId: value.projectId,
+  resultRunId: value.resultRunId,
+  resultItems: "resultItems" in value
+    ? value.resultItems.map((item) =>
+        create(ChannelIssueBatchResultItemSchema, item)
+      )
+    : [],
+  executionProposal: value.executionProposal
+    ? responseMessage(IssueExecutionProposalSchema, value.executionProposal)
+    : undefined,
+  dispatch: "dispatch" in value && value.dispatch
+    ? executionDispatchMessage(value.dispatch)
+    : undefined,
+});
 
-const channelPath = (organizationId: string, channelId: string) =>
-  `${organizationPath(organizationId)}/channels/${canonicalUuid(channelId)}`;
+const acceptExecutionProposalMessage = (
+  value: Awaited<
+    ReturnType<typeof acceptOrganizationChannelExecutionProposal>
+  >,
+) => create(AcceptChannelExecutionProposalResponseSchema, {
+  proposal: responseMessage(IssueExecutionProposalSchema, value.proposal),
+  outcome: approvalOutcome(value.outcome),
+  projectId: value.projectId,
+  runId: value.runId,
+  dispatch: executionDispatchMessage(value.dispatch),
+});
 
-const messagePath = (
-  organizationId: string,
-  channelId: string,
-  messageId?: string,
-) => `${channelPath(organizationId, channelId)}/messages${
-  messageId ? `/${canonicalUuid(messageId)}` : ""
-}`;
+const declineProposalMessage = (
+  value: Awaited<ReturnType<typeof declineOrganizationChannelProposal>>,
+) => create(DeclineChannelProposalResponseSchema, {
+  outcome: value.outcome === "declined"
+    ? DeclineChannelProposalResponse_Outcome.DECLINED
+    : DeclineChannelProposalResponse_Outcome.ALREADY_DECLINED,
+});
+
+const acceptSkillExecutionProposalMessage = (
+  value: Awaited<
+    ReturnType<typeof acceptOrganizationChannelSkillExecutionProposal>
+  >,
+) => create(AcceptChannelSkillExecutionProposalResponseSchema, {
+  outcome: approvalOutcome(value.outcome),
+  proposal: responseMessage(AgentSkillExecutionProposalSchema, value.proposal),
+  projectId: value.projectId,
+  session: value.session
+    ? responseMessage(ProjectAgentSessionSchema, value.session)
+    : undefined,
+});
 
 const scheduleChannelMutation = (
   input: AppConnectChannelInput,
@@ -333,13 +389,12 @@ const createAppChannelService = (
   services: AppConnectChannelServices = appConnectChannelServices,
 ): ServiceImpl<typeof ChannelService> => ({
   listChannels: (request) => rpc(async () => {
-    const result = await callChannelRoute(
-      input,
-      services,
-      "organization",
-      `${organizationPath(request.organizationId)}/channels`,
-      "GET",
-    );
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.listChannels({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      userId: session.user.id,
+    });
     return responseMessage(ChannelService.method.listChannels.output, result);
   }),
 
@@ -347,27 +402,26 @@ const createAppChannelService = (
     if (request.cursor > BigInt(Number.MAX_SAFE_INTEGER)) {
       throw new ConnectError("Invalid channel cursor", Code.InvalidArgument);
     }
-    const query = new URLSearchParams({ since: request.cursor.toString() });
-    const result = await callChannelRoute(
-      input,
-      services,
-      "organization",
-      `${organizationPath(request.organizationId)}/channel-changes?${query}`,
-      "GET",
-    );
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.syncChannels({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      userId: session.user.id,
+      since: Number(request.cursor),
+    });
     return responseMessage(ChannelService.method.syncChannels.output, result);
   }),
 
   listDirectMessageRecipients: (request) => rpc(async () => {
     const organizationId = canonicalUuid(request.organizationId);
-    const session = await requireSession(input.auth, input.request);
+    const session = await services.requireSession(input.auth, input.request);
     const role = await getOrganizationRole(
       input.db,
       organizationId,
       session.user.id,
     );
     if (!hasOrganizationCapability(role, "organization:read")) {
-      throw new HttpError(404, "Organization not found");
+      throw new ConnectError("Organization not found", Code.NotFound);
     }
     const [members, agents] = await Promise.all([
       listOrganizationMembers(input.db, organizationId),
@@ -383,74 +437,71 @@ const createAppChannelService = (
   }),
 
   createDirectMessage: (request) => rpc(async () => {
-    const result = await callChannelRoute(
-      input,
-      services,
-      "organization",
-      `${organizationPath(request.organizationId)}/dms`,
-      "POST",
-      { memberIds: request.memberIds, agentIds: request.agentIds },
-    );
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.createDirectMessage({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      userId: session.user.id,
+      request: { memberIds: request.memberIds, agentIds: request.agentIds },
+    });
     scheduleChannelMutation(input, request.organizationId);
     return responseMessage(ChannelService.method.createDirectMessage.output, result);
   }),
 
   getChannel: (request) => rpc(async () => {
-    const query = request.messageLimit === undefined
-      ? ""
-      : `?${new URLSearchParams({ limit: String(request.messageLimit) })}`;
-    const result = await callChannelRoute(
-      input,
-      services,
-      "organization",
-      `${channelPath(request.organizationId, request.channelId)}${query}`,
-      "GET",
-    );
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.getChannel({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      userId: session.user.id,
+      messageLimit: request.messageLimit ?? null,
+    });
     return responseMessage(ChannelService.method.getChannel.output, result);
   }),
 
   markChannelRead: (request) => rpc(async () => {
-    const result = await callChannelRoute(
-      input,
-      services,
-      "organization",
-      `${channelPath(request.organizationId, request.channelId)}/read`,
-      "PUT",
-      {
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.markRead({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      userId: session.user.id,
+      request: {
         lastReadAt: request.lastReadAt
           ? timestampDate(request.lastReadAt).toISOString()
           : undefined,
       },
-    );
+    });
     scheduleChannelMutation(input, request.organizationId);
     return responseMessage(ChannelService.method.markChannelRead.output, result);
   }),
 
   listChannelMessages: (request) => rpc(async () => {
-    const query = new URLSearchParams();
-    if (request.parentMessageId) query.set("parentMessageId", request.parentMessageId);
-    if (request.cursor) query.set("cursor", request.cursor);
-    if (request.limit !== undefined) query.set("limit", String(request.limit));
-    const result = await callChannelRoute(
-      input,
-      services,
-      "message",
-      `${messagePath(request.organizationId, request.channelId)}${
-        query.size ? `?${query}` : ""
-      }`,
-      "GET",
-    );
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.listMessages({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      userId: session.user.id,
+      parentMessageId: request.parentMessageId,
+      cursor: request.cursor,
+      limit: request.limit,
+    });
     return responseMessage(ChannelService.method.listChannelMessages.output, result);
   }),
 
   createChannelMessage: (request) => rpc(async () => {
-    const result = await callChannelRoute(
-      input,
-      services,
-      "message",
-      messagePath(request.organizationId, request.channelId),
-      "POST",
-      {
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.createMessage({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      userId: session.user.id,
+      attachmentsBucket: input.attachmentsBucket,
+      attachments: [],
+      attachmentReferences: request.attachmentReferences,
+      request: decodeChannelMessageApplicationInput({
         clientMessageId: canonicalUuid(request.clientMessageId),
         body: request.body,
         parentMessageId: request.parentMessageId ?? null,
@@ -458,34 +509,38 @@ const createAppChannelService = (
         mentionedAgentIds: request.mentionedAgentIds,
         skillId: request.skillId ?? null,
         preferredDeviceId: request.preferredDeviceId ?? null,
-        attachmentReferences: request.attachmentReferences,
-      },
-    );
+      }),
+    });
     scheduleChannelMutation(input, request.organizationId);
     return responseMessage(ChannelService.method.createChannelMessage.output, result);
   }),
 
   deleteChannelMessage: (request) => rpc(async () => {
-    const result = await callChannelRoute(
-      input,
-      services,
-      "message",
-      messagePath(request.organizationId, request.channelId, request.messageId),
-      "DELETE",
-    );
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.deleteMessage({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      messageId: canonicalUuid(request.messageId),
+      userId: session.user.id,
+      attachmentsBucket: input.attachmentsBucket,
+      env: input.env,
+      context: input.context,
+    });
     scheduleChannelMutation(input, request.organizationId);
     return responseMessage(ChannelService.method.deleteChannelMessage.output, result);
   }),
 
   toggleChannelMessageReaction: (request) => rpc(async () => {
-    const result = await callChannelRoute(
-      input,
-      services,
-      "message",
-      `${messagePath(request.organizationId, request.channelId, request.messageId)}/reactions`,
-      "PUT",
-      { emoji: request.emoji },
-    );
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.toggleReaction({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      messageId: canonicalUuid(request.messageId),
+      userId: session.user.id,
+      request: { emoji: request.emoji },
+    });
     scheduleChannelMutation(input, request.organizationId);
     return responseMessage(
       ChannelService.method.toggleChannelMessageReaction.output,
@@ -494,17 +549,15 @@ const createAppChannelService = (
   }),
 
   setChannelThreadSubscription: (request) => rpc(async () => {
-    const result = await callChannelRoute(
-      input,
-      services,
-      "message",
-      `${messagePath(
-        request.organizationId,
-        request.channelId,
-        request.rootMessageId,
-      )}/subscription`,
-      request.subscribed ? "PUT" : "DELETE",
-    );
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.setThreadSubscription({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      rootMessageId: canonicalUuid(request.rootMessageId),
+      userId: session.user.id,
+      subscribed: request.subscribed,
+    });
     scheduleChannelMutation(input, request.organizationId);
     return responseMessage(
       ChannelService.method.setChannelThreadSubscription.output,
@@ -513,21 +566,21 @@ const createAppChannelService = (
   }),
 
   acceptChannelProposal: (request) => rpc(async () => {
-    const result = await callChannelRoute(
-      input,
-      services,
-      "proposal",
-      `${channelPath(request.organizationId, request.channelId)}/proposals/${
-        canonicalUuid(request.proposalId)
-      }/accept`,
-      "POST",
-      {
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.acceptProposal({
+      db: input.db,
+      env: input.env,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      proposalId: canonicalUuid(request.proposalId),
+      userId: session.user.id,
+      request: {
         projectId: request.projectId ?? null,
         execution: request.execution ? approvalJson(request.execution) : null,
       },
-    );
+    });
     scheduleChannelMutation(input, request.organizationId);
-    if (Predicate.isObject(result) && typeof result.projectId === "string") {
+    if (result.projectId) {
       scheduleProjectRealtimePublish(
         input.env,
         input.db,
@@ -535,25 +588,25 @@ const createAppChannelService = (
         input.context,
       );
     }
-    return responseMessage(ChannelService.method.acceptChannelProposal.output, result);
+    return acceptProposalMessage(result);
   }),
 
   acceptChannelExecutionProposal: (request) => rpc(async () => {
     if (!request.approval) {
       throw new ConnectError("approval is required", Code.InvalidArgument);
     }
-    const result = await callChannelRoute(
-      input,
-      services,
-      "proposal",
-      `${channelPath(request.organizationId, request.channelId)}/proposals/${
-        canonicalUuid(request.proposalId)
-      }/accept-execution`,
-      "POST",
-      approvalJson(request.approval),
-    );
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.acceptExecutionProposal({
+      db: input.db,
+      env: input.env,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      proposalId: canonicalUuid(request.proposalId),
+      userId: session.user.id,
+      request: approvalJson(request.approval),
+    });
     scheduleChannelMutation(input, request.organizationId);
-    if (Predicate.isObject(result) && typeof result.projectId === "string") {
+    if (result.projectId) {
       scheduleProjectRealtimePublish(
         input.env,
         input.db,
@@ -561,43 +614,39 @@ const createAppChannelService = (
         input.context,
       );
     }
-    return responseMessage(
-      ChannelService.method.acceptChannelExecutionProposal.output,
-      result,
-    );
+    return acceptExecutionProposalMessage(result);
   }),
 
   declineChannelProposal: (request) => rpc(async () => {
-    const result = await callChannelRoute(
-      input,
-      services,
-      "proposal",
-      `${channelPath(request.organizationId, request.channelId)}/proposals/${
-        canonicalUuid(request.proposalId)
-      }/decline`,
-      "POST",
-    );
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.declineProposal({
+      db: input.db,
+      env: input.env,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      proposalId: canonicalUuid(request.proposalId),
+      userId: session.user.id,
+    });
     scheduleChannelMutation(input, request.organizationId);
-    return responseMessage(ChannelService.method.declineChannelProposal.output, result);
+    return declineProposalMessage(result);
   }),
 
   acceptChannelSkillExecutionProposal: (request) => rpc(async () => {
-    const result = await callChannelRoute(
-      input,
-      services,
-      "proposal",
-      `${channelPath(
-        request.organizationId,
-        request.channelId,
-      )}/skill-execution-proposals/${canonicalUuid(request.proposalId)}/accept`,
-      "POST",
-      { workerId: request.workerId },
-    );
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.acceptSkillExecutionProposal({
+      db: input.db,
+      env: input.env,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      proposalId: canonicalUuid(request.proposalId),
+      userId: session.user.id,
+      request: { workerId: request.workerId ?? null },
+    });
     scheduleChannelMutation(input, request.organizationId);
-    if (Predicate.isObject(result) && typeof result.projectId === "string") {
+    if (result.projectId) {
       const projectId = canonicalUuid(result.projectId);
       scheduleProjectRealtimePublish(input.env, input.db, projectId, input.context);
-      if (result.session !== null && result.session !== undefined) {
+      if (result.session) {
         scheduleProjectAgentSessionRealtimePublish(
           input.env,
           input.db,
@@ -606,10 +655,7 @@ const createAppChannelService = (
         );
       }
     }
-    return responseMessage(
-      ChannelService.method.acceptChannelSkillExecutionProposal.output,
-      result,
-    );
+    return acceptSkillExecutionProposalMessage(result);
   }),
 });
 

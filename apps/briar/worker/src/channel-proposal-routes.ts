@@ -318,6 +318,552 @@ export type ChannelProposalRouteInput = {
   env: Env;
 };
 
+type ChannelProposalApplicationInput = {
+  db: D1Database;
+  env: Env;
+  organizationId: string;
+  channelId: string;
+  proposalId: string;
+  userId: string;
+};
+
+export async function declineOrganizationChannelProposal(
+  input: ChannelProposalApplicationInput,
+) {
+  const channel = await requireChannelAccess(
+    input.db,
+    input.organizationId,
+    input.channelId,
+    input.userId,
+  );
+  const proposal = await getChannelActionProposal(
+    input.db,
+    channel.id,
+    input.proposalId,
+  );
+  if (!proposal) throw new HttpError(404, "Proposal not found");
+  if (proposal.action_type !== "request_issue_create") {
+    throw new HttpError(409, "This proposal cannot be declined");
+  }
+  if (proposal.status === "accepted") {
+    throw new HttpError(409, "Accepted proposals cannot be declined");
+  }
+  if (proposal.status === "declined") {
+    return { outcome: "already_declined" as const };
+  }
+  const declined = await declineChannelActionProposal(input.db, {
+    channelId: channel.id,
+    proposalId: proposal.id,
+    userId: input.userId,
+    declinedAt: new Date().toISOString(),
+  });
+  if (!declined) {
+    const current = await getChannelActionProposal(
+      input.db,
+      channel.id,
+      proposal.id,
+    );
+    if (current?.status === "declined") {
+      return { outcome: "already_declined" as const };
+    }
+    throw new HttpError(409, "Proposal changed");
+  }
+  return { outcome: "declined" as const };
+}
+
+export async function acceptOrganizationChannelExecutionProposal(
+  input: ChannelProposalApplicationInput & { request: unknown },
+) {
+  const channel = await requireChannelAccess(
+    input.db,
+    input.organizationId,
+    input.channelId,
+    input.userId,
+  );
+  if (!(await channelExecutionProposalTablesAvailable(input.db))) {
+    throw new HttpError(
+      503,
+      "Issue execution approval is not available during this upgrade",
+      "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
+    );
+  }
+  const proposal = await getChannelExecutionProposal(input.db, {
+    organizationId: channel.organization_id,
+    channelId: channel.id,
+    proposalId: input.proposalId,
+    userId: input.userId,
+  });
+  if (!proposal) throw new HttpError(404, "Execution proposal not found");
+  const request = decodeChannelExecutionProposalAcceptInput(input.request);
+  decodeExecutionPreferences({
+    provider: request.provider,
+    model: request.model,
+    effort: request.effort,
+  });
+  const project = await getProject(input.db, proposal.project_id, input.userId);
+  if (!project || project.organization_id !== channel.organization_id) {
+    throw new HttpError(404, "Project not found");
+  }
+  return approveChannelExecutionProposalRequest({
+    db: input.db,
+    channel,
+    project,
+    proposal,
+    userId: input.userId,
+    selection: request,
+  });
+}
+
+export async function acceptOrganizationChannelSkillExecutionProposal(
+  input: ChannelProposalApplicationInput & { request: unknown },
+) {
+  const channel = await requireChannelAccess(
+    input.db,
+    input.organizationId,
+    input.channelId,
+    input.userId,
+  );
+  if (!(await channelSkillExecutionProposalTablesAvailable(input.db))) {
+    throw new HttpError(
+      503,
+      "Agent Skill execution approval is not available during this upgrade",
+      "AGENT_SKILL_EXECUTION_APPROVAL_UNAVAILABLE",
+    );
+  }
+  const loadProposal = () => getChannelAgentSkillExecutionProposal(input.db, {
+    organizationId: channel.organization_id,
+    channelId: channel.id,
+    proposalId: input.proposalId,
+    userId: input.userId,
+  });
+  const proposal = await loadProposal();
+  if (!proposal) {
+    throw new HttpError(404, "Agent Skill execution proposal not found");
+  }
+  const request = decodeAgentSkillExecutionProposalAcceptInput(input.request);
+  const project = await getProject(input.db, proposal.project_id, input.userId);
+  if (!project || project.organization_id !== channel.organization_id) {
+    throw new HttpError(404, "Project not found");
+  }
+  if (proposal.status === "pending" && channel.archived_at) {
+    throw new HttpError(
+      409,
+      "Channel is archived",
+      "CHANNEL_SKILL_EXECUTION_PROPOSAL_STALE",
+    );
+  }
+  return approveAgentSkillExecutionProposal(
+    input.db,
+    input.env.ARCHIVES,
+    proposal,
+    {
+      sourceKind: "channel",
+      userId: input.userId,
+      workerId: request.workerId,
+      staleCode: "CHANNEL_SKILL_EXECUTION_PROPOSAL_STALE",
+      conflictCode: "CHANNEL_SKILL_EXECUTION_PROPOSAL_CONFLICT",
+      reload: loadProposal,
+    },
+  );
+}
+
+export async function acceptOrganizationChannelProposal(
+  input: ChannelProposalApplicationInput & { request: unknown },
+) {
+  const channel = await requireChannelAccess(
+    input.db,
+    input.organizationId,
+    input.channelId,
+    input.userId,
+  );
+  const proposal = await getChannelActionProposal(
+    input.db,
+    channel.id,
+    input.proposalId,
+  );
+  if (!proposal) throw new HttpError(404, "Proposal not found");
+  if (proposal.action_type !== "request_issue_create") {
+    throw new HttpError(409, "This proposal cannot create an issue");
+  }
+  if (proposal.status === "declined") {
+    throw new HttpError(409, "Declined proposals cannot create an issue");
+  }
+  assertChannelProposalAuthorScope({
+    channelOrganizationId: channel.organization_id,
+    proposedProjectId: proposal.project_id,
+    replyAuthorAgentId: proposal.reply_author_agent_id,
+    replyAuthorAgentOrganizationId: proposal.reply_author_agent_organization_id,
+    replyAuthorAgentProjectId: proposal.reply_author_agent_project_id,
+  });
+  const request = decodeChannelProposalAcceptInput(input.request);
+  const rawProposalPayload: unknown = JSON.parse(proposal.payload_json);
+  // A batch marker is authoritative even if its contents are malformed. It
+  // must never fall through to the single-issue decoder.
+  const isBatchPayload = typeof rawProposalPayload === "object" &&
+    rawProposalPayload !== null && "batch" in rawProposalPayload;
+  const batchPayload = isBatchPayload
+    ? decodeChannelIssueBatchProposalPayload(rawProposalPayload)
+    : null;
+  if (batchPayload && request.execution) {
+    throw new HttpError(400, "Issue batches cannot be executed on creation");
+  }
+  if (
+    batchPayload &&
+    !(await channelIssueBatchProposalTablesAvailable(input.db))
+  ) {
+    throw new HttpError(
+      503,
+      "Issue batch approval is not available during this upgrade",
+      "ISSUE_BATCH_APPROVAL_UNAVAILABLE",
+    );
+  }
+  if (request.execution && proposal.execute_after_create !== 1) {
+    throw new HttpError(
+      400,
+      "Execution settings require a create-and-execute proposal",
+    );
+  }
+  if (
+    request.execution &&
+    !(await channelExecutionProposalTablesAvailable(input.db))
+  ) {
+    throw new HttpError(
+      503,
+      "Issue execution approval is not available during this upgrade",
+      "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
+    );
+  }
+  const targetProjectId = resolveChannelProposalTargetProjectId({
+    requestedProjectId: request.projectId,
+    proposedProjectId: proposal.project_id,
+    defaultProjectId: channel.default_project_id,
+  });
+  if (!targetProjectId) {
+    throw new HttpError(400, "A target project is required");
+  }
+  const organizationProject = await getOrganizationProject(
+    input.db,
+    channel.organization_id,
+    targetProjectId,
+  );
+  if (!organizationProject) throw new HttpError(404, "Project not found");
+  const project = await getProject(input.db, targetProjectId, input.userId);
+  if (!project || project.organization_id !== channel.organization_id) {
+    throw new HttpError(404, "Project not found");
+  }
+  if (batchPayload) {
+    const acceptedBatchResponse = async (
+      current: NonNullable<Awaited<ReturnType<typeof getChannelActionProposal>>>,
+      outcome: "accepted" | "already_accepted",
+    ) => {
+      if (!current.project_id || !current.result_run_id) {
+        throw new HttpError(409, "Accepted batch proposal is missing its result");
+      }
+      const resultItems = await listChannelIssueBatchItems(input.db, current.id);
+      if (
+        resultItems.length !== batchPayload.batch.items.length ||
+        resultItems.some((item, index) =>
+          item.localKey !== batchPayload.batch.items[index]?.key
+        )
+      ) {
+        throw new HttpError(409, "Accepted batch proposal mapping is incomplete");
+      }
+      return {
+        outcome,
+        projectId: current.project_id,
+        resultRunId: current.result_run_id,
+        resultItems,
+        executionProposal: null,
+      };
+    };
+    if (proposal.status === "accepted") {
+      return acceptedBatchResponse(proposal, "already_accepted");
+    }
+    if (channel.archived_at) {
+      throw new HttpError(409, "Channel is archived");
+    }
+    const approvedAt = new Date().toISOString();
+    const reservation = await reserveChannelActionProposalApproval(input.db, {
+      organizationId: channel.organization_id,
+      channelId: channel.id,
+      proposalId: proposal.id,
+      projectId: project.id,
+      userId: input.userId,
+      approvedAt,
+      issueSourceKey: newChannelBatchProposalIssueSourceKey(),
+    });
+    if (!reservation) {
+      const current = await getChannelActionProposal(
+        input.db,
+        channel.id,
+        proposal.id,
+      );
+      if (current?.status === "accepted") {
+        return acceptedBatchResponse(current, "already_accepted");
+      }
+      if (
+        current?.status === "pending" && current.project_id &&
+        current.project_id !== project.id
+      ) {
+        throw new HttpError(
+          409,
+          "The proposal was already approved for another project",
+        );
+      }
+      throw new HttpError(409, "Proposal changed");
+    }
+    try {
+      await materializeChannelIssueBatch({
+        db: input.db,
+        project,
+        organizationId: channel.organization_id,
+        channelId: channel.id,
+        proposalId: proposal.id,
+        messageId: proposal.reply_message_id,
+        rootMessageId: proposal.reply_parent_message_id,
+        proposalPayloadJson: proposal.payload_json,
+        proposalCreatedAt: proposal.created_at,
+        approvedAt: reservation.accepted_at,
+        approvedByUserId: reservation.accepted_by_user_id,
+        reservationSourceKey: reservation.issue_source_key,
+        batch: batchPayload.batch,
+      });
+    } catch (error) {
+      const current = await getChannelActionProposal(
+        input.db,
+        channel.id,
+        proposal.id,
+      );
+      if (current?.status === "accepted") {
+        return acceptedBatchResponse(current, "already_accepted");
+      }
+      throw error;
+    }
+    const finalized = await getChannelActionProposal(
+      input.db,
+      channel.id,
+      proposal.id,
+    );
+    if (
+      finalized?.status !== "accepted" ||
+      finalized.project_id !== project.id ||
+      finalized.issue_source_key !== reservation.issue_source_key
+    ) {
+      throw new HttpError(409, "Batch proposal approval was not finalized");
+    }
+    return acceptedBatchResponse(finalized, "accepted");
+  }
+  if (proposal.status === "accepted") {
+    if (!proposal.project_id || !proposal.result_run_id) {
+      throw new HttpError(409, "Accepted proposal is missing its result");
+    }
+    const executionProposal = proposal.execution_proposal_id
+      ? await getChannelExecutionProposal(input.db, {
+          organizationId: channel.organization_id,
+          channelId: channel.id,
+          proposalId: proposal.execution_proposal_id,
+          userId: input.userId,
+        })
+      : null;
+    if (request.execution) {
+      if (!executionProposal) {
+        throw new HttpError(
+          409,
+          "The created issue has no retryable execution proposal",
+          "CHANNEL_EXECUTION_PROPOSAL_STALE",
+        );
+      }
+      const execution = await approveChannelExecutionProposalRequest({
+        db: input.db,
+        channel,
+        project,
+        proposal: executionProposal,
+        userId: input.userId,
+        selection: request.execution,
+      });
+      return {
+        outcome: "already_accepted" as const,
+        projectId: proposal.project_id,
+        resultRunId: proposal.result_run_id,
+        executionProposal: execution.proposal,
+        dispatch: execution.dispatch,
+      };
+    }
+    return {
+      outcome: "already_accepted" as const,
+      projectId: proposal.project_id,
+      resultRunId: proposal.result_run_id,
+      executionProposal: liveIssueExecutionProposalJson(executionProposal),
+    };
+  }
+  if (channel.archived_at) {
+    throw new HttpError(409, "Channel is archived");
+  }
+  const payload = decodeChannelIssueProposalPayload(rawProposalPayload);
+  const approvedAt = new Date().toISOString();
+  if (request.execution) {
+    decodeExecutionPreferences({
+      provider: request.execution.provider,
+      model: request.execution.model,
+      effort: request.execution.effort,
+    });
+    try {
+      await assertExecutionSelectionAvailable(
+        input.db,
+        channel.organization_id,
+        project.id,
+        { ...request.execution, observedAt: approvedAt },
+      );
+    } catch (error) {
+      if (error instanceof WorkerConflictError) {
+        throw new HttpError(
+          409,
+          error.message,
+          "CHANNEL_EXECUTION_PROPOSAL_CONFLICT",
+        );
+      }
+      throw error;
+    }
+  }
+  const reservation = await reserveChannelActionProposalApproval(input.db, {
+    organizationId: channel.organization_id,
+    channelId: channel.id,
+    proposalId: proposal.id,
+    projectId: project.id,
+    userId: input.userId,
+    approvedAt,
+    issueSourceKey: newChannelProposalIssueSourceKey(),
+  });
+  if (!reservation) {
+    const current = await getChannelActionProposal(
+      input.db,
+      channel.id,
+      proposal.id,
+    );
+    if (
+      current?.status === "accepted" &&
+      current.project_id &&
+      current.result_run_id
+    ) {
+      const executionProposal = current.execution_proposal_id
+        ? await getChannelExecutionProposal(input.db, {
+            organizationId: channel.organization_id,
+            channelId: channel.id,
+            proposalId: current.execution_proposal_id,
+            userId: input.userId,
+          })
+        : null;
+      if (request.execution) {
+        if (!executionProposal) {
+          throw new HttpError(
+            409,
+            "The created issue has no retryable execution proposal",
+            "CHANNEL_EXECUTION_PROPOSAL_STALE",
+          );
+        }
+        const execution = await approveChannelExecutionProposalRequest({
+          db: input.db,
+          channel,
+          project,
+          proposal: executionProposal,
+          userId: input.userId,
+          selection: request.execution,
+        });
+        return {
+          outcome: "already_accepted" as const,
+          projectId: current.project_id,
+          resultRunId: current.result_run_id,
+          executionProposal: execution.proposal,
+          dispatch: execution.dispatch,
+        };
+      }
+      return {
+        outcome: "already_accepted" as const,
+        projectId: current.project_id,
+        resultRunId: current.result_run_id,
+        executionProposal: liveIssueExecutionProposalJson(executionProposal),
+      };
+    }
+    if (
+      current?.status === "pending" && current.project_id &&
+      current.project_id !== project.id
+    ) {
+      throw new HttpError(
+        409,
+        "The proposal was already approved for another project",
+      );
+    }
+    throw new HttpError(409, "Proposal changed");
+  }
+  const approvedIssue = approvedIssueCreation(payload.issue);
+  const resultRunId = await createApprovedChannelProposalIssue({
+    db: input.db,
+    project,
+    organizationId: channel.organization_id,
+    sourceKey: reservation.issue_source_key,
+    proposalId: proposal.id,
+    channelId: channel.id,
+    messageId: proposal.reply_message_id,
+    rootMessageId: proposal.reply_parent_message_id,
+    title: approvedIssue.title,
+    description: approvedIssue.description,
+    priority: approvedIssue.priority,
+    createdByUserId: reservation.accepted_by_user_id,
+    occurredAt: proposal.created_at,
+  });
+  const finalized = await getChannelActionProposal(
+    input.db,
+    channel.id,
+    proposal.id,
+  );
+  if (
+    finalized?.status !== "accepted" ||
+    finalized.project_id !== project.id ||
+    finalized.result_run_id !== resultRunId ||
+    finalized.issue_source_key !== reservation.issue_source_key
+  ) {
+    throw new HttpError(409, "Proposal approval was not finalized");
+  }
+  const executionProposal = finalized.execution_proposal_id
+    ? await getChannelExecutionProposal(input.db, {
+        organizationId: channel.organization_id,
+        channelId: channel.id,
+        proposalId: finalized.execution_proposal_id,
+        userId: input.userId,
+      })
+    : null;
+  if (request.execution) {
+    if (!executionProposal) {
+      throw new HttpError(
+        409,
+        "The created issue has no execution proposal",
+        "CHANNEL_EXECUTION_PROPOSAL_STALE",
+      );
+    }
+    const execution = await approveChannelExecutionProposalRequest({
+      db: input.db,
+      channel,
+      project,
+      proposal: executionProposal,
+      userId: input.userId,
+      selection: request.execution,
+    });
+    return {
+      outcome: "accepted" as const,
+      projectId: project.id,
+      resultRunId,
+      executionProposal: execution.proposal,
+      dispatch: execution.dispatch,
+    };
+  }
+  return {
+    outcome: "accepted" as const,
+    projectId: project.id,
+    resultRunId,
+    executionProposal: liveIssueExecutionProposalJson(executionProposal),
+  };
+}
+
 export async function handleChannelProposalRoute(
   routeInput: ChannelProposalRouteInput,
 ): Promise<Response | undefined> {
@@ -329,45 +875,14 @@ export async function handleChannelProposalRoute(
   );
   if (channelProposalDeclineMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const channel = await requireChannelAccess(
+    return json(await declineOrganizationChannelProposal({
       db,
-      channelProposalDeclineMatch[1],
-      channelProposalDeclineMatch[2],
-      session.user.id,
-    );
-    const proposal = await getChannelActionProposal(
-      db,
-      channel.id,
-      channelProposalDeclineMatch[3],
-    );
-    if (!proposal) throw new HttpError(404, "Proposal not found");
-    if (proposal.action_type !== "request_issue_create") {
-      throw new HttpError(409, "This proposal cannot be declined");
-    }
-    if (proposal.status === "accepted") {
-      throw new HttpError(409, "Accepted proposals cannot be declined");
-    }
-    if (proposal.status === "declined") {
-      return json({ outcome: "already_declined" as const });
-    }
-    const declined = await declineChannelActionProposal(db, {
-      channelId: channel.id,
-      proposalId: proposal.id,
+      env,
+      organizationId: channelProposalDeclineMatch[1],
+      channelId: channelProposalDeclineMatch[2],
+      proposalId: channelProposalDeclineMatch[3],
       userId: session.user.id,
-      declinedAt: new Date().toISOString(),
-    });
-    if (!declined) {
-      const current = await getChannelActionProposal(
-        db,
-        channel.id,
-        proposal.id,
-      );
-      if (current?.status === "declined") {
-        return json({ outcome: "already_declined" as const });
-      }
-      throw new HttpError(409, "Proposal changed");
-    }
-    return json({ outcome: "declined" as const });
+    }));
   }
 
   const channelProposalAcceptMatch = pathname.match(
@@ -375,404 +890,15 @@ export async function handleChannelProposalRoute(
   );
   if (channelProposalAcceptMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const channel = await requireChannelAccess(
+    return json(await acceptOrganizationChannelProposal({
       db,
-      channelProposalAcceptMatch[1],
-      channelProposalAcceptMatch[2],
-      session.user.id,
-    );
-    const proposal = await getChannelActionProposal(
-      db,
-      channel.id,
-      channelProposalAcceptMatch[3],
-    );
-    if (!proposal) throw new HttpError(404, "Proposal not found");
-    if (proposal.action_type !== "request_issue_create") {
-      throw new HttpError(409, "This proposal cannot create an issue");
-    }
-    if (proposal.status === "declined") {
-      throw new HttpError(409, "Declined proposals cannot create an issue");
-    }
-    assertChannelProposalAuthorScope({
-      channelOrganizationId: channel.organization_id,
-      proposedProjectId: proposal.project_id,
-      replyAuthorAgentId: proposal.reply_author_agent_id,
-      replyAuthorAgentOrganizationId:
-        proposal.reply_author_agent_organization_id,
-      replyAuthorAgentProjectId: proposal.reply_author_agent_project_id,
-    });
-    const input = decodeChannelProposalAcceptInput(await readJson(request));
-    const rawProposalPayload: unknown = JSON.parse(proposal.payload_json);
-    // Treat the presence of `batch` as authoritative even when its contents
-    // are malformed. Falling through to the legacy single-issue decoder would
-    // otherwise risk accepting a mixed or corrupted payload as one issue.
-    const isBatchPayload = typeof rawProposalPayload === "object" &&
-      rawProposalPayload !== null && "batch" in rawProposalPayload;
-    const batchPayload = isBatchPayload
-      ? decodeChannelIssueBatchProposalPayload(rawProposalPayload)
-      : null;
-    if (batchPayload && input.execution) {
-      throw new HttpError(400, "Issue batches cannot be executed on creation");
-    }
-    if (
-      batchPayload &&
-      !(await channelIssueBatchProposalTablesAvailable(db))
-    ) {
-      throw new HttpError(
-        503,
-        "Issue batch approval is not available during this upgrade",
-        "ISSUE_BATCH_APPROVAL_UNAVAILABLE",
-      );
-    }
-    if (input.execution && proposal.execute_after_create !== 1) {
-      throw new HttpError(
-        400,
-        "Execution settings require a create-and-execute proposal",
-      );
-    }
-    if (
-      input.execution &&
-      !(await channelExecutionProposalTablesAvailable(db))
-    ) {
-      throw new HttpError(
-        503,
-        "Issue execution approval is not available during this upgrade",
-        "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
-      );
-    }
-    // A Project Agent's proposal is already bound to its authoritative
-    // project. Only an organization-scoped proposal may be assigned at
-    // approval time, and every target must stay inside this channel's org.
-    const targetProjectId = resolveChannelProposalTargetProjectId({
-      requestedProjectId: input.projectId,
-      proposedProjectId: proposal.project_id,
-      defaultProjectId: channel.default_project_id,
-    });
-    if (!targetProjectId) {
-      throw new HttpError(400, "A target project is required");
-    }
-    const organizationProject = await getOrganizationProject(
-      db,
-      channel.organization_id,
-      targetProjectId,
-    );
-    if (!organizationProject) throw new HttpError(404, "Project not found");
-    const project = await getProject(db, targetProjectId, session.user.id);
-    if (!project || project.organization_id !== channel.organization_id) {
-      throw new HttpError(404, "Project not found");
-    }
-    if (batchPayload) {
-      const acceptedBatchResponse = async (
-        current: NonNullable<Awaited<ReturnType<typeof getChannelActionProposal>>>,
-        outcome: "accepted" | "already_accepted",
-      ) => {
-        if (!current.project_id || !current.result_run_id) {
-          throw new HttpError(409, "Accepted batch proposal is missing its result");
-        }
-        const resultItems = await listChannelIssueBatchItems(db, current.id);
-        if (
-          resultItems.length !== batchPayload.batch.items.length ||
-          resultItems.some((item, index) =>
-            item.localKey !== batchPayload.batch.items[index]?.key
-          )
-        ) {
-          throw new HttpError(409, "Accepted batch proposal mapping is incomplete");
-        }
-        return json({
-          outcome,
-          projectId: current.project_id,
-          resultRunId: current.result_run_id,
-          resultItems,
-          executionProposal: null,
-        });
-      };
-      if (proposal.status === "accepted") {
-        return acceptedBatchResponse(proposal, "already_accepted");
-      }
-      if (channel.archived_at) {
-        throw new HttpError(409, "Channel is archived");
-      }
-      const approvedAt = new Date().toISOString();
-      const reservation = await reserveChannelActionProposalApproval(db, {
-        organizationId: channel.organization_id,
-        channelId: channel.id,
-        proposalId: proposal.id,
-        projectId: project.id,
-        userId: session.user.id,
-        approvedAt,
-        issueSourceKey: newChannelBatchProposalIssueSourceKey(),
-      });
-      if (!reservation) {
-        const current = await getChannelActionProposal(
-          db,
-          channel.id,
-          proposal.id,
-        );
-        if (current?.status === "accepted") {
-          return acceptedBatchResponse(current, "already_accepted");
-        }
-        if (
-          current?.status === "pending" && current.project_id &&
-          current.project_id !== project.id
-        ) {
-          throw new HttpError(
-            409,
-            "The proposal was already approved for another project",
-          );
-        }
-        throw new HttpError(409, "Proposal changed");
-      }
-      try {
-        await materializeChannelIssueBatch({
-          db,
-          project,
-          organizationId: channel.organization_id,
-          channelId: channel.id,
-          proposalId: proposal.id,
-          messageId: proposal.reply_message_id,
-          rootMessageId: proposal.reply_parent_message_id,
-          proposalPayloadJson: proposal.payload_json,
-          proposalCreatedAt: proposal.created_at,
-          approvedAt: reservation.accepted_at,
-          approvedByUserId: reservation.accepted_by_user_id,
-          reservationSourceKey: reservation.issue_source_key,
-          batch: batchPayload.batch,
-        });
-      } catch (error) {
-        const current = await getChannelActionProposal(
-          db,
-          channel.id,
-          proposal.id,
-        );
-        if (current?.status === "accepted") {
-          return acceptedBatchResponse(current, "already_accepted");
-        }
-        throw error;
-      }
-      const finalized = await getChannelActionProposal(
-        db,
-        channel.id,
-        proposal.id,
-      );
-      if (
-        finalized?.status !== "accepted" ||
-        finalized.project_id !== project.id ||
-        finalized.issue_source_key !== reservation.issue_source_key
-      ) {
-        throw new HttpError(409, "Batch proposal approval was not finalized");
-      }
-      return acceptedBatchResponse(finalized, "accepted");
-    }
-    if (proposal.status === "accepted") {
-      if (!proposal.project_id || !proposal.result_run_id) {
-        throw new HttpError(409, "Accepted proposal is missing its result");
-      }
-      const executionProposal = proposal.execution_proposal_id
-        ? await getChannelExecutionProposal(db, {
-            organizationId: channel.organization_id,
-            channelId: channel.id,
-            proposalId: proposal.execution_proposal_id,
-            userId: session.user.id,
-          })
-        : null;
-      if (input.execution) {
-        if (!executionProposal) {
-          throw new HttpError(
-            409,
-            "The created issue has no retryable execution proposal",
-            "CHANNEL_EXECUTION_PROPOSAL_STALE",
-          );
-        }
-        const execution = await approveChannelExecutionProposalRequest({
-          db,
-          channel,
-          project,
-          proposal: executionProposal,
-          userId: session.user.id,
-          selection: input.execution,
-        });
-        return json({
-          outcome: "already_accepted",
-          projectId: proposal.project_id,
-          resultRunId: proposal.result_run_id,
-          executionProposal: execution.proposal,
-          dispatch: execution.dispatch,
-        });
-      }
-      return json({
-        outcome: "already_accepted",
-        projectId: proposal.project_id,
-        resultRunId: proposal.result_run_id,
-        executionProposal: liveIssueExecutionProposalJson(executionProposal),
-      });
-    }
-    if (channel.archived_at) {
-      throw new HttpError(409, "Channel is archived");
-    }
-    const payload = decodeChannelIssueProposalPayload(rawProposalPayload);
-    const approvedAt = new Date().toISOString();
-    if (input.execution) {
-      decodeExecutionPreferences({
-        provider: input.execution.provider,
-        model: input.execution.model,
-        effort: input.execution.effort,
-      });
-      try {
-        await assertExecutionSelectionAvailable(
-          db,
-          channel.organization_id,
-          project.id,
-          { ...input.execution, observedAt: approvedAt },
-        );
-      } catch (error) {
-        if (error instanceof WorkerConflictError) {
-          throw new HttpError(
-            409,
-            error.message,
-            "CHANNEL_EXECUTION_PROPOSAL_CONFLICT",
-          );
-        }
-        throw error;
-      }
-    }
-    const reservation = await reserveChannelActionProposalApproval(db, {
-      organizationId: channel.organization_id,
-      channelId: channel.id,
-      proposalId: proposal.id,
-      projectId: project.id,
+      env,
+      organizationId: channelProposalAcceptMatch[1],
+      channelId: channelProposalAcceptMatch[2],
+      proposalId: channelProposalAcceptMatch[3],
       userId: session.user.id,
-      approvedAt,
-      issueSourceKey: newChannelProposalIssueSourceKey(),
-    });
-    if (!reservation) {
-      const current = await getChannelActionProposal(
-        db,
-        channel.id,
-        proposal.id,
-      );
-      if (
-        current?.status === "accepted" &&
-        current.project_id &&
-        current.result_run_id
-      ) {
-        const executionProposal = current.execution_proposal_id
-          ? await getChannelExecutionProposal(db, {
-              organizationId: channel.organization_id,
-              channelId: channel.id,
-              proposalId: current.execution_proposal_id,
-              userId: session.user.id,
-            })
-          : null;
-        if (input.execution) {
-          if (!executionProposal) {
-            throw new HttpError(
-              409,
-              "The created issue has no retryable execution proposal",
-              "CHANNEL_EXECUTION_PROPOSAL_STALE",
-            );
-          }
-          const execution = await approveChannelExecutionProposalRequest({
-            db,
-            channel,
-            project,
-            proposal: executionProposal,
-            userId: session.user.id,
-            selection: input.execution,
-          });
-          return json({
-            outcome: "already_accepted",
-            projectId: current.project_id,
-            resultRunId: current.result_run_id,
-            executionProposal: execution.proposal,
-            dispatch: execution.dispatch,
-          });
-        }
-        return json({
-          outcome: "already_accepted",
-          projectId: current.project_id,
-          resultRunId: current.result_run_id,
-          executionProposal: liveIssueExecutionProposalJson(executionProposal),
-        });
-      }
-      if (
-        current?.status === "pending" &&
-        current.project_id &&
-        current.project_id !== project.id
-      ) {
-        throw new HttpError(
-          409,
-          "The proposal was already approved for another project",
-        );
-      }
-      throw new HttpError(409, "Proposal changed");
-    }
-    const approvedIssue = approvedIssueCreation(payload.issue);
-    const resultRunId = await createApprovedChannelProposalIssue({
-      db,
-      project,
-      organizationId: channel.organization_id,
-      sourceKey: reservation.issue_source_key,
-      proposalId: proposal.id,
-      channelId: channel.id,
-      messageId: proposal.reply_message_id,
-      rootMessageId: proposal.reply_parent_message_id,
-      title: approvedIssue.title,
-      description: approvedIssue.description,
-      priority: approvedIssue.priority,
-      createdByUserId: reservation.accepted_by_user_id,
-      occurredAt: proposal.created_at,
-    });
-    const finalized = await getChannelActionProposal(
-      db,
-      channel.id,
-      proposal.id,
-    );
-    if (
-      finalized?.status !== "accepted" ||
-      finalized.project_id !== project.id ||
-      finalized.result_run_id !== resultRunId ||
-      finalized.issue_source_key !== reservation.issue_source_key
-    ) {
-      throw new HttpError(409, "Proposal approval was not finalized");
-    }
-    const executionProposal = finalized.execution_proposal_id
-      ? await getChannelExecutionProposal(db, {
-          organizationId: channel.organization_id,
-          channelId: channel.id,
-          proposalId: finalized.execution_proposal_id,
-          userId: session.user.id,
-        })
-      : null;
-    if (input.execution) {
-      if (!executionProposal) {
-        throw new HttpError(
-          409,
-          "The created issue has no execution proposal",
-          "CHANNEL_EXECUTION_PROPOSAL_STALE",
-        );
-      }
-      const execution = await approveChannelExecutionProposalRequest({
-        db,
-        channel,
-        project,
-        proposal: executionProposal,
-        userId: session.user.id,
-        selection: input.execution,
-      });
-      return json({
-        outcome: "accepted",
-        projectId: project.id,
-        resultRunId,
-        executionProposal: execution.proposal,
-        dispatch: execution.dispatch,
-      });
-    }
-    return json({
-      outcome: "accepted",
-      projectId: project.id,
-      resultRunId,
-      executionProposal: liveIssueExecutionProposalJson(executionProposal),
-    });
+      request: await readJson(request),
+    }));
   }
 
   const channelSkillExecutionProposalAcceptMatch = pathname.match(
@@ -780,57 +906,15 @@ export async function handleChannelProposalRoute(
   );
   if (channelSkillExecutionProposalAcceptMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const channel = await requireChannelAccess(
+    return json(await acceptOrganizationChannelSkillExecutionProposal({
       db,
-      channelSkillExecutionProposalAcceptMatch[1],
-      channelSkillExecutionProposalAcceptMatch[2],
-      session.user.id,
-    );
-    if (!(await channelSkillExecutionProposalTablesAvailable(db))) {
-      throw new HttpError(
-        503,
-        "Agent Skill execution approval is not available during this upgrade",
-        "AGENT_SKILL_EXECUTION_APPROVAL_UNAVAILABLE",
-      );
-    }
-    const proposalId = channelSkillExecutionProposalAcceptMatch[3];
-    const loadProposal = () => getChannelAgentSkillExecutionProposal(db, {
-      organizationId: channel.organization_id,
-      channelId: channel.id,
-      proposalId,
+      env,
+      organizationId: channelSkillExecutionProposalAcceptMatch[1],
+      channelId: channelSkillExecutionProposalAcceptMatch[2],
+      proposalId: channelSkillExecutionProposalAcceptMatch[3],
       userId: session.user.id,
-    });
-    const proposal = await loadProposal();
-    if (!proposal) {
-      throw new HttpError(404, "Agent Skill execution proposal not found");
-    }
-    const input = decodeAgentSkillExecutionProposalAcceptInput(
-      await readJson(request),
-    );
-    const project = await getProject(db, proposal.project_id, session.user.id);
-    if (!project || project.organization_id !== channel.organization_id) {
-      throw new HttpError(404, "Project not found");
-    }
-    if (proposal.status === "pending" && channel.archived_at) {
-      throw new HttpError(
-        409,
-        "Channel is archived",
-        "CHANNEL_SKILL_EXECUTION_PROPOSAL_STALE",
-      );
-    }
-    return json(await approveAgentSkillExecutionProposal(
-      db,
-      env.ARCHIVES,
-      proposal,
-      {
-        sourceKind: "channel",
-        userId: session.user.id,
-        workerId: input.workerId,
-        staleCode: "CHANNEL_SKILL_EXECUTION_PROPOSAL_STALE",
-        conflictCode: "CHANNEL_SKILL_EXECUTION_PROPOSAL_CONFLICT",
-        reload: loadProposal,
-      },
-    ));
+      request: await readJson(request),
+    }));
   }
 
   const channelExecutionProposalAcceptMatch = pathname.match(
@@ -838,45 +922,14 @@ export async function handleChannelProposalRoute(
   );
   if (channelExecutionProposalAcceptMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const channel = await requireChannelAccess(
+    return json(await acceptOrganizationChannelExecutionProposal({
       db,
-      channelExecutionProposalAcceptMatch[1],
-      channelExecutionProposalAcceptMatch[2],
-      session.user.id,
-    );
-    if (!(await channelExecutionProposalTablesAvailable(db))) {
-      throw new HttpError(
-        503,
-        "Issue execution approval is not available during this upgrade",
-        "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
-      );
-    }
-    const proposal = await getChannelExecutionProposal(db, {
-      organizationId: channel.organization_id,
-      channelId: channel.id,
+      env,
+      organizationId: channelExecutionProposalAcceptMatch[1],
+      channelId: channelExecutionProposalAcceptMatch[2],
       proposalId: channelExecutionProposalAcceptMatch[3],
       userId: session.user.id,
-    });
-    if (!proposal) throw new HttpError(404, "Execution proposal not found");
-    const input = decodeChannelExecutionProposalAcceptInput(
-      await readJson(request),
-    );
-    decodeExecutionPreferences({
-      provider: input.provider,
-      model: input.model,
-      effort: input.effort,
-    });
-    const project = await getProject(db, proposal.project_id, session.user.id);
-    if (!project || project.organization_id !== channel.organization_id) {
-      throw new HttpError(404, "Project not found");
-    }
-    return json(await approveChannelExecutionProposalRequest({
-      db,
-      channel,
-      project,
-      proposal,
-      userId: session.user.id,
-      selection: input,
+      request: await readJson(request),
     }));
   }
 

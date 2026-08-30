@@ -67,6 +67,228 @@ export type OrganizationChannelRouteInput = {
   context?: ExecutionContext;
 };
 
+type OrganizationChannelApplicationInput = {
+  db: D1Database;
+  organizationId: string;
+  userId: string;
+};
+
+export async function syncOrganizationChannels(
+  input: OrganizationChannelApplicationInput & { since: number },
+) {
+  const role = await getOrganizationRole(
+    input.db,
+    input.organizationId,
+    input.userId,
+  );
+  if (!hasOrganizationCapability(role, "organization:read")) {
+    throw new HttpError(404, "Organization not found");
+  }
+  if (!Number.isSafeInteger(input.since) || input.since < 0) {
+    throw new HttpError(400, "Invalid channel cursor");
+  }
+  return loadChannelDelta(
+    input.db,
+    input.organizationId,
+    input.userId,
+    input.since,
+  );
+}
+
+export async function listOrganizationChannels(
+  input: OrganizationChannelApplicationInput,
+) {
+  const role = await getOrganizationRole(
+    input.db,
+    input.organizationId,
+    input.userId,
+  );
+  if (!hasOrganizationCapability(role, "organization:read")) {
+    throw new HttpError(404, "Organization not found");
+  }
+  const snapshot = await loadChannelCatalogSnapshot(
+    () => getChannelSyncCursor(input.db, input.organizationId),
+    () => listChannels(input.db, input.organizationId, input.userId),
+  );
+  return {
+    channels: snapshot.channels.map(channelJson),
+    cursor: snapshot.cursor,
+  };
+}
+
+export async function createOrganizationDirectMessage(
+  input: OrganizationChannelApplicationInput & { request: unknown },
+) {
+  const role = await getOrganizationRole(
+    input.db,
+    input.organizationId,
+    input.userId,
+  );
+  if (!hasOrganizationCapability(role, "organization:read")) {
+    throw new HttpError(404, "Organization not found");
+  }
+  if (!hasOrganizationCapability(role, "conversations:write")) {
+    throw new HttpError(403, "Conversation editing permission required");
+  }
+  const request = decodeDirectMessageInput(input.request);
+  const selectedMemberIds = [...new Set(request.memberIds)];
+  const selfSelected = selectedMemberIds.includes(input.userId);
+  const memberIds = selectedMemberIds.filter((userId) => userId !== input.userId);
+  const agentIds = [...new Set(request.agentIds)];
+  if (selectedMemberIds.length + agentIds.length === 0) {
+    throw new HttpError(400, "At least one participant is required");
+  }
+
+  const [organizationMembers, organizationAgents] = await Promise.all([
+    listOrganizationMembers(input.db, input.organizationId),
+    listOrganizationAgents(input.db, input.organizationId),
+  ]);
+  const membersById = new Map(
+    organizationMembers.map((member) => [member.user_id, member]),
+  );
+  const agentsById = new Map(
+    organizationAgents.map((agent) => [agent.id, agent]),
+  );
+  for (const userId of selectedMemberIds) {
+    if (!membersById.has(userId)) {
+      throw new HttpError(404, "Organization member not found");
+    }
+  }
+  for (const agentId of agentIds) {
+    if (!agentsById.has(agentId)) {
+      throw new HttpError(404, "Organization Agent not found");
+    }
+  }
+
+  const selectedParticipantCount = selectedMemberIds.length + agentIds.length;
+  const dmKey = selectedParticipantCount === 1
+    ? selfSelected
+      ? `self:${input.userId}`
+      : memberIds.length === 1
+      ? `users:${JSON.stringify([input.userId, memberIds[0]!].sort())}`
+      : `agent:${JSON.stringify([input.userId, agentIds[0]!])}`
+    : null;
+  if (dmKey) {
+    const existing = await getDirectMessageByKey(
+      input.db,
+      input.organizationId,
+      dmKey,
+      input.userId,
+    );
+    if (existing) return { channel: channelJson(existing) };
+  }
+
+  const participantNames = [
+    ...selectedMemberIds.map((userId) => membersById.get(userId)!.name),
+    ...agentIds.map((agentId) => agentsById.get(agentId)!.name),
+  ];
+  const channelId = crypto.randomUUID();
+  const name = participantNames.join(", ").slice(0, 100);
+  let channel;
+  try {
+    channel = await createChannel(input.db, {
+      id: channelId,
+      organizationId: input.organizationId,
+      kind: "dm",
+      dmKey,
+      slug: channelSlugFromName(`dm-${channelId}`, channelId),
+      name,
+      topic: null,
+      visibility: "private",
+      defaultProjectId: null,
+      createdByUserId: input.userId,
+      memberIds,
+      agentIds,
+      createdAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : "";
+    if (dmKey && message.includes("unique")) {
+      channel = await getDirectMessageByKey(
+        input.db,
+        input.organizationId,
+        dmKey,
+        input.userId,
+      );
+    } else {
+      throw error;
+    }
+  }
+  if (!channel) throw new HttpError(500, "Direct message was not created");
+  return { channel: channelJson(channel) };
+}
+
+export async function getOrganizationChannelDetail(
+  input: OrganizationChannelApplicationInput & {
+    channelId: string;
+    messageLimit: string | number | null;
+  },
+) {
+  const channel = await requireChannelAccess(
+    input.db,
+    input.organizationId,
+    input.channelId,
+    input.userId,
+  );
+  const messageLimit = input.messageLimit === null
+    ? null
+    : decodeMessageLimit(String(input.messageLimit));
+  const [members, channelAgents, messagePage, activeReplies] = await Promise.all([
+    listChannelMembers(input.db, channel.id),
+    listChannelAgents(input.db, channel.id),
+    messageLimit === null
+      ? listChannelRootMessages(input.db, channel.id).then((messages) => ({
+          messages,
+          nextCursor: null,
+        }))
+      : listChannelMessagePage(input.db, {
+          channelId: channel.id,
+          parentMessageId: null,
+          cursor: null,
+          limit: messageLimit,
+          includeRepliesInTimeline: channel.kind === "dm",
+        }),
+    listActiveChannelAgentReplies(input.db, channel.id),
+  ]);
+  const agents = await hydrateAgentSkills(input.db, channelAgents);
+  return {
+    channel: channelJson(channel),
+    members,
+    agents: agents.map(organizationAgentJson),
+    messages: messagePage?.messages ?? [],
+    agentReplies: activeReplies.map(channelReplyJson),
+    nextCursor: messagePage?.nextCursor ?? null,
+  };
+}
+
+export async function markOrganizationChannelRead(
+  input: OrganizationChannelApplicationInput & {
+    channelId: string;
+    request: unknown;
+  },
+) {
+  const channel = await requireChannelAccess(
+    input.db,
+    input.organizationId,
+    input.channelId,
+    input.userId,
+  );
+  const request = decodeChannelReadInput(input.request);
+  await markChannelRead(input.db, {
+    userId: input.userId,
+    channelId: channel.id,
+    lastReadAt: request.lastReadAt ?? new Date().toISOString(),
+  });
+  const updated = await getChannel(
+    input.db,
+    input.organizationId,
+    channel.id,
+    input.userId,
+  );
+  if (!updated) throw new HttpError(404, "Channel not found");
+  return { channel: channelJson(updated) };
+}
+
 export async function handleOrganizationChannelRoute(
   routeInput: OrganizationChannelRouteInput,
 ): Promise<Response | undefined> {
@@ -79,18 +301,13 @@ export async function handleOrganizationChannelRoute(
   );
   if (channelChangesMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
-    const organizationId = channelChangesMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!hasOrganizationCapability(role, "organization:read")) {
-      throw new HttpError(404, "Organization not found");
-    }
     const since = Number(url.searchParams.get("since") ?? "0");
-    if (!Number.isSafeInteger(since) || since < 0) {
-      throw new HttpError(400, "Invalid channel cursor");
-    }
-    return json(
-      await loadChannelDelta(db, organizationId, session.user.id, since),
-    );
+    return json(await syncOrganizationChannels({
+      db,
+      organizationId: channelChangesMatch[1],
+      userId: session.user.id,
+      since,
+    }));
   }
 
   const organizationChannelsMatch = pathname.match(
@@ -102,119 +319,21 @@ export async function handleOrganizationChannelRoute(
   );
   if (organizationDirectMessagesMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const organizationId = organizationDirectMessagesMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!hasOrganizationCapability(role, "organization:read")) {
-      throw new HttpError(404, "Organization not found");
-    }
-    if (!hasOrganizationCapability(role, "conversations:write")) {
-      throw new HttpError(403, "Conversation editing permission required");
-    }
-    const input = decodeDirectMessageInput(await readJson(request));
-    const selectedMemberIds = [...new Set(input.memberIds)];
-    const selfSelected = selectedMemberIds.includes(session.user.id);
-    const memberIds = selectedMemberIds.filter(
-      (userId) => userId !== session.user.id,
-    );
-    const agentIds = [...new Set(input.agentIds)];
-    if (selectedMemberIds.length + agentIds.length === 0) {
-      throw new HttpError(400, "At least one participant is required");
-    }
-
-    const [organizationMembers, organizationAgents] = await Promise.all([
-      listOrganizationMembers(db, organizationId),
-      listOrganizationAgents(db, organizationId),
-    ]);
-    const membersById = new Map(
-      organizationMembers.map((member) => [member.user_id, member]),
-    );
-    const agentsById = new Map(
-      organizationAgents.map((agent) => [agent.id, agent]),
-    );
-    for (const userId of selectedMemberIds) {
-      if (!membersById.has(userId)) {
-        throw new HttpError(404, "Organization member not found");
-      }
-    }
-    for (const agentId of agentIds) {
-      if (!agentsById.has(agentId)) {
-        throw new HttpError(404, "Organization Agent not found");
-      }
-    }
-
-    const selectedParticipantCount = selectedMemberIds.length + agentIds.length;
-    const dmKey = selectedParticipantCount === 1
-      ? selfSelected
-        ? `self:${session.user.id}`
-        : memberIds.length === 1
-        ? `users:${JSON.stringify([session.user.id, memberIds[0]!].sort())}`
-        : `agent:${JSON.stringify([session.user.id, agentIds[0]!])}`
-      : null;
-    if (dmKey) {
-      const existing = await getDirectMessageByKey(
-        db,
-        organizationId,
-        dmKey,
-        session.user.id,
-      );
-      if (existing) return json({ channel: channelJson(existing) });
-    }
-
-    const participantNames = [
-      ...selectedMemberIds.map((userId) => membersById.get(userId)!.name),
-      ...agentIds.map((agentId) => agentsById.get(agentId)!.name),
-    ];
-    const channelId = crypto.randomUUID();
-    const name = participantNames.join(", ").slice(0, 100);
-    let channel;
-    try {
-      channel = await createChannel(db, {
-        id: channelId,
-        organizationId,
-        kind: "dm",
-        dmKey,
-        slug: channelSlugFromName(`dm-${channelId}`, channelId),
-        name,
-        topic: null,
-        visibility: "private",
-        defaultProjectId: null,
-        createdByUserId: session.user.id,
-        memberIds,
-        agentIds,
-        createdAt: new Date().toISOString(),
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message.toLowerCase() : "";
-      if (dmKey && message.includes("unique")) {
-        channel = await getDirectMessageByKey(
-          db,
-          organizationId,
-          dmKey,
-          session.user.id,
-        );
-      } else {
-        throw error;
-      }
-    }
-    if (!channel) throw new HttpError(500, "Direct message was not created");
-    return json({ channel: channelJson(channel) }, 201);
+    return json(await createOrganizationDirectMessage({
+      db,
+      organizationId: organizationDirectMessagesMatch[1],
+      userId: session.user.id,
+      request: await readJson(request),
+    }), 201);
   }
 
   if (organizationChannelsMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
-    const organizationId = organizationChannelsMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!hasOrganizationCapability(role, "organization:read")) {
-      throw new HttpError(404, "Organization not found");
-    }
-    const snapshot = await loadChannelCatalogSnapshot(
-      () => getChannelSyncCursor(db, organizationId),
-      () => listChannels(db, organizationId, session.user.id),
-    );
-    return json({
-      channels: snapshot.channels.map(channelJson),
-      cursor: snapshot.cursor,
-    });
+    return json(await listOrganizationChannels({
+      db,
+      organizationId: organizationChannelsMatch[1],
+      userId: session.user.id,
+    }));
   }
   if (organizationChannelsMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
@@ -266,27 +385,13 @@ export async function handleOrganizationChannelRoute(
   );
   if (organizationChannelReadMatch && request.method === "PUT") {
     const session = await requireSession(auth, request);
-    const channel = await requireChannelAccess(
+    return json(await markOrganizationChannelRead({
       db,
-      organizationChannelReadMatch[1],
-      organizationChannelReadMatch[2],
-      session.user.id,
-    );
-    const input = decodeChannelReadInput(await readJson(request));
-    const lastReadAt = input.lastReadAt ?? new Date().toISOString();
-    await markChannelRead(db, {
+      organizationId: organizationChannelReadMatch[1],
+      channelId: organizationChannelReadMatch[2],
       userId: session.user.id,
-      channelId: channel.id,
-      lastReadAt,
-    });
-    const updated = await getChannel(
-      db,
-      organizationChannelReadMatch[1],
-      channel.id,
-      session.user.id,
-    );
-    if (!updated) throw new HttpError(404, "Channel not found");
-    return json({ channel: channelJson(updated) });
+      request: await readJson(request),
+    }));
   }
 
   const organizationChannelMatch = pathname.match(
@@ -294,43 +399,13 @@ export async function handleOrganizationChannelRoute(
   );
   if (organizationChannelMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
-    const channel = await requireChannelAccess(
+    return json(await getOrganizationChannelDetail({
       db,
-      organizationChannelMatch[1],
-      organizationChannelMatch[2],
-      session.user.id,
-    );
-    const rawMessageLimit = new URL(request.url).searchParams.get("limit");
-    const messageLimit = rawMessageLimit === null
-      ? null
-      : decodeMessageLimit(rawMessageLimit);
-    const [members, channelAgents, messagePage, activeReplies] =
-      await Promise.all([
-        listChannelMembers(db, channel.id),
-        listChannelAgents(db, channel.id),
-        messageLimit === null
-          ? listChannelRootMessages(db, channel.id).then((messages) => ({
-              messages,
-              nextCursor: null,
-            }))
-          : listChannelMessagePage(db, {
-              channelId: channel.id,
-              parentMessageId: null,
-              cursor: null,
-              limit: messageLimit,
-              includeRepliesInTimeline: channel.kind === "dm",
-            }),
-        listActiveChannelAgentReplies(db, channel.id),
-      ]);
-    const agents = await hydrateAgentSkills(db, channelAgents);
-    return json({
-      channel: channelJson(channel),
-      members,
-      agents: agents.map(organizationAgentJson),
-      messages: messagePage?.messages ?? [],
-      agentReplies: activeReplies.map(channelReplyJson),
-      nextCursor: messagePage?.nextCursor ?? null,
-    });
+      organizationId: organizationChannelMatch[1],
+      channelId: organizationChannelMatch[2],
+      userId: session.user.id,
+      messageLimit: url.searchParams.get("limit"),
+    }));
   }
   if (organizationChannelMatch && request.method === "PATCH") {
     const session = await requireSession(auth, request);

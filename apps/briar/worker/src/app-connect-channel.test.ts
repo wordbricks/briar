@@ -6,15 +6,15 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import type { BriarAuth } from "./auth";
 import {
+  appConnectChannelServices,
   registerAppChannelService,
   type AppConnectChannelServices,
 } from "./app-connect-channel";
 
-const routeMocks = {
-  message: vi.fn<AppConnectChannelServices["handleMessageRoute"]>(),
-  organization:
-    vi.fn<AppConnectChannelServices["handleOrganizationRoute"]>(),
-  proposal: vi.fn<AppConnectChannelServices["handleProposalRoute"]>(),
+const applicationMocks = {
+  acceptProposal: vi.fn<AppConnectChannelServices["acceptProposal"]>(),
+  createMessage: vi.fn<AppConnectChannelServices["createMessage"]>(),
+  requireSession: vi.fn<AppConnectChannelServices["requireSession"]>(),
 };
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
@@ -26,6 +26,7 @@ const proposalId = "66666666-6666-4666-8666-666666666666";
 const projectId = "77777777-7777-4777-8777-777777777777";
 const skillId = "88888888-8888-4888-8888-888888888888";
 const clientMessageId = "99999999-9999-4999-8999-999999999999";
+const deviceId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab";
 
 const connectRequest = () => new Request(
   "https://api.example.test/briar.app.v1.ChannelService/CreateChannelMessage",
@@ -44,15 +45,51 @@ const connectRequest = () => new Request(
       mentionedUserIds: [userId],
       mentionedAgentIds: [agentId],
       skillId,
-      preferredDeviceId: "device-1",
+      preferredDeviceId: deviceId,
       attachmentReferences: ["existing-image"],
     }),
   },
 );
 
+const proposalConnectRequest = () => new Request(
+  "https://api.example.test/briar.app.v1.ChannelService/AcceptChannelProposal",
+  {
+    method: "POST",
+    headers: {
+      authorization: "Bearer session-token",
+      "connect-protocol-version": "1",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      organizationId,
+      channelId,
+      proposalId,
+      projectId,
+    }),
+  },
+);
+
 describe("app Channel Connect adapter", () => {
-  it("registers every RPC and preserves message oneofs and invocation input", async () => {
-    routeMocks.message.mockResolvedValueOnce(new Response(JSON.stringify({
+  it("calls the message application service directly and preserves oneofs", async () => {
+    applicationMocks.requireSession.mockResolvedValueOnce({
+      session: {
+        id: "session-1",
+        userId,
+        token: "session-token",
+        expiresAt: new Date("2027-08-30T00:00:00.000Z"),
+        createdAt: new Date("2026-08-30T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+      },
+      user: {
+        id: userId,
+        name: "Owner",
+        email: "owner@example.com",
+        emailVerified: true,
+        createdAt: new Date("2026-08-30T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+      },
+    });
+    applicationMocks.createMessage.mockResolvedValueOnce({
       message: {
         id: messageId,
         channelId,
@@ -122,7 +159,7 @@ describe("app Channel Connect adapter", () => {
         createdAt: "2026-08-30T01:02:03.000Z",
         updatedAt: "2026-08-30T01:02:03.000Z",
       }],
-    }), { headers: { "content-type": "application/json" } }));
+    });
 
     const router = createConnectRouter({
       connect: true,
@@ -139,9 +176,9 @@ describe("app Channel Connect adapter", () => {
         env: {} as Env,
       },
       {
-        handleMessageRoute: routeMocks.message,
-        handleOrganizationRoute: routeMocks.organization,
-        handleProposalRoute: routeMocks.proposal,
+        ...appConnectChannelServices,
+        createMessage: applicationMocks.createMessage,
+        requireSession: applicationMocks.requireSession,
       },
     );
 
@@ -154,23 +191,24 @@ describe("app Channel Connect adapter", () => {
 
     const response = await createFetchHandler(handler!)(connectRequest());
 
-    expect(response.status).toBe(200);
-    expect(routeMocks.message).toHaveBeenCalledOnce();
-    const routed = routeMocks.message.mock.calls[0][0] as { request: Request };
-    expect(routed.request.method).toBe("POST");
-    expect(new URL(routed.request.url).pathname).toBe(
-      `/organizations/${organizationId}/channels/${channelId}/messages`,
-    );
-    expect(routed.request.headers.get("authorization")).toBe("Bearer session-token");
-    expect(await routed.request.json()).toEqual({
-      clientMessageId,
-      body: "Please create the issue",
-      parentMessageId: null,
-      mentionedUserIds: [userId],
-      mentionedAgentIds: [agentId],
-      skillId,
-      preferredDeviceId: "device-1",
+    expect(response.status, await response.clone().text()).toBe(200);
+    expect(applicationMocks.createMessage).toHaveBeenCalledWith({
+      db: {},
+      organizationId,
+      channelId,
+      userId,
+      attachmentsBucket: {},
+      attachments: [],
       attachmentReferences: ["existing-image"],
+      request: {
+        body: "Please create the issue",
+        clientMessageId,
+        parentMessageId: null,
+        mentionedUserIds: [userId],
+        mentionedAgentIds: [agentId],
+        skillId,
+        preferredDeviceId: deviceId,
+      },
     });
     expect(await response.json()).toEqual({
       message: {
@@ -227,6 +265,85 @@ describe("app Channel Connect adapter", () => {
         createdAt: "2026-08-30T01:02:03Z",
         updatedAt: "2026-08-30T01:02:03Z",
       }],
+    });
+  });
+
+  it("maps a batch proposal result without routing through HTTP", async () => {
+    applicationMocks.requireSession.mockResolvedValueOnce({
+      session: {
+        id: "session-2",
+        userId,
+        token: "session-token",
+        expiresAt: new Date("2027-08-30T00:00:00.000Z"),
+        createdAt: new Date("2026-08-30T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+      },
+      user: {
+        id: userId,
+        name: "Owner",
+        email: "owner@example.com",
+        emailVerified: true,
+        createdAt: new Date("2026-08-30T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+      },
+    });
+    applicationMocks.acceptProposal.mockResolvedValueOnce({
+      outcome: "accepted",
+      projectId,
+      resultRunId: "run-batch",
+      resultItems: [
+        { localKey: "api", runId: "run-api" },
+        { localKey: "ios", runId: "run-ios" },
+      ],
+      executionProposal: null,
+    });
+
+    const router = createConnectRouter({
+      connect: true,
+      grpc: false,
+      grpcWeb: false,
+    });
+    registerAppChannelService(
+      router,
+      {
+        request: proposalConnectRequest(),
+        auth: {} as BriarAuth,
+        db: {} as D1Database,
+        attachmentsBucket: {} as R2Bucket,
+        env: {} as Env,
+      },
+      {
+        ...appConnectChannelServices,
+        acceptProposal: applicationMocks.acceptProposal,
+        requireSession: applicationMocks.requireSession,
+      },
+    );
+    const handler = router.handlers.find((candidate) =>
+      candidate.requestPath ===
+        "/briar.app.v1.ChannelService/AcceptChannelProposal"
+    );
+
+    const response = await createFetchHandler(handler!)(proposalConnectRequest());
+
+    expect(applicationMocks.acceptProposal).toHaveBeenCalledOnce();
+    expect(response.status, await response.clone().text()).toBe(200);
+    expect(applicationMocks.acceptProposal).toHaveBeenCalledWith({
+      db: {},
+      env: {},
+      organizationId,
+      channelId,
+      proposalId,
+      userId,
+      request: { projectId, execution: null },
+    });
+    expect(await response.json()).toEqual({
+      outcome: "APPROVAL_OUTCOME_ACCEPTED",
+      projectId,
+      resultRunId: "run-batch",
+      resultItems: [
+        { localKey: "api", runId: "run-api" },
+        { localKey: "ios", runId: "run-ios" },
+      ],
     });
   });
 });
