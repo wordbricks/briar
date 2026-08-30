@@ -411,7 +411,7 @@ for (const required of [
   }
 }
 for (const required of [
-  'sudo -u briar -H /opt/briar/bin/codex --version 2>&1',
+  "sudo -u briar -H bash -lc '/opt/briar/bin/codex --version' 2>&1",
   'grep -Fq "could not create PATH aliases"',
   "test -w /home/briar/.codex",
   "test -w /home/briar/.codex/log",
