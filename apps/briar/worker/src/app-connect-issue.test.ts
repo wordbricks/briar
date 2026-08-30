@@ -5,11 +5,10 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { describe, expect, it, vi } from "vitest";
 import type { BriarAuth } from "./auth";
-import type { handleIssueConversationRoute } from "./issue-conversation-routes";
-import type { handleIssueCoreRoute } from "./issue-core-routes";
-
+import { HttpError } from "./http-response";
 import {
-  type AppConnectIssueRouteHandlers,
+  appConnectIssueServices,
+  type AppConnectIssueServices,
   registerAppIssueService,
 } from "./app-connect-issue";
 
@@ -20,6 +19,7 @@ const proposalId = "44444444-4444-4444-8444-444444444444";
 const replyId = "55555555-5555-4555-8555-555555555555";
 const agentId = "66666666-6666-4666-8666-666666666666";
 const attachmentId = "77777777-7777-4777-8777-777777777777";
+const userId = "88888888-8888-4888-8888-888888888888";
 
 const issueConnectRequest = (method: string, body: unknown) =>
   new Request(
@@ -35,10 +35,29 @@ const issueConnectRequest = (method: string, body: unknown) =>
     },
   );
 
+const authenticatedSession = {
+  session: {
+    id: "session-1",
+    userId,
+    token: "session-token",
+    expiresAt: new Date("2027-08-30T00:00:00.000Z"),
+    createdAt: new Date("2026-08-30T00:00:00.000Z"),
+    updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+  },
+  user: {
+    id: userId,
+    name: "Owner",
+    email: "owner@example.com",
+    emailVerified: true,
+    createdAt: new Date("2026-08-30T00:00:00.000Z"),
+    updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+  },
+};
+
 const invokeIssueRpc = async (
   method: string,
   body: unknown,
-  routeHandlers: Partial<AppConnectIssueRouteHandlers>,
+  overrides: Partial<AppConnectIssueServices>,
 ) => {
   const request = issueConnectRequest(method, body);
   const router = createConnectRouter({
@@ -46,16 +65,23 @@ const invokeIssueRpc = async (
     grpc: false,
     grpcWeb: false,
   });
-  registerAppIssueService(router, {
-    request,
-    auth: {} as BriarAuth,
-    db: {} as D1Database,
-    env: {
-      ATTACHMENTS: {},
-      ARCHIVES: {},
-    } as Env,
-    routeHandlers,
-  });
+  registerAppIssueService(
+    router,
+    {
+      request,
+      auth: {} as BriarAuth,
+      db: {} as D1Database,
+      env: {
+        ATTACHMENTS: {},
+        ARCHIVES: {},
+      } as Env,
+    },
+    {
+      ...appConnectIssueServices,
+      requireSession: vi.fn().mockResolvedValue(authenticatedSession),
+      ...overrides,
+    },
+  );
   const handler = router.handlers.find((candidate) =>
     candidate.requestPath === `/briar.app.v1.IssueService/${method}`
   );
@@ -63,31 +89,19 @@ const invokeIssueRpc = async (
   return createFetchHandler(handler!)(request);
 };
 
-const connectRequest = () =>
-  new Request(
-    "https://api.example.test/briar.app.v1.IssueService/ListIssueMessages",
-    {
-      method: "POST",
-      headers: {
-        authorization: "Bearer session-token",
-        "connect-protocol-version": "1",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ projectId, runId }),
-    },
-  );
-
 describe("app Issue Connect adapter", () => {
-  it("preserves checkpoints and attachment references when creating an issue", async () => {
-    const coreRoute = vi.fn<typeof handleIssueCoreRoute>();
-    coreRoute.mockResolvedValueOnce(new Response(JSON.stringify({
+  it("calls the create application service directly with lossless workflow input", async () => {
+    const createIssue = vi.fn<AppConnectIssueServices["createIssue"]>();
+    createIssue.mockResolvedValueOnce({
       runId,
       sourceKey: "BR-1",
       status: "backlog",
       stage: "queued",
+      assigneeUserId: null,
+      createdByUserId: userId,
+      difficulty: null,
       attachments: [],
-      createdByUserId: "user-1",
-    }), { headers: { "content-type": "application/json" } }));
+    });
 
     const response = await invokeIssueRpc("CreateIssue", {
       projectId,
@@ -99,23 +113,29 @@ describe("app Issue Connect adapter", () => {
         position: "POSITION_AFTER",
       }],
       attachmentReferences: ["draft-image-1"],
-    }, { core: coreRoute });
+    }, { createIssue });
 
     expect(response.status).toBe(200);
-    const routed = coreRoute.mock.calls[0][0] as { request: Request };
-    expect(await routed.request.json()).toMatchObject({
-      checkpoints: [{
-        key: "review",
-        stage: "implement",
-        position: "after",
-      }],
+    expect(createIssue).toHaveBeenCalledOnce();
+    expect(createIssue.mock.calls[0][0]).toMatchObject({
+      projectId,
+      userId,
+      attachments: [],
       attachmentReferences: ["draft-image-1"],
+      request: {
+        status: "backlog",
+        checkpoints: [{
+          key: "review",
+          stage: "implement",
+          position: "after",
+        }],
+      },
     });
   });
 
-  it("preserves clear/no-op assignee states and a present empty attachment patch", async () => {
-    const coreRoute = vi.fn<typeof handleIssueCoreRoute>();
-    const updated = {
+  it("preserves assignee and attachment patch presence", async () => {
+    const updateIssue = vi.fn<AppConnectIssueServices["updateIssue"]>();
+    updateIssue.mockResolvedValue({
       runId,
       title: "Updated issue",
       description: null,
@@ -129,12 +149,7 @@ describe("app Issue Connect adapter", () => {
         byteSize: 12,
         url: `https://api.example.test/attachments/${attachmentId}`,
       }],
-    };
-    coreRoute.mockImplementation(async () =>
-      new Response(JSON.stringify(updated), {
-        headers: { "content-type": "application/json" },
-      })
-    );
+    });
 
     const cleared = await invokeIssueRpc("UpdateIssue", {
       projectId,
@@ -143,14 +158,13 @@ describe("app Issue Connect adapter", () => {
       clearAssignee: {},
       attachmentReferences: [attachmentId],
       keptAttachmentIds: { values: [] },
-    }, { core: coreRoute });
+    }, { updateIssue });
     expect(cleared.status).toBe(200);
-    expect(await (coreRoute.mock.calls[0][0] as { request: Request }).request
-      .json()).toMatchObject({
-        assigneeUserId: null,
-        attachmentReferences: [attachmentId],
-        keptAttachmentIds: [],
-      });
+    expect(updateIssue.mock.calls[0][0]).toMatchObject({
+      request: { assigneeUserId: null },
+      attachmentReferences: [attachmentId],
+      keptAttachmentIds: [],
+    });
     expect(await cleared.json()).toMatchObject({
       attachments: [{ id: attachmentId, byteSize: "12" }],
     });
@@ -159,18 +173,22 @@ describe("app Issue Connect adapter", () => {
       projectId,
       runId,
       title: "Updated issue",
-    }, { core: coreRoute });
+    }, { updateIssue });
     expect(unchanged.status).toBe(200);
-    const unchangedBody = await (
-      coreRoute.mock.calls[1][0] as { request: Request }
-    ).request.json() as Record<string, unknown>;
-    expect(unchangedBody).not.toHaveProperty("assigneeUserId");
-    expect(unchangedBody).not.toHaveProperty("keptAttachmentIds");
+    const applicationInput = updateIssue.mock.calls[1][0];
+    expect(applicationInput.request).not.toHaveProperty("assigneeUserId");
+    expect(applicationInput.keptAttachmentIds).toBeUndefined();
   });
 
-  it("registers every RPC and preserves a complex conversation response", async () => {
-    const conversationRoute = vi.fn<typeof handleIssueConversationRoute>();
-    conversationRoute.mockResolvedValueOnce(new Response(JSON.stringify({
+  it("turns an expired delta into an authoritative reset snapshot", async () => {
+    const syncMessages = vi.fn<AppConnectIssueServices["syncMessages"]>();
+    syncMessages.mockRejectedValueOnce(new HttpError(
+      410,
+      "Conversation cursor expired; reload the full snapshot",
+      "issue_conversation_cursor_expired",
+    ));
+    const listMessages = vi.fn<AppConnectIssueServices["listMessages"]>();
+    const snapshot = {
       cursor: 42,
       messages: [{
         id: messageId,
@@ -213,83 +231,38 @@ describe("app Issue Connect adapter", () => {
         error: null,
         updatedAt: "2026-08-30T01:02:05.000Z",
       }],
-    }), {
-      headers: { "content-type": "application/json" },
-    }));
-
-    const router = createConnectRouter({
-      connect: true,
-      grpc: false,
-      grpcWeb: false,
-    });
-    registerAppIssueService(router, {
-      request: connectRequest(),
-      auth: {} as BriarAuth,
-      db: {} as D1Database,
-      env: {
-        ATTACHMENTS: {},
-        ARCHIVES: {},
-      } as Env,
-      routeHandlers: { conversation: conversationRoute },
-    });
-
-    expect(router.handlers).toHaveLength(
-      Object.keys(IssueService.method).length,
+    };
+    listMessages.mockResolvedValueOnce(
+      snapshot as Awaited<ReturnType<AppConnectIssueServices["listMessages"]>>,
     );
-    const handler = router.handlers.find((candidate) =>
-      candidate.requestPath ===
-        "/briar.app.v1.IssueService/ListIssueMessages"
-    );
-    expect(handler).toBeDefined();
 
-    const response = await createFetchHandler(handler!)(connectRequest());
+    const response = await invokeIssueRpc("SyncIssueMessages", {
+      projectId,
+      runId,
+      cursor: "41",
+    }, { syncMessages, listMessages });
 
     expect(response.status).toBe(200);
-    expect(conversationRoute).toHaveBeenCalledOnce();
-    const routed = conversationRoute.mock.calls[0][0] as {
-      request: Request;
-    };
-    expect(routed.request.method).toBe("GET");
-    expect(new URL(routed.request.url).pathname).toBe(
-      `/projects/${projectId}/runs/${runId}/messages`,
-    );
-    expect(routed.request.headers.get("authorization"))
-      .toBe("Bearer session-token");
-    expect(await response.json()).toEqual({
+    expect(syncMessages).toHaveBeenCalledWith(expect.objectContaining({
+      projectId,
+      runId,
+      userId,
+      cursor: 41,
+    }));
+    expect(listMessages).toHaveBeenCalledOnce();
+    expect(await response.json()).toMatchObject({
       cursor: "42",
+      changed: true,
+      reset: true,
       messages: [{
         id: messageId,
-        runId,
-        body: "Change the title",
-        author: {
-          id: agentId,
-          agentId,
-          name: "Planner",
-          provider: "AGENT_PROVIDER_CLAUDE",
-        },
         updateProposal: {
           id: proposalId,
-          changes: { title: "New title" },
           changedFields: [
             "ISSUE_CHANGED_FIELD_TITLE",
             "ISSUE_CHANGED_FIELD_DESCRIPTION",
           ],
-          status: "PROPOSAL_STATUS_PENDING",
         },
-        createdAt: "2026-08-30T01:02:03Z",
-        updatedAt: "2026-08-30T01:02:04Z",
-      }],
-      agentReplies: [{
-        id: replyId,
-        triggerMessageId: messageId,
-        parentMessageId: messageId,
-        agentId,
-        agentName: "Planner",
-        status: "REPLY_JOB_STATUS_RUNNING",
-        attempts: 2,
-        workerId: "worker-1",
-        provider: "AGENT_PROVIDER_CLAUDE",
-        updatedAt: "2026-08-30T01:02:05Z",
       }],
     });
   });

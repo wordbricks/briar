@@ -30,6 +30,243 @@ import {
   unassignHuntRun,
 } from "./workers";
 
+type IssueControlApplicationInput = {
+  db: D1Database;
+  projectId: string;
+  runId: string;
+  userId: string;
+};
+
+async function requireIssueExecutionProject(
+  input: IssueControlApplicationInput,
+  capability: "issues:execute" | "issues:write",
+  deniedMessage: string,
+) {
+  const project = await getProject(input.db, input.projectId, input.userId);
+  if (!project) throw new HttpError(404, "Project not found");
+  if (!hasOrganizationCapability(project.member_role, capability)) {
+    throw new HttpError(403, deniedMessage);
+  }
+  return project;
+}
+
+export async function transferProjectIssue(
+  input: IssueControlApplicationInput & { request: unknown },
+) {
+  const sourceProject = await requireIssueExecutionProject(
+    input,
+    "issues:write",
+    "Issue editing permission required",
+  );
+  const request = decodeProjectTransferInput(input.request);
+  if (request.targetProjectId === sourceProject.id) {
+    throw new HttpError(400, "Target project must be different");
+  }
+  const targetProject = await getProject(
+    input.db,
+    request.targetProjectId,
+    input.userId,
+  );
+  if (!targetProject) throw new HttpError(404, "Target project not found");
+  if (targetProject.organization_id !== sourceProject.organization_id) {
+    throw new HttpError(
+      403,
+      "Issues can only be transferred within the same organization",
+    );
+  }
+  const outcome = await transferIssue(input.db, {
+    sourceProjectId: sourceProject.id,
+    targetProjectId: targetProject.id,
+    targetProjectName: targetProject.name,
+    runId: input.runId,
+    observedAt: new Date().toISOString(),
+  });
+  if (outcome === "not_found") throw new HttpError(404, "Run not found");
+  if (outcome === "active") {
+    throw new HttpError(409, "An active issue cannot be transferred");
+  }
+  if (outcome === "same_project") {
+    throw new HttpError(400, "Target project must be different");
+  }
+  if (outcome === "source_key_conflict") {
+    throw new HttpError(
+      409,
+      "The target project already has an issue with the same source key",
+    );
+  }
+  if (outcome === "archive_in_progress") {
+    throw new HttpError(
+      409,
+      "This issue is being archived; retry the transfer shortly",
+    );
+  }
+  if (outcome === "proposal_approval_in_progress") {
+    throw new HttpError(
+      409,
+      "This issue has an approval in progress; retry the transfer shortly",
+    );
+  }
+  if (outcome === "execution_approval_boundary") {
+    throw new HttpError(
+      409,
+      "Completed or cancelled channel-approved issues cannot be transferred",
+    );
+  }
+  return {
+    runId: input.runId,
+    sourceProjectId: sourceProject.id,
+    targetProjectId: targetProject.id,
+    outcome: "transferred" as const,
+  };
+}
+
+export async function recoverProjectIssueRun(
+  input: IssueControlApplicationInput & {
+    action: "retry" | "cancel";
+    request: unknown;
+  },
+) {
+  const project = await requireIssueExecutionProject(
+    input,
+    "issues:execute",
+    "Issue execution permission required",
+  );
+  const request = decodeRecoveryUserInput(input.request);
+  const result = await recoverHuntRun(input.db, project.id, {
+    runId: input.runId,
+    action: input.action,
+    requestId: request.requestId,
+    actor: `briar-app:${input.userId}`,
+    reason: request.reason ?? null,
+    occurredAt: new Date().toISOString(),
+  });
+  if (result.outcome === "not_found") {
+    throw new HttpError(404, "Run not found");
+  }
+  if (result.outcome === "ineligible") {
+    throw new HttpError(
+      409,
+      input.action === "retry"
+        ? "Only blocked or failed runs can be retried"
+        : "Completed or cancelled runs cannot be cancelled",
+    );
+  }
+  if (
+    input.action === "cancel" &&
+    (result.outcome === "cancelled" || result.outcome === "already_cancelled")
+  ) {
+    await auditExecutionEvent(input.db, {
+      organizationId: project.organization_id,
+      projectId: project.id,
+      runId: input.runId,
+      actorUserId: input.userId,
+      action: "cancelled",
+      requestId: request.requestId,
+      detail: { reason: request.reason ?? null },
+      occurredAt: new Date().toISOString(),
+    });
+  }
+  return { runId: input.runId, ...result };
+}
+
+export async function resumeProjectIssueRun(
+  input: IssueControlApplicationInput & { request: unknown },
+) {
+  const project = await requireIssueExecutionProject(
+    input,
+    "issues:execute",
+    "Issue execution permission required",
+  );
+  const request = decodeResumeUserInput(input.request);
+  const result = await resumeRunWithCheckpointIdentity(
+    input.db,
+    project.id,
+    input.runId,
+    request,
+    `briar-app:${input.userId}`,
+  );
+  if (result.outcome === "not_found") {
+    throw new HttpError(404, "Run not found");
+  }
+  if (result.outcome === "conflict") {
+    throw new HttpError(
+      409,
+      "The paused checkpoint changed before it could be resumed",
+      "CHECKPOINT_CONFLICT",
+    );
+  }
+  return {
+    runId: input.runId,
+    ...result,
+    workflowStage: result.nextStage,
+    startStage: result.nextStage,
+  };
+}
+
+export async function moveProjectIssueRun(
+  input: IssueControlApplicationInput & { request: unknown },
+) {
+  const project = await requireIssueExecutionProject(
+    input,
+    "issues:execute",
+    "Issue execution permission required",
+  );
+  const request = decodeMoveRunInput(input.request);
+  try {
+    const result = await moveHuntRun(input.db, project.id, {
+      runId: input.runId,
+      status: request.status,
+      workflowStage: request.workflowStage,
+      requestId: request.requestId,
+      actor: `briar-app:${input.userId}`,
+      occurredAt: new Date().toISOString(),
+    });
+    if (result.outcome === "not_found") {
+      throw new HttpError(404, "Run not found");
+    }
+    return { runId: input.runId, ...result };
+  } catch (error) {
+    if (error instanceof HuntTransitionError) {
+      throw new HttpError(409, error.message);
+    }
+    throw error;
+  }
+}
+
+export async function dispatchProjectIssueRun(
+  input: IssueControlApplicationInput & {
+    request: unknown;
+    reassign: boolean;
+  },
+) {
+  const project = await requireIssueExecutionProject(
+    input,
+    "issues:execute",
+    "Issue execution permission required",
+  );
+  const request = decodeDispatchRun(input.request);
+  const dispatched = await dispatchHuntRun(
+    input.db,
+    project.organization_id,
+    project.id,
+    {
+      runId: input.runId,
+      agentId: request.agentId ?? null,
+      provider: request.provider,
+      model: request.model,
+      effort: request.effort,
+      persistPreferences: request.persistPreferences,
+      workerId: request.workerId ?? null,
+      requestedByUserId: input.userId,
+      requestId: request.requestId,
+      occurredAt: new Date().toISOString(),
+      reassign: input.reassign,
+    },
+  );
+  if (!dispatched) throw new HttpError(404, "Run not found");
+  return dispatched;
+}
+
 export async function handleIssueControlRoute(input: {
   request: Request;
   url: URL;
@@ -48,126 +285,25 @@ export async function handleIssueControlRoute(input: {
   );
   if (issueTransferMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const sourceProject = await getProject(
+    return json(await transferProjectIssue({
       db,
-      issueTransferMatch[1],
-      session.user.id,
-    );
-    if (!sourceProject) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(sourceProject.member_role, "issues:write")) {
-      throw new HttpError(403, "Issue editing permission required");
-    }
-    const body = decodeProjectTransferInput(await readJson(request));
-    if (body.targetProjectId === sourceProject.id) {
-      throw new HttpError(400, "Target project must be different");
-    }
-    const targetProject = await getProject(
-      db,
-      body.targetProjectId,
-      session.user.id,
-    );
-    if (!targetProject) throw new HttpError(404, "Target project not found");
-    if (targetProject.organization_id !== sourceProject.organization_id) {
-      throw new HttpError(
-        403,
-        "Issues can only be transferred within the same organization",
-      );
-    }
-    const outcome = await transferIssue(db, {
-      sourceProjectId: sourceProject.id,
-      targetProjectId: targetProject.id,
-      targetProjectName: targetProject.name,
+      projectId: issueTransferMatch[1],
       runId: issueTransferMatch[2],
-      observedAt: new Date().toISOString(),
-    });
-    if (outcome === "not_found") {
-      throw new HttpError(404, "Run not found");
-    }
-    if (outcome === "active") {
-      throw new HttpError(
-        409,
-        "An active issue cannot be transferred",
-      );
-    }
-    if (outcome === "same_project") {
-      throw new HttpError(400, "Target project must be different");
-    }
-    if (outcome === "source_key_conflict") {
-      throw new HttpError(
-        409,
-        "The target project already has an issue with the same source key",
-      );
-    }
-    if (outcome === "archive_in_progress") {
-      throw new HttpError(
-        409,
-        "This issue is being archived; retry the transfer shortly",
-      );
-    }
-    if (outcome === "proposal_approval_in_progress") {
-      throw new HttpError(
-        409,
-        "This issue has an approval in progress; retry the transfer shortly",
-      );
-    }
-    if (outcome === "execution_approval_boundary") {
-      throw new HttpError(
-        409,
-        "Completed or cancelled channel-approved issues cannot be transferred",
-      );
-    }
-    return json({
-      runId: issueTransferMatch[2],
-      sourceProjectId: sourceProject.id,
-      targetProjectId: targetProject.id,
-      outcome: "transferred",
-    });
+      userId: session.user.id,
+      request: await readJson(request),
+    }));
   }
 
   if (recoveryMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const project = await getProject(db, recoveryMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
-      throw new HttpError(403, "Issue execution permission required");
-    }
-    const input = decodeRecoveryUserInput(await readJson(request));
-    const result = await recoverHuntRun(db, project.id, {
+    return json(await recoverProjectIssueRun({
+      db,
+      projectId: recoveryMatch[1],
       runId: recoveryMatch[2],
       action: recoveryMatch[3] as "retry" | "cancel",
-      requestId: input.requestId,
-      actor: `briar-app:${session.user.id}`,
-      reason: input.reason ?? null,
-      occurredAt: new Date().toISOString(),
-    });
-    if (result.outcome === "not_found") {
-      throw new HttpError(404, "Run not found");
-    }
-    if (result.outcome === "ineligible") {
-      throw new HttpError(
-        409,
-        recoveryMatch[3] === "retry"
-          ? "Only blocked or failed runs can be retried"
-          : "Completed or cancelled runs cannot be cancelled",
-      );
-    }
-    if (
-      recoveryMatch[3] === "cancel" &&
-      (result.outcome === "cancelled" ||
-        result.outcome === "already_cancelled")
-    ) {
-      await auditExecutionEvent(db, {
-        organizationId: project.organization_id,
-        projectId: project.id,
-        runId: recoveryMatch[2],
-        actorUserId: session.user.id,
-        action: "cancelled",
-        requestId: input.requestId,
-        detail: { reason: input.reason ?? null },
-        occurredAt: new Date().toISOString(),
-      });
-    }
-    return json({ runId: recoveryMatch[2], ...result });
+      userId: session.user.id,
+      request: await readJson(request),
+    }));
   }
 
   const resumeRunMatch = url.pathname.match(
@@ -175,35 +311,13 @@ export async function handleIssueControlRoute(input: {
   );
   if (resumeRunMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const project = await getProject(db, resumeRunMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
-      throw new HttpError(403, "Issue execution permission required");
-    }
-    const input = decodeResumeUserInput(await readJson(request));
-    const result = await resumeRunWithCheckpointIdentity(
+    return json(await resumeProjectIssueRun({
       db,
-      project.id,
-      resumeRunMatch[2],
-      input,
-      `briar-app:${session.user.id}`,
-    );
-    if (result.outcome === "not_found") {
-      throw new HttpError(404, "Run not found");
-    }
-    if (result.outcome === "conflict") {
-      throw new HttpError(
-        409,
-        "The paused checkpoint changed before it could be resumed",
-        "CHECKPOINT_CONFLICT",
-      );
-    }
-    return json({
+      projectId: resumeRunMatch[1],
       runId: resumeRunMatch[2],
-      ...result,
-      workflowStage: result.nextStage,
-      startStage: result.nextStage,
-    });
+      userId: session.user.id,
+      request: await readJson(request),
+    }));
   }
 
   const pausedReworkMatch = url.pathname.match(
@@ -248,31 +362,13 @@ export async function handleIssueControlRoute(input: {
   );
   if (moveRunMatch && request.method === "PUT") {
     const session = await requireSession(auth, request);
-    const project = await getProject(db, moveRunMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
-      throw new HttpError(403, "Issue execution permission required");
-    }
-    const input = decodeMoveRunInput(await readJson(request));
-    try {
-      const result = await moveHuntRun(db, project.id, {
-        runId: moveRunMatch[2],
-        status: input.status,
-        workflowStage: input.workflowStage,
-        requestId: input.requestId,
-        actor: `briar-app:${session.user.id}`,
-        occurredAt: new Date().toISOString(),
-      });
-      if (result.outcome === "not_found") {
-        throw new HttpError(404, "Run not found");
-      }
-      return json({ runId: moveRunMatch[2], ...result });
-    } catch (error) {
-      if (error instanceof HuntTransitionError) {
-        throw new HttpError(409, error.message);
-      }
-      throw error;
-    }
+    return json(await moveProjectIssueRun({
+      db,
+      projectId: moveRunMatch[1],
+      runId: moveRunMatch[2],
+      userId: session.user.id,
+      request: await readJson(request),
+    }));
   }
 
   const dispatchRunMatch = url.pathname.match(
@@ -280,32 +376,14 @@ export async function handleIssueControlRoute(input: {
   );
   if (dispatchRunMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const project = await getProject(db, dispatchRunMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
-      throw new HttpError(403, "Issue execution permission required");
-    }
-    const input = decodeDispatchRun(await readJson(request));
-    const dispatched = await dispatchHuntRun(
+    return json(await dispatchProjectIssueRun({
       db,
-      project.organization_id,
-      project.id,
-      {
-        runId: dispatchRunMatch[2],
-        agentId: input.agentId ?? null,
-        provider: input.provider,
-        model: input.model,
-        effort: input.effort,
-        persistPreferences: input.persistPreferences,
-        workerId: input.workerId ?? null,
-        requestedByUserId: session.user.id,
-        requestId: input.requestId,
-        occurredAt: new Date().toISOString(),
-        reassign: dispatchRunMatch[3] === "reassign",
-      },
-    );
-    if (!dispatched) throw new HttpError(404, "Run not found");
-    return json(dispatched);
+      projectId: dispatchRunMatch[1],
+      runId: dispatchRunMatch[2],
+      userId: session.user.id,
+      reassign: dispatchRunMatch[3] === "reassign",
+      request: await readJson(request),
+    }));
   }
 
   const unassignRunMatch = url.pathname.match(

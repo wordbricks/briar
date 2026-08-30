@@ -31,6 +31,63 @@ const isWorkerRequest = (request: Request) =>
     "Bearer briar_worker_",
   ) ?? false;
 
+export async function listProjectRunEvidence(input: {
+  db: D1Database;
+  archivesBucket: R2Bucket;
+  projectId: string;
+  runId: string;
+  userId: string;
+}) {
+  const project = await getProject(input.db, input.projectId, input.userId);
+  if (!project) throw new HttpError(404, "Project not found");
+  const [hotEvidence, revisions, hotImages, archived] = await Promise.all([
+    listRunEvidence(input.db, project.id, input.runId),
+    listRunStageRevisions(input.db, project.id, input.runId),
+    listRunEvidenceImages(input.db, project.id, input.runId),
+    listArchivedRunEvidence(
+      input.db,
+      input.archivesBucket,
+      project.id,
+      input.runId,
+    ),
+  ]);
+  if (!hotEvidence || !revisions || !hotImages) {
+    throw new HttpError(404, "Run not found");
+  }
+  const evidence = [
+    ...new Map(
+      [...archived.evidence, ...hotEvidence].map((item) => [item.id, item]),
+    ).values(),
+  ].sort(
+    (left, right) =>
+      left.observed_at.localeCompare(right.observed_at) ||
+      left.id.localeCompare(right.id),
+  );
+  const images = [
+    ...new Map(
+      [...archived.images, ...hotImages].map((item) => [item.id, item]),
+    ).values(),
+  ];
+  const imagesByEvidence = new Map<string, RunEvidenceImageRow[]>();
+  for (const image of images) {
+    const evidenceImages = imagesByEvidence.get(image.evidence_id) ?? [];
+    evidenceImages.push(image);
+    imagesByEvidence.set(image.evidence_id, evidenceImages);
+  }
+  return {
+    runId: input.runId,
+    attempt: revisions.attempt,
+    revision: revisions.revision,
+    evidence: evidence.map((item) =>
+      runEvidenceJson(
+        item,
+        revisions.requirements.get(item.workflow_stage) ?? 1,
+        imagesByEvidence.get(item.id) ?? [],
+      )
+    ),
+  };
+}
+
 export async function handleRunEvidenceRoute(input: {
   request: Request;
   url: URL;
@@ -57,58 +114,13 @@ export async function handleRunEvidenceRoute(input: {
   );
   if (projectRunEvidenceMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
-    const project = await getProject(
+    return json(await listProjectRunEvidence({
       db,
-      projectRunEvidenceMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const [hotEvidence, revisions, hotImages, archived] = await Promise.all([
-      listRunEvidence(db, project.id, projectRunEvidenceMatch[2]),
-      listRunStageRevisions(db, project.id, projectRunEvidenceMatch[2]),
-      listRunEvidenceImages(db, project.id, projectRunEvidenceMatch[2]),
-      listArchivedRunEvidence(
-        db,
-        archivesBucket,
-        project.id,
-        projectRunEvidenceMatch[2],
-      ),
-    ]);
-    if (!hotEvidence || !revisions || !hotImages) {
-      throw new HttpError(404, "Run not found");
-    }
-    const evidence = [
-      ...new Map(
-        [...archived.evidence, ...hotEvidence].map((item) => [item.id, item]),
-      ).values(),
-    ].sort(
-      (left, right) =>
-        left.observed_at.localeCompare(right.observed_at) ||
-        left.id.localeCompare(right.id),
-    );
-    const images = [
-      ...new Map(
-        [...archived.images, ...hotImages].map((item) => [item.id, item]),
-      ).values(),
-    ];
-    const imagesByEvidence = new Map<string, RunEvidenceImageRow[]>();
-    for (const image of images) {
-      const evidenceImages = imagesByEvidence.get(image.evidence_id) ?? [];
-      evidenceImages.push(image);
-      imagesByEvidence.set(image.evidence_id, evidenceImages);
-    }
-    return json({
+      archivesBucket,
+      projectId: projectRunEvidenceMatch[1],
       runId: projectRunEvidenceMatch[2],
-      attempt: revisions.attempt,
-      revision: revisions.revision,
-      evidence: evidence.map((item) =>
-        runEvidenceJson(
-          item,
-          revisions.requirements.get(item.workflow_stage) ?? 1,
-          imagesByEvidence.get(item.id) ?? [],
-        )
-      ),
-    });
+      userId: session.user.id,
+    }));
   }
 
   const projectEvidenceImageMatch = url.pathname.match(

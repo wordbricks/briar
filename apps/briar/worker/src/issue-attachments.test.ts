@@ -572,12 +572,24 @@ describe("issue update multipart input", () => {
     expect(result.keptAttachmentIds).toEqual([existingAttachmentId]);
   });
 
-  it("keeps keptAttachmentIds undefined when the field is absent", async () => {
+  it("preserves omitted multipart patch fields", async () => {
+    const form = new FormData();
+    form.set("title", "Edited screenshot issue");
+    form.append(
+      "attachments",
+      new File(["image"], "inline.png", { type: "image/png" }),
+    );
+    form.set("attachmentReferences", JSON.stringify(["draft-update-1"]));
     const result = await readIssueUpdateRequest(
-      updateRequest(new File(["image"], "inline.png", { type: "image/png" })),
+      new Request("https://briar.example/projects/project/runs/run", {
+        method: "PATCH",
+        headers: { "Content-Length": "4096" },
+        body: form,
+      }),
     );
 
     expect(result.keptAttachmentIds).toBeUndefined();
+    expect(result.input).not.toHaveProperty("assigneeUserId");
   });
 
   it("rejects malformed kept attachment IDs", async () => {

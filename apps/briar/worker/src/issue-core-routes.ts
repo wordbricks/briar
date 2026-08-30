@@ -1,3 +1,5 @@
+import { maxIssueAttachmentCount } from "../../src/lib/issue-attachments";
+import { isIssueAttachmentReference } from "../../src/lib/issue-markdown";
 import { processArchiveCleanupQueue } from "./archive";
 import type { BriarAuth } from "./auth";
 import {
@@ -19,13 +21,16 @@ import { issueAttachmentJson } from "./issue-conversation-json";
 import { hasOrganizationCapability } from "./organization-access";
 import {
   decodeExecutionPreferences,
+  decodeIssueInput,
+  decodeIssueKeptAttachmentIds,
+  decodeIssueUpdateInput,
 } from "./issue-request-contract";
 import {
   createIssueWithAttachments,
   updateIssueWithAttachments,
 } from "./issue-write-service";
 import { listProjectMembers } from "./organization-repository";
-import { responseWithPostCommitCleanup } from "./post-commit-cleanup";
+import { schedulePostCommitCleanup } from "./post-commit-cleanup";
 import {
   readIssueRequest,
   readIssueUpdateRequest,
@@ -47,6 +52,321 @@ async function requireIssueAssigneeMembership(
       "Assignee must have access to the project",
     );
   }
+}
+
+const validateAttachmentReferences = (references: readonly string[]) => {
+  if (
+    references.length > maxIssueAttachmentCount ||
+    !references.every(isIssueAttachmentReference)
+  ) {
+    throw new HttpError(400, "Attachment references are invalid");
+  }
+  return [...references];
+};
+
+type IssueCoreApplicationInput = {
+  db: D1Database;
+  projectId: string;
+  userId: string;
+};
+
+async function requireIssueProject(
+  input: IssueCoreApplicationInput,
+  capability: "issues:execute" | "issues:write" | "organization:read" |
+    "results:review",
+  deniedMessage: string,
+) {
+  const project = await getProject(input.db, input.projectId, input.userId);
+  if (!project) throw new HttpError(404, "Project not found");
+  if (!hasOrganizationCapability(project.member_role, capability)) {
+    throw new HttpError(403, deniedMessage);
+  }
+  return project;
+}
+
+export async function createProjectIssue(
+  input: IssueCoreApplicationInput & {
+    attachmentsBucket: R2Bucket;
+    request: unknown;
+    attachments: File[];
+    attachmentReferences: string[];
+  },
+) {
+  const project = await requireIssueProject(
+    input,
+    "issues:write",
+    "Issue editing permission required",
+  );
+  const issue = decodeIssueInput(input.request);
+  const attachmentReferences = validateAttachmentReferences(
+    input.attachmentReferences,
+  );
+  await requireIssueAssigneeMembership(
+    input.db,
+    project.id,
+    issue.assigneeUserId,
+  );
+  const issueId = crypto.randomUUID();
+  const sourceKey = `briar-issue:${issueId}`;
+  const detail = issue.status === "backlog"
+    ? "Briar 앱에서 생성된 이슈가 백로그에 추가되었습니다."
+    : "Briar 앱에서 생성된 이슈가 처리를 기다리고 있습니다.";
+  const created = await createIssueWithAttachments({
+    db: input.db,
+    attachmentsBucket: input.attachmentsBucket,
+    project,
+    issue,
+    attachments: input.attachments,
+    attachmentReferences,
+    sourceKey,
+    actor: "briar-app",
+    detail,
+    context: { origin: "briar-app" },
+    issueId,
+    createdByUserId: input.userId,
+  });
+  return {
+    runId: created.runId,
+    sourceKey,
+    stage: "queued" as const,
+    status: issue.status,
+    assigneeUserId: issue.assigneeUserId ?? null,
+    createdByUserId: input.userId,
+    difficulty: issue.difficulty,
+    attachments: created.attachments.map(issueAttachmentJson),
+  };
+}
+
+export async function updateProjectIssue(
+  input: IssueCoreApplicationInput & {
+    attachmentsBucket: R2Bucket;
+    runId: string;
+    request: unknown;
+    attachments: File[];
+    attachmentReferences: string[];
+    keptAttachmentIds?: string[];
+  },
+) {
+  const project = await requireIssueProject(
+    input,
+    "issues:write",
+    "Issue editing permission required",
+  );
+  const issue = decodeIssueUpdateInput(input.request);
+  const attachmentReferences = validateAttachmentReferences(
+    input.attachmentReferences,
+  );
+  const keptAttachmentIds = input.keptAttachmentIds === undefined
+    ? undefined
+    : decodeIssueKeptAttachmentIds(input.keptAttachmentIds);
+  await requireIssueAssigneeMembership(
+    input.db,
+    project.id,
+    issue.assigneeUserId,
+  );
+  const run = await updateIssueWithAttachments({
+    db: input.db,
+    attachmentsBucket: input.attachmentsBucket,
+    project,
+    runId: input.runId,
+    issue,
+    attachments: input.attachments,
+    attachmentReferences,
+    keptAttachmentIds,
+    updatedAt: new Date().toISOString(),
+  });
+  return {
+    runId: run.id,
+    title: run.title,
+    description: run.issue_description,
+    priority: run.priority,
+    difficulty: run.difficulty,
+    assigneeUserId: run.assignee_user_id,
+    attachments: (await listIssueAttachments(
+      input.db,
+      project.id,
+      input.runId,
+    )).map(issueAttachmentJson),
+  };
+}
+
+export async function deleteProjectIssue(
+  input: IssueCoreApplicationInput & {
+    runId: string;
+    attachmentsBucket: R2Bucket;
+    archivesBucket: R2Bucket;
+    context?: ExecutionContext;
+  },
+) {
+  const project = await requireIssueProject(
+    input,
+    "issues:write",
+    "Issue editing permission required",
+  );
+  const observedAt = new Date().toISOString();
+  const outcome = await deleteIssue(
+    input.db,
+    project.id,
+    input.runId,
+    observedAt,
+  );
+  if (outcome === "not_found") throw new HttpError(404, "Run not found");
+  if (outcome === "active") {
+    throw new HttpError(409, "An active issue cannot be deleted");
+  }
+  void schedulePostCommitCleanup({
+    context: input.context,
+    operation: "issue_delete",
+    observedAt,
+    tasks: [{
+      queue: "archive",
+      run: () => processArchiveCleanupQueue(
+        input.db,
+        input.archivesBucket,
+        input.attachmentsBucket,
+        observedAt,
+        1_000,
+      ),
+    }],
+  });
+  return { deleted: true as const };
+}
+
+export async function setProjectIssueSubscription(
+  input: IssueCoreApplicationInput & { runId: string; subscribed: boolean },
+) {
+  const project = await requireIssueProject(
+    input,
+    "organization:read",
+    "Project reading permission required",
+  );
+  const run = await getHuntRunForProject(input.db, project.id, input.runId);
+  if (!run) throw new HttpError(404, "Run not found");
+  if (!input.subscribed) {
+    if (run.assignee_user_id === input.userId) {
+      throw new HttpError(
+        409,
+        "The issue assignee must remain subscribed",
+        "ISSUE_ASSIGNEE_SUBSCRIPTION_REQUIRED",
+      );
+    }
+    await unsubscribeIssue(input.db, project.id, run.id, input.userId);
+  } else {
+    await subscribeIssue(
+      input.db,
+      project.id,
+      run.id,
+      input.userId,
+      new Date().toISOString(),
+    );
+  }
+  const subscribers = await listIssueSubscriptions(input.db, project.id, run.id);
+  return {
+    runId: run.id,
+    subscribers: subscribers.map((subscriber) => ({
+      userId: subscriber.user_id,
+      subscribedAt: subscriber.created_at,
+    })),
+  };
+}
+
+export async function setProjectIssueDependency(
+  input: IssueCoreApplicationInput & {
+    dependentRunId: string;
+    prerequisiteRunId: string;
+    enabled: boolean;
+  },
+) {
+  const project = await requireIssueProject(
+    input,
+    "issues:write",
+    "Issue editing permission required",
+  );
+  if (!input.enabled) {
+    const deleted = await deleteIssueDependency(
+      input.db,
+      project.id,
+      input.prerequisiteRunId,
+      input.dependentRunId,
+    );
+    return {
+      prerequisiteRunId: input.prerequisiteRunId,
+      dependentRunId: input.dependentRunId,
+      outcome: deleted ? "removed" as const : "already_removed" as const,
+    };
+  }
+  const outcome = await createIssueDependency(input.db, project.id, {
+    dependentRunId: input.dependentRunId,
+    prerequisiteRunId: input.prerequisiteRunId,
+    createdByUserId: input.userId,
+    createdAt: new Date().toISOString(),
+  });
+  if (outcome === "not_found") {
+    throw new HttpError(404, "Dependency issue not found");
+  }
+  if (outcome === "cycle") {
+    throw new HttpError(409, "Dependency would create a cycle");
+  }
+  if (outcome === "ineligible") {
+    throw new HttpError(
+      409,
+      "Dependencies cannot be added after an issue starts executing",
+    );
+  }
+  return {
+    prerequisiteRunId: input.prerequisiteRunId,
+    dependentRunId: input.dependentRunId,
+    outcome,
+  };
+}
+
+export async function updateProjectIssuePreferences(
+  input: IssueCoreApplicationInput & { runId: string; request: unknown },
+) {
+  const project = await requireIssueProject(
+    input,
+    "issues:execute",
+    "Issue execution permission required",
+  );
+  const request = decodeExecutionPreferences(input.request);
+  const run = await updateIssueExecutionPreferences(
+    input.db,
+    project.id,
+    input.runId,
+    { ...request, updatedAt: new Date().toISOString() },
+  );
+  if (!run) throw new HttpError(404, "Run not found");
+  return {
+    runId: run.id,
+    provider: run.preferred_agent_provider,
+    model: run.preferred_agent_model,
+    effort: run.preferred_agent_effort,
+  };
+}
+
+export async function completeProjectIssueResultReview(
+  input: IssueCoreApplicationInput & { runId: string },
+) {
+  const project = await requireIssueProject(
+    input,
+    "results:review",
+    "Result review permission required",
+  );
+  const review = await completeIssueResultReview(
+    input.db,
+    project.id,
+    input.runId,
+    input.userId,
+    new Date().toISOString(),
+  );
+  if (!review) throw new HttpError(404, "Run not found");
+  return {
+    userId: review.user_id,
+    name: review.name,
+    username: review.username,
+    image: review.image,
+    completedAt: review.completed_at,
+  };
 }
 
 export async function handleIssueCoreRoute(input: {
@@ -71,51 +391,17 @@ export async function handleIssueCoreRoute(input: {
   const issuesMatch = url.pathname.match(/^\/projects\/([0-9a-f-]+)\/issues$/u);
   if (issuesMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const project = await getProject(db, issuesMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
-      throw new HttpError(403, "Issue editing permission required");
-    }
-    const { input, attachments, attachmentReferences } =
+    const issueRequest =
       await readIssueRequest(request);
-    await requireIssueAssigneeMembership(
+    return json(await createProjectIssue({
       db,
-      project.id,
-      input.assigneeUserId,
-    );
-    const issueId = crypto.randomUUID();
-    const sourceKey = `briar-issue:${issueId}`;
-    const detail =
-      input.status === "backlog"
-        ? "Briar 앱에서 생성된 이슈가 백로그에 추가되었습니다."
-        : "Briar 앱에서 생성된 이슈가 처리를 기다리고 있습니다.";
-    const created = await createIssueWithAttachments({
-      db,
+      projectId: issuesMatch[1],
+      userId: session.user.id,
       attachmentsBucket,
-      project,
-      issue: input,
-      attachments,
-      attachmentReferences,
-      sourceKey,
-      actor: "briar-app",
-      detail,
-      context: { origin: "briar-app" },
-      issueId,
-      createdByUserId: session.user.id,
-    });
-    return json(
-      {
-        runId: created.runId,
-        sourceKey,
-        stage: "queued",
-        status: input.status,
-        assigneeUserId: input.assigneeUserId ?? null,
-        createdByUserId: session.user.id,
-        difficulty: input.difficulty,
-        attachments: created.attachments.map(issueAttachmentJson),
-      },
-      201,
-    );
+      request: issueRequest.input,
+      attachments: issueRequest.attachments,
+      attachmentReferences: issueRequest.attachmentReferences,
+    }), 201);
   }
 
   const issueUpdateMatch = url.pathname.match(
@@ -141,133 +427,47 @@ export async function handleIssueCoreRoute(input: {
     (request.method === "PUT" || request.method === "DELETE")
   ) {
     const session = await requireSession(auth, request);
-    const project = await getProject(
+    return json(await setProjectIssueSubscription({
       db,
-      issueSubscriptionMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "organization:read")) {
-      throw new HttpError(403, "Project reading permission required");
-    }
-    const run = await getHuntRunForProject(
-      db,
-      project.id,
-      issueSubscriptionMatch[2],
-    );
-    if (!run) throw new HttpError(404, "Run not found");
-    if (request.method === "DELETE") {
-      if (run.assignee_user_id === session.user.id) {
-        throw new HttpError(
-          409,
-          "The issue assignee must remain subscribed",
-          "ISSUE_ASSIGNEE_SUBSCRIPTION_REQUIRED",
-        );
-      }
-      await unsubscribeIssue(db, project.id, run.id, session.user.id);
-    } else {
-      await subscribeIssue(
-        db,
-        project.id,
-        run.id,
-        session.user.id,
-        new Date().toISOString(),
-      );
-    }
-    const subscribers = await listIssueSubscriptions(db, project.id, run.id);
-    return json({
-      runId: run.id,
-      subscribers: subscribers.map((subscriber) => ({
-        userId: subscriber.user_id,
-        subscribedAt: subscriber.created_at,
-      })),
-    });
+      projectId: issueSubscriptionMatch[1],
+      runId: issueSubscriptionMatch[2],
+      userId: session.user.id,
+      subscribed: request.method === "PUT",
+    }));
   }
   if (issueDependencyMatch && request.method === "PUT") {
     const session = await requireSession(auth, request);
-    const project = await getProject(
+    const result = await setProjectIssueDependency({
       db,
-      issueDependencyMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
-      throw new HttpError(403, "Issue editing permission required");
-    }
-    const outcome = await createIssueDependency(db, project.id, {
+      projectId: issueDependencyMatch[1],
       dependentRunId: issueDependencyMatch[2],
       prerequisiteRunId: issueDependencyMatch[3],
-      createdByUserId: session.user.id,
-      createdAt: new Date().toISOString(),
+      userId: session.user.id,
+      enabled: true,
     });
-    if (outcome === "not_found") {
-      throw new HttpError(404, "Dependency issue not found");
-    }
-    if (outcome === "cycle") {
-      throw new HttpError(409, "Dependency would create a cycle");
-    }
-    if (outcome === "ineligible") {
-      throw new HttpError(
-        409,
-        "Dependencies cannot be added after an issue starts executing",
-      );
-    }
-    return json(
-      {
-        prerequisiteRunId: issueDependencyMatch[3],
-        dependentRunId: issueDependencyMatch[2],
-        outcome,
-      },
-      outcome === "created" ? 201 : 200,
-    );
+    return json(result, result.outcome === "created" ? 201 : 200);
   }
   if (issueDependencyMatch && request.method === "DELETE") {
     const session = await requireSession(auth, request);
-    const project = await getProject(
+    await setProjectIssueDependency({
       db,
-      issueDependencyMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
-      throw new HttpError(403, "Issue editing permission required");
-    }
-    await deleteIssueDependency(
-      db,
-      project.id,
-      issueDependencyMatch[3],
-      issueDependencyMatch[2],
-    );
+      projectId: issueDependencyMatch[1],
+      dependentRunId: issueDependencyMatch[2],
+      prerequisiteRunId: issueDependencyMatch[3],
+      userId: session.user.id,
+      enabled: false,
+    });
     return new Response(null, { status: 204, headers: corsHeaders });
   }
   if (issuePreferencesMatch && request.method === "PUT") {
     const session = await requireSession(auth, request);
-    const project = await getProject(
+    return json(await updateProjectIssuePreferences({
       db,
-      issuePreferencesMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
-      throw new HttpError(403, "Issue execution permission required");
-    }
-    const input = decodeExecutionPreferences(await readJson(request));
-    const run = await updateIssueExecutionPreferences(
-      db,
-      project.id,
-      issuePreferencesMatch[2],
-      {
-        ...input,
-        updatedAt: new Date().toISOString(),
-      },
-    );
-    if (!run) throw new HttpError(404, "Run not found");
-    return json({
-      runId: run.id,
-      provider: run.preferred_agent_provider,
-      model: run.preferred_agent_model,
-      effort: run.preferred_agent_effort,
-    });
+      projectId: issuePreferencesMatch[1],
+      runId: issuePreferencesMatch[2],
+      userId: session.user.id,
+      request: await readJson(request),
+    }));
   }
   if (issueCheckpointsMatch && request.method === "PUT") {
     const session = await requireSession(auth, request);
@@ -302,108 +502,41 @@ export async function handleIssueCoreRoute(input: {
   }
   if (issueResultReviewsMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const project = await getProject(
+    return json(await completeProjectIssueResultReview({
       db,
-      issueResultReviewsMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "results:review")) {
-      throw new HttpError(403, "Result review permission required");
-    }
-    const review = await completeIssueResultReview(
-      db,
-      project.id,
-      issueResultReviewsMatch[2],
-      session.user.id,
-      new Date().toISOString(),
-    );
-    if (!review) throw new HttpError(404, "Run not found");
-    return json({
-      userId: review.user_id,
-      name: review.name,
-      username: review.username,
-      image: review.image,
-      completedAt: review.completed_at,
-    });
+      projectId: issueResultReviewsMatch[1],
+      runId: issueResultReviewsMatch[2],
+      userId: session.user.id,
+    }));
   }
   if (issueUpdateMatch && request.method === "PATCH") {
     const session = await requireSession(auth, request);
-    const project = await getProject(db, issueUpdateMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
-      throw new HttpError(403, "Issue editing permission required");
-    }
-    const { input, attachments, attachmentReferences, keptAttachmentIds } =
+    const issueRequest =
       await readIssueUpdateRequest(request);
-    await requireIssueAssigneeMembership(
+    return json(await updateProjectIssue({
       db,
-      project.id,
-      input.assigneeUserId,
-    );
-    const run = await updateIssueWithAttachments({
-      db,
+      projectId: issueUpdateMatch[1],
+      userId: session.user.id,
       attachmentsBucket,
-      project,
       runId: issueUpdateMatch[2],
-      issue: input,
-      attachments,
-      attachmentReferences,
-      keptAttachmentIds,
-      updatedAt: new Date().toISOString(),
-    });
-    return json({
-      runId: run.id,
-      title: run.title,
-      description: run.issue_description,
-      priority: run.priority,
-      difficulty: run.difficulty,
-      assigneeUserId: run.assignee_user_id,
-      attachments: (await listIssueAttachments(
-        db,
-        project.id,
-        issueUpdateMatch[2],
-      )).map(issueAttachmentJson),
-    });
+      request: issueRequest.input,
+      attachments: issueRequest.attachments,
+      attachmentReferences: issueRequest.attachmentReferences,
+      keptAttachmentIds: issueRequest.keptAttachmentIds,
+    }));
   }
   if (issueUpdateMatch && request.method === "DELETE") {
     const session = await requireSession(auth, request);
-    const project = await getProject(db, issueUpdateMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
-      throw new HttpError(403, "Issue editing permission required");
-    }
-    const observedAt = new Date().toISOString();
-    const outcome = await deleteIssue(
+    await deleteProjectIssue({
       db,
-      project.id,
-      issueUpdateMatch[2],
-      observedAt,
-    );
-    if (outcome === "not_found") {
-      throw new HttpError(404, "Run not found");
-    }
-    if (outcome === "active") {
-      throw new HttpError(409, "An active issue cannot be deleted");
-    }
-    return responseWithPostCommitCleanup(
-      new Response(null, { status: 204, headers: corsHeaders }),
-      {
-        context,
-        operation: "issue_delete",
-        observedAt,
-        tasks: [{
-          queue: "archive",
-          run: () => processArchiveCleanupQueue(
-            db,
-            archivesBucket,
-            attachmentsBucket,
-            observedAt,
-            1_000,
-          ),
-        }],
-      },
-    );
+      projectId: issueUpdateMatch[1],
+      userId: session.user.id,
+      runId: issueUpdateMatch[2],
+      attachmentsBucket,
+      archivesBucket,
+      context,
+    });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
 

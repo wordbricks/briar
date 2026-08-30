@@ -27,22 +27,40 @@ import * as Predicate from "effect/Predicate";
 import { agentSkillConflictMessage } from "./agent-skills";
 import type { BriarAuth } from "./auth";
 import {
-  createIssueDependency,
-  deleteIssueDependency,
-  getProject,
-} from "./db";
+  createProjectIssueMessage,
+  getProjectIssueAgentReply,
+  listProjectIssueMessages,
+  syncProjectIssueMessages,
+} from "./issue-conversation-routes";
+import {
+  dispatchProjectIssueRun,
+  moveProjectIssueRun,
+  recoverProjectIssueRun,
+  resumeProjectIssueRun,
+  transferProjectIssue,
+} from "./issue-control-routes";
+import {
+  completeProjectIssueResultReview,
+  createProjectIssue,
+  deleteProjectIssue,
+  setProjectIssueDependency,
+  setProjectIssueSubscription,
+  updateProjectIssue,
+  updateProjectIssuePreferences,
+} from "./issue-core-routes";
 import { HttpError } from "./http-response";
-import { handleIssueConversationRoute } from "./issue-conversation-routes";
-import { handleIssueControlRoute } from "./issue-control-routes";
-import { handleIssueCoreRoute } from "./issue-core-routes";
-import { handleIssueProposalRoute } from "./issue-proposal-routes";
-import { hasOrganizationCapability } from "./organization-access";
+import {
+  acceptProjectIssueActionProposal,
+  acceptProjectIssueExecutionProposal,
+  acceptProjectIssueReworkProposal,
+  acceptProjectIssueSkillExecutionProposal,
+} from "./issue-proposal-routes";
 import {
   scheduleProjectAgentSessionRealtimePublish,
   scheduleProjectRealtimePublish,
 } from "./realtime-scheduling";
 import { RequestDecodeError, decodeRequestSync } from "./request-schema";
-import { handleRunEvidenceRoute } from "./run-evidence-routes";
+import { listProjectRunEvidence } from "./run-evidence-routes";
 import { UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
 import { WorkerConflictError } from "./workers";
@@ -53,17 +71,57 @@ export type AppConnectIssueRouteInput = {
   readonly db: D1Database;
   readonly env: Env;
   readonly context?: ExecutionContext;
-  readonly routeHandlers?: Partial<AppConnectIssueRouteHandlers>;
 };
 
-type LegacyRoute = "conversation" | "control" | "core" | "evidence" | "proposal";
+export type AppConnectIssueServices = {
+  readonly acceptActionProposal: typeof acceptProjectIssueActionProposal;
+  readonly acceptExecutionProposal: typeof acceptProjectIssueExecutionProposal;
+  readonly acceptReworkProposal: typeof acceptProjectIssueReworkProposal;
+  readonly acceptSkillExecutionProposal:
+    typeof acceptProjectIssueSkillExecutionProposal;
+  readonly completeResultReview: typeof completeProjectIssueResultReview;
+  readonly createIssue: typeof createProjectIssue;
+  readonly createMessage: typeof createProjectIssueMessage;
+  readonly deleteIssue: typeof deleteProjectIssue;
+  readonly dispatchRun: typeof dispatchProjectIssueRun;
+  readonly getAgentReply: typeof getProjectIssueAgentReply;
+  readonly listEvidence: typeof listProjectRunEvidence;
+  readonly listMessages: typeof listProjectIssueMessages;
+  readonly moveRun: typeof moveProjectIssueRun;
+  readonly recoverRun: typeof recoverProjectIssueRun;
+  readonly requireSession: typeof requireSession;
+  readonly resumeRun: typeof resumeProjectIssueRun;
+  readonly setDependency: typeof setProjectIssueDependency;
+  readonly setSubscription: typeof setProjectIssueSubscription;
+  readonly syncMessages: typeof syncProjectIssueMessages;
+  readonly transferIssue: typeof transferProjectIssue;
+  readonly updateIssue: typeof updateProjectIssue;
+  readonly updatePreferences: typeof updateProjectIssuePreferences;
+};
 
-export type AppConnectIssueRouteHandlers = {
-  readonly conversation: typeof handleIssueConversationRoute;
-  readonly control: typeof handleIssueControlRoute;
-  readonly core: typeof handleIssueCoreRoute;
-  readonly evidence: typeof handleRunEvidenceRoute;
-  readonly proposal: typeof handleIssueProposalRoute;
+export const appConnectIssueServices: AppConnectIssueServices = {
+  acceptActionProposal: acceptProjectIssueActionProposal,
+  acceptExecutionProposal: acceptProjectIssueExecutionProposal,
+  acceptReworkProposal: acceptProjectIssueReworkProposal,
+  acceptSkillExecutionProposal: acceptProjectIssueSkillExecutionProposal,
+  completeResultReview: completeProjectIssueResultReview,
+  createIssue: createProjectIssue,
+  createMessage: createProjectIssueMessage,
+  deleteIssue: deleteProjectIssue,
+  dispatchRun: dispatchProjectIssueRun,
+  getAgentReply: getProjectIssueAgentReply,
+  listEvidence: listProjectRunEvidence,
+  listMessages: listProjectIssueMessages,
+  moveRun: moveProjectIssueRun,
+  recoverRun: recoverProjectIssueRun,
+  requireSession,
+  resumeRun: resumeProjectIssueRun,
+  setDependency: setProjectIssueDependency,
+  setSubscription: setProjectIssueSubscription,
+  syncMessages: syncProjectIssueMessages,
+  transferIssue: transferProjectIssue,
+  updateIssue: updateProjectIssue,
+  updatePreferences: updateProjectIssuePreferences,
 };
 
 const decodeUuid = decodeRequestSync(UuidString);
@@ -389,144 +447,6 @@ const checkpointPositionJson = (position: WorkflowCheckpoint_Position) => {
   }
 };
 
-const legacyRequest = (
-  input: AppConnectIssueRouteInput,
-  path: string,
-  method: string,
-  body?: JsonObject,
-) => {
-  const headers = new Headers(input.request.headers);
-  headers.delete("content-encoding");
-  headers.delete("content-length");
-  headers.delete("connect-protocol-version");
-  headers.delete("connect-timeout-ms");
-  if (body !== undefined) headers.set("content-type", "application/json");
-  return new Request(new URL(path, input.request.url), {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-};
-
-const parseLegacyResponse = async (response: Response | undefined) => {
-  if (!response) {
-    throw new ConnectError(
-      "The RPC did not match its Worker route",
-      Code.Internal,
-    );
-  }
-  if (response.status === 204) return null;
-  const body: unknown = await response.json();
-  if (!response.ok) {
-    const message = Predicate.isObject(body) && typeof body.message === "string"
-      ? body.message
-      : `Worker route failed with status ${response.status}`;
-    const code = Predicate.isObject(body) && typeof body.code === "string"
-      ? body.code
-      : undefined;
-    throw new HttpError(response.status, message, code);
-  }
-  return body;
-};
-
-const callLegacyRoute = async (
-  input: AppConnectIssueRouteInput,
-  route: LegacyRoute,
-  path: string,
-  method: string,
-  body?: JsonObject,
-) => {
-  const request = legacyRequest(input, path, method, body);
-  const url = new URL(request.url);
-  switch (route) {
-    case "core":
-      return parseLegacyResponse(await (
-        input.routeHandlers?.core ?? handleIssueCoreRoute
-      )({
-        request,
-        url,
-        auth: input.auth,
-        db: input.db,
-        attachmentsBucket: input.env.ATTACHMENTS,
-        archivesBucket: input.env.ARCHIVES,
-        context: input.context,
-      }));
-    case "control":
-      return parseLegacyResponse(await (
-        input.routeHandlers?.control ?? handleIssueControlRoute
-      )({
-        request,
-        url,
-        auth: input.auth,
-        db: input.db,
-        archivesBucket: input.env.ARCHIVES,
-      }));
-    case "proposal":
-      return parseLegacyResponse(await (
-        input.routeHandlers?.proposal ?? handleIssueProposalRoute
-      )({
-        request,
-        url,
-        auth: input.auth,
-        db: input.db,
-        attachmentsBucket: input.env.ATTACHMENTS,
-        archivesBucket: input.env.ARCHIVES,
-      }));
-    case "conversation":
-      return parseLegacyResponse(await (
-        input.routeHandlers?.conversation ?? handleIssueConversationRoute
-      )({
-        request,
-        url,
-        auth: input.auth,
-        db: input.db,
-        attachmentsBucket: input.env.ATTACHMENTS,
-        archivesBucket: input.env.ARCHIVES,
-        requireRunExecutionProject: async () => {
-          throw new ConnectError(
-            "Binary issue attachments are not served by Connect",
-            Code.Unimplemented,
-          );
-        },
-        requireProjectAccess: async () => {
-          throw new ConnectError(
-            "Binary issue attachments are not served by Connect",
-            Code.Unimplemented,
-          );
-        },
-      }));
-    case "evidence":
-      return parseLegacyResponse(await (
-        input.routeHandlers?.evidence ?? handleRunEvidenceRoute
-      )({
-        request,
-        url,
-        auth: input.auth,
-        db: input.db,
-        attachmentsBucket: input.env.ATTACHMENTS,
-        archivesBucket: input.env.ARCHIVES,
-        requireRunExecutionProject: async () => {
-          throw new ConnectError(
-            "Binary evidence images are not served by Connect",
-            Code.Unimplemented,
-          );
-        },
-        requireProjectAccess: async () => {
-          throw new ConnectError(
-            "Binary evidence images are not served by Connect",
-            Code.Unimplemented,
-          );
-        },
-      }));
-  }
-};
-
-const projectPath = (projectId: string) =>
-  `/projects/${canonicalUuid(projectId)}`;
-
-const runPath = (projectId: string, runId: string) =>
-  `${projectPath(projectId)}/runs/${canonicalUuid(runId)}`;
-
 const mutated = async <A>(
   input: AppConnectIssueRouteInput,
   projectIds: readonly string[],
@@ -546,15 +466,17 @@ const mutated = async <A>(
 
 export const createAppIssueService = (
   input: AppConnectIssueRouteInput,
+  services: AppConnectIssueServices = appConnectIssueServices,
 ): ServiceImpl<typeof IssueService> => ({
   createIssue: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "core",
-        `${projectPath(request.projectId)}/issues`,
-        "POST",
-        {
+      services.createIssue({
+        db: input.db,
+        attachmentsBucket: input.env.ATTACHMENTS,
+        projectId: canonicalUuid(request.projectId),
+        userId: session.user.id,
+        request: {
           title: request.title,
           description: request.description ?? null,
           priority: request.priority ?? null,
@@ -572,21 +494,24 @@ export const createAppIssueService = (
             stage: checkpoint.stage,
             position: checkpointPositionJson(checkpoint.position),
           })),
-          attachmentReferences: request.attachmentReferences,
         },
-      )
+        attachments: [],
+        attachmentReferences: request.attachmentReferences,
+      })
     );
     return responseMessage(IssueService.method.createIssue.output, result);
   }),
 
   updateIssue: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "core",
-        runPath(request.projectId, request.runId),
-        "PATCH",
-        {
+      services.updateIssue({
+        db: input.db,
+        attachmentsBucket: input.env.ATTACHMENTS,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+        request: {
           title: request.title,
           description: request.description ?? null,
           priority: request.priority ?? null,
@@ -596,24 +521,27 @@ export const createAppIssueService = (
             : request.assigneeUpdate.case === "clearAssignee"
             ? { assigneeUserId: null }
             : {}),
-          attachmentReferences: request.attachmentReferences,
-          ...(request.keptAttachmentIds === undefined
-            ? {}
-            : { keptAttachmentIds: request.keptAttachmentIds.values }),
         },
-      )
+        attachments: [],
+        attachmentReferences: request.attachmentReferences,
+        keptAttachmentIds: request.keptAttachmentIds?.values,
+      })
     );
     return responseMessage(IssueService.method.updateIssue.output, result);
   }),
 
   deleteIssue: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
     await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "core",
-        runPath(request.projectId, request.runId),
-        "DELETE",
-      )
+      services.deleteIssue({
+        db: input.db,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+        attachmentsBucket: input.env.ATTACHMENTS,
+        archivesBucket: input.env.ARCHIVES,
+        context: input.context,
+      })
     );
     return responseMessage(IssueService.method.deleteIssue.output, {
       deleted: true,
@@ -622,29 +550,31 @@ export const createAppIssueService = (
 
   transferIssue: (request) => rpc(async () => {
     const targetProjectId = canonicalUuid(request.targetProjectId);
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(
       input,
       [request.projectId, targetProjectId],
-      () =>
-        callLegacyRoute(
-          input,
-          "control",
-          `${runPath(request.projectId, request.runId)}/transfer`,
-          "POST",
-          { targetProjectId },
-        ),
+      () => services.transferIssue({
+        db: input.db,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+        request: { targetProjectId },
+      }),
     );
     return responseMessage(IssueService.method.transferIssue.output, result);
   }),
 
   setIssueSubscription: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "core",
-        `${runPath(request.projectId, request.runId)}/subscription`,
-        request.subscribed ? "PUT" : "DELETE",
-      )
+      services.setSubscription({
+        db: input.db,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+        subscribed: request.subscribed,
+      })
     );
     return responseMessage(
       IssueService.method.setIssueSubscription.output,
@@ -653,20 +583,21 @@ export const createAppIssueService = (
   }),
 
   updateIssuePreferences: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "core",
-        `${runPath(request.projectId, request.runId)}/preferences`,
-        "PUT",
-        {
+      services.updatePreferences({
+        db: input.db,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+        request: {
           provider: request.provider === undefined
             ? null
             : providerJson(request.provider) ?? null,
           model: request.model ?? null,
           effort: request.effort ?? null,
         },
-      )
+      })
     );
     return responseMessage(
       IssueService.method.updateIssuePreferences.output,
@@ -678,46 +609,17 @@ export const createAppIssueService = (
     const projectId = canonicalUuid(request.projectId);
     const dependentRunId = canonicalUuid(request.runId);
     const prerequisiteRunId = canonicalUuid(request.prerequisiteRunId);
-    const result = await mutated(input, [projectId], async () => {
-      const session = await requireSession(input.auth, input.request);
-      const project = await getProject(input.db, projectId, session.user.id);
-      if (!project) throw new HttpError(404, "Project not found");
-      if (!hasOrganizationCapability(project.member_role, "issues:write")) {
-        throw new HttpError(403, "Issue editing permission required");
-      }
-      if (!request.enabled) {
-        const deleted = await deleteIssueDependency(
-          input.db,
-          project.id,
-          prerequisiteRunId,
-          dependentRunId,
-        );
-        return {
-          prerequisiteRunId,
-          dependentRunId,
-          outcome: deleted ? "removed" : "already_removed",
-        };
-      }
-      const outcome = await createIssueDependency(input.db, project.id, {
-        prerequisiteRunId,
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await mutated(input, [projectId], () =>
+      services.setDependency({
+        db: input.db,
+        projectId,
         dependentRunId,
-        createdByUserId: session.user.id,
-        createdAt: new Date().toISOString(),
-      });
-      if (outcome === "not_found") {
-        throw new HttpError(404, "Dependency issue not found");
-      }
-      if (outcome === "cycle") {
-        throw new HttpError(409, "Dependency would create a cycle");
-      }
-      if (outcome === "ineligible") {
-        throw new HttpError(
-          409,
-          "Dependencies cannot be added after an issue starts executing",
-        );
-      }
-      return { prerequisiteRunId, dependentRunId, outcome };
-    });
+        prerequisiteRunId,
+        userId: session.user.id,
+        enabled: request.enabled,
+      })
+    );
     return responseMessage(
       IssueService.method.setIssueDependency.output,
       result,
@@ -725,34 +627,37 @@ export const createAppIssueService = (
   }),
 
   moveRun: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "control",
-        `${runPath(request.projectId, request.runId)}/status`,
-        "PUT",
-        {
+      services.moveRun({
+        db: input.db,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+        request: {
           requestId: canonicalUuid(request.requestId),
           status: runStatusJson(request.status),
           workflowStage: request.workflowStage ?? null,
         },
-      )
+      })
     );
     return responseMessage(IssueService.method.moveRun.output, result);
   }),
 
   retryRun: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "control",
-        `${runPath(request.projectId, request.runId)}/retry`,
-        "POST",
-        {
+      services.recoverRun({
+        db: input.db,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+        action: "retry",
+        request: {
           requestId: canonicalUuid(request.requestId),
           reason: request.reason ?? null,
         },
-      )
+      })
     );
     if (!Predicate.isObject(result)) {
       throw new Error("Retry response is invalid");
@@ -766,17 +671,19 @@ export const createAppIssueService = (
   }),
 
   cancelRun: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "control",
-        `${runPath(request.projectId, request.runId)}/cancel`,
-        "POST",
-        {
+      services.recoverRun({
+        db: input.db,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+        action: "cancel",
+        request: {
           requestId: canonicalUuid(request.requestId),
           reason: request.reason ?? null,
         },
-      )
+      })
     );
     if (!Predicate.isObject(result)) {
       throw new Error("Cancellation response is invalid");
@@ -790,19 +697,20 @@ export const createAppIssueService = (
   }),
 
   resumeRun: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "control",
-        `${runPath(request.projectId, request.runId)}/resume`,
-        "POST",
-        {
+      services.resumeRun({
+        db: input.db,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+        request: {
           requestId: canonicalUuid(request.requestId),
           checkpointKey: request.checkpointKey,
           attempt: request.attempt,
           revision: request.revision,
         },
-      )
+      })
     );
     return responseMessage(IssueService.method.resumeRun.output, result);
   }),
@@ -812,13 +720,15 @@ export const createAppIssueService = (
       throw new ConnectError("Dispatch input is required", Code.InvalidArgument);
     }
     const dispatch = request.dispatch;
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "control",
-        `${runPath(request.projectId, request.runId)}/dispatch`,
-        "POST",
-        {
+      services.dispatchRun({
+        db: input.db,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+        reassign: false,
+        request: {
           requestId: canonicalUuid(dispatch.requestId),
           agentId: dispatch.agentId
             ? canonicalUuid(dispatch.agentId)
@@ -829,7 +739,7 @@ export const createAppIssueService = (
           persistPreferences: dispatch.persistPreferences,
           workerId: dispatch.workerId ?? null,
         },
-      )
+      })
     );
     return responseMessage(IssueService.method.dispatchRun.output, {
       dispatch: result,
@@ -841,13 +751,15 @@ export const createAppIssueService = (
       throw new ConnectError("Dispatch input is required", Code.InvalidArgument);
     }
     const dispatch = request.dispatch;
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "control",
-        `${runPath(request.projectId, request.runId)}/reassign`,
-        "POST",
-        {
+      services.dispatchRun({
+        db: input.db,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+        reassign: true,
+        request: {
           requestId: canonicalUuid(dispatch.requestId),
           agentId: dispatch.agentId
             ? canonicalUuid(dispatch.agentId)
@@ -858,7 +770,7 @@ export const createAppIssueService = (
           persistPreferences: dispatch.persistPreferences,
           workerId: dispatch.workerId ?? null,
         },
-      )
+      })
     );
     return responseMessage(IssueService.method.reassignRun.output, {
       dispatch: result,
@@ -866,13 +778,14 @@ export const createAppIssueService = (
   }),
 
   completeResultReview: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "core",
-        `${runPath(request.projectId, request.runId)}/result-reviews`,
-        "POST",
-      )
+      services.completeResultReview({
+        db: input.db,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+      })
     );
     return responseMessage(
       IssueService.method.completeResultReview.output,
@@ -881,12 +794,14 @@ export const createAppIssueService = (
   }),
 
   listIssueMessages: (request) => rpc(async () => {
-    const result = await callLegacyRoute(
-      input,
-      "conversation",
-      `${runPath(request.projectId, request.runId)}/messages`,
-      "GET",
-    );
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.listMessages({
+      db: input.db,
+      archivesBucket: input.env.ARCHIVES,
+      projectId: canonicalUuid(request.projectId),
+      runId: canonicalUuid(request.runId),
+      userId: session.user.id,
+    });
     return responseMessage(
       IssueService.method.listIssueMessages.output,
       result,
@@ -894,28 +809,32 @@ export const createAppIssueService = (
   }),
 
   syncIssueMessages: (request) => rpc(async () => {
-    try {
-      const result = await callLegacyRoute(
-        input,
-        "conversation",
-        `${runPath(request.projectId, request.runId)}/messages/delta?cursor=${request.cursor.toString()}`,
-        "GET",
+    if (request.cursor > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new ConnectError(
+        "Conversation cursor is outside the safe range",
+        Code.InvalidArgument,
       );
+    }
+    const session = await services.requireSession(input.auth, input.request);
+    const applicationInput = {
+      db: input.db,
+      archivesBucket: input.env.ARCHIVES,
+      projectId: canonicalUuid(request.projectId),
+      runId: canonicalUuid(request.runId),
+      userId: session.user.id,
+    };
+    try {
+      const result = await services.syncMessages({
+        ...applicationInput,
+        cursor: Number(request.cursor),
+      });
       return responseMessage(
         IssueService.method.syncIssueMessages.output,
         result,
       );
     } catch (error) {
       if (!(error instanceof HttpError) || error.status !== 410) throw error;
-      const snapshot = await callLegacyRoute(
-        input,
-        "conversation",
-        `${runPath(request.projectId, request.runId)}/messages`,
-        "GET",
-      );
-      if (!Predicate.isObject(snapshot)) {
-        throw new Error("Issue conversation snapshot is invalid");
-      }
+      const snapshot = await services.listMessages(applicationInput);
       return responseMessage(
         IssueService.method.syncIssueMessages.output,
         {
@@ -929,13 +848,16 @@ export const createAppIssueService = (
   }),
 
   createIssueMessage: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "conversation",
-        `${runPath(request.projectId, request.runId)}/messages`,
-        "POST",
-        {
+      services.createMessage({
+        db: input.db,
+        archivesBucket: input.env.ARCHIVES,
+        attachmentsBucket: input.env.ATTACHMENTS,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+        request: {
           clientMessageId: canonicalUuid(request.clientMessageId),
           body: request.body,
           parentMessageId: request.parentMessageId
@@ -944,9 +866,10 @@ export const createAppIssueService = (
           mentionedUserIds: request.mentionedUserIds,
           mentionedAgentIds: request.mentionedAgentIds.map(canonicalUuid),
           agentConversationId: request.agentConversationId ?? null,
-          attachmentReferences: request.attachmentReferences,
         },
-      )
+        attachments: [],
+        attachmentReferences: request.attachmentReferences,
+      })
     );
     return responseMessage(
       IssueService.method.createIssueMessage.output,
@@ -955,12 +878,15 @@ export const createAppIssueService = (
   }),
 
   getIssueAgentReply: (request) => rpc(async () => {
-    const result = await callLegacyRoute(
-      input,
-      "conversation",
-      `${runPath(request.projectId, request.runId)}/messages/${canonicalUuid(request.triggerMessageId)}/agent-reply`,
-      "GET",
-    );
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.getAgentReply({
+      db: input.db,
+      archivesBucket: input.env.ARCHIVES,
+      projectId: canonicalUuid(request.projectId),
+      runId: canonicalUuid(request.runId),
+      triggerMessageId: canonicalUuid(request.triggerMessageId),
+      userId: session.user.id,
+    });
     return responseMessage(
       IssueService.method.getIssueAgentReply.output,
       result,
@@ -968,23 +894,29 @@ export const createAppIssueService = (
   }),
 
   listRunEvidence: (request) => rpc(async () => {
-    const result = await callLegacyRoute(
-      input,
-      "evidence",
-      `${runPath(request.projectId, request.runId)}/evidence`,
-      "GET",
-    );
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.listEvidence({
+      db: input.db,
+      archivesBucket: input.env.ARCHIVES,
+      projectId: canonicalUuid(request.projectId),
+      runId: canonicalUuid(request.runId),
+      userId: session.user.id,
+    });
     return responseMessage(IssueService.method.listRunEvidence.output, result);
   }),
 
   acceptIssueReworkProposal: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "proposal",
-        `${runPath(request.projectId, request.runId)}/rework-proposals/${canonicalUuid(request.proposalId)}/accept`,
-        "POST",
-      )
+      services.acceptReworkProposal({
+        db: input.db,
+        attachmentsBucket: input.env.ATTACHMENTS,
+        archivesBucket: input.env.ARCHIVES,
+        projectId: canonicalUuid(request.projectId),
+        conversationRunId: canonicalUuid(request.runId),
+        proposalId: canonicalUuid(request.proposalId),
+        userId: session.user.id,
+      })
     );
     return responseMessage(
       IssueService.method.acceptIssueReworkProposal.output,
@@ -993,13 +925,17 @@ export const createAppIssueService = (
   }),
 
   acceptIssueActionProposal: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "proposal",
-        `${runPath(request.projectId, request.runId)}/issue-action-proposals/${canonicalUuid(request.proposalId)}/accept`,
-        "POST",
-      )
+      services.acceptActionProposal({
+        db: input.db,
+        attachmentsBucket: input.env.ATTACHMENTS,
+        archivesBucket: input.env.ARCHIVES,
+        projectId: canonicalUuid(request.projectId),
+        conversationRunId: canonicalUuid(request.runId),
+        proposalId: canonicalUuid(request.proposalId),
+        userId: session.user.id,
+      })
     );
     return responseMessage(
       IssueService.method.acceptIssueActionProposal.output,
@@ -1012,19 +948,23 @@ export const createAppIssueService = (
       throw new ConnectError("Execution approval is required", Code.InvalidArgument);
     }
     const approval = request.approval;
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "proposal",
-        `${runPath(request.projectId, request.conversationRunId)}/issue-execution-proposals/${canonicalUuid(request.proposalId)}/accept`,
-        "POST",
-        {
+      services.acceptExecutionProposal({
+        db: input.db,
+        attachmentsBucket: input.env.ATTACHMENTS,
+        archivesBucket: input.env.ARCHIVES,
+        projectId: canonicalUuid(request.projectId),
+        conversationRunId: canonicalUuid(request.conversationRunId),
+        proposalId: canonicalUuid(request.proposalId),
+        userId: session.user.id,
+        request: {
           provider: requiredProviderJson(approval.provider),
           model: approval.model ?? null,
           effort: approval.effort ?? null,
           workerId: approval.workerId ?? null,
         },
-      )
+      })
     );
     return responseMessage(
       IssueService.method.acceptIssueExecutionProposal.output,
@@ -1033,14 +973,18 @@ export const createAppIssueService = (
   }),
 
   acceptIssueSkillExecutionProposal: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
-      callLegacyRoute(
-        input,
-        "proposal",
-        `${runPath(request.projectId, request.conversationRunId)}/skill-execution-proposals/${canonicalUuid(request.proposalId)}/accept`,
-        "POST",
-        { workerId: request.workerId ?? null },
-      )
+      services.acceptSkillExecutionProposal({
+        db: input.db,
+        attachmentsBucket: input.env.ATTACHMENTS,
+        archivesBucket: input.env.ARCHIVES,
+        projectId: canonicalUuid(request.projectId),
+        conversationRunId: canonicalUuid(request.conversationRunId),
+        proposalId: canonicalUuid(request.proposalId),
+        userId: session.user.id,
+        request: { workerId: request.workerId ?? null },
+      })
     );
     if (
       Predicate.isObject(result) && result.session !== null &&
@@ -1063,8 +1007,9 @@ export const createAppIssueService = (
 export function registerAppIssueService(
   router: ConnectRouter,
   input: AppConnectIssueRouteInput,
+  services: AppConnectIssueServices = appConnectIssueServices,
 ) {
-  router.service(IssueService, createAppIssueService(input));
+  router.service(IssueService, createAppIssueService(input, services));
 }
 
 export { IssueService };

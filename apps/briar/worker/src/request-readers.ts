@@ -568,10 +568,14 @@ export async function readIssueUpdateRequest(request: Request) {
         typeof priority === "string" && priority ? Number(priority) : null,
       difficulty:
         typeof difficulty === "string" && difficulty ? difficulty : null,
-      assigneeUserId:
-        typeof assigneeUserId === "string" && assigneeUserId.trim()
-          ? assigneeUserId
-          : null,
+      ...(form.has("assigneeUserId")
+        ? {
+            assigneeUserId:
+              typeof assigneeUserId === "string" && assigneeUserId.trim()
+                ? assigneeUserId
+                : null,
+          }
+        : {}),
     }),
     attachments,
     attachmentReferences,
