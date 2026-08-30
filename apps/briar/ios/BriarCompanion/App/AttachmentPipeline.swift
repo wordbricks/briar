@@ -162,7 +162,6 @@ enum PhotoAttachmentImporter {
 struct AttachmentMessagePayload: Sendable {
     let body: String
     let references: [String]
-    let referencesJSON: String
     let files: [MultipartFile]
 
     init(
@@ -182,10 +181,6 @@ struct AttachmentMessagePayload: Sendable {
             Self.markdown(reference: reference, filename: attachment.filename)
         }.joined(separator: "\n\n")
         self.body = [body, markdown].filter { !$0.isEmpty }.joined(separator: "\n\n")
-        referencesJSON = String(
-            data: try JSONEncoder().encode(references),
-            encoding: .utf8
-        ) ?? "[]"
         files = attachments.map {
             MultipartFile(
                 fieldName: "attachments",

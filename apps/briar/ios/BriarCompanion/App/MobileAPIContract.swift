@@ -252,9 +252,12 @@ protocol MobileHTTPClientProtocol: Sendable {
         as responseType: Response.Type
     ) async throws -> Response
 
-    func upload<Response: SwiftProtobuf.Message & Sendable>(
+    func upload<
+        UploadRequest: SwiftProtobuf.Message & Sendable,
+        Response: SwiftProtobuf.Message & Sendable
+    >(
         _ path: String,
-        fields: [String: String],
+        request: UploadRequest,
         files: [MultipartFile],
         token: String,
         as responseType: Response.Type
@@ -313,9 +316,12 @@ extension MobileHTTPClientProtocol {
         throw MobileAPIError.invalidRequest
     }
 
-    func upload<Response: SwiftProtobuf.Message & Sendable>(
+    func upload<
+        UploadRequest: SwiftProtobuf.Message & Sendable,
+        Response: SwiftProtobuf.Message & Sendable
+    >(
         _ path: String,
-        fields: [String: String],
+        request: UploadRequest,
         files: [MultipartFile],
         token: String,
         as responseType: Response.Type
@@ -372,9 +378,12 @@ struct MobileHTTPClient: MobileHTTPClientProtocol, Sendable {
         return data
     }
 
-    func upload<Response: SwiftProtobuf.Message & Sendable>(
+    func upload<
+        UploadRequest: SwiftProtobuf.Message & Sendable,
+        Response: SwiftProtobuf.Message & Sendable
+    >(
         _ path: String,
-        fields: [String: String],
+        request protobufRequest: UploadRequest,
         files: [MultipartFile],
         token: String,
         as responseType: Response.Type = Response.self
@@ -386,7 +395,11 @@ struct MobileHTTPClient: MobileHTTPClientProtocol, Sendable {
         request.setValue("application/protobuf", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.httpBody = MultipartEncoder.encode(fields: fields, files: files, boundary: boundary)
+        request.httpBody = try MultipartEncoder.encode(
+            request: protobufRequest,
+            files: files,
+            boundary: boundary
+        )
         let (data, response) = try await session.data(for: request)
         try validate(response: response, data: data)
         guard let httpResponse = response as? HTTPURLResponse,
@@ -481,18 +494,19 @@ struct MultipartFile: Sendable {
 }
 
 private enum MultipartEncoder {
-    static func encode(
-        fields: [String: String],
+    static func encode<Request: SwiftProtobuf.Message>(
+        request: Request,
         files: [MultipartFile],
         boundary: String
-    ) -> Data {
+    ) throws -> Data {
         var data = Data()
-        for key in fields.keys.sorted() {
-            data.append("--\(boundary)\r\n")
-            data.append("Content-Disposition: form-data; name=\"\(quoted(key))\"\r\n\r\n")
-            data.append("\(fields[key] ?? "")\r\n")
-        }
-        for file in files {
+        let protobufPart = MultipartFile(
+            fieldName: "request",
+            filename: "request.pb",
+            contentType: "application/protobuf",
+            data: try request.serializedData()
+        )
+        for file in [protobufPart] + files {
             data.append("--\(boundary)\r\n")
             data.append("Content-Disposition: form-data; name=\"\(quoted(file.fieldName))\"; filename=\"\(quoted(file.filename))\"\r\n")
             let contentType = file.contentType.contains("\r") || file.contentType.contains("\n")

@@ -926,20 +926,20 @@ final class ChannelsStore: ObservableObject {
             let mentionedAgentIds = mentions.compactMap {
                 $0.kind == .agent ? UUID(uuidString: $0.recipientId) : nil
             }
+            var request = BriarAPI_CreateChannelMessageRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            request.channelID = coreUUIDString(channelID)
+            request.clientMessageID = coreUUIDString(clientMessageID)
+            request.body = payload?.body ?? trimmed
+            if let parentMessageID {
+                request.parentMessageID = coreUUIDString(parentMessageID)
+            }
+            request.mentionedUserIds = mentionedUserIds
+            request.mentionedAgentIds = mentionedAgentIds.map(coreUUIDString)
+            request.attachmentReferences = payload?.references ?? existingAttachmentReferences
             let response: CreateChannelMessageResponse
             if attachments.isEmpty {
                 guard let channelService else { throw MobileAPIError.invalidRequest }
-                var request = BriarAPI_CreateChannelMessageRequest()
-                request.organizationID = coreUUIDString(organizationID)
-                request.channelID = coreUUIDString(channelID)
-                request.clientMessageID = coreUUIDString(clientMessageID)
-                request.body = trimmed
-                if let parentMessageID {
-                    request.parentMessageID = coreUUIDString(parentMessageID)
-                }
-                request.mentionedUserIds = mentionedUserIds
-                request.mentionedAgentIds = mentionedAgentIds.map(coreUUIDString)
-                request.attachmentReferences = existingAttachmentReferences
                 let wireResponse = await channelService.createChannelMessage(
                     request: request,
                     headers: [:]
@@ -949,30 +949,9 @@ final class ChannelsStore: ObservableObject {
                 )
             } else {
                 guard let payload else { throw MobileAPIError.invalidRequest }
-                let attachmentReferencesJSON = String(
-                    data: try JSONEncoder().encode(
-                        payload.references
-                    ),
-                    encoding: .utf8
-                ) ?? "[]"
                 let wireResponse = try await api.upload(
                     path,
-                    fields: [
-                        "body": payload.body,
-                        "clientMessageId": clientMessageID.uuidString.lowercased(),
-                        "parentMessageId": parentMessageID?.uuidString.lowercased() ?? "",
-                        "mentionedUserIds": String(
-                            data: try JSONEncoder().encode(mentionedUserIds),
-                            encoding: .utf8
-                        ) ?? "[]",
-                        "mentionedAgentIds": String(
-                            data: try JSONEncoder().encode(
-                                mentionedAgentIds.map { $0.uuidString.lowercased() }
-                            ),
-                            encoding: .utf8
-                        ) ?? "[]",
-                        "attachmentReferences": attachmentReferencesJSON,
-                    ],
+                    request: request,
                     files: payload.files,
                     token: token,
                     as: BriarAPI_CreateChannelMessageResponse.self

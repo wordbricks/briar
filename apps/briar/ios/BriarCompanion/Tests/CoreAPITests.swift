@@ -31,14 +31,20 @@ final class CoreAPITests: XCTestCase {
             baseURL: URL(string: "https://briar-api.example")!,
             session: URLSession(configuration: configuration)
         )
+        var uploadRequest = BriarAPI_CreateIssueRequest()
+        uploadRequest.projectID = "22222222-2222-4222-8222-222222222222"
+        uploadRequest.title = "Example"
+        uploadRequest.status = .queued
         URLProtocolStub.handler = { request in
             XCTAssertEqual(request.httpMethod, "POST")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer token")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/protobuf")
-            let body = String(decoding: try request.bodyData(), as: UTF8.self)
-            XCTAssertTrue(body.contains("name=\"title\""))
-            XCTAssertTrue(body.contains("filename=\"note.txt\""))
-            XCTAssertTrue(body.contains("hello"))
+            let body = try request.bodyData()
+            let bodyText = String(decoding: body, as: UTF8.self)
+            XCTAssertTrue(bodyText.contains("name=\"request\"; filename=\"request.pb\""))
+            XCTAssertTrue(bodyText.contains("Content-Type: application/protobuf"))
+            XCTAssertTrue(bodyText.contains("filename=\"note.txt\""))
+            XCTAssertNotNil(body.range(of: try uploadRequest.serializedData()))
             var response = BriarAPI_CreateIssueResponse()
             response.runID = "11111111-1111-4111-8111-111111111111"
             response.sourceKey = "briar-issue:11111111-1111-4111-8111-111111111111"
@@ -58,7 +64,7 @@ final class CoreAPITests: XCTestCase {
 
         let response: BriarAPI_CreateIssueResponse = try await client.upload(
             "/upload",
-            fields: ["title": "Example"],
+            request: uploadRequest,
             files: [MultipartFile(
                 fieldName: "file",
                 filename: "note.txt",

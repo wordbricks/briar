@@ -1,5 +1,6 @@
 import {
   fromBinary,
+  toBinary,
   type DescMessage,
 } from "@bufbuild/protobuf";
 import * as Option from "effect/Option";
@@ -124,6 +125,18 @@ export async function request<T>(
 ): Promise<T> {
   const body = await requestUnknown(path, token, init);
   return body as T;
+}
+
+export function setMultipartProtobufRequest<Desc extends DescMessage>(
+  form: FormData,
+  schema: Desc,
+  message: Parameters<typeof toBinary<Desc>>[1],
+) {
+  form.set(
+    "request",
+    new Blob([toBinary(schema, message)], { type: "application/protobuf" }),
+    "request.pb",
+  );
 }
 
 export async function requestProtobuf<Desc extends DescMessage>(

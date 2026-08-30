@@ -1,3 +1,4 @@
+import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { createClient } from "@connectrpc/connect";
 import {
@@ -10,6 +11,7 @@ import {
   ChannelMessageAuthor_Kind as ProtoChannelMessageAuthorKind,
   ChannelService,
   ChannelVisibility as ProtoChannelVisibility,
+  CreateChannelMessageRequestSchema,
   CreateChannelMessageResponseSchema,
   DeclineChannelProposalResponse_Outcome as ProtoDeclineOutcome,
   DirectMessageParticipant_Kind as ProtoDirectMessageParticipantKind,
@@ -51,7 +53,10 @@ import type {
   IssueExecutionApprovalInput,
   OrganizationMember,
 } from "../../types";
-import { requestProtobuf } from "../api/request";
+import {
+  requestProtobuf,
+  setMultipartProtobufRequest,
+} from "../api/request";
 import type {
   AgentSkillExecutionProposal,
   ChannelAgentReply,
@@ -1134,23 +1139,24 @@ export async function sendChannelMessage(
 ) {
   const clientMessageId = (input.clientMessageId ?? crypto.randomUUID())
     .toLowerCase();
+  const request = create(CreateChannelMessageRequestSchema, {
+    organizationId,
+    channelId,
+    clientMessageId,
+    body: input.body,
+    parentMessageId: input.parentMessageId ?? undefined,
+    mentionedUserIds: input.mentionedUserIds ?? [],
+    mentionedAgentIds: input.mentionedAgentIds ?? [],
+    skillId: input.skillId ?? undefined,
+    preferredDeviceId: input.preferredDeviceId ?? undefined,
+    attachmentReferences: input.attachmentReferences ?? [],
+  });
   if (input.attachments?.length) {
     const form = new FormData();
-    form.set("body", input.body);
-    form.set("clientMessageId", clientMessageId);
-    if (input.skillId) form.set("skillId", input.skillId);
-    form.set("parentMessageId", input.parentMessageId ?? "");
-    form.set("mentionedUserIds", JSON.stringify(input.mentionedUserIds ?? []));
-    form.set(
-      "mentionedAgentIds",
-      JSON.stringify(input.mentionedAgentIds ?? []),
-    );
-    if (input.preferredDeviceId) {
-      form.set("preferredDeviceId", input.preferredDeviceId);
-    }
-    form.set(
-      "attachmentReferences",
-      JSON.stringify(input.attachmentReferences ?? []),
+    setMultipartProtobufRequest(
+      form,
+      CreateChannelMessageRequestSchema,
+      request,
     );
     for (const attachment of input.attachments) {
       form.append("attachments", attachment, attachment.name);
@@ -1166,18 +1172,7 @@ export async function sendChannelMessage(
   const client = requireChannelClient();
   return appRpc(async () => createChannelMessageResultFromMessage(
     await client.createChannelMessage(
-      {
-        organizationId,
-        channelId,
-        clientMessageId,
-        body: input.body,
-        parentMessageId: input.parentMessageId ?? undefined,
-        mentionedUserIds: input.mentionedUserIds ?? [],
-        mentionedAgentIds: input.mentionedAgentIds ?? [],
-        skillId: input.skillId ?? undefined,
-        preferredDeviceId: input.preferredDeviceId ?? undefined,
-        attachmentReferences: input.attachmentReferences ?? [],
-      },
+      request,
       appCallOptions(token),
     ),
   ));

@@ -54,14 +54,14 @@ final class IssueMutationStore: ObservableObject {
                 throw IssueMutationError.attachment(message)
             }
             let description = draft.description.trimmingCharacters(in: .whitespacesAndNewlines)
+            var normalizedDraft = draft
+            normalizedDraft.title = title
+            normalizedDraft.description = description
+            normalizedDraft.preferredEffort = draft.preferredProvider != nil &&
+                    draft.preferredModel != nil
+                ? draft.preferredEffort
+                : nil
             if attachments.isEmpty {
-                var normalizedDraft = draft
-                normalizedDraft.title = title
-                normalizedDraft.description = description
-                normalizedDraft.preferredEffort = draft.preferredProvider != nil &&
-                        draft.preferredModel != nil
-                    ? draft.preferredEffort
-                    : nil
                 let response = try await issueClient().createIssue(
                     request: issueCreateRequest(
                         projectID: projectID,
@@ -74,20 +74,11 @@ final class IssueMutationStore: ObservableObject {
             }
             let wireResponse = try await api.upload(
                 MobileAPIContract.Endpoint.issues(projectID: projectID),
-                fields: [
-                    "title": title,
-                    "description": description,
-                    "priority": draft.priority.map(String.init) ?? "",
-                    "difficulty": draft.difficulty?.rawValue ?? "",
-                    "assigneeUserId": draft.assigneeUserId ?? "",
-                    "status": draft.status.rawValue,
-                    "preferredProvider": draft.preferredProvider?.rawValue ?? "",
-                    "preferredModel": draft.preferredModel ?? "",
-                    "preferredEffort": draft.preferredProvider != nil && draft.preferredModel != nil
-                        ? (draft.preferredEffort?.rawValue ?? "")
-                        : "",
-                    "fullAuto": draft.fullAuto ? "true" : "false",
-                ],
+                request: issueCreateRequest(
+                    projectID: projectID,
+                    draft: normalizedDraft,
+                    attachmentReferences: []
+                ),
                 files: attachments.map {
                     MultipartFile(
                         fieldName: "attachments",
@@ -483,31 +474,25 @@ final class IssueMutationStore: ObservableObject {
             }
             let uniqueMentionedUserIds = Array(Set(mentionedUserIds.filter { !$0.isEmpty })).sorted()
             let uniqueMentionedAgentIds = Array(Set(mentionedAgentIds.filter { !$0.isEmpty })).sorted()
-            let mentionedUserIdsJSON = String(
-                data: try JSONEncoder().encode(uniqueMentionedUserIds),
-                encoding: .utf8
-            ) ?? "[]"
-            let mentionedAgentIdsJSON = String(
-                data: try JSONEncoder().encode(uniqueMentionedAgentIds),
-                encoding: .utf8
-            ) ?? "[]"
+            let mentionedAgentUUIDs = try uniqueMentionedAgentIds.map {
+                guard let id = UUID(uuidString: $0) else {
+                    throw MobileAPIError.invalidRequest
+                }
+                return id
+            }
+            let resolvedClientMessageID = clientMessageID ?? UUID()
             let response: CreateIssueMessageResponse
             if attachments.isEmpty {
                 var request = BriarAPI_CreateIssueMessageRequest()
                 request.projectID = coreUUIDString(projectID)
                 request.runID = coreUUIDString(runID)
-                request.clientMessageID = coreUUIDString(clientMessageID ?? UUID())
+                request.clientMessageID = coreUUIDString(resolvedClientMessageID)
                 request.body = trimmed
                 if let parentMessageID {
                     request.parentMessageID = coreUUIDString(parentMessageID)
                 }
                 request.mentionedUserIds = uniqueMentionedUserIds
-                request.mentionedAgentIds = try uniqueMentionedAgentIds.map {
-                    guard let id = UUID(uuidString: $0) else {
-                        throw MobileAPIError.invalidRequest
-                    }
-                    return coreUUIDString(id)
-                }
+                request.mentionedAgentIds = mentionedAgentUUIDs.map(coreUUIDString)
                 request.attachmentReferences = attachmentReferences ?? []
                 let wireResponse = try await issueClient().createIssueMessage(
                     request: request,
@@ -523,20 +508,23 @@ final class IssueMutationStore: ObservableObject {
                     references: attachmentReferences,
                     referenceGenerator: attachmentReference
                 )
+                var request = BriarAPI_CreateIssueMessageRequest()
+                request.projectID = coreUUIDString(projectID)
+                request.runID = coreUUIDString(runID)
+                request.clientMessageID = coreUUIDString(resolvedClientMessageID)
+                request.body = payload.body
+                if let parentMessageID {
+                    request.parentMessageID = coreUUIDString(parentMessageID)
+                }
+                request.mentionedUserIds = uniqueMentionedUserIds
+                request.mentionedAgentIds = mentionedAgentUUIDs.map(coreUUIDString)
+                request.attachmentReferences = payload.references
                 let wireResponse = try await api.upload(
                     MobileAPIContract.Endpoint.runMessages(
                         projectID: projectID,
                         runID: runID
                     ),
-                    fields: [
-                        "body": payload.body,
-                        "clientMessageId": clientMessageID?.uuidString.lowercased() ?? "",
-                        "parentMessageId": parentMessageID?.uuidString.lowercased() ?? "",
-                        "mentionedUserIds": mentionedUserIdsJSON,
-                        "mentionedAgentIds": mentionedAgentIdsJSON,
-                        "agentConversationId": "",
-                        "attachmentReferences": payload.referencesJSON,
-                    ],
+                    request: request,
                     files: payload.files,
                     token: token,
                     as: BriarAPI_CreateIssueMessageResponse.self

@@ -1,3 +1,4 @@
+import { create } from "@bufbuild/protobuf";
 import { createClient } from "@connectrpc/connect";
 import {
   IssueChangedField as ProtoIssueChangedField,
@@ -12,7 +13,10 @@ import {
   TransferIssueResponse_Outcome as ProtoTransferOutcome,
   UnassignRunResponse_Outcome as ProtoUnassignOutcome,
   CreateIssueMessageResponseSchema,
+  CreateIssueMessageRequestSchema,
+  CreateIssueRequestSchema,
   CreateIssueResponseSchema,
+  UpdateIssueRequestSchema,
   UpdateIssueResponseSchema,
   type CreateIssueMessageResponse as CreateIssueMessageResponseMessage,
   type CreateIssueResponse as CreateIssueResponseMessage,
@@ -55,7 +59,10 @@ import type {
 } from "../../types";
 import type { AutoHuntWorkflowCheckpoint } from "../auto-hunt-contract";
 import type { AgentProvider } from "../agent-provider";
-import { requestProtobuf } from "../api/request";
+import {
+  requestProtobuf,
+  setMultipartProtobufRequest,
+} from "../api/request";
 import { validateIssueAttachments } from "../issue-attachments";
 import { projectAgentSessionFromMessage } from "./agent";
 import {
@@ -183,27 +190,14 @@ const createIssueMultipart = async (
   const attachmentError = validateIssueAttachments(input.attachments);
   if (attachmentError) throw new Error(attachmentError);
   const form = new FormData();
-  form.set("title", input.title);
-  form.set("description", input.description ?? "");
-  form.set("priority", input.priority === null ? "" : String(input.priority));
-  form.set("difficulty", input.difficulty ?? "");
-  if (input.assigneeUserId !== undefined) {
-    form.set("assigneeUserId", input.assigneeUserId ?? "");
-  }
-  form.set("status", input.status);
-  form.set("preferredProvider", input.preferredProvider ?? "");
-  form.set("preferredModel", input.preferredModel ?? "");
-  form.set("preferredEffort", input.preferredEffort ?? "");
-  form.set("fullAuto", input.fullAuto ? "true" : "false");
-  if (input.checkpoints?.length) {
-    form.set("checkpoints", JSON.stringify(input.checkpoints));
-  }
-  if (input.attachmentReferences?.length) {
-    form.set(
-      "attachmentReferences",
-      JSON.stringify(input.attachmentReferences),
-    );
-  }
+  setMultipartProtobufRequest(
+    form,
+    CreateIssueRequestSchema,
+    create(
+      CreateIssueRequestSchema,
+      createIssueRequestFromInput(projectId, input),
+    ),
+  );
   for (const attachment of input.attachments) {
     form.append("attachments", attachment, attachment.name);
   }
@@ -275,22 +269,14 @@ const updateIssueMultipart = async (
   const attachmentError = validateIssueAttachments(input.attachments);
   if (attachmentError) throw new Error(attachmentError);
   const form = new FormData();
-  form.set("title", input.title);
-  form.set("description", input.description ?? "");
-  form.set("priority", input.priority === null ? "" : String(input.priority));
-  form.set("difficulty", input.difficulty ?? "");
-  if (input.assigneeUserId !== undefined) {
-    form.set("assigneeUserId", input.assigneeUserId ?? "");
-  }
-  if (input.attachmentReferences?.length) {
-    form.set(
-      "attachmentReferences",
-      JSON.stringify(input.attachmentReferences),
-    );
-  }
-  if (input.keptAttachmentIds !== undefined) {
-    form.set("keptAttachmentIds", JSON.stringify(input.keptAttachmentIds));
-  }
+  setMultipartProtobufRequest(
+    form,
+    UpdateIssueRequestSchema,
+    create(
+      UpdateIssueRequestSchema,
+      updateIssueRequestFromInput(projectId, runId, input),
+    ),
+  );
   for (const attachment of input.attachments) {
     form.append("attachments", attachment, attachment.name);
   }
@@ -1083,18 +1069,14 @@ const createIssueMessageMultipart = async (
   const attachments = input.attachments ?? [];
   const attachmentError = validateIssueAttachments(attachments);
   if (attachmentError) throw new Error(attachmentError);
-  const clientMessageId = input.clientMessageId?.toLowerCase();
-  const parentMessageId = input.parentMessageId?.toLowerCase() ?? null;
   const form = new FormData();
-  form.set("body", input.body);
-  if (clientMessageId) form.set("clientMessageId", clientMessageId);
-  form.set("parentMessageId", parentMessageId ?? "");
-  form.set("mentionedUserIds", JSON.stringify(input.mentionedUserIds ?? []));
-  form.set("mentionedAgentIds", JSON.stringify(input.mentionedAgentIds ?? []));
-  form.set("agentConversationId", input.agentConversationId ?? "");
-  form.set(
-    "attachmentReferences",
-    JSON.stringify(input.attachmentReferences ?? []),
+  setMultipartProtobufRequest(
+    form,
+    CreateIssueMessageRequestSchema,
+    create(
+      CreateIssueMessageRequestSchema,
+      createIssueMessageRequestFromInput(projectId, runId, input),
+    ),
   );
   for (const attachment of attachments) {
     form.append("attachments", attachment, attachment.name);

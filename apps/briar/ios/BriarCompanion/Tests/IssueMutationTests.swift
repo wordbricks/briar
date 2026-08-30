@@ -203,24 +203,30 @@ private actor IssueHTTPRecorder: MobileHTTPClientProtocol {
         throw MobileAPIError.invalidRequest
     }
 
-    func upload<Response: SwiftProtobuf.Message & Sendable>(
+    func upload<
+        UploadRequest: SwiftProtobuf.Message & Sendable,
+        Response: SwiftProtobuf.Message & Sendable
+    >(
         _ path: String,
-        fields: [String: String],
+        request: UploadRequest,
         files: [MultipartFile],
         token: String,
         as responseType: Response.Type
     ) async throws -> Response {
         if responseType == BriarAPI_CreateIssueResponse.self {
+            guard request is BriarAPI_CreateIssueRequest else {
+                throw MobileAPIError.invalidRequest
+            }
             recorded.multipartCreates += 1
             return createResponse() as! Response
         }
         if responseType == BriarAPI_CreateIssueMessageResponse.self {
+            guard let request = request as? BriarAPI_CreateIssueMessageRequest else {
+                throw MobileAPIError.invalidRequest
+            }
             recorded.multipartMessages += 1
-            let referencesData = Data((fields["attachmentReferences"] ?? "[]").utf8)
-            recorded.messageAttachmentReferences.append(
-                try JSONDecoder().decode([String].self, from: referencesData)
-            )
-            return messageResponse(id: UUID(), body: fields["body"] ?? "") as! Response
+            recorded.messageAttachmentReferences.append(request.attachmentReferences)
+            return messageResponse(id: UUID(), body: request.body) as! Response
         }
         throw MobileAPIError.invalidRequest
     }
