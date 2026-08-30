@@ -154,7 +154,11 @@ async function claimWork(
   },
   services: WorkerQueueServices,
 ) {
-  const claimInput = decodeWorkerClaimInput(request);
+  const claimInput = decodeWorkerClaimInput({
+    projectId: request.projectId,
+    workerId: request.workerId,
+    claimedBy: request.claimedBy,
+  });
   const worker = await authenticatedWorker(
     input,
     claimInput.projectId,

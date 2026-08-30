@@ -5,10 +5,7 @@ import {
   type MergeBatchApi,
   type MergeQueueCommandRunner,
 } from "./merge-queue";
-import {
-  decodeClaimedMergeBatch,
-  type ClaimedMergeBatch,
-} from "./worker-queue-contract";
+import type { ClaimedMergeBatch } from "./worker-queue-contract";
 
 const batchId = "11111111-1111-4111-8111-111111111111";
 const projectId = "22222222-2222-4222-8222-222222222222";
@@ -38,9 +35,9 @@ const validationResults: NonNullable<
 function claimFixture(
   phase: ClaimedMergeBatch["phase"] = "tail_authority",
   proof = validationResults,
-) {
+): ClaimedMergeBatch {
   const hasAuthority = ["validate", "publish", "drain"].includes(phase);
-  return decodeClaimedMergeBatch({
+  return {
     workType: "mergeBatch",
     workId: batchId,
     runId: batchId,
@@ -56,6 +53,7 @@ function claimFixture(
     claimedAt: "2026-08-21T01:00:00+00:00",
     leaseExpiresAt: "2026-08-21T01:15:00+00:00",
     claimAttempts: 1,
+    handoffContext: null,
     batch: {
       id: batchId,
       state: phase === "enqueue"
@@ -97,7 +95,7 @@ function claimFixture(
       state: phase === "enqueue" ? "frozen" : "enqueued",
     }],
     pendingHeads: [],
-  });
+  };
 }
 
 function pullRequestResponse() {
@@ -205,7 +203,7 @@ describe("local provider-independent merge-queue worker", () => {
     expect(commands.some((command) =>
       command[1] === "push" && command.includes(`${integrationSha}:${integrationRef}`)
     )).toBe(true);
-    expect(api.calls.at(-2)).toMatchObject({
+    expect(api.calls.at(-1)).toMatchObject({
       path: `/merge-batch-claims/${batchId}/authority`,
       body: { integrationRef, integrationSha, baseSha: liveBaseSha },
     });
@@ -369,14 +367,14 @@ describe("local provider-independent merge-queue worker", () => {
 
   it("accepts a retry after signed member state and main tree match the batch", async () => {
     const initial = claimFixture("publish");
-    const claim = decodeClaimedMergeBatch({
+    const claim: ClaimedMergeBatch = {
       ...initial,
       claimAttempts: 2,
       members: initial.members.map((member) => ({
         ...member,
-        state: "merged",
+        state: "merged" as const,
       })),
-    });
+    };
     const commands: string[][] = [];
     const run: MergeQueueCommandRunner = (command) => {
       commands.push([...command]);

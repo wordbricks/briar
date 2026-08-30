@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Config, ProjectConfig } from "./config-contract";
 import type { DetachedProviderTurnResult } from "./detached-provider-turn";
 import { runClaimedProjectAgentTask } from "./reply-execution";
-import { decodeClaimedProjectAgentTask } from "./worker-queue-contract";
+import type { ClaimedProjectAgentTask } from "./worker-queue-contract";
 import type { GitRunner } from "./worktree";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
@@ -51,7 +51,7 @@ const project: ProjectConfig = {
   },
 };
 
-const task = decodeClaimedProjectAgentTask({
+const task: ClaimedProjectAgentTask = {
   workType: "projectAgentTask",
   workId,
   runId,
@@ -61,6 +61,7 @@ const task = decodeClaimedProjectAgentTask({
   claimAttempts: 1,
   claimedAt: "2026-08-22T08:00:00+00:00",
   leaseExpiresAt: "2026-08-22T08:15:00+00:00",
+  handoffContext: null,
   request: "Run the saved release Skill",
   agent: {
     id: "agent-1",
@@ -69,8 +70,11 @@ const task = decodeClaimedProjectAgentTask({
     model: null,
     effort: null,
     responsibility: "Release the project",
+    skill: "Release the project",
+    skills: [],
   },
-});
+  activeSkill: null,
+};
 
 const git: GitRunner = () => ({ exitCode: 0, stdout: "", stderr: "" });
 

@@ -48,13 +48,7 @@ import {
   type WorkerRegistration,
 } from "./worker-registration-contract";
 import { createWorkerQueueClient } from "./worker-queue-client";
-import {
-  decodeClaimedChannelReply,
-  decodeClaimedIssueReply,
-  decodeClaimedMergeBatch,
-  decodeClaimedProjectAgentTask,
-  decodeClaimedRun,
-} from "./worker-queue-contract";
+import type { ClaimedWork } from "./worker-queue-contract";
 import {
   configDirectory,
   cliVersion,
@@ -454,7 +448,7 @@ async function workerCommand() {
   let lastAnalysisWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let lastServerMaintenanceAt = Number.NEGATIVE_INFINITY;
   let lastTriggeredUpdateId: string | null = null;
-  const result = await runWorkerLoop(
+  const result = await runWorkerLoop<ClaimedWork>(
     {
       claim: async (_options) => workerQueue.claimWork({
           projectId: project.id,
@@ -463,22 +457,13 @@ async function workerCommand() {
           repliesOnly: _options?.repliesOnly === true,
         }),
       renewLease: async (issue) => {
-        const work = issue.workType === "mergeBatch"
-          ? decodeClaimedMergeBatch(issue)
-          : issue.workType === "projectAgentTask"
-            ? decodeClaimedProjectAgentTask(issue)
-            : issue.workType === "channelReply"
-              ? decodeClaimedChannelReply(issue)
-              : issue.workType === "issueReply"
-                ? decodeClaimedIssueReply(issue)
-                : decodeClaimedRun(issue);
         const renewed = await workerQueue.renewWorkLease({
           projectId: project.id,
           workerId,
-          work,
+          work: issue,
         });
         if (issue.workType === "channelReply") {
-          const reply = decodeClaimedChannelReply(issue);
+          const reply = issue;
           activeReplyActivityPublishers.get(reply.workId)?.updateCredential(
             renewed.activity,
           );
@@ -513,7 +498,7 @@ async function workerCommand() {
           return;
         }
         if (issue.workType === "issueReply") {
-          const reply = decodeClaimedIssueReply(issue);
+          const reply = issue;
           activeReplyActivityPublishers.get(reply.workId)?.updateCredential(
             renewed.activity,
           );
@@ -730,26 +715,17 @@ async function workerCommand() {
         });
       },
       handoff: async (issue, requestId, checkpoint) => {
-        const work = issue.workType === "mergeBatch"
-          ? decodeClaimedMergeBatch(issue)
-          : issue.workType === "projectAgentTask"
-            ? decodeClaimedProjectAgentTask(issue)
-            : issue.workType === "channelReply"
-              ? decodeClaimedChannelReply(issue)
-              : issue.workType === "issueReply"
-                ? decodeClaimedIssueReply(issue)
-                : decodeClaimedRun(issue);
         await workerQueue.handoffWork({
           requestId,
           projectId: project.id,
           workerId,
-          work,
+          work: issue,
           checkpoint,
         });
       },
       runIssue: async (issue, signal, reportCheckpoint) => {
         if (issue.workType === "mergeBatch") {
-          const claim = decodeClaimedMergeBatch(issue);
+          const claim = issue;
           await executeClaimedMergeBatch({
             claim,
             workerId,
@@ -776,7 +752,7 @@ async function workerCommand() {
           return;
         }
         if (issue.workType === "projectAgentTask") {
-          const task = decodeClaimedProjectAgentTask(issue);
+          const task = issue;
           await runProjectAgentTaskCompletionFlow({
             runProvider: () => runClaimedProjectAgentTask(
               config,
@@ -814,7 +790,7 @@ async function workerCommand() {
           return;
         }
         if (issue.workType === "channelReply") {
-          const reply = decodeClaimedChannelReply(issue);
+          const reply = issue;
           try {
             await runClaimedChannelReply(
               config,
@@ -837,7 +813,7 @@ async function workerCommand() {
           return;
         }
         if (issue.workType === "issueReply") {
-          const reply = decodeClaimedIssueReply(issue);
+          const reply = issue;
           try {
             await runClaimedIssueReply(
               config,
@@ -862,7 +838,7 @@ async function workerCommand() {
         await runClaimedIssue(
           config,
           project,
-          decodeClaimedRun(issue),
+          issue,
           workerToken,
           signal,
           reportCheckpoint,

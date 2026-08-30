@@ -38,7 +38,6 @@ import {
 } from "../src/lib/auto-hunt-contract";
 import type { AgentProvider } from "../src/lib/agent-provider";
 import { MERGE_QUEUE_VALIDATION_CONTEXT } from "../src/lib/merge-queue-validation-contract";
-import * as Predicate from "effect/Predicate";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -761,30 +760,6 @@ export function claimedWorkFromProto(value: ProtoClaimedWork): ClaimedWork {
       throw new Error("Worker claim omitted work variant");
   }
 }
-
-const domainClaim = (value: unknown, workType: ClaimedWork["workType"]): ClaimedWork => {
-  if (!Predicate.isObject(value) || value.workType !== workType) {
-    throw new Error(`Expected ${workType} claim`);
-  }
-  return value as ClaimedWork;
-};
-
-export const decodeClaimedRun = (value: unknown): ClaimedRun =>
-  domainClaim(value, "issue") as ClaimedRun;
-
-export const decodeClaimedIssueReply = (value: unknown): ClaimedIssueReply =>
-  domainClaim(value, "issueReply") as ClaimedIssueReply;
-
-export const decodeClaimedChannelReply = (value: unknown): ClaimedChannelReply =>
-  domainClaim(value, "channelReply") as ClaimedChannelReply;
-
-export const decodeClaimedProjectAgentTask = (
-  value: unknown,
-): ClaimedProjectAgentTask =>
-  domainClaim(value, "projectAgentTask") as ClaimedProjectAgentTask;
-
-export const decodeClaimedMergeBatch = (value: unknown): ClaimedMergeBatch =>
-  assertMergeBatch(domainClaim(value, "mergeBatch") as ClaimedMergeBatch);
 
 export type WorkerLeaseRenewal = {
   leaseExpiresAt: string;
