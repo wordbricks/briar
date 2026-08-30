@@ -6,6 +6,7 @@ import type { DashboardDeltaPayload } from "../types";
 const delta = (
   overrides: Partial<DashboardDeltaPayload> = {},
 ): DashboardDeltaPayload => ({
+  reset: false,
   cursor: 2,
   hasMore: false,
   runs: [],

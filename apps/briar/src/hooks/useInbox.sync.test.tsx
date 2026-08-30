@@ -106,7 +106,7 @@ describe("Inbox read-state synchronization", () => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     window.localStorage.clear();
     sync.loadFeed.mockReset().mockResolvedValue({
-      state: { etag: 'W/"organization-inbox:org:0"' },
+      state: { version: "0" },
       notModified: false,
       messages: [],
     });

@@ -569,6 +569,11 @@ export function useBriar(options: UseBriarOptions = {}) {
                 cursor,
                 abort.signal,
               );
+              if (delta.reset) {
+                current = await loadDashboard(token, projectId, abort.signal);
+                cursor = current.cursor ?? null;
+                break;
+              }
             } catch (caught) {
               if (!isApiErrorStatus(caught, 410)) throw caught;
               current = await loadDashboard(token, projectId, abort.signal);

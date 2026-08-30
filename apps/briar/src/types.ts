@@ -1001,6 +1001,7 @@ export type DashboardPayload = {
 export type DashboardDeltaPayload = {
   cursor: number;
   hasMore: boolean;
+  reset: boolean;
   runs: HuntRun[];
   deletedRunIds: string[];
   workers: ExecutionWorker[];

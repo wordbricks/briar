@@ -36,6 +36,18 @@ import {
   decodeProjectUsageSummaryResponse,
 } from "./api/project-contract";
 import { listProjects } from "./mobile-rpc/project";
+import { listOrganizationMembers as listOrganizationMembersRpc } from "./mobile-rpc/account";
+import {
+  deleteInboxReadStateRpc,
+  getInboxFeed,
+  getInboxReadStates,
+  putInboxReadStates,
+} from "./mobile-rpc/inbox";
+import {
+  getDashboard,
+  listRunEventsRpc,
+  syncDashboard,
+} from "./mobile-rpc/dashboard";
 import type { StructuredAgentResult } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import {
@@ -226,7 +238,7 @@ export async function pollDeviceToken(
 }
 
 export type InboxFeedSyncState = {
-  etag: string | null;
+  version: string;
 };
 
 export type InboxFeedSyncResult = {
@@ -242,86 +254,38 @@ export async function loadInboxFeed(
   state: InboxFeedSyncState | null = null,
   signal?: AbortSignal,
 ): Promise<InboxFeedSyncResult> {
-  if (!apiUrl) throw new Error("Briar API URL이 설정되지 않았습니다.");
-  const headers = new Headers({
-    Accept: "application/json",
-    Authorization: `Bearer ${token}`,
-  });
-  if (state?.etag) headers.set("If-None-Match", state.etag);
-  const response = await fetch(
-    `${apiUrl}/organizations/${encodeURIComponent(organizationId)}/inbox`,
-    { headers, signal },
+  const result = await getInboxFeed(
+    token,
+    organizationId,
+    state?.version,
+    signal,
   );
-  if (response.status === 304 && state) {
-    return {
-      state: { etag: response.headers.get("ETag") ?? state.etag },
-      notModified: true,
-      messages: [],
-    };
-  }
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new ApiError(
-      response.status,
-      body?.message ?? `Briar API 요청 실패 (${response.status})`,
-      body?.code,
-      Array.isArray(body?.issues) ? body.issues : undefined,
-    );
-  }
-  const result = await response.json() as {
-    messages?: InboxMessage[];
-    subscribedIssueIds?: string[];
-  };
   return {
-    state: { etag: response.headers.get("ETag") },
-    notModified: false,
-    messages: Array.isArray(result.messages) ? result.messages : [],
-    subscribedIssueIds: Array.isArray(result.subscribedIssueIds)
-      ? result.subscribedIssueIds.filter(
-          (runId): runId is string => typeof runId === "string",
-        )
-      : undefined,
+    state: { version: result.version },
+    notModified: result.unchanged,
+    messages: result.messages,
+    subscribedIssueIds: result.subscribedIssueIds,
   };
 }
 
 export async function loadInboxReadStates(
   token: string,
 ): Promise<Record<string, string>> {
-  const result = await request<{ readVersions?: unknown }>(
-    "/inbox/read-states",
-    token,
-  );
-  return decodeInboxReadVersions(result.readVersions ?? {});
+  return decodeInboxReadVersions(await getInboxReadStates(token));
 }
 
 export async function saveInboxReadStates(
   token: string,
   readVersions: Record<string, string>,
 ): Promise<Record<string, string>> {
-  const result = await request<{ readVersions?: unknown }>(
-    "/inbox/read-states",
-    token,
-    {
-      method: "PUT",
-      body: JSON.stringify({ readVersions }),
-    },
-  );
-  return decodeInboxReadVersions(result.readVersions ?? {});
+  return decodeInboxReadVersions(await putInboxReadStates(token, readVersions));
 }
 
 export async function deleteInboxReadState(
   token: string,
   messageId: string,
 ): Promise<Record<string, string>> {
-  const result = await request<{ readVersions?: unknown }>(
-    "/inbox/read-states",
-    token,
-    {
-      method: "DELETE",
-      body: JSON.stringify({ messageId }),
-    },
-  );
-  return decodeInboxReadVersions(result.readVersions ?? {});
+  return decodeInboxReadVersions(await deleteInboxReadStateRpc(token, messageId));
 }
 
 export async function loadProjects(token: string): Promise<Project[]> {
@@ -399,11 +363,7 @@ export async function loadOrganizationMembers(
   token: string,
   organizationId: string,
 ) {
-  const result = await request<{ members: OrganizationMember[] }>(
-    `/organizations/${organizationId}/members`,
-    token,
-  );
-  return result.members;
+  return listOrganizationMembersRpc(token, organizationId);
 }
 
 export async function loadOrganizationInvitations(
@@ -822,11 +782,7 @@ export async function loadDashboard(
   projectId: string,
   signal?: AbortSignal,
 ): Promise<DashboardPayload> {
-  const dashboard = await request<DashboardPayload>(
-    `/projects/${projectId}/dashboard`,
-    token,
-    { signal },
-  );
+  const dashboard = await getDashboard(token, projectId, signal);
   return {
     ...dashboard,
     settings: {
@@ -888,11 +844,7 @@ export async function loadDashboardDelta(
   cursor: number,
   signal?: AbortSignal,
 ): Promise<DashboardDeltaPayload> {
-  const delta = await request<DashboardDeltaPayload>(
-    `/projects/${projectId}/dashboard/delta?cursor=${cursor}`,
-    token,
-    { signal },
-  );
+  const delta = await syncDashboard(token, projectId, cursor, signal);
   return { ...delta, runs: normalizeDashboardRuns(delta.runs) };
 }
 
@@ -926,18 +878,7 @@ export async function loadRunEvents(
   projectId: string,
   runId: string,
 ): Promise<HuntEvent[]> {
-  const result = await request<{ events: HuntEvent[] }>(
-    `/projects/${projectId}/runs/${runId}/events`,
-    token,
-  );
-  return result.events.map((event) => ({
-    ...event,
-    actorName: event.actorName ?? null,
-    revision:
-      Number.isInteger(event.revision) && event.revision >= 1
-        ? event.revision
-        : 1,
-  }));
+  return listRunEventsRpc(token, projectId, runId);
 }
 
 export type ProjectAgentTranscript = {
