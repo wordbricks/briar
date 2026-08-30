@@ -8042,6 +8042,338 @@ pub mod message_block {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::message_block::Value as ValueView;
 }
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum MobilePushEndpoint {
+    MOBILE_PUSH_ENDPOINT_UNSPECIFIED = 0i32,
+    MOBILE_PUSH_ENDPOINT_APNS_DEVELOPMENT = 1i32,
+    MOBILE_PUSH_ENDPOINT_APNS_PRODUCTION = 2i32,
+    MOBILE_PUSH_ENDPOINT_FCM = 3i32,
+}
+impl MobilePushEndpoint {
+    ///Idiomatic alias for [`Self::MOBILE_PUSH_ENDPOINT_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::MOBILE_PUSH_ENDPOINT_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::MOBILE_PUSH_ENDPOINT_APNS_DEVELOPMENT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ApnsDevelopment: Self = Self::MOBILE_PUSH_ENDPOINT_APNS_DEVELOPMENT;
+    ///Idiomatic alias for [`Self::MOBILE_PUSH_ENDPOINT_APNS_PRODUCTION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ApnsProduction: Self = Self::MOBILE_PUSH_ENDPOINT_APNS_PRODUCTION;
+    ///Idiomatic alias for [`Self::MOBILE_PUSH_ENDPOINT_FCM`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Fcm: Self = Self::MOBILE_PUSH_ENDPOINT_FCM;
+}
+impl ::core::default::Default for MobilePushEndpoint {
+    fn default() -> Self {
+        Self::MOBILE_PUSH_ENDPOINT_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for MobilePushEndpoint {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for MobilePushEndpoint {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = MobilePushEndpoint;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(MobilePushEndpoint)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<MobilePushEndpoint, E> {
+                <MobilePushEndpoint as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<MobilePushEndpoint, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <MobilePushEndpoint as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<MobilePushEndpoint, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <MobilePushEndpoint as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<MobilePushEndpoint, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MobilePushEndpoint {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for MobilePushEndpoint {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::MOBILE_PUSH_ENDPOINT_UNSPECIFIED),
+            1i32 => {
+                ::core::option::Option::Some(Self::MOBILE_PUSH_ENDPOINT_APNS_DEVELOPMENT)
+            }
+            2i32 => {
+                ::core::option::Option::Some(Self::MOBILE_PUSH_ENDPOINT_APNS_PRODUCTION)
+            }
+            3i32 => ::core::option::Option::Some(Self::MOBILE_PUSH_ENDPOINT_FCM),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::MOBILE_PUSH_ENDPOINT_UNSPECIFIED => "MOBILE_PUSH_ENDPOINT_UNSPECIFIED",
+            Self::MOBILE_PUSH_ENDPOINT_APNS_DEVELOPMENT => {
+                "MOBILE_PUSH_ENDPOINT_APNS_DEVELOPMENT"
+            }
+            Self::MOBILE_PUSH_ENDPOINT_APNS_PRODUCTION => {
+                "MOBILE_PUSH_ENDPOINT_APNS_PRODUCTION"
+            }
+            Self::MOBILE_PUSH_ENDPOINT_FCM => "MOBILE_PUSH_ENDPOINT_FCM",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "MOBILE_PUSH_ENDPOINT_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::MOBILE_PUSH_ENDPOINT_UNSPECIFIED)
+            }
+            "MOBILE_PUSH_ENDPOINT_APNS_DEVELOPMENT" => {
+                ::core::option::Option::Some(Self::MOBILE_PUSH_ENDPOINT_APNS_DEVELOPMENT)
+            }
+            "MOBILE_PUSH_ENDPOINT_APNS_PRODUCTION" => {
+                ::core::option::Option::Some(Self::MOBILE_PUSH_ENDPOINT_APNS_PRODUCTION)
+            }
+            "MOBILE_PUSH_ENDPOINT_FCM" => {
+                ::core::option::Option::Some(Self::MOBILE_PUSH_ENDPOINT_FCM)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::MOBILE_PUSH_ENDPOINT_UNSPECIFIED,
+            Self::MOBILE_PUSH_ENDPOINT_APNS_DEVELOPMENT,
+            Self::MOBILE_PUSH_ENDPOINT_APNS_PRODUCTION,
+            Self::MOBILE_PUSH_ENDPOINT_FCM,
+        ]
+    }
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum MobilePushLocale {
+    MOBILE_PUSH_LOCALE_UNSPECIFIED = 0i32,
+    MOBILE_PUSH_LOCALE_KO = 1i32,
+    MOBILE_PUSH_LOCALE_EN = 2i32,
+    MOBILE_PUSH_LOCALE_ZH = 3i32,
+}
+impl MobilePushLocale {
+    ///Idiomatic alias for [`Self::MOBILE_PUSH_LOCALE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::MOBILE_PUSH_LOCALE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::MOBILE_PUSH_LOCALE_KO`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Ko: Self = Self::MOBILE_PUSH_LOCALE_KO;
+    ///Idiomatic alias for [`Self::MOBILE_PUSH_LOCALE_EN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const En: Self = Self::MOBILE_PUSH_LOCALE_EN;
+    ///Idiomatic alias for [`Self::MOBILE_PUSH_LOCALE_ZH`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Zh: Self = Self::MOBILE_PUSH_LOCALE_ZH;
+}
+impl ::core::default::Default for MobilePushLocale {
+    fn default() -> Self {
+        Self::MOBILE_PUSH_LOCALE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for MobilePushLocale {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for MobilePushLocale {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = MobilePushLocale;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(MobilePushLocale)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<MobilePushLocale, E> {
+                <MobilePushLocale as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<MobilePushLocale, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <MobilePushLocale as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<MobilePushLocale, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <MobilePushLocale as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<MobilePushLocale, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MobilePushLocale {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for MobilePushLocale {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::MOBILE_PUSH_LOCALE_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::MOBILE_PUSH_LOCALE_KO),
+            2i32 => ::core::option::Option::Some(Self::MOBILE_PUSH_LOCALE_EN),
+            3i32 => ::core::option::Option::Some(Self::MOBILE_PUSH_LOCALE_ZH),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::MOBILE_PUSH_LOCALE_UNSPECIFIED => "MOBILE_PUSH_LOCALE_UNSPECIFIED",
+            Self::MOBILE_PUSH_LOCALE_KO => "MOBILE_PUSH_LOCALE_KO",
+            Self::MOBILE_PUSH_LOCALE_EN => "MOBILE_PUSH_LOCALE_EN",
+            Self::MOBILE_PUSH_LOCALE_ZH => "MOBILE_PUSH_LOCALE_ZH",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "MOBILE_PUSH_LOCALE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::MOBILE_PUSH_LOCALE_UNSPECIFIED)
+            }
+            "MOBILE_PUSH_LOCALE_KO" => {
+                ::core::option::Option::Some(Self::MOBILE_PUSH_LOCALE_KO)
+            }
+            "MOBILE_PUSH_LOCALE_EN" => {
+                ::core::option::Option::Some(Self::MOBILE_PUSH_LOCALE_EN)
+            }
+            "MOBILE_PUSH_LOCALE_ZH" => {
+                ::core::option::Option::Some(Self::MOBILE_PUSH_LOCALE_ZH)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::MOBILE_PUSH_LOCALE_UNSPECIFIED,
+            Self::MOBILE_PUSH_LOCALE_KO,
+            Self::MOBILE_PUSH_LOCALE_EN,
+            Self::MOBILE_PUSH_LOCALE_ZH,
+        ]
+    }
+}
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -8280,6 +8612,812 @@ pub const __GET_CURRENT_USER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyE
     type_url: "type.googleapis.com/briar.app.v1.GetCurrentUserResponse",
     to_json: ::buffa::type_registry::any_to_json::<GetCurrentUserResponse>,
     from_json: ::buffa::type_registry::any_from_json::<GetCurrentUserResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MobilePushPreferences {
+    /// Field 1: `play_sound`
+    #[serde(
+        rename = "playSound",
+        alias = "play_sound",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub play_sound: bool,
+    /// Field 2: `urgent`
+    #[serde(
+        rename = "urgent",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub urgent: bool,
+    /// Field 3: `action_required`
+    #[serde(
+        rename = "actionRequired",
+        alias = "action_required",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub action_required: bool,
+    /// Field 4: `important`
+    #[serde(
+        rename = "important",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub important: bool,
+    /// Field 5: `activity`
+    #[serde(
+        rename = "activity",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub activity: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MobilePushPreferences {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MobilePushPreferences")
+            .field("play_sound", &self.play_sound)
+            .field("urgent", &self.urgent)
+            .field("action_required", &self.action_required)
+            .field("important", &self.important)
+            .field("activity", &self.activity)
+            .finish()
+    }
+}
+impl MobilePushPreferences {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MobilePushPreferences";
+}
+::buffa::impl_default_instance!(MobilePushPreferences);
+impl ::buffa::MessageName for MobilePushPreferences {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "MobilePushPreferences";
+    const FULL_NAME: &'static str = "briar.app.v1.MobilePushPreferences";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MobilePushPreferences";
+}
+impl ::buffa::Message for MobilePushPreferences {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.play_sound {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.urgent {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.action_required {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.important {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.activity {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.play_sound {
+            ::buffa::types::put_bool_field(1u32, self.play_sound, buf);
+        }
+        if self.urgent {
+            ::buffa::types::put_bool_field(2u32, self.urgent, buf);
+        }
+        if self.action_required {
+            ::buffa::types::put_bool_field(3u32, self.action_required, buf);
+        }
+        if self.important {
+            ::buffa::types::put_bool_field(4u32, self.important, buf);
+        }
+        if self.activity {
+            ::buffa::types::put_bool_field(5u32, self.activity, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.play_sound = ::buffa::types::decode_bool(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.urgent = ::buffa::types::decode_bool(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.action_required = ::buffa::types::decode_bool(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.important = ::buffa::types::decode_bool(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.activity = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.play_sound = false;
+        self.urgent = false;
+        self.action_required = false;
+        self.important = false;
+        self.activity = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MobilePushPreferences {
+    const PROTO_FQN: &'static str = "briar.app.v1.MobilePushPreferences";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MobilePushPreferences {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MOBILE_PUSH_PREFERENCES_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.MobilePushPreferences",
+    to_json: ::buffa::type_registry::any_to_json::<MobilePushPreferences>,
+    from_json: ::buffa::type_registry::any_from_json::<MobilePushPreferences>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RegisterMobilePushDeviceRequest {
+    /// Field 1: `endpoint`
+    #[serde(
+        rename = "endpoint",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub endpoint: ::buffa::EnumValue<MobilePushEndpoint>,
+    /// Field 2: `token`
+    #[serde(
+        rename = "token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub token: ::buffa::alloc::string::String,
+    /// Field 3: `locale`
+    #[serde(
+        rename = "locale",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub locale: ::buffa::EnumValue<MobilePushLocale>,
+    /// Field 4: `preferences`
+    #[serde(
+        rename = "preferences",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub preferences: ::buffa::MessageField<
+        MobilePushPreferences,
+        ::buffa::Inline<MobilePushPreferences>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RegisterMobilePushDeviceRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RegisterMobilePushDeviceRequest")
+            .field("endpoint", &self.endpoint)
+            .field("token", &self.token)
+            .field("locale", &self.locale)
+            .field("preferences", &self.preferences)
+            .finish()
+    }
+}
+impl RegisterMobilePushDeviceRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RegisterMobilePushDeviceRequest";
+}
+::buffa::impl_default_instance!(RegisterMobilePushDeviceRequest);
+impl ::buffa::MessageName for RegisterMobilePushDeviceRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "RegisterMobilePushDeviceRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.RegisterMobilePushDeviceRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RegisterMobilePushDeviceRequest";
+}
+impl ::buffa::Message for RegisterMobilePushDeviceRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        {
+            let val = self.endpoint.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if !self.token.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.token) as u64;
+        }
+        {
+            let val = self.locale.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.preferences.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.preferences.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.endpoint.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if !self.token.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.token, buf);
+        }
+        {
+            let val = self.locale.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if self.preferences.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                4u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.preferences.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.endpoint = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.token, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.locale = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.preferences.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.endpoint = ::buffa::EnumValue::from(0);
+        self.token.clear();
+        self.locale = ::buffa::EnumValue::from(0);
+        self.preferences = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RegisterMobilePushDeviceRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.RegisterMobilePushDeviceRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RegisterMobilePushDeviceRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __REGISTER_MOBILE_PUSH_DEVICE_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.RegisterMobilePushDeviceRequest",
+    to_json: ::buffa::type_registry::any_to_json::<RegisterMobilePushDeviceRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<RegisterMobilePushDeviceRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RegisterMobilePushDeviceResponse {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RegisterMobilePushDeviceResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RegisterMobilePushDeviceResponse").finish()
+    }
+}
+impl RegisterMobilePushDeviceResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RegisterMobilePushDeviceResponse";
+}
+::buffa::impl_default_instance!(RegisterMobilePushDeviceResponse);
+impl ::buffa::MessageName for RegisterMobilePushDeviceResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "RegisterMobilePushDeviceResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.RegisterMobilePushDeviceResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RegisterMobilePushDeviceResponse";
+}
+impl ::buffa::Message for RegisterMobilePushDeviceResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RegisterMobilePushDeviceResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.RegisterMobilePushDeviceResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RegisterMobilePushDeviceResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __REGISTER_MOBILE_PUSH_DEVICE_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.RegisterMobilePushDeviceResponse",
+    to_json: ::buffa::type_registry::any_to_json::<RegisterMobilePushDeviceResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<RegisterMobilePushDeviceResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UnregisterMobilePushDeviceRequest {
+    /// Field 1: `endpoint`
+    #[serde(
+        rename = "endpoint",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub endpoint: ::buffa::EnumValue<MobilePushEndpoint>,
+    /// Field 2: `token`
+    #[serde(
+        rename = "token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub token: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UnregisterMobilePushDeviceRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UnregisterMobilePushDeviceRequest")
+            .field("endpoint", &self.endpoint)
+            .field("token", &self.token)
+            .finish()
+    }
+}
+impl UnregisterMobilePushDeviceRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UnregisterMobilePushDeviceRequest";
+}
+::buffa::impl_default_instance!(UnregisterMobilePushDeviceRequest);
+impl ::buffa::MessageName for UnregisterMobilePushDeviceRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "UnregisterMobilePushDeviceRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.UnregisterMobilePushDeviceRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UnregisterMobilePushDeviceRequest";
+}
+impl ::buffa::Message for UnregisterMobilePushDeviceRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        {
+            let val = self.endpoint.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if !self.token.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.token) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.endpoint.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if !self.token.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.token, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.endpoint = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.token, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.endpoint = ::buffa::EnumValue::from(0);
+        self.token.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UnregisterMobilePushDeviceRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.UnregisterMobilePushDeviceRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UnregisterMobilePushDeviceRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UNREGISTER_MOBILE_PUSH_DEVICE_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UnregisterMobilePushDeviceRequest",
+    to_json: ::buffa::type_registry::any_to_json::<UnregisterMobilePushDeviceRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        UnregisterMobilePushDeviceRequest,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UnregisterMobilePushDeviceResponse {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UnregisterMobilePushDeviceResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UnregisterMobilePushDeviceResponse").finish()
+    }
+}
+impl UnregisterMobilePushDeviceResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UnregisterMobilePushDeviceResponse";
+}
+::buffa::impl_default_instance!(UnregisterMobilePushDeviceResponse);
+impl ::buffa::MessageName for UnregisterMobilePushDeviceResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "UnregisterMobilePushDeviceResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.UnregisterMobilePushDeviceResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UnregisterMobilePushDeviceResponse";
+}
+impl ::buffa::Message for UnregisterMobilePushDeviceResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UnregisterMobilePushDeviceResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.UnregisterMobilePushDeviceResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UnregisterMobilePushDeviceResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UNREGISTER_MOBILE_PUSH_DEVICE_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UnregisterMobilePushDeviceResponse",
+    to_json: ::buffa::type_registry::any_to_json::<UnregisterMobilePushDeviceResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        UnregisterMobilePushDeviceResponse,
+    >,
     is_wkt: false,
 };
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -76689,6 +77827,966 @@ pub const __DELETE_INBOX_READ_STATE_RESPONSE_JSON_ANY: ::buffa::type_registry::J
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
+pub struct MobilePushConversationDestination {
+    /// Field 1: `conversation_message_id`
+    #[serde(
+        rename = "conversationMessageId",
+        alias = "conversation_message_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub conversation_message_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MobilePushConversationDestination {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MobilePushConversationDestination")
+            .field("conversation_message_id", &self.conversation_message_id)
+            .finish()
+    }
+}
+impl MobilePushConversationDestination {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MobilePushConversationDestination";
+}
+::buffa::impl_default_instance!(MobilePushConversationDestination);
+impl ::buffa::MessageName for MobilePushConversationDestination {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "MobilePushConversationDestination";
+    const FULL_NAME: &'static str = "briar.app.v1.MobilePushConversationDestination";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MobilePushConversationDestination";
+}
+impl ::buffa::Message for MobilePushConversationDestination {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.conversation_message_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.conversation_message_id)
+                        as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.conversation_message_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.conversation_message_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.conversation_message_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.conversation_message_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MobilePushConversationDestination {
+    const PROTO_FQN: &'static str = "briar.app.v1.MobilePushConversationDestination";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MobilePushConversationDestination {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MOBILE_PUSH_CONVERSATION_DESTINATION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.MobilePushConversationDestination",
+    to_json: ::buffa::type_registry::any_to_json::<MobilePushConversationDestination>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        MobilePushConversationDestination,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MobilePushChannelDestination {
+    /// Field 1: `channel_message_id`
+    #[serde(
+        rename = "channelMessageId",
+        alias = "channel_message_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub channel_message_id: ::buffa::alloc::string::String,
+    /// Field 2: `root_message_id`
+    #[serde(
+        rename = "rootMessageId",
+        alias = "root_message_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub root_message_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MobilePushChannelDestination {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MobilePushChannelDestination")
+            .field("channel_message_id", &self.channel_message_id)
+            .field("root_message_id", &self.root_message_id)
+            .finish()
+    }
+}
+impl MobilePushChannelDestination {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MobilePushChannelDestination";
+}
+::buffa::impl_default_instance!(MobilePushChannelDestination);
+impl ::buffa::MessageName for MobilePushChannelDestination {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "MobilePushChannelDestination";
+    const FULL_NAME: &'static str = "briar.app.v1.MobilePushChannelDestination";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MobilePushChannelDestination";
+}
+impl ::buffa::Message for MobilePushChannelDestination {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.channel_message_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.channel_message_id)
+                        as u64;
+        }
+        if !self.root_message_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.root_message_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.channel_message_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.channel_message_id, buf);
+        }
+        if !self.root_message_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.root_message_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.channel_message_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.root_message_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.channel_message_id.clear();
+        self.root_message_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MobilePushChannelDestination {
+    const PROTO_FQN: &'static str = "briar.app.v1.MobilePushChannelDestination";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MobilePushChannelDestination {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MOBILE_PUSH_CHANNEL_DESTINATION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.MobilePushChannelDestination",
+    to_json: ::buffa::type_registry::any_to_json::<MobilePushChannelDestination>,
+    from_json: ::buffa::type_registry::any_from_json::<MobilePushChannelDestination>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct MobilePushNotificationTarget {
+    /// Field 1: `inbox_message_id`
+    #[serde(
+        rename = "inboxMessageId",
+        alias = "inbox_message_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub inbox_message_id: ::buffa::alloc::string::String,
+    /// Field 2: `inbox_message_version`
+    #[serde(
+        rename = "inboxMessageVersion",
+        alias = "inbox_message_version",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub inbox_message_version: ::buffa::alloc::string::String,
+    /// Field 3: `notification_id`
+    #[serde(
+        rename = "notificationId",
+        alias = "notification_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub notification_id: ::buffa::alloc::string::String,
+    /// Field 4: `project_id`
+    #[serde(
+        rename = "projectId",
+        alias = "project_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub project_id: ::buffa::alloc::string::String,
+    /// Field 5: `target_id`
+    #[serde(
+        rename = "targetId",
+        alias = "target_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub target_id: ::buffa::alloc::string::String,
+    #[serde(flatten)]
+    pub destination: ::core::option::Option<
+        __buffa::oneof::mobile_push_notification_target::Destination,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MobilePushNotificationTarget {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MobilePushNotificationTarget")
+            .field("inbox_message_id", &self.inbox_message_id)
+            .field("inbox_message_version", &self.inbox_message_version)
+            .field("notification_id", &self.notification_id)
+            .field("project_id", &self.project_id)
+            .field("target_id", &self.target_id)
+            .field("destination", &self.destination)
+            .finish()
+    }
+}
+impl MobilePushNotificationTarget {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MobilePushNotificationTarget";
+}
+::buffa::impl_default_instance!(MobilePushNotificationTarget);
+impl ::buffa::MessageName for MobilePushNotificationTarget {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "MobilePushNotificationTarget";
+    const FULL_NAME: &'static str = "briar.app.v1.MobilePushNotificationTarget";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MobilePushNotificationTarget";
+}
+impl ::buffa::Message for MobilePushNotificationTarget {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.inbox_message_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.inbox_message_id) as u64;
+        }
+        if !self.inbox_message_version.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.inbox_message_version)
+                        as u64;
+        }
+        if !self.notification_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.notification_id) as u64;
+        }
+        if !self.project_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        }
+        if !self.target_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.target_id) as u64;
+        }
+        if let ::core::option::Option::Some(ref v) = self.destination {
+            match v {
+                __buffa::oneof::mobile_push_notification_target::Destination::Issue(
+                    x,
+                ) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+                __buffa::oneof::mobile_push_notification_target::Destination::Conversation(
+                    x,
+                ) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+                __buffa::oneof::mobile_push_notification_target::Destination::Channel(
+                    x,
+                ) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+                __buffa::oneof::mobile_push_notification_target::Destination::Session(
+                    x,
+                ) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.inbox_message_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.inbox_message_id, buf);
+        }
+        if !self.inbox_message_version.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.inbox_message_version, buf);
+        }
+        if !self.notification_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.notification_id, buf);
+        }
+        if !self.project_id.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.project_id, buf);
+        }
+        if !self.target_id.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.target_id, buf);
+        }
+        if let ::core::option::Option::Some(ref v) = self.destination {
+            match v {
+                __buffa::oneof::mobile_push_notification_target::Destination::Issue(
+                    x,
+                ) => {
+                    ::buffa::types::put_len_delimited_header(
+                        10u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::mobile_push_notification_target::Destination::Conversation(
+                    x,
+                ) => {
+                    ::buffa::types::put_len_delimited_header(
+                        11u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::mobile_push_notification_target::Destination::Channel(
+                    x,
+                ) => {
+                    ::buffa::types::put_len_delimited_header(
+                        12u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::mobile_push_notification_target::Destination::Session(
+                    x,
+                ) => {
+                    ::buffa::types::put_len_delimited_header(
+                        13u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.inbox_message_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.inbox_message_version, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.notification_id, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.target_id, buf)?;
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::mobile_push_notification_target::Destination::Issue(
+                        ref mut existing,
+                    ),
+                ) = self.destination
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.destination = ::core::option::Option::Some(
+                        __buffa::oneof::mobile_push_notification_target::Destination::Issue(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::mobile_push_notification_target::Destination::Conversation(
+                        ref mut existing,
+                    ),
+                ) = self.destination
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.destination = ::core::option::Option::Some(
+                        __buffa::oneof::mobile_push_notification_target::Destination::Conversation(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::mobile_push_notification_target::Destination::Channel(
+                        ref mut existing,
+                    ),
+                ) = self.destination
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.destination = ::core::option::Option::Some(
+                        __buffa::oneof::mobile_push_notification_target::Destination::Channel(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::mobile_push_notification_target::Destination::Session(
+                        ref mut existing,
+                    ),
+                ) = self.destination
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.destination = ::core::option::Option::Some(
+                        __buffa::oneof::mobile_push_notification_target::Destination::Session(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.inbox_message_id.clear();
+        self.inbox_message_version.clear();
+        self.notification_id.clear();
+        self.project_id.clear();
+        self.target_id.clear();
+        self.destination = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MobilePushNotificationTarget {
+    const PROTO_FQN: &'static str = "briar.app.v1.MobilePushNotificationTarget";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for MobilePushNotificationTarget {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = MobilePushNotificationTarget;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct MobilePushNotificationTarget")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<MobilePushNotificationTarget, A::Error> {
+                let mut __f_inbox_message_id: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_inbox_message_version: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_notification_id: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_project_id: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_target_id: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __oneof_destination: ::core::option::Option<
+                    __buffa::oneof::mobile_push_notification_target::Destination,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "inboxMessageId" | "inbox_message_id" => {
+                            __f_inbox_message_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "inboxMessageVersion" | "inbox_message_version" => {
+                            __f_inbox_message_version = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "notificationId" | "notification_id" => {
+                            __f_notification_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "projectId" | "project_id" => {
+                            __f_project_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "targetId" | "target_id" => {
+                            __f_target_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "issue" => {
+                            let v: ::core::option::Option<
+                                ::buffa_types::google::protobuf::Empty,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa_types::google::protobuf::Empty,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_destination.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'destination'",
+                                        ),
+                                    );
+                                }
+                                __oneof_destination = Some(
+                                    __buffa::oneof::mobile_push_notification_target::Destination::Issue(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "conversation" => {
+                            let v: ::core::option::Option<
+                                MobilePushConversationDestination,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            MobilePushConversationDestination,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_destination.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'destination'",
+                                        ),
+                                    );
+                                }
+                                __oneof_destination = Some(
+                                    __buffa::oneof::mobile_push_notification_target::Destination::Conversation(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "channel" => {
+                            let v: ::core::option::Option<
+                                MobilePushChannelDestination,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            MobilePushChannelDestination,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_destination.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'destination'",
+                                        ),
+                                    );
+                                }
+                                __oneof_destination = Some(
+                                    __buffa::oneof::mobile_push_notification_target::Destination::Channel(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "session" => {
+                            let v: ::core::option::Option<
+                                ::buffa_types::google::protobuf::Empty,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa_types::google::protobuf::Empty,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_destination.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'destination'",
+                                        ),
+                                    );
+                                }
+                                __oneof_destination = Some(
+                                    __buffa::oneof::mobile_push_notification_target::Destination::Session(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <MobilePushNotificationTarget as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_inbox_message_id {
+                    __r.inbox_message_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_inbox_message_version {
+                    __r.inbox_message_version = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_notification_id {
+                    __r.notification_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_project_id {
+                    __r.project_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_target_id {
+                    __r.target_id = v;
+                }
+                __r.destination = __oneof_destination;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MobilePushNotificationTarget {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MOBILE_PUSH_NOTIFICATION_TARGET_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.MobilePushNotificationTarget",
+    to_json: ::buffa::type_registry::any_to_json::<MobilePushNotificationTarget>,
+    from_json: ::buffa::type_registry::any_from_json::<MobilePushNotificationTarget>,
+    is_wkt: false,
+};
+pub mod mobile_push_notification_target {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::mobile_push_notification_target::Destination;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::mobile_push_notification_target::Destination as DestinationView;
+}
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
 pub struct InboxMessageIdentity {
     /// Field 1: `id`
     #[serde(
@@ -95560,6 +97658,1593 @@ pub mod __buffa {
             type ViewHandle = GetCurrentUserResponseOwnedView;
         }
         impl ::serde::Serialize for GetCurrentUserResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MobilePushPreferencesView<'a> {
+            /// Field 1: `play_sound`
+            pub play_sound: bool,
+            /// Field 2: `urgent`
+            pub urgent: bool,
+            /// Field 3: `action_required`
+            pub action_required: bool,
+            /// Field 4: `important`
+            pub important: bool,
+            /// Field 5: `activity`
+            pub activity: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MobilePushPreferencesView<'a> {
+            type Owned = super::super::MobilePushPreferences;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.play_sound = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.urgent = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.action_required = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.important = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.activity = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MobilePushPreferences,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MobilePushPreferences,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MobilePushPreferences {
+                    play_sound: self.play_sound,
+                    urgent: self.urgent,
+                    action_required: self.action_required,
+                    important: self.important,
+                    activity: self.activity,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MobilePushPreferencesView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.play_sound {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if self.urgent {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if self.action_required {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if self.important {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if self.activity {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.play_sound {
+                    ::buffa::types::put_bool_field(1u32, self.play_sound, buf);
+                }
+                if self.urgent {
+                    ::buffa::types::put_bool_field(2u32, self.urgent, buf);
+                }
+                if self.action_required {
+                    ::buffa::types::put_bool_field(3u32, self.action_required, buf);
+                }
+                if self.important {
+                    ::buffa::types::put_bool_field(4u32, self.important, buf);
+                }
+                if self.activity {
+                    ::buffa::types::put_bool_field(5u32, self.activity, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MobilePushPreferencesView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if self.play_sound {
+                    __map.serialize_entry("playSound", &self.play_sound)?;
+                }
+                if self.urgent {
+                    __map.serialize_entry("urgent", &self.urgent)?;
+                }
+                if self.action_required {
+                    __map.serialize_entry("actionRequired", &self.action_required)?;
+                }
+                if self.important {
+                    __map.serialize_entry("important", &self.important)?;
+                }
+                if self.activity {
+                    __map.serialize_entry("activity", &self.activity)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MobilePushPreferencesView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "MobilePushPreferences";
+            const FULL_NAME: &'static str = "briar.app.v1.MobilePushPreferences";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MobilePushPreferences";
+        }
+        ::buffa::impl_default_view_instance!(MobilePushPreferencesView);
+        ::buffa::impl_view_reborrow!(MobilePushPreferencesView);
+        /** Self-contained, `'static` owned view of a `MobilePushPreferences` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MobilePushPreferencesView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MobilePushPreferencesView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MobilePushPreferencesOwnedView(
+            ::buffa::OwnedView<MobilePushPreferencesView<'static>>,
+        );
+        impl MobilePushPreferencesOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MobilePushPreferencesOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MobilePushPreferencesOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MobilePushPreferences,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MobilePushPreferencesOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`MobilePushPreferencesView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MobilePushPreferencesView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MobilePushPreferences {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `play_sound`
+            #[must_use]
+            pub fn play_sound(&self) -> bool {
+                self.0.reborrow().play_sound
+            }
+            /// Field 2: `urgent`
+            #[must_use]
+            pub fn urgent(&self) -> bool {
+                self.0.reborrow().urgent
+            }
+            /// Field 3: `action_required`
+            #[must_use]
+            pub fn action_required(&self) -> bool {
+                self.0.reborrow().action_required
+            }
+            /// Field 4: `important`
+            #[must_use]
+            pub fn important(&self) -> bool {
+                self.0.reborrow().important
+            }
+            /// Field 5: `activity`
+            #[must_use]
+            pub fn activity(&self) -> bool {
+                self.0.reborrow().activity
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MobilePushPreferencesView<'static>>,
+        > for MobilePushPreferencesOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MobilePushPreferencesView<'static>>,
+            ) -> Self {
+                MobilePushPreferencesOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MobilePushPreferencesOwnedView>
+        for ::buffa::OwnedView<MobilePushPreferencesView<'static>> {
+            fn from(wrapper: MobilePushPreferencesOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MobilePushPreferencesView<'static>>,
+        > for MobilePushPreferencesOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<MobilePushPreferencesView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MobilePushPreferences {
+            type View<'a> = MobilePushPreferencesView<'a>;
+            type ViewHandle = MobilePushPreferencesOwnedView;
+        }
+        impl ::serde::Serialize for MobilePushPreferencesOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct RegisterMobilePushDeviceRequestView<'a> {
+            /// Field 1: `endpoint`
+            pub endpoint: ::buffa::EnumValue<super::super::MobilePushEndpoint>,
+            /// Field 2: `token`
+            pub token: &'a str,
+            /// Field 3: `locale`
+            pub locale: ::buffa::EnumValue<super::super::MobilePushLocale>,
+            /// Field 4: `preferences`
+            pub preferences: ::buffa::MessageFieldView<
+                super::super::__buffa::view::MobilePushPreferencesView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for RegisterMobilePushDeviceRequestView<'a> {
+            type Owned = super::super::RegisterMobilePushDeviceRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.endpoint = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.locale = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.preferences.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.preferences = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::MobilePushPreferencesView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RegisterMobilePushDeviceRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RegisterMobilePushDeviceRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RegisterMobilePushDeviceRequest {
+                    endpoint: self.endpoint,
+                    token: self.token.to_string(),
+                    locale: self.locale,
+                    preferences: match self.preferences.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::MobilePushPreferences,
+                                ::buffa::Inline<super::super::MobilePushPreferences>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for RegisterMobilePushDeviceRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                {
+                    let val = self.endpoint.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if !self.token.is_empty() {
+                    size
+                        += 1u64 + ::buffa::types::string_encoded_len(&self.token) as u64;
+                }
+                {
+                    let val = self.locale.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if self.preferences.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.preferences.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.endpoint.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if !self.token.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.token, buf);
+                }
+                {
+                    let val = self.locale.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                if self.preferences.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.preferences.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for RegisterMobilePushDeviceRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.endpoint,
+                ) {
+                    __map.serialize_entry("endpoint", &self.endpoint)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.token) {
+                    __map.serialize_entry("token", self.token)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.locale) {
+                    __map.serialize_entry("locale", &self.locale)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .preferences
+                        .as_option()
+                    {
+                        __map.serialize_entry("preferences", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RegisterMobilePushDeviceRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "RegisterMobilePushDeviceRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.RegisterMobilePushDeviceRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RegisterMobilePushDeviceRequest";
+        }
+        ::buffa::impl_default_view_instance!(RegisterMobilePushDeviceRequestView);
+        ::buffa::impl_view_reborrow!(RegisterMobilePushDeviceRequestView);
+        /** Self-contained, `'static` owned view of a `RegisterMobilePushDeviceRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RegisterMobilePushDeviceRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RegisterMobilePushDeviceRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RegisterMobilePushDeviceRequestOwnedView(
+            ::buffa::OwnedView<RegisterMobilePushDeviceRequestView<'static>>,
+        );
+        impl RegisterMobilePushDeviceRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RegisterMobilePushDeviceRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RegisterMobilePushDeviceRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RegisterMobilePushDeviceRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RegisterMobilePushDeviceRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`RegisterMobilePushDeviceRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RegisterMobilePushDeviceRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::RegisterMobilePushDeviceRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `endpoint`
+            #[must_use]
+            pub fn endpoint(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::MobilePushEndpoint> {
+                self.0.reborrow().endpoint
+            }
+            /// Field 2: `token`
+            #[must_use]
+            pub fn token(&self) -> &'_ str {
+                self.0.reborrow().token
+            }
+            /// Field 3: `locale`
+            #[must_use]
+            pub fn locale(&self) -> ::buffa::EnumValue<super::super::MobilePushLocale> {
+                self.0.reborrow().locale
+            }
+            /// Field 4: `preferences`
+            #[must_use]
+            pub fn preferences(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::MobilePushPreferencesView<'_>,
+            > {
+                &self.0.reborrow().preferences
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<RegisterMobilePushDeviceRequestView<'static>>,
+        > for RegisterMobilePushDeviceRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<RegisterMobilePushDeviceRequestView<'static>>,
+            ) -> Self {
+                RegisterMobilePushDeviceRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RegisterMobilePushDeviceRequestOwnedView>
+        for ::buffa::OwnedView<RegisterMobilePushDeviceRequestView<'static>> {
+            fn from(wrapper: RegisterMobilePushDeviceRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<RegisterMobilePushDeviceRequestView<'static>>,
+        > for RegisterMobilePushDeviceRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<RegisterMobilePushDeviceRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::RegisterMobilePushDeviceRequest {
+            type View<'a> = RegisterMobilePushDeviceRequestView<'a>;
+            type ViewHandle = RegisterMobilePushDeviceRequestOwnedView;
+        }
+        impl ::serde::Serialize for RegisterMobilePushDeviceRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct RegisterMobilePushDeviceResponseView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for RegisterMobilePushDeviceResponseView<'a> {
+            type Owned = super::super::RegisterMobilePushDeviceResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RegisterMobilePushDeviceResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RegisterMobilePushDeviceResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RegisterMobilePushDeviceResponse {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for RegisterMobilePushDeviceResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for RegisterMobilePushDeviceResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RegisterMobilePushDeviceResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "RegisterMobilePushDeviceResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.RegisterMobilePushDeviceResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RegisterMobilePushDeviceResponse";
+        }
+        ::buffa::impl_default_view_instance!(RegisterMobilePushDeviceResponseView);
+        ::buffa::impl_view_reborrow!(RegisterMobilePushDeviceResponseView);
+        /** Self-contained, `'static` owned view of a `RegisterMobilePushDeviceResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RegisterMobilePushDeviceResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RegisterMobilePushDeviceResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RegisterMobilePushDeviceResponseOwnedView(
+            ::buffa::OwnedView<RegisterMobilePushDeviceResponseView<'static>>,
+        );
+        impl RegisterMobilePushDeviceResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RegisterMobilePushDeviceResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RegisterMobilePushDeviceResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RegisterMobilePushDeviceResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RegisterMobilePushDeviceResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`RegisterMobilePushDeviceResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RegisterMobilePushDeviceResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::RegisterMobilePushDeviceResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<RegisterMobilePushDeviceResponseView<'static>>,
+        > for RegisterMobilePushDeviceResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<RegisterMobilePushDeviceResponseView<'static>>,
+            ) -> Self {
+                RegisterMobilePushDeviceResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RegisterMobilePushDeviceResponseOwnedView>
+        for ::buffa::OwnedView<RegisterMobilePushDeviceResponseView<'static>> {
+            fn from(wrapper: RegisterMobilePushDeviceResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<RegisterMobilePushDeviceResponseView<'static>>,
+        > for RegisterMobilePushDeviceResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<RegisterMobilePushDeviceResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::RegisterMobilePushDeviceResponse {
+            type View<'a> = RegisterMobilePushDeviceResponseView<'a>;
+            type ViewHandle = RegisterMobilePushDeviceResponseOwnedView;
+        }
+        impl ::serde::Serialize for RegisterMobilePushDeviceResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct UnregisterMobilePushDeviceRequestView<'a> {
+            /// Field 1: `endpoint`
+            pub endpoint: ::buffa::EnumValue<super::super::MobilePushEndpoint>,
+            /// Field 2: `token`
+            pub token: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for UnregisterMobilePushDeviceRequestView<'a> {
+            type Owned = super::super::UnregisterMobilePushDeviceRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.endpoint = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UnregisterMobilePushDeviceRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UnregisterMobilePushDeviceRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UnregisterMobilePushDeviceRequest {
+                    endpoint: self.endpoint,
+                    token: self.token.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for UnregisterMobilePushDeviceRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                {
+                    let val = self.endpoint.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if !self.token.is_empty() {
+                    size
+                        += 1u64 + ::buffa::types::string_encoded_len(&self.token) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.endpoint.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if !self.token.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.token, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for UnregisterMobilePushDeviceRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.endpoint,
+                ) {
+                    __map.serialize_entry("endpoint", &self.endpoint)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.token) {
+                    __map.serialize_entry("token", self.token)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for UnregisterMobilePushDeviceRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "UnregisterMobilePushDeviceRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.UnregisterMobilePushDeviceRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UnregisterMobilePushDeviceRequest";
+        }
+        ::buffa::impl_default_view_instance!(UnregisterMobilePushDeviceRequestView);
+        ::buffa::impl_view_reborrow!(UnregisterMobilePushDeviceRequestView);
+        /** Self-contained, `'static` owned view of a `UnregisterMobilePushDeviceRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UnregisterMobilePushDeviceRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UnregisterMobilePushDeviceRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UnregisterMobilePushDeviceRequestOwnedView(
+            ::buffa::OwnedView<UnregisterMobilePushDeviceRequestView<'static>>,
+        );
+        impl UnregisterMobilePushDeviceRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UnregisterMobilePushDeviceRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UnregisterMobilePushDeviceRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UnregisterMobilePushDeviceRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UnregisterMobilePushDeviceRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`UnregisterMobilePushDeviceRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UnregisterMobilePushDeviceRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::UnregisterMobilePushDeviceRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `endpoint`
+            #[must_use]
+            pub fn endpoint(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::MobilePushEndpoint> {
+                self.0.reborrow().endpoint
+            }
+            /// Field 2: `token`
+            #[must_use]
+            pub fn token(&self) -> &'_ str {
+                self.0.reborrow().token
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<UnregisterMobilePushDeviceRequestView<'static>>,
+        > for UnregisterMobilePushDeviceRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<UnregisterMobilePushDeviceRequestView<'static>>,
+            ) -> Self {
+                UnregisterMobilePushDeviceRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UnregisterMobilePushDeviceRequestOwnedView>
+        for ::buffa::OwnedView<UnregisterMobilePushDeviceRequestView<'static>> {
+            fn from(wrapper: UnregisterMobilePushDeviceRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<UnregisterMobilePushDeviceRequestView<'static>>,
+        > for UnregisterMobilePushDeviceRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<UnregisterMobilePushDeviceRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::UnregisterMobilePushDeviceRequest {
+            type View<'a> = UnregisterMobilePushDeviceRequestView<'a>;
+            type ViewHandle = UnregisterMobilePushDeviceRequestOwnedView;
+        }
+        impl ::serde::Serialize for UnregisterMobilePushDeviceRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct UnregisterMobilePushDeviceResponseView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for UnregisterMobilePushDeviceResponseView<'a> {
+            type Owned = super::super::UnregisterMobilePushDeviceResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UnregisterMobilePushDeviceResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UnregisterMobilePushDeviceResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UnregisterMobilePushDeviceResponse {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for UnregisterMobilePushDeviceResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for UnregisterMobilePushDeviceResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for UnregisterMobilePushDeviceResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "UnregisterMobilePushDeviceResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.UnregisterMobilePushDeviceResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UnregisterMobilePushDeviceResponse";
+        }
+        ::buffa::impl_default_view_instance!(UnregisterMobilePushDeviceResponseView);
+        ::buffa::impl_view_reborrow!(UnregisterMobilePushDeviceResponseView);
+        /** Self-contained, `'static` owned view of a `UnregisterMobilePushDeviceResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UnregisterMobilePushDeviceResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UnregisterMobilePushDeviceResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UnregisterMobilePushDeviceResponseOwnedView(
+            ::buffa::OwnedView<UnregisterMobilePushDeviceResponseView<'static>>,
+        );
+        impl UnregisterMobilePushDeviceResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UnregisterMobilePushDeviceResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UnregisterMobilePushDeviceResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UnregisterMobilePushDeviceResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UnregisterMobilePushDeviceResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`UnregisterMobilePushDeviceResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UnregisterMobilePushDeviceResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::UnregisterMobilePushDeviceResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<UnregisterMobilePushDeviceResponseView<'static>>,
+        > for UnregisterMobilePushDeviceResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    UnregisterMobilePushDeviceResponseView<'static>,
+                >,
+            ) -> Self {
+                UnregisterMobilePushDeviceResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UnregisterMobilePushDeviceResponseOwnedView>
+        for ::buffa::OwnedView<UnregisterMobilePushDeviceResponseView<'static>> {
+            fn from(wrapper: UnregisterMobilePushDeviceResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<UnregisterMobilePushDeviceResponseView<'static>>,
+        > for UnregisterMobilePushDeviceResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<UnregisterMobilePushDeviceResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::UnregisterMobilePushDeviceResponse {
+            type View<'a> = UnregisterMobilePushDeviceResponseView<'a>;
+            type ViewHandle = UnregisterMobilePushDeviceResponseOwnedView;
+        }
+        impl ::serde::Serialize for UnregisterMobilePushDeviceResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -199445,6 +203130,1299 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
+        pub struct MobilePushConversationDestinationView<'a> {
+            /// Field 1: `conversation_message_id`
+            pub conversation_message_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MobilePushConversationDestinationView<'a> {
+            type Owned = super::super::MobilePushConversationDestination;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.conversation_message_id = ::buffa::types::borrow_str(
+                            &mut cur,
+                        )?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MobilePushConversationDestination,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MobilePushConversationDestination,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MobilePushConversationDestination {
+                    conversation_message_id: self.conversation_message_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MobilePushConversationDestinationView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.conversation_message_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(
+                                &self.conversation_message_id,
+                            ) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.conversation_message_id.is_empty() {
+                    ::buffa::types::put_string_field(
+                        1u32,
+                        &self.conversation_message_id,
+                        buf,
+                    );
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MobilePushConversationDestinationView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.conversation_message_id,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "conversationMessageId",
+                            self.conversation_message_id,
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MobilePushConversationDestinationView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "MobilePushConversationDestination";
+            const FULL_NAME: &'static str = "briar.app.v1.MobilePushConversationDestination";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MobilePushConversationDestination";
+        }
+        ::buffa::impl_default_view_instance!(MobilePushConversationDestinationView);
+        ::buffa::impl_view_reborrow!(MobilePushConversationDestinationView);
+        /** Self-contained, `'static` owned view of a `MobilePushConversationDestination` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MobilePushConversationDestinationView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MobilePushConversationDestinationView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MobilePushConversationDestinationOwnedView(
+            ::buffa::OwnedView<MobilePushConversationDestinationView<'static>>,
+        );
+        impl MobilePushConversationDestinationOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MobilePushConversationDestinationOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MobilePushConversationDestinationOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MobilePushConversationDestination,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MobilePushConversationDestinationOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`MobilePushConversationDestinationView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MobilePushConversationDestinationView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::MobilePushConversationDestination {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `conversation_message_id`
+            #[must_use]
+            pub fn conversation_message_id(&self) -> &'_ str {
+                self.0.reborrow().conversation_message_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MobilePushConversationDestinationView<'static>>,
+        > for MobilePushConversationDestinationOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MobilePushConversationDestinationView<'static>>,
+            ) -> Self {
+                MobilePushConversationDestinationOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MobilePushConversationDestinationOwnedView>
+        for ::buffa::OwnedView<MobilePushConversationDestinationView<'static>> {
+            fn from(wrapper: MobilePushConversationDestinationOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MobilePushConversationDestinationView<'static>>,
+        > for MobilePushConversationDestinationOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MobilePushConversationDestinationView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::MobilePushConversationDestination {
+            type View<'a> = MobilePushConversationDestinationView<'a>;
+            type ViewHandle = MobilePushConversationDestinationOwnedView;
+        }
+        impl ::serde::Serialize for MobilePushConversationDestinationOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MobilePushChannelDestinationView<'a> {
+            /// Field 1: `channel_message_id`
+            pub channel_message_id: &'a str,
+            /// Field 2: `root_message_id`
+            pub root_message_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MobilePushChannelDestinationView<'a> {
+            type Owned = super::super::MobilePushChannelDestination;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.channel_message_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.root_message_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MobilePushChannelDestination,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MobilePushChannelDestination,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MobilePushChannelDestination {
+                    channel_message_id: self.channel_message_id.to_string(),
+                    root_message_id: self.root_message_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MobilePushChannelDestinationView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.channel_message_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(
+                                &self.channel_message_id,
+                            ) as u64;
+                }
+                if !self.root_message_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.root_message_id)
+                                as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.channel_message_id.is_empty() {
+                    ::buffa::types::put_string_field(
+                        1u32,
+                        &self.channel_message_id,
+                        buf,
+                    );
+                }
+                if !self.root_message_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.root_message_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MobilePushChannelDestinationView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.channel_message_id,
+                ) {
+                    __map.serialize_entry("channelMessageId", self.channel_message_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.root_message_id) {
+                    __map.serialize_entry("rootMessageId", self.root_message_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MobilePushChannelDestinationView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "MobilePushChannelDestination";
+            const FULL_NAME: &'static str = "briar.app.v1.MobilePushChannelDestination";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MobilePushChannelDestination";
+        }
+        ::buffa::impl_default_view_instance!(MobilePushChannelDestinationView);
+        ::buffa::impl_view_reborrow!(MobilePushChannelDestinationView);
+        /** Self-contained, `'static` owned view of a `MobilePushChannelDestination` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MobilePushChannelDestinationView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MobilePushChannelDestinationView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MobilePushChannelDestinationOwnedView(
+            ::buffa::OwnedView<MobilePushChannelDestinationView<'static>>,
+        );
+        impl MobilePushChannelDestinationOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MobilePushChannelDestinationOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MobilePushChannelDestinationOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MobilePushChannelDestination,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MobilePushChannelDestinationOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`MobilePushChannelDestinationView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MobilePushChannelDestinationView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::MobilePushChannelDestination {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `channel_message_id`
+            #[must_use]
+            pub fn channel_message_id(&self) -> &'_ str {
+                self.0.reborrow().channel_message_id
+            }
+            /// Field 2: `root_message_id`
+            #[must_use]
+            pub fn root_message_id(&self) -> &'_ str {
+                self.0.reborrow().root_message_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MobilePushChannelDestinationView<'static>>,
+        > for MobilePushChannelDestinationOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MobilePushChannelDestinationView<'static>>,
+            ) -> Self {
+                MobilePushChannelDestinationOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MobilePushChannelDestinationOwnedView>
+        for ::buffa::OwnedView<MobilePushChannelDestinationView<'static>> {
+            fn from(wrapper: MobilePushChannelDestinationOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MobilePushChannelDestinationView<'static>>,
+        > for MobilePushChannelDestinationOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MobilePushChannelDestinationView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MobilePushChannelDestination {
+            type View<'a> = MobilePushChannelDestinationView<'a>;
+            type ViewHandle = MobilePushChannelDestinationOwnedView;
+        }
+        impl ::serde::Serialize for MobilePushChannelDestinationOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MobilePushNotificationTargetView<'a> {
+            /// Field 1: `inbox_message_id`
+            pub inbox_message_id: &'a str,
+            /// Field 2: `inbox_message_version`
+            pub inbox_message_version: &'a str,
+            /// Field 3: `notification_id`
+            pub notification_id: &'a str,
+            /// Field 4: `project_id`
+            pub project_id: &'a str,
+            /// Field 5: `target_id`
+            pub target_id: &'a str,
+            pub destination: ::core::option::Option<
+                super::super::__buffa::view::oneof::mobile_push_notification_target::Destination<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MobilePushNotificationTargetView<'a> {
+            type Owned = super::super::MobilePushNotificationTarget;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.inbox_message_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.inbox_message_version = ::buffa::types::borrow_str(
+                            &mut cur,
+                        )?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.notification_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.target_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Issue(
+                                ref mut existing,
+                            ),
+                        ) = view.destination
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.destination = Some(
+                                super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Issue(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <::buffa_types::google::protobuf::__buffa::view::EmptyView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Conversation(
+                                ref mut existing,
+                            ),
+                        ) = view.destination
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.destination = Some(
+                                super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Conversation(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::MobilePushConversationDestinationView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Channel(
+                                ref mut existing,
+                            ),
+                        ) = view.destination
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.destination = Some(
+                                super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Channel(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::MobilePushChannelDestinationView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Session(
+                                ref mut existing,
+                            ),
+                        ) = view.destination
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.destination = Some(
+                                super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Session(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <::buffa_types::google::protobuf::__buffa::view::EmptyView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MobilePushNotificationTarget,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MobilePushNotificationTarget,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MobilePushNotificationTarget {
+                    inbox_message_id: self.inbox_message_id.to_string(),
+                    inbox_message_version: self.inbox_message_version.to_string(),
+                    notification_id: self.notification_id.to_string(),
+                    project_id: self.project_id.to_string(),
+                    target_id: self.target_id.to_string(),
+                    destination: match self.destination.as_ref() {
+                        ::core::option::Option::Some(v) => {
+                            ::core::option::Option::Some(
+                                match v {
+                                    super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Issue(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::mobile_push_notification_target::Destination::Issue(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Conversation(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::mobile_push_notification_target::Destination::Conversation(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Channel(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::mobile_push_notification_target::Destination::Channel(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Session(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::mobile_push_notification_target::Destination::Session(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        ::core::option::Option::None => ::core::option::Option::None,
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MobilePushNotificationTargetView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.inbox_message_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.inbox_message_id)
+                                as u64;
+                }
+                if !self.inbox_message_version.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(
+                                &self.inbox_message_version,
+                            ) as u64;
+                }
+                if !self.notification_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.notification_id)
+                                as u64;
+                }
+                if !self.project_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.project_id)
+                                as u64;
+                }
+                if !self.target_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.target_id) as u64;
+                }
+                if let ::core::option::Option::Some(ref v) = self.destination {
+                    match v {
+                        super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Issue(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                        super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Conversation(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                        super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Channel(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                        super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Session(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.inbox_message_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.inbox_message_id, buf);
+                }
+                if !self.inbox_message_version.is_empty() {
+                    ::buffa::types::put_string_field(
+                        2u32,
+                        &self.inbox_message_version,
+                        buf,
+                    );
+                }
+                if !self.notification_id.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.notification_id, buf);
+                }
+                if !self.project_id.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.project_id, buf);
+                }
+                if !self.target_id.is_empty() {
+                    ::buffa::types::put_string_field(5u32, &self.target_id, buf);
+                }
+                if let ::core::option::Option::Some(ref v) = self.destination {
+                    match v {
+                        super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Issue(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                10u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Conversation(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                11u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Channel(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                12u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Session(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                13u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MobilePushNotificationTargetView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.inbox_message_id) {
+                    __map.serialize_entry("inboxMessageId", self.inbox_message_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.inbox_message_version,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "inboxMessageVersion",
+                            self.inbox_message_version,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.notification_id) {
+                    __map.serialize_entry("notificationId", self.notification_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
+                    __map.serialize_entry("projectId", self.project_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.target_id) {
+                    __map.serialize_entry("targetId", self.target_id)?;
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.destination {
+                    match __ov {
+                        super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Issue(
+                            v,
+                        ) => {
+                            __map.serialize_entry("issue", v)?;
+                        }
+                        super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Conversation(
+                            v,
+                        ) => {
+                            __map.serialize_entry("conversation", v)?;
+                        }
+                        super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Channel(
+                            v,
+                        ) => {
+                            __map.serialize_entry("channel", v)?;
+                        }
+                        super::super::__buffa::view::oneof::mobile_push_notification_target::Destination::Session(
+                            v,
+                        ) => {
+                            __map.serialize_entry("session", v)?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MobilePushNotificationTargetView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "MobilePushNotificationTarget";
+            const FULL_NAME: &'static str = "briar.app.v1.MobilePushNotificationTarget";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.MobilePushNotificationTarget";
+        }
+        ::buffa::impl_default_view_instance!(MobilePushNotificationTargetView);
+        ::buffa::impl_view_reborrow!(MobilePushNotificationTargetView);
+        /** Self-contained, `'static` owned view of a `MobilePushNotificationTarget` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MobilePushNotificationTargetView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MobilePushNotificationTargetView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MobilePushNotificationTargetOwnedView(
+            ::buffa::OwnedView<MobilePushNotificationTargetView<'static>>,
+        );
+        impl MobilePushNotificationTargetOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MobilePushNotificationTargetOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MobilePushNotificationTargetOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MobilePushNotificationTarget,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MobilePushNotificationTargetOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`MobilePushNotificationTargetView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MobilePushNotificationTargetView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::MobilePushNotificationTarget {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `inbox_message_id`
+            #[must_use]
+            pub fn inbox_message_id(&self) -> &'_ str {
+                self.0.reborrow().inbox_message_id
+            }
+            /// Field 2: `inbox_message_version`
+            #[must_use]
+            pub fn inbox_message_version(&self) -> &'_ str {
+                self.0.reborrow().inbox_message_version
+            }
+            /// Field 3: `notification_id`
+            #[must_use]
+            pub fn notification_id(&self) -> &'_ str {
+                self.0.reborrow().notification_id
+            }
+            /// Field 4: `project_id`
+            #[must_use]
+            pub fn project_id(&self) -> &'_ str {
+                self.0.reborrow().project_id
+            }
+            /// Field 5: `target_id`
+            #[must_use]
+            pub fn target_id(&self) -> &'_ str {
+                self.0.reborrow().target_id
+            }
+            /// Oneof `destination`.
+            #[must_use]
+            pub fn destination(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::mobile_push_notification_target::Destination<
+                    '_,
+                >,
+            > {
+                self.0.reborrow().destination.as_ref()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MobilePushNotificationTargetView<'static>>,
+        > for MobilePushNotificationTargetOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MobilePushNotificationTargetView<'static>>,
+            ) -> Self {
+                MobilePushNotificationTargetOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MobilePushNotificationTargetOwnedView>
+        for ::buffa::OwnedView<MobilePushNotificationTargetView<'static>> {
+            fn from(wrapper: MobilePushNotificationTargetOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MobilePushNotificationTargetView<'static>>,
+        > for MobilePushNotificationTargetOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MobilePushNotificationTargetView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MobilePushNotificationTarget {
+            type View<'a> = MobilePushNotificationTargetView<'a>;
+            type ViewHandle = MobilePushNotificationTargetOwnedView;
+        }
+        impl ::serde::Serialize for MobilePushNotificationTargetOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
         pub struct InboxMessageIdentityView<'a> {
             /// Field 1: `id`
             pub id: &'a str,
@@ -214833,6 +219811,37 @@ pub mod __buffa {
                     ),
                 }
             }
+            pub mod mobile_push_notification_target {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum Destination<'a> {
+                    Issue(
+                        ::buffa::alloc::boxed::Box<
+                            ::buffa_types::google::protobuf::__buffa::view::EmptyView<'a>,
+                        >,
+                    ),
+                    Conversation(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::MobilePushConversationDestinationView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    Channel(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::MobilePushChannelDestinationView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    Session(
+                        ::buffa::alloc::boxed::Box<
+                            ::buffa_types::google::protobuf::__buffa::view::EmptyView<'a>,
+                        >,
+                    ),
+                }
+            }
             pub mod inbox_feed_message {
                 #[allow(unused_imports)]
                 use super::*;
@@ -215985,6 +220994,82 @@ pub mod __buffa {
                 }
             }
         }
+        pub mod mobile_push_notification_target {
+            #[allow(unused_imports)]
+            use super::*;
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Destination {
+                Issue(
+                    ::buffa::alloc::boxed::Box<::buffa_types::google::protobuf::Empty>,
+                ),
+                Conversation(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::MobilePushConversationDestination,
+                    >,
+                ),
+                Channel(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::MobilePushChannelDestination,
+                    >,
+                ),
+                Session(
+                    ::buffa::alloc::boxed::Box<::buffa_types::google::protobuf::Empty>,
+                ),
+            }
+            impl ::buffa::Oneof for Destination {}
+            impl From<super::super::super::MobilePushConversationDestination>
+            for Destination {
+                fn from(
+                    v: super::super::super::MobilePushConversationDestination,
+                ) -> Self {
+                    Self::Conversation(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::MobilePushConversationDestination>
+            for ::core::option::Option<Destination> {
+                fn from(
+                    v: super::super::super::MobilePushConversationDestination,
+                ) -> Self {
+                    Self::Some(Destination::from(v))
+                }
+            }
+            impl From<super::super::super::MobilePushChannelDestination>
+            for Destination {
+                fn from(v: super::super::super::MobilePushChannelDestination) -> Self {
+                    Self::Channel(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::MobilePushChannelDestination>
+            for ::core::option::Option<Destination> {
+                fn from(v: super::super::super::MobilePushChannelDestination) -> Self {
+                    Self::Some(Destination::from(v))
+                }
+            }
+            impl serde::Serialize for Destination {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::Issue(v) => {
+                            map.serialize_entry("issue", v)?;
+                        }
+                        Self::Conversation(v) => {
+                            map.serialize_entry("conversation", v)?;
+                        }
+                        Self::Channel(v) => {
+                            map.serialize_entry("channel", v)?;
+                        }
+                        Self::Session(v) => {
+                            map.serialize_entry("session", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
         pub mod inbox_feed_message {
             #[allow(unused_imports)]
             use super::*;
@@ -216237,6 +221322,11 @@ pub mod __buffa {
         reg.register_json_any(super::message_block::__RICH_TEXT_JSON_ANY);
         reg.register_json_any(super::__GET_CURRENT_USER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_CURRENT_USER_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MOBILE_PUSH_PREFERENCES_JSON_ANY);
+        reg.register_json_any(super::__REGISTER_MOBILE_PUSH_DEVICE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REGISTER_MOBILE_PUSH_DEVICE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UNREGISTER_MOBILE_PUSH_DEVICE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UNREGISTER_MOBILE_PUSH_DEVICE_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_ORGANIZATION_AGENTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_ORGANIZATION_AGENTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_ORGANIZATION_AGENT_REQUEST_JSON_ANY);
@@ -216547,6 +221637,9 @@ pub mod __buffa {
         reg.register_json_any(super::__PUT_INBOX_READ_STATES_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__DELETE_INBOX_READ_STATE_REQUEST_JSON_ANY);
         reg.register_json_any(super::__DELETE_INBOX_READ_STATE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MOBILE_PUSH_CONVERSATION_DESTINATION_JSON_ANY);
+        reg.register_json_any(super::__MOBILE_PUSH_CHANNEL_DESTINATION_JSON_ANY);
+        reg.register_json_any(super::__MOBILE_PUSH_NOTIFICATION_TARGET_JSON_ANY);
         reg.register_json_any(super::__INBOX_MESSAGE_IDENTITY_JSON_ANY);
         reg.register_json_any(super::__INBOX_ISSUE_MESSAGE_JSON_ANY);
         reg.register_json_any(super::__INBOX_CONVERSATION_MESSAGE_JSON_ANY);
@@ -216671,6 +221764,26 @@ pub use self::__buffa::view::GetCurrentUserRequestOwnedView;
 pub use self::__buffa::view::GetCurrentUserResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetCurrentUserResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MobilePushPreferencesView;
+#[doc(inline)]
+pub use self::__buffa::view::MobilePushPreferencesOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RegisterMobilePushDeviceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RegisterMobilePushDeviceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RegisterMobilePushDeviceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RegisterMobilePushDeviceResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UnregisterMobilePushDeviceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UnregisterMobilePushDeviceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UnregisterMobilePushDeviceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UnregisterMobilePushDeviceResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListOrganizationAgentsRequestView;
 #[doc(inline)]
@@ -217615,6 +222728,18 @@ pub use self::__buffa::view::DeleteInboxReadStateRequestOwnedView;
 pub use self::__buffa::view::DeleteInboxReadStateResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::DeleteInboxReadStateResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MobilePushConversationDestinationView;
+#[doc(inline)]
+pub use self::__buffa::view::MobilePushConversationDestinationOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MobilePushChannelDestinationView;
+#[doc(inline)]
+pub use self::__buffa::view::MobilePushChannelDestinationOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MobilePushNotificationTargetView;
+#[doc(inline)]
+pub use self::__buffa::view::MobilePushNotificationTargetOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::InboxMessageIdentityView;
 #[doc(inline)]

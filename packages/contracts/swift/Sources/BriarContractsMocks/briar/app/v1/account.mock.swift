@@ -24,10 +24,22 @@ import SwiftProtobuf
 open class BriarAPI_AccountServiceClientMock: BriarAPI_AccountServiceClientInterface, @unchecked Sendable {
     /// Mocked for async calls to `getCurrentUser()`.
     public var mockAsyncGetCurrentUser = { (_: BriarAPI_GetCurrentUserRequest) -> ResponseMessage<BriarAPI_GetCurrentUserResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `registerMobilePushDevice()`.
+    public var mockAsyncRegisterMobilePushDevice = { (_: BriarAPI_RegisterMobilePushDeviceRequest) -> ResponseMessage<BriarAPI_RegisterMobilePushDeviceResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `unregisterMobilePushDevice()`.
+    public var mockAsyncUnregisterMobilePushDevice = { (_: BriarAPI_UnregisterMobilePushDeviceRequest) -> ResponseMessage<BriarAPI_UnregisterMobilePushDeviceResponse> in .init(result: .success(.init())) }
 
     public init() {}
 
     open func `getCurrentUser`(request: BriarAPI_GetCurrentUserRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetCurrentUserResponse> {
         return self.mockAsyncGetCurrentUser(request)
+    }
+
+    open func `registerMobilePushDevice`(request: BriarAPI_RegisterMobilePushDeviceRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RegisterMobilePushDeviceResponse> {
+        return self.mockAsyncRegisterMobilePushDevice(request)
+    }
+
+    open func `unregisterMobilePushDevice`(request: BriarAPI_UnregisterMobilePushDeviceRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UnregisterMobilePushDeviceResponse> {
+        return self.mockAsyncUnregisterMobilePushDevice(request)
     }
 }

@@ -6,15 +6,15 @@ import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobu
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { MessageBlock, NotificationReason, RunStatus, StructuredRunResult } from "./common_pb";
 import { file_briar_app_v1_common } from "./common_pb";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Empty, Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_empty, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file briar/app/v1/inbox.proto.
  */
 export const file_briar_app_v1_inbox: GenFile = /*@__PURE__*/
-  fileDesc("Chhicmlhci9hcHAvdjEvaW5ib3gucHJvdG8SDGJyaWFyLmFwcC52MSJcChNHZXRJbmJveEZlZWRSZXF1ZXN0EhcKD29yZ2FuaXphdGlvbl9pZBgBIAEoCRIaCg1rbm93bl92ZXJzaW9uGAIgASgJSACIAQFCEAoOX2tub3duX3ZlcnNpb24ivAEKFEdldEluYm94RmVlZFJlc3BvbnNlEjAKCG1lc3NhZ2VzGAEgAygLMh4uYnJpYXIuYXBwLnYxLkluYm94RmVlZE1lc3NhZ2USHAoUc3Vic2NyaWJlZF9pc3N1ZV9pZHMYAiADKAkSMAoMZ2VuZXJhdGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIPCgd2ZXJzaW9uGAQgASgJEhEKCXVuY2hhbmdlZBgFIAEoCCIbChlHZXRJbmJveFJlYWRTdGF0ZXNSZXF1ZXN0IqQBChpHZXRJbmJveFJlYWRTdGF0ZXNSZXNwb25zZRJRCg1yZWFkX3ZlcnNpb25zGAEgAygLMjouYnJpYXIuYXBwLnYxLkdldEluYm94UmVhZFN0YXRlc1Jlc3BvbnNlLlJlYWRWZXJzaW9uc0VudHJ5GjMKEVJlYWRWZXJzaW9uc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiogEKGVB1dEluYm94UmVhZFN0YXRlc1JlcXVlc3QSUAoNcmVhZF92ZXJzaW9ucxgBIAMoCzI5LmJyaWFyLmFwcC52MS5QdXRJbmJveFJlYWRTdGF0ZXNSZXF1ZXN0LlJlYWRWZXJzaW9uc0VudHJ5GjMKEVJlYWRWZXJzaW9uc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEipAEKGlB1dEluYm94UmVhZFN0YXRlc1Jlc3BvbnNlElEKDXJlYWRfdmVyc2lvbnMYASADKAsyOi5icmlhci5hcHAudjEuUHV0SW5ib3hSZWFkU3RhdGVzUmVzcG9uc2UuUmVhZFZlcnNpb25zRW50cnkaMwoRUmVhZFZlcnNpb25zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIxChtEZWxldGVJbmJveFJlYWRTdGF0ZVJlcXVlc3QSEgoKbWVzc2FnZV9pZBgBIAEoCSKoAQocRGVsZXRlSW5ib3hSZWFkU3RhdGVSZXNwb25zZRJTCg1yZWFkX3ZlcnNpb25zGAEgAygLMjwuYnJpYXIuYXBwLnYxLkRlbGV0ZUluYm94UmVhZFN0YXRlUmVzcG9uc2UuUmVhZFZlcnNpb25zRW50cnkaMwoRUmVhZFZlcnNpb25zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASKwAQoUSW5ib3hNZXNzYWdlSWRlbnRpdHkSCgoCaWQYASABKAkSEgoKcHJvamVjdF9pZBgCIAEoCRIUCgxwcm9qZWN0X25hbWUYAyABKAkSEQoJdGFyZ2V0X2lkGAQgASgJEg0KBXRpdGxlGAUgASgJEi8KC29jY3VycmVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIPCgd2ZXJzaW9uGAcgASgJIrkCChFJbmJveElzc3VlTWVzc2FnZRISCgpydW5fbnVtYmVyGAEgASgNEicKBnN0YXR1cxgCIAEoDjIXLmJyaWFyLmFwcC52MS5SdW5TdGF0dXMSGwoOd29ya2Zsb3dfc3RhZ2UYAyABKAlIAIgBARIhChR3b3JrZmxvd19zdGFnZV9sYWJlbBgEIAEoCUgBiAEBEhUKCHByaW9yaXR5GAUgASgNSAKIAQESQQoRc3RydWN0dXJlZF9yZXN1bHQYBiABKAsyIS5icmlhci5hcHAudjEuU3RydWN0dXJlZFJ1blJlc3VsdEgDiAEBQhEKD193b3JrZmxvd19zdGFnZUIXChVfd29ya2Zsb3dfc3RhZ2VfbGFiZWxCCwoJX3ByaW9yaXR5QhQKEl9zdHJ1Y3R1cmVkX3Jlc3VsdCKaAgoYSW5ib3hDb252ZXJzYXRpb25NZXNzYWdlEhIKCm1lc3NhZ2VfaWQYASABKAkSFwoPcm9vdF9tZXNzYWdlX2lkGAIgASgJEgwKBGJvZHkYAyABKAkSKgoGYmxvY2tzGAQgAygLMhouYnJpYXIuYXBwLnYxLk1lc3NhZ2VCbG9jaxITCgthdXRob3JfbmFtZRgFIAEoCRIZCgxhdXRob3JfaW1hZ2UYBiABKAlIAIgBARIWCglpc3N1ZV9rZXkYByABKAlIAYgBARIwCgZyZWFzb24YCCABKA4yIC5icmlhci5hcHAudjEuTm90aWZpY2F0aW9uUmVhc29uQg8KDV9hdXRob3JfaW1hZ2VCDAoKX2lzc3VlX2tleSLtAQoTSW5ib3hDaGFubmVsTWVzc2FnZRISCgpjaGFubmVsX2lkGAEgASgJEhQKDGNoYW5uZWxfbmFtZRgCIAEoCRISCgptZXNzYWdlX2lkGAMgASgJEhcKD3Jvb3RfbWVzc2FnZV9pZBgEIAEoCRIMCgRib2R5GAUgASgJEhMKC2F1dGhvcl9uYW1lGAYgASgJEhkKDGF1dGhvcl9pbWFnZRgHIAEoCUgAiAEBEjAKBnJlYXNvbhgIIAEoDjIgLmJyaWFyLmFwcC52MS5Ob3RpZmljYXRpb25SZWFzb25CDwoNX2F1dGhvcl9pbWFnZSKzAgoTSW5ib3hTZXNzaW9uTWVzc2FnZRI4CgZzdGF0dXMYASABKA4yKC5icmlhci5hcHAudjEuSW5ib3hTZXNzaW9uTWVzc2FnZS5TdGF0dXMSFwoKYWdlbnRfbmFtZRgCIAEoCUgAiAEBEhMKC2lzc3VlX2NvdW50GAMgASgNEhIKBWVycm9yGAQgASgJSAGIAQESFAoHc3VtbWFyeRgFIAEoCUgCiAEBEhoKEnJlcXVpcmVzX2F0dGVudGlvbhgGIAEoCCJJCgZTdGF0dXMSFgoSU1RBVFVTX1VOU1BFQ0lGSUVEEAASFAoQU1RBVFVTX0NPTVBMRVRFRBABEhEKDVNUQVRVU19GQUlMRUQQAkINCgtfYWdlbnRfbmFtZUIICgZfZXJyb3JCCgoIX3N1bW1hcnkisQIKEEluYm94RmVlZE1lc3NhZ2USNAoIaWRlbnRpdHkYASABKAsyIi5icmlhci5hcHAudjEuSW5ib3hNZXNzYWdlSWRlbnRpdHkSMAoFaXNzdWUYAiABKAsyHy5icmlhci5hcHAudjEuSW5ib3hJc3N1ZU1lc3NhZ2VIABI+Cgxjb252ZXJzYXRpb24YAyABKAsyJi5icmlhci5hcHAudjEuSW5ib3hDb252ZXJzYXRpb25NZXNzYWdlSAASNAoHY2hhbm5lbBgEIAEoCzIhLmJyaWFyLmFwcC52MS5JbmJveENoYW5uZWxNZXNzYWdlSAASNAoHc2Vzc2lvbhgFIAEoCzIhLmJyaWFyLmFwcC52MS5JbmJveFNlc3Npb25NZXNzYWdlSABCCQoHY29udGVudDKmAwoMSW5ib3hTZXJ2aWNlElUKDEdldEluYm94RmVlZBIhLmJyaWFyLmFwcC52MS5HZXRJbmJveEZlZWRSZXF1ZXN0GiIuYnJpYXIuYXBwLnYxLkdldEluYm94RmVlZFJlc3BvbnNlEmcKEkdldEluYm94UmVhZFN0YXRlcxInLmJyaWFyLmFwcC52MS5HZXRJbmJveFJlYWRTdGF0ZXNSZXF1ZXN0GiguYnJpYXIuYXBwLnYxLkdldEluYm94UmVhZFN0YXRlc1Jlc3BvbnNlEmcKElB1dEluYm94UmVhZFN0YXRlcxInLmJyaWFyLmFwcC52MS5QdXRJbmJveFJlYWRTdGF0ZXNSZXF1ZXN0GiguYnJpYXIuYXBwLnYxLlB1dEluYm94UmVhZFN0YXRlc1Jlc3BvbnNlEm0KFERlbGV0ZUluYm94UmVhZFN0YXRlEikuYnJpYXIuYXBwLnYxLkRlbGV0ZUluYm94UmVhZFN0YXRlUmVxdWVzdBoqLmJyaWFyLmFwcC52MS5EZWxldGVJbmJveFJlYWRTdGF0ZVJlc3BvbnNlQgy6AglCcmlhckFQSV9iBnByb3RvMw", [file_briar_app_v1_common, file_google_protobuf_timestamp]);
+  fileDesc("Chhicmlhci9hcHAvdjEvaW5ib3gucHJvdG8SDGJyaWFyLmFwcC52MSJcChNHZXRJbmJveEZlZWRSZXF1ZXN0EhcKD29yZ2FuaXphdGlvbl9pZBgBIAEoCRIaCg1rbm93bl92ZXJzaW9uGAIgASgJSACIAQFCEAoOX2tub3duX3ZlcnNpb24ivAEKFEdldEluYm94RmVlZFJlc3BvbnNlEjAKCG1lc3NhZ2VzGAEgAygLMh4uYnJpYXIuYXBwLnYxLkluYm94RmVlZE1lc3NhZ2USHAoUc3Vic2NyaWJlZF9pc3N1ZV9pZHMYAiADKAkSMAoMZ2VuZXJhdGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIPCgd2ZXJzaW9uGAQgASgJEhEKCXVuY2hhbmdlZBgFIAEoCCIbChlHZXRJbmJveFJlYWRTdGF0ZXNSZXF1ZXN0IqQBChpHZXRJbmJveFJlYWRTdGF0ZXNSZXNwb25zZRJRCg1yZWFkX3ZlcnNpb25zGAEgAygLMjouYnJpYXIuYXBwLnYxLkdldEluYm94UmVhZFN0YXRlc1Jlc3BvbnNlLlJlYWRWZXJzaW9uc0VudHJ5GjMKEVJlYWRWZXJzaW9uc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiogEKGVB1dEluYm94UmVhZFN0YXRlc1JlcXVlc3QSUAoNcmVhZF92ZXJzaW9ucxgBIAMoCzI5LmJyaWFyLmFwcC52MS5QdXRJbmJveFJlYWRTdGF0ZXNSZXF1ZXN0LlJlYWRWZXJzaW9uc0VudHJ5GjMKEVJlYWRWZXJzaW9uc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEipAEKGlB1dEluYm94UmVhZFN0YXRlc1Jlc3BvbnNlElEKDXJlYWRfdmVyc2lvbnMYASADKAsyOi5icmlhci5hcHAudjEuUHV0SW5ib3hSZWFkU3RhdGVzUmVzcG9uc2UuUmVhZFZlcnNpb25zRW50cnkaMwoRUmVhZFZlcnNpb25zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIxChtEZWxldGVJbmJveFJlYWRTdGF0ZVJlcXVlc3QSEgoKbWVzc2FnZV9pZBgBIAEoCSKoAQocRGVsZXRlSW5ib3hSZWFkU3RhdGVSZXNwb25zZRJTCg1yZWFkX3ZlcnNpb25zGAEgAygLMjwuYnJpYXIuYXBwLnYxLkRlbGV0ZUluYm94UmVhZFN0YXRlUmVzcG9uc2UuUmVhZFZlcnNpb25zRW50cnkaMwoRUmVhZFZlcnNpb25zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJECiFNb2JpbGVQdXNoQ29udmVyc2F0aW9uRGVzdGluYXRpb24SHwoXY29udmVyc2F0aW9uX21lc3NhZ2VfaWQYASABKAkiUwocTW9iaWxlUHVzaENoYW5uZWxEZXN0aW5hdGlvbhIaChJjaGFubmVsX21lc3NhZ2VfaWQYASABKAkSFwoPcm9vdF9tZXNzYWdlX2lkGAIgASgJIoIDChxNb2JpbGVQdXNoTm90aWZpY2F0aW9uVGFyZ2V0EhgKEGluYm94X21lc3NhZ2VfaWQYASABKAkSHQoVaW5ib3hfbWVzc2FnZV92ZXJzaW9uGAIgASgJEhcKD25vdGlmaWNhdGlvbl9pZBgDIAEoCRISCgpwcm9qZWN0X2lkGAQgASgJEhEKCXRhcmdldF9pZBgFIAEoCRInCgVpc3N1ZRgKIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eUgAEkcKDGNvbnZlcnNhdGlvbhgLIAEoCzIvLmJyaWFyLmFwcC52MS5Nb2JpbGVQdXNoQ29udmVyc2F0aW9uRGVzdGluYXRpb25IABI9CgdjaGFubmVsGAwgASgLMiouYnJpYXIuYXBwLnYxLk1vYmlsZVB1c2hDaGFubmVsRGVzdGluYXRpb25IABIpCgdzZXNzaW9uGA0gASgLMhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5SABCDQoLZGVzdGluYXRpb24isAEKFEluYm94TWVzc2FnZUlkZW50aXR5EgoKAmlkGAEgASgJEhIKCnByb2plY3RfaWQYAiABKAkSFAoMcHJvamVjdF9uYW1lGAMgASgJEhEKCXRhcmdldF9pZBgEIAEoCRINCgV0aXRsZRgFIAEoCRIvCgtvY2N1cnJlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDwoHdmVyc2lvbhgHIAEoCSK5AgoRSW5ib3hJc3N1ZU1lc3NhZ2USEgoKcnVuX251bWJlchgBIAEoDRInCgZzdGF0dXMYAiABKA4yFy5icmlhci5hcHAudjEuUnVuU3RhdHVzEhsKDndvcmtmbG93X3N0YWdlGAMgASgJSACIAQESIQoUd29ya2Zsb3dfc3RhZ2VfbGFiZWwYBCABKAlIAYgBARIVCghwcmlvcml0eRgFIAEoDUgCiAEBEkEKEXN0cnVjdHVyZWRfcmVzdWx0GAYgASgLMiEuYnJpYXIuYXBwLnYxLlN0cnVjdHVyZWRSdW5SZXN1bHRIA4gBAUIRCg9fd29ya2Zsb3dfc3RhZ2VCFwoVX3dvcmtmbG93X3N0YWdlX2xhYmVsQgsKCV9wcmlvcml0eUIUChJfc3RydWN0dXJlZF9yZXN1bHQimgIKGEluYm94Q29udmVyc2F0aW9uTWVzc2FnZRISCgptZXNzYWdlX2lkGAEgASgJEhcKD3Jvb3RfbWVzc2FnZV9pZBgCIAEoCRIMCgRib2R5GAMgASgJEioKBmJsb2NrcxgEIAMoCzIaLmJyaWFyLmFwcC52MS5NZXNzYWdlQmxvY2sSEwoLYXV0aG9yX25hbWUYBSABKAkSGQoMYXV0aG9yX2ltYWdlGAYgASgJSACIAQESFgoJaXNzdWVfa2V5GAcgASgJSAGIAQESMAoGcmVhc29uGAggASgOMiAuYnJpYXIuYXBwLnYxLk5vdGlmaWNhdGlvblJlYXNvbkIPCg1fYXV0aG9yX2ltYWdlQgwKCl9pc3N1ZV9rZXki7QEKE0luYm94Q2hhbm5lbE1lc3NhZ2USEgoKY2hhbm5lbF9pZBgBIAEoCRIUCgxjaGFubmVsX25hbWUYAiABKAkSEgoKbWVzc2FnZV9pZBgDIAEoCRIXCg9yb290X21lc3NhZ2VfaWQYBCABKAkSDAoEYm9keRgFIAEoCRITCgthdXRob3JfbmFtZRgGIAEoCRIZCgxhdXRob3JfaW1hZ2UYByABKAlIAIgBARIwCgZyZWFzb24YCCABKA4yIC5icmlhci5hcHAudjEuTm90aWZpY2F0aW9uUmVhc29uQg8KDV9hdXRob3JfaW1hZ2UiswIKE0luYm94U2Vzc2lvbk1lc3NhZ2USOAoGc3RhdHVzGAEgASgOMiguYnJpYXIuYXBwLnYxLkluYm94U2Vzc2lvbk1lc3NhZ2UuU3RhdHVzEhcKCmFnZW50X25hbWUYAiABKAlIAIgBARITCgtpc3N1ZV9jb3VudBgDIAEoDRISCgVlcnJvchgEIAEoCUgBiAEBEhQKB3N1bW1hcnkYBSABKAlIAogBARIaChJyZXF1aXJlc19hdHRlbnRpb24YBiABKAgiSQoGU3RhdHVzEhYKElNUQVRVU19VTlNQRUNJRklFRBAAEhQKEFNUQVRVU19DT01QTEVURUQQARIRCg1TVEFUVVNfRkFJTEVEEAJCDQoLX2FnZW50X25hbWVCCAoGX2Vycm9yQgoKCF9zdW1tYXJ5IrECChBJbmJveEZlZWRNZXNzYWdlEjQKCGlkZW50aXR5GAEgASgLMiIuYnJpYXIuYXBwLnYxLkluYm94TWVzc2FnZUlkZW50aXR5EjAKBWlzc3VlGAIgASgLMh8uYnJpYXIuYXBwLnYxLkluYm94SXNzdWVNZXNzYWdlSAASPgoMY29udmVyc2F0aW9uGAMgASgLMiYuYnJpYXIuYXBwLnYxLkluYm94Q29udmVyc2F0aW9uTWVzc2FnZUgAEjQKB2NoYW5uZWwYBCABKAsyIS5icmlhci5hcHAudjEuSW5ib3hDaGFubmVsTWVzc2FnZUgAEjQKB3Nlc3Npb24YBSABKAsyIS5icmlhci5hcHAudjEuSW5ib3hTZXNzaW9uTWVzc2FnZUgAQgkKB2NvbnRlbnQypgMKDEluYm94U2VydmljZRJVCgxHZXRJbmJveEZlZWQSIS5icmlhci5hcHAudjEuR2V0SW5ib3hGZWVkUmVxdWVzdBoiLmJyaWFyLmFwcC52MS5HZXRJbmJveEZlZWRSZXNwb25zZRJnChJHZXRJbmJveFJlYWRTdGF0ZXMSJy5icmlhci5hcHAudjEuR2V0SW5ib3hSZWFkU3RhdGVzUmVxdWVzdBooLmJyaWFyLmFwcC52MS5HZXRJbmJveFJlYWRTdGF0ZXNSZXNwb25zZRJnChJQdXRJbmJveFJlYWRTdGF0ZXMSJy5icmlhci5hcHAudjEuUHV0SW5ib3hSZWFkU3RhdGVzUmVxdWVzdBooLmJyaWFyLmFwcC52MS5QdXRJbmJveFJlYWRTdGF0ZXNSZXNwb25zZRJtChREZWxldGVJbmJveFJlYWRTdGF0ZRIpLmJyaWFyLmFwcC52MS5EZWxldGVJbmJveFJlYWRTdGF0ZVJlcXVlc3QaKi5icmlhci5hcHAudjEuRGVsZXRlSW5ib3hSZWFkU3RhdGVSZXNwb25zZUIMugIJQnJpYXJBUElfYgZwcm90bzM", [file_briar_app_v1_common, file_google_protobuf_empty, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message briar.app.v1.GetInboxFeedRequest
@@ -174,6 +174,111 @@ export const DeleteInboxReadStateResponseSchema: GenMessage<DeleteInboxReadState
   messageDesc(file_briar_app_v1_inbox, 7);
 
 /**
+ * @generated from message briar.app.v1.MobilePushConversationDestination
+ */
+export type MobilePushConversationDestination = Message<"briar.app.v1.MobilePushConversationDestination"> & {
+  /**
+   * @generated from field: string conversation_message_id = 1;
+   */
+  conversationMessageId: string;
+};
+
+/**
+ * Describes the message briar.app.v1.MobilePushConversationDestination.
+ * Use `create(MobilePushConversationDestinationSchema)` to create a new message.
+ */
+export const MobilePushConversationDestinationSchema: GenMessage<MobilePushConversationDestination> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_inbox, 8);
+
+/**
+ * @generated from message briar.app.v1.MobilePushChannelDestination
+ */
+export type MobilePushChannelDestination = Message<"briar.app.v1.MobilePushChannelDestination"> & {
+  /**
+   * @generated from field: string channel_message_id = 1;
+   */
+  channelMessageId: string;
+
+  /**
+   * @generated from field: string root_message_id = 2;
+   */
+  rootMessageId: string;
+};
+
+/**
+ * Describes the message briar.app.v1.MobilePushChannelDestination.
+ * Use `create(MobilePushChannelDestinationSchema)` to create a new message.
+ */
+export const MobilePushChannelDestinationSchema: GenMessage<MobilePushChannelDestination> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_inbox, 9);
+
+/**
+ * @generated from message briar.app.v1.MobilePushNotificationTarget
+ */
+export type MobilePushNotificationTarget = Message<"briar.app.v1.MobilePushNotificationTarget"> & {
+  /**
+   * @generated from field: string inbox_message_id = 1;
+   */
+  inboxMessageId: string;
+
+  /**
+   * @generated from field: string inbox_message_version = 2;
+   */
+  inboxMessageVersion: string;
+
+  /**
+   * @generated from field: string notification_id = 3;
+   */
+  notificationId: string;
+
+  /**
+   * @generated from field: string project_id = 4;
+   */
+  projectId: string;
+
+  /**
+   * @generated from field: string target_id = 5;
+   */
+  targetId: string;
+
+  /**
+   * @generated from oneof briar.app.v1.MobilePushNotificationTarget.destination
+   */
+  destination: {
+    /**
+     * @generated from field: google.protobuf.Empty issue = 10;
+     */
+    value: Empty;
+    case: "issue";
+  } | {
+    /**
+     * @generated from field: briar.app.v1.MobilePushConversationDestination conversation = 11;
+     */
+    value: MobilePushConversationDestination;
+    case: "conversation";
+  } | {
+    /**
+     * @generated from field: briar.app.v1.MobilePushChannelDestination channel = 12;
+     */
+    value: MobilePushChannelDestination;
+    case: "channel";
+  } | {
+    /**
+     * @generated from field: google.protobuf.Empty session = 13;
+     */
+    value: Empty;
+    case: "session";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message briar.app.v1.MobilePushNotificationTarget.
+ * Use `create(MobilePushNotificationTargetSchema)` to create a new message.
+ */
+export const MobilePushNotificationTargetSchema: GenMessage<MobilePushNotificationTarget> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_inbox, 10);
+
+/**
  * @generated from message briar.app.v1.InboxMessageIdentity
  */
 export type InboxMessageIdentity = Message<"briar.app.v1.InboxMessageIdentity"> & {
@@ -218,7 +323,7 @@ export type InboxMessageIdentity = Message<"briar.app.v1.InboxMessageIdentity"> 
  * Use `create(InboxMessageIdentitySchema)` to create a new message.
  */
 export const InboxMessageIdentitySchema: GenMessage<InboxMessageIdentity> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_inbox, 8);
+  messageDesc(file_briar_app_v1_inbox, 11);
 
 /**
  * @generated from message briar.app.v1.InboxIssueMessage
@@ -260,7 +365,7 @@ export type InboxIssueMessage = Message<"briar.app.v1.InboxIssueMessage"> & {
  * Use `create(InboxIssueMessageSchema)` to create a new message.
  */
 export const InboxIssueMessageSchema: GenMessage<InboxIssueMessage> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_inbox, 9);
+  messageDesc(file_briar_app_v1_inbox, 12);
 
 /**
  * @generated from message briar.app.v1.InboxConversationMessage
@@ -312,7 +417,7 @@ export type InboxConversationMessage = Message<"briar.app.v1.InboxConversationMe
  * Use `create(InboxConversationMessageSchema)` to create a new message.
  */
 export const InboxConversationMessageSchema: GenMessage<InboxConversationMessage> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_inbox, 10);
+  messageDesc(file_briar_app_v1_inbox, 13);
 
 /**
  * @generated from message briar.app.v1.InboxChannelMessage
@@ -364,7 +469,7 @@ export type InboxChannelMessage = Message<"briar.app.v1.InboxChannelMessage"> & 
  * Use `create(InboxChannelMessageSchema)` to create a new message.
  */
 export const InboxChannelMessageSchema: GenMessage<InboxChannelMessage> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_inbox, 11);
+  messageDesc(file_briar_app_v1_inbox, 14);
 
 /**
  * @generated from message briar.app.v1.InboxSessionMessage
@@ -406,7 +511,7 @@ export type InboxSessionMessage = Message<"briar.app.v1.InboxSessionMessage"> & 
  * Use `create(InboxSessionMessageSchema)` to create a new message.
  */
 export const InboxSessionMessageSchema: GenMessage<InboxSessionMessage> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_inbox, 12);
+  messageDesc(file_briar_app_v1_inbox, 15);
 
 /**
  * @generated from enum briar.app.v1.InboxSessionMessage.Status
@@ -432,7 +537,7 @@ export enum InboxSessionMessage_Status {
  * Describes the enum briar.app.v1.InboxSessionMessage.Status.
  */
 export const InboxSessionMessage_StatusSchema: GenEnum<InboxSessionMessage_Status> = /*@__PURE__*/
-  enumDesc(file_briar_app_v1_inbox, 12, 0);
+  enumDesc(file_briar_app_v1_inbox, 15, 0);
 
 /**
  * @generated from message briar.app.v1.InboxFeedMessage
@@ -478,7 +583,7 @@ export type InboxFeedMessage = Message<"briar.app.v1.InboxFeedMessage"> & {
  * Use `create(InboxFeedMessageSchema)` to create a new message.
  */
 export const InboxFeedMessageSchema: GenMessage<InboxFeedMessage> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_inbox, 13);
+  messageDesc(file_briar_app_v1_inbox, 16);
 
 /**
  * @generated from service briar.app.v1.InboxService

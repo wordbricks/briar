@@ -142,6 +142,94 @@ public nonisolated struct BriarAPI_DeleteInboxReadStateResponse: Sendable {
   public init() {}
 }
 
+public nonisolated struct BriarAPI_MobilePushConversationDestination: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var conversationMessageID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_MobilePushChannelDestination: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var channelMessageID: String = String()
+
+  public var rootMessageID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_MobilePushNotificationTarget: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var inboxMessageID: String = String()
+
+  public var inboxMessageVersion: String = String()
+
+  public var notificationID: String = String()
+
+  public var projectID: String = String()
+
+  public var targetID: String = String()
+
+  public var destination: BriarAPI_MobilePushNotificationTarget.OneOf_Destination? = nil
+
+  public var issue: SwiftProtobuf.Google_Protobuf_Empty {
+    get {
+      if case .issue(let v)? = destination {return v}
+      return SwiftProtobuf.Google_Protobuf_Empty()
+    }
+    set {destination = .issue(newValue)}
+  }
+
+  public var conversation: BriarAPI_MobilePushConversationDestination {
+    get {
+      if case .conversation(let v)? = destination {return v}
+      return BriarAPI_MobilePushConversationDestination()
+    }
+    set {destination = .conversation(newValue)}
+  }
+
+  public var channel: BriarAPI_MobilePushChannelDestination {
+    get {
+      if case .channel(let v)? = destination {return v}
+      return BriarAPI_MobilePushChannelDestination()
+    }
+    set {destination = .channel(newValue)}
+  }
+
+  public var session: SwiftProtobuf.Google_Protobuf_Empty {
+    get {
+      if case .session(let v)? = destination {return v}
+      return SwiftProtobuf.Google_Protobuf_Empty()
+    }
+    set {destination = .session(newValue)}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum OneOf_Destination: Equatable, Sendable {
+    case issue(SwiftProtobuf.Google_Protobuf_Empty)
+    case conversation(BriarAPI_MobilePushConversationDestination)
+    case channel(BriarAPI_MobilePushChannelDestination)
+    case session(SwiftProtobuf.Google_Protobuf_Empty)
+
+  }
+
+  public init() {}
+}
+
 public nonisolated struct BriarAPI_InboxMessageIdentity: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -720,6 +808,197 @@ nonisolated extension BriarAPI_DeleteInboxReadStateResponse: SwiftProtobuf.Messa
 
   public static func ==(lhs: BriarAPI_DeleteInboxReadStateResponse, rhs: BriarAPI_DeleteInboxReadStateResponse) -> Bool {
     if lhs.readVersions != rhs.readVersions {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_MobilePushConversationDestination: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".MobilePushConversationDestination"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}conversation_message_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.conversationMessageID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.conversationMessageID.isEmpty {
+      try visitor.visitSingularStringField(value: self.conversationMessageID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_MobilePushConversationDestination, rhs: BriarAPI_MobilePushConversationDestination) -> Bool {
+    if lhs.conversationMessageID != rhs.conversationMessageID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_MobilePushChannelDestination: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".MobilePushChannelDestination"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}channel_message_id\0\u{3}root_message_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.channelMessageID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.rootMessageID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.channelMessageID.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelMessageID, fieldNumber: 1)
+    }
+    if !self.rootMessageID.isEmpty {
+      try visitor.visitSingularStringField(value: self.rootMessageID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_MobilePushChannelDestination, rhs: BriarAPI_MobilePushChannelDestination) -> Bool {
+    if lhs.channelMessageID != rhs.channelMessageID {return false}
+    if lhs.rootMessageID != rhs.rootMessageID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_MobilePushNotificationTarget: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".MobilePushNotificationTarget"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}inbox_message_id\0\u{3}inbox_message_version\0\u{3}notification_id\0\u{3}project_id\0\u{3}target_id\0\u{2}\u{5}issue\0\u{1}conversation\0\u{1}channel\0\u{1}session\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.inboxMessageID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.inboxMessageVersion) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.notificationID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.targetID) }()
+      case 10: try {
+        var v: SwiftProtobuf.Google_Protobuf_Empty?
+        var hadOneofValue = false
+        if let current = self.destination {
+          hadOneofValue = true
+          if case .issue(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.destination = .issue(v)
+        }
+      }()
+      case 11: try {
+        var v: BriarAPI_MobilePushConversationDestination?
+        var hadOneofValue = false
+        if let current = self.destination {
+          hadOneofValue = true
+          if case .conversation(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.destination = .conversation(v)
+        }
+      }()
+      case 12: try {
+        var v: BriarAPI_MobilePushChannelDestination?
+        var hadOneofValue = false
+        if let current = self.destination {
+          hadOneofValue = true
+          if case .channel(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.destination = .channel(v)
+        }
+      }()
+      case 13: try {
+        var v: SwiftProtobuf.Google_Protobuf_Empty?
+        var hadOneofValue = false
+        if let current = self.destination {
+          hadOneofValue = true
+          if case .session(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.destination = .session(v)
+        }
+      }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.inboxMessageID.isEmpty {
+      try visitor.visitSingularStringField(value: self.inboxMessageID, fieldNumber: 1)
+    }
+    if !self.inboxMessageVersion.isEmpty {
+      try visitor.visitSingularStringField(value: self.inboxMessageVersion, fieldNumber: 2)
+    }
+    if !self.notificationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.notificationID, fieldNumber: 3)
+    }
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 4)
+    }
+    if !self.targetID.isEmpty {
+      try visitor.visitSingularStringField(value: self.targetID, fieldNumber: 5)
+    }
+    switch self.destination {
+    case .issue?: try {
+      guard case .issue(let v)? = self.destination else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+    }()
+    case .conversation?: try {
+      guard case .conversation(let v)? = self.destination else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
+    }()
+    case .channel?: try {
+      guard case .channel(let v)? = self.destination else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
+    }()
+    case .session?: try {
+      guard case .session(let v)? = self.destination else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
+    }()
+    case nil: break
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_MobilePushNotificationTarget, rhs: BriarAPI_MobilePushNotificationTarget) -> Bool {
+    if lhs.inboxMessageID != rhs.inboxMessageID {return false}
+    if lhs.inboxMessageVersion != rhs.inboxMessageVersion {return false}
+    if lhs.notificationID != rhs.notificationID {return false}
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.targetID != rhs.targetID {return false}
+    if lhs.destination != rhs.destination {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

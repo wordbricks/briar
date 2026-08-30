@@ -2,8 +2,8 @@
 // @generated from file briar/app/v1/account.proto (package briar.app.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { User } from "./common_pb";
 import { file_briar_app_v1_common } from "./common_pb";
 import type { Message } from "@bufbuild/protobuf";
@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/app/v1/account.proto.
  */
 export const file_briar_app_v1_account: GenFile = /*@__PURE__*/
-  fileDesc("Chpicmlhci9hcHAvdjEvYWNjb3VudC5wcm90bxIMYnJpYXIuYXBwLnYxIhcKFUdldEN1cnJlbnRVc2VyUmVxdWVzdCI6ChZHZXRDdXJyZW50VXNlclJlc3BvbnNlEiAKBHVzZXIYASABKAsyEi5icmlhci5hcHAudjEuVXNlcjJtCg5BY2NvdW50U2VydmljZRJbCg5HZXRDdXJyZW50VXNlchIjLmJyaWFyLmFwcC52MS5HZXRDdXJyZW50VXNlclJlcXVlc3QaJC5icmlhci5hcHAudjEuR2V0Q3VycmVudFVzZXJSZXNwb25zZUIMugIJQnJpYXJBUElfYgZwcm90bzM", [file_briar_app_v1_common]);
+  fileDesc("Chpicmlhci9hcHAvdjEvYWNjb3VudC5wcm90bxIMYnJpYXIuYXBwLnYxIhcKFUdldEN1cnJlbnRVc2VyUmVxdWVzdCI6ChZHZXRDdXJyZW50VXNlclJlc3BvbnNlEiAKBHVzZXIYASABKAsyEi5icmlhci5hcHAudjEuVXNlciJ5ChVNb2JpbGVQdXNoUHJlZmVyZW5jZXMSEgoKcGxheV9zb3VuZBgBIAEoCBIOCgZ1cmdlbnQYAiABKAgSFwoPYWN0aW9uX3JlcXVpcmVkGAMgASgIEhEKCWltcG9ydGFudBgEIAEoCBIQCghhY3Rpdml0eRgFIAEoCCLOAQofUmVnaXN0ZXJNb2JpbGVQdXNoRGV2aWNlUmVxdWVzdBIyCghlbmRwb2ludBgBIAEoDjIgLmJyaWFyLmFwcC52MS5Nb2JpbGVQdXNoRW5kcG9pbnQSDQoFdG9rZW4YAiABKAkSLgoGbG9jYWxlGAMgASgOMh4uYnJpYXIuYXBwLnYxLk1vYmlsZVB1c2hMb2NhbGUSOAoLcHJlZmVyZW5jZXMYBCABKAsyIy5icmlhci5hcHAudjEuTW9iaWxlUHVzaFByZWZlcmVuY2VzIiIKIFJlZ2lzdGVyTW9iaWxlUHVzaERldmljZVJlc3BvbnNlImYKIVVucmVnaXN0ZXJNb2JpbGVQdXNoRGV2aWNlUmVxdWVzdBIyCghlbmRwb2ludBgBIAEoDjIgLmJyaWFyLmFwcC52MS5Nb2JpbGVQdXNoRW5kcG9pbnQSDQoFdG9rZW4YAiABKAkiJAoiVW5yZWdpc3Rlck1vYmlsZVB1c2hEZXZpY2VSZXNwb25zZSqtAQoSTW9iaWxlUHVzaEVuZHBvaW50EiQKIE1PQklMRV9QVVNIX0VORFBPSU5UX1VOU1BFQ0lGSUVEEAASKQolTU9CSUxFX1BVU0hfRU5EUE9JTlRfQVBOU19ERVZFTE9QTUVOVBABEigKJE1PQklMRV9QVVNIX0VORFBPSU5UX0FQTlNfUFJPRFVDVElPThACEhwKGE1PQklMRV9QVVNIX0VORFBPSU5UX0ZDTRADKocBChBNb2JpbGVQdXNoTG9jYWxlEiIKHk1PQklMRV9QVVNIX0xPQ0FMRV9VTlNQRUNJRklFRBAAEhkKFU1PQklMRV9QVVNIX0xPQ0FMRV9LTxABEhkKFU1PQklMRV9QVVNIX0xPQ0FMRV9FThACEhkKFU1PQklMRV9QVVNIX0xPQ0FMRV9aSBADMukCCg5BY2NvdW50U2VydmljZRJbCg5HZXRDdXJyZW50VXNlchIjLmJyaWFyLmFwcC52MS5HZXRDdXJyZW50VXNlclJlcXVlc3QaJC5icmlhci5hcHAudjEuR2V0Q3VycmVudFVzZXJSZXNwb25zZRJ5ChhSZWdpc3Rlck1vYmlsZVB1c2hEZXZpY2USLS5icmlhci5hcHAudjEuUmVnaXN0ZXJNb2JpbGVQdXNoRGV2aWNlUmVxdWVzdBouLmJyaWFyLmFwcC52MS5SZWdpc3Rlck1vYmlsZVB1c2hEZXZpY2VSZXNwb25zZRJ/ChpVbnJlZ2lzdGVyTW9iaWxlUHVzaERldmljZRIvLmJyaWFyLmFwcC52MS5VbnJlZ2lzdGVyTW9iaWxlUHVzaERldmljZVJlcXVlc3QaMC5icmlhci5hcHAudjEuVW5yZWdpc3Rlck1vYmlsZVB1c2hEZXZpY2VSZXNwb25zZUIMugIJQnJpYXJBUElfYgZwcm90bzM", [file_briar_app_v1_common]);
 
 /**
  * @generated from message briar.app.v1.GetCurrentUserRequest
@@ -45,6 +45,185 @@ export const GetCurrentUserResponseSchema: GenMessage<GetCurrentUserResponse> = 
   messageDesc(file_briar_app_v1_account, 1);
 
 /**
+ * @generated from message briar.app.v1.MobilePushPreferences
+ */
+export type MobilePushPreferences = Message<"briar.app.v1.MobilePushPreferences"> & {
+  /**
+   * @generated from field: bool play_sound = 1;
+   */
+  playSound: boolean;
+
+  /**
+   * @generated from field: bool urgent = 2;
+   */
+  urgent: boolean;
+
+  /**
+   * @generated from field: bool action_required = 3;
+   */
+  actionRequired: boolean;
+
+  /**
+   * @generated from field: bool important = 4;
+   */
+  important: boolean;
+
+  /**
+   * @generated from field: bool activity = 5;
+   */
+  activity: boolean;
+};
+
+/**
+ * Describes the message briar.app.v1.MobilePushPreferences.
+ * Use `create(MobilePushPreferencesSchema)` to create a new message.
+ */
+export const MobilePushPreferencesSchema: GenMessage<MobilePushPreferences> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_account, 2);
+
+/**
+ * @generated from message briar.app.v1.RegisterMobilePushDeviceRequest
+ */
+export type RegisterMobilePushDeviceRequest = Message<"briar.app.v1.RegisterMobilePushDeviceRequest"> & {
+  /**
+   * @generated from field: briar.app.v1.MobilePushEndpoint endpoint = 1;
+   */
+  endpoint: MobilePushEndpoint;
+
+  /**
+   * @generated from field: string token = 2;
+   */
+  token: string;
+
+  /**
+   * @generated from field: briar.app.v1.MobilePushLocale locale = 3;
+   */
+  locale: MobilePushLocale;
+
+  /**
+   * @generated from field: briar.app.v1.MobilePushPreferences preferences = 4;
+   */
+  preferences?: MobilePushPreferences | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.RegisterMobilePushDeviceRequest.
+ * Use `create(RegisterMobilePushDeviceRequestSchema)` to create a new message.
+ */
+export const RegisterMobilePushDeviceRequestSchema: GenMessage<RegisterMobilePushDeviceRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_account, 3);
+
+/**
+ * @generated from message briar.app.v1.RegisterMobilePushDeviceResponse
+ */
+export type RegisterMobilePushDeviceResponse = Message<"briar.app.v1.RegisterMobilePushDeviceResponse"> & {
+};
+
+/**
+ * Describes the message briar.app.v1.RegisterMobilePushDeviceResponse.
+ * Use `create(RegisterMobilePushDeviceResponseSchema)` to create a new message.
+ */
+export const RegisterMobilePushDeviceResponseSchema: GenMessage<RegisterMobilePushDeviceResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_account, 4);
+
+/**
+ * @generated from message briar.app.v1.UnregisterMobilePushDeviceRequest
+ */
+export type UnregisterMobilePushDeviceRequest = Message<"briar.app.v1.UnregisterMobilePushDeviceRequest"> & {
+  /**
+   * @generated from field: briar.app.v1.MobilePushEndpoint endpoint = 1;
+   */
+  endpoint: MobilePushEndpoint;
+
+  /**
+   * @generated from field: string token = 2;
+   */
+  token: string;
+};
+
+/**
+ * Describes the message briar.app.v1.UnregisterMobilePushDeviceRequest.
+ * Use `create(UnregisterMobilePushDeviceRequestSchema)` to create a new message.
+ */
+export const UnregisterMobilePushDeviceRequestSchema: GenMessage<UnregisterMobilePushDeviceRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_account, 5);
+
+/**
+ * @generated from message briar.app.v1.UnregisterMobilePushDeviceResponse
+ */
+export type UnregisterMobilePushDeviceResponse = Message<"briar.app.v1.UnregisterMobilePushDeviceResponse"> & {
+};
+
+/**
+ * Describes the message briar.app.v1.UnregisterMobilePushDeviceResponse.
+ * Use `create(UnregisterMobilePushDeviceResponseSchema)` to create a new message.
+ */
+export const UnregisterMobilePushDeviceResponseSchema: GenMessage<UnregisterMobilePushDeviceResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_account, 6);
+
+/**
+ * @generated from enum briar.app.v1.MobilePushEndpoint
+ */
+export enum MobilePushEndpoint {
+  /**
+   * @generated from enum value: MOBILE_PUSH_ENDPOINT_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: MOBILE_PUSH_ENDPOINT_APNS_DEVELOPMENT = 1;
+   */
+  APNS_DEVELOPMENT = 1,
+
+  /**
+   * @generated from enum value: MOBILE_PUSH_ENDPOINT_APNS_PRODUCTION = 2;
+   */
+  APNS_PRODUCTION = 2,
+
+  /**
+   * @generated from enum value: MOBILE_PUSH_ENDPOINT_FCM = 3;
+   */
+  FCM = 3,
+}
+
+/**
+ * Describes the enum briar.app.v1.MobilePushEndpoint.
+ */
+export const MobilePushEndpointSchema: GenEnum<MobilePushEndpoint> = /*@__PURE__*/
+  enumDesc(file_briar_app_v1_account, 0);
+
+/**
+ * @generated from enum briar.app.v1.MobilePushLocale
+ */
+export enum MobilePushLocale {
+  /**
+   * @generated from enum value: MOBILE_PUSH_LOCALE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: MOBILE_PUSH_LOCALE_KO = 1;
+   */
+  KO = 1,
+
+  /**
+   * @generated from enum value: MOBILE_PUSH_LOCALE_EN = 2;
+   */
+  EN = 2,
+
+  /**
+   * @generated from enum value: MOBILE_PUSH_LOCALE_ZH = 3;
+   */
+  ZH = 3,
+}
+
+/**
+ * Describes the enum briar.app.v1.MobilePushLocale.
+ */
+export const MobilePushLocaleSchema: GenEnum<MobilePushLocale> = /*@__PURE__*/
+  enumDesc(file_briar_app_v1_account, 1);
+
+/**
  * @generated from service briar.app.v1.AccountService
  */
 export const AccountService: GenService<{
@@ -55,6 +234,22 @@ export const AccountService: GenService<{
     methodKind: "unary";
     input: typeof GetCurrentUserRequestSchema;
     output: typeof GetCurrentUserResponseSchema;
+  },
+  /**
+   * @generated from rpc briar.app.v1.AccountService.RegisterMobilePushDevice
+   */
+  registerMobilePushDevice: {
+    methodKind: "unary";
+    input: typeof RegisterMobilePushDeviceRequestSchema;
+    output: typeof RegisterMobilePushDeviceResponseSchema;
+  },
+  /**
+   * @generated from rpc briar.app.v1.AccountService.UnregisterMobilePushDevice
+   */
+  unregisterMobilePushDevice: {
+    methodKind: "unary";
+    input: typeof UnregisterMobilePushDeviceRequestSchema;
+    output: typeof UnregisterMobilePushDeviceResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_briar_app_v1_account, 0);

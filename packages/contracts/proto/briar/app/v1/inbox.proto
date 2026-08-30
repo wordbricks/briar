@@ -3,6 +3,7 @@ syntax = "proto3";
 package briar.app.v1;
 
 import "briar/app/v1/common.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
 option swift_prefix = "BriarAPI_";
@@ -47,6 +48,30 @@ message DeleteInboxReadStateRequest {
 
 message DeleteInboxReadStateResponse {
   map<string, string> read_versions = 1;
+}
+
+message MobilePushConversationDestination {
+  string conversation_message_id = 1;
+}
+
+message MobilePushChannelDestination {
+  string channel_message_id = 1;
+  string root_message_id = 2;
+}
+
+message MobilePushNotificationTarget {
+  string inbox_message_id = 1;
+  string inbox_message_version = 2;
+  string notification_id = 3;
+  string project_id = 4;
+  string target_id = 5;
+
+  oneof destination {
+    google.protobuf.Empty issue = 10;
+    MobilePushConversationDestination conversation = 11;
+    MobilePushChannelDestination channel = 12;
+    google.protobuf.Empty session = 13;
+  }
 }
 
 message InboxMessageIdentity {

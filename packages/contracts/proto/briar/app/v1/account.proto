@@ -8,6 +8,22 @@ option swift_prefix = "BriarAPI_";
 
 service AccountService {
   rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse);
+  rpc RegisterMobilePushDevice(RegisterMobilePushDeviceRequest) returns (RegisterMobilePushDeviceResponse);
+  rpc UnregisterMobilePushDevice(UnregisterMobilePushDeviceRequest) returns (UnregisterMobilePushDeviceResponse);
+}
+
+enum MobilePushEndpoint {
+  MOBILE_PUSH_ENDPOINT_UNSPECIFIED = 0;
+  MOBILE_PUSH_ENDPOINT_APNS_DEVELOPMENT = 1;
+  MOBILE_PUSH_ENDPOINT_APNS_PRODUCTION = 2;
+  MOBILE_PUSH_ENDPOINT_FCM = 3;
+}
+
+enum MobilePushLocale {
+  MOBILE_PUSH_LOCALE_UNSPECIFIED = 0;
+  MOBILE_PUSH_LOCALE_KO = 1;
+  MOBILE_PUSH_LOCALE_EN = 2;
+  MOBILE_PUSH_LOCALE_ZH = 3;
 }
 
 message GetCurrentUserRequest {}
@@ -15,3 +31,27 @@ message GetCurrentUserRequest {}
 message GetCurrentUserResponse {
   User user = 1;
 }
+
+message MobilePushPreferences {
+  bool play_sound = 1;
+  bool urgent = 2;
+  bool action_required = 3;
+  bool important = 4;
+  bool activity = 5;
+}
+
+message RegisterMobilePushDeviceRequest {
+  MobilePushEndpoint endpoint = 1;
+  string token = 2;
+  MobilePushLocale locale = 3;
+  MobilePushPreferences preferences = 4;
+}
+
+message RegisterMobilePushDeviceResponse {}
+
+message UnregisterMobilePushDeviceRequest {
+  MobilePushEndpoint endpoint = 1;
+  string token = 2;
+}
+
+message UnregisterMobilePushDeviceResponse {}

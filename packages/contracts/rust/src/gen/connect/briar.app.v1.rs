@@ -8,6 +8,30 @@ pub type OwnedGetCurrentUserRequestView = ::buffa::view::OwnedView<
 pub type OwnedGetCurrentUserResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::GetCurrentUserResponseView<'static>,
 >;
+///Shorthand for `OwnedView<RegisterMobilePushDeviceRequestView<'static>>`.
+pub type OwnedRegisterMobilePushDeviceRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RegisterMobilePushDeviceRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RegisterMobilePushDeviceResponseView<'static>>`.
+pub type OwnedRegisterMobilePushDeviceResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RegisterMobilePushDeviceResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UnregisterMobilePushDeviceRequestView<'static>>`.
+pub type OwnedUnregisterMobilePushDeviceRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UnregisterMobilePushDeviceRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UnregisterMobilePushDeviceResponseView<'static>>`.
+pub type OwnedUnregisterMobilePushDeviceResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UnregisterMobilePushDeviceResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::GetCurrentUserResponse>
 for crate::proto::briar::app::v1::__buffa::view::GetCurrentUserResponseView<'_> {
     fn encode(
@@ -42,11 +66,107 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RegisterMobilePushDeviceResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::RegisterMobilePushDeviceResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RegisterMobilePushDeviceResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RegisterMobilePushDeviceResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UnregisterMobilePushDeviceResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::UnregisterMobilePushDeviceResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UnregisterMobilePushDeviceResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UnregisterMobilePushDeviceResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 /// Full service name for this service.
 pub const ACCOUNT_SERVICE_SERVICE_NAME: &str = "briar.app.v1.AccountService";
 /// Static [`Spec`](::connectrpc::Spec) for the `GetCurrentUser` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const ACCOUNT_SERVICE_GET_CURRENT_USER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.AccountService/GetCurrentUser",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RegisterMobilePushDevice` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ACCOUNT_SERVICE_REGISTER_MOBILE_PUSH_DEVICE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AccountService/RegisterMobilePushDevice",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UnregisterMobilePushDevice` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ACCOUNT_SERVICE_UNREGISTER_MOBILE_PUSH_DEVICE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AccountService/UnregisterMobilePushDevice",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -124,6 +244,52 @@ pub trait AccountService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// Handle the RegisterMobilePushDevice RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn register_mobile_push_device<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::RegisterMobilePushDeviceRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::RegisterMobilePushDeviceResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UnregisterMobilePushDevice RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn unregister_mobile_push_device<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UnregisterMobilePushDeviceRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UnregisterMobilePushDeviceResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -185,6 +351,64 @@ impl<S: AccountService> AccountServiceExt for S {
                 },
             )
             .with_spec(ACCOUNT_SERVICE_GET_CURRENT_USER_SPEC)
+            .route_view(
+                ACCOUNT_SERVICE_SERVICE_NAME,
+                "RegisterMobilePushDevice",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::RegisterMobilePushDeviceRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::RegisterMobilePushDeviceRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.register_mobile_push_device(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::RegisterMobilePushDeviceResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ACCOUNT_SERVICE_REGISTER_MOBILE_PUSH_DEVICE_SPEC)
+            .route_view(
+                ACCOUNT_SERVICE_SERVICE_NAME,
+                "UnregisterMobilePushDevice",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UnregisterMobilePushDeviceRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UnregisterMobilePushDeviceRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.unregister_mobile_push_device(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UnregisterMobilePushDeviceResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ACCOUNT_SERVICE_UNREGISTER_MOBILE_PUSH_DEVICE_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -245,6 +469,18 @@ impl<T: AccountService> ::connectrpc::Dispatcher for AccountServiceServer<T> {
                         .with_spec(ACCOUNT_SERVICE_GET_CURRENT_USER_SPEC),
                 )
             }
+            "RegisterMobilePushDevice" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ACCOUNT_SERVICE_REGISTER_MOBILE_PUSH_DEVICE_SPEC),
+                )
+            }
+            "UnregisterMobilePushDevice" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ACCOUNT_SERVICE_UNREGISTER_MOBILE_PUSH_DEVICE_SPEC),
+                )
+            }
             _ => None,
         }
     }
@@ -279,6 +515,50 @@ impl<T: AccountService> ::connectrpc::Dispatcher for AccountServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::GetCurrentUserResponse,
+                        >(format)
+                })
+            }
+            "RegisterMobilePushDevice" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::RegisterMobilePushDeviceRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::RegisterMobilePushDeviceRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::RegisterMobilePushDeviceRequest,
+                    >::from_parts(&req, &body);
+                    svc.register_mobile_push_device(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::RegisterMobilePushDeviceResponse,
+                        >(format)
+                })
+            }
+            "UnregisterMobilePushDevice" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UnregisterMobilePushDeviceRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UnregisterMobilePushDeviceRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UnregisterMobilePushDeviceRequest,
+                    >::from_parts(&req, &body);
+                    svc.unregister_mobile_push_device(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UnregisterMobilePushDeviceResponse,
                         >(format)
                 })
             }
@@ -451,6 +731,96 @@ where
                 &self.transport,
                 &self.config,
                 ACCOUNT_SERVICE_GET_CURRENT_USER_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RegisterMobilePushDevice RPC. Sends a request to /briar.app.v1.AccountService/RegisterMobilePushDevice.
+    pub async fn register_mobile_push_device(
+        &self,
+        request: crate::proto::briar::app::v1::RegisterMobilePushDeviceRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RegisterMobilePushDeviceResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.register_mobile_push_device_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RegisterMobilePushDevice RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn register_mobile_push_device_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::RegisterMobilePushDeviceRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RegisterMobilePushDeviceResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ACCOUNT_SERVICE_REGISTER_MOBILE_PUSH_DEVICE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UnregisterMobilePushDevice RPC. Sends a request to /briar.app.v1.AccountService/UnregisterMobilePushDevice.
+    pub async fn unregister_mobile_push_device(
+        &self,
+        request: crate::proto::briar::app::v1::UnregisterMobilePushDeviceRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UnregisterMobilePushDeviceResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.unregister_mobile_push_device_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UnregisterMobilePushDevice RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn unregister_mobile_push_device_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UnregisterMobilePushDeviceRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UnregisterMobilePushDeviceResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ACCOUNT_SERVICE_UNREGISTER_MOBILE_PUSH_DEVICE_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

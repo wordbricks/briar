@@ -20,6 +20,90 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
+public nonisolated enum BriarAPI_MobilePushEndpoint: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case apnsDevelopment // = 1
+  case apnsProduction // = 2
+  case fcm // = 3
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .apnsDevelopment
+    case 2: self = .apnsProduction
+    case 3: self = .fcm
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .apnsDevelopment: return 1
+    case .apnsProduction: return 2
+    case .fcm: return 3
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [BriarAPI_MobilePushEndpoint] = [
+    .unspecified,
+    .apnsDevelopment,
+    .apnsProduction,
+    .fcm,
+  ]
+
+}
+
+public nonisolated enum BriarAPI_MobilePushLocale: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case ko // = 1
+  case en // = 2
+  case zh // = 3
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .ko
+    case 2: self = .en
+    case 3: self = .zh
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .ko: return 1
+    case .en: return 2
+    case .zh: return 3
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [BriarAPI_MobilePushLocale] = [
+    .unspecified,
+    .ko,
+    .en,
+    .zh,
+  ]
+
+}
+
 public nonisolated struct BriarAPI_GetCurrentUserRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -51,9 +135,98 @@ public nonisolated struct BriarAPI_GetCurrentUserResponse: Sendable {
   fileprivate var _user: BriarAPI_User? = nil
 }
 
+public nonisolated struct BriarAPI_MobilePushPreferences: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var playSound: Bool = false
+
+  public var urgent: Bool = false
+
+  public var actionRequired: Bool = false
+
+  public var important: Bool = false
+
+  public var activity: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_RegisterMobilePushDeviceRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var endpoint: BriarAPI_MobilePushEndpoint = .unspecified
+
+  public var token: String = String()
+
+  public var locale: BriarAPI_MobilePushLocale = .unspecified
+
+  public var preferences: BriarAPI_MobilePushPreferences {
+    get {_preferences ?? BriarAPI_MobilePushPreferences()}
+    set {_preferences = newValue}
+  }
+  /// Returns true if `preferences` has been explicitly set.
+  public var hasPreferences: Bool {self._preferences != nil}
+  /// Clears the value of `preferences`. Subsequent reads from it will return its default value.
+  public mutating func clearPreferences() {self._preferences = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _preferences: BriarAPI_MobilePushPreferences? = nil
+}
+
+public nonisolated struct BriarAPI_RegisterMobilePushDeviceResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_UnregisterMobilePushDeviceRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var endpoint: BriarAPI_MobilePushEndpoint = .unspecified
+
+  public var token: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_UnregisterMobilePushDeviceResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "briar.app.v1"
+
+nonisolated extension BriarAPI_MobilePushEndpoint: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MOBILE_PUSH_ENDPOINT_UNSPECIFIED\0\u{1}MOBILE_PUSH_ENDPOINT_APNS_DEVELOPMENT\0\u{1}MOBILE_PUSH_ENDPOINT_APNS_PRODUCTION\0\u{1}MOBILE_PUSH_ENDPOINT_FCM\0")
+}
+
+nonisolated extension BriarAPI_MobilePushLocale: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MOBILE_PUSH_LOCALE_UNSPECIFIED\0\u{1}MOBILE_PUSH_LOCALE_KO\0\u{1}MOBILE_PUSH_LOCALE_EN\0\u{1}MOBILE_PUSH_LOCALE_ZH\0")
+}
 
 nonisolated extension BriarAPI_GetCurrentUserRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetCurrentUserRequest"
@@ -103,6 +276,178 @@ nonisolated extension BriarAPI_GetCurrentUserResponse: SwiftProtobuf.Message, Sw
 
   public static func ==(lhs: BriarAPI_GetCurrentUserResponse, rhs: BriarAPI_GetCurrentUserResponse) -> Bool {
     if lhs._user != rhs._user {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_MobilePushPreferences: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".MobilePushPreferences"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}play_sound\0\u{1}urgent\0\u{3}action_required\0\u{1}important\0\u{1}activity\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.playSound) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.urgent) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.actionRequired) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.important) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.activity) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.playSound != false {
+      try visitor.visitSingularBoolField(value: self.playSound, fieldNumber: 1)
+    }
+    if self.urgent != false {
+      try visitor.visitSingularBoolField(value: self.urgent, fieldNumber: 2)
+    }
+    if self.actionRequired != false {
+      try visitor.visitSingularBoolField(value: self.actionRequired, fieldNumber: 3)
+    }
+    if self.important != false {
+      try visitor.visitSingularBoolField(value: self.important, fieldNumber: 4)
+    }
+    if self.activity != false {
+      try visitor.visitSingularBoolField(value: self.activity, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_MobilePushPreferences, rhs: BriarAPI_MobilePushPreferences) -> Bool {
+    if lhs.playSound != rhs.playSound {return false}
+    if lhs.urgent != rhs.urgent {return false}
+    if lhs.actionRequired != rhs.actionRequired {return false}
+    if lhs.important != rhs.important {return false}
+    if lhs.activity != rhs.activity {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_RegisterMobilePushDeviceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RegisterMobilePushDeviceRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}endpoint\0\u{1}token\0\u{1}locale\0\u{1}preferences\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.endpoint) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.token) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.locale) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._preferences) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.endpoint != .unspecified {
+      try visitor.visitSingularEnumField(value: self.endpoint, fieldNumber: 1)
+    }
+    if !self.token.isEmpty {
+      try visitor.visitSingularStringField(value: self.token, fieldNumber: 2)
+    }
+    if self.locale != .unspecified {
+      try visitor.visitSingularEnumField(value: self.locale, fieldNumber: 3)
+    }
+    try { if let v = self._preferences {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_RegisterMobilePushDeviceRequest, rhs: BriarAPI_RegisterMobilePushDeviceRequest) -> Bool {
+    if lhs.endpoint != rhs.endpoint {return false}
+    if lhs.token != rhs.token {return false}
+    if lhs.locale != rhs.locale {return false}
+    if lhs._preferences != rhs._preferences {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_RegisterMobilePushDeviceResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RegisterMobilePushDeviceResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_RegisterMobilePushDeviceResponse, rhs: BriarAPI_RegisterMobilePushDeviceResponse) -> Bool {
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UnregisterMobilePushDeviceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UnregisterMobilePushDeviceRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}endpoint\0\u{1}token\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.endpoint) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.token) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.endpoint != .unspecified {
+      try visitor.visitSingularEnumField(value: self.endpoint, fieldNumber: 1)
+    }
+    if !self.token.isEmpty {
+      try visitor.visitSingularStringField(value: self.token, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UnregisterMobilePushDeviceRequest, rhs: BriarAPI_UnregisterMobilePushDeviceRequest) -> Bool {
+    if lhs.endpoint != rhs.endpoint {return false}
+    if lhs.token != rhs.token {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UnregisterMobilePushDeviceResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UnregisterMobilePushDeviceResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UnregisterMobilePushDeviceResponse, rhs: BriarAPI_UnregisterMobilePushDeviceResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
