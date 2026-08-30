@@ -790,8 +790,11 @@ export const createAppAgentService = (
       throw new HttpError(403, "Development management permission required");
     }
     const input = decodeProjectAgentTaskInput({
-      ...rawInput,
+      agentId: rawInput.agentId,
       skillId: rawInput.skillId || null,
+      request: rawInput.request,
+      workerId: rawInput.workerId,
+      requestId: rawInput.requestId,
     });
     const existingJob = await getProjectAgentTaskJobByRequest(
       db,

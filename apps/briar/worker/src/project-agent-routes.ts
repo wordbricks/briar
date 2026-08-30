@@ -13,7 +13,6 @@ import {
   createProjectAgent,
   deleteProjectAgent,
   getProjectAgent,
-  listProjectAgents,
   updateProjectAgent,
 } from "./project-agent-repository";
 import { getProject } from "./project-command-repository";
@@ -75,19 +74,6 @@ export async function handleProjectAgentRoute(
   const projectAgentsMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/agents$/u,
   );
-  if (projectAgentsMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectAgentsMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const agents = await listProjectAgents(db, project.id);
-    return json({
-      agents: agents.map((agent) => projectAgentJson(agent)),
-    });
-  }
   if (projectAgentsMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
     const project = await getProject(

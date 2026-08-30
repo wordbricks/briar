@@ -375,6 +375,22 @@ describe("conversational Agent Skill execution approval", () => {
     GOOGLE_CLIENT_SECRET: "google-secret",
   }) as unknown as Env;
 
+  const agentRpc = (
+    method: "PutProjectAgentSession" | "RunProjectAgentTask",
+    body: Record<string, unknown>,
+  ) => apiWorker.fetch(new Request(
+    `https://briar.example/briar.app.v1.AgentService/${method}`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${ownerToken}`,
+        "connect-protocol-version": "1",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+  ), env());
+
   const nextId = (prefix: number) => {
     sequence += 1;
     return `${prefix.toString(16).padStart(8, "0")}-0000-4000-8000-${sequence
@@ -779,18 +795,15 @@ describe("conversational Agent Skill execution approval", () => {
        where project_id = ? and task_id = ?`,
     ).bind(projectId, claimed!.id).first()).toEqual({ count: 1 });
 
-    const put = await apiWorker.fetch(new Request(
-      `https://briar.example/projects/${projectId}/agent-sessions/${claimed!.id}`,
-      {
-        method: "PUT",
-        headers: {
-          authorization: `Bearer ${ownerToken}`,
-          "content-type": "application/json",
-        },
-        body: "{}",
-      },
-    ), env());
-    expect(put.status).toBe(409);
+    const put = await agentRpc("PutProjectAgentSession", {
+      projectId,
+      sessionId: claimed!.id,
+    });
+    expect(await put.json()).toMatchObject({
+      code: "failed_precondition",
+      message:
+        "Approved Agent Skill execution sessions are updated by their assigned Worker",
+    });
 
     const archive = await archiveCompletedLogs(
       db,
@@ -1265,24 +1278,18 @@ describe("conversational Agent Skill execution approval", () => {
 
   it("replays and repairs a direct task after its completion response is lost", async () => {
     const agent = await createAgent();
-    const created = await apiWorker.fetch(new Request(
-      `https://briar.example/projects/${projectId}/agent-tasks`,
-      {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${ownerToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          agentId: agent.id,
-          skillId: agent.skills[0].id,
-          request: "Run this direct task exactly once.",
-          workerId,
-          requestId: crypto.randomUUID(),
-        }),
-      },
-    ), env());
-    expect(created.status).toBe(200);
+    const created = await agentRpc("RunProjectAgentTask", {
+      projectId,
+      agentId: agent.id,
+      skillId: agent.skills[0].id,
+      request: "Run this direct task exactly once.",
+      workerId,
+      requestId: crypto.randomUUID(),
+    });
+    expect(
+      created.status,
+      JSON.stringify(await created.clone().json()),
+    ).toBe(200);
     const taskId = ((await created.json()) as { session: { id: string } })
       .session.id;
     const claim = await claimTask();
@@ -1307,10 +1314,6 @@ describe("conversational Agent Skill execution approval", () => {
         body: JSON.stringify({
           projectId,
           sessionId: taskId,
-          // Worker v1.2.139 sent the direct-task UUID in runId even though
-          // direct Project Agent tasks are not Hunt runs. Keep this legacy
-          // field in the regression payload to verify server compatibility.
-          runId: taskId,
           workType: "projectAgentTask",
           workId: taskId,
           claimToken: work.claimToken,

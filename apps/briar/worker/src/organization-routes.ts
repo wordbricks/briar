@@ -23,7 +23,6 @@ import { hasOrganizationCapability } from "./organization-access";
 import {
   createOrganizationAgent,
   deleteOrganizationAgent,
-  listOrganizationAgents,
   organizationAgentJson,
   updateOrganizationAgent,
 } from "./organization-agents";
@@ -638,19 +637,6 @@ export async function handleOrganizationRoute(
   const organizationAgentsMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/agents$/u,
   );
-  if (organizationAgentsMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const organizationId = organizationAgentsMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!hasOrganizationCapability(role, "organization:read")) {
-      throw new HttpError(404, "Organization not found");
-    }
-    const agents = await listOrganizationAgents(db, organizationId);
-    return json({
-      agents: agents.map(organizationAgentJson),
-      canManage: hasOrganizationCapability(role, "development:manage"),
-    });
-  }
   if (organizationAgentsMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
     const organizationId = organizationAgentsMatch[1];

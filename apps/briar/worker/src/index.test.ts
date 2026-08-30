@@ -1891,11 +1891,6 @@ describe("Worker HTTP contract", () => {
       "POST",
       201,
     )).toBe(projectId);
-    expect(projectMutationProject(
-      `/projects/${projectId}/agent-sessions/session-1`,
-      "PUT",
-      200,
-    )).toBeNull();
     expect(decodeProjectAgentScheduleBatchClaim({
       projectIds: [projectId, projectId],
     })).toEqual({ projectIds: [projectId, projectId] });

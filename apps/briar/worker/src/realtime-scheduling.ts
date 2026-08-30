@@ -418,10 +418,5 @@ export function projectMutationProject(
 ) {
   if (status >= 400 || method === "GET" || method === "HEAD") return null;
   if (projectScheduleClaimMutation(pathname, method, status)) return null;
-  if (
-    /^\/projects\/[0-9a-f-]+\/agent-sessions\/[^/]+$/u.test(
-      pathname,
-    )
-  ) return null;
   return pathname.match(/^\/projects\/([0-9a-f-]+)(?:\/|$)/u)?.[1] ?? null;
 }

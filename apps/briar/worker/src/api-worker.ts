@@ -23,8 +23,6 @@ import { handleOrganizationChannelRoute } from "./organization-channel-routes";
 import { handleOrganizationWorkerRoute } from "./organization-worker-routes";
 import { handleOrganizationRoute } from "./organization-routes";
 import { handleProjectAgentRoute } from "./project-agent-routes";
-import { handleProjectAgentSessionRoute } from "./project-agent-session-routes";
-import { handleProjectAgentTaskRoute } from "./project-agent-task-routes";
 import { handleProjectAgentTaskWorkerRoute } from "./project-agent-task-worker-routes";
 import { handleProjectCoreRoute } from "./project-core-routes";
 import { handleProjectGithubRoute } from "./project-github-routes";
@@ -312,28 +310,6 @@ async function route(
     db,
   });
   if (projectSettingsResponse !== undefined) return projectSettingsResponse;
-
-  const projectAgentTaskResponse = await handleProjectAgentTaskRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-    context,
-  });
-  if (projectAgentTaskResponse !== undefined) return projectAgentTaskResponse;
-
-  const projectAgentSessionResponse = await handleProjectAgentSessionRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-    context,
-  });
-  if (projectAgentSessionResponse !== undefined) {
-    return projectAgentSessionResponse;
-  }
 
   const projectAgentResponse = await handleProjectAgentRoute({
     request,
