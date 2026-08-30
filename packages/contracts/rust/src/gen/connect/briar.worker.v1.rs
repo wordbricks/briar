@@ -36,6 +36,62 @@ pub type OwnedCompleteProjectAgentTaskResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<RecordMergeBatchCandidateEnqueuedRequestView<'static>>`.
+pub type OwnedRecordMergeBatchCandidateEnqueuedRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchCandidateEnqueuedRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RecordMergeBatchCandidateEnqueuedResponseView<'static>>`.
+pub type OwnedRecordMergeBatchCandidateEnqueuedResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchCandidateEnqueuedResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RecordMergeBatchAuthorityRequestView<'static>>`.
+pub type OwnedRecordMergeBatchAuthorityRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchAuthorityRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RecordMergeBatchAuthorityResponseView<'static>>`.
+pub type OwnedRecordMergeBatchAuthorityResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchAuthorityResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RecordMergeBatchValidationRequestView<'static>>`.
+pub type OwnedRecordMergeBatchValidationRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchValidationRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RecordMergeBatchValidationResponseView<'static>>`.
+pub type OwnedRecordMergeBatchValidationResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchValidationResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CompleteMergeBatchPublicationRequestView<'static>>`.
+pub type OwnedCompleteMergeBatchPublicationRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::CompleteMergeBatchPublicationRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CompleteMergeBatchPublicationResponseView<'static>>`.
+pub type OwnedCompleteMergeBatchPublicationResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::CompleteMergeBatchPublicationResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<BlockMergeBatchRequestView<'static>>`.
+pub type OwnedBlockMergeBatchRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::BlockMergeBatchRequestView<'static>,
+>;
+///Shorthand for `OwnedView<BlockMergeBatchResponseView<'static>>`.
+pub type OwnedBlockMergeBatchResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::BlockMergeBatchResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<HeartbeatWorkerRequestView<'static>>`.
 pub type OwnedHeartbeatWorkerRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::HeartbeatWorkerRequestView<'static>,
@@ -252,6 +308,208 @@ for ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::CompleteProjectAgentTaskResponseView<
         'static,
     >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::RecordMergeBatchCandidateEnqueuedResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchCandidateEnqueuedResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::RecordMergeBatchCandidateEnqueuedResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchCandidateEnqueuedResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::RecordMergeBatchAuthorityResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchAuthorityResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::RecordMergeBatchAuthorityResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchAuthorityResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::RecordMergeBatchValidationResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchValidationResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::RecordMergeBatchValidationResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchValidationResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::CompleteMergeBatchPublicationResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::CompleteMergeBatchPublicationResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::CompleteMergeBatchPublicationResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::CompleteMergeBatchPublicationResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::BlockMergeBatchResponse>
+for crate::proto::briar::worker::v1::__buffa::view::BlockMergeBatchResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::BlockMergeBatchResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::BlockMergeBatchResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -614,6 +872,36 @@ pub const WORKER_QUEUE_SERVICE_COMPLETE_PROJECT_AGENT_TASK_SPEC: ::connectrpc::S
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RecordMergeBatchCandidateEnqueued` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_RECORD_MERGE_BATCH_CANDIDATE_ENQUEUED_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/RecordMergeBatchCandidateEnqueued",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RecordMergeBatchAuthority` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_RECORD_MERGE_BATCH_AUTHORITY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/RecordMergeBatchAuthority",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RecordMergeBatchValidation` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_RECORD_MERGE_BATCH_VALIDATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/RecordMergeBatchValidation",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CompleteMergeBatchPublication` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_COMPLETE_MERGE_BATCH_PUBLICATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/CompleteMergeBatchPublication",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `BlockMergeBatch` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_BLOCK_MERGE_BATCH_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/BlockMergeBatch",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// The machine Worker queue control plane. Large result uploads, transcripts,
 /// evidence, and provider-specific execution endpoints intentionally remain
 /// outside this service because they have different lifecycle and transport
@@ -757,6 +1045,121 @@ pub trait WorkerQueueService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::worker::v1::CompleteProjectAgentTaskResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RecordMergeBatchCandidateEnqueued RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn record_merge_batch_candidate_enqueued<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::RecordMergeBatchCandidateEnqueuedRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::RecordMergeBatchCandidateEnqueuedResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RecordMergeBatchAuthority RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn record_merge_batch_authority<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::RecordMergeBatchAuthorityRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::RecordMergeBatchAuthorityResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RecordMergeBatchValidation RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn record_merge_batch_validation<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::RecordMergeBatchValidationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::RecordMergeBatchValidationResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the CompleteMergeBatchPublication RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn complete_merge_batch_publication<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::CompleteMergeBatchPublicationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::CompleteMergeBatchPublicationResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the BlockMergeBatch RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn block_merge_batch<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::BlockMergeBatchRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::BlockMergeBatchResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -908,6 +1311,151 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
                 },
             )
             .with_spec(WORKER_QUEUE_SERVICE_COMPLETE_PROJECT_AGENT_TASK_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "RecordMergeBatchCandidateEnqueued",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchCandidateEnqueuedRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::RecordMergeBatchCandidateEnqueuedRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.record_merge_batch_candidate_enqueued(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::RecordMergeBatchCandidateEnqueuedResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_RECORD_MERGE_BATCH_CANDIDATE_ENQUEUED_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "RecordMergeBatchAuthority",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchAuthorityRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::RecordMergeBatchAuthorityRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.record_merge_batch_authority(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::RecordMergeBatchAuthorityResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_RECORD_MERGE_BATCH_AUTHORITY_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "RecordMergeBatchValidation",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchValidationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::RecordMergeBatchValidationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.record_merge_batch_validation(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::RecordMergeBatchValidationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_RECORD_MERGE_BATCH_VALIDATION_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "CompleteMergeBatchPublication",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::CompleteMergeBatchPublicationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::CompleteMergeBatchPublicationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.complete_merge_batch_publication(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::CompleteMergeBatchPublicationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_COMPLETE_MERGE_BATCH_PUBLICATION_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "BlockMergeBatch",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::BlockMergeBatchRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::BlockMergeBatchRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.block_merge_batch(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::BlockMergeBatchResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_BLOCK_MERGE_BATCH_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -986,6 +1534,44 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(WORKER_QUEUE_SERVICE_COMPLETE_PROJECT_AGENT_TASK_SPEC),
+                )
+            }
+            "RecordMergeBatchCandidateEnqueued" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            WORKER_QUEUE_SERVICE_RECORD_MERGE_BATCH_CANDIDATE_ENQUEUED_SPEC,
+                        ),
+                )
+            }
+            "RecordMergeBatchAuthority" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            WORKER_QUEUE_SERVICE_RECORD_MERGE_BATCH_AUTHORITY_SPEC,
+                        ),
+                )
+            }
+            "RecordMergeBatchValidation" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            WORKER_QUEUE_SERVICE_RECORD_MERGE_BATCH_VALIDATION_SPEC,
+                        ),
+                )
+            }
+            "CompleteMergeBatchPublication" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            WORKER_QUEUE_SERVICE_COMPLETE_MERGE_BATCH_PUBLICATION_SPEC,
+                        ),
+                )
+            }
+            "BlockMergeBatch" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_BLOCK_MERGE_BATCH_SPEC),
                 )
             }
             _ => None,
@@ -1088,6 +1674,116 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                         .await?
                         .encode::<
                             crate::proto::briar::worker::v1::CompleteProjectAgentTaskResponse,
+                        >(format)
+                })
+            }
+            "RecordMergeBatchCandidateEnqueued" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::RecordMergeBatchCandidateEnqueuedRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchCandidateEnqueuedRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::RecordMergeBatchCandidateEnqueuedRequest,
+                    >::from_parts(&req, &body);
+                    svc.record_merge_batch_candidate_enqueued(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::RecordMergeBatchCandidateEnqueuedResponse,
+                        >(format)
+                })
+            }
+            "RecordMergeBatchAuthority" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::RecordMergeBatchAuthorityRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchAuthorityRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::RecordMergeBatchAuthorityRequest,
+                    >::from_parts(&req, &body);
+                    svc.record_merge_batch_authority(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::RecordMergeBatchAuthorityResponse,
+                        >(format)
+                })
+            }
+            "RecordMergeBatchValidation" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::RecordMergeBatchValidationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchValidationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::RecordMergeBatchValidationRequest,
+                    >::from_parts(&req, &body);
+                    svc.record_merge_batch_validation(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::RecordMergeBatchValidationResponse,
+                        >(format)
+                })
+            }
+            "CompleteMergeBatchPublication" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::CompleteMergeBatchPublicationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::CompleteMergeBatchPublicationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::CompleteMergeBatchPublicationRequest,
+                    >::from_parts(&req, &body);
+                    svc.complete_merge_batch_publication(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::CompleteMergeBatchPublicationResponse,
+                        >(format)
+                })
+            }
+            "BlockMergeBatch" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::BlockMergeBatchRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::BlockMergeBatchRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::BlockMergeBatchRequest,
+                    >::from_parts(&req, &body);
+                    svc.block_merge_batch(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::BlockMergeBatchResponse,
                         >(format)
                 })
             }
@@ -1395,6 +2091,231 @@ where
                 &self.transport,
                 &self.config,
                 WORKER_QUEUE_SERVICE_COMPLETE_PROJECT_AGENT_TASK_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RecordMergeBatchCandidateEnqueued RPC. Sends a request to /briar.worker.v1.WorkerQueueService/RecordMergeBatchCandidateEnqueued.
+    pub async fn record_merge_batch_candidate_enqueued(
+        &self,
+        request: crate::proto::briar::worker::v1::RecordMergeBatchCandidateEnqueuedRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchCandidateEnqueuedResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.record_merge_batch_candidate_enqueued_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RecordMergeBatchCandidateEnqueued RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn record_merge_batch_candidate_enqueued_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::RecordMergeBatchCandidateEnqueuedRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchCandidateEnqueuedResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_RECORD_MERGE_BATCH_CANDIDATE_ENQUEUED_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RecordMergeBatchAuthority RPC. Sends a request to /briar.worker.v1.WorkerQueueService/RecordMergeBatchAuthority.
+    pub async fn record_merge_batch_authority(
+        &self,
+        request: crate::proto::briar::worker::v1::RecordMergeBatchAuthorityRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchAuthorityResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.record_merge_batch_authority_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RecordMergeBatchAuthority RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn record_merge_batch_authority_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::RecordMergeBatchAuthorityRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchAuthorityResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_RECORD_MERGE_BATCH_AUTHORITY_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RecordMergeBatchValidation RPC. Sends a request to /briar.worker.v1.WorkerQueueService/RecordMergeBatchValidation.
+    pub async fn record_merge_batch_validation(
+        &self,
+        request: crate::proto::briar::worker::v1::RecordMergeBatchValidationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchValidationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.record_merge_batch_validation_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RecordMergeBatchValidation RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn record_merge_batch_validation_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::RecordMergeBatchValidationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::RecordMergeBatchValidationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_RECORD_MERGE_BATCH_VALIDATION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CompleteMergeBatchPublication RPC. Sends a request to /briar.worker.v1.WorkerQueueService/CompleteMergeBatchPublication.
+    pub async fn complete_merge_batch_publication(
+        &self,
+        request: crate::proto::briar::worker::v1::CompleteMergeBatchPublicationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::CompleteMergeBatchPublicationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.complete_merge_batch_publication_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CompleteMergeBatchPublication RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn complete_merge_batch_publication_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::CompleteMergeBatchPublicationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::CompleteMergeBatchPublicationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_COMPLETE_MERGE_BATCH_PUBLICATION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the BlockMergeBatch RPC. Sends a request to /briar.worker.v1.WorkerQueueService/BlockMergeBatch.
+    pub async fn block_merge_batch(
+        &self,
+        request: crate::proto::briar::worker::v1::BlockMergeBatchRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::BlockMergeBatchResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.block_merge_batch_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the BlockMergeBatch RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn block_merge_batch_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::BlockMergeBatchRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::BlockMergeBatchResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_BLOCK_MERGE_BATCH_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

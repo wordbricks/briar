@@ -22,6 +22,11 @@ service WorkerQueueService {
   rpc RenewWorkLease(RenewWorkLeaseRequest) returns (RenewWorkLeaseResponse);
   rpc HandoffWork(HandoffWorkRequest) returns (HandoffWorkResponse);
   rpc CompleteProjectAgentTask(CompleteProjectAgentTaskRequest) returns (CompleteProjectAgentTaskResponse);
+  rpc RecordMergeBatchCandidateEnqueued(RecordMergeBatchCandidateEnqueuedRequest) returns (RecordMergeBatchCandidateEnqueuedResponse);
+  rpc RecordMergeBatchAuthority(RecordMergeBatchAuthorityRequest) returns (RecordMergeBatchAuthorityResponse);
+  rpc RecordMergeBatchValidation(RecordMergeBatchValidationRequest) returns (RecordMergeBatchValidationResponse);
+  rpc CompleteMergeBatchPublication(CompleteMergeBatchPublicationRequest) returns (CompleteMergeBatchPublicationResponse);
+  rpc BlockMergeBatch(BlockMergeBatchRequest) returns (BlockMergeBatchResponse);
 }
 
 // Worker-credential runtime control plane. Enrollment and project binding are
@@ -235,6 +240,77 @@ message ProjectAgentTaskFailure {
 
 message CompleteProjectAgentTaskResponse {
   bool replayed = 1;
+}
+
+message RecordMergeBatchCandidateEnqueuedRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+  string candidate_id = 4;
+  string expected_head_sha = 5;
+  string expected_base_sha = 6;
+  string queue_entry_id = 7;
+}
+
+message RecordMergeBatchCandidateEnqueuedResponse {
+  string batch_id = 1;
+  string candidate_id = 2;
+  MergeBatchState state = 3;
+}
+
+message RecordMergeBatchAuthorityRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+  string integration_ref = 4;
+  string integration_sha = 5;
+  string base_sha = 6;
+}
+
+message RecordMergeBatchAuthorityResponse {
+  string batch_id = 1;
+  MergeBatchState state = 2;
+  string merge_group_sha = 3;
+}
+
+message RecordMergeBatchValidationRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+  string merge_group_sha = 4;
+  MergeBatchValidationResults validation_results = 5;
+}
+
+message RecordMergeBatchValidationResponse {
+  string batch_id = 1;
+  MergeBatchState state = 2;
+  google.protobuf.Timestamp validated_at = 3;
+}
+
+message CompleteMergeBatchPublicationRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+  string merge_group_sha = 4;
+}
+
+message CompleteMergeBatchPublicationResponse {
+  string batch_id = 1;
+  MergeBatchState state = 2;
+  google.protobuf.Timestamp published_at = 3;
+}
+
+message BlockMergeBatchRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+  string code = 4;
+  string detail = 5;
+}
+
+message BlockMergeBatchResponse {
+  string batch_id = 1;
+  MergeBatchState state = 2;
 }
 
 enum WorkerReadinessState {
