@@ -40,10 +40,8 @@ import {
 } from "./project-request-contract";
 import {
   decodePausedRunReworkInput,
-  decodeRunEvent,
   decodeRunEvidenceInput,
   decodeRunReworkInput,
-  decodeWorkflowStageLifecycleInput,
 } from "./run-request-contract";
 import {
   decodeProjectAgentScheduleRunCompletion,
@@ -512,24 +510,6 @@ describe("Worker HTTP contract", () => {
     ).toEqual({ model: "mentioned-agent-skill", effort: "xhigh" });
   });
 
-  it("validates idempotent workflow stage lifecycle requests", () => {
-    expect(
-      decodeWorkflowStageLifecycleInput({
-        requestId: "11111111-1111-4111-8111-111111111111",
-        attempt: 2,
-        revision: 3,
-        actor: "briar-workflow",
-      }),
-    ).toMatchObject({ attempt: 2, revision: 3 });
-    expect(() =>
-      decodeWorkflowStageLifecycleInput({
-        requestId: "not-a-uuid",
-        attempt: 0,
-        actor: "",
-      }),
-    ).toThrow();
-  });
-
   it("requires an email confirmation for account deletion", () => {
     expect(
       decodeAccountDeletionInput({
@@ -651,57 +631,6 @@ describe("Worker HTTP contract", () => {
       }),
     ).toThrow(/one emoji/u);
     expect(decodeWorkerSettings({ icon: null })).toEqual({ icon: null });
-  });
-
-  it("requires an actionable structured handoff for blocked work", () => {
-    const blockedEvent = {
-      runId: "11111111-1111-4111-8111-111111111111",
-      status: "blocked" as const,
-      eventKey: "BRIAR-42:blocked:github-auth",
-      occurredAt: "2026-07-31T00:00:00.000Z",
-      actor: "briar-workflow",
-      repository: "example/briar",
-      detail:
-        "GitHub sign-in expired, so Briar cannot open the pull request and review cannot begin.",
-      structuredResult: {
-        summary:
-          "GitHub sign-in expired, so Briar cannot open the pull request and review cannot begin.",
-        outcome: "blocked" as const,
-        importance: "important" as const,
-        urgency: "normal" as const,
-        impact: "issue" as const,
-        humanActionRequired: true,
-        nextAction:
-          "A repository owner should sign in to GitHub on the worker computer, confirm the account is active, and retry this issue.",
-        dueAt: null,
-      },
-    };
-
-    expect(decodeRunEvent(blockedEvent).structuredResult?.nextAction).toContain(
-      "repository owner",
-    );
-    expect(() =>
-      decodeRunEvent({ ...blockedEvent, structuredResult: null }),
-    ).toThrow(/structured blocked result/u);
-    expect(() =>
-      decodeRunEvent({
-        ...blockedEvent,
-        structuredResult: {
-          ...blockedEvent.structuredResult,
-          outcome: "failed",
-        },
-      }),
-    ).toThrow(/blocked structured outcome/u);
-    expect(() =>
-      decodeRunEvent({
-        ...blockedEvent,
-        structuredResult: {
-          ...blockedEvent.structuredResult,
-          humanActionRequired: false,
-          nextAction: null,
-        },
-      }),
-    ).toThrow(/exact human next action/u);
   });
 
   it("validates synchronized agent session snapshots", () => {

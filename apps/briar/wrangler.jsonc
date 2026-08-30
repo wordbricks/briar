@@ -57,7 +57,6 @@
       "/agent-schedule-runs/claim",
       "/channel-reply-claims*",
       "/queue*",
-      "/run-events",
       "/health",
       "/html-artifact-preview",
       "/github/*",

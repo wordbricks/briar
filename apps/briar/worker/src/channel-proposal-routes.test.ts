@@ -956,46 +956,6 @@ describe("channel issue proposal approval route", () => {
     ).bind(proposalId).first<{ count: number }>()).resolves.toEqual({ count: 0 });
   });
 
-  it("prevents a project agent from preempting the approval identity namespace", async () => {
-    for (const [index, sourceKey] of [
-      `briar-channel-approved:${"f".repeat(64)}`,
-      `briar-channel-batch-approved:${"d".repeat(64)}`,
-      "briar-channel-proposal:legacy-channel",
-      `briar-conversation-approved:${"e".repeat(64)}`,
-      "briar-conversation-proposal:legacy-conversation",
-    ].entries()) {
-      const response = await worker.fetch(
-        new Request("https://briar.example/run-events", {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${projectAgentToken}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            source: "issue",
-            sourceKey,
-            title: "Preempted approval",
-            status: "backlog",
-            eventKey: `preempted-approval:${index}:backlog:intake`,
-            occurredAt: now,
-            actor: "project-agent",
-            repository: "Project A",
-          }),
-        }),
-        env(),
-      );
-      expect(response.status).toBe(403);
-    }
-    await expect(
-      db.prepare(
-        `select count(*) as count from briar_hunt_runs
-         where source_key = ?`,
-      ).bind(`briar-channel-approved:${"f".repeat(64)}`).first<{
-        count: number;
-      }>(),
-    ).resolves.toMatchObject({ count: 0 });
-  });
-
   it("binds conversation approval to an opaque payload and keeps execution in backlog", async () => {
     const { conversationRunId, proposalId } =
       await seedConversationProposal(101);

@@ -3,7 +3,6 @@ import {
   decodeRunEvidenceInput,
   httpErrorMessage,
   validateReworkRunInput,
-  validateRunEventInput,
 } from "./command-contract";
 
 const requestId = "11111111-1111-4111-8111-111111111111";
@@ -19,35 +18,6 @@ describe("CLI command contracts", () => {
 
     expect(validateReworkRunInput(input)).toBeUndefined();
     expect(input.reason).toBe("  keep the original wire value  ");
-  });
-
-  it("keeps cross-field run event validation at the command boundary", () => {
-    expect(() =>
-      validateRunEventInput({
-        runId: null,
-        source: null,
-        sourceKey: null,
-        title: null,
-        status: "running",
-        workflowStage: null,
-        eventKey: "started",
-        occurredAt: "2026-08-20T08:00:00+00:00",
-        actor: "briar-workflow",
-        repository: "wordbricks/briar",
-        detail: null,
-        priority: null,
-        branch: null,
-        commitSha: null,
-        tracker: null,
-        issueDescription: null,
-        resultSummary: null,
-        structuredResult: null,
-        pullRequestUrls: [],
-        targetSha: null,
-        sourceCreatedAt: null,
-        context: null,
-      })
-    ).toThrow("--source, --source-key, and --title are required without --run");
   });
 
   it("uses decoded values when a command consumes the parse result", () => {

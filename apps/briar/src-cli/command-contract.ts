@@ -1,10 +1,5 @@
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import {
-  autoHuntPersistedRunStatuses,
-  autoHuntSources,
-} from "../src/lib/auto-hunt-contract";
-import { StructuredAgentResult } from "../src/lib/agent-result";
 import { IsoDateTimeWithOffset } from "../src/lib/date-time-schema";
 import {
   issueTitleAbsoluteMaxLength,
@@ -12,8 +7,6 @@ import {
 } from "../src/lib/issue-title";
 import { EvidenceType, WorkflowStageId } from "./config-contract";
 
-const mutableArray = <S extends Schema.Top>(item: S) =>
-  Schema.mutable(Schema.Array(item));
 const Uuid = Schema.String.check(Schema.isUUID());
 const UrlString = Schema.String.check(
   Schema.makeFilter((value) => URL.canParse(value) || "Expected a valid URL"),
@@ -97,76 +90,6 @@ export const decodeChannelMessagesInput = Schema.decodeUnknownSync(
   ChannelMessagesInput,
 );
 
-const RunEventTracker = Schema.Struct({
-  provider: Schema.String.check(Schema.isLengthBetween(1, 64)),
-  issueId: Schema.NullOr(Schema.String),
-  identifier: Schema.NullOr(Schema.String),
-  url: Schema.NullOr(UrlString),
-  state: Schema.NullOr(Schema.String),
-});
-
-export const RunEventInput = Schema.Struct({
-  runId: Schema.NullOr(Uuid),
-  source: Schema.NullOr(Schema.Literals(autoHuntSources)),
-  sourceKey: Schema.NullOr(Schema.NonEmptyString),
-  title: Schema.NullOr(Schema.NonEmptyString),
-  status: Schema.optional(Schema.Literals(autoHuntPersistedRunStatuses)),
-  workflowStage: Schema.optional(Schema.NullOr(WorkflowStageId)),
-  eventKey: Schema.NonEmptyString,
-  occurredAt: IsoDateTimeWithOffset,
-  actor: Schema.NonEmptyString,
-  repository: Schema.NonEmptyString,
-  detail: Schema.NullOr(Schema.String),
-  priority: Schema.NullOr(
-    Schema.Int.check(
-      Schema.isGreaterThanOrEqualTo(1),
-      Schema.isLessThanOrEqualTo(4, { message: "Too big" }),
-    ),
-  ),
-  branch: Schema.NullOr(Schema.String),
-  commitSha: Schema.NullOr(
-    Schema.String.check(Schema.isPattern(/^[0-9a-f]{7,64}$/u)),
-  ),
-  tracker: Schema.NullOr(RunEventTracker),
-  issueDescription: Schema.NullOr(Schema.String),
-  resultSummary: Schema.NullOr(Schema.String),
-  structuredResult: Schema.NullOr(StructuredAgentResult),
-  pullRequestUrls: mutableArray(UrlString).check(Schema.isMaxLength(20)),
-  targetSha: Schema.NullOr(
-    Schema.String.check(Schema.isPattern(/^[0-9a-f]{7,64}$/u)),
-  ),
-  sourceCreatedAt: Schema.NullOr(IsoDateTimeWithOffset),
-  context: Schema.NullOr(StringRecord),
-}).check(
-  Schema.makeFilter((progress) => {
-    const issues: Array<Schema.FilterIssue> = [];
-    if (
-      !progress.runId &&
-      (!progress.source || !progress.sourceKey || !progress.title)
-    ) {
-      issues.push({
-        path: [],
-        issue: "--source, --source-key, and --title are required without --run",
-      });
-    }
-    if (!progress.status) {
-      issues.push({ path: [], issue: "--status is required" });
-    }
-    if (progress.status === "running" && !progress.workflowStage) {
-      issues.push({
-        path: ["workflowStage"],
-        issue: "--workflow-stage is required with --status running",
-      });
-    }
-    return issues;
-  }),
-);
-const decodeRunEventInput = Schema.decodeUnknownSync(RunEventInput);
-
-export function validateRunEventInput(input: unknown): void {
-  decodeRunEventInput(input);
-}
-
 export const RunEvidenceInput = Schema.Struct({
   evidenceKey: Schema.String.check(Schema.isLengthBetween(1, 300)),
   stage: WorkflowStageId,
@@ -231,18 +154,4 @@ const decodeResumeRunInput = Schema.decodeUnknownSync(ResumeRunInput);
 
 export function validateResumeRunInput(input: unknown): void {
   decodeResumeRunInput(input);
-}
-
-const WorkflowTransitionInput = Schema.Struct({
-  requestId: Uuid,
-  actor: Schema.String.check(Schema.isLengthBetween(1, 128)),
-  attempt: Schema.optional(PositiveInteger),
-  revision: Schema.optional(PositiveInteger),
-});
-const decodeWorkflowTransitionInput = Schema.decodeUnknownSync(
-  WorkflowTransitionInput,
-);
-
-export function validateWorkflowTransitionInput(input: unknown): void {
-  decodeWorkflowTransitionInput(input);
 }

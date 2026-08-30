@@ -1,6 +1,5 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaIssue from "effect/SchemaIssue";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import {
@@ -10,11 +9,9 @@ import {
   autoHuntEvidenceTypePattern,
   autoHuntPersistedRunStatuses,
   autoHuntRequirementKinds,
-  autoHuntSources,
   cloneAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
 } from "../../src/lib/auto-hunt-contract";
-import { StructuredAgentResult } from "../../src/lib/agent-result";
 import { IsoDateTimeWithOffset } from "../../src/lib/date-time-schema";
 import {
   defaulted,
@@ -110,9 +107,6 @@ export const Workflow = strictSchema(Schema.Struct({
   }))),
 }));
 
-const nullableTrimmed = (maximum: number) =>
-  Schema.optional(Schema.NullOr(trimmedText(1, maximum)));
-
 export const HttpsUrl = Schema.String.check(
   Schema.isMaxLength(1_000),
   Schema.makeFilter((value) => {
@@ -125,154 +119,6 @@ export const HttpsUrl = Schema.String.check(
     }
   }),
 );
-
-const Tracker = strictSchema(Schema.Struct({
-  provider: trimmedText(1, 50),
-  issueId: nullableTrimmed(200),
-  identifier: nullableTrimmed(100),
-  url: Schema.optional(Schema.NullOr(HttpsUrl)),
-  state: nullableTrimmed(100),
-}));
-
-const PullRequestUrlsSource = defaultedWith(
-  mutableArray(HttpsUrl).check(Schema.isMaxLength(20)),
-  () => [],
-).pipe(
-  Schema.decode({
-    decode: SchemaGetter.transform((urls) => [...new Set(urls)].sort()),
-    encode: SchemaGetter.transform((urls) => [...new Set(urls)].sort()),
-  }),
-);
-
-export const RunEvent = strictSchema(Schema.Struct({
-  runId: Schema.optional(Schema.NullOr(UuidString)),
-  source: Schema.optional(Schema.NullOr(Schema.Literals(autoHuntSources))),
-  sourceKey: Schema.optional(Schema.NullOr(trimmedText(1, 200))),
-  title: Schema.optional(Schema.NullOr(trimmedText(1, 300))),
-  status: RunStatus,
-  workflowStage: Schema.optional(Schema.NullOr(WorkflowStageId)),
-  eventKey: trimmedText(1, 300),
-  occurredAt: IsoDateTimeWithOffset,
-  actor: trimmedText(1, 128),
-  repository: trimmedText(1, 500),
-  detail: Schema.optional(
-    Schema.NullOr(Schema.String.check(Schema.isMaxLength(4_000))),
-  ),
-  priority: Schema.optional(
-    Schema.NullOr(
-      Schema.Int.check(
-        Schema.isGreaterThanOrEqualTo(1),
-        Schema.isLessThanOrEqualTo(4),
-      ),
-    ),
-  ),
-  branch: nullableTrimmed(500),
-  commitSha: Schema.optional(Schema.NullOr(
-    Schema.String.check(Schema.isPattern(/^[0-9a-f]{7,64}$/u)),
-  )),
-  tracker: Schema.optional(Schema.NullOr(Tracker)),
-  issueDescription: Schema.optional(
-    Schema.NullOr(Schema.String.check(Schema.isMaxLength(100_000))),
-  ),
-  resultSummary: Schema.optional(
-    Schema.NullOr(Schema.String.check(Schema.isMaxLength(100_000))),
-  ),
-  structuredResult: Schema.optional(Schema.NullOr(StructuredAgentResult)),
-  pullRequestUrls: PullRequestUrlsSource,
-  targetSha: Schema.optional(Schema.NullOr(
-    Schema.String.check(Schema.isPattern(/^[0-9a-f]{7,64}$/u)),
-  )),
-  sourceCreatedAt: Schema.optional(Schema.NullOr(IsoDateTimeWithOffset)),
-  context: Schema.optional(
-    Schema.NullOr(Schema.Record(Schema.String, Schema.Unknown)),
-  ),
-}).check(
-  Schema.makeFilter((input) => {
-    const issues: Array<Schema.FilterIssue> = [];
-    if (!input.runId && (!input.source || !input.sourceKey || !input.title)) {
-      issues.push({
-        path: ["runId"],
-        issue: "source, sourceKey, and title are required without runId",
-      });
-    }
-    if (input.status === "running" && !input.workflowStage) {
-      issues.push({
-        path: ["workflowStage"],
-        issue: "running progress requires a workflow stage",
-      });
-    }
-    if (input.status === "blocked" && !input.detail?.trim()) {
-      issues.push({
-        path: ["detail"],
-        issue: "blocked progress requires technical blocker details",
-      });
-    }
-    if (input.status === "blocked" && !input.structuredResult) {
-      issues.push({
-        path: ["structuredResult"],
-        issue: "blocked progress requires a structured blocked result",
-      });
-    }
-    if (
-      input.status === "blocked" &&
-      input.structuredResult &&
-      input.structuredResult.outcome !== "blocked"
-    ) {
-      issues.push({
-        path: ["structuredResult", "outcome"],
-        issue: "blocked progress requires a blocked structured outcome",
-      });
-    }
-    if (
-      input.status === "blocked" &&
-      input.structuredResult &&
-      (!input.structuredResult.humanActionRequired ||
-        !input.structuredResult.nextAction)
-    ) {
-      issues.push({
-        path: ["structuredResult", "nextAction"],
-        issue: "blocked progress requires an exact human next action",
-      });
-    }
-    if (input.status === "completed" && !input.structuredResult) {
-      issues.push({
-        path: ["structuredResult"],
-        issue: "completed runs require a structured result",
-      });
-    }
-    if (
-      input.status === "completed" &&
-      input.structuredResult &&
-      !["completed", "partial"].includes(input.structuredResult.outcome)
-    ) {
-      issues.push({
-        path: ["structuredResult", "outcome"],
-        issue: "completed runs require a completed or partial outcome",
-      });
-    }
-    if (
-      input.resultSummary &&
-      input.structuredResult &&
-      input.resultSummary !== input.structuredResult.summary
-    ) {
-      issues.push({
-        path: ["resultSummary"],
-        issue: "resultSummary must match structuredResult.summary",
-      });
-    }
-    if (
-      input.tracker?.provider === "linear" &&
-      input.tracker.url &&
-      new URL(input.tracker.url).hostname !== "linear.app"
-    ) {
-      issues.push({
-        path: ["tracker", "url"],
-        issue: "Linear tracker URLs must use linear.app",
-      });
-    }
-    return issues.length > 0 ? issues : undefined;
-  }),
-));
 
 export const RunEvidenceInput = strictSchema(Schema.Struct({
   evidenceKey: trimmedText(1, 300),
@@ -314,13 +160,6 @@ export const ResumeAgentInput = strictSchema(Schema.Struct({
   checkpointKey: WorkflowStageId,
   attempt: PositiveSafeInteger,
   revision: PositiveSafeInteger,
-  actor: trimmedText(1, 128),
-}));
-
-export const WorkflowStageLifecycleInput = strictSchema(Schema.Struct({
-  requestId: UuidString,
-  attempt: Schema.optional(PositiveSafeInteger),
-  revision: Schema.optional(PositiveSafeInteger),
   actor: trimmedText(1, 128),
 }));
 
@@ -459,15 +298,11 @@ export const decodeProjectUsagePeriod = decodeRequestSync(ProjectUsagePeriod);
 export const decodeProjectUsageDateRange = decodeRequestSync(
   ProjectUsageDateRangeInput,
 );
-export const decodeRunEvent = decodeRequestSync(RunEvent);
 export const decodeRunEvidenceInput = decodeRequestSync(RunEvidenceInput);
 export const decodeRecoveryUserInput = decodeRequestSync(RecoveryUserInput);
 export const decodeRecoveryAgentInput = decodeRequestSync(RecoveryAgentInput);
 export const decodeResumeUserInput = decodeRequestSync(ResumeUserInput);
 export const decodeResumeAgentInput = decodeRequestSync(ResumeAgentInput);
-export const decodeWorkflowStageLifecycleInput = decodeRequestSync(
-  WorkflowStageLifecycleInput,
-);
 export const decodeRunReworkInput = decodeRequestSync(RunReworkInput);
 export const decodePausedRunReworkInput = decodeRequestSync(
   PausedRunReworkInput,

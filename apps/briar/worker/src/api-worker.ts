@@ -269,12 +269,10 @@ async function route(
     url,
     db,
     attachmentsBucket,
-    env,
     requireRunExecutionProject: (runId) =>
       requireRunExecutionProject(db, request, runId),
     requireActiveWorkerRunClaim: (runId) =>
       requireActiveWorkerRunClaim(db, request, runId),
-    requireAgentProject: () => requireAgentProject(db, request),
   });
   if (runAgentResponse !== undefined) return runAgentResponse;
 

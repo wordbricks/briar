@@ -1,37 +1,23 @@
 import { contentDisposition } from "./attachment-storage";
-import { sha256, sha256Bytes } from "./crypto-digest";
+import { sha256Bytes } from "./crypto-digest";
 import {
-  assertQueuedHuntClaim,
-  attemptGithubMergeAutoResume,
-  completeWorkflowStageLifecycle,
   createRunEvidenceImages,
   EventKeyConflictError,
-  getHuntRunForProject,
-  HuntClaimError,
   HuntTransitionError,
   listEvidenceImagesForEvidence,
   recoverHuntRun,
-  recordHuntEvent,
   recordRunEvidence,
   reworkHuntRun,
-  startWorkflowStageLifecycle,
   type RunEvidenceImageInput,
 } from "./db";
 import { HttpError, json } from "./http-response";
-import { registerReadyMergeCandidates } from "./merge-batches";
-import { getMergeQueueProfile } from "./merge-queue-profile";
-import { isReservedProposalIssueSourceKey } from "./proposal-issue-source";
-import { readJson, readRunEvidenceRequest, dashboardStageForProgress } from "./request-readers";
+import { readJson, readRunEvidenceRequest } from "./request-readers";
 import { evidenceImageJson } from "./run-evidence-json";
 import {
   decodeRecoveryAgentInput,
   decodeResumeAgentInput,
-  decodeRunEvent,
   decodeRunReworkInput,
-  decodeWorkflowStageLifecycleInput,
 } from "./run-request-contract";
-import { assertRunEventIdentityNotOverridden } from "./run-event-identity";
-import { auditExecutionEvent } from "./workers";
 import { resumeRunWithCheckpointIdentity } from "./workflow-resume";
 
 export type RunAgentRouteInput = {
@@ -39,20 +25,18 @@ export type RunAgentRouteInput = {
   url: URL;
   db: D1Database;
   attachmentsBucket: R2Bucket;
-  env: Env;
   requireRunExecutionProject: (runId: string) => Promise<string>;
   requireActiveWorkerRunClaim: (runId: string) => Promise<{
     projectId: string;
     claimTokenHash: string;
     authenticatedAt: string;
   }>;
-  requireAgentProject: () => Promise<string>;
 };
 
 export async function handleRunAgentRoute(
   routeInput: RunAgentRouteInput,
 ): Promise<Response | undefined> {
-  const { request, url, db, attachmentsBucket, env } = routeInput;
+  const { request, url, db, attachmentsBucket } = routeInput;
   const { pathname } = url;
   const requireRunExecutionProject = (
     _db: D1Database,
@@ -64,10 +48,6 @@ export async function handleRunAgentRoute(
     _request: Request,
     runId: string,
   ) => routeInput.requireActiveWorkerRunClaim(runId);
-  const requireAgentProject = (
-    _db: D1Database,
-    _request: Request,
-  ) => routeInput.requireAgentProject();
 
   const agentRecoveryMatch = pathname.match(
     /^\/runs\/([0-9a-f-]+)\/(retry|cancel)$/u,
@@ -99,91 +79,6 @@ export async function handleRunAgentRoute(
   const agentResumeMatch = pathname.match(
     /^\/runs\/([0-9a-f-]+)\/resume$/u,
   );
-  const agentStageLifecycleMatch = pathname.match(
-    /^\/runs\/([0-9a-f-]+)\/stages\/([a-z][a-z0-9_-]{0,63})\/(start|complete)$/u,
-  );
-  if (agentStageLifecycleMatch && request.method === "POST") {
-    const { projectId } = await requireActiveWorkerRunClaim(
-      db,
-      request,
-      agentStageLifecycleMatch[1],
-    );
-    const input = decodeWorkflowStageLifecycleInput(await readJson(request));
-    try {
-      const lifecycleObservedAt = new Date().toISOString();
-      const common = {
-        runId: agentStageLifecycleMatch[1],
-        stageId: agentStageLifecycleMatch[2],
-        attempt: input.attempt,
-        revision: input.revision,
-        actor: input.actor,
-      };
-      const result = agentStageLifecycleMatch[3] === "start"
-        ? await startWorkflowStageLifecycle(db, projectId, {
-            ...common,
-            startedAt: new Date().toISOString(),
-          })
-        : await completeWorkflowStageLifecycle(db, projectId, {
-            ...common,
-            finishedAt: lifecycleObservedAt,
-          });
-      if (result.outcome === "not_found") {
-        throw new HttpError(404, "Run not found", "RUN_NOT_FOUND");
-      }
-      const githubAutoResume =
-        result.outcome === "paused" &&
-          result.checkpoint?.stage === "pr_open" &&
-          result.checkpoint.position === "after"
-          ? await attemptGithubMergeAutoResume(
-              db,
-              projectId,
-              agentStageLifecycleMatch[1],
-            )
-          : null;
-      const mergeQueueProfile = agentStageLifecycleMatch[3] === "complete"
-        ? await getMergeQueueProfile(db, projectId)
-        : null;
-      const mergeQueueRun =
-        mergeQueueProfile?.enabled === 1 &&
-          mergeQueueProfile.readiness_stage_id === agentStageLifecycleMatch[2]
-          ? await getHuntRunForProject(
-              db,
-              projectId,
-              agentStageLifecycleMatch[1],
-            )
-          : null;
-      const mergeQueueRegistration = mergeQueueRun
-        ? await registerReadyMergeCandidates(db, {
-            projectId,
-            runId: mergeQueueRun.id,
-            attempt: mergeQueueRun.current_attempt,
-            revision: mergeQueueRun.current_revision,
-            readyAt: lifecycleObservedAt,
-          })
-        : null;
-      const response = {
-        runId: agentStageLifecycleMatch[1],
-        requestId: input.requestId,
-        ...result,
-      };
-      if (githubAutoResume) Object.assign(response, { githubAutoResume });
-      if (mergeQueueRegistration) {
-        Object.assign(response, {
-          mergeQueueRegistered: mergeQueueRegistration.length,
-        });
-      }
-      return json(response);
-    } catch (error) {
-      if (error instanceof HuntTransitionError) {
-        throw new HttpError(
-          409,
-          error.message,
-          "WORKFLOW_STAGE_CONFLICT",
-        );
-      }
-      throw error;
-    }
-  }
   if (agentResumeMatch && request.method === "POST") {
     const projectId = await requireRunExecutionProject(
       db,
@@ -379,117 +274,6 @@ export async function handleRunAgentRoute(
         error instanceof EventKeyConflictError ||
         error instanceof HuntTransitionError
       ) {
-        throw new HttpError(409, error.message);
-      }
-      throw error;
-    }
-  }
-
-  if (pathname === "/run-events" && request.method === "POST") {
-    const parsed = decodeRunEvent(await readJson(request));
-    const projectId = parsed.runId
-      ? (await requireActiveWorkerRunClaim(db, request, parsed.runId)).projectId
-      : await requireAgentProject(db, request);
-    const run = parsed.runId
-      ? await getHuntRunForProject(db, projectId, parsed.runId)
-      : null;
-    if (parsed.runId && !run) throw new HttpError(404, "Run not found");
-    assertRunEventIdentityNotOverridden({
-      run,
-      source: parsed.source,
-      sourceKey: parsed.sourceKey,
-    });
-    const source = parsed.source ?? run?.source;
-    const sourceKey = parsed.sourceKey ?? run?.source_key;
-    const title = parsed.title ?? run?.title;
-    if (!source || !sourceKey || !title) {
-      throw new HttpError(400, "Run identity is incomplete");
-    }
-    if (
-      !parsed.runId &&
-      isReservedProposalIssueSourceKey(sourceKey)
-    ) {
-      throw new HttpError(403, "Run identity is reserved for proposal approval");
-    }
-    const input = {
-      ...parsed,
-      source,
-      sourceKey,
-      title,
-      stage: dashboardStageForProgress(
-        parsed.status,
-        parsed.workflowStage ?? null,
-      ),
-      workflowStage: parsed.workflowStage ?? null,
-      occurredAt: new Date(parsed.occurredAt).toISOString(),
-      detail: parsed.detail ?? null,
-      priority: parsed.priority ?? null,
-      branch: parsed.branch ?? null,
-      commitSha: parsed.commitSha ?? null,
-      tracker: parsed.tracker
-        ? {
-            provider: parsed.tracker.provider,
-            issueId: parsed.tracker.issueId ?? null,
-            identifier: parsed.tracker.identifier ?? null,
-            url: parsed.tracker.url ?? null,
-            state: parsed.tracker.state ?? null,
-          }
-        : null,
-      issueDescription: parsed.issueDescription ?? null,
-      resultSummary: parsed.resultSummary ?? null,
-      structuredResult: parsed.structuredResult ?? null,
-      targetSha: parsed.targetSha ?? null,
-      sourceCreatedAt: parsed.sourceCreatedAt
-        ? new Date(parsed.sourceCreatedAt).toISOString()
-        : null,
-      qaStatus: null,
-      stagingQaDetail: null,
-      productionQaDetail: null,
-      context: parsed.context ?? null,
-    };
-    try {
-      const claimToken = request.headers.get("x-briar-claim-token");
-      await assertQueuedHuntClaim(
-        db,
-        projectId,
-        input,
-        claimToken?.startsWith("briar_claim_")
-          ? await sha256(claimToken)
-          : null,
-        new Date().toISOString(),
-      );
-      const runId = await recordHuntEvent(db, projectId, input);
-      if (input.status === "completed" && run?.worker_id) {
-        const project = await db
-          .prepare(`select organization_id from briar_projects where id = ?`)
-          .bind(projectId)
-          .first<{ organization_id: string }>();
-        if (project) {
-          await auditExecutionEvent(db, {
-            organizationId: project.organization_id,
-            projectId,
-            runId,
-            workerId: run.worker_id,
-            agentId: run.agent_id,
-            action: "completed",
-            detail: { eventKey: input.eventKey },
-            occurredAt: input.occurredAt,
-          });
-        }
-      }
-      return json({
-        runId,
-        status: input.status,
-        workflowStage: input.workflowStage,
-      });
-    } catch (error) {
-      if (error instanceof EventKeyConflictError) {
-        throw new HttpError(409, error.message);
-      }
-      if (error instanceof HuntTransitionError) {
-        throw new HttpError(409, error.message);
-      }
-      if (error instanceof HuntClaimError) {
         throw new HttpError(409, error.message);
       }
       throw error;

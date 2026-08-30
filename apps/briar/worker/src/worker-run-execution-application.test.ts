@@ -96,6 +96,31 @@ describe("Worker run execution application", () => {
     })).rejects.toThrow("structured blocked result");
   });
 
+  it.each([
+    `briar-channel-approved:${"f".repeat(64)}`,
+    `briar-channel-batch-approved:${"d".repeat(64)}`,
+    "briar-channel-proposal:legacy-channel",
+    `briar-conversation-approved:${"e".repeat(64)}`,
+    "briar-conversation-proposal:legacy-conversation",
+  ])("reserves proposal approval identity %s", async (sourceKey) => {
+    const recordEvent = vi.fn();
+    await expect(recordWorkerRunEventApplication({
+      db,
+      projectId,
+      principal: { kind: "agent" },
+      target: {
+        kind: "sourceIdentity",
+        source: "issue",
+        sourceKey,
+        title: "Preempted approval",
+      },
+      event: runningEvent({ status: "backlog", workflowStage: null }),
+    }, { recordEvent })).rejects.toThrow(
+      "Run identity is reserved for proposal approval",
+    );
+    expect(recordEvent).not.toHaveBeenCalled();
+  });
+
   it("records a claimed completion and its execution audit together", async () => {
     const recordEvent = vi.fn(async () => runId);
     const auditEvent = vi.fn();
