@@ -14,5 +14,9 @@ describe("Wrangler asset routing", () => {
     expect(runWorkerFirst).toContain('"/briar.worker.v1.*"');
     expect(runWorkerFirst).toContain('"/reply-attachment-uploads*"');
     expect(runWorkerFirst).not.toContain('"/issue-reply-claims*"');
+    expect(runWorkerFirst).not.toContain('"/channel-reply-claims*"');
+    expect(runWorkerFirst).not.toContain('"/worker-claims"');
+    expect(runWorkerFirst).not.toContain('"/agent-schedule-runs/claim"');
+    expect(runWorkerFirst).not.toContain('"/queue*"');
   });
 });
