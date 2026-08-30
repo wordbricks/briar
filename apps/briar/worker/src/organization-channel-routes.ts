@@ -1,29 +1,19 @@
 import { channelSlugFromName } from "../../src/lib/channels-contract";
-import type { BriarAuth } from "./auth";
-import { processArchiveCleanupQueue } from "./archive";
 import { hydrateAgentSkills } from "./agent-skills";
 import {
   loadChannelCatalogSnapshot,
 } from "./channel-proposal-helpers";
 import {
   requireChannelAccess,
-  requireChannelDeletionAccess,
-  requireChannelWriteAccess,
 } from "./channel-route-access";
 import {
-  decodeChannelInput,
-  decodeChannelMemberInput,
   decodeChannelReadInput,
-  decodeChannelUpdateInput,
   decodeDirectMessageInput,
 } from "./channel-route-decoders";
 import {
-  addChannelAgent,
-  addChannelMember,
   channelJson,
   channelReplyJson,
   createChannel,
-  deleteChannel,
   getChannel,
   getChannelSyncCursor,
   getDirectMessageByKey,
@@ -35,14 +25,10 @@ import {
   listChannels,
   loadChannelDelta,
   markChannelRead,
-  removeChannelAgent,
-  removeChannelMember,
-  updateChannel,
 } from "./channels";
-import { HttpError, json } from "./http-response";
+import { HttpError } from "./http-response";
 import { hasOrganizationCapability } from "./organization-access";
 import {
-  getOrganizationAgent,
   listOrganizationAgents,
   organizationAgentJson,
 } from "./organization-agents";
@@ -50,22 +36,7 @@ import {
   getOrganizationRole,
   listOrganizationMembers,
 } from "./organization-repository";
-import { responseWithPostCommitCleanup } from "./post-commit-cleanup";
-import { getProject } from "./project-command-repository";
 import { decodeMessageLimit } from "./query-contract";
-import { readJson } from "./request-readers";
-import { scheduleChannelActivityDisconnect } from "./realtime-scheduling";
-import { requireSession } from "./session-auth";
-
-export type OrganizationChannelRouteInput = {
-  request: Request;
-  url: URL;
-  auth: BriarAuth;
-  db: D1Database;
-  attachmentsBucket: R2Bucket;
-  env: Env;
-  context?: ExecutionContext;
-};
 
 type OrganizationChannelApplicationInput = {
   db: D1Database;
@@ -287,244 +258,4 @@ export async function markOrganizationChannelRead(
   );
   if (!updated) throw new HttpError(404, "Channel not found");
   return { channel: channelJson(updated) };
-}
-
-export async function handleOrganizationChannelRoute(
-  routeInput: OrganizationChannelRouteInput,
-): Promise<Response | undefined> {
-  const { request, url, auth, db, attachmentsBucket, env, context } =
-    routeInput;
-  const { pathname } = url;
-
-  const organizationChannelsMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels$/u,
-  );
-  if (organizationChannelsMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const organizationId = organizationChannelsMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!hasOrganizationCapability(role, "organization:read")) {
-      throw new HttpError(404, "Organization not found");
-    }
-    if (!hasOrganizationCapability(role, "conversations:write")) {
-      throw new HttpError(403, "Conversation editing permission required");
-    }
-    const input = decodeChannelInput(await readJson(request));
-    const channelId = crypto.randomUUID();
-    const slug = input.slug ?? channelSlugFromName(input.name, channelId);
-    if (input.defaultProjectId) {
-      const project = await getProject(
-        db,
-        input.defaultProjectId,
-        session.user.id,
-      );
-      if (!project) throw new HttpError(404, "Project not found");
-    }
-    let channel;
-    try {
-      channel = await createChannel(db, {
-        id: channelId,
-        organizationId,
-        slug,
-        name: input.name,
-        topic: input.topic,
-        visibility: input.visibility,
-        defaultProjectId: input.defaultProjectId,
-        createdByUserId: session.user.id,
-        createdAt: new Date().toISOString(),
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message.toLowerCase() : "";
-      if (message.includes("unique")) {
-        throw new HttpError(409, "Channel slug already exists");
-      }
-      throw error;
-    }
-    if (!channel) throw new HttpError(500, "Channel was not created");
-    return json({ channel: channelJson(channel) }, 201);
-  }
-
-  const organizationChannelMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)$/u,
-  );
-  if (organizationChannelMatch && request.method === "PATCH") {
-    const session = await requireSession(auth, request);
-    const currentChannel = await requireChannelWriteAccess(
-      db,
-      organizationChannelMatch[1],
-      organizationChannelMatch[2],
-      session.user.id,
-    );
-    const input = decodeChannelUpdateInput(await readJson(request));
-    if (
-      currentChannel.kind === "dm" &&
-      (input.visibility === "public" || input.defaultProjectId)
-    ) {
-      throw new HttpError(
-        400,
-        "Direct messages must remain private and organization-scoped",
-      );
-    }
-    if (input.defaultProjectId) {
-      const project = await getProject(
-        db,
-        input.defaultProjectId,
-        session.user.id,
-      );
-      if (!project) throw new HttpError(404, "Project not found");
-    }
-    const channel = await updateChannel(db, {
-      organizationId: organizationChannelMatch[1],
-      channelId: organizationChannelMatch[2],
-      userId: session.user.id,
-      ...input,
-      updatedAt: new Date().toISOString(),
-    });
-    if (!channel) throw new HttpError(404, "Channel not found");
-    scheduleChannelActivityDisconnect(
-      env,
-      organizationChannelMatch[1],
-      organizationChannelMatch[2],
-      context,
-    );
-    return json({ channel: channelJson(channel) });
-  }
-  if (organizationChannelMatch && request.method === "DELETE") {
-    const session = await requireSession(auth, request);
-    const organizationId = organizationChannelMatch[1];
-    await requireChannelDeletionAccess(
-      db,
-      organizationId,
-      organizationChannelMatch[2],
-      session.user.id,
-    );
-    const observedAt = new Date().toISOString();
-    const deleted = await deleteChannel(
-      db,
-      organizationId,
-      organizationChannelMatch[2],
-      session.user.id,
-      observedAt,
-    );
-    if (!deleted) throw new HttpError(404, "Channel not found");
-    scheduleChannelActivityDisconnect(
-      env,
-      organizationId,
-      organizationChannelMatch[2],
-      context,
-    );
-    return responseWithPostCommitCleanup(json({ deleted: true }), {
-      context,
-      operation: "channel_delete",
-      observedAt,
-      tasks: [{
-        queue: "archive",
-        run: () =>
-          processArchiveCleanupQueue(
-            db,
-            env.ARCHIVES,
-            attachmentsBucket,
-            observedAt,
-            1_000,
-          ),
-      }],
-    });
-  }
-
-  const channelMemberMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/members\/([0-9a-zA-Z-]+)$/u,
-  );
-  if (channelMemberMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    const channel = await requireChannelWriteAccess(
-      db,
-      channelMemberMatch[1],
-      channelMemberMatch[2],
-      session.user.id,
-    );
-    const input = decodeChannelMemberInput(await readJson(request));
-    const targetRole = await getOrganizationRole(
-      db,
-      channelMemberMatch[1],
-      channelMemberMatch[3],
-    );
-    if (!targetRole) throw new HttpError(404, "Organization member not found");
-    await addChannelMember(db, {
-      channelId: channel.id,
-      userId: channelMemberMatch[3],
-      role: input.role,
-      createdAt: new Date().toISOString(),
-    });
-    return json({ members: await listChannelMembers(db, channel.id) });
-  }
-  if (channelMemberMatch && request.method === "DELETE") {
-    const session = await requireSession(auth, request);
-    const channel = await requireChannelWriteAccess(
-      db,
-      channelMemberMatch[1],
-      channelMemberMatch[2],
-      session.user.id,
-    );
-    await removeChannelMember(db, channel.id, channelMemberMatch[3]);
-    scheduleChannelActivityDisconnect(
-      env,
-      channelMemberMatch[1],
-      channel.id,
-      context,
-    );
-    return json({ members: await listChannelMembers(db, channel.id) });
-  }
-
-  const channelAgentMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/agents\/([0-9a-f-]+)$/u,
-  );
-  if (channelAgentMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    const channel = await requireChannelWriteAccess(
-      db,
-      channelAgentMatch[1],
-      channelAgentMatch[2],
-      session.user.id,
-    );
-    const agent = await getOrganizationAgent(
-      db,
-      channelAgentMatch[1],
-      channelAgentMatch[3],
-    );
-    if (!agent) throw new HttpError(404, "Agent not found");
-    // Adding a project Agent exposes that project's context to the channel, so
-    // the member doing it must be able to reach the project themselves.
-    if (agent.project_id) {
-      const project = await getProject(db, agent.project_id, session.user.id);
-      if (!project) throw new HttpError(403, "Project access required");
-    }
-    await addChannelAgent(db, {
-      channelId: channel.id,
-      agentId: agent.id,
-      addedByUserId: session.user.id,
-      createdAt: new Date().toISOString(),
-    });
-    const agents = await hydrateAgentSkills(
-      db,
-      await listChannelAgents(db, channel.id),
-    );
-    return json({ agents: agents.map(organizationAgentJson) });
-  }
-  if (channelAgentMatch && request.method === "DELETE") {
-    const session = await requireSession(auth, request);
-    const channel = await requireChannelWriteAccess(
-      db,
-      channelAgentMatch[1],
-      channelAgentMatch[2],
-      session.user.id,
-    );
-    await removeChannelAgent(db, channel.id, channelAgentMatch[3]);
-    const agents = await hydrateAgentSkills(
-      db,
-      await listChannelAgents(db, channel.id),
-    );
-    return json({ agents: agents.map(organizationAgentJson) });
-  }
-
-  return undefined;
 }

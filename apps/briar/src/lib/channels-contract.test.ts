@@ -9,7 +9,6 @@ import {
   channelReplyContextMessageJson,
   channelReplyCompletionSchema,
   channelAgentSkillInputSchema,
-  channelWebhookInputSchema,
   organizationAgentInputSchema,
   type ChannelMessage,
 } from "./channels-contract";
@@ -224,8 +223,6 @@ describe("channel message contract", () => {
 
 describe("channel webhook contract", () => {
   it("trims bounded names and message fields without accepting extra input", () => {
-    expect(decode(channelWebhookInputSchema, { name: " Deploy notifier " }))
-      .toEqual({ name: "Deploy notifier" });
     expect(decode(channelIncomingWebhookMessageSchema, {
       text: " Deployment complete ",
       eventId: " deploy-42 ",

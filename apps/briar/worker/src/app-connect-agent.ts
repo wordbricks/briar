@@ -58,9 +58,9 @@ import {
   createOrganizationAgent,
   deleteOrganizationAgent,
   listOrganizationAgents,
-  organizationAgentJson,
   updateOrganizationAgent,
 } from "./organization-agents";
+import { appOrganizationAgent } from "./app-connect-agent-mappers";
 import {
   createProjectAgentApplication,
   deleteProjectAgentApplication,
@@ -618,29 +618,6 @@ const toProjectAgent = (row: Parameters<typeof projectAgentJson>[0]) => {
   };
 };
 
-const toOrganizationAgent = (
-  row: Awaited<ReturnType<typeof listOrganizationAgents>>[number],
-) => {
-  const agent = organizationAgentJson(row);
-  return {
-    agentId: agent.agentId,
-    name: agent.name,
-    avatar: agent.avatar ?? undefined,
-    provider: agentProvider[agent.provider],
-    model: agent.model ?? undefined,
-    effort: agent.effort ?? undefined,
-    projectId: agent.projectId ?? undefined,
-    projectName: agent.projectName ?? undefined,
-    description: agent.description || undefined,
-    responsibility: agent.responsibility,
-    skills: agent.skills.map(toSkill),
-    createdAt: requiredTimestamp(
-      agent.createdAt,
-      "Organization Agent creation",
-    ),
-  };
-};
-
 const scheduleRecurrence = {
   daily: ProtoProjectAgentScheduleRecurrence.DAILY,
   weekdays: ProtoProjectAgentScheduleRecurrence.WEEKDAYS,
@@ -1056,7 +1033,7 @@ export const createAppAgentService = (
         createdAt: new Date().toISOString(),
       });
       if (!agent) throw new HttpError(500, "Agent was not created");
-      return { agent: toOrganizationAgent(agent) };
+      return { agent: appOrganizationAgent(agent) };
     }),
 
   updateOrganizationAgent: (input) =>
@@ -1085,7 +1062,7 @@ export const createAppAgentService = (
         updatedAt: new Date().toISOString(),
       });
       if (!agent) throw new HttpError(404, "Organization agent not found");
-      return { agent: toOrganizationAgent(agent) };
+      return { agent: appOrganizationAgent(agent) };
     }),
 
   deleteOrganizationAgent: (input) =>
@@ -1123,7 +1100,7 @@ export const createAppAgentService = (
       }
       return {
         agents: (await listOrganizationAgents(db, organizationId)).map(
-          toOrganizationAgent,
+          appOrganizationAgent,
         ),
         canManage: hasOrganizationCapability(role, "development:manage"),
       };

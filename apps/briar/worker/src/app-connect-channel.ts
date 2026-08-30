@@ -14,6 +14,7 @@ import {
   AcceptChannelSkillExecutionProposalResponseSchema,
   ChannelIssueBatchResultItemSchema,
   ChannelService,
+  ChannelVisibility as ProtoChannelVisibility,
   DeclineChannelProposalResponse_Outcome,
   DeclineChannelProposalResponseSchema,
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
@@ -37,6 +38,14 @@ import {
 } from "@connectrpc/connect";
 import * as Predicate from "effect/Predicate";
 import type { BriarAuth } from "./auth";
+import { processArchiveCleanupQueue } from "./archive";
+import {
+  createChannelApplication,
+  deleteChannelApplication,
+  setChannelAgentApplication,
+  setChannelMemberApplication,
+  updateChannelApplication,
+} from "./channel-administration-application";
 import {
   createOrganizationChannelMessage,
   decodeChannelMessageApplicationInput,
@@ -58,6 +67,21 @@ import {
   markOrganizationChannelRead,
   syncOrganizationChannels,
 } from "./organization-channel-routes";
+import {
+  createChannelWebhookApplication,
+  listChannelWebhooksApplication,
+  revokeChannelWebhookApplication,
+  rotateChannelWebhookApplication,
+  updateChannelWebhookApplication,
+} from "./channel-webhook-application";
+import {
+  channelNameSchema,
+  channelSlugSchema,
+  channelTopicSchema,
+  channelUserIdSchema,
+  channelWebhookNameSchema,
+  type ChannelVisibility,
+} from "../../src/lib/channels-contract";
 import { hasOrganizationCapability } from "./organization-access";
 import {
   getOrganizationRole,
@@ -65,10 +89,10 @@ import {
 } from "./organization-repository";
 import {
   listOrganizationAgents,
-  organizationAgentJson,
 } from "./organization-agents";
 import {
   scheduleChannelRealtimePublish,
+  scheduleChannelActivityDisconnect,
   scheduleProjectAgentSessionRealtimePublish,
   scheduleProjectRealtimePublish,
 } from "./realtime-scheduling";
@@ -77,6 +101,13 @@ import { UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
 import { toConnectError } from "./app-connect-errors";
 import { appOrganizationMember } from "./app-connect-mappers";
+import { appOrganizationAgent } from "./app-connect-agent-mappers";
+import {
+  appChannelMember,
+  appChannelSummary,
+  appChannelWebhook,
+} from "./app-connect-channel-mappers";
+import { schedulePostCommitCleanup } from "./post-commit-cleanup";
 
 export type AppConnectChannelInput = {
   readonly request: Request;
@@ -94,6 +125,16 @@ export type AppConnectChannelServices = {
   readonly acceptSkillExecutionProposal:
     typeof acceptOrganizationChannelSkillExecutionProposal;
   readonly createDirectMessage: typeof createOrganizationDirectMessage;
+  readonly createChannel: typeof createChannelApplication;
+  readonly updateChannel: typeof updateChannelApplication;
+  readonly deleteChannel: typeof deleteChannelApplication;
+  readonly setChannelAgent: typeof setChannelAgentApplication;
+  readonly setChannelMember: typeof setChannelMemberApplication;
+  readonly listChannelWebhooks: typeof listChannelWebhooksApplication;
+  readonly createChannelWebhook: typeof createChannelWebhookApplication;
+  readonly updateChannelWebhook: typeof updateChannelWebhookApplication;
+  readonly rotateChannelWebhook: typeof rotateChannelWebhookApplication;
+  readonly revokeChannelWebhook: typeof revokeChannelWebhookApplication;
   readonly createMessage: typeof createOrganizationChannelMessage;
   readonly declineProposal: typeof declineOrganizationChannelProposal;
   readonly deleteMessage: typeof deleteOrganizationChannelMessage;
@@ -113,6 +154,16 @@ export const appConnectChannelServices: AppConnectChannelServices = {
   acceptProposal: acceptOrganizationChannelProposal,
   acceptSkillExecutionProposal: acceptOrganizationChannelSkillExecutionProposal,
   createDirectMessage: createOrganizationDirectMessage,
+  createChannel: createChannelApplication,
+  updateChannel: updateChannelApplication,
+  deleteChannel: deleteChannelApplication,
+  setChannelAgent: setChannelAgentApplication,
+  setChannelMember: setChannelMemberApplication,
+  listChannelWebhooks: listChannelWebhooksApplication,
+  createChannelWebhook: createChannelWebhookApplication,
+  updateChannelWebhook: updateChannelWebhookApplication,
+  rotateChannelWebhook: rotateChannelWebhookApplication,
+  revokeChannelWebhook: revokeChannelWebhookApplication,
   createMessage: createOrganizationChannelMessage,
   declineProposal: declineOrganizationChannelProposal,
   deleteMessage: deleteOrganizationChannelMessage,
@@ -128,6 +179,41 @@ export const appConnectChannelServices: AppConnectChannelServices = {
 
 const decodeUuid = decodeRequestSync(UuidString);
 const canonicalUuid = (value: string) => decodeUuid(value).toLowerCase();
+const decodeChannelName = decodeRequestSync(channelNameSchema);
+const decodeChannelSlug = decodeRequestSync(channelSlugSchema);
+const decodeChannelTopic = decodeRequestSync(channelTopicSchema);
+const decodeChannelUserId = decodeRequestSync(channelUserIdSchema);
+const decodeChannelWebhookName = decodeRequestSync(channelWebhookNameSchema);
+
+const domainChannelVisibility = (
+  value: ProtoChannelVisibility | undefined,
+  fallback?: ChannelVisibility,
+): ChannelVisibility | undefined => {
+  switch (value) {
+    case undefined:
+      return fallback;
+    case ProtoChannelVisibility.PUBLIC:
+      return "public";
+    case ProtoChannelVisibility.PRIVATE:
+      return "private";
+    case ProtoChannelVisibility.UNSPECIFIED:
+    default:
+      throw new ConnectError("visibility is invalid", Code.InvalidArgument);
+  }
+};
+
+const domainMembershipChange = (
+  value: { readonly case: "add" | "remove" | undefined },
+) => {
+  switch (value.case) {
+    case "add":
+      return { case: "add" } as const;
+    case "remove":
+      return { case: "remove" } as const;
+    case undefined:
+      throw new ConnectError("membership change is required", Code.InvalidArgument);
+  }
+};
 
 const rpc = async <A>(operation: () => Promise<A>): Promise<A> => {
   try {
@@ -427,13 +513,10 @@ const createAppChannelService = (
       listOrganizationMembers(input.db, organizationId),
       listOrganizationAgents(input.db, organizationId),
     ]);
-    return responseMessage(
-      ChannelService.method.listDirectMessageRecipients.output,
-      {
-        members: members.map((member) => appOrganizationMember(member)),
-        agents: agents.map(organizationAgentJson),
-      },
-    );
+    return create(ChannelService.method.listDirectMessageRecipients.output, {
+      members: members.map((member) => appOrganizationMember(member)),
+      agents: agents.map(appOrganizationAgent),
+    });
   }),
 
   createDirectMessage: (request) => rpc(async () => {
@@ -446,6 +529,244 @@ const createAppChannelService = (
     });
     scheduleChannelMutation(input, request.organizationId);
     return responseMessage(ChannelService.method.createDirectMessage.output, result);
+  }),
+
+  createChannel: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const organizationId = canonicalUuid(request.organizationId);
+    const channel = await services.createChannel({
+      db: input.db,
+      organizationId,
+      userId: session.user.id,
+      command: {
+        name: decodeChannelName(request.name),
+        slug: request.slug === undefined
+          ? undefined
+          : decodeChannelSlug(request.slug),
+        topic: request.topic === undefined
+          ? null
+          : decodeChannelTopic(request.topic),
+        visibility: domainChannelVisibility(request.visibility, "public") ??
+          "public",
+        defaultProjectId: request.defaultProjectId === undefined
+          ? null
+          : canonicalUuid(request.defaultProjectId),
+      },
+    });
+    scheduleChannelMutation(input, organizationId);
+    return create(ChannelService.method.createChannel.output, {
+      channel: appChannelSummary(channel),
+    });
+  }),
+
+  updateChannel: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const organizationId = canonicalUuid(request.organizationId);
+    const channelId = canonicalUuid(request.channelId);
+    const topic = request.topicUpdate.case === "topic"
+      ? decodeChannelTopic(request.topicUpdate.value)
+      : request.topicUpdate.case === "clearTopic"
+      ? null
+      : undefined;
+    const defaultProjectId = request.defaultProjectUpdate.case ===
+        "defaultProjectId"
+      ? canonicalUuid(request.defaultProjectUpdate.value)
+      : request.defaultProjectUpdate.case === "clearDefaultProject"
+      ? null
+      : undefined;
+    const channel = await services.updateChannel({
+      db: input.db,
+      organizationId,
+      channelId,
+      userId: session.user.id,
+      command: {
+        name: request.name === undefined
+          ? undefined
+          : decodeChannelName(request.name),
+        topic,
+        visibility: domainChannelVisibility(request.visibility),
+        defaultProjectId,
+        archived: request.archived,
+      },
+    });
+    scheduleChannelMutation(input, organizationId);
+    scheduleChannelActivityDisconnect(
+      input.env,
+      organizationId,
+      channelId,
+      input.context,
+    );
+    return create(ChannelService.method.updateChannel.output, {
+      channel: appChannelSummary(channel),
+    });
+  }),
+
+  deleteChannel: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const organizationId = canonicalUuid(request.organizationId);
+    const channelId = canonicalUuid(request.channelId);
+    const result = await services.deleteChannel({
+      db: input.db,
+      organizationId,
+      channelId,
+      userId: session.user.id,
+    });
+    void schedulePostCommitCleanup({
+      context: input.context,
+      operation: "channel_delete",
+      observedAt: result.observedAt,
+      tasks: [{
+        queue: "archive",
+        run: () =>
+          processArchiveCleanupQueue(
+            input.db,
+            input.env.ARCHIVES,
+            input.attachmentsBucket,
+            result.observedAt,
+            1_000,
+          ),
+      }],
+    });
+    scheduleChannelMutation(input, organizationId);
+    scheduleChannelActivityDisconnect(
+      input.env,
+      organizationId,
+      channelId,
+      input.context,
+    );
+    return create(ChannelService.method.deleteChannel.output, { deleted: true });
+  }),
+
+  setChannelAgent: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const organizationId = canonicalUuid(request.organizationId);
+    const channelId = canonicalUuid(request.channelId);
+    const change = domainMembershipChange(request.membership);
+    const agents = await services.setChannelAgent({
+      db: input.db,
+      organizationId,
+      channelId,
+      userId: session.user.id,
+      agentId: canonicalUuid(request.agentId),
+      change,
+    });
+    scheduleChannelMutation(input, organizationId);
+    if (change.case === "remove") {
+      scheduleChannelActivityDisconnect(
+        input.env,
+        organizationId,
+        channelId,
+        input.context,
+      );
+    }
+    return create(ChannelService.method.setChannelAgent.output, {
+      agents: agents.map(appOrganizationAgent),
+    });
+  }),
+
+  setChannelMember: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const organizationId = canonicalUuid(request.organizationId);
+    const channelId = canonicalUuid(request.channelId);
+    const change = domainMembershipChange(request.membership);
+    const members = await services.setChannelMember({
+      db: input.db,
+      organizationId,
+      channelId,
+      userId: session.user.id,
+      targetUserId: decodeChannelUserId(request.userId),
+      change,
+    });
+    scheduleChannelMutation(input, organizationId);
+    if (change.case === "remove") {
+      scheduleChannelActivityDisconnect(
+        input.env,
+        organizationId,
+        channelId,
+        input.context,
+      );
+    }
+    return create(ChannelService.method.setChannelMember.output, {
+      members: members.map(appChannelMember),
+    });
+  }),
+
+  listChannelWebhooks: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const webhooks = await services.listChannelWebhooks({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      userId: session.user.id,
+    });
+    return create(ChannelService.method.listChannelWebhooks.output, {
+      webhooks: webhooks.map(appChannelWebhook),
+    });
+  }),
+
+  createChannelWebhook: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.createChannelWebhook({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      userId: session.user.id,
+      name: decodeChannelWebhookName(request.name),
+    });
+    return create(ChannelService.method.createChannelWebhook.output, {
+      webhook: appChannelWebhook(result.webhook),
+      url: new URL(
+        `/hooks/channels/${result.webhook.id}/${result.secret}`,
+        input.request.url,
+      ).toString(),
+    });
+  }),
+
+  updateChannelWebhook: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const webhook = await services.updateChannelWebhook({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      webhookId: canonicalUuid(request.webhookId),
+      userId: session.user.id,
+      name: decodeChannelWebhookName(request.name),
+    });
+    return create(ChannelService.method.updateChannelWebhook.output, {
+      webhook: appChannelWebhook(webhook),
+    });
+  }),
+
+  rotateChannelWebhook: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.rotateChannelWebhook({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      webhookId: canonicalUuid(request.webhookId),
+      userId: session.user.id,
+    });
+    return create(ChannelService.method.rotateChannelWebhook.output, {
+      webhook: appChannelWebhook(result.webhook),
+      url: new URL(
+        `/hooks/channels/${result.webhook.id}/${result.secret}`,
+        input.request.url,
+      ).toString(),
+    });
+  }),
+
+  revokeChannelWebhook: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const webhook = await services.revokeChannelWebhook({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      webhookId: canonicalUuid(request.webhookId),
+      userId: session.user.id,
+    });
+    return create(ChannelService.method.revokeChannelWebhook.output, {
+      webhook: appChannelWebhook(webhook),
+    });
   }),
 
   getChannel: (request) => rpc(async () => {

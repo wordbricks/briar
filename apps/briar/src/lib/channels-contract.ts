@@ -127,6 +127,10 @@ export const channelMessageBodySchema = Schema.Trim.check(
 export const channelWebhookNameSchema = Schema.Trim.check(
   Schema.isLengthBetween(1, 100),
 );
+/** Better Auth user IDs are opaque rather than UUIDs. */
+export const channelUserIdSchema = Schema.String.check(
+  Schema.isLengthBetween(1, 64),
+);
 
 const channelBlockIdSchema = Schema.optional(
   Schema.String.check(Schema.isLengthBetween(1, 255)),
@@ -421,18 +425,10 @@ const canonicalUuidSchema = Uuid.pipe(
   }),
 );
 
-export const channelInputSchema = strict(Schema.Struct({
-  name: channelNameSchema,
-  slug: Schema.optional(channelSlugSchema),
-  topic: nullableDefault(channelTopicSchema),
-  visibility: defaulted(Schema.Literals(channelVisibilities), "public"),
-  defaultProjectId: nullableDefault(Uuid),
-}));
-
 export const directMessageInputSchema = strict(Schema.Struct({
   memberIds: defaultedWith(
     mutableArray(
-      Schema.String.check(Schema.isLengthBetween(1, 64)),
+      channelUserIdSchema,
     ).check(Schema.isMaxLength(20)),
     () => [],
   ),
@@ -451,14 +447,6 @@ export const directMessageInputSchema = strict(Schema.Struct({
   ),
 );
 
-export const channelUpdateInputSchema = strict(Schema.Struct({
-  name: Schema.optional(channelNameSchema),
-  topic: Schema.optional(Schema.NullOr(channelTopicSchema)),
-  visibility: Schema.optional(Schema.Literals(channelVisibilities)),
-  defaultProjectId: Schema.optional(Schema.NullOr(Uuid)),
-  archived: Schema.optional(Schema.Boolean),
-}));
-
 export const channelMessageInputSchema = strict(Schema.Struct({
   body: channelMessageBodySchema,
   clientMessageId: Schema.optional(canonicalUuidSchema),
@@ -475,10 +463,6 @@ export const channelMessageInputSchema = strict(Schema.Struct({
     () => [],
   ),
   preferredDeviceId: nullableDefault(canonicalUuidSchema),
-}));
-
-export const channelWebhookInputSchema = strict(Schema.Struct({
-  name: channelWebhookNameSchema,
 }));
 
 export const channelIncomingWebhookMessageSchema = strict(Schema.Struct({
@@ -541,10 +525,6 @@ export const organizationAgentInputSchema = strict(Schema.Struct({
       Schema.isMaxLength(agentSkillsMaxCount),
     ),
   ),
-}));
-
-export const channelMemberInputSchema = strict(Schema.Struct({
-  role: defaulted(Schema.Literals(["owner", "member"]), "member"),
 }));
 
 export const channelExecutionProposalAcceptInputSchema = strict(Schema.Struct({

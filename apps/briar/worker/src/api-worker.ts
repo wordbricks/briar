@@ -15,9 +15,7 @@ import { handleIssueReplyWorkerRoute } from "./issue-reply-worker-routes";
 import { handleChannelMessageRoute } from "./channel-message-routes";
 import { handleChannelOrganizationContextRoute } from "./channel-organization-context-routes";
 import { handleChannelReplyResultRoute } from "./channel-reply-result-routes";
-import { handleChannelWebhookManagementRoute } from "./channel-webhook-management-routes";
 import { handleManagedComputerRoute } from "./managed-computer-routes";
-import { handleOrganizationChannelRoute } from "./organization-channel-routes";
 import { handleOrganizationWorkerRoute } from "./organization-worker-routes";
 import { handleOrganizationUsageRoute } from "./organization-usage-routes";
 import { handleProjectAgentRoute } from "./project-agent-routes";
@@ -213,30 +211,6 @@ async function route(
     context,
   });
   if (channelMessageResponse !== undefined) return channelMessageResponse;
-
-  const organizationChannelResponse = await handleOrganizationChannelRoute({
-    request,
-    url,
-    auth,
-    db,
-    attachmentsBucket,
-    env,
-    context,
-  });
-  if (organizationChannelResponse !== undefined) {
-    return organizationChannelResponse;
-  }
-
-  const channelWebhookManagementResponse =
-    await handleChannelWebhookManagementRoute({
-      request,
-      url,
-      auth,
-      db,
-    });
-  if (channelWebhookManagementResponse !== undefined) {
-    return channelWebhookManagementResponse;
-  }
 
   const organizationWorkerResponse = await handleOrganizationWorkerRoute({
     request,

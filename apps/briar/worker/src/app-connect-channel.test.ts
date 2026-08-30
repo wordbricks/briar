@@ -346,4 +346,208 @@ describe("app Channel Connect adapter", () => {
       ],
     });
   });
+
+  it("normalizes channel writes and rejects explicit unspecified visibility", async () => {
+    const createChannel = vi.fn<AppConnectChannelServices["createChannel"]>();
+    applicationMocks.requireSession.mockResolvedValue({
+      session: {
+        id: "session-channel-write",
+        userId,
+        token: "session-token",
+        expiresAt: new Date("2027-08-30T00:00:00.000Z"),
+        createdAt: new Date("2026-08-30T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+      },
+      user: {
+        id: userId,
+        name: "Owner",
+        email: "owner@example.com",
+        emailVerified: true,
+        createdAt: new Date("2026-08-30T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+      },
+    });
+    createChannel.mockResolvedValue({
+      id: channelId,
+      organization_id: organizationId,
+      kind: "channel",
+      dm_key: null,
+      slug: "release-notes",
+      name: "Release Notes",
+      topic: "Shipping",
+      visibility: "public",
+      default_project_id: null,
+      archived_at: null,
+      member_count: 1,
+      agent_count: 0,
+      created_by_user_id: userId,
+      created_at: "2026-08-30T01:02:03.000Z",
+      updated_at: "2026-08-30T01:02:03.000Z",
+      last_message_at: null,
+      last_message_preview: null,
+      dm_participants_json: null,
+      last_read_at: null,
+      last_unread_message_at: null,
+    });
+    const requestFor = (
+      visibility?: string,
+      name = "  Release Notes  ",
+    ) =>
+      new Request(
+        "https://api.example.test/briar.app.v1.ChannelService/CreateChannel",
+        {
+          method: "POST",
+          headers: {
+            authorization: "Bearer session-token",
+            "connect-protocol-version": "1",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            organizationId,
+            name,
+            slug: "  RELEASE-NOTES  ",
+            topic: "  Shipping  ",
+            ...(visibility ? { visibility } : {}),
+          }),
+        },
+      );
+    const router = createConnectRouter({
+      connect: true,
+      grpc: false,
+      grpcWeb: false,
+    });
+    registerAppChannelService(
+      router,
+      {
+        request: requestFor(),
+        auth: {} as BriarAuth,
+        db: {} as D1Database,
+        attachmentsBucket: {} as R2Bucket,
+        env: {} as Env,
+      },
+      {
+        ...appConnectChannelServices,
+        createChannel,
+        requireSession: applicationMocks.requireSession,
+      },
+    );
+    const handler = router.handlers.find((candidate) =>
+      candidate.requestPath === "/briar.app.v1.ChannelService/CreateChannel"
+    )!;
+
+    const response = await createFetchHandler(handler)(requestFor());
+    expect(response.status, await response.clone().text()).toBe(200);
+    expect(createChannel).toHaveBeenCalledWith({
+      db: {},
+      organizationId,
+      userId,
+      command: {
+        name: "Release Notes",
+        slug: "release-notes",
+        topic: "Shipping",
+        visibility: "public",
+        defaultProjectId: null,
+      },
+    });
+    expect(await response.json()).toMatchObject({
+      channel: {
+        id: channelId,
+        visibility: "CHANNEL_VISIBILITY_PUBLIC",
+      },
+    });
+
+    createChannel.mockClear();
+    const invalid = await createFetchHandler(handler)(
+      requestFor("CHANNEL_VISIBILITY_UNSPECIFIED"),
+    );
+    expect(invalid.status).toBe(400);
+    expect(createChannel).not.toHaveBeenCalled();
+
+    const invalidName = await createFetchHandler(handler)(
+      requestFor(undefined, "   "),
+    );
+    expect(invalidName.status).toBe(400);
+    expect(createChannel).not.toHaveBeenCalled();
+  });
+
+  it("keeps opaque user IDs while enforcing the membership oneof", async () => {
+    const setChannelMember = vi.fn<
+      AppConnectChannelServices["setChannelMember"]
+    >().mockResolvedValue([]);
+    applicationMocks.requireSession.mockResolvedValue({
+      session: {
+        id: "session-member-write",
+        userId: "owner",
+        token: "session-token",
+        expiresAt: new Date("2027-08-30T00:00:00.000Z"),
+        createdAt: new Date("2026-08-30T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+      },
+      user: {
+        id: "owner",
+        name: "Owner",
+        email: "owner@example.com",
+        emailVerified: true,
+        createdAt: new Date("2026-08-30T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+      },
+    });
+    const requestFor = (addMembership: boolean) =>
+      new Request(
+        "https://api.example.test/briar.app.v1.ChannelService/SetChannelMember",
+        {
+          method: "POST",
+          headers: {
+            authorization: "Bearer session-token",
+            "connect-protocol-version": "1",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            organizationId,
+            channelId,
+            userId: "target-member",
+            ...(addMembership ? { add: {} } : {}),
+          }),
+        },
+      );
+    const router = createConnectRouter({
+      connect: true,
+      grpc: false,
+      grpcWeb: false,
+    });
+    registerAppChannelService(
+      router,
+      {
+        request: requestFor(true),
+        auth: {} as BriarAuth,
+        db: {} as D1Database,
+        attachmentsBucket: {} as R2Bucket,
+        env: {} as Env,
+      },
+      {
+        ...appConnectChannelServices,
+        requireSession: applicationMocks.requireSession,
+        setChannelMember,
+      },
+    );
+    const handler = router.handlers.find((candidate) =>
+      candidate.requestPath === "/briar.app.v1.ChannelService/SetChannelMember"
+    )!;
+
+    const response = await createFetchHandler(handler)(requestFor(true));
+    expect(response.status, await response.clone().text()).toBe(200);
+    expect(setChannelMember).toHaveBeenCalledWith({
+      db: {},
+      organizationId,
+      channelId,
+      userId: "owner",
+      targetUserId: "target-member",
+      change: { case: "add" },
+    });
+
+    setChannelMember.mockClear();
+    const missing = await createFetchHandler(handler)(requestFor(false));
+    expect(missing.status).toBe(400);
+    expect(setChannelMember).not.toHaveBeenCalled();
+  });
 });
