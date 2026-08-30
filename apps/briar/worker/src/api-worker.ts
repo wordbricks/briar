@@ -18,7 +18,6 @@ import { handleManagedComputerRoute } from "./managed-computer-routes";
 import { handleProjectAgentRoute } from "./project-agent-routes";
 import { handleProjectAgentTaskWorkerRoute } from "./project-agent-task-worker-routes";
 import { handleProjectGithubRoute } from "./project-github-routes";
-import { handleProjectLinearRoute } from "./project-linear-routes";
 import { handlePublicRoute } from "./public-routes";
 import { handleIncomingChannelWebhookRoute } from "./incoming-channel-webhook";
 import { handleRealtimeRoute } from "./realtime-routes";
@@ -221,14 +220,6 @@ async function route(
     attachmentsBucket,
   });
   if (projectAgentResponse !== undefined) return projectAgentResponse;
-
-  const projectLinearResponse = await handleProjectLinearRoute({
-    request,
-    url,
-    auth,
-    db,
-  });
-  if (projectLinearResponse !== undefined) return projectLinearResponse;
 
   const issueConversationResponse = await handleIssueConversationRoute({
     request,

@@ -108,29 +108,6 @@ export const ExecutionPreferences = strictSchema(Schema.Struct({
   }),
 ));
 
-export const LinearApiKeyInput = strictSchema(Schema.Struct({
-  apiKey: trimmedText(10, 500),
-}));
-
-export const LinearStatesInput = strictSchema(Schema.Struct({
-  apiKey: trimmedText(10, 500),
-  teamIds: mutableArray(trimmedText(1, 100)).check(
-    Schema.isLengthBetween(1, 50),
-  ),
-}));
-
-export const LinearImportInput = strictSchema(Schema.Struct({
-  apiKey: trimmedText(10, 500),
-  teamIds: mutableArray(trimmedText(1, 100)).check(
-    Schema.isLengthBetween(1, 50),
-  ),
-  statusMapping: Schema.Record(trimmedText(1, 100), trimmedText(1, 100)).check(
-    Schema.makeFilter((value) =>
-      Object.keys(value).length > 0 ? undefined : "statusMapping is required"
-    ),
-  ),
-}));
-
 const CanonicalUuid = UuidString.pipe(
   Schema.decode({
     decode: SchemaGetter.transform((value) => value.toLowerCase()),
@@ -283,9 +260,6 @@ export const decodeIssueUpdateInput = decodeRequestSync(IssueUpdateInput);
 export const decodeExecutionPreferences = decodeRequestSync(
   ExecutionPreferences,
 );
-export const decodeLinearApiKeyInput = decodeRequestSync(LinearApiKeyInput);
-export const decodeLinearStatesInput = decodeRequestSync(LinearStatesInput);
-export const decodeLinearImportInput = decodeRequestSync(LinearImportInput);
 export const decodeIssueMessageInput = decodeRequestSync(IssueMessageInput);
 export const decodeIssueMessageEditInput = decodeRequestSync(
   IssueMessageEditInput,
