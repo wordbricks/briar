@@ -1,4 +1,6 @@
+import BriarContracts
 import Foundation
+import SwiftProtobuf
 import UIKit
 import UserNotifications
 
@@ -13,12 +15,73 @@ struct RemotePushNotificationTarget: Codable, Equatable, Sendable {
     let channelMessageId: UUID?
     let rootMessageId: UUID?
 
+    init(protobuf message: BriarAPI_MobilePushNotificationTarget) throws {
+        guard !message.inboxMessageID.isEmpty,
+              !message.inboxMessageVersion.isEmpty,
+              !message.notificationID.isEmpty,
+              let projectID = UUID(uuidString: message.projectID),
+              !message.targetID.isEmpty,
+              let destination = message.destination
+        else { throw MobileAPIError.invalidResponse }
+
+        let kind: InboxMessageKind
+        let conversationMessageID: UUID?
+        let channelMessageID: UUID?
+        let rootMessageID: UUID?
+        switch destination {
+        case .issue:
+            guard UUID(uuidString: message.targetID) != nil else {
+                throw MobileAPIError.invalidResponse
+            }
+            kind = .issue
+            conversationMessageID = nil
+            channelMessageID = nil
+            rootMessageID = nil
+        case .conversation(let conversation):
+            guard UUID(uuidString: message.targetID) != nil,
+                  let messageID = UUID(uuidString: conversation.conversationMessageID)
+            else {
+                throw MobileAPIError.invalidResponse
+            }
+            kind = .conversation
+            conversationMessageID = messageID
+            channelMessageID = nil
+            rootMessageID = nil
+        case .channel(let channel):
+            guard UUID(uuidString: message.targetID) != nil,
+                  let messageID = UUID(uuidString: channel.channelMessageID),
+                  let rootID = UUID(uuidString: channel.rootMessageID)
+            else { throw MobileAPIError.invalidResponse }
+            kind = .channel
+            conversationMessageID = nil
+            channelMessageID = messageID
+            rootMessageID = rootID
+        case .session:
+            kind = .session
+            conversationMessageID = nil
+            channelMessageID = nil
+            rootMessageID = nil
+        }
+
+        messageId = message.inboxMessageID
+        messageVersion = message.inboxMessageVersion
+        notificationId = message.notificationID
+        projectId = projectID
+        targetId = message.targetID
+        self.kind = kind
+        conversationMessageId = conversationMessageID
+        channelMessageId = channelMessageID
+        rootMessageId = rootMessageID
+    }
+
     static func parse(userInfo: [AnyHashable: Any]) -> RemotePushNotificationTarget? {
-        guard let raw = userInfo["briarInboxTarget"] else { return nil }
-        guard JSONSerialization.isValidJSONObject(raw),
-              let data = try? JSONSerialization.data(withJSONObject: raw)
+        guard let encoded = userInfo["briarInboxTargetProto"] as? String,
+              let data = Data(base64Encoded: encoded),
+              let message = try? BriarAPI_MobilePushNotificationTarget(
+                  serializedBytes: data
+              )
         else { return nil }
-        return try? JSONDecoder().decode(Self.self, from: data)
+        return try? Self(protobuf: message)
     }
 }
 
@@ -148,39 +211,22 @@ final class InboxPushAppDelegate: NSObject, UIApplicationDelegate,
     }
 }
 
-private struct MobilePushPreferencesRequest: Encodable, Sendable {
-    let playSound: Bool
-    let urgent: Bool
-    let actionRequired: Bool
-    let important: Bool
-    let activity: Bool
-}
-
-private struct MobilePushRegistrationRequest: Encodable, Sendable {
-    let platform: String
-    let token: String
-    let environment: String
-    let topic: String
-    let locale: String
-    let preferences: MobilePushPreferencesRequest
-}
-
-private struct MobilePushRegistrationDeleteRequest: Encodable, Sendable {
-    let platform: String
-    let token: String
-}
-
 @MainActor
 final class RemotePushRegistrationService: ObservableObject {
-    private let api: any MobileAPIClientProtocol
+    private let api: any MobileHTTPClientProtocol
+    private let accountService: (any BriarAPI_AccountServiceClientInterface)?
     private var syncTask: Task<Void, Never>?
     private var sessionToken: String?
     private var preferences = InboxNotificationPreferences()
     private var locale = CompanionLocale.ko
     private var lastPayload: Data?
 
-    init(api: any MobileAPIClientProtocol) {
+    init(
+        api: any MobileHTTPClientProtocol,
+        accountService: (any BriarAPI_AccountServiceClientInterface)? = nil
+    ) {
         self.api = api
+        self.accountService = accountService
     }
 
     func configure(
@@ -188,6 +234,9 @@ final class RemotePushRegistrationService: ObservableObject {
         preferences: InboxNotificationPreferences,
         locale: CompanionLocale
     ) {
+        if self.sessionToken != sessionToken {
+            lastPayload = nil
+        }
         self.sessionToken = sessionToken
         self.preferences = preferences
         self.locale = locale
@@ -200,59 +249,92 @@ final class RemotePushRegistrationService: ObservableObject {
     }
 
     func unregister(sessionToken: String?) async {
-        guard let sessionToken, let deviceToken = RemotePushNotificationBridge.token else {
+        let pendingSync = syncTask
+        syncTask = nil
+        pendingSync?.cancel()
+        await pendingSync?.value
+        lastPayload = nil
+        guard let sessionToken,
+              let deviceToken = RemotePushNotificationBridge.token,
+              let endpoint = Self.apnsEndpoint
+        else {
             return
         }
-        try? await api.sendVoid(
-            MobileAPIContract.Endpoint.pushRegistration,
-            method: "DELETE",
-            token: sessionToken,
-            body: MobilePushRegistrationDeleteRequest(
-                platform: "apns",
-                token: deviceToken
+        do {
+            let account = try account(for: sessionToken)
+            var request = BriarAPI_UnregisterMobilePushDeviceRequest()
+            request.endpoint = endpoint
+            request.token = deviceToken
+            let response = await account.unregisterMobilePushDevice(
+                request: request,
+                headers: [:]
             )
-        )
-        lastPayload = nil
+            _ = try response.briarValue()
+        } catch {
+            // Signing out remains local even if best-effort device cleanup fails.
+        }
     }
 
     private func synchronize() {
         syncTask?.cancel()
         guard let sessionToken,
               let deviceToken = RemotePushNotificationBridge.token,
-              let topic = Bundle.main.bundleIdentifier
+              let endpoint = Self.apnsEndpoint,
+              let account = try? account(for: sessionToken)
         else { return }
-        let request = MobilePushRegistrationRequest(
-            platform: "apns",
-            token: deviceToken,
-            environment: Bundle.main.object(
-                forInfoDictionaryKey: "BriarAPNSEnvironment"
-            ) as? String ?? "development",
-            topic: topic,
-            locale: locale.rawValue,
-            preferences: MobilePushPreferencesRequest(
-                playSound: preferences.playSound,
-                urgent: preferences.urgent,
-                actionRequired: preferences.actionRequired,
-                important: preferences.important,
-                activity: preferences.activity
-            )
-        )
-        guard let payload = try? JSONEncoder().encode(request), payload != lastPayload else {
+        var pushPreferences = BriarAPI_MobilePushPreferences()
+        pushPreferences.playSound = preferences.playSound
+        pushPreferences.urgent = preferences.urgent
+        pushPreferences.actionRequired = preferences.actionRequired
+        pushPreferences.important = preferences.important
+        pushPreferences.activity = preferences.activity
+        var request = BriarAPI_RegisterMobilePushDeviceRequest()
+        request.endpoint = endpoint
+        request.token = deviceToken
+        request.locale = locale.mobilePushLocale
+        request.preferences = pushPreferences
+        guard let payload = try? request.serializedData(), payload != lastPayload else {
             return
         }
-        syncTask = Task { [weak self, api] in
+        syncTask = Task { [weak self, account] in
             do {
-                try await api.sendVoid(
-                    MobileAPIContract.Endpoint.pushRegistration,
-                    method: "PUT",
-                    token: sessionToken,
-                    body: request
+                let response = await account.registerMobilePushDevice(
+                    request: request,
+                    headers: [:]
                 )
-                guard !Task.isCancelled else { return }
+                _ = try response.briarValue()
+                guard !Task.isCancelled, self?.sessionToken == sessionToken else { return }
                 self?.lastPayload = payload
             } catch {
                 // A later token, preference, locale, or foreground change retries registration.
             }
+        }
+    }
+
+    private func account(
+        for token: String
+    ) throws -> any BriarAPI_AccountServiceClientInterface {
+        if let accountService {
+            return accountService
+        }
+        return try authenticatedMobileServices(for: api, token: token).account
+    }
+
+    private static var apnsEndpoint: BriarAPI_MobilePushEndpoint? {
+        switch Bundle.main.object(forInfoDictionaryKey: "BriarAPNSEnvironment") as? String {
+        case "development": .apnsDevelopment
+        case "production": .apnsProduction
+        default: nil
+        }
+    }
+}
+
+private extension CompanionLocale {
+    var mobilePushLocale: BriarAPI_MobilePushLocale {
+        switch self {
+        case .ko: .ko
+        case .en: .en
+        case .zh: .zh
         }
     }
 }

@@ -38,23 +38,24 @@ final class AgentsInboxSystemTests: XCTestCase {
     }
 
     @MainActor
-    func testRemoteNotificationTargetParsesAndOpensConversation() throws {
+    func testRemoteNotificationProtoTargetValidatesAndOpensDestination() throws {
         let projectID = try XCTUnwrap(
             UUID(uuidString: "22222222-2222-4222-8222-222222222222")
         )
         let runID = try XCTUnwrap(
             UUID(uuidString: "11111111-1111-4111-8111-111111111111")
         )
+        var destination = BriarAPI_MobilePushConversationDestination()
+        destination.conversationMessageID = "33333333-3333-4333-8333-333333333333"
+        var wireTarget = BriarAPI_MobilePushNotificationTarget()
+        wireTarget.inboxMessageID = "conversation:33333333-3333-4333-8333-333333333333"
+        wireTarget.inboxMessageVersion = "33333333-3333-4333-8333-333333333333"
+        wireTarget.notificationID = "conversation-thread:\(projectID):\(runID):root"
+        wireTarget.projectID = projectID.uuidString.lowercased()
+        wireTarget.targetID = runID.uuidString.lowercased()
+        wireTarget.conversation = destination
         let target = try XCTUnwrap(RemotePushNotificationTarget.parse(userInfo: [
-            "briarInboxTarget": [
-                "messageId": "conversation:33333333-3333-4333-8333-333333333333",
-                "messageVersion": "33333333-3333-4333-8333-333333333333",
-                "notificationId": "conversation-thread:\(projectID):\(runID):root",
-                "projectId": projectID.uuidString.lowercased(),
-                "targetId": runID.uuidString.lowercased(),
-                "kind": "conversation",
-                "conversationMessageId": "33333333-3333-4333-8333-333333333333",
-            ],
+            "briarInboxTargetProto": try wireTarget.serializedData().base64EncodedString(),
         ]))
 
         let navigation = CompanionNavigationModel()
@@ -63,6 +64,84 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(navigation.pendingProjectID, projectID)
         XCTAssertEqual(navigation.pendingIssueID, runID)
         XCTAssertEqual(navigation.pendingIssueDetailTab, .conversation)
+
+        wireTarget.projectID = "not-a-uuid"
+        XCTAssertNil(RemotePushNotificationTarget.parse(userInfo: [
+            "briarInboxTargetProto": try wireTarget.serializedData().base64EncodedString(),
+        ]))
+
+        wireTarget.projectID = projectID.uuidString.lowercased()
+        wireTarget.targetID = "session-fixture-1"
+        wireTarget.session = .init()
+        let sessionTarget = try XCTUnwrap(RemotePushNotificationTarget.parse(userInfo: [
+            "briarInboxTargetProto": try wireTarget.serializedData().base64EncodedString(),
+        ]))
+        XCTAssertEqual(sessionTarget.kind, .session)
+        XCTAssertEqual(sessionTarget.targetId, "session-fixture-1")
+    }
+
+    @MainActor
+    func testRemotePushRegistrationUsesGeneratedAccountService() async throws {
+        let expectedEndpoint: BriarAPI_MobilePushEndpoint
+        switch Bundle.main.object(forInfoDictionaryKey: "BriarAPNSEnvironment") as? String {
+        case "development": expectedEndpoint = .apnsDevelopment
+        case "production": expectedEndpoint = .apnsProduction
+        default:
+            return XCTFail("The test host must declare its APNs environment")
+        }
+
+        let tokenKey = "briar.remote-push-token.v1"
+        let originalToken = UserDefaults.standard.object(forKey: tokenKey)
+        defer {
+            if let originalToken {
+                UserDefaults.standard.set(originalToken, forKey: tokenKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: tokenKey)
+            }
+        }
+
+        let recorder = MobilePushRequestRecorder()
+        let account = BriarAPI_AccountServiceClientMock()
+        account.mockAsyncRegisterMobilePushDevice = { request in
+            recorder.record(request)
+            return .init(result: .success(.init()))
+        }
+        account.mockAsyncUnregisterMobilePushDevice = { request in
+            recorder.record(request)
+            return .init(result: .success(.init()))
+        }
+        let service = RemotePushRegistrationService(
+            api: PushHTTPStub(),
+            accountService: account
+        )
+        RemotePushNotificationBridge.updateToken("apns-device-token")
+        var preferences = InboxNotificationPreferences()
+        preferences.playSound = false
+        preferences.urgent = true
+        preferences.important = true
+        service.configure(
+            sessionToken: "session-token",
+            preferences: preferences,
+            locale: .en
+        )
+
+        for _ in 0..<100 {
+            if recorder.registration != nil { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let registration = try XCTUnwrap(recorder.registration)
+        XCTAssertEqual(registration.endpoint, expectedEndpoint)
+        XCTAssertEqual(registration.token, "apns-device-token")
+        XCTAssertEqual(registration.locale, .en)
+        XCTAssertTrue(registration.hasPreferences)
+        XCTAssertFalse(registration.preferences.playSound)
+        XCTAssertTrue(registration.preferences.urgent)
+        XCTAssertTrue(registration.preferences.important)
+
+        await service.unregister(sessionToken: "session-token")
+        let unregistration = try XCTUnwrap(recorder.unregistration)
+        XCTAssertEqual(unregistration.endpoint, expectedEndpoint)
+        XCTAssertEqual(unregistration.token, "apns-device-token")
     }
 
     @MainActor
@@ -1343,6 +1422,30 @@ final class AgentsInboxSystemTests: XCTestCase {
             AgentsStore.collapseLinked([parent, child])
         }
         XCTAssertEqual(collapsed.map(\.id), ["child"])
+    }
+}
+
+private struct PushHTTPStub: MobileHTTPClientProtocol {}
+
+private final class MobilePushRequestRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var registrations: [BriarAPI_RegisterMobilePushDeviceRequest] = []
+    private var unregistrations: [BriarAPI_UnregisterMobilePushDeviceRequest] = []
+
+    var registration: BriarAPI_RegisterMobilePushDeviceRequest? {
+        lock.withLock { registrations.last }
+    }
+
+    var unregistration: BriarAPI_UnregisterMobilePushDeviceRequest? {
+        lock.withLock { unregistrations.last }
+    }
+
+    func record(_ request: BriarAPI_RegisterMobilePushDeviceRequest) {
+        lock.withLock { registrations.append(request) }
+    }
+
+    func record(_ request: BriarAPI_UnregisterMobilePushDeviceRequest) {
+        lock.withLock { unregistrations.append(request) }
     }
 }
 

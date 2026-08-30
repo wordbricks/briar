@@ -1,4 +1,6 @@
+import BriarContracts
 import Foundation
+import SwiftProtobuf
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -329,18 +331,16 @@ final class LocalNotificationService: ObservableObject {
     }
 
     private func schedule(_ message: InboxMessage) async {
+        guard let target = message.mobilePushNotificationTarget,
+              let targetData = try? target.serializedData()
+        else { return }
         let presentation = InboxNotificationPresentationBuilder.content(for: message)
         let content = UNMutableNotificationContent()
         content.title = presentation.title
         content.body = presentation.body
         content.sound = preferences.playSound ? .default : nil
         content.userInfo = [
-            "briarInboxTarget": [
-                "messageId": message.id,
-                "projectId": message.projectId.uuidString.lowercased(),
-                "targetId": message.targetId,
-                "kind": message.kind.rawValue,
-            ],
+            "briarInboxTargetProto": targetData.base64EncodedString(),
         ]
         let request = UNNotificationRequest(
             identifier: "inbox-\(message.notificationGroupId ?? message.id)",
@@ -361,6 +361,42 @@ final class LocalNotificationService: ObservableObject {
                 continuation.resume(returning: versions)
             }
         }
+    }
+}
+
+private extension InboxMessage {
+    var mobilePushNotificationTarget: BriarAPI_MobilePushNotificationTarget? {
+        var target = BriarAPI_MobilePushNotificationTarget()
+        target.inboxMessageID = id
+        target.inboxMessageVersion = version
+        target.notificationID = notificationGroupId ?? id
+        target.projectID = projectId.uuidString.lowercased()
+        target.targetID = targetId
+        switch kind {
+        case .issue:
+            guard UUID(uuidString: targetId) != nil else { return nil }
+            target.issue = .init()
+        case .conversation:
+            guard UUID(uuidString: targetId) != nil,
+                  let conversationMessageId
+            else { return nil }
+            var destination = BriarAPI_MobilePushConversationDestination()
+            destination.conversationMessageID = conversationMessageId.uuidString.lowercased()
+            target.conversation = destination
+        case .channel:
+            guard UUID(uuidString: targetId) != nil,
+                  let channelMessageId,
+                  let rootMessageId
+            else { return nil }
+            var destination = BriarAPI_MobilePushChannelDestination()
+            destination.channelMessageID = channelMessageId.uuidString.lowercased()
+            destination.rootMessageID = rootMessageId.uuidString.lowercased()
+            target.channel = destination
+        case .session:
+            guard !targetId.isEmpty else { return nil }
+            target.session = .init()
+        }
+        return target
     }
 }
 
