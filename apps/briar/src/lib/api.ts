@@ -19,11 +19,16 @@ import {
   decodeOrganizationResponse,
   decodeOrganizationsResponse,
 } from "./api/organization-contract";
-import {
-  decodeProjectResponse,
-  decodeProjectUsageSummaryResponse,
-} from "./api/project-contract";
+import { decodeProjectUsageSummaryResponse } from "./api/project-usage-contract";
 import { listProjects } from "./app-rpc/project";
+export {
+  createAgentToken,
+  createProject,
+  deleteProject,
+  updateProjectIcon,
+  updateProjectIssueKeyPrefix,
+  updateProjectTabs,
+} from "./app-rpc/project";
 import { listOrganizationMembers as listOrganizationMembersRpc } from "./app-rpc/account";
 import {
   deleteInboxReadStateRpc,
@@ -939,68 +944,6 @@ export async function loadProjectAgentTranscript(
   );
 }
 
-export async function createProject(
-  token: string,
-  input: { name: string; organizationId?: string },
-) {
-  return request<{ project: Project; agentToken: string }>("/projects", token, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-}
-
-export async function deleteProject(token: string, projectId: string) {
-  return request<void>(`/projects/${projectId}`, token, { method: "DELETE" });
-}
-
-export async function updateProjectIcon(
-  token: string,
-  projectId: string,
-  icon: string | null,
-): Promise<{ project: Project }> {
-  const result = await request<{ project: unknown }>(
-    `/projects/${projectId}/icon`,
-    token,
-    {
-      method: "PUT",
-      body: JSON.stringify({ icon }),
-    },
-  );
-  return { project: decodeProjectResponse(result.project) };
-}
-
-export async function updateProjectIssueKeyPrefix(
-  token: string,
-  projectId: string,
-  issueKeyPrefix: string,
-): Promise<{ project: Project }> {
-  const result = await request<{ project: unknown }>(
-    `/projects/${projectId}/issue-key-prefix`,
-    token,
-    {
-      method: "PUT",
-      body: JSON.stringify({ issueKeyPrefix }),
-    },
-  );
-  return { project: decodeProjectResponse(result.project) };
-}
-
-export async function updateProjectTabs(
-  token: string,
-  projectId: string,
-  tabs: { schedule: boolean },
-): Promise<{ project: Project }> {
-  const result = await request<{ project: unknown }>(
-    `/projects/${projectId}/tabs`,
-    token,
-    {
-      method: "PUT",
-      body: JSON.stringify(tabs),
-    },
-  );
-  return { project: decodeProjectResponse(result.project) };
-}
-
 export async function loadProjectAgentSpriteSheet(
   token: string,
   projectId: string,
@@ -1401,16 +1344,6 @@ export async function updateProjectExecutionWorkerPolicy(
     `/projects/${projectId}/execution-policy`,
     token,
     { method: "PUT", body: JSON.stringify(policy) },
-  );
-}
-
-export async function createAgentToken(token: string, projectId: string) {
-  return request<{ agentToken: string }>(
-    `/projects/${projectId}/agent-token`,
-    token,
-    {
-      method: "POST",
-    },
   );
 }
 

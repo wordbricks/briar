@@ -6,7 +6,6 @@ import {
   type AutoHuntWorkflowCheckpoint,
   type AutoHuntWorkflowStageId,
 } from "./lib/auto-hunt-contract";
-import type { ProjectResponse } from "./lib/api/project-contract";
 import type { StructuredAgentResult } from "./lib/agent-result";
 import type { AgentExecutionCostRecord } from "./lib/agent-execution-cost";
 import type { AgentUsagePricing } from "./lib/agent-usage-pricing";
@@ -707,7 +706,17 @@ export type HuntRunPlacement = {
   workflowStage: AutoHuntWorkflowStageId | null;
 };
 
-export type Project = ProjectResponse;
+export type Project = {
+  id: string;
+  name: string;
+  issueKeyPrefix: string;
+  scheduleTabEnabled: boolean;
+  icon: string | null;
+  organizationId: string;
+  organizationName: string;
+  role: OrganizationRole;
+  createdAt: string;
+};
 
 export type ProjectAgent = {
   id: string;

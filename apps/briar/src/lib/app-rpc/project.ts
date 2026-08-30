@@ -4,41 +4,151 @@ import {
   type Project as ProjectMessage,
 } from "@briar/contracts/gen/briar/app/v1/project_pb";
 import type { Project } from "../../types";
-import { decodeProjectResponse } from "../api/project-contract";
+import { isProjectIconDataUrl } from "../project-icon";
+import { appCallOptions, appRpc, appTransport } from "./core";
 import {
-  appCallOptions,
-  appRpc,
-  appTransport,
-} from "./core";
-import { projectRoleFromProto, requiredTimestamp } from "./mappers";
+  projectRoleFromProto,
+  requiredMessage,
+  requiredTimestamp,
+} from "./mappers";
 
 const projectClient = appTransport
   ? createClient(ProjectService, appTransport)
   : undefined;
 
-export const projectFromMessage = (project: ProjectMessage): Project =>
-  decodeProjectResponse({
-    id: project.id,
-    name: project.name,
-    issueKeyPrefix: project.issueKeyPrefix,
-    scheduleTabEnabled: project.scheduleTabEnabled,
-    icon: project.icon ?? null,
-    organizationId: project.organizationId,
-    organizationName: project.organizationName,
-    role: projectRoleFromProto(project.role),
-    createdAt: requiredTimestamp(project.createdAt, "project.createdAt"),
-  });
+const requireProjectClient = () => {
+  if (!projectClient) throw new Error("Briar API URL이 설정되지 않았습니다.");
+  return projectClient;
+};
+
+export const projectFromMessage = (project: ProjectMessage): Project => ({
+  id: project.id,
+  name: project.name,
+  issueKeyPrefix: project.issueKeyPrefix,
+  scheduleTabEnabled: project.scheduleTabEnabled,
+  icon:
+    project.icon !== undefined && isProjectIconDataUrl(project.icon)
+      ? project.icon
+      : null,
+  organizationId: project.organizationId,
+  organizationName: project.organizationName,
+  role: projectRoleFromProto(project.role),
+  createdAt: requiredTimestamp(project.createdAt, "project.createdAt"),
+});
 
 export async function listProjects(
   token: string,
   signal?: AbortSignal,
 ): Promise<Project[]> {
-  if (!projectClient) throw new Error("Briar API URL이 설정되지 않았습니다.");
+  const client = requireProjectClient();
   return appRpc(async () => {
-    const response = await projectClient.listProjects(
+    const response = await client.listProjects(
       {},
       appCallOptions(token, signal),
     );
     return response.projects.map(projectFromMessage);
+  });
+}
+
+export async function createProject(
+  token: string,
+  input: { readonly name: string; readonly organizationId?: string },
+): Promise<{ project: Project; agentToken: string }> {
+  const client = requireProjectClient();
+  return appRpc(async () => {
+    const response = await client.createProject(input, appCallOptions(token));
+    return {
+      project: projectFromMessage(
+        requiredMessage(response.project, "createProject.project"),
+      ),
+      agentToken: response.agentToken,
+    };
+  });
+}
+
+export async function deleteProject(token: string, projectId: string) {
+  const client = requireProjectClient();
+  await appRpc(async () => {
+    const response = await client.deleteProject(
+      { projectId },
+      appCallOptions(token),
+    );
+    if (!response.deleted) throw new Error("Project was not deleted");
+  });
+}
+
+export async function updateProjectIcon(
+  token: string,
+  projectId: string,
+  icon: string | null,
+): Promise<{ project: Project }> {
+  const client = requireProjectClient();
+  return appRpc(async () => {
+    const response = await client.updateProjectIcon(
+      {
+        projectId,
+        iconUpdate: icon === null
+          ? { case: "clearIcon", value: {} }
+          : { case: "icon", value: icon },
+      },
+      appCallOptions(token),
+    );
+    return {
+      project: projectFromMessage(
+        requiredMessage(response.project, "updateProjectIcon.project"),
+      ),
+    };
+  });
+}
+
+export async function updateProjectIssueKeyPrefix(
+  token: string,
+  projectId: string,
+  issueKeyPrefix: string,
+): Promise<{ project: Project }> {
+  const client = requireProjectClient();
+  return appRpc(async () => {
+    const response = await client.updateProjectIssueKeyPrefix(
+      { projectId, issueKeyPrefix },
+      appCallOptions(token),
+    );
+    return {
+      project: projectFromMessage(
+        requiredMessage(
+          response.project,
+          "updateProjectIssueKeyPrefix.project",
+        ),
+      ),
+    };
+  });
+}
+
+export async function updateProjectTabs(
+  token: string,
+  projectId: string,
+  tabs: { readonly schedule: boolean },
+): Promise<{ project: Project }> {
+  const client = requireProjectClient();
+  return appRpc(async () => {
+    const response = await client.updateProjectTabs(
+      { projectId, schedule: tabs.schedule },
+      appCallOptions(token),
+    );
+    return {
+      project: projectFromMessage(
+        requiredMessage(response.project, "updateProjectTabs.project"),
+      ),
+    };
+  });
+}
+
+export async function createAgentToken(token: string, projectId: string) {
+  const client = requireProjectClient();
+  return appRpc(async () => {
+    const response = await client.createProjectAgentToken(
+      { projectId },
+      appCallOptions(token),
+    );
+    return { agentToken: response.agentToken };
   });
 }
