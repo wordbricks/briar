@@ -2,7 +2,7 @@
 // swift-format-ignore-file
 // swiftlint:disable all
 //
-// Source: briar/app/v1/realtime.proto
+// Source: briar/app/v1/realtime_control.proto
 //
 
 import Connect
