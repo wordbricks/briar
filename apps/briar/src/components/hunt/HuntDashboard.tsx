@@ -13,7 +13,6 @@ import { CompanionBottomNavigation, type CompanionStatusFilter } from "@/compone
 import type { AutoHuntSession } from "@/hooks/useAutoHuntSessions";
 import { inboxIssueMessageVersion } from "@/hooks/useInbox";
 import { AppKeyboardCommandBoundary, useAppKeyboardCommandScope } from "@/hooks/appKeyboardCommands";
-import { useAppCollectionKeyboardCommandScope } from "@/hooks/useAppCollectionKeyboardCommandScope";
 import {
   useControlledCollectionNavigation,
   type CollectionNavigationDirection,
@@ -32,6 +31,7 @@ import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
 import { CompanionTaskSwipeAction } from "./board/CompanionTaskSwipeAction";
 import { IssueList } from "./board/IssueList";
+import { IssueCollection, type IssueCollectionState, type IssueWorkflowContext } from "./board/IssueCollection";
 import { IssuePropertyFilterMenu } from "./board/IssuePropertyFilterMenu";
 import { KanbanCard } from "./board/KanbanCard";
 import { KanbanColumnMenu } from "./board/KanbanColumnMenu";
@@ -700,17 +700,6 @@ function HuntDashboardContent({
     selectedId: null,
     selectionBehavior: "manual",
   });
-  useAppCollectionKeyboardCommandScope({
-    enabled: !companionMode &&
-      view === "kanban" &&
-      selected === null &&
-      !issuesLoading &&
-      keyboardKanbanRunIds.length > 0,
-    id: "hunt-kanban-board",
-    move: kanbanNavigation.move,
-    orientation: "both",
-    rootRef: kanbanBoardRef,
-  });
   useEffect(() => {
     setKanbanCursorRunId(current =>
       current !== null && !keyboardKanbanRunIds.includes(current)
@@ -740,6 +729,24 @@ function HuntDashboardContent({
       checkpoints: dashboard.settings.checkpointPolicy?.effective ?? dashboard.settings.workflow.execution.checkpoints
     }
   } : undefined} workflowProjectId={dashboard?.project.id} /> : null;
+  const collectionState = useMemo<IssueCollectionState>(() => ({
+    propertyFilters,
+    query,
+    setPropertyFilters,
+    setQuery,
+    setSource,
+    setStatus,
+    setView,
+    source,
+    status,
+    view,
+  }), [propertyFilters, query, setStatus, source, status, view]);
+  const issueWorkflowContext = useMemo<IssueWorkflowContext | undefined>(() => dashboard ? {
+    id: dashboard.project.id,
+    label: dashboard.project.name,
+    settings: dashboard.settings,
+  } : undefined, [dashboard?.project.id, dashboard?.project.name, dashboard?.settings]);
+  const workflowForRun = useCallback(() => issueWorkflowContext, [issueWorkflowContext]);
   if (noProject) {
     return <MainContent id="issues">
         {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region="deep" />}
@@ -779,35 +786,60 @@ function HuntDashboardContent({
       </>;
   }
   return <MainContent id="issues">
-      {!companionMode ? <PageHeader action={<div className="queue-tools">
-              <label className="search-box">
-                <Input className="h-full border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" onChange={e => setQuery(e.target.value)} placeholder={t("dashboard.search")} value={query} />
-                <Search aria-hidden="true" size={15} />
-              </label>
-              <IssuePropertyFilterMenu agents={agents} filters={propertyFilters} members={dashboard?.members ?? []} onChange={setPropertyFilters} />
-              <div aria-label={t("dashboard.viewMode")} className="view-switch" role="group">
-                <button aria-label={t("dashboard.kanbanView")} aria-pressed={view === "kanban"} className={view === "kanban" ? "active" : ""} onClick={() => setView("kanban")} title={t("dashboard.kanbanView")} type="button">
-                  <Columns3 size={14} />
-                  <span>{t("dashboard.kanban")}</span>
-                </button>
-                <button aria-label={t("dashboard.listView")} aria-pressed={view === "list"} className={view === "list" ? "active" : ""} onClick={() => setView("list")} title={t("dashboard.listView")} type="button">
-                  <List size={14} />
-                  <span>{t("dashboard.list")}</span>
-                </button>
-              </div>
-              <Button aria-keyshortcuts="Meta+N" aria-label={t("dashboard.createIssue")} className="create-issue-button" onClick={() => openCreateIssueDialog()} type="button">
-                <Plus size={16} />
-                {t("issue.newIssue")}
-              </Button>
-            </div>} className={`app-page-header queue-header${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region="deep" title={<span className="queue-heading-copy">
-              <span>{t("dashboard.queue")}</span>
-              <Typography as="span" className="queue-task-count" tone="muted" variant="caption">
-                {t("dashboard.taskCount", {
-          count: runs.length
-        })}
-              </Typography>
-            </span>} /> : null}
-      <div className="dashboard-scroll">
+      {!companionMode ? <IssueCollection
+        activeAgentForRun={run => agentAssociationsByRunId.activeAgents.get(run.id) ?? null}
+        agents={agents}
+        assignedWorkerForRun={run => workerById.get(run.workerId ?? "") ?? workerById.get(run.requestedWorkerId ?? "") ?? null}
+        availableProviders={availableProviders}
+        countLabel={count => t("dashboard.taskCount", { count })}
+        currentUserId={currentUserId}
+        deletingIssueId={deletingIssueId}
+        headerTrailing={<Button aria-keyshortcuts="Meta+N" aria-label={t("dashboard.createIssue")} className="create-issue-button" onClick={() => openCreateIssueDialog()} type="button"><Plus size={16} />{t("issue.newIssue")}</Button>}
+        isLoading={issuesLoading}
+        isSidebarOpen={isSidebarOpen}
+        issueKeyPrefixForRun={() => dashboard?.project.issueKeyPrefix}
+        members={dashboard?.members ?? []}
+        onCheckpointsChange={(run, checkpoints) => onUpdateIssueCheckpoints(run.id, checkpoints).catch(() => undefined)}
+        onCreateInColumn={openCreateIssueDialog}
+        onDelete={run => {
+          setContextDeleteError(null);
+          setDeletingRunFromMenuId(run.id);
+        }}
+        onEdit={run => setEditingRunId(run.id)}
+        onMove={(run, placement) => onMoveRun(run.id, placement).catch(() => undefined)}
+        onOpen={run => {
+          setSelectedRunMessageId(null);
+          setSelectedRunInitialTab(null);
+          setSelectedRunId(run.id);
+        }}
+        onPreferencesChange={(run, preferences) => onUpdateIssuePreferences(run.id, preferences).catch(() => undefined)}
+        onPriorityChange={(run, priority) => onUpdateIssue(run.id, {
+          title: run.title,
+          description: run.issueDescription,
+          priority,
+          difficulty: run.difficulty,
+          attachments: []
+        }).catch(() => undefined)}
+        onProcessNow={onProcessIssueNow}
+        onTransfer={onTransferIssue ? run => {
+          setContextTransferError(null);
+          setTransferTargetProjectId(transferDestinationProjects[0]?.id ?? "");
+          setTransferringRunFromMenuId(run.id);
+        } : undefined}
+        processingIssueIds={processingIssueIds}
+        recoveringRunId={recoveringRunId}
+        runs={runs}
+        scrollLeftRef={kanbanScrollLeftRef}
+        searchPlaceholder={t("dashboard.search")}
+        state={collectionState}
+        storageScopeId={dashboard?.project.id}
+        title={t("dashboard.queue")}
+        token={token}
+        updatingIssueId={updatingIssueId}
+        workflowForRun={workflowForRun}
+        workflowContexts={issueWorkflowContext ? [issueWorkflowContext] : []}
+      /> : null}
+      {companionMode ? <div className="dashboard-scroll">
         {companionMode ? <div className="queue-header">
             <div className="queue-heading">
               <div className="queue-heading-copy">
@@ -1014,7 +1046,7 @@ function HuntDashboardContent({
               </aside> : null}
           </>}
         </div>}
-      </div>
+      </div> : null}
       {companionMode && <CompanionBottomNavigation activeDestination={status} onCreate={() => setIsIssueDialogOpen(true)} onDmsOpen={() => onCompanionDmsOpen?.()} onInboxOpen={() => onCompanionInboxOpen?.()} onHomeOpen={() => onCompanionHomeOpen?.()} onStatusChange={setStatus} unreadDmCount={companionUnreadDmCount} unreadInboxCount={companionUnreadInboxCount} workers={dashboard?.workers ?? []} />}
       {createIssueDialog}
       {editingRun && <EditIssueDialog isSubmitting={updatingIssueId === editingRun.id} onClose={() => setEditingRunId(null)} onLoadAttachment={onLoadAttachment} onUpdate={async input => {

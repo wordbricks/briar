@@ -1,17 +1,18 @@
-import { Check, ChevronDown, FolderGit2, ListTodo, RefreshCw, Search } from "lucide-react";
+import { Check, ChevronDown, FolderGit2, ListTodo, RefreshCw } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { useEffect, useMemo, useState } from "react";
-import { EmptyState, MainContent, PageHeader } from "./layout";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { EmptyState, MainContent } from "./layout";
 import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { LoadingState } from "./ui/loading-state";
-import { IssueList } from "./hunt/board/IssueList";
+import {
+  IssueCollection,
+  type IssueCollectionState,
+  type IssueWorkflowContext,
+} from "./hunt/board/IssueCollection";
 import { ProjectIcon } from "./ProjectIcon";
 import { useI18n } from "../i18n";
 import { formatIssueKey } from "../lib/issue-key";
 import type { DashboardPayload, HuntRun, OrganizationMember, Project } from "../types";
-
-type MyIssuesStatus = "all" | "active" | "attention" | "completed";
+import { emptyIssuePropertyFilters } from "./hunt/model/filters";
 
 type MyIssue = {
   project: Project;
@@ -134,29 +135,6 @@ function ProjectFilter({
   );
 }
 
-function matchesStatus(run: HuntRun, status: MyIssuesStatus) {
-  if (status === "active") return !["completed", "cancelled"].includes(run.status);
-  if (status === "attention") return ["paused", "blocked", "failed"].includes(run.status);
-  if (status === "completed") return ["completed", "cancelled"].includes(run.status);
-  return true;
-}
-
-function issueMatchesQuery(issue: MyIssue, query: string) {
-  if (!query) return true;
-  const searchText = [
-    issue.project.name,
-    formatIssueKey(issue.project.issueKeyPrefix, issue.run.runNumber),
-    issue.run.title,
-    issue.run.detail,
-    issue.run.issueDescription,
-    issue.run.sourceKey,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLocaleLowerCase();
-  return searchText.includes(query);
-}
-
 export function MyIssues({
   currentUserId,
   isSidebarOpen,
@@ -183,10 +161,23 @@ export function MyIssues({
   );
   const [failedProjectIds, setFailedProjectIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [loadedConfigurationKey, setLoadedConfigurationKey] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<MyIssuesStatus>("all");
+  const [source, setSource] = useState<IssueCollectionState["source"]>("all");
+  const [status, setStatus] = useState<IssueCollectionState["status"]>("all");
+  const [view, setView] = useState<IssueCollectionState["view"]>("list");
+  const [propertyFilters, setPropertyFilters] = useState(emptyIssuePropertyFilters);
+  const loadProjectDashboardRef = useRef(loadProjectDashboard);
+  loadProjectDashboardRef.current = loadProjectDashboard;
+  const projectConfigurationKey = useMemo(
+    () =>
+      JSON.stringify({
+        organizationId,
+        projectIds: scopedProjects.map((project) => project.id).sort(),
+      }),
+    [organizationId, scopedProjects],
+  );
 
   useEffect(() => {
     const projectIds = new Set(scopedProjects.map((project) => project.id));
@@ -199,41 +190,52 @@ export function MyIssues({
   }, [scopedProjects]);
 
   useEffect(() => {
+    const projectIds = (
+      JSON.parse(projectConfigurationKey) as { projectIds: string[] }
+    ).projectIds;
     const controller = new AbortController();
     let cancelled = false;
     setIsLoading(true);
-    setHasLoaded(scopedProjects.length === 0);
-    setDashboards({});
     setFailedProjectIds([]);
 
-    if (scopedProjects.length === 0) {
+    if (projectIds.length === 0) {
+      setDashboards({});
+      setLoadedConfigurationKey(projectConfigurationKey);
       setIsLoading(false);
       return () => controller.abort();
     }
 
     void Promise.all(
-      scopedProjects.map(async (project) => {
+      projectIds.map(async (projectId) => {
         try {
           return {
-            dashboard: await loadProjectDashboard(project.id, controller.signal),
+            dashboard: await loadProjectDashboardRef.current(projectId, controller.signal),
             failed: false,
-            projectId: project.id,
+            projectId,
           };
         } catch {
-          return { dashboard: null, failed: true, projectId: project.id };
+          return { dashboard: null, failed: true, projectId };
         }
       }),
     ).then((results) => {
       if (cancelled || controller.signal.aborted) return;
-      const nextDashboards: Record<string, DashboardPayload> = {};
       const nextFailedProjectIds: string[] = [];
+      setDashboards((current) => {
+        const nextDashboards: Record<string, DashboardPayload> = {};
+        for (const projectId of projectIds) {
+          const dashboard = current[projectId];
+          if (dashboard) nextDashboards[projectId] = dashboard;
+        }
+        for (const result of results) {
+          if (result.dashboard) nextDashboards[result.projectId] = result.dashboard;
+        }
+        return nextDashboards;
+      });
       for (const result of results) {
-        if (result.dashboard) nextDashboards[result.projectId] = result.dashboard;
         if (result.failed) nextFailedProjectIds.push(result.projectId);
       }
-      setDashboards(nextDashboards);
       setFailedProjectIds(nextFailedProjectIds);
-      setHasLoaded(true);
+      setLoadedConfigurationKey(projectConfigurationKey);
       setIsLoading(false);
     });
 
@@ -241,7 +243,7 @@ export function MyIssues({
       cancelled = true;
       controller.abort();
     };
-  }, [loadProjectDashboard, retryToken, scopedProjects]);
+  }, [projectConfigurationKey, retryToken]);
 
   const projectById = useMemo(
     () => new Map(scopedProjects.map((project) => [project.id, project])),
@@ -250,7 +252,8 @@ export function MyIssues({
   const issues = useMemo(() => {
     const next: MyIssue[] = [];
     for (const [projectId, dashboard] of Object.entries(dashboards)) {
-      const project = projectById.get(projectId) ?? dashboard.project;
+      const project = projectById.get(projectId);
+      if (!project) continue;
       for (const run of dashboard.runs) {
         if (
           currentUserId &&
@@ -272,29 +275,18 @@ export function MyIssues({
         : issues.filter((issue) => selectedProjectIds.has(issue.project.id)),
     [issues, selectedProjectIds],
   );
-  const normalizedQuery = query.trim().toLocaleLowerCase();
-  const filteredIssues = useMemo(
-    () =>
-      selectedIssues.filter(
-        (issue) =>
-          matchesStatus(issue.run, status) &&
-          issueMatchesQuery(issue, normalizedQuery),
-      ),
-    [normalizedQuery, selectedIssues, status],
-  );
-  const activeCount = selectedIssues.filter((issue) =>
-    matchesStatus(issue.run, "active"),
-  ).length;
-  const attentionCount = selectedIssues.filter((issue) =>
-    matchesStatus(issue.run, "attention"),
-  ).length;
-  const completedCount = selectedIssues.filter((issue) =>
-    matchesStatus(issue.run, "completed"),
-  ).length;
   const projectByRunId = useMemo(
-    () => new Map(filteredIssues.map((issue) => [issue.run.id, issue.project])),
-    [filteredIssues],
+    () => new Map(selectedIssues.map((issue) => [issue.run.id, issue.project])),
+    [selectedIssues],
   );
+  const dashboardByRunId = useMemo(() => {
+    const result = new Map<string, DashboardPayload>();
+    for (const issue of selectedIssues) {
+      const dashboard = dashboards[issue.project.id];
+      if (dashboard) result.set(issue.run.id, dashboard);
+    }
+    return result;
+  }, [dashboards, selectedIssues]);
   const members = useMemo(() => {
     const byUserId = new Map<string, OrganizationMember>();
     for (const dashboard of Object.values(dashboards)) {
@@ -303,88 +295,57 @@ export function MyIssues({
     return [...byUserId.values()];
   }, [dashboards]);
   const emptyProcessingIds = useMemo(() => new Set<string>(), []);
+  const collectionState = useMemo<IssueCollectionState>(
+    () => ({
+      propertyFilters,
+      query,
+      setPropertyFilters,
+      setQuery,
+      setSource,
+      setStatus,
+      setView,
+      source,
+      status,
+      view,
+    }),
+    [propertyFilters, query, source, status, view],
+  );
+  const workflowForRun = useCallback(
+    (run: HuntRun): IssueWorkflowContext | undefined => {
+      const dashboard = dashboardByRunId.get(run.id);
+      if (!dashboard) return undefined;
+      return {
+        id: dashboard.project.id,
+        label: dashboard.project.name,
+        settings: dashboard.settings,
+      };
+    },
+    [dashboardByRunId],
+  );
+  const workflowContexts = useMemo(() => {
+    const result = new Map<string, IssueWorkflowContext>();
+    for (const issue of selectedIssues) {
+      const dashboard = dashboards[issue.project.id];
+      if (!dashboard) continue;
+      result.set(dashboard.project.id, {
+        id: dashboard.project.id,
+        label: dashboard.project.name,
+        settings: dashboard.settings,
+      });
+    }
+    return [...result.values()];
+  }, [dashboards, selectedIssues]);
+  const isInitialLoading =
+    isLoading &&
+    loadedConfigurationKey !== projectConfigurationKey &&
+    selectedIssues.length === 0;
 
   return (
     <MainContent id="my-issues">
-      <PageHeader
-        action={
-          <div className="queue-tools my-issues-tools">
-            <label className="search-box my-issues-search">
-              <Search aria-hidden="true" size={15} />
-              <Input
-                aria-label={t("myIssues.search")}
-                className="h-full border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
-                onChange={(event) => setQuery(event.currentTarget.value)}
-                placeholder={t("myIssues.search")}
-                value={query}
-              />
-            </label>
-            <ProjectFilter
-              onChange={setSelectedProjectIds}
-              projects={scopedProjects}
-              selectedProjectIds={selectedProjectIds}
-            />
-            <Button
-              aria-label={t("myIssues.retry")}
-              className="my-issues-refresh-button"
-              disabled={isLoading}
-              onClick={() => setRetryToken((current) => current + 1)}
-              size="icon-sm"
-              title={t("myIssues.retry")}
-              type="button"
-              variant="outline"
-            >
-              <RefreshCw aria-hidden="true" size={15} />
-            </Button>
-          </div>
-        }
-        className={`app-page-header queue-header${isSidebarOpen ? "" : " sidebar-closed"}`}
-        data-tauri-drag-region="deep"
-        description={t("myIssues.description")}
-        eyebrow={organizationName}
-        title={
-          <span className="queue-heading-copy">
-            <span>{t("myIssues.title")}</span>
-            <span className="queue-task-count">
-              {t("myIssues.count", { count: filteredIssues.length })}
-            </span>
-          </span>
-        }
-      />
-      <div className="dashboard-scroll my-issues-scroll">
-        <div className="queue-filter-bar my-issues-filter-bar">
-          <div className="status-tabs">
-            <button
-              className={status === "all" ? "active" : ""}
-              onClick={() => setStatus("all")}
-              type="button"
-            >
-              {t("dashboard.all")} <span>{selectedIssues.length}</span>
-            </button>
-            <button
-              className={status === "active" ? "active" : ""}
-              onClick={() => setStatus("active")}
-              type="button"
-            >
-              {t("dashboard.active")} <span>{activeCount}</span>
-            </button>
-            <button
-              className={status === "attention" ? "active" : ""}
-              onClick={() => setStatus("attention")}
-              type="button"
-            >
-              {t("dashboard.attention")} <span>{attentionCount}</span>
-            </button>
-            <button
-              className={status === "completed" ? "active" : ""}
-              onClick={() => setStatus("completed")}
-              type="button"
-            >
-              {t("dashboard.completed")} <span>{completedCount}</span>
-            </button>
-          </div>
-        </div>
-        {failedProjectIds.length > 0 ? (
+      <IssueCollection
+        agents={[]}
+        availableProviders={[]}
+        bodyBefore={failedProjectIds.length > 0 ? (
           <div className="my-issues-load-error" role="alert">
             <span>{t("myIssues.loadError")}</span>
             <Button
@@ -397,11 +358,10 @@ export function MyIssues({
             </Button>
           </div>
         ) : null}
-        {!hasLoaded || isLoading ? (
-          <div aria-busy="true" className="my-issues-loading" role="status">
-            <LoadingState label={t("myIssues.loading")} />
-          </div>
-        ) : failedProjectIds.length > 0 && issues.length === 0 ? (
+        countLabel={(count) => t("myIssues.count", { count })}
+        currentUserId={currentUserId}
+        deletingIssueId={null}
+        emptyContent={failedProjectIds.length > 0 && issues.length === 0 ? (
           <EmptyState
             action={
               <Button
@@ -417,45 +377,77 @@ export function MyIssues({
             icon={<RefreshCw aria-hidden="true" size={22} />}
             title={t("myIssues.loadError")}
           />
-        ) : issues.length === 0 ? (
+        ) : (
           <EmptyState
             description={t("myIssues.emptyDescription")}
             icon={<ListTodo aria-hidden="true" size={22} />}
             title={t("myIssues.emptyTitle")}
           />
-        ) : filteredIssues.length === 0 ? (
+        )}
+        filteredEmptyContent={
           <EmptyState
             description={t("myIssues.filterEmptyDescription")}
             icon={<FolderGit2 aria-hidden="true" size={22} />}
             title={t("myIssues.filterEmptyTitle")}
           />
-        ) : (
-          <IssueList
-            availableProviders={[]}
-            deletingIssueId={null}
-            issueKeyPrefix={undefined}
-            issueKeyPrefixForRun={(run) =>
-              projectByRunId.get(run.id)?.issueKeyPrefix
-            }
-            members={members}
-            onCheckpointsChange={() => undefined}
-            onDelete={() => undefined}
-            onEdit={() => undefined}
-            onMove={() => undefined}
-            onOpen={(runId) => {
-              const issue = projectByRunId.get(runId);
-              if (issue) onOpenIssue(issue.id, runId);
-            }}
-            onPreferencesChange={() => undefined}
-            onPriorityChange={() => undefined}
-            processingIssueIds={emptyProcessingIds}
-            projectForRun={(run) => projectByRunId.get(run.id)}
-            readOnly
-            runs={filteredIssues.map((issue) => issue.run)}
-            updatingIssueId={null}
+        }
+        getSearchText={(run) => {
+          const project = projectByRunId.get(run.id);
+          return [
+            project?.name,
+            formatIssueKey(project?.issueKeyPrefix, run.runNumber),
+            run.title,
+            run.detail,
+            run.issueDescription,
+            run.sourceKey,
+          ].filter(Boolean).join(" ");
+        }}
+        headerDescription={t("myIssues.description")}
+        headerEyebrow={organizationName}
+        headerTrailing={
+          <Button
+            aria-label={t("myIssues.retry")}
+            className="my-issues-refresh-button"
+            disabled={isLoading}
+            onClick={() => setRetryToken((current) => current + 1)}
+            size="icon-sm"
+            title={t("myIssues.retry")}
+            type="button"
+            variant="outline"
+          >
+            <RefreshCw aria-hidden="true" size={15} />
+          </Button>
+        }
+        isLoading={isInitialLoading}
+        isSidebarOpen={isSidebarOpen}
+        issueKeyPrefixForRun={(run) => projectByRunId.get(run.id)?.issueKeyPrefix}
+        loadingLabel={t("myIssues.loading")}
+        members={members}
+        onOpen={(run) => {
+          const project = projectByRunId.get(run.id);
+          if (project) onOpenIssue(project.id, run.id);
+        }}
+        processingIssueIds={emptyProcessingIds}
+        projectForRun={(run) => projectByRunId.get(run.id)}
+        readOnly
+        recoveringRunId={null}
+        runs={selectedIssues.map((issue) => issue.run)}
+        scrollClassName="my-issues-scroll"
+        searchPlaceholder={t("myIssues.search")}
+        state={collectionState}
+        storageScopeId={organizationId ? `my-issues:${organizationId}` : null}
+        title={t("myIssues.title")}
+        toolbarAfterSearch={
+          <ProjectFilter
+            onChange={setSelectedProjectIds}
+            projects={scopedProjects}
+            selectedProjectIds={selectedProjectIds}
           />
-        )}
-      </div>
+        }
+        updatingIssueId={null}
+        workflowForRun={workflowForRun}
+        workflowContexts={workflowContexts}
+      />
     </MainContent>
   );
 }

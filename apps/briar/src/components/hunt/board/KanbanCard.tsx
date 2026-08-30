@@ -9,7 +9,7 @@ import { ProjectAgentAvatar } from "@/components/ProjectAgentAvatar";
 import { runMeta } from "@/lib/stages";
 import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
 import { formatIssueKey } from "@/lib/issue-key";
-import type { ExecutionWorker, HuntRun, HuntRunPlacement, IssueExecutionPreferences, OrganizationMember, ProjectAgent } from "@/types";
+import type { ExecutionWorker, HuntRun, HuntRunPlacement, IssueExecutionPreferences, OrganizationMember, Project, ProjectAgent } from "@/types";
 import { agentProviderLabels, type AgentProvider } from "@/lib/project-llm";
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
@@ -20,6 +20,7 @@ import { RunStatusPill } from "../detail/RunStatusPill";
 import { localizeStatus, relativeTime } from "../model/formatters";
 import { hasResultReviews } from "../results/model";
 import { IssueDifficultyIcon } from "../IssueDifficultyIcon";
+import { ProjectIcon } from "../../ProjectIcon";
 export function KanbanCard({
   availableProviders,
   activeAgent,
@@ -34,6 +35,7 @@ export function KanbanCard({
   isMoving,
   isProcessing,
   issueKeyPrefix,
+  project,
   onDelete,
   onTransfer,
   onPointerCancel,
@@ -49,6 +51,7 @@ export function KanbanCard({
   onPriorityChange,
   onPreferencesChange,
   onCheckpointsChange,
+  readOnly = false,
   token,
   updatingIssueId
 }: {
@@ -65,6 +68,7 @@ export function KanbanCard({
   isMoving: boolean;
   isProcessing: boolean;
   issueKeyPrefix?: string;
+  project?: Pick<Project, "icon" | "name">;
   onDelete: () => void;
   onTransfer?: () => void;
   onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
@@ -80,6 +84,7 @@ export function KanbanCard({
   onPriorityChange: (priority: number | null) => void;
   onPreferencesChange: (preferences: IssueExecutionPreferences) => void;
   onCheckpointsChange: (checkpoints: AutoHuntWorkflowCheckpoint[]) => void;
+  readOnly?: boolean;
   token: string | null;
   updatingIssueId: string | null;
 }) {
@@ -95,7 +100,7 @@ export function KanbanCard({
   return <IssueContextMenu availableProviders={availableProviders} disabled={contextMenuDisabled || isMoving || isDragging || deletingIssueId === run.id || updatingIssueId === run.id} onDelete={onDelete} onTransfer={onTransfer} onEdit={onEdit} onMove={onMove} onOpen={onOpen} onProcessNow={onProcessNow} onPriorityChange={onPriorityChange} onPreferencesChange={onPreferencesChange} onCheckpointsChange={onCheckpointsChange} run={run} isProcessing={isProcessing}>
       <div aria-label={t("run.details", {
       title: run.title
-    })} aria-disabled={isMoving} className={`kanban-card ${meta.tone}${run.status === "paused" ? " awaiting-review" : ""}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignmentBadgeCount > 0 ? " has-assignees" : ""}${assignmentBadgeCount > 1 ? " has-multiple-assignees" : ""}${assignmentBadgeCount > 2 ? " has-three-assignees" : ""}${assignmentBadgeCount > 3 ? " has-four-assignees" : ""}`} data-keyboard-list-current={isKeyboardCursor ? "" : undefined} data-keyboard-list-item="" data-run-id={run.id} draggable={false} onClick={onOpen} onFocus={onFocus} onKeyDown={event => {
+    })} aria-disabled={isMoving} className={`kanban-card ${meta.tone}${run.status === "paused" ? " awaiting-review" : ""}${readOnly ? " read-only" : ""}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignmentBadgeCount > 0 ? " has-assignees" : ""}${assignmentBadgeCount > 1 ? " has-multiple-assignees" : ""}${assignmentBadgeCount > 2 ? " has-three-assignees" : ""}${assignmentBadgeCount > 3 ? " has-four-assignees" : ""}`} data-keyboard-list-current={isKeyboardCursor ? "" : undefined} data-keyboard-list-item="" data-run-id={run.id} draggable={false} onClick={onOpen} onFocus={onFocus} onKeyDown={event => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
       onOpen();
@@ -121,9 +126,9 @@ export function KanbanCard({
             {showFullAutoBadge && <span aria-label={`${t("issue.fullAuto")}: ${t("issue.fullAutoDescription")}`} className="kanban-card-full-auto-badge" title={t("issue.fullAutoDescription")}>
                 <Rocket aria-hidden="true" size={12} strokeWidth={2.2} />
               </span>}
-          </span>}
+        </span>}
         <span className="kanban-card-kicker">
-          <small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small>
+          {project ? <span className="kanban-card-project"><ProjectIcon className="kanban-card-project-icon" project={project} /><small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small></span> : <small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small>}
         </span>
         <span className="kanban-card-copy">
           <strong>{run.title}</strong>
