@@ -1000,28 +1000,18 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
         guard let channelID = UUID(uuidString: request.channelID) else {
             throw MobileAPIError.invalidRequest
         }
-        let detail: ChannelDetailResponse
         switch channelID {
         case designChannelID where hasHistory:
-            detail = channelHistory
+            return channelHistoryResponse
         case designChannelID where showsBatchProposal:
-            detail = batchProposalChannel
+            return batchProposalChannelResponse
         case designChannelID:
-            detail = designChannel
+            return designChannelResponse
         case honeyChannelID:
-            detail = honeyChannel
+            return honeyChannelResponse
         default:
             throw MobileAPIError.invalidRequest
         }
-        var response = BriarAPI_GetChannelResponse()
-        response.channel = channelSummaryMessage(detail.channel)
-        response.members = try detail.members.map(channelMemberMessage)
-        response.agents = detail.agents.map(organizationAgentMessage)
-        response.messages = detail.messages.map(channelMessageMessage)
-        if let nextCursor = detail.nextCursor {
-            response.nextCursor = nextCursor.uuidString.lowercased()
-        }
-        return response
     }
 
     private static func markChannelReadResponse(
@@ -1041,19 +1031,39 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
         hasHistory: Bool
     ) -> BriarAPI_ListChannelMessagesResponse {
         let channelID = UUID(uuidString: request.channelID)
-        let result: ChannelMessagesResponse
         if hasHistory, channelID == designChannelID, request.hasCursor {
-            result = earlierChannelHistory
+            return earlierChannelHistoryResponse
         } else if channelID == designChannelID,
                   request.hasParentMessageID,
                   UUID(uuidString: request.parentMessageID) == designRootMessageID {
-            result = designThread
-        } else {
-            result = ChannelMessagesResponse(messages: [], nextCursor: nil)
+            return designThreadResponse
         }
+        return BriarAPI_ListChannelMessagesResponse()
+    }
+
+    private static func getChannelResponse(
+        channel: ChannelSummary,
+        agents: [ChannelAgentSummary],
+        messages: [ChannelMessage],
+        nextCursor: UUID? = nil
+    ) -> BriarAPI_GetChannelResponse {
+        var response = BriarAPI_GetChannelResponse()
+        response.channel = channelSummaryMessage(channel)
+        response.agents = agents.map(organizationAgentMessage)
+        response.messages = messages.map(channelMessageMessage)
+        if let nextCursor {
+            response.nextCursor = nextCursor.uuidString.lowercased()
+        }
+        return response
+    }
+
+    private static func channelMessagePage(
+        messages: [ChannelMessage],
+        nextCursor: UUID? = nil
+    ) -> BriarAPI_ListChannelMessagesResponse {
         var response = BriarAPI_ListChannelMessagesResponse()
-        response.messages = result.messages.map(channelMessageMessage)
-        if let nextCursor = result.nextCursor {
+        response.messages = messages.map(channelMessageMessage)
+        if let nextCursor {
             response.nextCursor = nextCursor.uuidString.lowercased()
         }
         return response
@@ -1466,10 +1476,9 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
         )
     }
 
-    private static var designChannel: ChannelDetailResponse {
-        ChannelDetailResponse(
+    private static var designChannelResponse: BriarAPI_GetChannelResponse {
+        getChannelResponse(
             channel: designChannelSummary,
-            members: [],
             agents: [ChannelAgentSummary(
                 agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
                 name: "Issue processing agent",
@@ -1485,7 +1494,7 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
         )
     }
 
-    private static var honeyChannel: ChannelDetailResponse {
+    private static var honeyChannelResponse: BriarAPI_GetChannelResponse {
         let root = ChannelMessage(
             id: UUID(uuidString: "16161616-1616-4616-8616-161616161616")!,
             channelId: honeyChannelID,
@@ -1522,9 +1531,8 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
             proposal: nil,
             createdAt: Date(timeIntervalSince1970: 1_777_105_440)
         )
-        return ChannelDetailResponse(
+        return getChannelResponse(
             channel: honeyChannelSummary,
-            members: [],
             agents: [ChannelAgentSummary(
                 agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
                 name: "Honey",
@@ -1540,8 +1548,8 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
         )
     }
 
-    private static var designThread: ChannelMessagesResponse {
-        ChannelMessagesResponse(
+    private static var designThreadResponse: BriarAPI_ListChannelMessagesResponse {
+        channelMessagePage(
             messages: [
                 designRootMessage,
                 ChannelMessage(
@@ -1567,7 +1575,7 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
         )
     }
 
-    private static var batchProposalChannel: ChannelDetailResponse {
+    private static var batchProposalChannelResponse: BriarAPI_GetChannelResponse {
         typealias Proposal = ChannelMessage.Proposal
         typealias Issue = Proposal.Payload.Issue
         let batch = Proposal.Payload.Batch(
@@ -1627,9 +1635,8 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
                 ),
             ]
         )
-        return ChannelDetailResponse(
+        return getChannelResponse(
             channel: designChannelSummary,
-            members: [],
             agents: [],
             messages: [ChannelMessage(
                 id: UUID(uuidString: "19191919-1919-4919-8919-191919191919")!,
@@ -1652,7 +1659,7 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
         )
     }
 
-    private static let channelHistory: ChannelDetailResponse = {
+    private static var channelHistoryResponse: BriarAPI_GetChannelResponse {
         let channelID = UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!
         let createdAt = Date(timeIntervalSince1970: 1_775_260_800)
         let channel = ChannelSummary(
@@ -1695,16 +1702,15 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
                 createdAt: createdAt.addingTimeInterval(TimeInterval(index * 60))
             )
         }
-        return ChannelDetailResponse(
+        return getChannelResponse(
             channel: channel,
-            members: [],
             agents: [],
             messages: messages,
             nextCursor: UUID(uuidString: "20000000-0000-4000-8000-000000000001")
         )
-    }()
+    }
 
-    private static let earlierChannelHistory = ChannelMessagesResponse(
+    private static let earlierChannelHistoryResponse = channelMessagePage(
         messages: [ChannelMessage(
             id: UUID(uuidString: "20000000-0000-4000-8000-000000000002")!,
             channelId: UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!,

@@ -2972,11 +2972,10 @@ struct RunDetailView: View {
     private func toggleSubscription() async {
         guard currentUserID != nil else { return }
         do {
-            let response = try await mutations.setSubscription(
+            subscribers = try await mutations.setSubscription(
                 runID: run.id,
                 subscribed: !isSubscribed
             )
-            subscribers = response.subscribers
             actionError = nil
             await refresh()
         } catch {

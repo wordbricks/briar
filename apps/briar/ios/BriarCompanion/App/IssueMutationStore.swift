@@ -133,7 +133,7 @@ final class IssueMutationStore: ObservableObject {
     func setSubscription(
         runID: UUID,
         subscribed: Bool
-    ) async throws -> IssueSubscriptionResponse {
+    ) async throws -> [IssueSubscriber] {
         try await perform("subscription-\(runID)") {
             var request = BriarAPI_SetIssueSubscriptionRequest()
             request.projectID = coreUUIDString(projectID)
@@ -143,7 +143,11 @@ final class IssueMutationStore: ObservableObject {
                 request: request,
                 headers: [:]
             )
-            return try IssueSubscriptionResponse(connectMessage: response.briarValue())
+            let message = try response.briarValue()
+            guard try issueUUID(message.runID) == runID else {
+                throw MobileAPIError.invalidResponse
+            }
+            return try message.subscribers.map(IssueSubscriber.init(connectMessage:))
         }
     }
 

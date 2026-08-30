@@ -2,13 +2,6 @@ import BriarContracts
 import Foundation
 import SwiftProtobuf
 
-extension ChannelsResponse {
-    init(connectMessage message: BriarAPI_ListChannelsResponse) throws {
-        channels = try message.channels.map { try ChannelSummary(connectMessage: $0) }
-        cursor = try channelSafeInt(message.cursor)
-    }
-}
-
 extension ChannelDeltaResponse {
     init(connectMessage message: BriarAPI_SyncChannelsResponse) throws {
         cursor = try channelSafeInt(message.cursor)
@@ -22,25 +15,6 @@ extension ChannelDeltaResponse {
     }
 }
 
-extension ChannelDetailResponse {
-    init(connectMessage message: BriarAPI_GetChannelResponse) throws {
-        guard message.hasChannel else { throw MobileAPIError.invalidResponse }
-        channel = try ChannelSummary(connectMessage: message.channel)
-        members = try message.members.map { try ChannelMember(connectMessage: $0) }
-        agents = try message.agents.map { try ChannelAgentSummary(connectMessage: $0) }
-        messages = try message.messages.map { try ChannelMessage(connectMessage: $0) }
-        agentReplies = try message.agentReplies.map { try ChannelAgentReply(connectMessage: $0) }
-        nextCursor = try channelOptionalUUID(message.nextCursor, present: message.hasNextCursor)
-    }
-}
-
-extension ChannelMessagesResponse {
-    init(connectMessage message: BriarAPI_ListChannelMessagesResponse) throws {
-        messages = try message.messages.map { try ChannelMessage(connectMessage: $0) }
-        nextCursor = try channelOptionalUUID(message.nextCursor, present: message.hasNextCursor)
-    }
-}
-
 extension CreateChannelMessageResponse {
     init(connectMessage message: BriarAPI_CreateChannelMessageResponse) throws {
         guard message.hasMessage else { throw MobileAPIError.invalidResponse }
@@ -48,18 +22,6 @@ extension CreateChannelMessageResponse {
             message: try ChannelMessage(connectMessage: message.message),
             agentReplies: try message.agentReplies.map { try ChannelAgentReply(connectMessage: $0) }
         )
-    }
-}
-
-extension DeleteChannelMessageResponse {
-    init(connectMessage message: BriarAPI_DeleteChannelMessageResponse) throws {
-        deleted = message.deleted
-        self.message = message.hasMessage
-            ? try ChannelMessage(connectMessage: message.message)
-            : nil
-        parentMessage = message.hasParentMessage
-            ? try ChannelMessage(connectMessage: message.parentMessage)
-            : nil
     }
 }
 
@@ -779,11 +741,11 @@ private func channelUUID(_ value: String) throws -> UUID {
     return value
 }
 
-private func channelOptionalUUID(_ value: String, present: Bool) throws -> UUID? {
+func channelOptionalUUID(_ value: String, present: Bool) throws -> UUID? {
     present ? try channelUUID(value) : nil
 }
 
-private func channelSafeInt<T: BinaryInteger>(_ value: T) throws -> Int {
+func channelSafeInt<T: BinaryInteger>(_ value: T) throws -> Int {
     guard let value = Int(exactly: value) else { throw MobileAPIError.invalidResponse }
     return value
 }

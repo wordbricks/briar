@@ -848,10 +848,6 @@ struct AcceptIssueActionProposalResponse: Codable, Equatable, Sendable {
     let executionProposal: IssueExecutionProposal?
 }
 
-struct RunEvidenceResponse: Codable, Equatable, Sendable {
-    let evidence: [RunEvidence]
-}
-
 struct RunEvidence: Codable, Equatable, Identifiable, Sendable {
     let key: String
     let attempt: Int

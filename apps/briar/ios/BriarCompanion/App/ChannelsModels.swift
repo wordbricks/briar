@@ -762,11 +762,6 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-struct ChannelsResponse: Sendable {
-    let channels: [ChannelSummary]
-    let cursor: Int?
-}
-
 struct ChannelAgentReply: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let agentId: UUID
@@ -1003,20 +998,6 @@ struct ChannelDeltaResponse: Equatable, Sendable {
     var agentReplies: [ChannelAgentReply]? = nil
 }
 
-struct ChannelDetailResponse: Sendable {
-    let channel: ChannelSummary
-    let members: [ChannelMember]
-    let agents: [ChannelAgentSummary]
-    let messages: [ChannelMessage]
-    var agentReplies: [ChannelAgentReply]? = nil
-    var nextCursor: UUID? = nil
-}
-
-struct ChannelMessagesResponse: Sendable {
-    let messages: [ChannelMessage]
-    var nextCursor: UUID? = nil
-}
-
 struct CreateChannelMessageResponse: Codable, Sendable {
     let message: ChannelMessage
     let agentReplies: [ChannelAgentReply]
@@ -1039,12 +1020,6 @@ struct CreateChannelMessageResponse: Codable, Sendable {
             forKey: .agentReplies
         ) ?? []
     }
-}
-
-struct DeleteChannelMessageResponse: Sendable {
-    let deleted: Bool
-    let message: ChannelMessage?
-    let parentMessage: ChannelMessage?
 }
 
 struct AcceptChannelProposalResponse: Equatable, Sendable {

@@ -521,8 +521,14 @@ final class RunDetailStore: ObservableObject {
                 let messageSnapshot = try IssueMessagesResponse(
                     connectMessage: loaded.1.briarValue()
                 )
-                let evidenceSnapshot = try RunEvidenceResponse(
-                    connectMessage: loaded.2.briarValue()
+                let evidenceMessage = try loaded.2.briarValue()
+                guard try issueUUID(evidenceMessage.runID) == runID else {
+                    throw MobileAPIError.invalidResponse
+                }
+                _ = try issueSafeInt(evidenceMessage.attempt)
+                _ = try issueSafeInt(evidenceMessage.revision)
+                let evidenceSnapshot = try evidenceMessage.evidence.map(
+                    RunEvidence.init(connectMessage:)
                 )
                 let stabilizedMessages = preservingLocallyAcceptedSkillExecutionProposals(
                     in: messageSnapshot.messages
@@ -540,7 +546,7 @@ final class RunDetailStore: ObservableObject {
                     return $0.id.uuidString < $1.id.uuidString
                 }
                 agentReplies = messageSnapshot.agentReplies
-                evidence = evidenceSnapshot.evidence
+                evidence = evidenceSnapshot
                 errorMessage = nil
             } catch {
                 guard expectedLifecycleRevision == lifecycleRevision else { return }

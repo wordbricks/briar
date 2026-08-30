@@ -304,11 +304,6 @@ struct CreateIssueResponse: Codable, Sendable {
     let difficulty: IssueDifficulty?
 }
 
-struct IssueSubscriptionResponse: Codable, Equatable, Sendable {
-    let runId: UUID
-    let subscribers: [IssueSubscriber]
-}
-
 struct IssueExecutionPreferences: Codable, Equatable, Sendable {
     var provider: AgentProvider?
     var model: String?

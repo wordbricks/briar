@@ -301,17 +301,19 @@ final class ChannelsStore: ObservableObject {
                 request: request,
                 headers: [:]
             )
-            let response = try ChannelsResponse(connectMessage: wireResponse.briarValue())
+            let response = try wireResponse.briarValue()
+            let incomingChannels = try response.channels.map(ChannelSummary.init(connectMessage:))
+            let cursor = try channelSafeInt(response.cursor)
             guard
                 !Task.isCancelled,
                 expectedGeneration == generation,
                 expectedCatalogRevision == catalogLoadRevision
             else { return }
-            channels = response.channels
+            channels = incomingChannels
             // Only the first authoritative snapshot establishes the cursor.
             // Advancing it on a later list-only refresh could skip messages.
             if syncCursor == nil {
-                syncCursor = response.cursor
+                syncCursor = cursor
             }
             errorMessage = nil
         } catch {
@@ -420,29 +422,45 @@ final class ChannelsStore: ObservableObject {
                 request: request,
                 headers: [:]
             )
-            let response = try ChannelDetailResponse(connectMessage: wireResponse.briarValue())
+            let response = try wireResponse.briarValue()
+            guard response.hasChannel else { throw MobileAPIError.invalidResponse }
+            let channel = try ChannelSummary(connectMessage: response.channel)
+            let incomingMembers = try response.members.map(ChannelMember.init(connectMessage:))
+            let incomingAgents = try response.agents.map(
+                ChannelAgentSummary.init(connectMessage:)
+            )
+            let incomingMessages = try response.messages.map(
+                ChannelMessage.init(connectMessage:)
+            )
+            let incomingReplies = try response.agentReplies.map(
+                ChannelAgentReply.init(connectMessage:)
+            )
+            let nextCursor = try channelOptionalUUID(
+                response.nextCursor,
+                present: response.hasNextCursor
+            )
             guard
                 !Task.isCancelled,
                 expectedGeneration == generation,
                 expectedLoadRevision == authoritativeLoadRevision,
                 focusedChannelID == channelID
             else { return }
-            upsertChannel(response.channel)
+            upsertChannel(channel)
             await markChannelRead(channelID)
             invalidateExecutionProposals(
-                forMessageIDs: previousMessageIDs.subtracting(Set(response.messages.map(\.id)))
+                forMessageIDs: previousMessageIDs.subtracting(Set(incomingMessages.map(\.id)))
             )
-            recordProposalMessages(response.messages)
+            recordProposalMessages(incomingMessages)
             messages = mergeAuthoritativeSnapshot(
                 current: messages,
-                incoming: response.messages
+                incoming: incomingMessages
             )
-            nextMessageCursor = response.nextCursor
+            nextMessageCursor = nextCursor
             hasEarlierMessages = nextMessageCursor != nil
-            members = response.members
-            agents = response.agents
+            members = incomingMembers
+            agents = incomingAgents
             replaceAgentReplies(
-                with: response.agentReplies ?? [],
+                with: incomingReplies,
                 channelID: channelID,
                 previous: repliesBeforeAuthoritativeLoad
             )
@@ -513,7 +531,14 @@ final class ChannelsStore: ObservableObject {
                 request: request,
                 headers: [:]
             )
-            let response = try ChannelMessagesResponse(connectMessage: wireResponse.briarValue())
+            let response = try wireResponse.briarValue()
+            let incomingMessages = try response.messages.map(
+                ChannelMessage.init(connectMessage:)
+            )
+            let nextCursor = try channelOptionalUUID(
+                response.nextCursor,
+                present: response.hasNextCursor
+            )
             guard
                 !Task.isCancelled,
                 expectedGeneration == generation,
@@ -522,7 +547,7 @@ final class ChannelsStore: ObservableObject {
                 focusedThreadParentID == nil
             else { return }
             let stabilizedMessages = preservingLocallyAcceptedExecutionProposals(
-                in: response.messages
+                in: incomingMessages
             )
             recordProposalMessages(stabilizedMessages)
             messages = Self.mergeMessages(
@@ -530,8 +555,8 @@ final class ChannelsStore: ObservableObject {
                 updates: stabilizedMessages,
                 removing: []
             )
-            nextMessageCursor = response.nextCursor
-            hasEarlierMessages = response.nextCursor != nil
+            nextMessageCursor = nextCursor
+            hasEarlierMessages = nextCursor != nil
             errorMessage = nil
         } catch {
             guard
@@ -573,14 +598,21 @@ final class ChannelsStore: ObservableObject {
                 request: request,
                 headers: [:]
             )
-            let response = try ChannelMessagesResponse(connectMessage: wireResponse.briarValue())
+            let response = try wireResponse.briarValue()
+            let incomingMessages = try response.messages.map(
+                ChannelMessage.init(connectMessage:)
+            )
+            _ = try channelOptionalUUID(
+                response.nextCursor,
+                present: response.hasNextCursor
+            )
             guard
                 !Task.isCancelled,
                 expectedGeneration == generation,
                 expectedLoadRevision == authoritativeLoadRevision,
                 focusedChannelID == channelID,
                 focusedThreadParentID == nil,
-                let root = response.messages.first(where: {
+                let root = incomingMessages.first(where: {
                     $0.id == messageID && $0.parentMessageId == nil
                 })
             else { return nil }
@@ -664,7 +696,14 @@ final class ChannelsStore: ObservableObject {
                 request: request,
                 headers: [:]
             )
-            let response = try ChannelMessagesResponse(connectMessage: wireResponse.briarValue())
+            let response = try wireResponse.briarValue()
+            let incomingMessages = try response.messages.map(
+                ChannelMessage.init(connectMessage:)
+            )
+            _ = try channelOptionalUUID(
+                response.nextCursor,
+                present: response.hasNextCursor
+            )
             guard
                 !Task.isCancelled,
                 expectedGeneration == generation,
@@ -674,13 +713,13 @@ final class ChannelsStore: ObservableObject {
             else { return }
             invalidateExecutionProposals(
                 forMessageIDs: previousThreadMessageIDs.subtracting(
-                    Set(response.messages.map(\.id))
+                    Set(incomingMessages.map(\.id))
                 )
             )
-            recordProposalMessages(response.messages)
+            recordProposalMessages(incomingMessages)
             thread = mergeAuthoritativeSnapshot(
                 current: thread,
-                incoming: response.messages
+                incoming: incomingMessages
             )
             storeCachedThread(thread, for: cacheKey)
             errorMessage = nil
@@ -1067,21 +1106,25 @@ final class ChannelsStore: ObservableObject {
                 request: request,
                 headers: [:]
             )
-            let response = try DeleteChannelMessageResponse(
-                connectMessage: wireResponse.briarValue()
-            )
-            guard response.message?.channelId == nil ||
-                    (response.message?.channelId == channelID &&
-                        response.message?.id == messageID &&
-                        response.message?.parentMessageId == nil),
-                  response.parentMessage?.channelId == nil ||
-                    (response.parentMessage?.channelId == channelID &&
-                        response.parentMessage?.id == expectedParentMessageID &&
-                        response.parentMessage?.parentMessageId == nil)
+            let response = try wireResponse.briarValue()
+            let updatedMessage = response.hasMessage
+                ? try ChannelMessage(connectMessage: response.message)
+                : nil
+            let updatedParent = response.hasParentMessage
+                ? try ChannelMessage(connectMessage: response.parentMessage)
+                : nil
+            guard updatedMessage?.channelId == nil ||
+                    (updatedMessage?.channelId == channelID &&
+                        updatedMessage?.id == messageID &&
+                        updatedMessage?.parentMessageId == nil),
+                  updatedParent?.channelId == nil ||
+                    (updatedParent?.channelId == channelID &&
+                        updatedParent?.id == expectedParentMessageID &&
+                        updatedParent?.parentMessageId == nil)
             else { throw MobileAPIError.invalidResponse }
             guard focusIsCurrent() else { return response.deleted }
-            let updates = [response.message, response.parentMessage].compactMap { $0 }
-            let removed = response.deleted && response.message == nil
+            let updates = [updatedMessage, updatedParent].compactMap { $0 }
+            let removed = response.deleted && updatedMessage == nil
                 ? Set([messageID])
                 : Set<UUID>()
             let messageIDs = Set(messages.map(\.id))

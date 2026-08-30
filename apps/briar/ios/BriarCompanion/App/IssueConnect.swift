@@ -88,15 +88,6 @@ extension CreateIssueResponse {
     }
 }
 
-extension IssueSubscriptionResponse {
-    init(connectMessage message: BriarAPI_SetIssueSubscriptionResponse) throws {
-        self.init(
-            runId: try issueUUID(message.runID),
-            subscribers: try message.subscribers.map { try .init(connectMessage: $0) }
-        )
-    }
-}
-
 extension ResultReview {
     init(connectMessage message: BriarAPI_ResultReview) throws {
         guard message.hasCompletedAt else { throw MobileAPIError.invalidResponse }
@@ -306,15 +297,6 @@ extension IssueProposedAction {
     }
 }
 
-extension RunEvidenceResponse {
-    init(connectMessage message: BriarAPI_ListRunEvidenceResponse) throws {
-        _ = try issueUUID(message.runID)
-        _ = try issueSafeInt(message.attempt)
-        _ = try issueSafeInt(message.revision)
-        self.init(evidence: try message.evidence.map { try .init(connectMessage: $0) })
-    }
-}
-
 extension RunEvidence {
     init(connectMessage message: BriarAPI_RunEvidence) throws {
         guard message.hasObservedAt, message.hasRecordedAt else {
@@ -468,7 +450,7 @@ func issueUUID(_ value: String) throws -> UUID {
     return value
 }
 
-private func issueSafeInt<T: BinaryInteger>(_ value: T) throws -> Int {
+func issueSafeInt<T: BinaryInteger>(_ value: T) throws -> Int {
     guard let value = Int(exactly: value) else { throw MobileAPIError.invalidResponse }
     return value
 }
