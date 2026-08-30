@@ -6,6 +6,7 @@ import { registerAppAccountService } from "./app-connect-account";
 import { registerAppAgentService } from "./app-connect-agent";
 import { registerAppChannelService } from "./app-connect-channel";
 import { registerAppDashboardService } from "./app-connect-dashboard";
+import { registerAppFleetService } from "./app-connect-fleet";
 import { registerAppInboxService } from "./app-connect-inbox";
 import { registerAppIssueService } from "./app-connect-issue";
 import { registerAppOrganizationService } from "./app-connect-organization";
@@ -67,6 +68,11 @@ export async function handleAppConnectRequest(
     context: input.context,
   });
   registerAppAgentService(router, {
+    ...sharedInput,
+    env: input.env,
+    context: input.context,
+  });
+  registerAppFleetService(router, {
     ...sharedInput,
     env: input.env,
     context: input.context,

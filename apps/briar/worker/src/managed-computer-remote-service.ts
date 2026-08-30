@@ -92,16 +92,19 @@ function requireRemoteDesktop(config: ManagedComputerConfig, env: Env) {
   }
 }
 
-export function assertManagedComputerRemoteOrigin(
-  request: Request,
+export function assertManagedComputerRemoteRequestOrigin(
+  request: {
+    readonly origin: string | null;
+    readonly secFetchSite: string | null;
+  },
   config: ManagedComputerConfig,
   options: { required: boolean },
 ) {
-  const origin = request.headers.get("origin")?.trim() ?? "";
+  const origin = request.origin?.trim() ?? "";
   if (!origin) {
     if (
       options.required ||
-      request.headers.get("sec-fetch-site")?.toLowerCase() === "cross-site"
+      request.secFetchSite?.toLowerCase() === "cross-site"
     ) {
       throw remoteError(
         403,
@@ -118,6 +121,17 @@ export function assertManagedComputerRemoteOrigin(
       "Remote desktop request origin is not allowed",
     );
   }
+}
+
+export function assertManagedComputerRemoteOrigin(
+  request: Request,
+  config: ManagedComputerConfig,
+  options: { required: boolean },
+) {
+  return assertManagedComputerRemoteRequestOrigin({
+    origin: request.headers.get("origin"),
+    secFetchSite: request.headers.get("sec-fetch-site"),
+  }, config, options);
 }
 
 export function managedComputerRemoteClientToken(request: Request) {
