@@ -45,6 +45,7 @@ const connectRequest = () => new Request(
       mentionedAgentIds: [agentId],
       skillId,
       preferredDeviceId: "device-1",
+      attachmentReferences: ["existing-image"],
     }),
   },
 );
@@ -169,6 +170,7 @@ describe("app Channel Connect adapter", () => {
       mentionedAgentIds: [agentId],
       skillId,
       preferredDeviceId: "device-1",
+      attachmentReferences: ["existing-image"],
     });
     expect(await response.json()).toEqual({
       message: {

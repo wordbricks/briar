@@ -6,8 +6,12 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import type { BriarAuth } from "./auth";
 import type { handleIssueConversationRoute } from "./issue-conversation-routes";
+import type { handleIssueCoreRoute } from "./issue-core-routes";
 
-import { registerAppIssueService } from "./app-connect-issue";
+import {
+  type AppConnectIssueRouteHandlers,
+  registerAppIssueService,
+} from "./app-connect-issue";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const runId = "22222222-2222-4222-8222-222222222222";
@@ -15,6 +19,49 @@ const messageId = "33333333-3333-4333-8333-333333333333";
 const proposalId = "44444444-4444-4444-8444-444444444444";
 const replyId = "55555555-5555-4555-8555-555555555555";
 const agentId = "66666666-6666-4666-8666-666666666666";
+const attachmentId = "77777777-7777-4777-8777-777777777777";
+
+const issueConnectRequest = (method: string, body: unknown) =>
+  new Request(
+    `https://api.example.test/briar.app.v1.IssueService/${method}`,
+    {
+      method: "POST",
+      headers: {
+        authorization: "Bearer session-token",
+        "connect-protocol-version": "1",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+  );
+
+const invokeIssueRpc = async (
+  method: string,
+  body: unknown,
+  routeHandlers: Partial<AppConnectIssueRouteHandlers>,
+) => {
+  const request = issueConnectRequest(method, body);
+  const router = createConnectRouter({
+    connect: true,
+    grpc: false,
+    grpcWeb: false,
+  });
+  registerAppIssueService(router, {
+    request,
+    auth: {} as BriarAuth,
+    db: {} as D1Database,
+    env: {
+      ATTACHMENTS: {},
+      ARCHIVES: {},
+    } as Env,
+    routeHandlers,
+  });
+  const handler = router.handlers.find((candidate) =>
+    candidate.requestPath === `/briar.app.v1.IssueService/${method}`
+  );
+  expect(handler).toBeDefined();
+  return createFetchHandler(handler!)(request);
+};
 
 const connectRequest = () =>
   new Request(
@@ -31,6 +78,96 @@ const connectRequest = () =>
   );
 
 describe("app Issue Connect adapter", () => {
+  it("preserves checkpoints and attachment references when creating an issue", async () => {
+    const coreRoute = vi.fn<typeof handleIssueCoreRoute>();
+    coreRoute.mockResolvedValueOnce(new Response(JSON.stringify({
+      runId,
+      sourceKey: "BR-1",
+      status: "backlog",
+      stage: "queued",
+      attachments: [],
+      createdByUserId: "user-1",
+    }), { headers: { "content-type": "application/json" } }));
+
+    const response = await invokeIssueRpc("CreateIssue", {
+      projectId,
+      title: "Preserve wire input",
+      status: "RUN_STATUS_BACKLOG",
+      checkpoints: [{
+        key: "review",
+        stage: "implement",
+        position: "POSITION_AFTER",
+      }],
+      attachmentReferences: ["draft-image-1"],
+    }, { core: coreRoute });
+
+    expect(response.status).toBe(200);
+    const routed = coreRoute.mock.calls[0][0] as { request: Request };
+    expect(await routed.request.json()).toMatchObject({
+      checkpoints: [{
+        key: "review",
+        stage: "implement",
+        position: "after",
+      }],
+      attachmentReferences: ["draft-image-1"],
+    });
+  });
+
+  it("preserves clear/no-op assignee states and a present empty attachment patch", async () => {
+    const coreRoute = vi.fn<typeof handleIssueCoreRoute>();
+    const updated = {
+      runId,
+      title: "Updated issue",
+      description: null,
+      priority: null,
+      difficulty: "normal",
+      assigneeUserId: null,
+      attachments: [{
+        id: attachmentId,
+        filename: "design.png",
+        contentType: "image/png",
+        byteSize: 12,
+        url: `https://api.example.test/attachments/${attachmentId}`,
+      }],
+    };
+    coreRoute.mockImplementation(async () =>
+      new Response(JSON.stringify(updated), {
+        headers: { "content-type": "application/json" },
+      })
+    );
+
+    const cleared = await invokeIssueRpc("UpdateIssue", {
+      projectId,
+      runId,
+      title: "Updated issue",
+      clearAssignee: {},
+      attachmentReferences: [attachmentId],
+      keptAttachmentIds: { values: [] },
+    }, { core: coreRoute });
+    expect(cleared.status).toBe(200);
+    expect(await (coreRoute.mock.calls[0][0] as { request: Request }).request
+      .json()).toMatchObject({
+        assigneeUserId: null,
+        attachmentReferences: [attachmentId],
+        keptAttachmentIds: [],
+      });
+    expect(await cleared.json()).toMatchObject({
+      attachments: [{ id: attachmentId, byteSize: "12" }],
+    });
+
+    const unchanged = await invokeIssueRpc("UpdateIssue", {
+      projectId,
+      runId,
+      title: "Updated issue",
+    }, { core: coreRoute });
+    expect(unchanged.status).toBe(200);
+    const unchangedBody = await (
+      coreRoute.mock.calls[1][0] as { request: Request }
+    ).request.json() as Record<string, unknown>;
+    expect(unchangedBody).not.toHaveProperty("assigneeUserId");
+    expect(unchangedBody).not.toHaveProperty("keptAttachmentIds");
+  });
+
   it("registers every RPC and preserves a complex conversation response", async () => {
     const conversationRoute = vi.fn<typeof handleIssueConversationRoute>();
     conversationRoute.mockResolvedValueOnce(new Response(JSON.stringify({

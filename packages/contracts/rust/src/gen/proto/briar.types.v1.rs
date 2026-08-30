@@ -206,1091 +206,6 @@ impl ::buffa::Enumeration for AgentProvider {
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct AgentEffortCapability {
-    /// Field 1: `id`
-    #[serde(
-        rename = "id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub id: ::buffa::alloc::string::String,
-    /// Field 2: `label`
-    #[serde(
-        rename = "label",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub label: ::buffa::alloc::string::String,
-    /// Field 3: `description`
-    #[serde(
-        rename = "description",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub description: ::core::option::Option<::buffa::alloc::string::String>,
-    /// Field 4: `is_default`
-    #[serde(
-        rename = "isDefault",
-        alias = "is_default",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub is_default: ::core::option::Option<bool>,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for AgentEffortCapability {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("AgentEffortCapability")
-            .field("id", &self.id)
-            .field("label", &self.label)
-            .field("description", &self.description)
-            .field("is_default", &self.is_default)
-            .finish()
-    }
-}
-impl AgentEffortCapability {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentEffortCapability";
-}
-impl AgentEffortCapability {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::description`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_description(
-        mut self,
-        value: impl Into<::buffa::alloc::string::String>,
-    ) -> Self {
-        self.description = Some(value.into());
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::is_default`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_is_default(mut self, value: bool) -> Self {
-        self.is_default = Some(value);
-        self
-    }
-}
-::buffa::impl_default_instance!(AgentEffortCapability);
-impl ::buffa::MessageName for AgentEffortCapability {
-    const PACKAGE: &'static str = "briar.types.v1";
-    const NAME: &'static str = "AgentEffortCapability";
-    const FULL_NAME: &'static str = "briar.types.v1.AgentEffortCapability";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentEffortCapability";
-}
-impl ::buffa::Message for AgentEffortCapability {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if !self.id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
-        }
-        if !self.label.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.label) as u64;
-        }
-        if let Some(ref v) = self.description {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-        }
-        if self.is_default.is_some() {
-            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if !self.id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.id, buf);
-        }
-        if !self.label.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.label, buf);
-        }
-        if let Some(ref v) = self.description {
-            ::buffa::types::put_string_field(3u32, v, buf);
-        }
-        if let Some(v) = self.is_default {
-            ::buffa::types::put_bool_field(4u32, v, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.id, buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.label, buf)?;
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(
-                    self
-                        .description
-                        .get_or_insert_with(::buffa::alloc::string::String::new),
-                    buf,
-                )?;
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.is_default = ::core::option::Option::Some(
-                    ::buffa::types::decode_bool(buf)?,
-                );
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.id.clear();
-        self.label.clear();
-        self.description = ::core::option::Option::None;
-        self.is_default = ::core::option::Option::None;
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for AgentEffortCapability {
-    const PROTO_FQN: &'static str = "briar.types.v1.AgentEffortCapability";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for AgentEffortCapability {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __AGENT_EFFORT_CAPABILITY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.types.v1.AgentEffortCapability",
-    to_json: ::buffa::type_registry::any_to_json::<AgentEffortCapability>,
-    from_json: ::buffa::type_registry::any_from_json::<AgentEffortCapability>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct AgentModelCapability {
-    /// Field 1: `id`
-    #[serde(
-        rename = "id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub id: ::buffa::alloc::string::String,
-    /// Field 2: `label`
-    #[serde(
-        rename = "label",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub label: ::buffa::alloc::string::String,
-    /// Field 3: `is_default`
-    #[serde(
-        rename = "isDefault",
-        alias = "is_default",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub is_default: ::core::option::Option<bool>,
-    /// Field 4: `default_effort_id`
-    #[serde(
-        rename = "defaultEffortId",
-        alias = "default_effort_id",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub default_effort_id: ::core::option::Option<::buffa::alloc::string::String>,
-    /// Field 5: `efforts`
-    #[serde(
-        rename = "efforts",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub efforts: ::buffa::alloc::vec::Vec<AgentEffortCapability>,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for AgentModelCapability {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("AgentModelCapability")
-            .field("id", &self.id)
-            .field("label", &self.label)
-            .field("is_default", &self.is_default)
-            .field("default_effort_id", &self.default_effort_id)
-            .field("efforts", &self.efforts)
-            .finish()
-    }
-}
-impl AgentModelCapability {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentModelCapability";
-}
-impl AgentModelCapability {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::is_default`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_is_default(mut self, value: bool) -> Self {
-        self.is_default = Some(value);
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::default_effort_id`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_default_effort_id(
-        mut self,
-        value: impl Into<::buffa::alloc::string::String>,
-    ) -> Self {
-        self.default_effort_id = Some(value.into());
-        self
-    }
-}
-::buffa::impl_default_instance!(AgentModelCapability);
-impl ::buffa::MessageName for AgentModelCapability {
-    const PACKAGE: &'static str = "briar.types.v1";
-    const NAME: &'static str = "AgentModelCapability";
-    const FULL_NAME: &'static str = "briar.types.v1.AgentModelCapability";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentModelCapability";
-}
-impl ::buffa::Message for AgentModelCapability {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if !self.id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
-        }
-        if !self.label.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.label) as u64;
-        }
-        if self.is_default.is_some() {
-            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-        }
-        if let Some(ref v) = self.default_effort_id {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-        }
-        for v in &self.efforts {
-            let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        __cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if !self.id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.id, buf);
-        }
-        if !self.label.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.label, buf);
-        }
-        if let Some(v) = self.is_default {
-            ::buffa::types::put_bool_field(3u32, v, buf);
-        }
-        if let Some(ref v) = self.default_effort_id {
-            ::buffa::types::put_string_field(4u32, v, buf);
-        }
-        for v in &self.efforts {
-            ::buffa::types::put_len_delimited_header(
-                5u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            v.write_to(__cache, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.id, buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.label, buf)?;
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.is_default = ::core::option::Option::Some(
-                    ::buffa::types::decode_bool(buf)?,
-                );
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(
-                    self
-                        .default_effort_id
-                        .get_or_insert_with(::buffa::alloc::string::String::new),
-                    buf,
-                )?;
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ctx.register_element_memory(
-                    ::buffa::__private::element_footprint(&elem),
-                )?;
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.efforts.push(elem);
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.id.clear();
-        self.label.clear();
-        self.is_default = ::core::option::Option::None;
-        self.default_effort_id = ::core::option::Option::None;
-        self.efforts.clear();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for AgentModelCapability {
-    const PROTO_FQN: &'static str = "briar.types.v1.AgentModelCapability";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for AgentModelCapability {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __AGENT_MODEL_CAPABILITY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.types.v1.AgentModelCapability",
-    to_json: ::buffa::type_registry::any_to_json::<AgentModelCapability>,
-    from_json: ::buffa::type_registry::any_from_json::<AgentModelCapability>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct AgentProviderCapability {
-    /// Field 1: `provider`
-    #[serde(
-        rename = "provider",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub provider: ::buffa::EnumValue<AgentProvider>,
-    /// Field 2: `models`
-    #[serde(
-        rename = "models",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub models: ::buffa::alloc::vec::Vec<AgentModelCapability>,
-    /// Field 3: `default_efforts`
-    #[serde(
-        rename = "defaultEfforts",
-        alias = "default_efforts",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub default_efforts: ::buffa::alloc::vec::Vec<AgentEffortCapability>,
-    /// Field 4: `allow_custom_models`
-    #[serde(
-        rename = "allowCustomModels",
-        alias = "allow_custom_models",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub allow_custom_models: ::core::option::Option<bool>,
-    /// Field 5: `error`
-    #[serde(rename = "error", skip_serializing_if = "::core::option::Option::is_none")]
-    pub error: ::core::option::Option<::buffa::alloc::string::String>,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for AgentProviderCapability {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("AgentProviderCapability")
-            .field("provider", &self.provider)
-            .field("models", &self.models)
-            .field("default_efforts", &self.default_efforts)
-            .field("allow_custom_models", &self.allow_custom_models)
-            .field("error", &self.error)
-            .finish()
-    }
-}
-impl AgentProviderCapability {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentProviderCapability";
-}
-impl AgentProviderCapability {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::allow_custom_models`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_allow_custom_models(mut self, value: bool) -> Self {
-        self.allow_custom_models = Some(value);
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::error`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_error(
-        mut self,
-        value: impl Into<::buffa::alloc::string::String>,
-    ) -> Self {
-        self.error = Some(value.into());
-        self
-    }
-}
-::buffa::impl_default_instance!(AgentProviderCapability);
-impl ::buffa::MessageName for AgentProviderCapability {
-    const PACKAGE: &'static str = "briar.types.v1";
-    const NAME: &'static str = "AgentProviderCapability";
-    const FULL_NAME: &'static str = "briar.types.v1.AgentProviderCapability";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentProviderCapability";
-}
-impl ::buffa::Message for AgentProviderCapability {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        {
-            let val = self.provider.to_i32();
-            if val != 0 {
-                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
-            }
-        }
-        for v in &self.models {
-            let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        for v in &self.default_efforts {
-            let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        if self.allow_custom_models.is_some() {
-            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-        }
-        if let Some(ref v) = self.error {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        __cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        {
-            let val = self.provider.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(1u32, val, buf);
-            }
-        }
-        for v in &self.models {
-            ::buffa::types::put_len_delimited_header(
-                2u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            v.write_to(__cache, buf);
-        }
-        for v in &self.default_efforts {
-            ::buffa::types::put_len_delimited_header(
-                3u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            v.write_to(__cache, buf);
-        }
-        if let Some(v) = self.allow_custom_models {
-            ::buffa::types::put_bool_field(4u32, v, buf);
-        }
-        if let Some(ref v) = self.error {
-            ::buffa::types::put_string_field(5u32, v, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.provider = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ctx.register_element_memory(
-                    ::buffa::__private::element_footprint(&elem),
-                )?;
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.models.push(elem);
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ctx.register_element_memory(
-                    ::buffa::__private::element_footprint(&elem),
-                )?;
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.default_efforts.push(elem);
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.allow_custom_models = ::core::option::Option::Some(
-                    ::buffa::types::decode_bool(buf)?,
-                );
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(
-                    self.error.get_or_insert_with(::buffa::alloc::string::String::new),
-                    buf,
-                )?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.provider = ::buffa::EnumValue::from(0);
-        self.models.clear();
-        self.default_efforts.clear();
-        self.allow_custom_models = ::core::option::Option::None;
-        self.error = ::core::option::Option::None;
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for AgentProviderCapability {
-    const PROTO_FQN: &'static str = "briar.types.v1.AgentProviderCapability";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for AgentProviderCapability {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __AGENT_PROVIDER_CAPABILITY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.types.v1.AgentProviderCapability",
-    to_json: ::buffa::type_registry::any_to_json::<AgentProviderCapability>,
-    from_json: ::buffa::type_registry::any_from_json::<AgentProviderCapability>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct RemoteUpdateCapability {
-    /// Field 1: `supported`
-    #[serde(
-        rename = "supported",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub supported: bool,
-    /// Field 2: `protocol`
-    #[serde(
-        rename = "protocol",
-        with = "::buffa::json_helpers::opt_uint32",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub protocol: ::core::option::Option<u32>,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for RemoteUpdateCapability {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("RemoteUpdateCapability")
-            .field("supported", &self.supported)
-            .field("protocol", &self.protocol)
-            .finish()
-    }
-}
-impl RemoteUpdateCapability {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.RemoteUpdateCapability";
-}
-impl RemoteUpdateCapability {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::protocol`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_protocol(mut self, value: u32) -> Self {
-        self.protocol = Some(value);
-        self
-    }
-}
-::buffa::impl_default_instance!(RemoteUpdateCapability);
-impl ::buffa::MessageName for RemoteUpdateCapability {
-    const PACKAGE: &'static str = "briar.types.v1";
-    const NAME: &'static str = "RemoteUpdateCapability";
-    const FULL_NAME: &'static str = "briar.types.v1.RemoteUpdateCapability";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.RemoteUpdateCapability";
-}
-impl ::buffa::Message for RemoteUpdateCapability {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if self.supported {
-            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-        }
-        if let Some(v) = self.protocol {
-            size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if self.supported {
-            ::buffa::types::put_bool_field(1u32, self.supported, buf);
-        }
-        if let Some(v) = self.protocol {
-            ::buffa::types::put_uint32_field(2u32, v, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.supported = ::buffa::types::decode_bool(buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.protocol = ::core::option::Option::Some(
-                    ::buffa::types::decode_uint32(buf)?,
-                );
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.supported = false;
-        self.protocol = ::core::option::Option::None;
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for RemoteUpdateCapability {
-    const PROTO_FQN: &'static str = "briar.types.v1.RemoteUpdateCapability";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for RemoteUpdateCapability {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __REMOTE_UPDATE_CAPABILITY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.types.v1.RemoteUpdateCapability",
-    to_json: ::buffa::type_registry::any_to_json::<RemoteUpdateCapability>,
-    from_json: ::buffa::type_registry::any_from_json::<RemoteUpdateCapability>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct WorkerCapabilities {
-    /// Field 1: `provider_capabilities`
-    #[serde(
-        rename = "providerCapabilities",
-        alias = "provider_capabilities",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub provider_capabilities: ::buffa::alloc::vec::Vec<AgentProviderCapability>,
-    /// Field 2: `remote_updates`
-    #[serde(
-        rename = "remoteUpdates",
-        alias = "remote_updates",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
-    )]
-    pub remote_updates: ::buffa::MessageField<
-        RemoteUpdateCapability,
-        ::buffa::Inline<RemoteUpdateCapability>,
-    >,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for WorkerCapabilities {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("WorkerCapabilities")
-            .field("provider_capabilities", &self.provider_capabilities)
-            .field("remote_updates", &self.remote_updates)
-            .finish()
-    }
-}
-impl WorkerCapabilities {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkerCapabilities";
-}
-::buffa::impl_default_instance!(WorkerCapabilities);
-impl ::buffa::MessageName for WorkerCapabilities {
-    const PACKAGE: &'static str = "briar.types.v1";
-    const NAME: &'static str = "WorkerCapabilities";
-    const FULL_NAME: &'static str = "briar.types.v1.WorkerCapabilities";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkerCapabilities";
-}
-impl ::buffa::Message for WorkerCapabilities {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        for v in &self.provider_capabilities {
-            let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        if self.remote_updates.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.remote_updates.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        __cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        for v in &self.provider_capabilities {
-            ::buffa::types::put_len_delimited_header(
-                1u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            v.write_to(__cache, buf);
-        }
-        if self.remote_updates.is_set() {
-            ::buffa::types::put_len_delimited_header(
-                2u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            self.remote_updates.write_to(__cache, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ctx.register_element_memory(
-                    ::buffa::__private::element_footprint(&elem),
-                )?;
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.provider_capabilities.push(elem);
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.remote_updates.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.provider_capabilities.clear();
-        self.remote_updates = ::buffa::MessageField::none();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for WorkerCapabilities {
-    const PROTO_FQN: &'static str = "briar.types.v1.WorkerCapabilities";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for WorkerCapabilities {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __WORKER_CAPABILITIES_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.types.v1.WorkerCapabilities",
-    to_json: ::buffa::type_registry::any_to_json::<WorkerCapabilities>,
-    from_json: ::buffa::type_registry::any_from_json::<WorkerCapabilities>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
 pub struct WorkflowCheckpoint {
     /// Field 1: `key`
     #[serde(
@@ -3459,6 +2374,1091 @@ pub const __CHECKPOINT_POLICY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
     type_url: "type.googleapis.com/briar.types.v1.CheckpointPolicy",
     to_json: ::buffa::type_registry::any_to_json::<CheckpointPolicy>,
     from_json: ::buffa::type_registry::any_from_json::<CheckpointPolicy>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AgentEffortCapability {
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// Field 2: `label`
+    #[serde(
+        rename = "label",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub label: ::buffa::alloc::string::String,
+    /// Field 3: `description`
+    #[serde(
+        rename = "description",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub description: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 4: `is_default`
+    #[serde(
+        rename = "isDefault",
+        alias = "is_default",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub is_default: ::core::option::Option<bool>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AgentEffortCapability {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AgentEffortCapability")
+            .field("id", &self.id)
+            .field("label", &self.label)
+            .field("description", &self.description)
+            .field("is_default", &self.is_default)
+            .finish()
+    }
+}
+impl AgentEffortCapability {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentEffortCapability";
+}
+impl AgentEffortCapability {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::description`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_description(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.description = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::is_default`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_is_default(mut self, value: bool) -> Self {
+        self.is_default = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(AgentEffortCapability);
+impl ::buffa::MessageName for AgentEffortCapability {
+    const PACKAGE: &'static str = "briar.types.v1";
+    const NAME: &'static str = "AgentEffortCapability";
+    const FULL_NAME: &'static str = "briar.types.v1.AgentEffortCapability";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentEffortCapability";
+}
+impl ::buffa::Message for AgentEffortCapability {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if !self.label.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.label) as u64;
+        }
+        if let Some(ref v) = self.description {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if self.is_default.is_some() {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        if !self.label.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.label, buf);
+        }
+        if let Some(ref v) = self.description {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        if let Some(v) = self.is_default {
+            ::buffa::types::put_bool_field(4u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.label, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .description
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.is_default = ::core::option::Option::Some(
+                    ::buffa::types::decode_bool(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.label.clear();
+        self.description = ::core::option::Option::None;
+        self.is_default = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AgentEffortCapability {
+    const PROTO_FQN: &'static str = "briar.types.v1.AgentEffortCapability";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AgentEffortCapability {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __AGENT_EFFORT_CAPABILITY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.types.v1.AgentEffortCapability",
+    to_json: ::buffa::type_registry::any_to_json::<AgentEffortCapability>,
+    from_json: ::buffa::type_registry::any_from_json::<AgentEffortCapability>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AgentModelCapability {
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// Field 2: `label`
+    #[serde(
+        rename = "label",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub label: ::buffa::alloc::string::String,
+    /// Field 3: `is_default`
+    #[serde(
+        rename = "isDefault",
+        alias = "is_default",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub is_default: ::core::option::Option<bool>,
+    /// Field 4: `default_effort_id`
+    #[serde(
+        rename = "defaultEffortId",
+        alias = "default_effort_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub default_effort_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 5: `efforts`
+    #[serde(
+        rename = "efforts",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub efforts: ::buffa::alloc::vec::Vec<AgentEffortCapability>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AgentModelCapability {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AgentModelCapability")
+            .field("id", &self.id)
+            .field("label", &self.label)
+            .field("is_default", &self.is_default)
+            .field("default_effort_id", &self.default_effort_id)
+            .field("efforts", &self.efforts)
+            .finish()
+    }
+}
+impl AgentModelCapability {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentModelCapability";
+}
+impl AgentModelCapability {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::is_default`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_is_default(mut self, value: bool) -> Self {
+        self.is_default = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::default_effort_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_default_effort_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.default_effort_id = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(AgentModelCapability);
+impl ::buffa::MessageName for AgentModelCapability {
+    const PACKAGE: &'static str = "briar.types.v1";
+    const NAME: &'static str = "AgentModelCapability";
+    const FULL_NAME: &'static str = "briar.types.v1.AgentModelCapability";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentModelCapability";
+}
+impl ::buffa::Message for AgentModelCapability {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if !self.label.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.label) as u64;
+        }
+        if self.is_default.is_some() {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if let Some(ref v) = self.default_effort_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        for v in &self.efforts {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        if !self.label.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.label, buf);
+        }
+        if let Some(v) = self.is_default {
+            ::buffa::types::put_bool_field(3u32, v, buf);
+        }
+        if let Some(ref v) = self.default_effort_id {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        for v in &self.efforts {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.label, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.is_default = ::core::option::Option::Some(
+                    ::buffa::types::decode_bool(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .default_effort_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.efforts.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.label.clear();
+        self.is_default = ::core::option::Option::None;
+        self.default_effort_id = ::core::option::Option::None;
+        self.efforts.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AgentModelCapability {
+    const PROTO_FQN: &'static str = "briar.types.v1.AgentModelCapability";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AgentModelCapability {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __AGENT_MODEL_CAPABILITY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.types.v1.AgentModelCapability",
+    to_json: ::buffa::type_registry::any_to_json::<AgentModelCapability>,
+    from_json: ::buffa::type_registry::any_from_json::<AgentModelCapability>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AgentProviderCapability {
+    /// Field 1: `provider`
+    #[serde(
+        rename = "provider",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub provider: ::buffa::EnumValue<AgentProvider>,
+    /// Field 2: `models`
+    #[serde(
+        rename = "models",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub models: ::buffa::alloc::vec::Vec<AgentModelCapability>,
+    /// Field 3: `default_efforts`
+    #[serde(
+        rename = "defaultEfforts",
+        alias = "default_efforts",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub default_efforts: ::buffa::alloc::vec::Vec<AgentEffortCapability>,
+    /// Field 4: `allow_custom_models`
+    #[serde(
+        rename = "allowCustomModels",
+        alias = "allow_custom_models",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub allow_custom_models: ::core::option::Option<bool>,
+    /// Field 5: `error`
+    #[serde(rename = "error", skip_serializing_if = "::core::option::Option::is_none")]
+    pub error: ::core::option::Option<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AgentProviderCapability {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AgentProviderCapability")
+            .field("provider", &self.provider)
+            .field("models", &self.models)
+            .field("default_efforts", &self.default_efforts)
+            .field("allow_custom_models", &self.allow_custom_models)
+            .field("error", &self.error)
+            .finish()
+    }
+}
+impl AgentProviderCapability {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentProviderCapability";
+}
+impl AgentProviderCapability {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::allow_custom_models`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_allow_custom_models(mut self, value: bool) -> Self {
+        self.allow_custom_models = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::error`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_error(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.error = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(AgentProviderCapability);
+impl ::buffa::MessageName for AgentProviderCapability {
+    const PACKAGE: &'static str = "briar.types.v1";
+    const NAME: &'static str = "AgentProviderCapability";
+    const FULL_NAME: &'static str = "briar.types.v1.AgentProviderCapability";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentProviderCapability";
+}
+impl ::buffa::Message for AgentProviderCapability {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        {
+            let val = self.provider.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        for v in &self.models {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.default_efforts {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.allow_custom_models.is_some() {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if let Some(ref v) = self.error {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.provider.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        for v in &self.models {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        for v in &self.default_efforts {
+            ::buffa::types::put_len_delimited_header(
+                3u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        if let Some(v) = self.allow_custom_models {
+            ::buffa::types::put_bool_field(4u32, v, buf);
+        }
+        if let Some(ref v) = self.error {
+            ::buffa::types::put_string_field(5u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.provider = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.models.push(elem);
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.default_efforts.push(elem);
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.allow_custom_models = ::core::option::Option::Some(
+                    ::buffa::types::decode_bool(buf)?,
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.error.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.provider = ::buffa::EnumValue::from(0);
+        self.models.clear();
+        self.default_efforts.clear();
+        self.allow_custom_models = ::core::option::Option::None;
+        self.error = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AgentProviderCapability {
+    const PROTO_FQN: &'static str = "briar.types.v1.AgentProviderCapability";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AgentProviderCapability {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __AGENT_PROVIDER_CAPABILITY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.types.v1.AgentProviderCapability",
+    to_json: ::buffa::type_registry::any_to_json::<AgentProviderCapability>,
+    from_json: ::buffa::type_registry::any_from_json::<AgentProviderCapability>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RemoteUpdateCapability {
+    /// Field 1: `supported`
+    #[serde(
+        rename = "supported",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub supported: bool,
+    /// Field 2: `protocol`
+    #[serde(
+        rename = "protocol",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub protocol: ::core::option::Option<u32>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RemoteUpdateCapability {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RemoteUpdateCapability")
+            .field("supported", &self.supported)
+            .field("protocol", &self.protocol)
+            .finish()
+    }
+}
+impl RemoteUpdateCapability {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.RemoteUpdateCapability";
+}
+impl RemoteUpdateCapability {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::protocol`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_protocol(mut self, value: u32) -> Self {
+        self.protocol = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(RemoteUpdateCapability);
+impl ::buffa::MessageName for RemoteUpdateCapability {
+    const PACKAGE: &'static str = "briar.types.v1";
+    const NAME: &'static str = "RemoteUpdateCapability";
+    const FULL_NAME: &'static str = "briar.types.v1.RemoteUpdateCapability";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.RemoteUpdateCapability";
+}
+impl ::buffa::Message for RemoteUpdateCapability {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.supported {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if let Some(v) = self.protocol {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.supported {
+            ::buffa::types::put_bool_field(1u32, self.supported, buf);
+        }
+        if let Some(v) = self.protocol {
+            ::buffa::types::put_uint32_field(2u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.supported = ::buffa::types::decode_bool(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.protocol = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.supported = false;
+        self.protocol = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RemoteUpdateCapability {
+    const PROTO_FQN: &'static str = "briar.types.v1.RemoteUpdateCapability";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RemoteUpdateCapability {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __REMOTE_UPDATE_CAPABILITY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.types.v1.RemoteUpdateCapability",
+    to_json: ::buffa::type_registry::any_to_json::<RemoteUpdateCapability>,
+    from_json: ::buffa::type_registry::any_from_json::<RemoteUpdateCapability>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct WorkerCapabilities {
+    /// Field 1: `provider_capabilities`
+    #[serde(
+        rename = "providerCapabilities",
+        alias = "provider_capabilities",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub provider_capabilities: ::buffa::alloc::vec::Vec<AgentProviderCapability>,
+    /// Field 2: `remote_updates`
+    #[serde(
+        rename = "remoteUpdates",
+        alias = "remote_updates",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub remote_updates: ::buffa::MessageField<
+        RemoteUpdateCapability,
+        ::buffa::Inline<RemoteUpdateCapability>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for WorkerCapabilities {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("WorkerCapabilities")
+            .field("provider_capabilities", &self.provider_capabilities)
+            .field("remote_updates", &self.remote_updates)
+            .finish()
+    }
+}
+impl WorkerCapabilities {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkerCapabilities";
+}
+::buffa::impl_default_instance!(WorkerCapabilities);
+impl ::buffa::MessageName for WorkerCapabilities {
+    const PACKAGE: &'static str = "briar.types.v1";
+    const NAME: &'static str = "WorkerCapabilities";
+    const FULL_NAME: &'static str = "briar.types.v1.WorkerCapabilities";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkerCapabilities";
+}
+impl ::buffa::Message for WorkerCapabilities {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        for v in &self.provider_capabilities {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.remote_updates.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.remote_updates.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.provider_capabilities {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        if self.remote_updates.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.remote_updates.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.provider_capabilities.push(elem);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.remote_updates.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.provider_capabilities.clear();
+        self.remote_updates = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for WorkerCapabilities {
+    const PROTO_FQN: &'static str = "briar.types.v1.WorkerCapabilities";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for WorkerCapabilities {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __WORKER_CAPABILITIES_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.types.v1.WorkerCapabilities",
+    to_json: ::buffa::type_registry::any_to_json::<WorkerCapabilities>,
+    from_json: ::buffa::type_registry::any_from_json::<WorkerCapabilities>,
     is_wkt: false,
 };
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -7925,1855 +7925,6 @@ pub mod __buffa {
         #[allow(unused_imports)]
         use super::*;
         #[derive(Clone, Debug, Default)]
-        pub struct AgentEffortCapabilityView<'a> {
-            /// Field 1: `id`
-            pub id: &'a str,
-            /// Field 2: `label`
-            pub label: &'a str,
-            /// Field 3: `description`
-            pub description: ::core::option::Option<&'a str>,
-            /// Field 4: `is_default`
-            pub is_default: ::core::option::Option<bool>,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for AgentEffortCapabilityView<'a> {
-            type Owned = super::super::AgentEffortCapability;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            #[inline]
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.id = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.label = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.description = Some(::buffa::types::borrow_str(&mut cur)?);
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.is_default = Some(::buffa::types::decode_bool(&mut cur)?);
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::AgentEffortCapability,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::AgentEffortCapability,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::AgentEffortCapability {
-                    id: self.id.to_string(),
-                    label: self.label.to_string(),
-                    description: self.description.map(|s| s.to_string()),
-                    is_default: self.is_default,
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for AgentEffortCapabilityView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u64;
-                if !self.id.is_empty() {
-                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
-                }
-                if !self.label.is_empty() {
-                    size
-                        += 1u64 + ::buffa::types::string_encoded_len(&self.label) as u64;
-                }
-                if let Some(ref v) = self.description {
-                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-                }
-                if self.is_default.is_some() {
-                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u64;
-                ::buffa::saturate_size(size)
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                _cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::EncodeSink,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                if !self.id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.id, buf);
-                }
-                if !self.label.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.label, buf);
-                }
-                if let Some(ref v) = self.description {
-                    ::buffa::types::put_string_field(3u32, v, buf);
-                }
-                if let Some(v) = self.is_default {
-                    ::buffa::types::put_bool_field(4u32, v, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for AgentEffortCapabilityView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
-                    __map.serialize_entry("id", self.id)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.label) {
-                    __map.serialize_entry("label", self.label)?;
-                }
-                if let ::core::option::Option::Some(__v) = self.description {
-                    __map.serialize_entry("description", __v)?;
-                }
-                if let ::core::option::Option::Some(__v) = self.is_default {
-                    __map.serialize_entry("isDefault", &__v)?;
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for AgentEffortCapabilityView<'a> {
-            const PACKAGE: &'static str = "briar.types.v1";
-            const NAME: &'static str = "AgentEffortCapability";
-            const FULL_NAME: &'static str = "briar.types.v1.AgentEffortCapability";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentEffortCapability";
-        }
-        ::buffa::impl_default_view_instance!(AgentEffortCapabilityView);
-        ::buffa::impl_view_reborrow!(AgentEffortCapabilityView);
-        /** Self-contained, `'static` owned view of a `AgentEffortCapability` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`AgentEffortCapabilityView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AgentEffortCapabilityView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct AgentEffortCapabilityOwnedView(
-            ::buffa::OwnedView<AgentEffortCapabilityView<'static>>,
-        );
-        impl AgentEffortCapabilityOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    AgentEffortCapabilityOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    AgentEffortCapabilityOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
-            /// message's encoded size exceeds the 2 GiB protobuf limit, or
-            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::AgentEffortCapability,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    AgentEffortCapabilityOwnedView(::buffa::OwnedView::from_owned(msg)?),
-                )
-            }
-            /// Borrow the full [`AgentEffortCapabilityView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &AgentEffortCapabilityView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// Infallible: this type's constructors wire-decode their
-            /// buffer, and a view produced by wire decoding always
-            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
-            /// whose contract also governs handles converted from a raw
-            /// [`::buffa::OwnedView`].
-            #[must_use]
-            pub fn to_owned_message(&self) -> super::super::AgentEffortCapability {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// Field 1: `id`
-            #[must_use]
-            pub fn id(&self) -> &'_ str {
-                self.0.reborrow().id
-            }
-            /// Field 2: `label`
-            #[must_use]
-            pub fn label(&self) -> &'_ str {
-                self.0.reborrow().label
-            }
-            /// Field 3: `description`
-            #[must_use]
-            pub fn description(&self) -> ::core::option::Option<&'_ str> {
-                self.0.reborrow().description
-            }
-            /// Field 4: `is_default`
-            #[must_use]
-            pub fn is_default(&self) -> ::core::option::Option<bool> {
-                self.0.reborrow().is_default
-            }
-        }
-        impl ::core::convert::From<
-            ::buffa::OwnedView<AgentEffortCapabilityView<'static>>,
-        > for AgentEffortCapabilityOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<AgentEffortCapabilityView<'static>>,
-            ) -> Self {
-                AgentEffortCapabilityOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<AgentEffortCapabilityOwnedView>
-        for ::buffa::OwnedView<AgentEffortCapabilityView<'static>> {
-            fn from(wrapper: AgentEffortCapabilityOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<AgentEffortCapabilityView<'static>>,
-        > for AgentEffortCapabilityOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<AgentEffortCapabilityView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::AgentEffortCapability {
-            type View<'a> = AgentEffortCapabilityView<'a>;
-            type ViewHandle = AgentEffortCapabilityOwnedView;
-        }
-        impl ::serde::Serialize for AgentEffortCapabilityOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
-        #[derive(Clone, Debug, Default)]
-        pub struct AgentModelCapabilityView<'a> {
-            /// Field 1: `id`
-            pub id: &'a str,
-            /// Field 2: `label`
-            pub label: &'a str,
-            /// Field 3: `is_default`
-            pub is_default: ::core::option::Option<bool>,
-            /// Field 4: `default_effort_id`
-            pub default_effort_id: ::core::option::Option<&'a str>,
-            /// Field 5: `efforts`
-            pub efforts: ::buffa::RepeatedView<
-                'a,
-                super::super::__buffa::view::AgentEffortCapabilityView<'a>,
-            >,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for AgentModelCapabilityView<'a> {
-            type Owned = super::super::AgentModelCapability;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            #[inline]
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.id = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.label = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.is_default = Some(::buffa::types::decode_bool(&mut cur)?);
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.default_effort_id = Some(
-                            ::buffa::types::borrow_str(&mut cur)?,
-                        );
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        ctx.register_element_memory(
-                            ::core::mem::size_of::<
-                                super::super::__buffa::view::AgentEffortCapabilityView,
-                            >(),
-                        )?;
-                        view.efforts
-                            .push(
-                                <super::super::__buffa::view::AgentEffortCapabilityView as ::buffa::MessageView>::decode_view_ctx(
-                                    sub,
-                                    __sub_ctx,
-                                )?,
-                            );
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::AgentModelCapability,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::AgentModelCapability,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::AgentModelCapability {
-                    id: self.id.to_string(),
-                    label: self.label.to_string(),
-                    is_default: self.is_default,
-                    default_effort_id: self.default_effort_id.map(|s| s.to_string()),
-                    efforts: self
-                        .efforts
-                        .iter()
-                        .map(|v| v.to_owned_from_source(__buffa_src))
-                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for AgentModelCapabilityView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u64;
-                if !self.id.is_empty() {
-                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
-                }
-                if !self.label.is_empty() {
-                    size
-                        += 1u64 + ::buffa::types::string_encoded_len(&self.label) as u64;
-                }
-                if self.is_default.is_some() {
-                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-                }
-                if let Some(ref v) = self.default_effort_id {
-                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-                }
-                for v in &self.efforts {
-                    let __slot = __cache.reserve();
-                    let inner_size = v.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                            + inner_size as u64;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u64;
-                ::buffa::saturate_size(size)
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                __cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::EncodeSink,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                if !self.id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.id, buf);
-                }
-                if !self.label.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.label, buf);
-                }
-                if let Some(v) = self.is_default {
-                    ::buffa::types::put_bool_field(3u32, v, buf);
-                }
-                if let Some(ref v) = self.default_effort_id {
-                    ::buffa::types::put_string_field(4u32, v, buf);
-                }
-                for v in &self.efforts {
-                    ::buffa::types::put_len_delimited_header(
-                        5u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    v.write_to(__cache, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for AgentModelCapabilityView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
-                    __map.serialize_entry("id", self.id)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.label) {
-                    __map.serialize_entry("label", self.label)?;
-                }
-                if let ::core::option::Option::Some(__v) = self.is_default {
-                    __map.serialize_entry("isDefault", &__v)?;
-                }
-                if let ::core::option::Option::Some(__v) = self.default_effort_id {
-                    __map.serialize_entry("defaultEffortId", __v)?;
-                }
-                if !self.efforts.is_empty() {
-                    __map.serialize_entry("efforts", &*self.efforts)?;
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for AgentModelCapabilityView<'a> {
-            const PACKAGE: &'static str = "briar.types.v1";
-            const NAME: &'static str = "AgentModelCapability";
-            const FULL_NAME: &'static str = "briar.types.v1.AgentModelCapability";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentModelCapability";
-        }
-        ::buffa::impl_default_view_instance!(AgentModelCapabilityView);
-        ::buffa::impl_view_reborrow!(AgentModelCapabilityView);
-        /** Self-contained, `'static` owned view of a `AgentModelCapability` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`AgentModelCapabilityView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AgentModelCapabilityView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct AgentModelCapabilityOwnedView(
-            ::buffa::OwnedView<AgentModelCapabilityView<'static>>,
-        );
-        impl AgentModelCapabilityOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    AgentModelCapabilityOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    AgentModelCapabilityOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
-            /// message's encoded size exceeds the 2 GiB protobuf limit, or
-            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::AgentModelCapability,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    AgentModelCapabilityOwnedView(::buffa::OwnedView::from_owned(msg)?),
-                )
-            }
-            /// Borrow the full [`AgentModelCapabilityView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &AgentModelCapabilityView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// Infallible: this type's constructors wire-decode their
-            /// buffer, and a view produced by wire decoding always
-            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
-            /// whose contract also governs handles converted from a raw
-            /// [`::buffa::OwnedView`].
-            #[must_use]
-            pub fn to_owned_message(&self) -> super::super::AgentModelCapability {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// Field 1: `id`
-            #[must_use]
-            pub fn id(&self) -> &'_ str {
-                self.0.reborrow().id
-            }
-            /// Field 2: `label`
-            #[must_use]
-            pub fn label(&self) -> &'_ str {
-                self.0.reborrow().label
-            }
-            /// Field 3: `is_default`
-            #[must_use]
-            pub fn is_default(&self) -> ::core::option::Option<bool> {
-                self.0.reborrow().is_default
-            }
-            /// Field 4: `default_effort_id`
-            #[must_use]
-            pub fn default_effort_id(&self) -> ::core::option::Option<&'_ str> {
-                self.0.reborrow().default_effort_id
-            }
-            /// Field 5: `efforts`
-            #[must_use]
-            pub fn efforts(
-                &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                super::super::__buffa::view::AgentEffortCapabilityView<'_>,
-            > {
-                &self.0.reborrow().efforts
-            }
-        }
-        impl ::core::convert::From<::buffa::OwnedView<AgentModelCapabilityView<'static>>>
-        for AgentModelCapabilityOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<AgentModelCapabilityView<'static>>,
-            ) -> Self {
-                AgentModelCapabilityOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<AgentModelCapabilityOwnedView>
-        for ::buffa::OwnedView<AgentModelCapabilityView<'static>> {
-            fn from(wrapper: AgentModelCapabilityOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<AgentModelCapabilityView<'static>>,
-        > for AgentModelCapabilityOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<AgentModelCapabilityView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::AgentModelCapability {
-            type View<'a> = AgentModelCapabilityView<'a>;
-            type ViewHandle = AgentModelCapabilityOwnedView;
-        }
-        impl ::serde::Serialize for AgentModelCapabilityOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
-        #[derive(Clone, Debug, Default)]
-        pub struct AgentProviderCapabilityView<'a> {
-            /// Field 1: `provider`
-            pub provider: ::buffa::EnumValue<super::super::AgentProvider>,
-            /// Field 2: `models`
-            pub models: ::buffa::RepeatedView<
-                'a,
-                super::super::__buffa::view::AgentModelCapabilityView<'a>,
-            >,
-            /// Field 3: `default_efforts`
-            pub default_efforts: ::buffa::RepeatedView<
-                'a,
-                super::super::__buffa::view::AgentEffortCapabilityView<'a>,
-            >,
-            /// Field 4: `allow_custom_models`
-            pub allow_custom_models: ::core::option::Option<bool>,
-            /// Field 5: `error`
-            pub error: ::core::option::Option<&'a str>,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for AgentProviderCapabilityView<'a> {
-            type Owned = super::super::AgentProviderCapability;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            #[inline]
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.provider = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.allow_custom_models = Some(
-                            ::buffa::types::decode_bool(&mut cur)?,
-                        );
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.error = Some(::buffa::types::borrow_str(&mut cur)?);
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        ctx.register_element_memory(
-                            ::core::mem::size_of::<
-                                super::super::__buffa::view::AgentModelCapabilityView,
-                            >(),
-                        )?;
-                        view.models
-                            .push(
-                                <super::super::__buffa::view::AgentModelCapabilityView as ::buffa::MessageView>::decode_view_ctx(
-                                    sub,
-                                    __sub_ctx,
-                                )?,
-                            );
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        ctx.register_element_memory(
-                            ::core::mem::size_of::<
-                                super::super::__buffa::view::AgentEffortCapabilityView,
-                            >(),
-                        )?;
-                        view.default_efforts
-                            .push(
-                                <super::super::__buffa::view::AgentEffortCapabilityView as ::buffa::MessageView>::decode_view_ctx(
-                                    sub,
-                                    __sub_ctx,
-                                )?,
-                            );
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::AgentProviderCapability,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::AgentProviderCapability,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::AgentProviderCapability {
-                    provider: self.provider,
-                    models: self
-                        .models
-                        .iter()
-                        .map(|v| v.to_owned_from_source(__buffa_src))
-                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    default_efforts: self
-                        .default_efforts
-                        .iter()
-                        .map(|v| v.to_owned_from_source(__buffa_src))
-                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    allow_custom_models: self.allow_custom_models,
-                    error: self.error.map(|s| s.to_string()),
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for AgentProviderCapabilityView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u64;
-                {
-                    let val = self.provider.to_i32();
-                    if val != 0 {
-                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
-                    }
-                }
-                for v in &self.models {
-                    let __slot = __cache.reserve();
-                    let inner_size = v.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                            + inner_size as u64;
-                }
-                for v in &self.default_efforts {
-                    let __slot = __cache.reserve();
-                    let inner_size = v.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                            + inner_size as u64;
-                }
-                if self.allow_custom_models.is_some() {
-                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-                }
-                if let Some(ref v) = self.error {
-                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u64;
-                ::buffa::saturate_size(size)
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                __cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::EncodeSink,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                {
-                    let val = self.provider.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(1u32, val, buf);
-                    }
-                }
-                for v in &self.models {
-                    ::buffa::types::put_len_delimited_header(
-                        2u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    v.write_to(__cache, buf);
-                }
-                for v in &self.default_efforts {
-                    ::buffa::types::put_len_delimited_header(
-                        3u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    v.write_to(__cache, buf);
-                }
-                if let Some(v) = self.allow_custom_models {
-                    ::buffa::types::put_bool_field(4u32, v, buf);
-                }
-                if let Some(ref v) = self.error {
-                    ::buffa::types::put_string_field(5u32, v, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for AgentProviderCapabilityView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.provider,
-                ) {
-                    __map.serialize_entry("provider", &self.provider)?;
-                }
-                if !self.models.is_empty() {
-                    __map.serialize_entry("models", &*self.models)?;
-                }
-                if !self.default_efforts.is_empty() {
-                    __map.serialize_entry("defaultEfforts", &*self.default_efforts)?;
-                }
-                if let ::core::option::Option::Some(__v) = self.allow_custom_models {
-                    __map.serialize_entry("allowCustomModels", &__v)?;
-                }
-                if let ::core::option::Option::Some(__v) = self.error {
-                    __map.serialize_entry("error", __v)?;
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for AgentProviderCapabilityView<'a> {
-            const PACKAGE: &'static str = "briar.types.v1";
-            const NAME: &'static str = "AgentProviderCapability";
-            const FULL_NAME: &'static str = "briar.types.v1.AgentProviderCapability";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentProviderCapability";
-        }
-        ::buffa::impl_default_view_instance!(AgentProviderCapabilityView);
-        ::buffa::impl_view_reborrow!(AgentProviderCapabilityView);
-        /** Self-contained, `'static` owned view of a `AgentProviderCapability` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`AgentProviderCapabilityView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AgentProviderCapabilityView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct AgentProviderCapabilityOwnedView(
-            ::buffa::OwnedView<AgentProviderCapabilityView<'static>>,
-        );
-        impl AgentProviderCapabilityOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    AgentProviderCapabilityOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    AgentProviderCapabilityOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
-            /// message's encoded size exceeds the 2 GiB protobuf limit, or
-            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::AgentProviderCapability,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    AgentProviderCapabilityOwnedView(
-                        ::buffa::OwnedView::from_owned(msg)?,
-                    ),
-                )
-            }
-            /// Borrow the full [`AgentProviderCapabilityView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &AgentProviderCapabilityView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// Infallible: this type's constructors wire-decode their
-            /// buffer, and a view produced by wire decoding always
-            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
-            /// whose contract also governs handles converted from a raw
-            /// [`::buffa::OwnedView`].
-            #[must_use]
-            pub fn to_owned_message(&self) -> super::super::AgentProviderCapability {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// Field 1: `provider`
-            #[must_use]
-            pub fn provider(&self) -> ::buffa::EnumValue<super::super::AgentProvider> {
-                self.0.reborrow().provider
-            }
-            /// Field 2: `models`
-            #[must_use]
-            pub fn models(
-                &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                super::super::__buffa::view::AgentModelCapabilityView<'_>,
-            > {
-                &self.0.reborrow().models
-            }
-            /// Field 3: `default_efforts`
-            #[must_use]
-            pub fn default_efforts(
-                &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                super::super::__buffa::view::AgentEffortCapabilityView<'_>,
-            > {
-                &self.0.reborrow().default_efforts
-            }
-            /// Field 4: `allow_custom_models`
-            #[must_use]
-            pub fn allow_custom_models(&self) -> ::core::option::Option<bool> {
-                self.0.reborrow().allow_custom_models
-            }
-            /// Field 5: `error`
-            #[must_use]
-            pub fn error(&self) -> ::core::option::Option<&'_ str> {
-                self.0.reborrow().error
-            }
-        }
-        impl ::core::convert::From<
-            ::buffa::OwnedView<AgentProviderCapabilityView<'static>>,
-        > for AgentProviderCapabilityOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<AgentProviderCapabilityView<'static>>,
-            ) -> Self {
-                AgentProviderCapabilityOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<AgentProviderCapabilityOwnedView>
-        for ::buffa::OwnedView<AgentProviderCapabilityView<'static>> {
-            fn from(wrapper: AgentProviderCapabilityOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<AgentProviderCapabilityView<'static>>,
-        > for AgentProviderCapabilityOwnedView {
-            fn as_ref(
-                &self,
-            ) -> &::buffa::OwnedView<AgentProviderCapabilityView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::AgentProviderCapability {
-            type View<'a> = AgentProviderCapabilityView<'a>;
-            type ViewHandle = AgentProviderCapabilityOwnedView;
-        }
-        impl ::serde::Serialize for AgentProviderCapabilityOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
-        #[derive(Clone, Debug, Default)]
-        pub struct RemoteUpdateCapabilityView<'a> {
-            /// Field 1: `supported`
-            pub supported: bool,
-            /// Field 2: `protocol`
-            pub protocol: ::core::option::Option<u32>,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for RemoteUpdateCapabilityView<'a> {
-            type Owned = super::super::RemoteUpdateCapability;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            #[inline]
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.supported = ::buffa::types::decode_bool(&mut cur)?;
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.protocol = Some(::buffa::types::decode_uint32(&mut cur)?);
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::RemoteUpdateCapability,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::RemoteUpdateCapability,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::RemoteUpdateCapability {
-                    supported: self.supported,
-                    protocol: self.protocol,
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for RemoteUpdateCapabilityView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u64;
-                if self.supported {
-                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-                }
-                if let Some(v) = self.protocol {
-                    size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u64;
-                ::buffa::saturate_size(size)
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                _cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::EncodeSink,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                if self.supported {
-                    ::buffa::types::put_bool_field(1u32, self.supported, buf);
-                }
-                if let Some(v) = self.protocol {
-                    ::buffa::types::put_uint32_field(2u32, v, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for RemoteUpdateCapabilityView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if self.supported {
-                    __map.serialize_entry("supported", &self.supported)?;
-                }
-                if let ::core::option::Option::Some(__v) = self.protocol {
-                    __map
-                        .serialize_entry(
-                            "protocol",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for RemoteUpdateCapabilityView<'a> {
-            const PACKAGE: &'static str = "briar.types.v1";
-            const NAME: &'static str = "RemoteUpdateCapability";
-            const FULL_NAME: &'static str = "briar.types.v1.RemoteUpdateCapability";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.RemoteUpdateCapability";
-        }
-        ::buffa::impl_default_view_instance!(RemoteUpdateCapabilityView);
-        ::buffa::impl_view_reborrow!(RemoteUpdateCapabilityView);
-        /** Self-contained, `'static` owned view of a `RemoteUpdateCapability` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`RemoteUpdateCapabilityView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RemoteUpdateCapabilityView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct RemoteUpdateCapabilityOwnedView(
-            ::buffa::OwnedView<RemoteUpdateCapabilityView<'static>>,
-        );
-        impl RemoteUpdateCapabilityOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    RemoteUpdateCapabilityOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    RemoteUpdateCapabilityOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
-            /// message's encoded size exceeds the 2 GiB protobuf limit, or
-            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::RemoteUpdateCapability,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    RemoteUpdateCapabilityOwnedView(::buffa::OwnedView::from_owned(msg)?),
-                )
-            }
-            /// Borrow the full [`RemoteUpdateCapabilityView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &RemoteUpdateCapabilityView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// Infallible: this type's constructors wire-decode their
-            /// buffer, and a view produced by wire decoding always
-            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
-            /// whose contract also governs handles converted from a raw
-            /// [`::buffa::OwnedView`].
-            #[must_use]
-            pub fn to_owned_message(&self) -> super::super::RemoteUpdateCapability {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// Field 1: `supported`
-            #[must_use]
-            pub fn supported(&self) -> bool {
-                self.0.reborrow().supported
-            }
-            /// Field 2: `protocol`
-            #[must_use]
-            pub fn protocol(&self) -> ::core::option::Option<u32> {
-                self.0.reborrow().protocol
-            }
-        }
-        impl ::core::convert::From<
-            ::buffa::OwnedView<RemoteUpdateCapabilityView<'static>>,
-        > for RemoteUpdateCapabilityOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<RemoteUpdateCapabilityView<'static>>,
-            ) -> Self {
-                RemoteUpdateCapabilityOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<RemoteUpdateCapabilityOwnedView>
-        for ::buffa::OwnedView<RemoteUpdateCapabilityView<'static>> {
-            fn from(wrapper: RemoteUpdateCapabilityOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<RemoteUpdateCapabilityView<'static>>,
-        > for RemoteUpdateCapabilityOwnedView {
-            fn as_ref(
-                &self,
-            ) -> &::buffa::OwnedView<RemoteUpdateCapabilityView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::RemoteUpdateCapability {
-            type View<'a> = RemoteUpdateCapabilityView<'a>;
-            type ViewHandle = RemoteUpdateCapabilityOwnedView;
-        }
-        impl ::serde::Serialize for RemoteUpdateCapabilityOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
-        #[derive(Clone, Debug, Default)]
-        pub struct WorkerCapabilitiesView<'a> {
-            /// Field 1: `provider_capabilities`
-            pub provider_capabilities: ::buffa::RepeatedView<
-                'a,
-                super::super::__buffa::view::AgentProviderCapabilityView<'a>,
-            >,
-            /// Field 2: `remote_updates`
-            pub remote_updates: ::buffa::MessageFieldView<
-                super::super::__buffa::view::RemoteUpdateCapabilityView<'a>,
-            >,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for WorkerCapabilitiesView<'a> {
-            type Owned = super::super::WorkerCapabilities;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            #[inline]
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.remote_updates.as_mut() {
-                            Some(existing) => {
-                                ::buffa::MessageView::merge_into_view(
-                                    existing,
-                                    sub,
-                                    __sub_ctx,
-                                )?
-                            }
-                            None => {
-                                view.remote_updates = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::RemoteUpdateCapabilityView as ::buffa::MessageView>::decode_view_ctx(
-                                        sub,
-                                        __sub_ctx,
-                                    )?,
-                                );
-                            }
-                        }
-                    }
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        ctx.register_element_memory(
-                            ::core::mem::size_of::<
-                                super::super::__buffa::view::AgentProviderCapabilityView,
-                            >(),
-                        )?;
-                        view.provider_capabilities
-                            .push(
-                                <super::super::__buffa::view::AgentProviderCapabilityView as ::buffa::MessageView>::decode_view_ctx(
-                                    sub,
-                                    __sub_ctx,
-                                )?,
-                            );
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::WorkerCapabilities,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::WorkerCapabilities,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::WorkerCapabilities {
-                    provider_capabilities: self
-                        .provider_capabilities
-                        .iter()
-                        .map(|v| v.to_owned_from_source(__buffa_src))
-                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    remote_updates: match self.remote_updates.as_option() {
-                        Some(v) => {
-                            ::buffa::MessageField::<
-                                super::super::RemoteUpdateCapability,
-                                ::buffa::Inline<super::super::RemoteUpdateCapability>,
-                            >::some(v.to_owned_from_source(__buffa_src)?)
-                        }
-                        None => ::buffa::MessageField::none(),
-                    },
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for WorkerCapabilitiesView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u64;
-                for v in &self.provider_capabilities {
-                    let __slot = __cache.reserve();
-                    let inner_size = v.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                            + inner_size as u64;
-                }
-                if self.remote_updates.is_set() {
-                    let __slot = __cache.reserve();
-                    let inner_size = self.remote_updates.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                            + inner_size as u64;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u64;
-                ::buffa::saturate_size(size)
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                __cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::EncodeSink,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                for v in &self.provider_capabilities {
-                    ::buffa::types::put_len_delimited_header(
-                        1u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    v.write_to(__cache, buf);
-                }
-                if self.remote_updates.is_set() {
-                    ::buffa::types::put_len_delimited_header(
-                        2u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    self.remote_updates.write_to(__cache, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for WorkerCapabilitiesView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !self.provider_capabilities.is_empty() {
-                    __map
-                        .serialize_entry(
-                            "providerCapabilities",
-                            &*self.provider_capabilities,
-                        )?;
-                }
-                {
-                    if let ::core::option::Option::Some(__v) = self
-                        .remote_updates
-                        .as_option()
-                    {
-                        __map.serialize_entry("remoteUpdates", __v)?;
-                    }
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for WorkerCapabilitiesView<'a> {
-            const PACKAGE: &'static str = "briar.types.v1";
-            const NAME: &'static str = "WorkerCapabilities";
-            const FULL_NAME: &'static str = "briar.types.v1.WorkerCapabilities";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkerCapabilities";
-        }
-        ::buffa::impl_default_view_instance!(WorkerCapabilitiesView);
-        ::buffa::impl_view_reborrow!(WorkerCapabilitiesView);
-        /** Self-contained, `'static` owned view of a `WorkerCapabilities` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`WorkerCapabilitiesView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`WorkerCapabilitiesView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct WorkerCapabilitiesOwnedView(
-            ::buffa::OwnedView<WorkerCapabilitiesView<'static>>,
-        );
-        impl WorkerCapabilitiesOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    WorkerCapabilitiesOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    WorkerCapabilitiesOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
-            /// message's encoded size exceeds the 2 GiB protobuf limit, or
-            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::WorkerCapabilities,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    WorkerCapabilitiesOwnedView(::buffa::OwnedView::from_owned(msg)?),
-                )
-            }
-            /// Borrow the full [`WorkerCapabilitiesView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &WorkerCapabilitiesView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// Infallible: this type's constructors wire-decode their
-            /// buffer, and a view produced by wire decoding always
-            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
-            /// whose contract also governs handles converted from a raw
-            /// [`::buffa::OwnedView`].
-            #[must_use]
-            pub fn to_owned_message(&self) -> super::super::WorkerCapabilities {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// Field 1: `provider_capabilities`
-            #[must_use]
-            pub fn provider_capabilities(
-                &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                super::super::__buffa::view::AgentProviderCapabilityView<'_>,
-            > {
-                &self.0.reborrow().provider_capabilities
-            }
-            /// Field 2: `remote_updates`
-            #[must_use]
-            pub fn remote_updates(
-                &self,
-            ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::RemoteUpdateCapabilityView<'_>,
-            > {
-                &self.0.reborrow().remote_updates
-            }
-        }
-        impl ::core::convert::From<::buffa::OwnedView<WorkerCapabilitiesView<'static>>>
-        for WorkerCapabilitiesOwnedView {
-            fn from(inner: ::buffa::OwnedView<WorkerCapabilitiesView<'static>>) -> Self {
-                WorkerCapabilitiesOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<WorkerCapabilitiesOwnedView>
-        for ::buffa::OwnedView<WorkerCapabilitiesView<'static>> {
-            fn from(wrapper: WorkerCapabilitiesOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<::buffa::OwnedView<WorkerCapabilitiesView<'static>>>
-        for WorkerCapabilitiesOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<WorkerCapabilitiesView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::WorkerCapabilities {
-            type View<'a> = WorkerCapabilitiesView<'a>;
-            type ViewHandle = WorkerCapabilitiesOwnedView;
-        }
-        impl ::serde::Serialize for WorkerCapabilitiesOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
-        #[derive(Clone, Debug, Default)]
         pub struct WorkflowCheckpointView<'a> {
             /// Field 1: `key`
             pub key: &'a str,
@@ -13346,6 +11497,1855 @@ pub mod __buffa {
             type ViewHandle = CheckpointPolicyOwnedView;
         }
         impl ::serde::Serialize for CheckpointPolicyOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct AgentEffortCapabilityView<'a> {
+            /// Field 1: `id`
+            pub id: &'a str,
+            /// Field 2: `label`
+            pub label: &'a str,
+            /// Field 3: `description`
+            pub description: ::core::option::Option<&'a str>,
+            /// Field 4: `is_default`
+            pub is_default: ::core::option::Option<bool>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for AgentEffortCapabilityView<'a> {
+            type Owned = super::super::AgentEffortCapability;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.label = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.description = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.is_default = Some(::buffa::types::decode_bool(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AgentEffortCapability,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AgentEffortCapability,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AgentEffortCapability {
+                    id: self.id.to_string(),
+                    label: self.label.to_string(),
+                    description: self.description.map(|s| s.to_string()),
+                    is_default: self.is_default,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for AgentEffortCapabilityView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.id.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+                }
+                if !self.label.is_empty() {
+                    size
+                        += 1u64 + ::buffa::types::string_encoded_len(&self.label) as u64;
+                }
+                if let Some(ref v) = self.description {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if self.is_default.is_some() {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.id, buf);
+                }
+                if !self.label.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.label, buf);
+                }
+                if let Some(ref v) = self.description {
+                    ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                if let Some(v) = self.is_default {
+                    ::buffa::types::put_bool_field(4u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AgentEffortCapabilityView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+                    __map.serialize_entry("id", self.id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.label) {
+                    __map.serialize_entry("label", self.label)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.description {
+                    __map.serialize_entry("description", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.is_default {
+                    __map.serialize_entry("isDefault", &__v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AgentEffortCapabilityView<'a> {
+            const PACKAGE: &'static str = "briar.types.v1";
+            const NAME: &'static str = "AgentEffortCapability";
+            const FULL_NAME: &'static str = "briar.types.v1.AgentEffortCapability";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentEffortCapability";
+        }
+        ::buffa::impl_default_view_instance!(AgentEffortCapabilityView);
+        ::buffa::impl_view_reborrow!(AgentEffortCapabilityView);
+        /** Self-contained, `'static` owned view of a `AgentEffortCapability` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AgentEffortCapabilityView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AgentEffortCapabilityView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AgentEffortCapabilityOwnedView(
+            ::buffa::OwnedView<AgentEffortCapabilityView<'static>>,
+        );
+        impl AgentEffortCapabilityOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AgentEffortCapabilityOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AgentEffortCapabilityOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AgentEffortCapability,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AgentEffortCapabilityOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`AgentEffortCapabilityView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AgentEffortCapabilityView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::AgentEffortCapability {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> &'_ str {
+                self.0.reborrow().id
+            }
+            /// Field 2: `label`
+            #[must_use]
+            pub fn label(&self) -> &'_ str {
+                self.0.reborrow().label
+            }
+            /// Field 3: `description`
+            #[must_use]
+            pub fn description(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().description
+            }
+            /// Field 4: `is_default`
+            #[must_use]
+            pub fn is_default(&self) -> ::core::option::Option<bool> {
+                self.0.reborrow().is_default
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<AgentEffortCapabilityView<'static>>,
+        > for AgentEffortCapabilityOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<AgentEffortCapabilityView<'static>>,
+            ) -> Self {
+                AgentEffortCapabilityOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AgentEffortCapabilityOwnedView>
+        for ::buffa::OwnedView<AgentEffortCapabilityView<'static>> {
+            fn from(wrapper: AgentEffortCapabilityOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<AgentEffortCapabilityView<'static>>,
+        > for AgentEffortCapabilityOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<AgentEffortCapabilityView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::AgentEffortCapability {
+            type View<'a> = AgentEffortCapabilityView<'a>;
+            type ViewHandle = AgentEffortCapabilityOwnedView;
+        }
+        impl ::serde::Serialize for AgentEffortCapabilityOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct AgentModelCapabilityView<'a> {
+            /// Field 1: `id`
+            pub id: &'a str,
+            /// Field 2: `label`
+            pub label: &'a str,
+            /// Field 3: `is_default`
+            pub is_default: ::core::option::Option<bool>,
+            /// Field 4: `default_effort_id`
+            pub default_effort_id: ::core::option::Option<&'a str>,
+            /// Field 5: `efforts`
+            pub efforts: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::AgentEffortCapabilityView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for AgentModelCapabilityView<'a> {
+            type Owned = super::super::AgentModelCapability;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.label = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.is_default = Some(::buffa::types::decode_bool(&mut cur)?);
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.default_effort_id = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::AgentEffortCapabilityView,
+                            >(),
+                        )?;
+                        view.efforts
+                            .push(
+                                <super::super::__buffa::view::AgentEffortCapabilityView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AgentModelCapability,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AgentModelCapability,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AgentModelCapability {
+                    id: self.id.to_string(),
+                    label: self.label.to_string(),
+                    is_default: self.is_default,
+                    default_effort_id: self.default_effort_id.map(|s| s.to_string()),
+                    efforts: self
+                        .efforts
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for AgentModelCapabilityView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.id.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+                }
+                if !self.label.is_empty() {
+                    size
+                        += 1u64 + ::buffa::types::string_encoded_len(&self.label) as u64;
+                }
+                if self.is_default.is_some() {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if let Some(ref v) = self.default_effort_id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                for v in &self.efforts {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.id, buf);
+                }
+                if !self.label.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.label, buf);
+                }
+                if let Some(v) = self.is_default {
+                    ::buffa::types::put_bool_field(3u32, v, buf);
+                }
+                if let Some(ref v) = self.default_effort_id {
+                    ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                for v in &self.efforts {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AgentModelCapabilityView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+                    __map.serialize_entry("id", self.id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.label) {
+                    __map.serialize_entry("label", self.label)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.is_default {
+                    __map.serialize_entry("isDefault", &__v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.default_effort_id {
+                    __map.serialize_entry("defaultEffortId", __v)?;
+                }
+                if !self.efforts.is_empty() {
+                    __map.serialize_entry("efforts", &*self.efforts)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AgentModelCapabilityView<'a> {
+            const PACKAGE: &'static str = "briar.types.v1";
+            const NAME: &'static str = "AgentModelCapability";
+            const FULL_NAME: &'static str = "briar.types.v1.AgentModelCapability";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentModelCapability";
+        }
+        ::buffa::impl_default_view_instance!(AgentModelCapabilityView);
+        ::buffa::impl_view_reborrow!(AgentModelCapabilityView);
+        /** Self-contained, `'static` owned view of a `AgentModelCapability` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AgentModelCapabilityView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AgentModelCapabilityView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AgentModelCapabilityOwnedView(
+            ::buffa::OwnedView<AgentModelCapabilityView<'static>>,
+        );
+        impl AgentModelCapabilityOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AgentModelCapabilityOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AgentModelCapabilityOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AgentModelCapability,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AgentModelCapabilityOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`AgentModelCapabilityView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AgentModelCapabilityView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::AgentModelCapability {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> &'_ str {
+                self.0.reborrow().id
+            }
+            /// Field 2: `label`
+            #[must_use]
+            pub fn label(&self) -> &'_ str {
+                self.0.reborrow().label
+            }
+            /// Field 3: `is_default`
+            #[must_use]
+            pub fn is_default(&self) -> ::core::option::Option<bool> {
+                self.0.reborrow().is_default
+            }
+            /// Field 4: `default_effort_id`
+            #[must_use]
+            pub fn default_effort_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().default_effort_id
+            }
+            /// Field 5: `efforts`
+            #[must_use]
+            pub fn efforts(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::AgentEffortCapabilityView<'_>,
+            > {
+                &self.0.reborrow().efforts
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<AgentModelCapabilityView<'static>>>
+        for AgentModelCapabilityOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<AgentModelCapabilityView<'static>>,
+            ) -> Self {
+                AgentModelCapabilityOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AgentModelCapabilityOwnedView>
+        for ::buffa::OwnedView<AgentModelCapabilityView<'static>> {
+            fn from(wrapper: AgentModelCapabilityOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<AgentModelCapabilityView<'static>>,
+        > for AgentModelCapabilityOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<AgentModelCapabilityView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::AgentModelCapability {
+            type View<'a> = AgentModelCapabilityView<'a>;
+            type ViewHandle = AgentModelCapabilityOwnedView;
+        }
+        impl ::serde::Serialize for AgentModelCapabilityOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct AgentProviderCapabilityView<'a> {
+            /// Field 1: `provider`
+            pub provider: ::buffa::EnumValue<super::super::AgentProvider>,
+            /// Field 2: `models`
+            pub models: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::AgentModelCapabilityView<'a>,
+            >,
+            /// Field 3: `default_efforts`
+            pub default_efforts: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::AgentEffortCapabilityView<'a>,
+            >,
+            /// Field 4: `allow_custom_models`
+            pub allow_custom_models: ::core::option::Option<bool>,
+            /// Field 5: `error`
+            pub error: ::core::option::Option<&'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for AgentProviderCapabilityView<'a> {
+            type Owned = super::super::AgentProviderCapability;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.provider = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.allow_custom_models = Some(
+                            ::buffa::types::decode_bool(&mut cur)?,
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.error = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::AgentModelCapabilityView,
+                            >(),
+                        )?;
+                        view.models
+                            .push(
+                                <super::super::__buffa::view::AgentModelCapabilityView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::AgentEffortCapabilityView,
+                            >(),
+                        )?;
+                        view.default_efforts
+                            .push(
+                                <super::super::__buffa::view::AgentEffortCapabilityView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AgentProviderCapability,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AgentProviderCapability,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AgentProviderCapability {
+                    provider: self.provider,
+                    models: self
+                        .models
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    default_efforts: self
+                        .default_efforts
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    allow_custom_models: self.allow_custom_models,
+                    error: self.error.map(|s| s.to_string()),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for AgentProviderCapabilityView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                {
+                    let val = self.provider.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                for v in &self.models {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                for v in &self.default_efforts {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.allow_custom_models.is_some() {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if let Some(ref v) = self.error {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.provider.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                for v in &self.models {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                for v in &self.default_efforts {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if let Some(v) = self.allow_custom_models {
+                    ::buffa::types::put_bool_field(4u32, v, buf);
+                }
+                if let Some(ref v) = self.error {
+                    ::buffa::types::put_string_field(5u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AgentProviderCapabilityView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.provider,
+                ) {
+                    __map.serialize_entry("provider", &self.provider)?;
+                }
+                if !self.models.is_empty() {
+                    __map.serialize_entry("models", &*self.models)?;
+                }
+                if !self.default_efforts.is_empty() {
+                    __map.serialize_entry("defaultEfforts", &*self.default_efforts)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.allow_custom_models {
+                    __map.serialize_entry("allowCustomModels", &__v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.error {
+                    __map.serialize_entry("error", __v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AgentProviderCapabilityView<'a> {
+            const PACKAGE: &'static str = "briar.types.v1";
+            const NAME: &'static str = "AgentProviderCapability";
+            const FULL_NAME: &'static str = "briar.types.v1.AgentProviderCapability";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentProviderCapability";
+        }
+        ::buffa::impl_default_view_instance!(AgentProviderCapabilityView);
+        ::buffa::impl_view_reborrow!(AgentProviderCapabilityView);
+        /** Self-contained, `'static` owned view of a `AgentProviderCapability` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AgentProviderCapabilityView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AgentProviderCapabilityView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AgentProviderCapabilityOwnedView(
+            ::buffa::OwnedView<AgentProviderCapabilityView<'static>>,
+        );
+        impl AgentProviderCapabilityOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AgentProviderCapabilityOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AgentProviderCapabilityOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AgentProviderCapability,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AgentProviderCapabilityOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`AgentProviderCapabilityView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AgentProviderCapabilityView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::AgentProviderCapability {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `provider`
+            #[must_use]
+            pub fn provider(&self) -> ::buffa::EnumValue<super::super::AgentProvider> {
+                self.0.reborrow().provider
+            }
+            /// Field 2: `models`
+            #[must_use]
+            pub fn models(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::AgentModelCapabilityView<'_>,
+            > {
+                &self.0.reborrow().models
+            }
+            /// Field 3: `default_efforts`
+            #[must_use]
+            pub fn default_efforts(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::AgentEffortCapabilityView<'_>,
+            > {
+                &self.0.reborrow().default_efforts
+            }
+            /// Field 4: `allow_custom_models`
+            #[must_use]
+            pub fn allow_custom_models(&self) -> ::core::option::Option<bool> {
+                self.0.reborrow().allow_custom_models
+            }
+            /// Field 5: `error`
+            #[must_use]
+            pub fn error(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().error
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<AgentProviderCapabilityView<'static>>,
+        > for AgentProviderCapabilityOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<AgentProviderCapabilityView<'static>>,
+            ) -> Self {
+                AgentProviderCapabilityOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AgentProviderCapabilityOwnedView>
+        for ::buffa::OwnedView<AgentProviderCapabilityView<'static>> {
+            fn from(wrapper: AgentProviderCapabilityOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<AgentProviderCapabilityView<'static>>,
+        > for AgentProviderCapabilityOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<AgentProviderCapabilityView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::AgentProviderCapability {
+            type View<'a> = AgentProviderCapabilityView<'a>;
+            type ViewHandle = AgentProviderCapabilityOwnedView;
+        }
+        impl ::serde::Serialize for AgentProviderCapabilityOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct RemoteUpdateCapabilityView<'a> {
+            /// Field 1: `supported`
+            pub supported: bool,
+            /// Field 2: `protocol`
+            pub protocol: ::core::option::Option<u32>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for RemoteUpdateCapabilityView<'a> {
+            type Owned = super::super::RemoteUpdateCapability;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.supported = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.protocol = Some(::buffa::types::decode_uint32(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RemoteUpdateCapability,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RemoteUpdateCapability,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RemoteUpdateCapability {
+                    supported: self.supported,
+                    protocol: self.protocol,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for RemoteUpdateCapabilityView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.supported {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if let Some(v) = self.protocol {
+                    size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.supported {
+                    ::buffa::types::put_bool_field(1u32, self.supported, buf);
+                }
+                if let Some(v) = self.protocol {
+                    ::buffa::types::put_uint32_field(2u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for RemoteUpdateCapabilityView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if self.supported {
+                    __map.serialize_entry("supported", &self.supported)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.protocol {
+                    __map
+                        .serialize_entry(
+                            "protocol",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RemoteUpdateCapabilityView<'a> {
+            const PACKAGE: &'static str = "briar.types.v1";
+            const NAME: &'static str = "RemoteUpdateCapability";
+            const FULL_NAME: &'static str = "briar.types.v1.RemoteUpdateCapability";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.RemoteUpdateCapability";
+        }
+        ::buffa::impl_default_view_instance!(RemoteUpdateCapabilityView);
+        ::buffa::impl_view_reborrow!(RemoteUpdateCapabilityView);
+        /** Self-contained, `'static` owned view of a `RemoteUpdateCapability` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RemoteUpdateCapabilityView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RemoteUpdateCapabilityView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RemoteUpdateCapabilityOwnedView(
+            ::buffa::OwnedView<RemoteUpdateCapabilityView<'static>>,
+        );
+        impl RemoteUpdateCapabilityOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RemoteUpdateCapabilityOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RemoteUpdateCapabilityOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RemoteUpdateCapability,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RemoteUpdateCapabilityOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`RemoteUpdateCapabilityView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RemoteUpdateCapabilityView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::RemoteUpdateCapability {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `supported`
+            #[must_use]
+            pub fn supported(&self) -> bool {
+                self.0.reborrow().supported
+            }
+            /// Field 2: `protocol`
+            #[must_use]
+            pub fn protocol(&self) -> ::core::option::Option<u32> {
+                self.0.reborrow().protocol
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<RemoteUpdateCapabilityView<'static>>,
+        > for RemoteUpdateCapabilityOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<RemoteUpdateCapabilityView<'static>>,
+            ) -> Self {
+                RemoteUpdateCapabilityOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RemoteUpdateCapabilityOwnedView>
+        for ::buffa::OwnedView<RemoteUpdateCapabilityView<'static>> {
+            fn from(wrapper: RemoteUpdateCapabilityOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<RemoteUpdateCapabilityView<'static>>,
+        > for RemoteUpdateCapabilityOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<RemoteUpdateCapabilityView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::RemoteUpdateCapability {
+            type View<'a> = RemoteUpdateCapabilityView<'a>;
+            type ViewHandle = RemoteUpdateCapabilityOwnedView;
+        }
+        impl ::serde::Serialize for RemoteUpdateCapabilityOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct WorkerCapabilitiesView<'a> {
+            /// Field 1: `provider_capabilities`
+            pub provider_capabilities: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::AgentProviderCapabilityView<'a>,
+            >,
+            /// Field 2: `remote_updates`
+            pub remote_updates: ::buffa::MessageFieldView<
+                super::super::__buffa::view::RemoteUpdateCapabilityView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for WorkerCapabilitiesView<'a> {
+            type Owned = super::super::WorkerCapabilities;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.remote_updates.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.remote_updates = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::RemoteUpdateCapabilityView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::AgentProviderCapabilityView,
+                            >(),
+                        )?;
+                        view.provider_capabilities
+                            .push(
+                                <super::super::__buffa::view::AgentProviderCapabilityView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::WorkerCapabilities,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::WorkerCapabilities,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::WorkerCapabilities {
+                    provider_capabilities: self
+                        .provider_capabilities
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    remote_updates: match self.remote_updates.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::RemoteUpdateCapability,
+                                ::buffa::Inline<super::super::RemoteUpdateCapability>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for WorkerCapabilitiesView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                for v in &self.provider_capabilities {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.remote_updates.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.remote_updates.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.provider_capabilities {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if self.remote_updates.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.remote_updates.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for WorkerCapabilitiesView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.provider_capabilities.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "providerCapabilities",
+                            &*self.provider_capabilities,
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .remote_updates
+                        .as_option()
+                    {
+                        __map.serialize_entry("remoteUpdates", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for WorkerCapabilitiesView<'a> {
+            const PACKAGE: &'static str = "briar.types.v1";
+            const NAME: &'static str = "WorkerCapabilities";
+            const FULL_NAME: &'static str = "briar.types.v1.WorkerCapabilities";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkerCapabilities";
+        }
+        ::buffa::impl_default_view_instance!(WorkerCapabilitiesView);
+        ::buffa::impl_view_reborrow!(WorkerCapabilitiesView);
+        /** Self-contained, `'static` owned view of a `WorkerCapabilities` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`WorkerCapabilitiesView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`WorkerCapabilitiesView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct WorkerCapabilitiesOwnedView(
+            ::buffa::OwnedView<WorkerCapabilitiesView<'static>>,
+        );
+        impl WorkerCapabilitiesOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    WorkerCapabilitiesOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    WorkerCapabilitiesOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::WorkerCapabilities,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    WorkerCapabilitiesOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`WorkerCapabilitiesView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &WorkerCapabilitiesView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::WorkerCapabilities {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `provider_capabilities`
+            #[must_use]
+            pub fn provider_capabilities(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::AgentProviderCapabilityView<'_>,
+            > {
+                &self.0.reborrow().provider_capabilities
+            }
+            /// Field 2: `remote_updates`
+            #[must_use]
+            pub fn remote_updates(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::RemoteUpdateCapabilityView<'_>,
+            > {
+                &self.0.reborrow().remote_updates
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<WorkerCapabilitiesView<'static>>>
+        for WorkerCapabilitiesOwnedView {
+            fn from(inner: ::buffa::OwnedView<WorkerCapabilitiesView<'static>>) -> Self {
+                WorkerCapabilitiesOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<WorkerCapabilitiesOwnedView>
+        for ::buffa::OwnedView<WorkerCapabilitiesView<'static>> {
+            fn from(wrapper: WorkerCapabilitiesOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<WorkerCapabilitiesView<'static>>>
+        for WorkerCapabilitiesOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<WorkerCapabilitiesView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::WorkerCapabilities {
+            type View<'a> = WorkerCapabilitiesView<'a>;
+            type ViewHandle = WorkerCapabilitiesOwnedView;
+        }
+        impl ::serde::Serialize for WorkerCapabilitiesOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -19260,11 +19260,6 @@ pub mod __buffa {
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
-        reg.register_json_any(super::__AGENT_EFFORT_CAPABILITY_JSON_ANY);
-        reg.register_json_any(super::__AGENT_MODEL_CAPABILITY_JSON_ANY);
-        reg.register_json_any(super::__AGENT_PROVIDER_CAPABILITY_JSON_ANY);
-        reg.register_json_any(super::__REMOTE_UPDATE_CAPABILITY_JSON_ANY);
-        reg.register_json_any(super::__WORKER_CAPABILITIES_JSON_ANY);
         reg.register_json_any(super::__WORKFLOW_CHECKPOINT_JSON_ANY);
         reg.register_json_any(super::__WORKFLOW_STAGE_JSON_ANY);
         reg.register_json_any(super::__AUTO_HUNT_WORKFLOW_JSON_ANY);
@@ -19274,6 +19269,11 @@ pub mod __buffa {
         reg.register_json_any(super::__WORKFLOW_COMPLETION_JSON_ANY);
         reg.register_json_any(super::__CHECKPOINT_BOUNDARY_JSON_ANY);
         reg.register_json_any(super::__CHECKPOINT_POLICY_JSON_ANY);
+        reg.register_json_any(super::__AGENT_EFFORT_CAPABILITY_JSON_ANY);
+        reg.register_json_any(super::__AGENT_MODEL_CAPABILITY_JSON_ANY);
+        reg.register_json_any(super::__AGENT_PROVIDER_CAPABILITY_JSON_ANY);
+        reg.register_json_any(super::__REMOTE_UPDATE_CAPABILITY_JSON_ANY);
+        reg.register_json_any(super::__WORKER_CAPABILITIES_JSON_ANY);
         reg.register_json_any(super::__NORMALIZED_AGENT_EVENT_JSON_ANY);
         reg.register_json_any(super::__CONVERSATION_STARTED_JSON_ANY);
         reg.register_json_any(super::__MESSAGE_STARTED_JSON_ANY);
@@ -19292,26 +19292,6 @@ pub mod __buffa {
         reg.register_json_any(super::__IDEMPOTENCY_CONFLICT_DETAIL_JSON_ANY);
     }
 }
-#[doc(inline)]
-pub use self::__buffa::view::AgentEffortCapabilityView;
-#[doc(inline)]
-pub use self::__buffa::view::AgentEffortCapabilityOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::AgentModelCapabilityView;
-#[doc(inline)]
-pub use self::__buffa::view::AgentModelCapabilityOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::AgentProviderCapabilityView;
-#[doc(inline)]
-pub use self::__buffa::view::AgentProviderCapabilityOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::RemoteUpdateCapabilityView;
-#[doc(inline)]
-pub use self::__buffa::view::RemoteUpdateCapabilityOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::WorkerCapabilitiesView;
-#[doc(inline)]
-pub use self::__buffa::view::WorkerCapabilitiesOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::WorkflowCheckpointView;
 #[doc(inline)]
@@ -19348,6 +19328,26 @@ pub use self::__buffa::view::CheckpointBoundaryOwnedView;
 pub use self::__buffa::view::CheckpointPolicyView;
 #[doc(inline)]
 pub use self::__buffa::view::CheckpointPolicyOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentEffortCapabilityView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentEffortCapabilityOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentModelCapabilityView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentModelCapabilityOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentProviderCapabilityView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentProviderCapabilityOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoteUpdateCapabilityView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoteUpdateCapabilityOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::WorkerCapabilitiesView;
+#[doc(inline)]
+pub use self::__buffa::view::WorkerCapabilitiesOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::NormalizedAgentEventView;
 #[doc(inline)]

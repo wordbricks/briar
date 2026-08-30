@@ -20,6 +20,9 @@ import {
   RunStatus,
 } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import {
+  WorkflowCheckpoint_Position,
+} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import * as Predicate from "effect/Predicate";
 import { agentSkillConflictMessage } from "./agent-skills";
 import type { BriarAuth } from "./auth";
@@ -372,6 +375,20 @@ const difficultyJson = (difficulty: IssueDifficulty | undefined) => {
   }
 };
 
+const checkpointPositionJson = (position: WorkflowCheckpoint_Position) => {
+  switch (position) {
+    case WorkflowCheckpoint_Position.BEFORE:
+      return "before";
+    case WorkflowCheckpoint_Position.AFTER:
+      return "after";
+    case WorkflowCheckpoint_Position.UNSPECIFIED:
+      throw new ConnectError(
+        "Checkpoint position is required",
+        Code.InvalidArgument,
+      );
+  }
+};
+
 const legacyRequest = (
   input: AppConnectIssueRouteInput,
   path: string,
@@ -550,6 +567,12 @@ export const createAppIssueService = (
           preferredModel: request.preferredModel ?? null,
           preferredEffort: request.preferredEffort ?? null,
           fullAuto: request.fullAuto,
+          checkpoints: request.checkpoints.map((checkpoint) => ({
+            key: checkpoint.key,
+            stage: checkpoint.stage,
+            position: checkpointPositionJson(checkpoint.position),
+          })),
+          attachmentReferences: request.attachmentReferences,
         },
       )
     );
@@ -568,9 +591,15 @@ export const createAppIssueService = (
           description: request.description ?? null,
           priority: request.priority ?? null,
           difficulty: difficultyJson(request.difficulty),
-          ...(request.assigneeUserId === undefined
+          ...(request.assigneeUpdate.case === "assigneeUserId"
+            ? { assigneeUserId: request.assigneeUpdate.value }
+            : request.assigneeUpdate.case === "clearAssignee"
+            ? { assigneeUserId: null }
+            : {}),
+          attachmentReferences: request.attachmentReferences,
+          ...(request.keptAttachmentIds === undefined
             ? {}
-            : { assigneeUserId: request.assigneeUserId }),
+            : { keptAttachmentIds: request.keptAttachmentIds.values }),
         },
       )
     );
@@ -915,6 +944,7 @@ export const createAppIssueService = (
           mentionedUserIds: request.mentionedUserIds,
           mentionedAgentIds: request.mentionedAgentIds.map(canonicalUuid),
           agentConversationId: request.agentConversationId ?? null,
+          attachmentReferences: request.attachmentReferences,
         },
       )
     );

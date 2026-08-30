@@ -679,8 +679,8 @@ export async function syncDashboard(
         agentProviderFromProto,
       ),
       executionPolicy: executionPolicyFromProto(response.executionPolicy),
-      members: response.members.map(organizationMemberFromProto),
-      conversationNotifications: response.conversationNotifications.map(
+      members: response.members?.values.map(organizationMemberFromProto),
+      conversationNotifications: response.conversationNotifications?.values.map(
         conversationNotificationFromProto,
       ),
       channelNotifications: response.channelNotifications.map(

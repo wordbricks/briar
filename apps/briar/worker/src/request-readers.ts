@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect";
+import * as Predicate from "effect/Predicate";
 import {
   type AutoHuntRunStatus,
   type AutoHuntWorkflowStageId,
@@ -9,6 +10,7 @@ import {
   validateEvidenceImages,
 } from "../../src/lib/evidence-images";
 import {
+  maxIssueAttachmentCount,
   maxIssueMultipartBytes,
   normalizeIssueAttachmentFile,
   validateIssueAttachments,
@@ -42,6 +44,24 @@ const decodeChannelReplyCompleteInput = decodeRequestSync(
   channelReplyCompleteInputSchema,
 );
 const decodeChannelMessageInput = decodeRequestSync(channelMessageInputSchema);
+
+const jsonAttachmentEnvelope = (raw: unknown) => {
+  if (!Predicate.isObject(raw)) {
+    return { input: raw, attachmentReferences: [] as string[] };
+  }
+  const { attachmentReferences: rawReferences, ...input } = raw;
+  if (rawReferences === undefined) {
+    return { input, attachmentReferences: [] as string[] };
+  }
+  if (
+    !Array.isArray(rawReferences) ||
+    rawReferences.length > maxIssueAttachmentCount ||
+    !rawReferences.every(isIssueAttachmentReference)
+  ) {
+    throw new HttpError(400, "Attachment references are invalid");
+  }
+  return { input, attachmentReferences: rawReferences };
+};
 
 async function readBoundedMultipartForm(
   request: Request,
@@ -229,10 +249,13 @@ export async function readIssueMessageRequest(request: Request) {
     "Message attachments exceed the 25MB total limit",
   );
   if (!form) {
+    const envelope = jsonAttachmentEnvelope(
+      await readJson(request, 16_384),
+    );
     return {
-      input: decodeIssueMessageInput(await readJson(request, 16_384)),
+      input: decodeIssueMessageInput(envelope.input),
       attachments: [] as File[],
-      attachmentReferences: [] as string[],
+      attachmentReferences: envelope.attachmentReferences,
     };
   }
   const attachments = readMultipartFiles(
@@ -296,10 +319,13 @@ export async function readChannelMessageRequest(request: Request) {
     "Channel images exceed the 25MB total limit",
   );
   if (!form) {
+    const envelope = jsonAttachmentEnvelope(
+      await readJson(request, 32_768),
+    );
     return {
-      input: decodeChannelMessageInput(await readJson(request, 32_768)),
+      input: decodeChannelMessageInput(envelope.input),
       attachments: [] as File[],
-      attachmentReferences: [] as string[],
+      attachmentReferences: envelope.attachmentReferences,
     };
   }
   const attachments = readMultipartFiles(
@@ -364,10 +390,11 @@ export async function readIssueRequest(request: Request) {
     "Issue attachments exceed the 25MB total limit",
   );
   if (!form) {
+    const envelope = jsonAttachmentEnvelope(await readJson(request));
     return {
-      input: decodeIssueInput(await readJson(request)),
+      input: decodeIssueInput(envelope.input),
       attachments: [] as File[],
-      attachmentReferences: [] as string[],
+      attachmentReferences: envelope.attachmentReferences,
     };
   }
   const attachments = readMultipartFiles(
@@ -466,14 +493,18 @@ export async function readIssueUpdateRequest(request: Request) {
   );
   if (!form) {
     const raw = await readJson(request);
-    const { keptAttachmentIds, ...fields } = (raw ?? {}) as {
-      keptAttachmentIds?: unknown;
-      [key: string]: unknown;
-    };
+    const envelope = jsonAttachmentEnvelope(raw);
+    const { fields, keptAttachmentIds } = (() => {
+      if (!Predicate.isObject(envelope.input)) {
+        return { fields: envelope.input, keptAttachmentIds: undefined };
+      }
+      const { keptAttachmentIds, ...fields } = envelope.input;
+      return { fields, keptAttachmentIds };
+    })();
     return {
       input: decodeIssueUpdateInput(fields),
       attachments: [] as File[],
-      attachmentReferences: [] as string[],
+      attachmentReferences: envelope.attachmentReferences,
       keptAttachmentIds:
         keptAttachmentIds === undefined
           ? undefined

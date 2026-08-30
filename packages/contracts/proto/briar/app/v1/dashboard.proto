@@ -40,6 +40,14 @@ message SyncDashboardRequest {
   uint64 cursor = 2;
 }
 
+message OrganizationMembersPatch {
+  repeated OrganizationMember values = 1;
+}
+
+message ConversationNotificationsPatch {
+  repeated ConversationNotification values = 1;
+}
+
 message SyncDashboardResponse {
   uint64 cursor = 1;
   bool has_more = 2;
@@ -50,8 +58,8 @@ message SyncDashboardResponse {
   repeated DashboardWorker workers = 7;
   repeated briar.types.v1.AgentProvider organization_providers = 8;
   optional ProjectExecutionWorkerPolicy execution_policy = 9;
-  repeated OrganizationMember members = 10;
-  repeated ConversationNotification conversation_notifications = 11;
+  optional OrganizationMembersPatch members = 10;
+  optional ConversationNotificationsPatch conversation_notifications = 11;
   repeated ChannelNotification channel_notifications = 12;
   google.protobuf.Timestamp generated_at = 13;
   optional ProjectSettings settings = 14;

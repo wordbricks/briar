@@ -5,6 +5,7 @@ package briar.app.v1;
 import "briar/app/v1/agent.proto";
 import "briar/app/v1/common.proto";
 import "briar/types/v1/provider.proto";
+import "briar/types/v1/workflow.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -50,6 +51,8 @@ message CreateIssueRequest {
   optional string preferred_model = 10;
   optional string preferred_effort = 11;
   bool full_auto = 12;
+  repeated briar.types.v1.WorkflowCheckpointSpec checkpoints = 14;
+  repeated string attachment_references = 15;
 }
 
 message CreateIssueResponse {
@@ -66,13 +69,24 @@ message CreateIssueResponse {
 message UpdateIssueRequest {
   reserved 3;
 
+  message ClearAssignee {}
+
+  message KeptAttachmentIdsPatch {
+    repeated string values = 1;
+  }
+
   string project_id = 1;
   string run_id = 2;
   string title = 4;
   optional string description = 5;
   optional uint32 priority = 6;
   optional IssueDifficulty difficulty = 7;
-  optional string assignee_user_id = 8;
+  oneof assignee_update {
+    string assignee_user_id = 8;
+    ClearAssignee clear_assignee = 9;
+  }
+  repeated string attachment_references = 10;
+  optional KeptAttachmentIdsPatch kept_attachment_ids = 11;
 }
 
 message UpdateIssueResponse {
@@ -82,6 +96,7 @@ message UpdateIssueResponse {
   optional uint32 priority = 4;
   optional IssueDifficulty difficulty = 5;
   optional string assignee_user_id = 6;
+  repeated IssueAttachment attachments = 7;
 }
 
 message DeleteIssueRequest {
@@ -325,6 +340,7 @@ message CreateIssueMessageRequest {
   repeated string mentioned_user_ids = 6;
   repeated string mentioned_agent_ids = 7;
   optional string agent_conversation_id = 8;
+  repeated string attachment_references = 10;
 }
 
 message CreateIssueMessageResponse {

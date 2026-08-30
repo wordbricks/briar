@@ -126,6 +126,7 @@ message CreateChannelMessageRequest {
   repeated string mentioned_agent_ids = 8;
   optional string skill_id = 10;
   optional string preferred_device_id = 11;
+  repeated string attachment_references = 12;
 }
 
 message CreateChannelMessageResponse {

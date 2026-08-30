@@ -458,6 +458,7 @@ const createAppChannelService = (
         mentionedAgentIds: request.mentionedAgentIds,
         skillId: request.skillId ?? null,
         preferredDeviceId: request.preferredDeviceId ?? null,
+        attachmentReferences: request.attachmentReferences,
       },
     );
     scheduleChannelMutation(input, request.organizationId);

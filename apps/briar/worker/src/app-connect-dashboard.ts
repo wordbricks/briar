@@ -85,6 +85,11 @@ type RunRelations = {
   readonly resultReviewsByRun: Map<string, IssueResultReviewRow[]>;
 };
 
+export const dashboardListPatch = <Input, Output>(
+  values: readonly Input[] | null,
+  map: (value: Input) => Output,
+) => values === null ? undefined : { values: values.map(map) };
+
 function indexRunRelations(
   attachments: readonly IssueAttachmentRow[],
   dependencies: readonly IssueDependencyRow[],
@@ -249,8 +254,6 @@ export const createAppDashboardService = (
         deletedRunIds: [],
         workers: [],
         organizationProviders: [],
-        members: [],
-        conversationNotifications: [],
         channelNotifications: [],
         generatedAt: timestampFromDate(new Date(observedAt)),
       };
@@ -339,16 +342,16 @@ export const createAppDashboardService = (
       executionPolicy: metadata
         ? appExecutionPolicy(metadata[2])
         : undefined,
-      members: metadata
-        ? metadata[3].map((member) => appOrganizationMember(member))
-        : [],
-      conversationNotifications: conversationNotifications
-        ? conversationNotifications.map((notification) =>
-            appConversationNotification(
-              issueConversationNotificationJson(notification),
-            )
-          )
-        : [],
+      members: dashboardListPatch(
+        metadata?.[3] ?? null,
+        appOrganizationMember,
+      ),
+      conversationNotifications: dashboardListPatch(
+        conversationNotifications,
+        (notification) => appConversationNotification(
+          issueConversationNotificationJson(notification),
+        ),
+      ),
       channelNotifications: channelNotifications.map((notification) =>
         appChannelNotification(
           channelConversationNotificationJson(notification),

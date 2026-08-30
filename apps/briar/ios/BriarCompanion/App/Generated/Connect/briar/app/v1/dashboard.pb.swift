@@ -129,6 +129,30 @@ nonisolated struct BriarAPI_SyncDashboardRequest: Sendable {
   init() {}
 }
 
+nonisolated struct BriarAPI_OrganizationMembersPatch: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var values: [BriarAPI_OrganizationMember] = []
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+nonisolated struct BriarAPI_ConversationNotificationsPatch: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var values: [BriarAPI_ConversationNotification] = []
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 nonisolated struct BriarAPI_SyncDashboardResponse: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -187,15 +211,23 @@ nonisolated struct BriarAPI_SyncDashboardResponse: @unchecked Sendable {
   /// Clears the value of `executionPolicy`. Subsequent reads from it will return its default value.
   mutating func clearExecutionPolicy() {_uniqueStorage()._executionPolicy = nil}
 
-  var members: [BriarAPI_OrganizationMember] {
-    get {_storage._members}
+  var members: BriarAPI_OrganizationMembersPatch {
+    get {_storage._members ?? BriarAPI_OrganizationMembersPatch()}
     set {_uniqueStorage()._members = newValue}
   }
+  /// Returns true if `members` has been explicitly set.
+  var hasMembers: Bool {_storage._members != nil}
+  /// Clears the value of `members`. Subsequent reads from it will return its default value.
+  mutating func clearMembers() {_uniqueStorage()._members = nil}
 
-  var conversationNotifications: [BriarAPI_ConversationNotification] {
-    get {_storage._conversationNotifications}
+  var conversationNotifications: BriarAPI_ConversationNotificationsPatch {
+    get {_storage._conversationNotifications ?? BriarAPI_ConversationNotificationsPatch()}
     set {_uniqueStorage()._conversationNotifications = newValue}
   }
+  /// Returns true if `conversationNotifications` has been explicitly set.
+  var hasConversationNotifications: Bool {_storage._conversationNotifications != nil}
+  /// Clears the value of `conversationNotifications`. Subsequent reads from it will return its default value.
+  mutating func clearConversationNotifications() {_uniqueStorage()._conversationNotifications = nil}
 
   var channelNotifications: [BriarAPI_ChannelNotification] {
     get {_storage._channelNotifications}
@@ -1948,6 +1980,66 @@ nonisolated extension BriarAPI_SyncDashboardRequest: SwiftProtobuf.Message, Swif
   }
 }
 
+nonisolated extension BriarAPI_OrganizationMembersPatch: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".OrganizationMembersPatch"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}values\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.values) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.values.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.values, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: BriarAPI_OrganizationMembersPatch, rhs: BriarAPI_OrganizationMembersPatch) -> Bool {
+    if lhs.values != rhs.values {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ConversationNotificationsPatch: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".ConversationNotificationsPatch"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}values\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.values) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.values.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.values, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: BriarAPI_ConversationNotificationsPatch, rhs: BriarAPI_ConversationNotificationsPatch) -> Bool {
+    if lhs.values != rhs.values {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".SyncDashboardResponse"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}cursor\0\u{3}has_more\0\u{1}reset\0\u{1}runs\0\u{3}deleted_run_ids\0\u{1}project\0\u{1}workers\0\u{3}organization_providers\0\u{3}execution_policy\0\u{1}members\0\u{3}conversation_notifications\0\u{3}channel_notifications\0\u{3}generated_at\0\u{1}settings\0")
@@ -1962,8 +2054,8 @@ nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, Swi
     var _workers: [BriarAPI_DashboardWorker] = []
     var _organizationProviders: [BriarTypes_AgentProvider] = []
     var _executionPolicy: BriarAPI_ProjectExecutionWorkerPolicy? = nil
-    var _members: [BriarAPI_OrganizationMember] = []
-    var _conversationNotifications: [BriarAPI_ConversationNotification] = []
+    var _members: BriarAPI_OrganizationMembersPatch? = nil
+    var _conversationNotifications: BriarAPI_ConversationNotificationsPatch? = nil
     var _channelNotifications: [BriarAPI_ChannelNotification] = []
     var _generatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _settings: BriarAPI_ProjectSettings? = nil
@@ -2018,8 +2110,8 @@ nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, Swi
         case 7: try { try decoder.decodeRepeatedMessageField(value: &_storage._workers) }()
         case 8: try { try decoder.decodeRepeatedEnumField(value: &_storage._organizationProviders) }()
         case 9: try { try decoder.decodeSingularMessageField(value: &_storage._executionPolicy) }()
-        case 10: try { try decoder.decodeRepeatedMessageField(value: &_storage._members) }()
-        case 11: try { try decoder.decodeRepeatedMessageField(value: &_storage._conversationNotifications) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._members) }()
+        case 11: try { try decoder.decodeSingularMessageField(value: &_storage._conversationNotifications) }()
         case 12: try { try decoder.decodeRepeatedMessageField(value: &_storage._channelNotifications) }()
         case 13: try { try decoder.decodeSingularMessageField(value: &_storage._generatedAt) }()
         case 14: try { try decoder.decodeSingularMessageField(value: &_storage._settings) }()
@@ -2062,12 +2154,12 @@ nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, Swi
       try { if let v = _storage._executionPolicy {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
       } }()
-      if !_storage._members.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._members, fieldNumber: 10)
-      }
-      if !_storage._conversationNotifications.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._conversationNotifications, fieldNumber: 11)
-      }
+      try { if let v = _storage._members {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      } }()
+      try { if let v = _storage._conversationNotifications {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
+      } }()
       if !_storage._channelNotifications.isEmpty {
         try visitor.visitRepeatedMessageField(value: _storage._channelNotifications, fieldNumber: 12)
       }

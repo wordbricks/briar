@@ -447,6 +447,8 @@ nonisolated struct BriarAPI_CreateChannelMessageRequest: Sendable {
   /// Clears the value of `preferredDeviceID`. Subsequent reads from it will return its default value.
   mutating func clearPreferredDeviceID() {self._preferredDeviceID = nil}
 
+  var attachmentReferences: [String] = []
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -2279,7 +2281,7 @@ nonisolated extension BriarAPI_ListChannelMessagesResponse: SwiftProtobuf.Messag
 
 nonisolated extension BriarAPI_CreateChannelMessageRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".CreateChannelMessageRequest"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}client_message_id\0\u{1}body\0\u{4}\u{2}parent_message_id\0\u{3}mentioned_user_ids\0\u{3}mentioned_agent_ids\0\u{4}\u{2}skill_id\0\u{3}preferred_device_id\0\u{c}\u{5}\u{1}\u{c}\u{9}\u{1}")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}client_message_id\0\u{1}body\0\u{4}\u{2}parent_message_id\0\u{3}mentioned_user_ids\0\u{3}mentioned_agent_ids\0\u{4}\u{2}skill_id\0\u{3}preferred_device_id\0\u{3}attachment_references\0\u{c}\u{5}\u{1}\u{c}\u{9}\u{1}")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2296,6 +2298,7 @@ nonisolated extension BriarAPI_CreateChannelMessageRequest: SwiftProtobuf.Messag
       case 8: try { try decoder.decodeRepeatedStringField(value: &self.mentionedAgentIds) }()
       case 10: try { try decoder.decodeSingularStringField(value: &self._skillID) }()
       case 11: try { try decoder.decodeSingularStringField(value: &self._preferredDeviceID) }()
+      case 12: try { try decoder.decodeRepeatedStringField(value: &self.attachmentReferences) }()
       default: break
       }
     }
@@ -2333,6 +2336,9 @@ nonisolated extension BriarAPI_CreateChannelMessageRequest: SwiftProtobuf.Messag
     try { if let v = self._preferredDeviceID {
       try visitor.visitSingularStringField(value: v, fieldNumber: 11)
     } }()
+    if !self.attachmentReferences.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.attachmentReferences, fieldNumber: 12)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -2346,6 +2352,7 @@ nonisolated extension BriarAPI_CreateChannelMessageRequest: SwiftProtobuf.Messag
     if lhs.mentionedAgentIds != rhs.mentionedAgentIds {return false}
     if lhs._skillID != rhs._skillID {return false}
     if lhs._preferredDeviceID != rhs._preferredDeviceID {return false}
+    if lhs.attachmentReferences != rhs.attachmentReferences {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
