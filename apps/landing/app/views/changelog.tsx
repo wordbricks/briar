@@ -30,6 +30,23 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.173",
+        date: "2026년 8월 30일",
+        title: "조직의 내 이슈와 저장소 작업을 한곳에서 확인합니다",
+        summary:
+          "조직별 내 이슈 화면과 GitHub 저장소 연결 흐름을 추가하고, 온보딩과 모바일 작업 경험을 다듬었습니다.",
+        items: [
+          "조직 사이드바에서 내가 맡은 이슈를 프로젝트별로 검색하고, 진행 중·확인이 필요한·완료된 항목으로 나눠 바로 열 수 있습니다.",
+          "관리형 컴퓨터 설정에서 GitHub CLI 없이 GitHub 연결을 시작하고, 선택한 저장소의 ID를 보존해 이름이 바뀌거나 재사용된 저장소를 잘못 가리키지 않게 했습니다.",
+          "조직 역할을 owner, co-owner, developer, editor, viewer 권한으로 나누고 기존 admin/member 권한을 안전하게 옮깁니다.",
+          "이슈 공유 페이지에서 Briar 앱을 열거나 웹에서 이슈를 볼 수 있습니다.",
+          "초기 온보딩에서 macOS 알림 권한을 확인하고, 시스템 설정으로 이동하거나 나중에 설정할 수 있습니다.",
+          "모바일에 호스트 상태 메뉴를 추가해 Worker 상태와 최근 실행을 확인할 수 있습니다.",
+          "이슈 대화에 답장을 제출하면 최신 메시지로 스크롤하고 입력창에 포커스를 돌려 작업을 이어갑니다.",
+          "iOS 이슈 대화가 불필요하게 주기적으로 다시 로드되지 않도록 동기화를 조정했습니다.",
+        ],
+      },
+      {
         version: "1.2.172",
         date: "2026년 8월 29일",
         title: "채널, Inbox, 모바일 홈을 한 흐름으로 연결합니다",
@@ -1298,6 +1315,23 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.173",
+        date: "August 30, 2026",
+        title: "Keep your issues and repository work in one place",
+        summary:
+          "Add an organization-wide My Issues view and a GitHub setup flow without the CLI, while tightening onboarding and mobile work.",
+        items: [
+          "Search your assigned issues across an organization by project and open active, needs-attention, or completed work directly from the sidebar.",
+          "Start GitHub repository setup from managed-computer configuration without the GitHub CLI, while preserving the selected repository ID when names change or are reused.",
+          "Split organization access into owner, co-owner, developer, editor, and viewer roles and migrate existing admin and member access safely.",
+          "Let shared issue pages open Briar or show the issue in the web app.",
+          "Check macOS notification permission during initial onboarding, open System Settings when needed, or defer the choice.",
+          "Add a mobile host-status menu for checking Worker readiness and recent runs.",
+          "After submitting an issue reply, return focus to the composer and keep the latest message in view.",
+          "Stop iOS issue conversations from reloading on an unnecessary periodic loop.",
+        ],
+      },
       {
         version: "1.2.172",
         date: "August 29, 2026",
@@ -2658,7 +2692,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-172">
+          <a href="#v1-2-173">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2680,7 +2714,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.172"
+                      entry.version === "1.2.173"
+                        ? "2026-08-30"
+                        : entry.version === "1.2.172"
                         ? "2026-08-29"
                         : entry.version === "1.2.171" ||
                           entry.version === "1.2.170" ||
