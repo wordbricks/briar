@@ -33,7 +33,7 @@ struct CompanionShellView: View {
     let errorMessage: String?
     let token: String
     let api: any MobileAPIClientProtocol
-    let user: CurrentUserResponse.User?
+    let user: CurrentUser?
     let refresh: () async -> Void
     let ensureIssueAvailable: (UUID, UUID) async -> Bool
     let selectProject: (UUID) -> Void
@@ -2589,11 +2589,13 @@ struct RunDetailView: View {
             }
         }
         do {
-            let snapshot: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
-                token: token,
-                as: DashboardSnapshot.self
-            )
+            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            var request = BriarAPI_GetDashboardRequest()
+            request.projectID = coreUUIDString(proposal.projectId)
+            let snapshot = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(
+                request: request,
+                headers: [:]
+            ).briarValue())
             guard detail.executionProposalIsCurrent(context) else { return }
             _ = try validateIssueExecutionApproval(
                 snapshot: snapshot,
@@ -2619,11 +2621,13 @@ struct RunDetailView: View {
             return false
         }
         do {
-            let preflight: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
-                token: token,
-                as: DashboardSnapshot.self
-            )
+            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            var dashboardRequest = BriarAPI_GetDashboardRequest()
+            dashboardRequest.projectID = coreUUIDString(proposal.projectId)
+            let preflight = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(
+                request: dashboardRequest,
+                headers: [:]
+            ).briarValue())
             guard detail.executionProposalIsCurrent(context) else { return false }
             _ = try validateIssueExecutionApproval(
                 snapshot: preflight,
@@ -2647,10 +2651,11 @@ struct RunDetailView: View {
                       request: request
                   )
             else { throw MobileAPIError.invalidResponse }
-            let acceptedSnapshot: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
-                token: token,
-                as: DashboardSnapshot.self
+            let acceptedSnapshot = try DashboardSnapshot(
+                connectMessage: await dashboard.getDashboard(
+                    request: dashboardRequest,
+                    headers: [:]
+                ).briarValue()
             )
             guard detail.executionProposalIsCurrent(context) else { return false }
             guard issueExecutionApprovalAcceptedStateMatches(
@@ -2687,11 +2692,13 @@ struct RunDetailView: View {
         }
 
         do {
-            let snapshot: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
-                token: token,
-                as: DashboardSnapshot.self
-            )
+            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            var request = BriarAPI_GetDashboardRequest()
+            request.projectID = coreUUIDString(proposal.projectId)
+            let snapshot = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(
+                request: request,
+                headers: [:]
+            ).briarValue())
             guard detail.skillExecutionProposalIsCurrent(context) else { return }
             _ = try validateAgentSkillExecutionApproval(
                 snapshot: snapshot,
@@ -2718,11 +2725,13 @@ struct RunDetailView: View {
         ) else { return false }
 
         do {
-            let preflight: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
-                token: token,
-                as: DashboardSnapshot.self
-            )
+            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            var dashboardRequest = BriarAPI_GetDashboardRequest()
+            dashboardRequest.projectID = coreUUIDString(proposal.projectId)
+            let preflight = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(
+                request: dashboardRequest,
+                headers: [:]
+            ).briarValue())
             guard detail.skillExecutionProposalIsCurrent(context) else { return false }
             _ = try validateAgentSkillExecutionApproval(
                 snapshot: preflight,

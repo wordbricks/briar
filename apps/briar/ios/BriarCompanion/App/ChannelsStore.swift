@@ -1094,10 +1094,14 @@ final class ChannelsStore: ObservableObject {
         }
         do {
             if let execution {
-                let preflight: DashboardSnapshot = try await api.get(
-                    MobileAPIContract.Endpoint.dashboard(projectID: projectID),
-                    token: token,
-                    as: DashboardSnapshot.self
+                let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+                var dashboardRequest = BriarAPI_GetDashboardRequest()
+                dashboardRequest.projectID = coreUUIDString(projectID)
+                let preflight = try DashboardSnapshot(
+                    connectMessage: await dashboard.getDashboard(
+                        request: dashboardRequest,
+                        headers: [:]
+                    ).briarValue()
                 )
                 guard
                     expectedGeneration == generation,
@@ -1343,10 +1347,14 @@ final class ChannelsStore: ObservableObject {
         }
 
         do {
-            let preflight: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: expectedProposal.projectId),
-                token: token,
-                as: DashboardSnapshot.self
+            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            var dashboardRequest = BriarAPI_GetDashboardRequest()
+            dashboardRequest.projectID = coreUUIDString(expectedProposal.projectId)
+            let preflight = try DashboardSnapshot(
+                connectMessage: await dashboard.getDashboard(
+                    request: dashboardRequest,
+                    headers: [:]
+                ).briarValue()
             )
             guard
                 expectedGeneration == generation,
@@ -1389,10 +1397,12 @@ final class ChannelsStore: ObservableObject {
                       request: request
                   )
             else { throw MobileAPIError.invalidResponse }
-            let acceptedSnapshot: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: response.projectId),
-                token: token,
-                as: DashboardSnapshot.self
+            dashboardRequest.projectID = coreUUIDString(response.projectId)
+            let acceptedSnapshot = try DashboardSnapshot(
+                connectMessage: await dashboard.getDashboard(
+                    request: dashboardRequest,
+                    headers: [:]
+                ).briarValue()
             )
             guard
                 expectedGeneration == generation,
@@ -1481,10 +1491,14 @@ final class ChannelsStore: ObservableObject {
         }
 
         do {
-            let snapshot: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
-                token: token,
-                as: DashboardSnapshot.self
+            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            var dashboardRequest = BriarAPI_GetDashboardRequest()
+            dashboardRequest.projectID = coreUUIDString(proposal.projectId)
+            let snapshot = try DashboardSnapshot(
+                connectMessage: await dashboard.getDashboard(
+                    request: dashboardRequest,
+                    headers: [:]
+                ).briarValue()
             )
             guard
                 expectedGeneration == generation,
@@ -1550,10 +1564,14 @@ final class ChannelsStore: ObservableObject {
         }
 
         do {
-            let snapshot: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: projectID),
-                token: token,
-                as: DashboardSnapshot.self
+            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            var dashboardRequest = BriarAPI_GetDashboardRequest()
+            dashboardRequest.projectID = coreUUIDString(projectID)
+            let snapshot = try DashboardSnapshot(
+                connectMessage: await dashboard.getDashboard(
+                    request: dashboardRequest,
+                    headers: [:]
+                ).briarValue()
             )
             guard
                 expectedGeneration == generation,
@@ -1630,10 +1648,14 @@ final class ChannelsStore: ObservableObject {
         }
 
         do {
-            let preflight: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: expectedProposal.projectId),
-                token: token,
-                as: DashboardSnapshot.self
+            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            var dashboardRequest = BriarAPI_GetDashboardRequest()
+            dashboardRequest.projectID = coreUUIDString(expectedProposal.projectId)
+            let preflight = try DashboardSnapshot(
+                connectMessage: await dashboard.getDashboard(
+                    request: dashboardRequest,
+                    headers: [:]
+                ).briarValue()
             )
             guard expectedGeneration == generation,
                   expectedAcceptanceRevision == acceptanceRevision,
@@ -1745,10 +1767,14 @@ final class ChannelsStore: ObservableObject {
         }
 
         do {
-            let snapshot: DashboardSnapshot = try await api.get(
-                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
-                token: token,
-                as: DashboardSnapshot.self
+            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            var dashboardRequest = BriarAPI_GetDashboardRequest()
+            dashboardRequest.projectID = coreUUIDString(proposal.projectId)
+            let snapshot = try DashboardSnapshot(
+                connectMessage: await dashboard.getDashboard(
+                    request: dashboardRequest,
+                    headers: [:]
+                ).briarValue()
             )
             guard expectedGeneration == generation,
                   expectedAcceptanceRevision == acceptanceRevision,

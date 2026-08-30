@@ -1507,15 +1507,6 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
         throw MobileAPIError.invalidRequest
     }
 
-    func sendVoid(
-        _ path: String,
-        method: String,
-        token: String?,
-        body: (any Encodable & Sendable)?
-    ) async throws {
-        throw MobileAPIError.invalidRequest
-    }
-
     func upload<Response: Decodable & Sendable>(
         _ path: String,
         fields: [String: String],

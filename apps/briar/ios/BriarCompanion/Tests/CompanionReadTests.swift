@@ -898,19 +898,11 @@ private actor RunDetailSnapshotAPI: MobileAPIClientProtocol {
         RunEvidenceResponse(evidence: [])
     }
 
-    func send<Response: Decodable & Sendable>(
-        _ path: String,
-        method: String,
-        token: String?,
-        body: (any Encodable & Sendable)?,
-        as responseType: Response.Type
-    ) async throws -> Response {
-        let data: Data
-        if path.hasSuffix("/events") {
-            data = try JSONEncoder.mobileContract.encode(RunEventsResponse(events: []))
-        } else {
-            throw MobileAPIError.invalidRequest
-        }
-        return try JSONDecoder.mobileContract.decode(responseType, from: data)
+    func listRunEvents(
+        projectID: UUID,
+        runID: UUID,
+        token: String
+    ) async throws -> [RunEvent] {
+        []
     }
 }

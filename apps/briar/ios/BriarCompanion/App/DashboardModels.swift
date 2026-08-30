@@ -389,8 +389,56 @@ struct OrganizationMember: Codable, Equatable, Identifiable, Sendable {
     var id: String { userId }
 }
 
-struct DashboardSnapshot: Codable, Equatable, Sendable {
+struct ProjectSettings: Equatable, Sendable {
+    struct Linear: Equatable, Sendable {
+        let enabled: Bool
+        let source: String?
+        let teamKey: String?
+    }
+
+    struct CheckpointPolicy: Equatable, Sendable {
+        struct Boundary: Equatable, Sendable {
+            let stage: String
+            let stageLabel: String
+            let position: WorkflowCheckpoint.Position
+        }
+
+        struct Checkpoint: Equatable, Sendable {
+            let key: String
+            let stage: String
+            let position: WorkflowCheckpoint.Position
+        }
+
+        let availableBoundaries: [Boundary]
+        let projectMandatory: [Checkpoint]
+        let userDefaults: [Checkpoint]
+        let effective: [Checkpoint]
+        let projectRevision: Int
+        let userRevision: Int
+    }
+
+    let velenOrg: String?
+    let dataSource: String?
+    let linear: Linear
+    let githubRepositoryId: Int?
+    let githubRepository: String?
+    let workflow: AutoHuntWorkflow
+    let checkpointPolicy: CheckpointPolicy?
+
+    static let empty = Self(
+        velenOrg: nil,
+        dataSource: nil,
+        linear: .init(enabled: false, source: nil, teamKey: nil),
+        githubRepositoryId: nil,
+        githubRepository: nil,
+        workflow: .init(version: 2, stages: []),
+        checkpointPolicy: nil
+    )
+}
+
+struct DashboardSnapshot: Equatable, Sendable {
     var project: Project
+    var settings: ProjectSettings
     var runs: [DashboardRun]
     var workers: [DashboardWorker]?
     var organizationProviders: [AgentProvider]?
@@ -403,6 +451,7 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
 
     init(
         project: Project,
+        settings: ProjectSettings = .empty,
         runs: [DashboardRun],
         workers: [DashboardWorker]? = nil,
         organizationProviders: [AgentProvider]? = nil,
@@ -414,6 +463,7 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
         generatedAt: Date
     ) {
         self.project = project
+        self.settings = settings
         self.runs = runs
         self.workers = workers
         self.organizationProviders = organizationProviders
@@ -426,12 +476,14 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
     }
 }
 
-struct DashboardDelta: Codable, Equatable, Sendable {
+struct DashboardDelta: Equatable, Sendable {
     let cursor: Int
     let hasMore: Bool
+    let reset: Bool
     let runs: [DashboardRun]
     let deletedRunIds: [UUID]
     let project: Project?
+    let settings: ProjectSettings?
     let workers: [DashboardWorker]?
     let organizationProviders: [AgentProvider]?
     let executionPolicy: ProjectExecutionWorkerPolicy?
@@ -443,9 +495,11 @@ struct DashboardDelta: Codable, Equatable, Sendable {
     init(
         cursor: Int,
         hasMore: Bool,
+        reset: Bool = false,
         runs: [DashboardRun],
         deletedRunIds: [UUID],
         project: Project?,
+        settings: ProjectSettings? = nil,
         workers: [DashboardWorker]? = nil,
         organizationProviders: [AgentProvider]? = nil,
         executionPolicy: ProjectExecutionWorkerPolicy? = nil,
@@ -456,9 +510,11 @@ struct DashboardDelta: Codable, Equatable, Sendable {
     ) {
         self.cursor = cursor
         self.hasMore = hasMore
+        self.reset = reset
         self.runs = runs
         self.deletedRunIds = deletedRunIds
         self.project = project
+        self.settings = settings
         self.workers = workers
         self.organizationProviders = organizationProviders
         self.executionPolicy = executionPolicy
@@ -469,11 +525,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
     }
 }
 
-struct RunEventsResponse: Codable, Equatable, Sendable {
-    let events: [RunEvent]
-}
-
-struct RunEvent: Codable, Equatable, Identifiable, Sendable {
+struct RunEvent: Equatable, Identifiable, Sendable {
     let id: UUID
     let status: DashboardRun.Status
     let workflowStage: String?
@@ -481,6 +533,13 @@ struct RunEvent: Codable, Equatable, Identifiable, Sendable {
     let actor: String
     let actorName: String?
     let occurredAt: Date
+    let attempt: Int
+    let revision: Int
+    let qaStatus: String?
+    let trackerState: String?
+    let pullRequestUrls: [URL]
+    let targetSha: String?
+    let recordedAt: Date
 }
 
 struct IssueMessagesResponse: Codable, Equatable, Sendable {
@@ -900,6 +959,7 @@ enum DashboardMerge {
         }
         return DashboardSnapshot(
             project: delta.project ?? snapshot.project,
+            settings: delta.settings ?? snapshot.settings,
             runs: Array(runs.prefix(200)),
             workers: delta.workers ?? snapshot.workers,
             organizationProviders: delta.organizationProviders ?? snapshot.organizationProviders,

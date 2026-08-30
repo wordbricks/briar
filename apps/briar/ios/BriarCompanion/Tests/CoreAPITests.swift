@@ -22,97 +22,6 @@ final class CoreAPITests: XCTestCase {
         )
     }
 
-    func testBearerRequestAndCommonErrorBody() async throws {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [URLProtocolStub.self]
-        let session = URLSession(configuration: configuration)
-        let client = MobileAPIClient(
-            baseURL: URL(string: "https://briar-api.example/base")!,
-            session: session
-        )
-        URLProtocolStub.handler = { request in
-            XCTAssertEqual(request.url?.absoluteString, "https://briar-api.example/base/me")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer secret")
-            return (
-                HTTPURLResponse(
-                    url: request.url!,
-                    statusCode: 403,
-                    httpVersion: nil,
-                    headerFields: ["Content-Type": "application/json"]
-                )!,
-                Data(#"{"message":"permission denied"}"#.utf8)
-            )
-        }
-
-        do {
-            let _: CurrentUserResponse = try await client.get("/me", token: "secret")
-            XCTFail("Expected an HTTP error")
-        } catch let MobileAPIError.httpStatus(status, message) {
-            XCTAssertEqual(status, 403)
-            XCTAssertEqual(message, "permission denied")
-        }
-    }
-
-    func testSendVoidUsesSharedJSONTransportAndHTTPErrorContract() async throws {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [URLProtocolStub.self]
-        let client = MobileAPIClient(
-            baseURL: URL(string: "https://briar-api.example/base")!,
-            session: URLSession(configuration: configuration)
-        )
-        URLProtocolStub.handler = { request in
-            XCTAssertEqual(request.url?.absoluteString, "https://briar-api.example/base/action")
-            XCTAssertEqual(request.httpMethod, "POST")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/json")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer secret")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
-            let body = try XCTUnwrap(
-                JSONSerialization.jsonObject(with: try request.bodyData()) as? [String: Bool]
-            )
-            XCTAssertEqual(body, ["enabled": true])
-            return (
-                HTTPURLResponse(
-                    url: request.url!,
-                    statusCode: 204,
-                    httpVersion: nil,
-                    headerFields: nil
-                )!,
-                Data()
-            )
-        }
-
-        try await client.sendVoid(
-            "/action",
-            method: "POST",
-            token: "secret",
-            body: VoidRequest(enabled: true)
-        )
-
-        URLProtocolStub.handler = { request in
-            (
-                HTTPURLResponse(
-                    url: request.url!,
-                    statusCode: 409,
-                    httpVersion: nil,
-                    headerFields: ["Content-Type": "application/json"]
-                )!,
-                Data(#"{"error":"already applied"}"#.utf8)
-            )
-        }
-        do {
-            try await client.sendVoid(
-                "/action",
-                method: "POST",
-                token: "secret",
-                body: nil
-            )
-            XCTFail("Expected the shared HTTP status validator to reject 409")
-        } catch let MobileAPIError.httpStatus(status, message) {
-            XCTAssertEqual(status, 409)
-            XCTAssertEqual(message, "already applied")
-        }
-    }
-
     func testMultipartUploadUsesBearerAndFileMetadata() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [URLProtocolStub.self]
@@ -147,42 +56,9 @@ final class CoreAPITests: XCTestCase {
         XCTAssertTrue(response.ok)
     }
 
-    func testConditionalGetSendsETagAndAcceptsNotModified() async throws {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [URLProtocolStub.self]
-        let client = MobileAPIClient(
-            baseURL: URL(string: "https://briar-api.example")!,
-            session: URLSession(configuration: configuration)
-        )
-        let eTag = "W/\"organization-inbox:organization-1:7\""
-        URLProtocolStub.handler = { request in
-            XCTAssertEqual(request.httpMethod, "GET")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "If-None-Match"), eTag)
-            return (
-                HTTPURLResponse(
-                    url: request.url!,
-                    statusCode: 304,
-                    httpVersion: nil,
-                    headerFields: ["ETag": eTag]
-                )!,
-                Data()
-            )
-        }
-
-        let result: ConditionalGETResponse<HealthResponse> = try await client.conditionalGet(
-            "/organizations/organization-1/inbox",
-            token: "token",
-            eTag: eTag
-        )
-
-        XCTAssertTrue(result.notModified)
-        XCTAssertNil(result.value)
-        XCTAssertEqual(result.eTag, eTag)
-    }
 }
 
 private struct UploadResponse: Codable { let ok: Bool }
-private struct VoidRequest: Codable, Sendable { let enabled: Bool }
 
 private extension URLRequest {
     func bodyData() throws -> Data {

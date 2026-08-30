@@ -69,6 +69,7 @@
 		D3A6AD589D6C6456AC8B1345 /* MessageMentions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151B809A488C8E38ABA12C73 /* MessageMentions.swift */; };
 		DEE6CEC664AA0427D1E794C1 /* worker.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD6B40E507406BFF74665B5 /* worker.pb.swift */; };
 		E24E1CD27DB7BB792B99D69E /* issue.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E55B6EB8FC49C2BF7942D6 /* issue.connect.swift */; };
+		E57A80FF76256DE142AF8B33 /* CoreConnect.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A0DAF596DFA24E90833C53 /* CoreConnect.swift */; };
 		E82252AC06AFC3B0761836BC /* workflow.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86B59801900F5A75A1583ED0 /* workflow.pb.swift */; };
 		EA3D7F4BD2F999AF67127AE8 /* AgentsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17FF04740F5A18F25325D2C /* AgentsStore.swift */; };
 		EE5D250A1092057DAB5C1206 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C3D7B1D017C131E8DD36044 /* SessionStore.swift */; };
@@ -164,6 +165,7 @@
 		C50DB71AFF1E7CA7B051BEEB /* ProjectIconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectIconView.swift; sourceTree = "<group>"; };
 		CE453FFA6A7F97CAF774A8E8 /* MobileAPIContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileAPIContractTests.swift; sourceTree = "<group>"; };
 		CE917D55AAB7F8525B5D6FA0 /* CompanionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionStore.swift; sourceTree = "<group>"; };
+		D3A0DAF596DFA24E90833C53 /* CoreConnect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreConnect.swift; sourceTree = "<group>"; };
 		D4334565F76CAABE2AFAC90F /* DeepLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLinks.swift; sourceTree = "<group>"; };
 		D59E70E330C5C3C60094A493 /* FoundationStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoundationStatusView.swift; sourceTree = "<group>"; };
 		D99F13716DDFFEE8061655B9 /* realtime.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = realtime.pb.swift; sourceTree = "<group>"; };
@@ -281,6 +283,7 @@
 				CE917D55AAB7F8525B5D6FA0 /* CompanionStore.swift */,
 				5B0BE22C1849DA483E8B7BFF /* CompanionViews.swift */,
 				46BD848F54967DE5872E25CD /* ConversationViews.swift */,
+				D3A0DAF596DFA24E90833C53 /* CoreConnect.swift */,
 				34368CFC402513DE2753ABCA /* DashboardModels.swift */,
 				D4334565F76CAABE2AFAC90F /* DeepLinks.swift */,
 				C3A2BD65A5BF60B1D39F7690 /* DeviceAuthorization.swift */,
@@ -551,6 +554,7 @@
 				8C3ACBC240C3C93066779D21 /* CompanionStore.swift in Sources */,
 				2E57FEC834A9552E0E4879A9 /* CompanionViews.swift in Sources */,
 				6FBF07710D1E55F5F140DD52 /* ConversationViews.swift in Sources */,
+				E57A80FF76256DE142AF8B33 /* CoreConnect.swift in Sources */,
 				F132013FB482B8BFC9068619 /* DashboardModels.swift in Sources */,
 				B9D870EFE863E945B4CBE764 /* DeepLinks.swift in Sources */,
 				3DB8D1A6D350998AF802BF7C /* DeviceAuthorization.swift in Sources */,

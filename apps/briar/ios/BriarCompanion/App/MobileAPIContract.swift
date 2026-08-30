@@ -7,15 +7,8 @@ enum MobileAPIContract {
     static let androidClientID = "briar-android"
 
     enum Endpoint {
-        static let health = "/health"
         static let deviceCode = "/api/auth/device/code"
         static let deviceToken = "/api/auth/device/token"
-        static let currentUser = "/me"
-        static let inboxReadStates = "/inbox/read-states"
-
-        static func inbox(organizationID: UUID) -> String {
-            "/organizations/\(organizationID.uuidString.lowercased())/inbox"
-        }
 
         /// Multipart issue creation remains HTTP because Connect requests do not carry file bytes.
         static func issues(projectID: UUID) -> String {
@@ -25,15 +18,6 @@ enum MobileAPIContract {
         static func run(projectID: UUID, runID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())"
         }
-
-        static func dashboard(projectID: UUID) -> String {
-            "/projects/\(projectID.uuidString.lowercased())/dashboard"
-        }
-
-        static func dashboardDelta(projectID: UUID, cursor: Int) -> String {
-            "\(dashboard(projectID: projectID))/delta?cursor=\(cursor)"
-        }
-
 
         static func channelEvents(organizationID: UUID, cursor: Int) -> String {
             "/organizations/\(organizationID.uuidString.lowercased())/channel-events?cursor=\(cursor)"
@@ -55,30 +39,11 @@ enum MobileAPIContract {
             "/organizations/\(organizationID.uuidString.lowercased())/channels/\(channelID.uuidString.lowercased())/messages"
         }
 
-        static func runEvents(projectID: UUID, runID: UUID) -> String {
-            "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/events"
-        }
-
         /// Multipart issue messages remain HTTP because Connect requests do not carry file bytes.
         static func runMessages(projectID: UUID, runID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/messages"
         }
     }
-}
-
-struct HealthResponse: Codable, Equatable, Sendable {
-    let ok: Bool
-    let service: String
-    let database: String
-    let updates: String
-}
-
-struct InboxReadStatesResponse: Codable, Equatable, Sendable {
-    let readVersions: [String: String]
-}
-
-struct InboxReadStatesRequest: Codable, Equatable, Sendable {
-    let readVersions: [String: String]
 }
 
 struct DeviceCodeRequest: Codable, Equatable, Sendable {
@@ -161,18 +126,6 @@ struct DeviceTokenErrorResponse: Codable, Equatable, Sendable {
     enum CodingKeys: String, CodingKey {
         case error
         case errorDescription = "error_description"
-    }
-}
-
-struct CurrentUserResponse: Codable, Equatable, Sendable {
-    let user: User
-
-    struct User: Codable, Equatable, Sendable {
-        let id: String
-        let username: String?
-        let name: String
-        let email: String
-        let image: String?
     }
 }
 
@@ -493,13 +446,6 @@ protocol MobileAPIClientProtocol: MobileIssueAPIClientProtocol, Sendable {
         as responseType: Response.Type
     ) async throws -> Response
 
-    func sendVoid(
-        _ path: String,
-        method: String,
-        token: String?,
-        body: (any Encodable & Sendable)?
-    ) async throws
-
     func upload<Response: Decodable & Sendable>(
         _ path: String,
         fields: [String: String],
@@ -510,18 +456,6 @@ protocol MobileAPIClientProtocol: MobileIssueAPIClientProtocol, Sendable {
 
     func download(_ path: String, token: String, to destination: URL) async throws -> URL
 
-    func conditionalGet<Response: Decodable & Sendable>(
-        _ path: String,
-        token: String,
-        eTag: String?,
-        as responseType: Response.Type
-    ) async throws -> ConditionalGETResponse<Response>
-}
-
-struct ConditionalGETResponse<Value: Sendable>: Sendable {
-    let value: Value?
-    let eTag: String?
-    let notModified: Bool
 }
 
 enum ChannelRealtimeNotification: Equatable, Sendable {
@@ -602,6 +536,16 @@ extension MobileRealtimeClientProtocol {
 }
 
 extension MobileAPIClientProtocol {
+    func send<Response: Decodable & Sendable>(
+        _ path: String,
+        method: String,
+        token: String?,
+        body: (any Encodable & Sendable)?,
+        as responseType: Response.Type
+    ) async throws -> Response {
+        throw MobileAPIError.invalidRequest
+    }
+
     func listProjects(token: String) async throws -> ProjectsResponse {
         throw MobileAPIError.invalidRequest
     }
@@ -806,29 +750,6 @@ extension MobileAPIClientProtocol {
         throw MobileAPIError.invalidRequest
     }
 
-    func get<Response: Decodable & Sendable>(
-        _ path: String,
-        token: String? = nil,
-        as responseType: Response.Type = Response.self
-    ) async throws -> Response {
-        try await send(path, method: "GET", token: token, body: nil, as: responseType)
-    }
-
-    func sendVoid(
-        _ path: String,
-        method: String,
-        token: String?,
-        body: (any Encodable & Sendable)?
-    ) async throws {
-        let _: EmptyAPIResponse = try await send(
-            path,
-            method: method,
-            token: token,
-            body: body,
-            as: EmptyAPIResponse.self
-        )
-    }
-
     func upload<Response: Decodable & Sendable>(
         _ path: String,
         fields: [String: String],
@@ -843,21 +764,7 @@ extension MobileAPIClientProtocol {
         throw MobileAPIError.invalidDownload
     }
 
-    func conditionalGet<Response: Decodable & Sendable>(
-        _ path: String,
-        token: String,
-        eTag: String?,
-        as responseType: Response.Type = Response.self
-    ) async throws -> ConditionalGETResponse<Response> {
-        ConditionalGETResponse(
-            value: try await get(path, token: token, as: responseType),
-            eTag: nil,
-            notModified: false
-        )
-    }
 }
-
-private struct EmptyAPIResponse: Decodable, Sendable {}
 
 struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, Sendable {
     let baseURL: URL
@@ -1033,23 +940,6 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
         }
     }
 
-    func get<Response: Decodable & Sendable>(
-        _ path: String,
-        token: String? = nil,
-        as responseType: Response.Type = Response.self
-    ) async throws -> Response {
-        try await send(path, method: "GET", token: token, body: nil, as: responseType)
-    }
-
-    func post<Body: Encodable & Sendable, Response: Decodable & Sendable>(
-        _ path: String,
-        body: Body,
-        token: String? = nil,
-        as responseType: Response.Type = Response.self
-    ) async throws -> Response {
-        try await send(path, method: "POST", token: token, body: body, as: responseType)
-    }
-
     func send<Response: Decodable & Sendable>(
         _ path: String,
         method: String,
@@ -1061,52 +951,8 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
         return try JSONDecoder.mobileContract.decode(responseType, from: data)
     }
 
-    func sendVoid(
-        _ path: String,
-        method: String,
-        token: String?,
-        body: (any Encodable & Sendable)?
-    ) async throws {
-        _ = try await sendData(path, method: method, token: token, body: body)
-    }
-
-    func conditionalGet<Response: Decodable & Sendable>(
-        _ path: String,
-        token: String,
-        eTag: String?,
-        as responseType: Response.Type = Response.self
-    ) async throws -> ConditionalGETResponse<Response> {
-        guard let url = endpointURL(path) else { throw MobileAPIError.invalidRequest }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        if let eTag {
-            request.setValue(eTag, forHTTPHeaderField: "If-None-Match")
-        }
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw MobileAPIError.invalidResponse
-        }
-        let responseETag = httpResponse.value(forHTTPHeaderField: "ETag")
-        if httpResponse.statusCode == 304 {
-            return ConditionalGETResponse(
-                value: nil,
-                eTag: responseETag ?? eTag,
-                notModified: true
-            )
-        }
-        try validate(response: response, data: data)
-        return ConditionalGETResponse(
-            value: try JSONDecoder.mobileContract.decode(responseType, from: data),
-            eTag: responseETag,
-            notModified: false
-        )
-    }
-
-    /// Executes a JSON API request after applying Briar's shared URL, auth, encoding,
-    /// and HTTP error contract. Typed and body-less calls intentionally diverge only
-    /// after this transport boundary: `send` decodes the bytes while `sendVoid` ignores them.
+    /// Executes the remaining JSON-only device authorization requests after applying
+    /// Briar's shared URL, encoding, and HTTP error contract.
     private func sendData(
         _ path: String,
         method: String,

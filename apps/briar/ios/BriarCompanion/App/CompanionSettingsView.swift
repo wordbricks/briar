@@ -4,7 +4,7 @@ struct CompanionSettingsView: View {
     @Binding var appearance: String
     @Binding var localeRaw: String
     @ObservedObject var notifications: LocalNotificationService
-    let user: CurrentUserResponse.User?
+    let user: CurrentUser?
     let onDismiss: () -> Void
 
     @State private var selectedIcon = AppIconService.current

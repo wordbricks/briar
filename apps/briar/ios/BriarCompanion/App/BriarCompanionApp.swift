@@ -122,7 +122,7 @@ private struct UITestCompanionFlow: View {
                 errorMessage: nil,
                 token: "ui-test-token",
                 api: api,
-                user: CurrentUserResponse.User(
+                user: CurrentUser(
                     id: "fixture-user",
                     username: "briar_user",
                     name: "Briar User",
@@ -630,8 +630,6 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
                 try await Task.sleep(for: .seconds(2))
             }
             payload = #"{"message":{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","runId":"77777777-7777-4777-8777-777777777777","parentMessageId":null,"body":"모바일에서 확인했습니다","author":{"id":"fixture-user","name":"Briar User","image":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","provider":null},"replyCount":0,"createdAt":"2026-08-02T01:02:00Z","updatedAt":"2026-08-02T01:02:00Z"},"agentReply":null}"#
-        } else if path.hasSuffix("/events") {
-            payload = #"{"events":[]}"#
         } else if path.hasSuffix("/messages") {
             payload = #"{"messages":[]}"#
         } else if path.hasSuffix("/evidence") {
@@ -641,13 +639,6 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
         }
         return try JSONDecoder.mobileContract.decode(Response.self, from: Data(payload.utf8))
     }
-
-    func sendVoid(
-        _ path: String,
-        method: String,
-        token: String?,
-        body: (any Encodable & Sendable)?
-    ) async throws {}
 
     func download(_ path: String, token: String, to destination: URL) async throws -> URL {
         guard path.hasPrefix("/ui-test/") else { throw MobileAPIError.invalidDownload }
