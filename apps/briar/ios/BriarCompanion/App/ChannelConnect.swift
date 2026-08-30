@@ -205,12 +205,18 @@ extension ChannelMember {
         guard !message.userID.isEmpty, message.hasCreatedAt else {
             throw MobileAPIError.invalidResponse
         }
+        let role: String
+        switch message.role {
+        case .owner: role = "owner"
+        case .member: role = "member"
+        case .unspecified, .UNRECOGNIZED: throw MobileAPIError.invalidResponse
+        }
         self.init(
             userId: message.userID,
             name: message.name,
             email: message.email,
             image: message.hasImage ? message.image : nil,
-            role: message.role,
+            role: role,
             createdAt: try channelDate(message.createdAt)
         )
     }

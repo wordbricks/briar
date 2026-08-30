@@ -1015,7 +1015,7 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
         }
         var response = BriarAPI_GetChannelResponse()
         response.channel = channelSummaryMessage(detail.channel)
-        response.members = detail.members.map(channelMemberMessage)
+        response.members = try detail.members.map(channelMemberMessage)
         response.agents = detail.agents.map(organizationAgentMessage)
         response.messages = detail.messages.map(channelMessageMessage)
         if let nextCursor = detail.nextCursor {
@@ -1138,13 +1138,17 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
         return message
     }
 
-    private static func channelMemberMessage(_ value: ChannelMember) -> BriarAPI_ChannelMember {
+    private static func channelMemberMessage(_ value: ChannelMember) throws -> BriarAPI_ChannelMember {
         var message = BriarAPI_ChannelMember()
         message.userID = value.userId
         message.name = value.name
         message.email = value.email
         if let image = value.image { message.image = image }
-        message.role = value.role
+        switch value.role {
+        case "owner": message.role = .owner
+        case "member": message.role = .member
+        default: throw MobileAPIError.invalidResponse
+        }
         message.createdAt = .init(date: value.createdAt)
         return message
     }
