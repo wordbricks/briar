@@ -1,4 +1,3 @@
-import { ChannelAgentActivityPublishInput } from "../../src/lib/channel-agent-activity";
 import { issueAttachmentMarkdown } from "../../src/lib/issue-markdown";
 import { workLogEntryTranscriptEvent } from "./agent-worklog";
 import { readLatestWorkLogForRunWithArchive } from "./agent-worklog-service";
@@ -9,8 +8,6 @@ import {
   prepareStoredAttachments,
   uploadStoredAttachments,
 } from "./attachment-storage";
-import { publishIssueActivity } from "./channel-activity-realtime";
-import { verifyIssueActivityPublishToken } from "./channel-activity-ticket";
 import { sha256 } from "./crypto-digest";
 import { dashboardEventJson, dashboardRunJson } from "./dashboard-json";
 import {
@@ -47,14 +44,9 @@ import {
   type IssueProposalRow,
 } from "./issue-conversation-json";
 import { listIssueMessagesWithArchive } from "./issue-conversation-service";
-import {
-  readIssueReplyCompleteRequest,
-  readJson,
-} from "./request-readers";
-import { decodeRequestSync } from "./request-schema";
+import { readIssueReplyCompleteRequest } from "./request-readers";
 import {
   issueActivityCredential,
-  issueActivityFrame,
   scheduleIssueActivityClear,
   scheduleProjectRealtimePublish,
 } from "./realtime-scheduling";
@@ -69,10 +61,6 @@ import {
   WORKER_STALE_AFTER_MS,
   workerStateAt,
 } from "./workers";
-
-const decodeChannelAgentActivityPublishInput = decodeRequestSync(
-  ChannelAgentActivityPublishInput,
-);
 
 export async function claimNextIssueReplyWork(input: {
   projectId: string;
@@ -337,38 +325,6 @@ export async function handleIssueReplyWorkerRoute(input: {
   context?: ExecutionContext;
 }): Promise<Response | undefined> {
   const { request, url, db, attachmentsBucket, env, context } = input;
-
-
-  const issueReplyActivityMatch = url.pathname.match(
-    /^\/issue-reply-claims\/([0-9a-f-]+)\/activity$/u,
-  );
-  if (issueReplyActivityMatch && request.method === "POST") {
-    const token = request.headers.get("X-Briar-Channel-Activity-Token") ?? "";
-    const verified = await verifyIssueActivityPublishToken(
-      env.BETTER_AUTH_SECRET,
-      token,
-      issueReplyActivityMatch[1],
-    );
-    if (!verified) {
-      throw new HttpError(401, "Invalid or expired activity token");
-    }
-    const input = decodeChannelAgentActivityPublishInput(
-      await readJson(request),
-    );
-    const frame = issueActivityFrame(
-      {
-        id: verified.replyJobId,
-        project_id: verified.projectId,
-        run_id: verified.runId,
-        trigger_message_id: verified.triggerMessageId,
-        parent_message_id: verified.parentMessageId,
-        attempts: verified.attempt,
-      },
-      input,
-    );
-    await publishIssueActivity(env, verified.organizationId, frame);
-    return new Response(null, { status: 204 });
-  }
 
   const issueReplyClaimMatch = url.pathname.match(
     /^\/issue-reply-claims\/([0-9a-f-]+)\/complete$/u,

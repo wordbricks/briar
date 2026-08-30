@@ -1,7 +1,4 @@
 import {
-  ChannelAgentActivityPublishInput,
-} from "../../src/lib/channel-agent-activity";
-import {
   channelExecutionProposalAcceptInputSchema,
   channelIssueBatchProposalPayloadSchema,
   channelIssueProposalPayloadSchema,
@@ -10,7 +7,6 @@ import {
   channelReadInputSchema,
   channelReplyClaimInputSchema,
   channelReplyLeaseInputSchema,
-  channelReplySessionCheckpointInputSchema,
   directMessageInputSchema,
 } from "../../src/lib/channels-contract";
 import { decodeRequestSync } from "./request-schema";
@@ -39,10 +35,4 @@ export const decodeChannelReplyClaimInput = decodeRequestSync(
 );
 export const decodeChannelReplyLeaseInput = decodeRequestSync(
   channelReplyLeaseInputSchema,
-);
-export const decodeChannelReplySessionCheckpointInput = decodeRequestSync(
-  channelReplySessionCheckpointInputSchema,
-);
-export const decodeChannelAgentActivityPublishInput = decodeRequestSync(
-  ChannelAgentActivityPublishInput,
 );

@@ -6,19 +6,12 @@ import {
   uploadStoredAttachments,
 } from "./attachment-storage";
 import { channelAttachmentResponse } from "./channel-attachment-response";
-import { publishChannelActivity } from "./channel-activity-realtime";
-import { verifyChannelActivityPublishToken } from "./channel-activity-ticket";
-import {
-  decodeChannelAgentActivityPublishInput,
-  decodeChannelReplySessionCheckpointInput,
-} from "./channel-route-decoders";
 import {
   channelExecutionProposalTablesAvailable,
   channelIssueBatchProposalTablesAvailable,
   channelReplyJson,
   channelSkillExecutionProposalTablesAvailable,
   completeChannelReply,
-  checkpointChannelReplySession,
   failChannelReply,
   getClaimedChannelReply,
   getClaimedChannelReplyAttachment,
@@ -30,12 +23,8 @@ import {
 import { sha256 } from "./crypto-digest";
 import { HttpError, json } from "./http-response";
 import { getOrganizationAgent } from "./organization-agents";
+import { readChannelReplyCompleteRequest } from "./request-readers";
 import {
-  readChannelReplyCompleteRequest,
-  readJson,
-} from "./request-readers";
-import {
-  channelActivityFrame,
   scheduleChannelActivityClear,
   scheduleChannelRealtimePublish,
 } from "./realtime-scheduling";
@@ -96,65 +85,10 @@ export async function handleChannelReplyResultRoute(
     return channelAttachmentResponse(attachment, object, object.body);
   }
 
-  const channelReplyActivityMatch = pathname.match(
-    /^\/channel-reply-claims\/([0-9a-f-]+)\/activity$/u,
-  );
-  if (channelReplyActivityMatch && request.method === "POST") {
-    const token = request.headers.get("X-Briar-Channel-Activity-Token") ?? "";
-    const verified = await verifyChannelActivityPublishToken(
-      env.BETTER_AUTH_SECRET,
-      token,
-      channelReplyActivityMatch[1],
-    );
-    if (!verified) {
-      throw new HttpError(401, "Invalid or expired activity token");
-    }
-    const input = decodeChannelAgentActivityPublishInput(
-      await readJson(request),
-    );
-    const frame = channelActivityFrame(
-      {
-        id: verified.replyJobId,
-        organization_id: verified.organizationId,
-        channel_id: verified.channelId,
-        agent_id: verified.agentId,
-        trigger_message_id: verified.triggerMessageId,
-        parent_message_id: verified.parentMessageId,
-        attempts: verified.attempt,
-      },
-      input,
-    );
-    await publishChannelActivity(env, verified.organizationId, frame);
-    return new Response(null, { status: 204 });
-  }
-
   const channelReplyClaimMatch = pathname.match(
-    /^\/channel-reply-claims\/([0-9a-f-]+)\/(session|complete)$/u,
+    /^\/channel-reply-claims\/([0-9a-f-]+)\/complete$/u,
   );
   if (channelReplyClaimMatch && request.method === "POST") {
-    if (channelReplyClaimMatch[2] === "session") {
-      const input = decodeChannelReplySessionCheckpointInput(
-        await readJson(request),
-      );
-      const principal = await requireWorkerOrganization(
-        db,
-        request,
-        input.organizationId,
-      );
-      const session = await checkpointChannelReplySession(db, {
-        jobId: channelReplyClaimMatch[1],
-        deviceId: principal.deviceId,
-        workerId: input.workerId,
-        claimTokenHash: await sha256(input.claimToken),
-        conversationId: input.conversationId,
-        observedAt: new Date().toISOString(),
-      });
-      if (!session) {
-        throw new HttpError(409, "Reply claim is no longer active");
-      }
-      return json({ retainedUntil: session.retained_until });
-    }
-
     const { input, attachments } = await readChannelReplyCompleteRequest(
       request,
     );

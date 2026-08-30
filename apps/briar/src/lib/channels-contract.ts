@@ -1145,13 +1145,6 @@ export const channelReplyLeaseInputSchema = strict(Schema.Struct({
   claimToken: Schema.Trim.check(Schema.isLengthBetween(1, 200)),
 }));
 
-export const channelReplySessionCheckpointInputSchema = strict(Schema.Struct({
-  ...channelReplyLeaseInputSchema.fields,
-  conversationId: Schema.NullOr(
-    Schema.Trim.check(Schema.isLengthBetween(1, 1_024)),
-  ),
-}));
-
 export const channelReplyCompleteInputSchema = strict(Schema.Struct({
   ...channelReplyLeaseInputSchema.fields,
   conversationId: nullableDefault(
