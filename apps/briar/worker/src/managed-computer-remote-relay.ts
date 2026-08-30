@@ -1,4 +1,15 @@
 import { DurableObject } from "cloudflare:workers";
+import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
+import {
+  ManagedComputerSetupControllerEndedSchema,
+  ManagedComputerSetupControllerReadySchema,
+  ManagedComputerSetupToAgentSchema,
+  ManagedComputerSetupToControllerSchema,
+} from "@briar/contracts/gen/briar/worker/v1/managed_computer_setup_pb";
+import {
+  isManagedComputerSetupControllerCommand,
+  isManagedComputerSetupToController,
+} from "../../src/lib/managed-computer-setup-codec";
 import {
   managedComputerRemoteHeartbeatRequest,
   managedComputerRemoteHeartbeatResponse,
@@ -40,6 +51,25 @@ function messageSize(message: string | ArrayBuffer) {
 
 function attachment(socket: WebSocket) {
   return socket.deserializeAttachment() as RemoteSocketAttachment | null;
+}
+
+function setupControllerControlFrame(
+  control: "ready" | "ended",
+  sessionId: string,
+): ArrayBuffer {
+  const message = create(ManagedComputerSetupToAgentSchema, {
+    payload: control === "ready"
+      ? {
+        case: "controllerReady",
+        value: create(ManagedComputerSetupControllerReadySchema, { sessionId }),
+      }
+      : {
+        case: "controllerEnded",
+        value: create(ManagedComputerSetupControllerEndedSchema, { sessionId }),
+      },
+  });
+  return new Uint8Array(toBinary(ManagedComputerSetupToAgentSchema, message))
+    .buffer;
 }
 
 export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
@@ -137,10 +167,7 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
     );
     const current = controller ? attachment(controller) : null;
     if (current?.sessionId) {
-      server.send(JSON.stringify({
-        type: "setup_controller_ready",
-        sessionId: current.sessionId,
-      }));
+      server.send(setupControllerControlFrame("ready", current.sessionId));
     }
     return new Response(null, {
       status: 101,
@@ -179,7 +206,7 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
       controllerBytes: 0,
       screenBytes: 0,
     } satisfies RemoteSocketAttachment);
-    agent.send(JSON.stringify({ type: "setup_controller_ready", sessionId }));
+    agent.send(setupControllerControlFrame("ready", sessionId));
     return new Response(null, {
       status: 101,
       headers: { "Sec-WebSocket-Protocol": protocol },
@@ -298,8 +325,15 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
     if (
       current.role === "setup-agent" || current.role === "setup-controller"
     ) {
-      if (typeof message !== "string") {
-        socket.close(1008, "Managed setup messages must be text");
+      if (typeof message === "string") {
+        if (
+          current.role === "setup-agent" &&
+          message === managedComputerRemoteHeartbeatRequest
+        ) {
+          socket.send(managedComputerRemoteHeartbeatResponse);
+          return;
+        }
+        socket.close(1008, "Managed setup control messages must be binary");
         return;
       }
       if (messageSize(message) > maxSetupFrameBytes) {
@@ -307,9 +341,21 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
         return;
       }
       try {
-        JSON.parse(message);
+        const valid = current.role === "setup-agent"
+          ? isManagedComputerSetupToController(fromBinary(
+            ManagedComputerSetupToControllerSchema,
+            new Uint8Array(message),
+          ))
+          : isManagedComputerSetupControllerCommand(fromBinary(
+            ManagedComputerSetupToAgentSchema,
+            new Uint8Array(message),
+          ));
+        if (!valid) {
+          socket.close(1008, "Managed setup message is invalid");
+          return;
+        }
       } catch {
-        socket.close(1008, "Managed setup message must be JSON");
+        socket.close(1008, "Managed setup message is malformed");
         return;
       }
       const targetRole = current.role === "setup-agent"
@@ -396,10 +442,7 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
       if (!current.sessionId) return;
       for (const agent of this.ctx.getWebSockets("setup-agent")) {
         if (agent.readyState !== socketOpen) continue;
-        agent.send(JSON.stringify({
-          type: "setup_controller_ended",
-          sessionId: current.sessionId,
-        }));
+        agent.send(setupControllerControlFrame("ended", current.sessionId));
       }
       return;
     }

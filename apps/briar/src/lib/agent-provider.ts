@@ -10,6 +10,16 @@ export const agentProviders = [
 
 export type AgentProvider = (typeof agentProviders)[number];
 
+export const managedComputerSetupProviders = [
+  "codex",
+  "claude",
+  "grok",
+  "opencode",
+] as const satisfies readonly AgentProvider[];
+
+export type ManagedComputerSetupProvider =
+  (typeof managedComputerSetupProviders)[number];
+
 const agentProviderMenuPositions = new Map<AgentProvider, number>(
   agentProviders.map((provider, index) => [provider, index]),
 );

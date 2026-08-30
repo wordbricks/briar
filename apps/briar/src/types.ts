@@ -26,7 +26,7 @@ import type {
   ProjectAgentScheduleRecurrence,
 } from "./lib/project-agent-schedule";
 import type { IssueDifficulty } from "./lib/issue-difficulty";
-import type { ManagedComputerSetupProvider } from "./lib/managed-computer-setup-protocol";
+import type { ManagedComputerSetupProvider } from "./lib/agent-provider";
 
 export type HuntStatus = AutoHuntRunStatus;
 export type HuntSource = AutoHuntSource;

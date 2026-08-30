@@ -10,6 +10,19 @@ import {
   XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
+import {
+  ManagedComputerSetupCancelSchema,
+  ManagedComputerSetupChallengeKind,
+  ManagedComputerSetupChallengeService,
+  ManagedComputerSetupPhase,
+  ManagedComputerSetupStartSchema,
+  ManagedComputerSetupStateStatus,
+  ManagedComputerSetupSubmitSchema,
+  ManagedComputerSetupToAgentSchema,
+  type ManagedComputerSetupToController,
+  ManagedComputerSetupToControllerSchema,
+} from "@briar/contracts/gen/briar/worker/v1/managed_computer_setup_pb";
 
 import { useI18n } from "../i18n";
 import { AgentProviderIcon } from "./AgentIcons";
@@ -29,34 +42,100 @@ import { Spinner } from "./ui/spinner";
 import { Typography } from "./ui/typography";
 import { createManagedComputerSetupSession } from "../lib/api";
 import { openExternalUrl } from "../lib/auth-session";
-import { agentProviderLabels } from "../lib/agent-provider";
 import {
-  decodeManagedComputerSetupAgentMessage,
+  agentProviderLabels,
   managedComputerSetupProviders,
-  type ManagedComputerSetupAgentMessage,
-} from "../lib/managed-computer-setup-protocol";
+  type ManagedComputerSetupProvider,
+} from "../lib/agent-provider";
+import {
+  isManagedComputerSetupToController,
+  managedComputerSetupProviderToProto,
+} from "../lib/managed-computer-setup-codec";
 import type {
   ManagedComputer,
-  ManagedComputerSetupProvider,
   Project,
 } from "../types";
 
 type WizardScreen = "start" | "running" | "complete" | "error";
 type ManagedComputerSetupMode = "setup" | "add_project";
-type SetupPhase = Extract<
-  ManagedComputerSetupAgentMessage,
-  { type: "state" }
->["phase"];
-type SetupChallenge = Extract<
-  ManagedComputerSetupAgentMessage,
-  { type: "challenge" }
->;
+type SetupPhase = "github" | "provider" | "repository" | "worker";
+type SetupChallenge = {
+  challengeId: string;
+  service: "github" | "provider";
+  kind: "device_code" | "authorization_code" | "api_key";
+  verificationUri: string;
+  userCode?: string;
+};
+
+const setupPhaseFromProto = (
+  phase: ManagedComputerSetupPhase,
+): SetupPhase | null => {
+  switch (phase) {
+    case ManagedComputerSetupPhase.GITHUB:
+      return "github";
+    case ManagedComputerSetupPhase.PROVIDER:
+      return "provider";
+    case ManagedComputerSetupPhase.REPOSITORY:
+      return "repository";
+    case ManagedComputerSetupPhase.WORKER:
+      return "worker";
+    default:
+      return null;
+  }
+};
+
+const setupStatusFromProto = (
+  status: ManagedComputerSetupStateStatus,
+): "working" | "complete" | null => {
+  switch (status) {
+    case ManagedComputerSetupStateStatus.WORKING:
+      return "working";
+    case ManagedComputerSetupStateStatus.COMPLETE:
+      return "complete";
+    default:
+      return null;
+  }
+};
+
+const setupChallengeFromProto = (
+  challenge: {
+    challengeId: string;
+    service: ManagedComputerSetupChallengeService;
+    kind: ManagedComputerSetupChallengeKind;
+    verificationUri: string;
+    userCode?: string;
+  },
+): SetupChallenge | null => {
+  const service = challenge.service === ManagedComputerSetupChallengeService.GITHUB
+    ? "github" as const
+    : challenge.service === ManagedComputerSetupChallengeService.PROVIDER
+      ? "provider" as const
+      : null;
+  const kind = challenge.kind === ManagedComputerSetupChallengeKind.DEVICE_CODE
+    ? "device_code" as const
+    : challenge.kind ===
+        ManagedComputerSetupChallengeKind.AUTHORIZATION_CODE
+      ? "authorization_code" as const
+      : challenge.kind === ManagedComputerSetupChallengeKind.API_KEY
+        ? "api_key" as const
+        : null;
+  return service && kind
+    ? {
+      challengeId: challenge.challengeId,
+      service,
+      kind,
+      verificationUri: challenge.verificationUri,
+      ...(challenge.userCode ? { userCode: challenge.userCode } : {}),
+    }
+    : null;
+};
 
 const initialPhaseState = (): Partial<Record<SetupPhase, "working" | "complete">> =>
   ({});
 
 export function ManagedComputerSetupWizard({
   computer,
+  createSetupSession = createManagedComputerSetupSession,
   mode = "setup",
   onComplete,
   onOpenChange,
@@ -66,6 +145,7 @@ export function ManagedComputerSetupWizard({
   token,
 }: {
   computer: ManagedComputer;
+  createSetupSession?: typeof createManagedComputerSetupSession;
   mode?: ManagedComputerSetupMode;
   onComplete: () => void;
   onOpenChange: (open: boolean) => void;
@@ -114,7 +194,15 @@ export function ManagedComputerSetupWizard({
       const socket = socketRef.current;
       socketRef.current = null;
       if (socket?.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "cancel" }));
+        socket.send(toBinary(
+          ManagedComputerSetupToAgentSchema,
+          create(ManagedComputerSetupToAgentSchema, {
+            payload: {
+              case: "cancel",
+              value: create(ManagedComputerSetupCancelSchema),
+            },
+          }),
+        ));
       }
       socket?.close(1000, "Setup dialog closed");
     };
@@ -148,7 +236,7 @@ export function ManagedComputerSetupWizard({
     setPhaseState(initialPhaseState());
     terminalRef.current = false;
     try {
-      const ticket = await createManagedComputerSetupSession(
+      const ticket = await createSetupSession(
         token,
         organizationId,
         computer.id,
@@ -159,40 +247,79 @@ export function ManagedComputerSetupWizard({
         return;
       }
       const socket = new WebSocket(ticket.socket.url, ticket.socket.protocol);
+      socket.binaryType = "arraybuffer";
       socketRef.current = socket;
       socket.addEventListener("open", () => {
         if (socketRef.current !== socket) return;
-        socket.send(JSON.stringify({
-          type: "start",
-          setupToken: ticket.setupToken,
-          provider,
-        }));
+        socket.send(toBinary(
+          ManagedComputerSetupToAgentSchema,
+          create(ManagedComputerSetupToAgentSchema, {
+            payload: {
+              case: "start",
+              value: create(ManagedComputerSetupStartSchema, {
+                setupToken: ticket.setupToken,
+                provider: managedComputerSetupProviderToProto(provider),
+              }),
+            },
+          }),
+        ));
       });
       socket.addEventListener("message", (event) => {
         if (socketRef.current !== socket) return;
-        const message = decodeManagedComputerSetupAgentMessage(event.data);
-        if (!message) return;
-        if (message.type === "state") {
+        if (!(event.data instanceof ArrayBuffer)) {
+          fail(t("managedComputer.setup.agentOffline"));
+          return;
+        }
+        let message: ManagedComputerSetupToController;
+        try {
+          message = fromBinary(
+            ManagedComputerSetupToControllerSchema,
+            new Uint8Array(event.data),
+          );
+        } catch {
+          fail(t("managedComputer.setup.agentOffline"));
+          return;
+        }
+        if (!isManagedComputerSetupToController(message)) {
+          fail(t("managedComputer.setup.agentOffline"));
+          return;
+        }
+        if (message.payload.case === "state") {
+          const phase = setupPhaseFromProto(message.payload.value.phase);
+          const status = setupStatusFromProto(message.payload.value.status);
+          if (!phase || !status) {
+            fail(t("managedComputer.setup.agentOffline"));
+            return;
+          }
           setPhaseState((current) => ({
             ...current,
-            [message.phase]: message.status,
+            [phase]: status,
           }));
-          if (message.status === "complete") {
+          if (status === "complete") {
             setChallenge(null);
             setCredential("");
             setCredentialSubmitted(false);
           }
           return;
         }
-        if (message.type === "challenge") {
-          setChallenge(message);
+        if (message.payload.case === "challenge") {
+          const nextChallenge = setupChallengeFromProto(message.payload.value);
+          if (!nextChallenge) {
+            fail(t("managedComputer.setup.agentOffline"));
+            return;
+          }
+          setChallenge(nextChallenge);
           setCredential("");
           setCredentialSubmitted(false);
           setCopied(false);
           return;
         }
-        if (message.type === "error") {
-          fail(message.message);
+        if (message.payload.case === "error") {
+          fail(message.payload.value.message);
+          return;
+        }
+        if (message.payload.case !== "complete") {
+          fail(t("managedComputer.setup.agentOffline"));
           return;
         }
         terminalRef.current = true;
@@ -223,11 +350,18 @@ export function ManagedComputerSetupWizard({
     if (!challenge || !credential.trim()) return;
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
-    socket.send(JSON.stringify({
-      type: "submit",
-      challengeId: challenge.challengeId,
-      value: credential.trim(),
-    }));
+    socket.send(toBinary(
+      ManagedComputerSetupToAgentSchema,
+      create(ManagedComputerSetupToAgentSchema, {
+        payload: {
+          case: "submit",
+          value: create(ManagedComputerSetupSubmitSchema, {
+            challengeId: challenge.challengeId,
+            value: credential.trim(),
+          }),
+        },
+      }),
+    ));
     setCredential("");
     setCredentialSubmitted(true);
   };
