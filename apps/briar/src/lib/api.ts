@@ -84,17 +84,27 @@ export {
   acceptChannelExecutionProposal,
   acceptChannelProposal,
   acceptChannelSkillExecutionProposal,
+  createChannel,
+  createChannelWebhook,
   createDirectMessage,
   declineChannelProposal,
+  deleteChannel,
   deleteChannelMessage,
   listChannelMessages,
   listChannels,
+  listChannelWebhooks,
   listDirectMessageRecipients,
   loadChannel,
   loadChannelDelta,
   markChannelRead,
+  revokeChannelWebhook,
+  rotateChannelWebhook,
   sendChannelMessage,
+  setChannelAgent,
+  setChannelMember,
   toggleChannelMessageReaction,
+  updateChannel,
+  updateChannelWebhook,
   updateChannelThreadSubscription,
 } from "./app-rpc/channel";
 export {
@@ -143,14 +153,9 @@ import type {
 import { LITELLM_MAIN_PRICING_SOURCE } from "./agent-usage-pricing";
 import type { InboxMessage } from "../hooks/useInbox";
 import type {
-  ChannelAgentSummary,
   ChannelLinkPreview,
-  ChannelMember,
   ChannelMessageAttachment,
   ChannelMessageDocumentContent,
-  ChannelSummary,
-  ChannelVisibility,
-  ChannelWebhook,
 } from "./channels-contract";
 import type {
   LinearImportConnectResult,
@@ -783,55 +788,6 @@ export async function loadProjectAgentSpriteSheet(
   return spriteSheet;
 }
 
-export async function createChannel(
-  token: string,
-  organizationId: string,
-  input: {
-    name: string;
-    slug?: string;
-    topic?: string | null;
-    visibility?: ChannelVisibility;
-    defaultProjectId?: string | null;
-  },
-) {
-  return request<{ channel: ChannelSummary }>(
-    `/organizations/${organizationId}/channels`,
-    token,
-    { method: "POST", body: JSON.stringify(input) },
-  );
-}
-
-export async function updateChannel(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  input: {
-    name?: string;
-    topic?: string | null;
-    visibility?: ChannelVisibility;
-    defaultProjectId?: string | null;
-    archived?: boolean;
-  },
-) {
-  return request<{ channel: ChannelSummary }>(
-    `/organizations/${organizationId}/channels/${channelId}`,
-    token,
-    { method: "PATCH", body: JSON.stringify(input) },
-  );
-}
-
-export async function deleteChannel(
-  token: string,
-  organizationId: string,
-  channelId: string,
-) {
-  return request<{ deleted: boolean }>(
-    `/organizations/${organizationId}/channels/${channelId}`,
-    token,
-    { method: "DELETE" },
-  );
-}
-
 export async function loadChannelMessageAttachment(
   token: string,
   attachment: ChannelMessageAttachment,
@@ -870,101 +826,6 @@ export async function loadChannelLinkPreview(
   return request<{ preview: ChannelLinkPreview | null }>(
     `/organizations/${organizationId}/channels/${channelId}/link-preview?${params}`,
     token,
-  );
-}
-
-export async function setChannelAgent(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  agentId: string,
-  present: boolean,
-) {
-  return request<{ agents: ChannelAgentSummary[] }>(
-    `/organizations/${organizationId}/channels/${channelId}/agents/${agentId}`,
-    token,
-    { method: present ? "PUT" : "DELETE" },
-  );
-}
-
-export async function setChannelMember(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  userId: string,
-  present: boolean,
-) {
-  return request<{ members: ChannelMember[] }>(
-    `/organizations/${organizationId}/channels/${channelId}/members/${encodeURIComponent(userId)}`,
-    token,
-    {
-      method: present ? "PUT" : "DELETE",
-      body: present ? JSON.stringify({ role: "member" }) : undefined,
-    },
-  );
-}
-
-export async function listChannelWebhooks(
-  token: string,
-  organizationId: string,
-  channelId: string,
-) {
-  return request<{ webhooks: ChannelWebhook[] }>(
-    `/organizations/${organizationId}/channels/${channelId}/webhooks`,
-    token,
-  );
-}
-
-export async function createChannelWebhook(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  name: string,
-) {
-  return request<{ webhook: ChannelWebhook; url: string }>(
-    `/organizations/${organizationId}/channels/${channelId}/webhooks`,
-    token,
-    { method: "POST", body: JSON.stringify({ name }) },
-  );
-}
-
-export async function updateChannelWebhook(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  webhookId: string,
-  name: string,
-) {
-  return request<{ webhook: ChannelWebhook }>(
-    `/organizations/${organizationId}/channels/${channelId}/webhooks/${webhookId}`,
-    token,
-    { method: "PATCH", body: JSON.stringify({ name }) },
-  );
-}
-
-export async function rotateChannelWebhook(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  webhookId: string,
-) {
-  return request<{ webhook: ChannelWebhook; url: string }>(
-    `/organizations/${organizationId}/channels/${channelId}/webhooks/${webhookId}/rotate`,
-    token,
-    { method: "POST" },
-  );
-}
-
-export async function revokeChannelWebhook(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  webhookId: string,
-) {
-  return request<{ webhook: ChannelWebhook }>(
-    `/organizations/${organizationId}/channels/${channelId}/webhooks/${webhookId}`,
-    token,
-    { method: "DELETE" },
   );
 }
 

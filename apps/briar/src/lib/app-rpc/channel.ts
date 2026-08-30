@@ -19,6 +19,7 @@ import {
   type ChannelMessageAuthor as ChannelMessageAuthorMessage,
   type ChannelProposal as ChannelProposalMessage,
   type ChannelSummary as ChannelSummaryMessage,
+  type ChannelWebhook as ChannelWebhookMessage,
   type SyncChannelsResponse as SyncChannelsResponseMessage,
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
 import {
@@ -61,6 +62,7 @@ import type {
   ChannelReplyStatus,
   ChannelSummary,
   ChannelVisibility,
+  ChannelWebhook,
   DeleteChannelMessageResponse,
   DirectMessageParticipant,
 } from "../channels-contract";
@@ -111,6 +113,17 @@ const channelVisibilityFromProto = (
       return "private";
     default:
       throw new Error(`Unknown channel visibility: ${value}`);
+  }
+};
+
+const channelVisibilityToProto = (
+  value: ChannelVisibility,
+): ProtoChannelVisibility => {
+  switch (value) {
+    case "public":
+      return ProtoChannelVisibility.PUBLIC;
+    case "private":
+      return ProtoChannelVisibility.PRIVATE;
   }
 };
 
@@ -196,6 +209,18 @@ export const channelMemberFromMessage = (
     createdAt: requiredTimestamp(value.createdAt, "channelMember.createdAt"),
   };
 };
+
+export const channelWebhookFromMessage = (
+  value: ChannelWebhookMessage,
+): ChannelWebhook => ({
+  id: value.id,
+  channelId: value.channelId,
+  name: value.name,
+  active: value.active,
+  lastUsedAt: optionalTimestamp(value.lastUsedAt),
+  createdAt: requiredTimestamp(value.createdAt, "channelWebhook.createdAt"),
+  updatedAt: requiredTimestamp(value.updatedAt, "channelWebhook.updatedAt"),
+});
 
 const blockTextFromMessage = (value: BlockTextMessage) => {
   switch (value.kind) {
@@ -759,6 +784,245 @@ export async function createDirectMessage(
         response.channel,
         "createDirectMessage.channel",
       )),
+    };
+  });
+}
+
+export async function createChannel(
+  token: string,
+  organizationId: string,
+  input: {
+    name: string;
+    slug?: string;
+    topic?: string | null;
+    visibility?: ChannelVisibility;
+    defaultProjectId?: string | null;
+  },
+) {
+  const client = requireChannelClient();
+  return appRpc(async () => {
+    const response = await client.createChannel(
+      {
+        organizationId,
+        name: input.name,
+        slug: input.slug,
+        topic: input.topic ?? undefined,
+        visibility: input.visibility === undefined
+          ? undefined
+          : channelVisibilityToProto(input.visibility),
+        defaultProjectId: input.defaultProjectId ?? undefined,
+      },
+      appCallOptions(token),
+    );
+    return {
+      channel: channelSummaryFromMessage(
+        requiredMessage(response.channel, "createChannel.channel"),
+      ),
+    };
+  });
+}
+
+export async function updateChannel(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  input: {
+    name?: string;
+    topic?: string | null;
+    visibility?: ChannelVisibility;
+    defaultProjectId?: string | null;
+    archived?: boolean;
+  },
+) {
+  const client = requireChannelClient();
+  return appRpc(async () => {
+    const response = await client.updateChannel(
+      {
+        organizationId,
+        channelId,
+        name: input.name,
+        topicUpdate: input.topic === undefined
+          ? { case: undefined }
+          : input.topic === null
+          ? { case: "clearTopic", value: {} }
+          : { case: "topic", value: input.topic },
+        visibility: input.visibility === undefined
+          ? undefined
+          : channelVisibilityToProto(input.visibility),
+        defaultProjectUpdate: input.defaultProjectId === undefined
+          ? { case: undefined }
+          : input.defaultProjectId === null
+          ? { case: "clearDefaultProject", value: {} }
+          : { case: "defaultProjectId", value: input.defaultProjectId },
+        archived: input.archived,
+      },
+      appCallOptions(token),
+    );
+    return {
+      channel: channelSummaryFromMessage(
+        requiredMessage(response.channel, "updateChannel.channel"),
+      ),
+    };
+  });
+}
+
+export async function deleteChannel(
+  token: string,
+  organizationId: string,
+  channelId: string,
+) {
+  const client = requireChannelClient();
+  return appRpc(async () => {
+    const response = await client.deleteChannel(
+      { organizationId, channelId },
+      appCallOptions(token),
+    );
+    return { deleted: response.deleted };
+  });
+}
+
+export async function setChannelAgent(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  agentId: string,
+  present: boolean,
+) {
+  const client = requireChannelClient();
+  return appRpc(async () => {
+    const response = await client.setChannelAgent(
+      {
+        organizationId,
+        channelId,
+        agentId,
+        membership: present
+          ? { case: "add", value: {} }
+          : { case: "remove", value: {} },
+      },
+      appCallOptions(token),
+    );
+    return { agents: response.agents.map(organizationAgentFromMessage) };
+  });
+}
+
+export async function setChannelMember(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  userId: string,
+  present: boolean,
+) {
+  const client = requireChannelClient();
+  return appRpc(async () => {
+    const response = await client.setChannelMember(
+      {
+        organizationId,
+        channelId,
+        userId,
+        membership: present
+          ? { case: "add", value: {} }
+          : { case: "remove", value: {} },
+      },
+      appCallOptions(token),
+    );
+    return { members: response.members.map(channelMemberFromMessage) };
+  });
+}
+
+export async function listChannelWebhooks(
+  token: string,
+  organizationId: string,
+  channelId: string,
+) {
+  const client = requireChannelClient();
+  return appRpc(async () => {
+    const response = await client.listChannelWebhooks(
+      { organizationId, channelId },
+      appCallOptions(token),
+    );
+    return { webhooks: response.webhooks.map(channelWebhookFromMessage) };
+  });
+}
+
+export async function createChannelWebhook(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  name: string,
+) {
+  const client = requireChannelClient();
+  return appRpc(async () => {
+    const response = await client.createChannelWebhook(
+      { organizationId, channelId, name },
+      appCallOptions(token),
+    );
+    return {
+      webhook: channelWebhookFromMessage(
+        requiredMessage(response.webhook, "createChannelWebhook.webhook"),
+      ),
+      url: response.url,
+    };
+  });
+}
+
+export async function updateChannelWebhook(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  webhookId: string,
+  name: string,
+) {
+  const client = requireChannelClient();
+  return appRpc(async () => {
+    const response = await client.updateChannelWebhook(
+      { organizationId, channelId, webhookId, name },
+      appCallOptions(token),
+    );
+    return {
+      webhook: channelWebhookFromMessage(
+        requiredMessage(response.webhook, "updateChannelWebhook.webhook"),
+      ),
+    };
+  });
+}
+
+export async function rotateChannelWebhook(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  webhookId: string,
+) {
+  const client = requireChannelClient();
+  return appRpc(async () => {
+    const response = await client.rotateChannelWebhook(
+      { organizationId, channelId, webhookId },
+      appCallOptions(token),
+    );
+    return {
+      webhook: channelWebhookFromMessage(
+        requiredMessage(response.webhook, "rotateChannelWebhook.webhook"),
+      ),
+      url: response.url,
+    };
+  });
+}
+
+export async function revokeChannelWebhook(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  webhookId: string,
+) {
+  const client = requireChannelClient();
+  return appRpc(async () => {
+    const response = await client.revokeChannelWebhook(
+      { organizationId, channelId, webhookId },
+      appCallOptions(token),
+    );
+    return {
+      webhook: channelWebhookFromMessage(
+        requiredMessage(response.webhook, "revokeChannelWebhook.webhook"),
+      ),
     };
   });
 }

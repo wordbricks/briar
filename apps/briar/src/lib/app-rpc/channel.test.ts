@@ -10,6 +10,7 @@ import {
   ChannelMessageAuthor_Kind,
   ChannelMessageSchema,
   ChannelProposalSchema,
+  ChannelWebhookSchema,
   SyncChannelsResponseSchema,
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
 import {
@@ -28,11 +29,37 @@ import { describe, expect, it } from "vitest";
 import {
   channelDeltaFromMessage,
   channelMessageFromMessage,
+  channelWebhookFromMessage,
 } from "./channel";
 
 const instant = (value: string) => timestampFromDate(new Date(value));
 
 describe("Channel Connect DTO mapping", () => {
+  it("requires webhook lifecycle timestamps and preserves optional use state", () => {
+    const createdAt = instant("2026-08-30T01:02:03.000Z");
+    const updatedAt = instant("2026-08-30T02:03:04.000Z");
+    expect(channelWebhookFromMessage(create(ChannelWebhookSchema, {
+      id: "webhook-1",
+      channelId: "channel-1",
+      name: "Deployments",
+      active: true,
+      createdAt,
+      updatedAt,
+    }))).toEqual({
+      id: "webhook-1",
+      channelId: "channel-1",
+      name: "Deployments",
+      active: true,
+      lastUsedAt: null,
+      createdAt: "2026-08-30T01:02:03.000Z",
+      updatedAt: "2026-08-30T02:03:04.000Z",
+    });
+    expect(() => channelWebhookFromMessage(create(ChannelWebhookSchema, {
+      id: "webhook-without-lifecycle",
+      channelId: "channel-1",
+    }))).toThrow("channelWebhook.createdAt is missing");
+  });
+
   it("maps nested oneofs and optional evidence without dropping fields", () => {
     const createdAt = instant("2026-08-30T01:02:03.000Z");
     const message = create(ChannelMessageSchema, {
