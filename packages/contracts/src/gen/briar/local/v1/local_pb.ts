@@ -6,19 +6,15 @@ import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2"
 import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import type { RunEvidence } from "../../app/v1/issue_pb";
 import { file_briar_app_v1_issue } from "../../app/v1/issue_pb";
-import type { AutoHuntWorkflow } from "../../types/v1/workflow_pb";
-import { file_briar_types_v1_workflow } from "../../types/v1/workflow_pb";
-import type { AutoHuntSource, DetachedExecution, QueuedAttachment, QueuedIssueMessage, ResumeContext } from "../../worker/v1/worker_queue_pb";
+import type { ClaimedIssuePayload, QueuedAttachment } from "../../worker/v1/worker_queue_pb";
 import { file_briar_worker_v1_worker_queue } from "../../worker/v1/worker_queue_pb";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_struct, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { JsonObject, Message } from "@bufbuild/protobuf";
+import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file briar/local/v1/local.proto.
  */
 export const file_briar_local_v1_local: GenFile = /*@__PURE__*/
-  fileDesc("Chpicmlhci9sb2NhbC92MS9sb2NhbC5wcm90bxIOYnJpYXIubG9jYWwudjEigQEKEExvY2FsQ2xhaW1SZXN1bHQSMgoHY2xhaW1lZBgBIAEoCzIfLmJyaWFyLmxvY2FsLnYxLkxvY2FsQ2xhaW1lZFJ1bkgAEi4KB25vX3dvcmsYAiABKAsyGy5icmlhci5sb2NhbC52MS5Mb2NhbE5vV29ya0gAQgkKB291dGNvbWUiDQoLTG9jYWxOb1dvcmsi/wkKD0xvY2FsQ2xhaW1lZFJ1bhIZCgxleGVjdXRpb25faWQYASABKAlIAIgBARIOCgZydW5faWQYAiABKAkSEgoKcnVuX251bWJlchgDIAEoDRIXCg9jdXJyZW50X2F0dGVtcHQYBCABKA0SGAoQY3VycmVudF9yZXZpc2lvbhgFIAEoDRIvCgZzb3VyY2UYBiABKA4yHy5icmlhci53b3JrZXIudjEuQXV0b0h1bnRTb3VyY2USEgoKc291cmNlX2tleRgHIAEoCRINCgV0aXRsZRgIIAEoCRIYCgtkZXNjcmlwdGlvbhgJIAEoCUgBiAEBEhUKCHByaW9yaXR5GAogASgNSAKIAQESEgoKcmVwb3NpdG9yeRgLIAEoCRI6ChFzb3VyY2VfY3JlYXRlZF9hdBgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIA4gBARIfChJjcmVhdGVkX2J5X3VzZXJfaWQYDSABKAlIBIgBARItCgdjb250ZXh0GA4gASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdEgFiAEBEhwKD3Jldmlld19mZWVkYmFjaxgPIAEoCUgGiAEBEjIKCHdvcmtmbG93GBAgASgLMiAuYnJpYXIudHlwZXMudjEuQXV0b0h1bnRXb3JrZmxvdxIbCg53b3JrZmxvd19zdGFnZRgRIAEoCUgHiAEBEhgKC3N0YXJ0X3N0YWdlGBIgASgJSAiIAQESOwoOcmVzdW1lX2NvbnRleHQYEyABKAsyHi5icmlhci53b3JrZXIudjEuUmVzdW1lQ29udGV4dEgJiAEBEjoKC2F0dGFjaG1lbnRzGBQgAygLMiUuYnJpYXIubG9jYWwudjEuTG9jYWxRdWV1ZWRBdHRhY2htZW50EjUKCG1lc3NhZ2VzGBUgAygLMiMuYnJpYXIud29ya2VyLnYxLlF1ZXVlZElzc3VlTWVzc2FnZRISCgpjbGFpbWVkX2J5GBYgASgJEi4KCmNsYWltZWRfYXQYFyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjQKEGxlYXNlX2V4cGlyZXNfYXQYGCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhYKDmNsYWltX2F0dGVtcHRzGBkgASgNEjoKCWV4ZWN1dGlvbhgaIAEoCzIiLmJyaWFyLndvcmtlci52MS5EZXRhY2hlZEV4ZWN1dGlvbkgKiAEBEhcKD2JyaWFyX2lzc3VlX3VybBgbIAEoCRI2Cgl3b3Jrc3BhY2UYHCABKAsyHi5icmlhci5sb2NhbC52MS5Mb2NhbFdvcmtzcGFjZUgLiAEBEhwKD3dvcmtzcGFjZV9lcnJvchgdIAEoCUgMiAEBQg8KDV9leGVjdXRpb25faWRCDgoMX2Rlc2NyaXB0aW9uQgsKCV9wcmlvcml0eUIUChJfc291cmNlX2NyZWF0ZWRfYXRCFQoTX2NyZWF0ZWRfYnlfdXNlcl9pZEIKCghfY29udGV4dEISChBfcmV2aWV3X2ZlZWRiYWNrQhEKD193b3JrZmxvd19zdGFnZUIOCgxfc3RhcnRfc3RhZ2VCEQoPX3Jlc3VtZV9jb250ZXh0QgwKCl9leGVjdXRpb25CDAoKX3dvcmtzcGFjZUISChBfd29ya3NwYWNlX2Vycm9yIqYBChVMb2NhbFF1ZXVlZEF0dGFjaG1lbnQSNQoKYXR0YWNobWVudBgBIAEoCzIhLmJyaWFyLndvcmtlci52MS5RdWV1ZWRBdHRhY2htZW50EhcKCmxvY2FsX3BhdGgYAiABKAlIAIgBARIbCg5kb3dubG9hZF9lcnJvchgDIAEoCUgBiAEBQg0KC19sb2NhbF9wYXRoQhEKD19kb3dubG9hZF9lcnJvciL8AgoOTG9jYWxXb3Jrc3BhY2USMQoEa2luZBgBIAEoDjIjLmJyaWFyLmxvY2FsLnYxLkxvY2FsV29ya3NwYWNlLktpbmQSDAoEcGF0aBgCIAEoCRITCgZicmFuY2gYAyABKAlIAIgBARIVCghiYXNlX3JlZhgEIAEoCUgBiAEBEh4KEWJhc2VfcmVmX3Jlc29sdmVkGAUgASgJSAKIAQESFQoIYmFzZV9zaGEYBiABKAlIA4gBARIOCgZyZXVzZWQYByABKAgSFgoOaW5jbHVkZWRfcGF0aHMYCCADKAkSFAoHd2FybmluZxgJIAEoCUgEiAEBIkEKBEtpbmQSFAoQS0lORF9VTlNQRUNJRklFRBAAEhAKDEtJTkRfQ1VSUkVOVBABEhEKDUtJTkRfV09SS1RSRUUQAkIJCgdfYnJhbmNoQgsKCV9iYXNlX3JlZkIUChJfYmFzZV9yZWZfcmVzb2x2ZWRCCwoJX2Jhc2Vfc2hhQgoKCF93YXJuaW5nIngKFkxvY2FsUnVuRXZpZGVuY2VSZXN1bHQSKwoIZXZpZGVuY2UYASADKAsyGS5icmlhci5hcHAudjEuUnVuRXZpZGVuY2USDgoGcnVuX2lkGAIgASgJEg8KB2F0dGVtcHQYAyABKA0SEAoIcmV2aXNpb24YBCABKA1CDroCC0JyaWFyTG9jYWxfYgZwcm90bzM", [file_briar_app_v1_issue, file_briar_types_v1_workflow, file_briar_worker_v1_worker_queue, file_google_protobuf_struct, file_google_protobuf_timestamp]);
+  fileDesc("Chpicmlhci9sb2NhbC92MS9sb2NhbC5wcm90bxIOYnJpYXIubG9jYWwudjEigQEKEExvY2FsQ2xhaW1SZXN1bHQSMgoHY2xhaW1lZBgBIAEoCzIfLmJyaWFyLmxvY2FsLnYxLkxvY2FsQ2xhaW1lZFJ1bkgAEi4KB25vX3dvcmsYAiABKAsyGy5icmlhci5sb2NhbC52MS5Mb2NhbE5vV29ya0gAQgkKB291dGNvbWUiDQoLTG9jYWxOb1dvcmsilQIKD0xvY2FsQ2xhaW1lZFJ1bhI1CgdwYXlsb2FkGAEgASgLMiQuYnJpYXIud29ya2VyLnYxLkNsYWltZWRJc3N1ZVBheWxvYWQSOgoLYXR0YWNobWVudHMYAiADKAsyJS5icmlhci5sb2NhbC52MS5Mb2NhbFF1ZXVlZEF0dGFjaG1lbnQSFwoPYnJpYXJfaXNzdWVfdXJsGAMgASgJEjYKCXdvcmtzcGFjZRgEIAEoCzIeLmJyaWFyLmxvY2FsLnYxLkxvY2FsV29ya3NwYWNlSACIAQESHAoPd29ya3NwYWNlX2Vycm9yGAUgASgJSAGIAQFCDAoKX3dvcmtzcGFjZUISChBfd29ya3NwYWNlX2Vycm9yIqYBChVMb2NhbFF1ZXVlZEF0dGFjaG1lbnQSNQoKYXR0YWNobWVudBgBIAEoCzIhLmJyaWFyLndvcmtlci52MS5RdWV1ZWRBdHRhY2htZW50EhcKCmxvY2FsX3BhdGgYAiABKAlIAIgBARIbCg5kb3dubG9hZF9lcnJvchgDIAEoCUgBiAEBQg0KC19sb2NhbF9wYXRoQhEKD19kb3dubG9hZF9lcnJvciL8AgoOTG9jYWxXb3Jrc3BhY2USMQoEa2luZBgBIAEoDjIjLmJyaWFyLmxvY2FsLnYxLkxvY2FsV29ya3NwYWNlLktpbmQSDAoEcGF0aBgCIAEoCRITCgZicmFuY2gYAyABKAlIAIgBARIVCghiYXNlX3JlZhgEIAEoCUgBiAEBEh4KEWJhc2VfcmVmX3Jlc29sdmVkGAUgASgJSAKIAQESFQoIYmFzZV9zaGEYBiABKAlIA4gBARIOCgZyZXVzZWQYByABKAgSFgoOaW5jbHVkZWRfcGF0aHMYCCADKAkSFAoHd2FybmluZxgJIAEoCUgEiAEBIkEKBEtpbmQSFAoQS0lORF9VTlNQRUNJRklFRBAAEhAKDEtJTkRfQ1VSUkVOVBABEhEKDUtJTkRfV09SS1RSRUUQAkIJCgdfYnJhbmNoQgsKCV9iYXNlX3JlZkIUChJfYmFzZV9yZWZfcmVzb2x2ZWRCCwoJX2Jhc2Vfc2hhQgoKCF93YXJuaW5nIngKFkxvY2FsUnVuRXZpZGVuY2VSZXN1bHQSKwoIZXZpZGVuY2UYASADKAsyGS5icmlhci5hcHAudjEuUnVuRXZpZGVuY2USDgoGcnVuX2lkGAIgASgJEg8KB2F0dGVtcHQYAyABKA0SEAoIcmV2aXNpb24YBCABKA1CDroCC0JyaWFyTG9jYWxfYgZwcm90bzM", [file_briar_app_v1_issue, file_briar_worker_v1_worker_queue]);
 
 /**
  * Stable ProtoJSON written by `briar queue claim` for local process consumers.
@@ -71,147 +67,27 @@ export const LocalNoWorkSchema: GenMessage<LocalNoWork> = /*@__PURE__*/
  */
 export type LocalClaimedRun = Message<"briar.local.v1.LocalClaimedRun"> & {
   /**
-   * @generated from field: optional string execution_id = 1;
+   * @generated from field: briar.worker.v1.ClaimedIssuePayload payload = 1;
    */
-  executionId?: string | undefined;
+  payload?: ClaimedIssuePayload | undefined;
 
   /**
-   * @generated from field: string run_id = 2;
-   */
-  runId: string;
-
-  /**
-   * @generated from field: uint32 run_number = 3;
-   */
-  runNumber: number;
-
-  /**
-   * @generated from field: uint32 current_attempt = 4;
-   */
-  currentAttempt: number;
-
-  /**
-   * @generated from field: uint32 current_revision = 5;
-   */
-  currentRevision: number;
-
-  /**
-   * @generated from field: briar.worker.v1.AutoHuntSource source = 6;
-   */
-  source: AutoHuntSource;
-
-  /**
-   * @generated from field: string source_key = 7;
-   */
-  sourceKey: string;
-
-  /**
-   * @generated from field: string title = 8;
-   */
-  title: string;
-
-  /**
-   * @generated from field: optional string description = 9;
-   */
-  description?: string | undefined;
-
-  /**
-   * @generated from field: optional uint32 priority = 10;
-   */
-  priority?: number | undefined;
-
-  /**
-   * @generated from field: string repository = 11;
-   */
-  repository: string;
-
-  /**
-   * @generated from field: optional google.protobuf.Timestamp source_created_at = 12;
-   */
-  sourceCreatedAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: optional string created_by_user_id = 13;
-   */
-  createdByUserId?: string | undefined;
-
-  /**
-   * @generated from field: optional google.protobuf.Struct context = 14;
-   */
-  context?: JsonObject | undefined;
-
-  /**
-   * @generated from field: optional string review_feedback = 15;
-   */
-  reviewFeedback?: string | undefined;
-
-  /**
-   * @generated from field: briar.types.v1.AutoHuntWorkflow workflow = 16;
-   */
-  workflow?: AutoHuntWorkflow | undefined;
-
-  /**
-   * @generated from field: optional string workflow_stage = 17;
-   */
-  workflowStage?: string | undefined;
-
-  /**
-   * @generated from field: optional string start_stage = 18;
-   */
-  startStage?: string | undefined;
-
-  /**
-   * @generated from field: optional briar.worker.v1.ResumeContext resume_context = 19;
-   */
-  resumeContext?: ResumeContext | undefined;
-
-  /**
-   * @generated from field: repeated briar.local.v1.LocalQueuedAttachment attachments = 20;
+   * @generated from field: repeated briar.local.v1.LocalQueuedAttachment attachments = 2;
    */
   attachments: LocalQueuedAttachment[];
 
   /**
-   * @generated from field: repeated briar.worker.v1.QueuedIssueMessage messages = 21;
-   */
-  messages: QueuedIssueMessage[];
-
-  /**
-   * @generated from field: string claimed_by = 22;
-   */
-  claimedBy: string;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp claimed_at = 23;
-   */
-  claimedAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp lease_expires_at = 24;
-   */
-  leaseExpiresAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: uint32 claim_attempts = 25;
-   */
-  claimAttempts: number;
-
-  /**
-   * @generated from field: optional briar.worker.v1.DetachedExecution execution = 26;
-   */
-  execution?: DetachedExecution | undefined;
-
-  /**
-   * @generated from field: string briar_issue_url = 27;
+   * @generated from field: string briar_issue_url = 3;
    */
   briarIssueUrl: string;
 
   /**
-   * @generated from field: optional briar.local.v1.LocalWorkspace workspace = 28;
+   * @generated from field: optional briar.local.v1.LocalWorkspace workspace = 4;
    */
   workspace?: LocalWorkspace | undefined;
 
   /**
-   * @generated from field: optional string workspace_error = 29;
+   * @generated from field: optional string workspace_error = 5;
    */
   workspaceError?: string | undefined;
 };

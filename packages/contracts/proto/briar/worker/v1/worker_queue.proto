@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package briar.worker.v1;
 
+import "briar/app/v1/issue.proto";
 import "briar/types/v1/provider.proto";
 import "briar/types/v1/workflow.proto";
 import "google/protobuf/struct.proto";
@@ -15,6 +16,25 @@ service WorkerQueueService {
   rpc ClaimWork(ClaimWorkRequest) returns (ClaimWorkResponse);
   rpc RenewWorkLease(RenewWorkLeaseRequest) returns (RenewWorkLeaseResponse);
   rpc HandoffWork(HandoffWorkRequest) returns (HandoffWorkResponse);
+}
+
+// Execution-credential reads that are shared by the interactive CLI and the
+// desktop-hosted Auto Hunt runtime. Result mutation and uploads remain on
+// their dedicated transports.
+service WorkerExecutionService {
+  rpc ListRunEvidence(ListRunEvidenceRequest) returns (ListRunEvidenceResponse);
+}
+
+message ListRunEvidenceRequest {
+  string project_id = 1;
+  string run_id = 2;
+}
+
+message ListRunEvidenceResponse {
+  repeated briar.app.v1.RunEvidence evidence = 1;
+  string run_id = 2;
+  uint32 attempt = 3;
+  uint32 revision = 4;
 }
 
 message ClaimWorkRequest {
@@ -249,7 +269,10 @@ enum AutoHuntSource {
   AUTO_HUNT_SOURCE_FEEDBACK = 3;
 }
 
-message ClaimedIssue {
+// Secret-free durable issue snapshot shared by the Worker RPC claim and local
+// CLI ProtoJSON output. Attachments are wrapped separately because local
+// allocation adds a downloaded path or error to each attachment.
+message ClaimedIssuePayload {
   optional string execution_id = 1;
   string run_id = 2;
   uint32 run_number = 3;
@@ -269,17 +292,21 @@ message ClaimedIssue {
   optional string workflow_stage = 17;
   optional string start_stage = 18;
   optional ResumeContext resume_context = 19;
-  repeated QueuedAttachment attachments = 20;
-  repeated QueuedIssueMessage messages = 21;
-  string claim_token = 22;
-  string claimed_by = 23;
-  google.protobuf.Timestamp claimed_at = 24;
-  google.protobuf.Timestamp lease_expires_at = 25;
-  uint32 claim_attempts = 26;
-  optional ClaimedHandoffContext handoff_context = 27;
-  optional DetachedExecution execution = 28;
-  optional DetachedAgentClaim agent = 29;
-  optional DetachedAgentSkill active_skill = 30;
+  repeated QueuedIssueMessage messages = 20;
+  string claimed_by = 21;
+  google.protobuf.Timestamp claimed_at = 22;
+  google.protobuf.Timestamp lease_expires_at = 23;
+  uint32 claim_attempts = 24;
+  optional DetachedExecution execution = 25;
+}
+
+message ClaimedIssue {
+  ClaimedIssuePayload payload = 1;
+  repeated QueuedAttachment attachments = 2;
+  string claim_token = 3;
+  optional ClaimedHandoffContext handoff_context = 4;
+  optional DetachedAgentClaim agent = 5;
+  optional DetachedAgentSkill active_skill = 6;
 }
 
 message ClaimedProjectAgentTask {
