@@ -33,7 +33,7 @@ import {
   type IssueAgentReplyJobRow,
   type IssueMessageRow,
 } from "./db";
-import { corsHeaders, HttpError, json } from "./http-response";
+import { HttpError, json } from "./http-response";
 import { hasOrganizationCapability } from "./organization-access";
 import {
   deleteUnreferencedUploadedIssueObjects,
@@ -52,7 +52,7 @@ import {
   decodeIssueMessageEditInput,
   decodeIssueMessageInput,
 } from "./issue-request-contract";
-import { readIssueMessageRequest, readJson } from "./request-readers";
+import { readIssueMessageRequest } from "./request-readers";
 import { requireSession } from "./session-auth";
 
 type RequireRunExecutionProject = (
@@ -623,36 +623,6 @@ export async function handleIssueConversationRoute(input: {
       attachments: messageRequest.attachments,
       attachmentReferences: messageRequest.attachmentReferences,
     }), 201);
-  }
-
-  const issueMessageEditMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)$/u,
-  );
-  if (issueMessageEditMatch && request.method === "PATCH") {
-    const session = await requireSession(auth, request);
-    return json(await updateProjectIssueMessage({
-      db,
-      archivesBucket,
-      attachmentsBucket,
-      projectId: issueMessageEditMatch[1],
-      runId: issueMessageEditMatch[2],
-      messageId: issueMessageEditMatch[3],
-      userId: session.user.id,
-      request: await readJson(request),
-    }));
-  }
-  if (issueMessageEditMatch && request.method === "DELETE") {
-    const session = await requireSession(auth, request);
-    await deleteProjectIssueMessage({
-      db,
-      archivesBucket,
-      attachmentsBucket,
-      projectId: issueMessageEditMatch[1],
-      runId: issueMessageEditMatch[2],
-      messageId: issueMessageEditMatch[3],
-      userId: session.user.id,
-    });
-    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   return undefined;

@@ -1,4 +1,3 @@
-import type { BriarAuth } from "./auth";
 import {
   getProject,
   HuntTransitionError,
@@ -7,10 +6,9 @@ import {
   reworkHuntRun,
   transferIssue,
 } from "./db";
-import { HttpError, json } from "./http-response";
+import { HttpError } from "./http-response";
 import { hasOrganizationCapability } from "./organization-access";
 import { decodeProjectTransferInput } from "./project-request-contract";
-import { readJson } from "./request-readers";
 import {
   decodeMoveRunInput,
   decodePausedRunReworkInput,
@@ -18,7 +16,6 @@ import {
   decodeRequestIdInput,
   decodeResumeUserInput,
 } from "./run-request-contract";
-import { requireSession } from "./session-auth";
 import { decodeDispatchRun } from "./worker-request-contract";
 import { resumeRunWithCheckpointIdentity } from "./workflow-resume";
 import {
@@ -321,43 +318,4 @@ export async function unassignProjectIssueRun(
   );
   if (!result) throw new HttpError(404, "Run not found");
   return result;
-}
-
-export async function handleIssueControlRoute(input: {
-  request: Request;
-  url: URL;
-  auth: BriarAuth;
-  db: D1Database;
-}): Promise<Response | undefined> {
-  const { request, url, auth, db } = input;
-
-  const pausedReworkMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/rework$/u,
-  );
-  if (pausedReworkMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await reworkProjectIssueRun({
-      db,
-      projectId: pausedReworkMatch[1],
-      runId: pausedReworkMatch[2],
-      userId: session.user.id,
-      request: await readJson(request),
-    }));
-  }
-
-  const unassignRunMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/unassign$/u,
-  );
-  if (unassignRunMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await unassignProjectIssueRun({
-      db,
-      projectId: unassignRunMatch[1],
-      runId: unassignRunMatch[2],
-      userId: session.user.id,
-      request: await readJson(request),
-    }));
-  }
-
-  return undefined;
 }

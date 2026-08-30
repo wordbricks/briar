@@ -10,7 +10,6 @@ import { requireSession } from "./session-auth";
 import { handleAccountRoute } from "./account-routes";
 import { handleIssueConversationRoute } from "./issue-conversation-routes";
 import { handleIssueCoreRoute } from "./issue-core-routes";
-import { handleIssueControlRoute } from "./issue-control-routes";
 import { handleIssueReplyWorkerRoute } from "./issue-reply-worker-routes";
 import { handleChannelMessageRoute } from "./channel-message-routes";
 import { handleChannelOrganizationContextRoute } from "./channel-organization-context-routes";
@@ -265,14 +264,6 @@ async function route(
     attachmentsBucket,
   });
   if (issueCoreResponse !== undefined) return issueCoreResponse;
-
-  const issueControlResponse = await handleIssueControlRoute({
-    request,
-    url,
-    auth,
-    db,
-  });
-  if (issueControlResponse !== undefined) return issueControlResponse;
 
   const executionWorkerResponse = await handleExecutionWorkerRoute({
     request,

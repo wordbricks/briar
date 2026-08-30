@@ -34,7 +34,6 @@ import { schedulePostCommitCleanup } from "./post-commit-cleanup";
 import {
   readIssueRequest,
   readIssueUpdateRequest,
-  readJson,
 } from "./request-readers";
 import { decodeIssueCheckpointsInput } from "./run-request-contract";
 import { requireSession } from "./session-auth";
@@ -437,19 +436,6 @@ export async function handleIssueCoreRoute(input: {
   const issueUpdateMatch = url.pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)$/u,
   );
-  const issueCheckpointsMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/checkpoints$/u,
-  );
-  if (issueCheckpointsMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    return json(await updateProjectIssueCheckpoints({
-      db,
-      projectId: issueCheckpointsMatch[1],
-      runId: issueCheckpointsMatch[2],
-      userId: session.user.id,
-      request: await readJson(request),
-    }));
-  }
   if (
     issueUpdateMatch && request.method === "PATCH" &&
     request.headers.get("content-type")?.toLowerCase().startsWith(
