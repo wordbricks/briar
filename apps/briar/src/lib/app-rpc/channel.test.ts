@@ -7,6 +7,8 @@ import {
   AgentSkillExecutionStatus,
 } from "@briar/contracts/gen/briar/app/v1/agent_pb";
 import {
+  ChannelDocumentContentSchema,
+  ChannelLinkPreviewSchema,
   ChannelMessageAuthor_Kind,
   ChannelMessageSchema,
   ChannelProposalSchema,
@@ -28,6 +30,8 @@ import {
 import { describe, expect, it } from "vitest";
 import {
   channelDeltaFromMessage,
+  channelDocumentContentFromMessage,
+  channelLinkPreviewFromMessage,
   channelMessageFromMessage,
   channelWebhookFromMessage,
 } from "./channel";
@@ -35,6 +39,33 @@ import {
 const instant = (value: string) => timestampFromDate(new Date(value));
 
 describe("Channel Connect DTO mapping", () => {
+  it("preserves nullable document and preview metadata", () => {
+    expect(channelDocumentContentFromMessage(create(
+      ChannelDocumentContentSchema,
+      {
+        messageId: "message-1",
+        title: "Plan",
+        markdown: "# Plan",
+      },
+    ))).toEqual({
+      messageId: "message-1",
+      title: "Plan",
+      markdown: "# Plan",
+      projectId: null,
+    });
+    expect(channelLinkPreviewFromMessage(create(ChannelLinkPreviewSchema, {
+      url: "https://example.com/release",
+      title: "Release",
+    }))).toEqual({
+      url: "https://example.com/release",
+      title: "Release",
+      description: null,
+      imageUrl: null,
+      faviconUrl: null,
+      siteName: null,
+    });
+  });
+
   it("requires webhook lifecycle timestamps and preserves optional use state", () => {
     const createdAt = instant("2026-08-30T01:02:03.000Z");
     const updatedAt = instant("2026-08-30T02:03:04.000Z");

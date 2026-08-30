@@ -13,7 +13,9 @@ import {
   DeclineChannelProposalResponse_Outcome as ProtoDeclineOutcome,
   DirectMessageParticipant_Kind as ProtoDirectMessageParticipantKind,
   type ChannelAgentReply as ChannelAgentReplyMessage,
+  type ChannelDocumentContent as ChannelDocumentContentMessage,
   type ChannelIssueProposal as ChannelIssueProposalMessage,
+  type ChannelLinkPreview as ChannelLinkPreviewMessage,
   type ChannelMember as ChannelMemberMessage,
   type ChannelMessage as ChannelMessageMessage,
   type ChannelMessageAuthor as ChannelMessageAuthorMessage,
@@ -55,9 +57,11 @@ import type {
   ChannelDelta,
   ChannelExecutionProposal,
   ChannelMember,
+  ChannelLinkPreview,
   ChannelMessage,
   ChannelMessageAuthor,
   ChannelMessageBlock,
+  ChannelMessageDocumentContent,
   ChannelMessageProposal,
   ChannelReplyStatus,
   ChannelSummary,
@@ -1483,6 +1487,64 @@ export async function loadChannelDelta(
       appCallOptions(token, signal),
     );
     return channelDeltaFromMessage(response);
+  });
+}
+
+export const channelDocumentContentFromMessage = (
+  value: ChannelDocumentContentMessage,
+): ChannelMessageDocumentContent => ({
+  messageId: value.messageId,
+  title: value.title,
+  markdown: value.markdown,
+  projectId: value.projectId ?? null,
+});
+
+export async function loadChannelMessageDocument(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  messageId: string,
+) {
+  const client = requireChannelClient();
+  return appRpc(async () => ({
+    document: channelDocumentContentFromMessage(requiredMessage(
+      (await client.getChannelMessageDocument(
+        { organizationId, channelId, messageId },
+        appCallOptions(token),
+      )).document,
+      "getChannelMessageDocument.document",
+    )),
+  }));
+}
+
+export const channelLinkPreviewFromMessage = (
+  value: ChannelLinkPreviewMessage,
+): ChannelLinkPreview => ({
+  url: value.url,
+  title: value.title ?? null,
+  description: value.description ?? null,
+  imageUrl: value.imageUrl ?? null,
+  faviconUrl: value.faviconUrl ?? null,
+  siteName: value.siteName ?? null,
+});
+
+export async function loadChannelLinkPreview(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  targetUrl: string,
+) {
+  const client = requireChannelClient();
+  return appRpc(async () => {
+    const response = await client.getChannelLinkPreview(
+      { organizationId, channelId, url: targetUrl },
+      appCallOptions(token),
+    );
+    return {
+      preview: response.preview
+        ? channelLinkPreviewFromMessage(response.preview)
+        : null,
+    };
   });
 }
 

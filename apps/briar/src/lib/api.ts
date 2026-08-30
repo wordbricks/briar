@@ -95,6 +95,8 @@ export {
   listDirectMessageRecipients,
   loadChannel,
   loadChannelDelta,
+  loadChannelLinkPreview,
+  loadChannelMessageDocument,
   markChannelRead,
   revokeChannelWebhook,
   rotateChannelWebhook,
@@ -177,11 +179,7 @@ import {
 } from "./auto-hunt-contract";
 import type { AgentProvider } from "./agent-provider";
 import type { InboxMessage } from "../hooks/useInbox";
-import type {
-  ChannelLinkPreview,
-  ChannelMessageAttachment,
-  ChannelMessageDocumentContent,
-} from "./channels-contract";
+import type { ChannelMessageAttachment } from "./channels-contract";
 import type {
   LinearImportConnectResult,
   LinearImportResult,
@@ -534,31 +532,6 @@ export async function loadChannelMessageAttachment(
     throw new Error(`첨부 파일을 열 수 없습니다. (${response.status})`);
   }
   return response.blob();
-}
-
-export async function loadChannelMessageDocument(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  messageId: string,
-) {
-  return request<{ document: ChannelMessageDocumentContent }>(
-    `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/document`,
-    token,
-  );
-}
-
-export async function loadChannelLinkPreview(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  targetUrl: string,
-) {
-  const params = new URLSearchParams({ url: targetUrl });
-  return request<{ preview: ChannelLinkPreview | null }>(
-    `/organizations/${organizationId}/channels/${channelId}/link-preview?${params}`,
-    token,
-  );
 }
 
 export async function loadIssueAttachment(
