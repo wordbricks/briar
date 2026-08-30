@@ -25,6 +25,22 @@ import {
 } from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import * as Predicate from "effect/Predicate";
 import { agentSkillConflictMessage } from "./agent-skills";
+import {
+  appCancelRunResponse,
+  appCompleteResultReviewResponse,
+  appCreateIssueResponse,
+  appDeleteIssueResponse,
+  appDispatchRunResponse,
+  appMoveRunResponse,
+  appReassignRunResponse,
+  appResumeRunResponse,
+  appRetryRunResponse,
+  appSetIssueDependencyResponse,
+  appSetIssueSubscriptionResponse,
+  appTransferIssueResponse,
+  appUpdateIssuePreferencesResponse,
+  appUpdateIssueResponse,
+} from "./app-connect-issue-mappers";
 import type { BriarAuth } from "./auth";
 import {
   createProjectIssueMessage,
@@ -500,7 +516,7 @@ export const createAppIssueService = (
         attachmentReferences: request.attachmentReferences,
       })
     );
-    return responseMessage(IssueService.method.createIssue.output, result);
+    return appCreateIssueResponse(result);
   }),
 
   updateIssue: (request) => rpc(async () => {
@@ -528,12 +544,12 @@ export const createAppIssueService = (
         keptAttachmentIds: request.keptAttachmentIds?.values,
       })
     );
-    return responseMessage(IssueService.method.updateIssue.output, result);
+    return appUpdateIssueResponse(result);
   }),
 
   deleteIssue: (request) => rpc(async () => {
     const session = await services.requireSession(input.auth, input.request);
-    await mutated(input, [request.projectId], () =>
+    const result = await mutated(input, [request.projectId], () =>
       services.deleteIssue({
         db: input.db,
         projectId: canonicalUuid(request.projectId),
@@ -544,9 +560,7 @@ export const createAppIssueService = (
         context: input.context,
       })
     );
-    return responseMessage(IssueService.method.deleteIssue.output, {
-      deleted: true,
-    });
+    return appDeleteIssueResponse(result);
   }),
 
   transferIssue: (request) => rpc(async () => {
@@ -563,7 +577,7 @@ export const createAppIssueService = (
         request: { targetProjectId },
       }),
     );
-    return responseMessage(IssueService.method.transferIssue.output, result);
+    return appTransferIssueResponse(result);
   }),
 
   setIssueSubscription: (request) => rpc(async () => {
@@ -577,10 +591,7 @@ export const createAppIssueService = (
         subscribed: request.subscribed,
       })
     );
-    return responseMessage(
-      IssueService.method.setIssueSubscription.output,
-      result,
-    );
+    return appSetIssueSubscriptionResponse(result);
   }),
 
   updateIssuePreferences: (request) => rpc(async () => {
@@ -600,10 +611,7 @@ export const createAppIssueService = (
         },
       })
     );
-    return responseMessage(
-      IssueService.method.updateIssuePreferences.output,
-      result,
-    );
+    return appUpdateIssuePreferencesResponse(result);
   }),
 
   setIssueDependency: (request) => rpc(async () => {
@@ -621,10 +629,7 @@ export const createAppIssueService = (
         enabled: request.enabled,
       })
     );
-    return responseMessage(
-      IssueService.method.setIssueDependency.output,
-      result,
-    );
+    return appSetIssueDependencyResponse(result);
   }),
 
   moveRun: (request) => rpc(async () => {
@@ -642,7 +647,7 @@ export const createAppIssueService = (
         },
       })
     );
-    return responseMessage(IssueService.method.moveRun.output, result);
+    return appMoveRunResponse(result);
   }),
 
   retryRun: (request) => rpc(async () => {
@@ -660,15 +665,7 @@ export const createAppIssueService = (
         },
       })
     );
-    if (!Predicate.isObject(result)) {
-      throw new Error("Retry response is invalid");
-    }
-    return responseMessage(IssueService.method.retryRun.output, {
-      ...result,
-      // The recovery repository returns the resulting dashboard stage. A
-      // successful user retry always persists the run status as queued.
-      status: "queued",
-    });
+    return appRetryRunResponse(result);
   }),
 
   cancelRun: (request) => rpc(async () => {
@@ -686,15 +683,7 @@ export const createAppIssueService = (
         },
       })
     );
-    if (!Predicate.isObject(result)) {
-      throw new Error("Cancellation response is invalid");
-    }
-    return responseMessage(IssueService.method.cancelRun.output, {
-      ...result,
-      // The recovery repository returns the resulting dashboard stage. A
-      // successful user cancellation always persists the run as cancelled.
-      status: "cancelled",
-    });
+    return appCancelRunResponse(result);
   }),
 
   resumeRun: (request) => rpc(async () => {
@@ -713,7 +702,7 @@ export const createAppIssueService = (
         },
       })
     );
-    return responseMessage(IssueService.method.resumeRun.output, result);
+    return appResumeRunResponse(result);
   }),
 
   dispatchRun: (request) => rpc(async () => {
@@ -742,9 +731,7 @@ export const createAppIssueService = (
         },
       })
     );
-    return responseMessage(IssueService.method.dispatchRun.output, {
-      dispatch: result,
-    });
+    return appDispatchRunResponse(result);
   }),
 
   reassignRun: (request) => rpc(async () => {
@@ -773,9 +760,7 @@ export const createAppIssueService = (
         },
       })
     );
-    return responseMessage(IssueService.method.reassignRun.output, {
-      dispatch: result,
-    });
+    return appReassignRunResponse(result);
   }),
 
   completeResultReview: (request) => rpc(async () => {
@@ -788,10 +773,7 @@ export const createAppIssueService = (
         userId: session.user.id,
       })
     );
-    return responseMessage(
-      IssueService.method.completeResultReview.output,
-      { review: result },
-    );
+    return appCompleteResultReviewResponse(result);
   }),
 
   listIssueMessages: (request) => rpc(async () => {
