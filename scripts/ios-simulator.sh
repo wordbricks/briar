@@ -11,18 +11,18 @@ readonly xcrun_bin="/usr/bin/xcrun"
 readonly swift_project="apps/briar/ios/BriarCompanion/BriarCompanion.xcodeproj"
 readonly swift_dev_scheme="BriarCompanion-Dev"
 readonly swift_production_scheme="BriarCompanion-Production"
-readonly ios_runtime_version="${BRIAR_IOS_RUNTIME_VERSION:-26.5}"
-readonly ios_runtime_name="iOS $ios_runtime_version"
-readonly ios_runtime_identifier="com.apple.CoreSimulator.SimRuntime.iOS-${ios_runtime_version//./-}"
 readonly iphone_name="${BRIAR_IOS_SIMULATOR_NAME:-Briar iPhone 17 Pro}"
 readonly iphone_type="com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro"
 readonly ipad_name="${BRIAR_IPAD_SIMULATOR_NAME:-iPad Pro 13-inch (M5)}"
 readonly ipad_type="com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-12GB"
-readonly iphone_destination="${BRIAR_IOS_DESTINATION:-platform=iOS Simulator,name=$iphone_name,OS=$ios_runtime_version}"
-readonly ipad_destination="${BRIAR_IPAD_DESTINATION:-platform=iOS Simulator,name=$ipad_name,OS=$ios_runtime_version}"
 readonly iphone_destination_overridden="${BRIAR_IOS_DESTINATION:-}"
 readonly ipad_destination_overridden="${BRIAR_IPAD_DESTINATION:-}"
 readonly generic_simulator_destination="generic/platform=iOS Simulator"
+ios_runtime_version="${BRIAR_IOS_RUNTIME_VERSION:-}"
+ios_runtime_name=""
+ios_runtime_identifier=""
+iphone_destination="$iphone_destination_overridden"
+ipad_destination="$ipad_destination_overridden"
 derived_data_args=()
 if [[ -n "${BRIAR_IOS_DERIVED_DATA_PATH:-}" ]]; then
   derived_data_args=(-derivedDataPath "$BRIAR_IOS_DERIVED_DATA_PATH")
@@ -52,6 +52,19 @@ fail() {
   exit 1
 }
 
+configure_runtime() {
+  [[ -n "$ios_runtime_name" ]] && return
+
+  if [[ -z "$ios_runtime_version" ]]; then
+    ios_runtime_version="$("$xcrun_bin" --sdk iphoneos --show-sdk-platform-version)"
+  fi
+
+  ios_runtime_name="iOS $ios_runtime_version"
+  ios_runtime_identifier="com.apple.CoreSimulator.SimRuntime.iOS-${ios_runtime_version//./-}"
+  iphone_destination="${iphone_destination:-platform=iOS Simulator,name=$iphone_name,OS=$ios_runtime_version}"
+  ipad_destination="${ipad_destination:-platform=iOS Simulator,name=$ipad_name,OS=$ios_runtime_version}"
+}
+
 require_xcode() {
   [[ -x "$xcodebuild_bin" ]] || fail "Full Xcode is not installed."
   [[ -x "$xcode_select_bin" ]] || fail "xcode-select is unavailable."
@@ -67,6 +80,8 @@ require_xcode() {
   if ! "$xcodebuild_bin" -checkFirstLaunchStatus >/dev/null; then
     fail "Xcode first-launch tasks are incomplete. Run: sudo xcodebuild -runFirstLaunch"
   fi
+
+  configure_runtime
 }
 
 runtime_is_available() {
@@ -163,18 +178,9 @@ bootstrap() {
       fail "Xcode completed the download, but compatible iOS Platform Support is unavailable."
   fi
 
-  if runtime_is_available; then
-    log "Simulator runtime already available: iOS $ios_runtime_version"
-  else
-    log "Downloading and installing the requested iOS $ios_runtime_version Simulator runtime."
-    "$xcodebuild_bin" \
-      -downloadPlatform iOS \
-      -buildVersion "$ios_runtime_version" \
-      -architectureVariant arm64
-
-    runtime_is_available ||
-      fail "Xcode completed the download, but runtime $ios_runtime_identifier is unavailable."
-  fi
+  runtime_is_available ||
+    fail "Configured runtime $ios_runtime_name is unavailable in the selected Xcode."
+  log "Simulator runtime already available: $ios_runtime_name"
 
   if [[ -z "$iphone_destination_overridden" ]]; then
     ensure_device "$iphone_name" "$iphone_type"

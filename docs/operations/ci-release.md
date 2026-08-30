@@ -47,8 +47,8 @@ bun run ios:bootstrap
 bun run mobile:ci
 ```
 
-The bootstrap first installs the current Xcode-compatible iOS Platform Support
-when it is missing, then installs the configured Simulator runtime if needed
+The bootstrap installs the selected Xcode's current iOS Platform Support when
+it is missing, derives the default Simulator OS version from that Xcode SDK,
 and idempotently creates the default iPhone and iPad destinations. Platform
 Support readiness is checked through an actual Xcode Simulator destination;
 the presence of a same-version runtime alone is insufficient because Xcode can
