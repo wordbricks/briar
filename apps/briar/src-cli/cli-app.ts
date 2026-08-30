@@ -94,6 +94,9 @@ const optionalIntegers = (...names: ReadonlyArray<string>) =>
     names.map((name) => [name, Flag.integer(name).pipe(Flag.optional)]),
   );
 
+const requiredIntegers = (...names: ReadonlyArray<string>) =>
+  Object.fromEntries(names.map((name) => [name, Flag.integer(name)]));
+
 const switches = (...names: ReadonlyArray<string>) =>
   Object.fromEntries(
     names.map((name) => [
@@ -423,8 +426,9 @@ const runCommand = Command.make("run").pipe(
     leaf(
       "resume",
       {
-        ...optionalStrings("run", "checkpoint", "request-id"),
-        ...optionalIntegers("attempt", "revision"),
+        ...requiredStrings("checkpoint"),
+        ...requiredIntegers("attempt", "revision"),
+        ...optionalStrings("run", "request-id"),
       },
       resumeRun,
       "Resume a paused run",

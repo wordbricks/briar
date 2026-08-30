@@ -10,9 +10,13 @@ import {
 } from "@bufbuild/protobuf";
 import { createClient } from "@connectrpc/connect";
 import {
+  CancelRunResponseSchema,
   CreateIssueResponseSchema,
   IssueService,
   ListRunEvidenceResponseSchema,
+  ReworkRunResponseSchema,
+  ResumeRunResponseSchema,
+  RetryRunResponseSchema,
   SetIssueDependencyResponseSchema,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
@@ -35,9 +39,6 @@ import {
   decodeRunEvidenceInput,
   decodeUuid,
   decodeWorkflowStageId,
-  validateRecoveryRunInput,
-  validateResumeRunInput,
-  validateReworkRunInput,
 } from "./command-contract";
 import {
   executionToken,
@@ -94,6 +95,14 @@ const activeIssueWork = (
     throw new Error("This run requires its active issue claim");
   }
   return issueWorkClaimIdentityToProto(runId, claim.token);
+};
+
+const positiveIntegerFlag = (flag: string) => {
+  const parsed = Number(required(flag));
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`${flag} must be a positive integer`);
+  }
+  return parsed;
 };
 
 async function createIssueCommand() {
@@ -429,24 +438,20 @@ async function recoverRun(action: "retry" | "cancel") {
   const project = await currentProject(config);
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
-  const input = {
-    requestId: value("--request-id") ?? crypto.randomUUID(),
-    actor: value("--actor") ?? "briar-workflow",
-    reason: value("--reason") ?? null,
-  };
-  validateRecoveryRunInput(input);
-  decodeUuid(runId);
-  const result = await request<{
-    runId: string;
-    outcome: string;
-    attempt: number;
-    stage: string;
-  }>(
+  const canonicalRunId = decodeUuid(runId);
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    `/runs/${runId}/${action}`,
     executionToken(project),
-    { method: "POST", body: JSON.stringify(input) },
   );
+  const input = {
+    projectId: project.id,
+    runId: canonicalRunId,
+    requestId: decodeUuid(value("--request-id") ?? crypto.randomUUID()),
+    reason: value("--reason"),
+  };
+  const result = action === "retry"
+    ? await executionRpc.client.retryRun(input, executionRpc.options)
+    : await executionRpc.client.cancelRun(input, executionRpc.options);
   if (project.activeClaim?.runId === runId) {
     // The server released this claim while queueing the new revision. Make the
     // current provider turn stop instead of continuing with a stale token.
@@ -457,7 +462,10 @@ async function recoverRun(action: "retry" | "cancel") {
     );
     await saveConfig(config);
   }
-  console.log(JSON.stringify(result));
+  console.log(toJsonString(
+    action === "retry" ? RetryRunResponseSchema : CancelRunResponseSchema,
+    result,
+  ));
 }
 
 async function reworkRun() {
@@ -465,26 +473,17 @@ async function reworkRun() {
   const project = await currentProject(config);
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
-  const input = {
-    requestId: value("--request-id") ?? crypto.randomUUID(),
-    actor: value("--actor") ?? "briar-workflow",
-    workflowStage: required("--to"),
-    reason: required("--reason"),
-  };
-  validateReworkRunInput(input);
-  decodeUuid(runId);
-  const result = await request<{
-    runId: string;
-    outcome: "reworked" | "already_reworked";
-    attempt: number;
-    revision: number;
-    workflowStage: string;
-  }>(
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    `/runs/${runId}/rework`,
     executionToken(project),
-    { method: "POST", body: JSON.stringify(input) },
   );
+  const result = await executionRpc.client.reworkRun({
+    projectId: project.id,
+    runId: decodeUuid(runId),
+    requestId: decodeUuid(value("--request-id") ?? crypto.randomUUID()),
+    workflowStage: decodeWorkflowStageId(required("--to")),
+    reason: required("--reason"),
+  }, executionRpc.options);
   if (project.activeClaim?.runId === runId) {
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
@@ -493,7 +492,7 @@ async function reworkRun() {
     );
     await saveConfig(config);
   }
-  console.log(JSON.stringify(result));
+  console.log(toJsonString(ReworkRunResponseSchema, result));
 }
 
 async function resumeRun() {
@@ -501,27 +500,18 @@ async function resumeRun() {
   const project = await currentProject(config);
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
-  const input = {
-    requestId: value("--request-id") ?? crypto.randomUUID(),
-    actor: value("--actor") ?? "briar-workflow",
-    checkpointKey: value("--checkpoint"),
-    attempt: value("--attempt") ? Number(value("--attempt")) : undefined,
-    revision: value("--revision") ? Number(value("--revision")) : undefined,
-  };
-  validateResumeRunInput(input);
-  decodeUuid(runId);
-  const result = await request<{
-    runId: string;
-    outcome: string;
-    workflowStage: string | null;
-    startStage: string | null;
-    terminalReviewOnly: boolean;
-  }>(
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    `/runs/${runId}/resume`,
     executionToken(project),
-    { method: "POST", body: JSON.stringify(input) },
   );
+  const result = await executionRpc.client.resumeRun({
+    projectId: project.id,
+    runId: decodeUuid(runId),
+    requestId: decodeUuid(value("--request-id") ?? crypto.randomUUID()),
+    checkpointKey: decodeWorkflowStageId(required("--checkpoint")),
+    attempt: positiveIntegerFlag("--attempt"),
+    revision: positiveIntegerFlag("--revision"),
+  }, executionRpc.options);
   if (project.activeClaim?.runId === runId) {
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
@@ -530,7 +520,7 @@ async function resumeRun() {
     );
     await saveConfig(config);
   }
-  console.log(JSON.stringify(result));
+  console.log(toJsonString(ResumeRunResponseSchema, result));
 }
 
 async function transitionWorkflowStage(action: "start" | "complete") {
