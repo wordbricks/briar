@@ -3,6 +3,8 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   BlockMergeBatchResponseSchema,
   CheckpointChannelReplySessionResponseSchema,
+  CompleteChannelReplyResponseSchema,
+  CompleteIssueReplyResponseSchema,
   CompleteMergeBatchPublicationResponseSchema,
   HandoffWorkResponse_Outcome,
   HandoffWorkResponse_State,
@@ -11,18 +13,27 @@ import {
   RecordMergeBatchAuthorityResponseSchema,
   RecordMergeBatchCandidateEnqueuedResponseSchema,
   RecordMergeBatchValidationResponseSchema,
+  PrepareReplyAttachmentUploadsResponseSchema,
+  ReplyCompletionDisposition,
   RenewWorkLeaseResponseSchema,
   WorkerQueueService,
   type BlockMergeBatchRequest,
   type CheckpointChannelReplySessionRequest,
+  type CompleteChannelReplyRequest,
+  type CompleteIssueReplyRequest,
   type CompleteMergeBatchPublicationRequest,
   type CompleteProjectAgentTaskRequest,
+  type PrepareReplyAttachmentUploadsRequest,
   type RecordMergeBatchAuthorityRequest,
   type RecordMergeBatchCandidateEnqueuedRequest,
   type RecordMergeBatchValidationRequest,
   type WorkClaimIdentity,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
-import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
+import type {
+  ConnectRouter,
+  HandlerContext,
+  ServiceImpl,
+} from "@connectrpc/connect";
 import { claimNextChannelReplyWork } from "./channel-reply-claim-routes";
 import {
   checkpointChannelReplySession,
@@ -80,6 +91,17 @@ import {
 import { decodeWorkerClaimInput } from "./worker-request-contract";
 import { withConnectErrors } from "./app-connect-errors";
 import { workerClaimMessage } from "./worker-connect-mappers";
+import {
+  completeChannelReplyApplication,
+  completeIssueReplyApplication,
+  prepareReplyAttachmentUploadsApplication,
+} from "./worker-reply-completion-application";
+import {
+  completeChannelReplyInputFromProto,
+  completeIssueReplyInputFromProto,
+  prepareReplyAttachmentUploadsInputFromProto,
+} from "./worker-reply-completion-mappers";
+import { rethrowReplyCompletionHttpError } from "./reply-completion-http-error";
 
 export type WorkerConnectQueueInput = {
   readonly request: Request;
@@ -119,6 +141,10 @@ export type WorkerQueueServices = {
   readonly completeMergeBatchPublicationWork:
     typeof completeMergeBatchPublicationWork;
   readonly blockMergeBatchWork: typeof blockMergeBatchWork;
+  readonly prepareReplyAttachmentUploadsApplication:
+    typeof prepareReplyAttachmentUploadsApplication;
+  readonly completeIssueReplyApplication: typeof completeIssueReplyApplication;
+  readonly completeChannelReplyApplication: typeof completeChannelReplyApplication;
 };
 
 const workerQueueServices: WorkerQueueServices = {
@@ -150,6 +176,9 @@ const workerQueueServices: WorkerQueueServices = {
   recordMergeBatchValidationWork,
   completeMergeBatchPublicationWork,
   blockMergeBatchWork,
+  prepareReplyAttachmentUploadsApplication,
+  completeIssueReplyApplication,
+  completeChannelReplyApplication,
 };
 
 const requiredWork = (value: WorkClaimIdentity | undefined) => {
@@ -855,6 +884,122 @@ async function blockMergeBatchRpc(
   });
 }
 
+const replyCompletionDisposition = (
+  value: "completed" | "requeued" | "failed",
+) => {
+  switch (value) {
+    case "completed": return ReplyCompletionDisposition.COMPLETED;
+    case "requeued": return ReplyCompletionDisposition.REQUEUED;
+    case "failed": return ReplyCompletionDisposition.FAILED;
+  }
+};
+
+async function replyCompletionOperation<Value>(
+  operation: () => Promise<Value>,
+) {
+  try {
+    return await operation();
+  } catch (error) {
+    return rethrowReplyCompletionHttpError(error);
+  }
+}
+
+const preventCapabilityCaching = (context: HandlerContext) => {
+  context.responseHeader.set("Cache-Control", "private, no-store");
+};
+
+async function prepareReplyAttachmentUploadsRpc(
+  input: WorkerConnectQueueInput,
+  request: PrepareReplyAttachmentUploadsRequest,
+  context: HandlerContext,
+  services: WorkerQueueServices,
+) {
+  preventCapabilityCaching(context);
+  const worker = await authenticatedWorker(
+    input,
+    request.projectId,
+    request.workerId,
+    services,
+  );
+  const prepared = await replyCompletionOperation(() =>
+    services.prepareReplyAttachmentUploadsApplication({
+      db: input.db,
+      env: input.env,
+      context: input.context,
+      worker,
+      request: prepareReplyAttachmentUploadsInputFromProto(request),
+    })
+  );
+  return create(PrepareReplyAttachmentUploadsResponseSchema, {
+    replayed: prepared.replayed,
+    uploads: prepared.uploads.map((upload) => ({
+      clientId: upload.clientId,
+      reference: { attachmentId: upload.attachmentId },
+      uploadUrl: new URL(
+        `/reply-attachment-uploads/${encodeURIComponent(upload.attachmentId)}`,
+        input.request.url,
+      ).toString(),
+      uploadCapability: upload.uploadCapability,
+      expiresAt: timestamp(upload.expiresAt, "reply upload expiry"),
+    })),
+  });
+}
+
+async function completeIssueReplyRpc(
+  input: WorkerConnectQueueInput,
+  request: CompleteIssueReplyRequest,
+  services: WorkerQueueServices,
+) {
+  const worker = await authenticatedWorker(
+    input,
+    request.projectId,
+    request.workerId,
+    services,
+  );
+  const completed = await replyCompletionOperation(() =>
+    services.completeIssueReplyApplication({
+      db: input.db,
+      env: input.env,
+      context: input.context,
+      worker,
+      request: completeIssueReplyInputFromProto(request),
+    })
+  );
+  return create(CompleteIssueReplyResponseSchema, {
+    replayed: completed.replayed,
+    disposition: replyCompletionDisposition(completed.disposition),
+  });
+}
+
+async function completeChannelReplyRpc(
+  input: WorkerConnectQueueInput,
+  request: CompleteChannelReplyRequest,
+  services: WorkerQueueServices,
+) {
+  const worker = await authenticatedWorker(
+    input,
+    request.projectId,
+    request.workerId,
+    services,
+  );
+  const completed = await replyCompletionOperation(() =>
+    services.completeChannelReplyApplication({
+      db: input.db,
+      env: input.env,
+      context: input.context,
+      worker,
+      request: completeChannelReplyInputFromProto(request),
+    })
+  );
+  return create(CompleteChannelReplyResponseSchema, {
+    replayed: completed.replayed,
+    disposition: replyCompletionDisposition(completed.disposition),
+    retainedUntil: completed.retainedUntil
+      ? timestamp(completed.retainedUntil, "channel reply retention")
+      : undefined,
+  });
+}
+
 export function createWorkerQueueService(
   input: WorkerConnectQueueInput,
   overrides: Partial<WorkerQueueServices> = {},
@@ -887,6 +1032,14 @@ export function createWorkerQueueService(
       ),
     blockMergeBatch: (request) =>
       withConnectErrors(() => blockMergeBatchRpc(input, request, services)),
+    prepareReplyAttachmentUploads: (request, context) =>
+      withConnectErrors(() =>
+        prepareReplyAttachmentUploadsRpc(input, request, context, services)
+      ),
+    completeIssueReply: (request) =>
+      withConnectErrors(() => completeIssueReplyRpc(input, request, services)),
+    completeChannelReply: (request) =>
+      withConnectErrors(() => completeChannelReplyRpc(input, request, services)),
   };
 }
 

@@ -10,10 +10,12 @@ import {
   HandoffWorkRequestSchema,
   HandoffWorkResponse_Outcome,
   IssueClaimIdentitySchema,
+  IssueReplyClaimIdentitySchema,
   MergeBatchClaimIdentitySchema,
   MergeBatchState,
   MergeBatchValidationFailureCode,
   ProjectAgentTaskClaimIdentitySchema,
+  PrepareReplyAttachmentUploadsRequestSchema,
   RecordMergeBatchAuthorityRequestSchema,
   RecordMergeBatchCandidateEnqueuedRequestSchema,
   RecordMergeBatchValidationRequestSchema,
@@ -74,6 +76,16 @@ const issueIdentity = () => create(WorkClaimIdentitySchema, {
   work: {
     case: "issue",
     value: create(IssueClaimIdentitySchema),
+  },
+});
+
+const issueReplyIdentity = () => create(WorkClaimIdentitySchema, {
+  workId,
+  runId: workId,
+  claimToken: `briar_reply_claim_${"a".repeat(64)}`,
+  work: {
+    case: "issueReply",
+    value: create(IssueReplyClaimIdentitySchema),
   },
 });
 
@@ -295,6 +307,74 @@ describe("WorkerQueueService lifecycle semantics", () => {
         conversationId: "conversation-1",
       },
     });
+  });
+
+  it("returns no-store upload capabilities from the generated prepare RPC", async () => {
+    const prepare = vi.fn<
+      WorkerQueueServices["prepareReplyAttachmentUploadsApplication"]
+    >().mockResolvedValue({
+      replayed: false,
+      uploads: [{
+        clientId: "artifact",
+        attachmentId: "77777777-7777-4777-8777-777777777777",
+        uploadCapability: "opaque-capability",
+        expiresAt: "2026-08-31T01:10:00.000Z",
+      }],
+    });
+    const service = createWorkerQueueService(input, {
+      requireWorkerProjectBinding: authentication(),
+      prepareReplyAttachmentUploadsApplication: prepare,
+    });
+    const handlerContext = {
+      responseHeader: new Headers(),
+    } as HandlerContext;
+    const request = create(PrepareReplyAttachmentUploadsRequestSchema, {
+      requestId,
+      projectId,
+      workerId,
+      work: issueReplyIdentity(),
+      attachments: [{
+        clientId: "artifact",
+        filename: "artifact.html",
+        contentType: "text/html",
+        byteSize: 12n,
+        sha256: new Uint8Array(32).fill(1),
+      }],
+    });
+
+    const response = await service.prepareReplyAttachmentUploads(
+      request,
+      handlerContext,
+    );
+    expect(handlerContext.responseHeader.get("cache-control")).toBe(
+      "private, no-store",
+    );
+    expect(response).toMatchObject({
+      replayed: false,
+      uploads: [{
+        clientId: "artifact",
+        reference: {
+          attachmentId: "77777777-7777-4777-8777-777777777777",
+        },
+        uploadUrl:
+          "https://briar.example/reply-attachment-uploads/77777777-7777-4777-8777-777777777777",
+        uploadCapability: "opaque-capability",
+      }],
+    });
+    expect(prepare).toHaveBeenCalledWith(expect.objectContaining({
+      db: input.db,
+      env: input.env,
+      worker,
+      request: expect.objectContaining({
+        requestId,
+        projectId,
+        workerId,
+        attachments: [expect.objectContaining({
+          contentType: "text/html",
+          byteSize: 12,
+        })],
+      }),
+    }));
   });
 
   it("reports a full merge-batch progression through one typed claim identity", async () => {

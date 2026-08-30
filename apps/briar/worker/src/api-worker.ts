@@ -20,6 +20,7 @@ import { handleProjectGithubRoute } from "./project-github-routes";
 import { handlePublicRoute } from "./public-routes";
 import { handleIncomingChannelWebhookRoute } from "./incoming-channel-webhook";
 import { handleRealtimeRoute } from "./realtime-routes";
+import { handleReplyAttachmentUploadRoute } from "./reply-attachment-upload-route";
 import {
   requireAgentProject,
   requireWorkerProjectBinding,
@@ -166,6 +167,18 @@ async function route(
     env,
   });
   if (realtimeResponse !== undefined) return realtimeResponse;
+
+  const replyAttachmentUploadResponse =
+    await handleReplyAttachmentUploadRoute({
+      request,
+      url,
+      db,
+      bucket: attachmentsBucket,
+      signingSecret: env.BETTER_AUTH_SECRET,
+    });
+  if (replyAttachmentUploadResponse !== undefined) {
+    return replyAttachmentUploadResponse;
+  }
 
   const channelMessageResponse = await handleChannelMessageRoute({
     request,

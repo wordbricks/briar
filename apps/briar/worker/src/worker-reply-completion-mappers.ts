@@ -20,7 +20,6 @@ import { decodeIssueAgentReplyCompletion } from "./issue-request-contract";
 import { decodeRequestSync } from "./request-schema";
 import type {
   ReplyAttachmentMetadata,
-  ReplyClaimScope,
   ReplyKind,
 } from "./reply-completion-repository";
 import { UuidString } from "./schema-codecs";
@@ -505,23 +504,3 @@ export function completeChannelReplyInputFromProto(
     outcome: { case: "success", completion: decoded.result! },
   };
 }
-
-export const replyClaimScope = (
-  input: {
-    projectId: string;
-    workerId: string;
-    claim: ReplyWireClaim;
-  },
-  organizationId: string,
-  deviceId: string,
-  claimTokenHash: string,
-): ReplyClaimScope => ({
-  replyKind: input.claim.replyKind,
-  organizationId,
-  projectId: input.projectId,
-  workId: input.claim.workId,
-  runId: input.claim.runId,
-  workerId: input.workerId,
-  deviceId,
-  claimTokenHash,
-});
