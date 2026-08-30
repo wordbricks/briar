@@ -673,11 +673,11 @@ final class BriarCompanionUITests: XCTestCase {
             send.waitForNonExistence(timeout: 5),
             "서버가 메시지를 확정하면 빈 입력창의 전송 버튼이 다시 숨겨져야 합니다."
         )
-        XCTAssertEqual(
+        XCTAssertFalse(
             app.descendants(matching: .any).matching(
                 NSPredicate(format: "label == %@", sentBody)
-            ).count,
-            2
+            ).count > 1,
+            "서버가 같은 client message ID를 확정하면 낙관적 메시지를 중복 표시하지 않아야 합니다."
         )
         captureScreenshot(named: "companion-native-write-flow")
     }

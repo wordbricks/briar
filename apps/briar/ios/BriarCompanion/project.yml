@@ -134,6 +134,81 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+  BriarCompanionUITestHost:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+        excludes:
+          - Info.plist
+      - path: UITestSupport
+        excludes:
+          - Info.plist
+    dependencies:
+      - target: BriarContracts
+      - target: BriarContractsMocks
+      - package: Connect
+        product: Connect
+      - package: SwiftProtobuf
+        product: SwiftProtobuf
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: [AppIconGray, AppIconPink, AppIconGreen]
+        BRIAR_DISPLAY_NAME: Briar Native UI Tests
+        DEVELOPMENT_TEAM: ""
+        PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion.native.dev.ui-test-host
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) BRIAR_UI_TEST_SUPPORT
+    entitlements:
+      path: App/BriarCompanion.entitlements
+      properties:
+        com.apple.developer.associated-domains:
+          - applinks:briar-api.wbai.workers.dev
+    info:
+      path: UITestSupport/Info.plist
+      properties:
+        CFBundleDisplayName: $(BRIAR_DISPLAY_NAME)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLName: app.briar.companion.authentication.ui-tests
+            CFBundleURLSchemes:
+              - briar-companion-ui-tests
+        CFBundleIcons:
+          CFBundlePrimaryIcon:
+            CFBundleIconName: AppIcon
+          CFBundleAlternateIcons:
+            AppIconGray:
+              CFBundleIconName: AppIconGray
+            AppIconPink:
+              CFBundleIconName: AppIconPink
+            AppIconGreen:
+              CFBundleIconName: AppIconGreen
+        CFBundleIcons~ipad:
+          CFBundlePrimaryIcon:
+            CFBundleIconName: AppIcon
+          CFBundleAlternateIcons:
+            AppIconGray:
+              CFBundleIconName: AppIconGray
+            AppIconPink:
+              CFBundleIconName: AppIconPink
+            AppIconGreen:
+              CFBundleIconName: AppIconGreen
+        ITSAppUsesNonExemptEncryption: false
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        UIBackgroundModes:
+          - remote-notification
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
   BriarCompanionTests:
     type: bundle.unit-test
     platform: iOS
@@ -156,12 +231,12 @@ targets:
     sources:
       - path: UITests
     dependencies:
-      - target: BriarCompanion
+      - target: BriarCompanionUITestHost
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion.native.dev.uitests
         GENERATE_INFOPLIST_FILE: true
-        TEST_TARGET_NAME: BriarCompanion
+        TEST_TARGET_NAME: BriarCompanionUITestHost
 schemes:
   BriarCompanion-Dev:
     build:
