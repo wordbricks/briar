@@ -1,28 +1,47 @@
 version: v2
 clean: true
 plugins:
-  - remote: buf.build/bufbuild/es:v2.14.0
+  - local:
+      - bash
+      - scripts/run-contract-generator.sh
+      - npm:@bufbuild/protoc-gen-es@2.14.0
+      - node_modules/.bin/protoc-gen-es
     out: packages/contracts/src/gen
     opt:
       - target=ts
-  - remote: buf.build/apple/swift:v1.38.1
+  - local:
+      - bash
+      - scripts/run-contract-generator.sh
+      - spm:apple/swift-protobuf@1.38.1
+      - bin/protoc-gen-swift
     out: packages/contracts/swift/Sources/BriarContracts
+    strategy: all
     types:
       - briar.app.v1
       - briar.realtime.v1
       - briar.types.v1
     opt:
       - Visibility=Public
-  - remote: buf.build/connectrpc/swift:v1.2.3
+  - local:
+      - bash
+      - scripts/run-contract-generator.sh
+      - spm:connectrpc/connect-swift@1.2.3
+      - bin/protoc-gen-connect-swift
     out: packages/contracts/swift/Sources/BriarContracts
+    strategy: all
     types:
       - briar.app.v1
     opt:
       - Visibility=Public
       - GenerateAsyncMethods=true
       - GenerateCallbackMethods=false
-  - remote: buf.build/connectrpc/swift-mocks:v1.2.3
+  - local:
+      - bash
+      - scripts/run-contract-generator.sh
+      - spm:connectrpc/connect-swift@1.2.3
+      - bin/protoc-gen-connect-swift-mocks
     out: packages/contracts/swift/Sources/BriarContractsMocks
+    strategy: all
     types:
       - briar.app.v1
     opt:
@@ -30,14 +49,24 @@ plugins:
       - GenerateAsyncMethods=true
       - GenerateCallbackMethods=false
       - ExtraModuleImports=BriarContracts
-  - remote: buf.build/anthropics/buffa:v0.9.1
+  - local:
+      - bash
+      - scripts/run-contract-generator.sh
+      - cargo:protoc-gen-buffa@0.9.1
+      - bin/protoc-gen-buffa
     out: packages/contracts/rust/src/gen/proto
+    strategy: all
     opt:
       - file_per_package=true
       - views=true
       - json=true
-  - remote: buf.build/connectrpc/rust:v0.9.0
+  - local:
+      - bash
+      - scripts/run-contract-generator.sh
+      - cargo:connectrpc-codegen@0.9.0
+      - bin/protoc-gen-connect-rust
     out: packages/contracts/rust/src/gen/connect
+    strategy: all
     types:
       - briar.app.v1
       - briar.worker.v1

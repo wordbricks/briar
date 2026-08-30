@@ -8,7 +8,9 @@ derived from the exact same descriptor graph.
 Run `mise exec -- bun run contracts:generate` after editing a proto. The
 command refreshes the compiled image and all generated language bindings.
 `mise exec -- bun run contracts:check` verifies lint, image currentness,
-generated source currentness, and compilation of the Rust bindings.
+generated source currentness, and compilation of the Rust bindings. `mise
+install` bootstraps Buf and every pinned local generator; generation does not
+depend on BSR plugin availability or quota.
 
 Swift output is split into two Xcode modules under `swift/Sources/`:
 `BriarContracts` contains the public protobuf messages and generated Connect
