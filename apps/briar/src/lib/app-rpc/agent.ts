@@ -56,7 +56,7 @@ import {
   structuredResultFromProto,
   structuredResultToProto,
 } from "./mappers";
-import { workflowFromProto } from "./dashboard";
+import { workflowFromProto } from "./project-configuration-mappers";
 
 const agentClient = appTransport ? createClient(AgentService, appTransport) : undefined;
 

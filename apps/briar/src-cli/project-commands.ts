@@ -4,12 +4,17 @@ import {
   join,
   resolve,
 } from "node:path";
-import type { Project as ProjectMessage } from "@briar/contracts/gen/briar/app/v1/project_pb";
+import { create } from "@bufbuild/protobuf";
+import {
+  type Project as ProjectMessage,
+  UpdateProjectSettingsRequestSchema,
+} from "@briar/contracts/gen/briar/app/v1/project_pb";
 import {
   isRepositoryWorkflowPending,
   repositoryWorkflowPendingStageId,
 } from "../src/lib/auto-hunt-contract";
 import { projectRoleFromProto } from "../src/lib/app-rpc/mappers";
+import { workflowToProto } from "../src/lib/app-rpc/project-configuration-mappers";
 import {
   projectWorktreeRoot,
   resolveBaseRef,
@@ -38,6 +43,7 @@ import {
 import {
   fetchProjects,
   isUnauthenticatedConnectError,
+  updateRemoteProjectSettings,
 } from "./app-connect-client";
 import { HttpRequestError } from "./execution-metrics-upload";
 import {
@@ -327,20 +333,22 @@ async function configureProject() {
   await saveConfig(config);
 
   if (config.userToken) {
-    await request(config.apiUrl, `/projects/${project.id}/settings`, config.userToken, {
-      method: "PUT",
-      body: JSON.stringify({
-        velenOrg: velenOrg ?? null,
-        dataSource: nextAutoHunt.dataSource ?? null,
+    await updateRemoteProjectSettings(
+      config.apiUrl,
+      config.userToken,
+      create(UpdateProjectSettingsRequestSchema, {
+        projectId: project.id,
+        velenOrg: velenOrg ?? undefined,
+        dataSource: nextAutoHunt.dataSource,
         linear: {
           enabled: nextAutoHunt.linear?.enabled ?? false,
-          source: nextAutoHunt.linear?.source ?? null,
-          teamKey: nextAutoHunt.linear?.teamKey ?? null,
+          source: nextAutoHunt.linear?.source,
+          teamKey: nextAutoHunt.linear?.teamKey,
         },
-        githubRepository: nextAutoHunt.githubRepository ?? null,
-        workflow: nextAutoHunt.workflow,
+        githubRepository: nextAutoHunt.githubRepository,
+        workflow: workflowToProto(nextAutoHunt.workflow),
       }),
-    });
+    );
   }
   console.log(
     JSON.stringify({

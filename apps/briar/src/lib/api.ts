@@ -25,8 +25,12 @@ export {
   createAgentToken,
   createProject,
   deleteProject,
+  loadProjectExecutionWorkerPolicy,
+  updateCheckpointPolicy,
   updateProjectIcon,
+  updateProjectExecutionWorkerPolicy,
   updateProjectIssueKeyPrefix,
+  updateProjectSettings,
   updateProjectTabs,
 } from "./app-rpc/project";
 import { listOrganizationMembers as listOrganizationMembersRpc } from "./app-rpc/account";
@@ -1277,25 +1281,6 @@ export async function reworkPausedHuntRun(
   );
 }
 
-export async function updateCheckpointPolicy(
-  token: string,
-  projectId: string,
-  input: {
-    scope: "project" | "user";
-    checkpoints: NonNullable<
-      ProjectSettings["checkpointPolicy"]
-    >["projectMandatory"];
-    expectedRevision: number;
-  },
-) {
-  return request<{
-    checkpointPolicy: NonNullable<ProjectSettings["checkpointPolicy"]>;
-  }>(`/projects/${projectId}/checkpoint-policy`, token, {
-    method: "PUT",
-    body: JSON.stringify(input),
-  });
-}
-
 export async function unassignHuntRun(token: string, projectId: string, runId: string) {
   return request<{
     runId: string;
@@ -1320,57 +1305,6 @@ export async function updateExecutionWorkerConcurrency(
       body: JSON.stringify({ maxConcurrentSessions }),
     },
   );
-}
-
-export async function loadProjectExecutionWorkerPolicy(
-  token: string,
-  projectId: string,
-) {
-  return request<{ policy: ProjectExecutionWorkerPolicy }>(
-    `/projects/${projectId}/execution-policy`,
-    token,
-  );
-}
-
-export async function updateProjectExecutionWorkerPolicy(
-  token: string,
-  projectId: string,
-  policy: Pick<
-    ProjectExecutionWorkerPolicy,
-    "selectionMode" | "defaultWorkerId" | "allowedWorkerIds"
-  >,
-) {
-  return request<{ policy: ProjectExecutionWorkerPolicy }>(
-    `/projects/${projectId}/execution-policy`,
-    token,
-    { method: "PUT", body: JSON.stringify(policy) },
-  );
-}
-
-export async function updateProjectSettings(
-  token: string,
-  projectId: string,
-  settings: ProjectSettings,
-) {
-  const writableSettings = {
-    velenOrg: settings.velenOrg,
-    dataSource: settings.dataSource,
-    linear: settings.linear,
-    githubRepository: settings.githubRepository,
-    workflow: settings.workflow,
-  };
-  const result = await request<{ settings: ProjectSettings }>(
-    `/projects/${projectId}/settings`,
-    token,
-    { method: "PUT", body: JSON.stringify(writableSettings) },
-  );
-  return {
-    ...result,
-    settings: {
-      ...result.settings,
-      workflow: normalizeDashboardWorkflow(result.settings.workflow),
-    },
-  };
 }
 
 export type ProjectGithubCredential = {

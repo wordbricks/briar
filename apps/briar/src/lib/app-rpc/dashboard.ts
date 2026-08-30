@@ -7,32 +7,19 @@ import {
   DashboardService,
   DashboardWorker_Readiness,
   DashboardWorker_State,
-  ProjectExecutionWorkerPolicy_SelectionMode,
   WorkerIcon_Kind,
   type ChannelNotification as ChannelNotificationMessage,
   type ConversationNotification as ConversationNotificationMessage,
   type DashboardRun as DashboardRunMessage,
   type DashboardWorker as DashboardWorkerMessage,
-  type ProjectExecutionWorkerPolicy as ProjectExecutionWorkerPolicyMessage,
-  type ProjectSettings as ProjectSettingsMessage,
   type RunEvent as RunEventMessage,
 } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
-import {
-  WorkflowCheckpoint_Position,
-  type AutoHuntWorkflow as AutoHuntWorkflowMessage,
-  type WorkflowCheckpointSpec,
-} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import type {
   WorkerCapabilities as WorkerCapabilitiesMessage,
 } from "@briar/contracts/gen/briar/types/v1/worker_pb";
-import {
-  autoHuntRequirementKinds,
-  normalizeAutoHuntWorkflow,
-  type AutoHuntQaStatus,
-  type AutoHuntSource,
-  type AutoHuntWorkflow,
-  type AutoHuntWorkflowCheckpoint,
-  type AutoHuntWorkflowRequirement,
+import type {
+  AutoHuntQaStatus,
+  AutoHuntSource,
 } from "../auto-hunt-contract";
 import {
   emptyAgentProviderCapabilityCatalog,
@@ -47,8 +34,6 @@ import type {
   HuntEvent,
   HuntRun,
   IssueConversationNotification,
-  ProjectExecutionWorkerPolicy,
-  ProjectSettings,
 } from "../../types";
 import {
   appCallOptions,
@@ -73,6 +58,13 @@ import {
   structuredResultFromProto,
 } from "./mappers";
 import { projectFromMessage } from "./project";
+import {
+  checkpointPositionFromProto as checkpointPosition,
+  executionPolicyFromProto,
+  projectSettingsFromProto,
+  workflowCheckpointFromProto,
+  workflowFromProto,
+} from "./project-configuration-mappers";
 
 const dashboardClient = appTransport
   ? createClient(DashboardService, appTransport)
@@ -83,120 +75,6 @@ const requireDashboardClient = () => {
     throw new Error("Briar API URL이 설정되지 않았습니다.");
   }
   return dashboardClient;
-};
-
-const checkpointPosition = (
-  value: WorkflowCheckpoint_Position,
-): "before" | "after" => {
-  switch (value) {
-    case WorkflowCheckpoint_Position.BEFORE:
-      return "before";
-    case WorkflowCheckpoint_Position.AFTER:
-      return "after";
-    default:
-      throw new Error(`Unknown checkpoint position: ${value}`);
-  }
-};
-
-const workflowCheckpointFromProto = (
-  value: WorkflowCheckpointSpec,
-): AutoHuntWorkflowCheckpoint => ({
-  key: value.key,
-  stage: value.stage,
-  position: checkpointPosition(value.position),
-});
-
-const workflowRequirementFromProto = (
-  value: AutoHuntWorkflowMessage["requirements"][number],
-): AutoHuntWorkflowRequirement => {
-  if (!autoHuntRequirementKinds.includes(
-    value.kind as AutoHuntWorkflowRequirement["kind"],
-  )) {
-    throw new Error(`Unknown workflow requirement kind: ${value.kind}`);
-  }
-  return {
-    id: value.id,
-    label: value.label,
-    kind: value.kind as AutoHuntWorkflowRequirement["kind"],
-    tool: value.tool,
-    reason: value.reason,
-  };
-};
-
-export const workflowFromProto = (
-  value: AutoHuntWorkflowMessage,
-): AutoHuntWorkflow => {
-  if (value.version !== 2) {
-    throw new Error(`Unsupported workflow version: ${value.version}`);
-  }
-  const execution = requiredMessage(value.execution, "workflow.execution");
-  const completion = requiredMessage(value.completion, "workflow.completion");
-  return normalizeAutoHuntWorkflow({
-    version: 2,
-    requirements: value.requirements.map(workflowRequirementFromProto),
-    stages: value.stages.map((stage) => ({
-      id: stage.id,
-      label: stage.label,
-      required: stage.required,
-      evidence: stage.evidence.length === 0 ? undefined : stage.evidence,
-      checks: stage.checks.length === 0 ? undefined : stage.checks,
-    })),
-    execution: {
-      checkpoints: execution.checkpoints.map(workflowCheckpointFromProto),
-    },
-    completion: { requiredStages: completion.requiredStages },
-  });
-};
-
-const projectSettingsFromProto = (
-  value: ProjectSettingsMessage,
-): ProjectSettings => {
-  const linear = requiredMessage(value.linear, "projectSettings.linear");
-  const checkpointPolicy = value.checkpointPolicy;
-  return {
-    velenOrg: value.velenOrg ?? null,
-    dataSource: value.dataSource ?? null,
-    linear: {
-      enabled: linear.enabled,
-      source: linear.source ?? null,
-      teamKey: linear.teamKey ?? null,
-    },
-    githubRepositoryId: value.githubRepositoryId === undefined
-      ? null
-      : safeNumber(value.githubRepositoryId, "settings.githubRepositoryId"),
-    githubRepository: value.githubRepository ?? null,
-    workflow: workflowFromProto(
-      requiredMessage(value.workflow, "projectSettings.workflow"),
-    ),
-    checkpointPolicy: checkpointPolicy === undefined
-      ? undefined
-      : {
-          availableBoundaries: checkpointPolicy.availableBoundaries.map(
-            (boundary) => ({
-              stage: boundary.stage,
-              stageLabel: boundary.stageLabel,
-              position: checkpointPosition(boundary.position),
-            }),
-          ),
-          projectMandatory: checkpointPolicy.projectMandatory.map(
-            workflowCheckpointFromProto,
-          ),
-          userDefaults: checkpointPolicy.userDefaults.map(
-            workflowCheckpointFromProto,
-          ),
-          effective: checkpointPolicy.effective.map(
-            workflowCheckpointFromProto,
-          ),
-          projectRevision: safeNumber(
-            checkpointPolicy.projectRevision,
-            "checkpointPolicy.projectRevision",
-          ),
-          userRevision: safeNumber(
-            checkpointPolicy.userRevision,
-            "checkpointPolicy.userRevision",
-          ),
-        },
-  };
 };
 
 const runSource = (value: DashboardRun_Source): AutoHuntSource => {
@@ -542,28 +420,6 @@ const dashboardWorkerFromProto = (
   ),
   createdAt: requiredTimestamp(worker.createdAt, "worker.createdAt"),
 });
-
-const executionPolicyFromProto = (
-  value: ProjectExecutionWorkerPolicyMessage | undefined,
-): ProjectExecutionWorkerPolicy | undefined => {
-  if (value === undefined) return undefined;
-  const selectionMode = (() => {
-    switch (value.selectionMode) {
-      case ProjectExecutionWorkerPolicy_SelectionMode.ANY:
-        return "any" as const;
-      case ProjectExecutionWorkerPolicy_SelectionMode.ALLOWLIST:
-        return "allowlist" as const;
-      default:
-        throw new Error(`Unknown worker selection mode: ${value.selectionMode}`);
-    }
-  })();
-  return {
-    selectionMode,
-    defaultWorkerId: value.defaultWorkerId ?? null,
-    allowedWorkerIds: value.allowedWorkerIds,
-    updatedAt: optionalTimestamp(value.updatedAt),
-  };
-};
 
 const conversationNotificationFromProto = (
   value: ConversationNotificationMessage,

@@ -1,9 +1,14 @@
 import { createClient } from "@connectrpc/connect";
 import {
   ProjectService,
+  UpdateCheckpointPolicyRequest_Scope,
   type Project as ProjectMessage,
 } from "@briar/contracts/gen/briar/app/v1/project_pb";
-import type { Project } from "../../types";
+import type {
+  Project,
+  ProjectExecutionWorkerPolicy,
+  ProjectSettings,
+} from "../../types";
 import { isProjectIconDataUrl } from "../project-icon";
 import { appCallOptions, appRpc, appTransport } from "./core";
 import {
@@ -11,6 +16,14 @@ import {
   requiredMessage,
   requiredTimestamp,
 } from "./mappers";
+import {
+  checkpointPolicyFromProto,
+  executionPolicyFromProto,
+  executionSelectionModeToProto,
+  projectSettingsFromProto,
+  workflowCheckpointToProto,
+  workflowToProto,
+} from "./project-configuration-mappers";
 
 const projectClient = appTransport
   ? createClient(ProjectService, appTransport)
@@ -150,5 +163,119 @@ export async function createAgentToken(token: string, projectId: string) {
       appCallOptions(token),
     );
     return { agentToken: response.agentToken };
+  });
+}
+
+export async function updateProjectSettings(
+  token: string,
+  projectId: string,
+  settings: ProjectSettings,
+) {
+  const client = requireProjectClient();
+  return appRpc(async () => {
+    const response = await client.updateProjectSettings(
+      {
+        projectId,
+        velenOrg: settings.velenOrg ?? undefined,
+        dataSource: settings.dataSource ?? undefined,
+        linear: {
+          enabled: settings.linear.enabled,
+          source: settings.linear.source ?? undefined,
+          teamKey: settings.linear.teamKey ?? undefined,
+        },
+        githubRepository: settings.githubRepository ?? undefined,
+        workflow: workflowToProto(settings.workflow),
+      },
+      appCallOptions(token),
+    );
+    return {
+      settings: projectSettingsFromProto(
+        requiredMessage(response.settings, "updateProjectSettings.settings"),
+      ),
+    };
+  });
+}
+
+export async function updateCheckpointPolicy(
+  token: string,
+  projectId: string,
+  input: {
+    scope: "project" | "user";
+    checkpoints: NonNullable<
+      ProjectSettings["checkpointPolicy"]
+    >["projectMandatory"];
+    expectedRevision: number;
+  },
+) {
+  const client = requireProjectClient();
+  return appRpc(async () => {
+    const response = await client.updateCheckpointPolicy(
+      {
+        projectId,
+        scope: input.scope === "project"
+          ? UpdateCheckpointPolicyRequest_Scope.PROJECT
+          : UpdateCheckpointPolicyRequest_Scope.USER,
+        checkpoints: input.checkpoints.map(workflowCheckpointToProto),
+        expectedRevision: BigInt(input.expectedRevision),
+      },
+      appCallOptions(token),
+    );
+    return {
+      checkpointPolicy: checkpointPolicyFromProto(
+        requiredMessage(
+          response.checkpointPolicy,
+          "updateCheckpointPolicy.checkpointPolicy",
+        ),
+      ),
+    };
+  });
+}
+
+const requiredExecutionPolicy = (
+  value: Parameters<typeof executionPolicyFromProto>[0],
+): ProjectExecutionWorkerPolicy => {
+  const policy = executionPolicyFromProto(value);
+  if (!policy) throw new Error("Project execution Worker policy is missing");
+  return policy;
+};
+
+export async function loadProjectExecutionWorkerPolicy(
+  token: string,
+  projectId: string,
+) {
+  const client = requireProjectClient();
+  return appRpc(async () => {
+    const response = await client.getProjectExecutionWorkerPolicy(
+      { projectId },
+      appCallOptions(token),
+    );
+    return {
+      policy: requiredExecutionPolicy(response.policy),
+    };
+  });
+}
+
+export async function updateProjectExecutionWorkerPolicy(
+  token: string,
+  projectId: string,
+  policy: Pick<
+    ProjectExecutionWorkerPolicy,
+    "selectionMode" | "defaultWorkerId" | "allowedWorkerIds"
+  >,
+) {
+  const client = requireProjectClient();
+  return appRpc(async () => {
+    const response = await client.updateProjectExecutionWorkerPolicy(
+      {
+        projectId,
+        selectionMode: executionSelectionModeToProto(policy.selectionMode),
+        defaultWorkerId: policy.defaultWorkerId ?? undefined,
+        allowedWorkerIds: policy.allowedWorkerIds,
+      },
+      appCallOptions(token),
+    );
+    return {
+      policy: requiredExecutionPolicy(response.policy),
+    };
   });
 }

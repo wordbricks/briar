@@ -15,6 +15,7 @@ import {
 import {
   ProjectService,
   type ListProjectsResponse,
+  type UpdateProjectSettingsRequest,
 } from "@briar/contracts/gen/briar/app/v1/project_pb";
 
 const transport = (apiUrl: string) =>
@@ -55,6 +56,17 @@ export async function fetchDashboard(
     DashboardService,
     transport(apiUrl),
   ).getDashboard({ projectId }, callOptions(token));
+}
+
+export async function updateRemoteProjectSettings(
+  apiUrl: string,
+  token: string,
+  input: UpdateProjectSettingsRequest,
+) {
+  return createClient(
+    ProjectService,
+    transport(apiUrl),
+  ).updateProjectSettings(input, callOptions(token));
 }
 
 export const isUnauthenticatedConnectError = (error: unknown) =>
