@@ -263,6 +263,429 @@ public nonisolated struct BriarAPI_CreateProjectAgentTokenResponse: Sendable {
   public init() {}
 }
 
+public nonisolated struct BriarAPI_LinearSettings: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var enabled: Bool = false
+
+  public var source: String {
+    get {_source ?? String()}
+    set {_source = newValue}
+  }
+  /// Returns true if `source` has been explicitly set.
+  public var hasSource: Bool {self._source != nil}
+  /// Clears the value of `source`. Subsequent reads from it will return its default value.
+  public mutating func clearSource() {self._source = nil}
+
+  public var teamKey: String {
+    get {_teamKey ?? String()}
+    set {_teamKey = newValue}
+  }
+  /// Returns true if `teamKey` has been explicitly set.
+  public var hasTeamKey: Bool {self._teamKey != nil}
+  /// Clears the value of `teamKey`. Subsequent reads from it will return its default value.
+  public mutating func clearTeamKey() {self._teamKey = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _source: String? = nil
+  fileprivate var _teamKey: String? = nil
+}
+
+public nonisolated struct BriarAPI_ProjectSettings: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var velenOrg: String {
+    get {_storage._velenOrg ?? String()}
+    set {_uniqueStorage()._velenOrg = newValue}
+  }
+  /// Returns true if `velenOrg` has been explicitly set.
+  public var hasVelenOrg: Bool {_storage._velenOrg != nil}
+  /// Clears the value of `velenOrg`. Subsequent reads from it will return its default value.
+  public mutating func clearVelenOrg() {_uniqueStorage()._velenOrg = nil}
+
+  public var dataSource: String {
+    get {_storage._dataSource ?? String()}
+    set {_uniqueStorage()._dataSource = newValue}
+  }
+  /// Returns true if `dataSource` has been explicitly set.
+  public var hasDataSource: Bool {_storage._dataSource != nil}
+  /// Clears the value of `dataSource`. Subsequent reads from it will return its default value.
+  public mutating func clearDataSource() {_uniqueStorage()._dataSource = nil}
+
+  public var linear: BriarAPI_LinearSettings {
+    get {_storage._linear ?? BriarAPI_LinearSettings()}
+    set {_uniqueStorage()._linear = newValue}
+  }
+  /// Returns true if `linear` has been explicitly set.
+  public var hasLinear: Bool {_storage._linear != nil}
+  /// Clears the value of `linear`. Subsequent reads from it will return its default value.
+  public mutating func clearLinear() {_uniqueStorage()._linear = nil}
+
+  public var githubRepositoryID: Int64 {
+    get {_storage._githubRepositoryID ?? 0}
+    set {_uniqueStorage()._githubRepositoryID = newValue}
+  }
+  /// Returns true if `githubRepositoryID` has been explicitly set.
+  public var hasGithubRepositoryID: Bool {_storage._githubRepositoryID != nil}
+  /// Clears the value of `githubRepositoryID`. Subsequent reads from it will return its default value.
+  public mutating func clearGithubRepositoryID() {_uniqueStorage()._githubRepositoryID = nil}
+
+  public var githubRepository: String {
+    get {_storage._githubRepository ?? String()}
+    set {_uniqueStorage()._githubRepository = newValue}
+  }
+  /// Returns true if `githubRepository` has been explicitly set.
+  public var hasGithubRepository: Bool {_storage._githubRepository != nil}
+  /// Clears the value of `githubRepository`. Subsequent reads from it will return its default value.
+  public mutating func clearGithubRepository() {_uniqueStorage()._githubRepository = nil}
+
+  public var workflow: BriarTypes_AutoHuntWorkflow {
+    get {_storage._workflow ?? BriarTypes_AutoHuntWorkflow()}
+    set {_uniqueStorage()._workflow = newValue}
+  }
+  /// Returns true if `workflow` has been explicitly set.
+  public var hasWorkflow: Bool {_storage._workflow != nil}
+  /// Clears the value of `workflow`. Subsequent reads from it will return its default value.
+  public mutating func clearWorkflow() {_uniqueStorage()._workflow = nil}
+
+  public var checkpointPolicy: BriarTypes_CheckpointPolicy {
+    get {_storage._checkpointPolicy ?? BriarTypes_CheckpointPolicy()}
+    set {_uniqueStorage()._checkpointPolicy = newValue}
+  }
+  /// Returns true if `checkpointPolicy` has been explicitly set.
+  public var hasCheckpointPolicy: Bool {_storage._checkpointPolicy != nil}
+  /// Clears the value of `checkpointPolicy`. Subsequent reads from it will return its default value.
+  public mutating func clearCheckpointPolicy() {_uniqueStorage()._checkpointPolicy = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public nonisolated struct BriarAPI_UpdateProjectSettingsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var velenOrg: String {
+    get {_velenOrg ?? String()}
+    set {_velenOrg = newValue}
+  }
+  /// Returns true if `velenOrg` has been explicitly set.
+  public var hasVelenOrg: Bool {self._velenOrg != nil}
+  /// Clears the value of `velenOrg`. Subsequent reads from it will return its default value.
+  public mutating func clearVelenOrg() {self._velenOrg = nil}
+
+  public var dataSource: String {
+    get {_dataSource ?? String()}
+    set {_dataSource = newValue}
+  }
+  /// Returns true if `dataSource` has been explicitly set.
+  public var hasDataSource: Bool {self._dataSource != nil}
+  /// Clears the value of `dataSource`. Subsequent reads from it will return its default value.
+  public mutating func clearDataSource() {self._dataSource = nil}
+
+  public var linear: BriarAPI_LinearSettings {
+    get {_linear ?? BriarAPI_LinearSettings()}
+    set {_linear = newValue}
+  }
+  /// Returns true if `linear` has been explicitly set.
+  public var hasLinear: Bool {self._linear != nil}
+  /// Clears the value of `linear`. Subsequent reads from it will return its default value.
+  public mutating func clearLinear() {self._linear = nil}
+
+  public var githubRepository: String {
+    get {_githubRepository ?? String()}
+    set {_githubRepository = newValue}
+  }
+  /// Returns true if `githubRepository` has been explicitly set.
+  public var hasGithubRepository: Bool {self._githubRepository != nil}
+  /// Clears the value of `githubRepository`. Subsequent reads from it will return its default value.
+  public mutating func clearGithubRepository() {self._githubRepository = nil}
+
+  public var workflow: BriarTypes_AutoHuntWorkflow {
+    get {_workflow ?? BriarTypes_AutoHuntWorkflow()}
+    set {_workflow = newValue}
+  }
+  /// Returns true if `workflow` has been explicitly set.
+  public var hasWorkflow: Bool {self._workflow != nil}
+  /// Clears the value of `workflow`. Subsequent reads from it will return its default value.
+  public mutating func clearWorkflow() {self._workflow = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _velenOrg: String? = nil
+  fileprivate var _dataSource: String? = nil
+  fileprivate var _linear: BriarAPI_LinearSettings? = nil
+  fileprivate var _githubRepository: String? = nil
+  fileprivate var _workflow: BriarTypes_AutoHuntWorkflow? = nil
+}
+
+public nonisolated struct BriarAPI_UpdateProjectSettingsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var settings: BriarAPI_ProjectSettings {
+    get {_settings ?? BriarAPI_ProjectSettings()}
+    set {_settings = newValue}
+  }
+  /// Returns true if `settings` has been explicitly set.
+  public var hasSettings: Bool {self._settings != nil}
+  /// Clears the value of `settings`. Subsequent reads from it will return its default value.
+  public mutating func clearSettings() {self._settings = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _settings: BriarAPI_ProjectSettings? = nil
+}
+
+public nonisolated struct BriarAPI_UpdateCheckpointPolicyRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var scope: BriarAPI_UpdateCheckpointPolicyRequest.Scope = .unspecified
+
+  public var checkpoints: [BriarTypes_WorkflowCheckpointSpec] = []
+
+  public var expectedRevision: UInt64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum Scope: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+    case unspecified // = 0
+    case project // = 1
+    case user // = 2
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .project
+      case 2: self = .user
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .project: return 1
+      case .user: return 2
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [BriarAPI_UpdateCheckpointPolicyRequest.Scope] = [
+      .unspecified,
+      .project,
+      .user,
+    ]
+
+  }
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_UpdateCheckpointPolicyResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var checkpointPolicy: BriarTypes_CheckpointPolicy {
+    get {_checkpointPolicy ?? BriarTypes_CheckpointPolicy()}
+    set {_checkpointPolicy = newValue}
+  }
+  /// Returns true if `checkpointPolicy` has been explicitly set.
+  public var hasCheckpointPolicy: Bool {self._checkpointPolicy != nil}
+  /// Clears the value of `checkpointPolicy`. Subsequent reads from it will return its default value.
+  public mutating func clearCheckpointPolicy() {self._checkpointPolicy = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _checkpointPolicy: BriarTypes_CheckpointPolicy? = nil
+}
+
+public nonisolated struct BriarAPI_ProjectExecutionWorkerPolicy: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var selectionMode: BriarAPI_ProjectExecutionWorkerPolicy.SelectionMode = .unspecified
+
+  public var defaultWorkerID: String {
+    get {_defaultWorkerID ?? String()}
+    set {_defaultWorkerID = newValue}
+  }
+  /// Returns true if `defaultWorkerID` has been explicitly set.
+  public var hasDefaultWorkerID: Bool {self._defaultWorkerID != nil}
+  /// Clears the value of `defaultWorkerID`. Subsequent reads from it will return its default value.
+  public mutating func clearDefaultWorkerID() {self._defaultWorkerID = nil}
+
+  public var allowedWorkerIds: [String] = []
+
+  public var updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_updatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_updatedAt = newValue}
+  }
+  /// Returns true if `updatedAt` has been explicitly set.
+  public var hasUpdatedAt: Bool {self._updatedAt != nil}
+  /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedAt() {self._updatedAt = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum SelectionMode: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+    case unspecified // = 0
+    case any // = 1
+    case allowlist // = 2
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .any
+      case 2: self = .allowlist
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .any: return 1
+      case .allowlist: return 2
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [BriarAPI_ProjectExecutionWorkerPolicy.SelectionMode] = [
+      .unspecified,
+      .any,
+      .allowlist,
+    ]
+
+  }
+
+  public init() {}
+
+  fileprivate var _defaultWorkerID: String? = nil
+  fileprivate var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public nonisolated struct BriarAPI_GetProjectExecutionWorkerPolicyRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_GetProjectExecutionWorkerPolicyResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var policy: BriarAPI_ProjectExecutionWorkerPolicy {
+    get {_policy ?? BriarAPI_ProjectExecutionWorkerPolicy()}
+    set {_policy = newValue}
+  }
+  /// Returns true if `policy` has been explicitly set.
+  public var hasPolicy: Bool {self._policy != nil}
+  /// Clears the value of `policy`. Subsequent reads from it will return its default value.
+  public mutating func clearPolicy() {self._policy = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _policy: BriarAPI_ProjectExecutionWorkerPolicy? = nil
+}
+
+public nonisolated struct BriarAPI_UpdateProjectExecutionWorkerPolicyRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var selectionMode: BriarAPI_ProjectExecutionWorkerPolicy.SelectionMode = .unspecified
+
+  public var defaultWorkerID: String {
+    get {_defaultWorkerID ?? String()}
+    set {_defaultWorkerID = newValue}
+  }
+  /// Returns true if `defaultWorkerID` has been explicitly set.
+  public var hasDefaultWorkerID: Bool {self._defaultWorkerID != nil}
+  /// Clears the value of `defaultWorkerID`. Subsequent reads from it will return its default value.
+  public mutating func clearDefaultWorkerID() {self._defaultWorkerID = nil}
+
+  public var allowedWorkerIds: [String] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _defaultWorkerID: String? = nil
+}
+
+public nonisolated struct BriarAPI_UpdateProjectExecutionWorkerPolicyResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var policy: BriarAPI_ProjectExecutionWorkerPolicy {
+    get {_policy ?? BriarAPI_ProjectExecutionWorkerPolicy()}
+    set {_policy = newValue}
+  }
+  /// Returns true if `policy` has been explicitly set.
+  public var hasPolicy: Bool {self._policy != nil}
+  /// Clears the value of `policy`. Subsequent reads from it will return its default value.
+  public mutating func clearPolicy() {self._policy = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _policy: BriarAPI_ProjectExecutionWorkerPolicy? = nil
+}
+
 public nonisolated struct BriarAPI_Project: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -793,6 +1216,538 @@ nonisolated extension BriarAPI_CreateProjectAgentTokenResponse: SwiftProtobuf.Me
 
   public static func ==(lhs: BriarAPI_CreateProjectAgentTokenResponse, rhs: BriarAPI_CreateProjectAgentTokenResponse) -> Bool {
     if lhs.agentToken != rhs.agentToken {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_LinearSettings: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LinearSettings"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}enabled\0\u{1}source\0\u{3}team_key\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._source) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._teamKey) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.enabled != false {
+      try visitor.visitSingularBoolField(value: self.enabled, fieldNumber: 1)
+    }
+    try { if let v = self._source {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._teamKey {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_LinearSettings, rhs: BriarAPI_LinearSettings) -> Bool {
+    if lhs.enabled != rhs.enabled {return false}
+    if lhs._source != rhs._source {return false}
+    if lhs._teamKey != rhs._teamKey {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ProjectSettings: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ProjectSettings"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}velen_org\0\u{3}data_source\0\u{1}linear\0\u{3}github_repository_id\0\u{3}github_repository\0\u{1}workflow\0\u{3}checkpoint_policy\0")
+
+  fileprivate class _StorageClass {
+    var _velenOrg: String? = nil
+    var _dataSource: String? = nil
+    var _linear: BriarAPI_LinearSettings? = nil
+    var _githubRepositoryID: Int64? = nil
+    var _githubRepository: String? = nil
+    var _workflow: BriarTypes_AutoHuntWorkflow? = nil
+    var _checkpointPolicy: BriarTypes_CheckpointPolicy? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _velenOrg = source._velenOrg
+      _dataSource = source._dataSource
+      _linear = source._linear
+      _githubRepositoryID = source._githubRepositoryID
+      _githubRepository = source._githubRepository
+      _workflow = source._workflow
+      _checkpointPolicy = source._checkpointPolicy
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._velenOrg) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._dataSource) }()
+        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._linear) }()
+        case 4: try { try decoder.decodeSingularInt64Field(value: &_storage._githubRepositoryID) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._githubRepository) }()
+        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._workflow) }()
+        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._checkpointPolicy) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._velenOrg {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+      } }()
+      try { if let v = _storage._dataSource {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+      } }()
+      try { if let v = _storage._linear {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      } }()
+      try { if let v = _storage._githubRepositoryID {
+        try visitor.visitSingularInt64Field(value: v, fieldNumber: 4)
+      } }()
+      try { if let v = _storage._githubRepository {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+      } }()
+      try { if let v = _storage._workflow {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._checkpointPolicy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+      } }()
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ProjectSettings, rhs: BriarAPI_ProjectSettings) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._velenOrg != rhs_storage._velenOrg {return false}
+        if _storage._dataSource != rhs_storage._dataSource {return false}
+        if _storage._linear != rhs_storage._linear {return false}
+        if _storage._githubRepositoryID != rhs_storage._githubRepositoryID {return false}
+        if _storage._githubRepository != rhs_storage._githubRepository {return false}
+        if _storage._workflow != rhs_storage._workflow {return false}
+        if _storage._checkpointPolicy != rhs_storage._checkpointPolicy {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateProjectSettingsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateProjectSettingsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}velen_org\0\u{3}data_source\0\u{1}linear\0\u{3}github_repository\0\u{1}workflow\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._velenOrg) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._dataSource) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._linear) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._githubRepository) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._workflow) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    try { if let v = self._velenOrg {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._dataSource {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._linear {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._githubRepository {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._workflow {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateProjectSettingsRequest, rhs: BriarAPI_UpdateProjectSettingsRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs._velenOrg != rhs._velenOrg {return false}
+    if lhs._dataSource != rhs._dataSource {return false}
+    if lhs._linear != rhs._linear {return false}
+    if lhs._githubRepository != rhs._githubRepository {return false}
+    if lhs._workflow != rhs._workflow {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateProjectSettingsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateProjectSettingsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}settings\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._settings) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._settings {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateProjectSettingsResponse, rhs: BriarAPI_UpdateProjectSettingsResponse) -> Bool {
+    if lhs._settings != rhs._settings {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateCheckpointPolicyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateCheckpointPolicyRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{1}scope\0\u{1}checkpoints\0\u{3}expected_revision\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self.scope) }()
+      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.checkpoints) }()
+      case 4: try { try decoder.decodeSingularUInt64Field(value: &self.expectedRevision) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    if self.scope != .unspecified {
+      try visitor.visitSingularEnumField(value: self.scope, fieldNumber: 2)
+    }
+    if !self.checkpoints.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.checkpoints, fieldNumber: 3)
+    }
+    if self.expectedRevision != 0 {
+      try visitor.visitSingularUInt64Field(value: self.expectedRevision, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateCheckpointPolicyRequest, rhs: BriarAPI_UpdateCheckpointPolicyRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.scope != rhs.scope {return false}
+    if lhs.checkpoints != rhs.checkpoints {return false}
+    if lhs.expectedRevision != rhs.expectedRevision {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateCheckpointPolicyRequest.Scope: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SCOPE_UNSPECIFIED\0\u{1}SCOPE_PROJECT\0\u{1}SCOPE_USER\0")
+}
+
+nonisolated extension BriarAPI_UpdateCheckpointPolicyResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateCheckpointPolicyResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}checkpoint_policy\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._checkpointPolicy) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._checkpointPolicy {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateCheckpointPolicyResponse, rhs: BriarAPI_UpdateCheckpointPolicyResponse) -> Bool {
+    if lhs._checkpointPolicy != rhs._checkpointPolicy {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ProjectExecutionWorkerPolicy: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ProjectExecutionWorkerPolicy"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}selection_mode\0\u{3}default_worker_id\0\u{3}allowed_worker_ids\0\u{3}updated_at\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.selectionMode) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._defaultWorkerID) }()
+      case 3: try { try decoder.decodeRepeatedStringField(value: &self.allowedWorkerIds) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._updatedAt) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.selectionMode != .unspecified {
+      try visitor.visitSingularEnumField(value: self.selectionMode, fieldNumber: 1)
+    }
+    try { if let v = self._defaultWorkerID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    if !self.allowedWorkerIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.allowedWorkerIds, fieldNumber: 3)
+    }
+    try { if let v = self._updatedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ProjectExecutionWorkerPolicy, rhs: BriarAPI_ProjectExecutionWorkerPolicy) -> Bool {
+    if lhs.selectionMode != rhs.selectionMode {return false}
+    if lhs._defaultWorkerID != rhs._defaultWorkerID {return false}
+    if lhs.allowedWorkerIds != rhs.allowedWorkerIds {return false}
+    if lhs._updatedAt != rhs._updatedAt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ProjectExecutionWorkerPolicy.SelectionMode: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SELECTION_MODE_UNSPECIFIED\0\u{1}SELECTION_MODE_ANY\0\u{1}SELECTION_MODE_ALLOWLIST\0")
+}
+
+nonisolated extension BriarAPI_GetProjectExecutionWorkerPolicyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetProjectExecutionWorkerPolicyRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_GetProjectExecutionWorkerPolicyRequest, rhs: BriarAPI_GetProjectExecutionWorkerPolicyRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_GetProjectExecutionWorkerPolicyResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetProjectExecutionWorkerPolicyResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}policy\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._policy) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._policy {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_GetProjectExecutionWorkerPolicyResponse, rhs: BriarAPI_GetProjectExecutionWorkerPolicyResponse) -> Bool {
+    if lhs._policy != rhs._policy {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateProjectExecutionWorkerPolicyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateProjectExecutionWorkerPolicyRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}selection_mode\0\u{3}default_worker_id\0\u{3}allowed_worker_ids\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self.selectionMode) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._defaultWorkerID) }()
+      case 4: try { try decoder.decodeRepeatedStringField(value: &self.allowedWorkerIds) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    if self.selectionMode != .unspecified {
+      try visitor.visitSingularEnumField(value: self.selectionMode, fieldNumber: 2)
+    }
+    try { if let v = self._defaultWorkerID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    if !self.allowedWorkerIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.allowedWorkerIds, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateProjectExecutionWorkerPolicyRequest, rhs: BriarAPI_UpdateProjectExecutionWorkerPolicyRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.selectionMode != rhs.selectionMode {return false}
+    if lhs._defaultWorkerID != rhs._defaultWorkerID {return false}
+    if lhs.allowedWorkerIds != rhs.allowedWorkerIds {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateProjectExecutionWorkerPolicyResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateProjectExecutionWorkerPolicyResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}policy\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._policy) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._policy {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateProjectExecutionWorkerPolicyResponse, rhs: BriarAPI_UpdateProjectExecutionWorkerPolicyResponse) -> Bool {
+    if lhs._policy != rhs._policy {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

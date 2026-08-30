@@ -74,22 +74,6 @@ message ListRunEventsResponse {
   repeated RunEvent events = 1;
 }
 
-message LinearSettings {
-  bool enabled = 1;
-  optional string source = 2;
-  optional string team_key = 3;
-}
-
-message ProjectSettings {
-  optional string velen_org = 1;
-  optional string data_source = 2;
-  LinearSettings linear = 3;
-  optional int64 github_repository_id = 4;
-  optional string github_repository = 5;
-  briar.types.v1.AutoHuntWorkflow workflow = 6;
-  optional briar.types.v1.CheckpointPolicy checkpoint_policy = 7;
-}
-
 message IssueDependencyReference {
   string id = 1;
   uint32 run_number = 2;
@@ -264,19 +248,6 @@ message DashboardWorker {
   uint32 max_concurrent_sessions = 16;
   google.protobuf.Timestamp last_heartbeat_at = 17;
   google.protobuf.Timestamp created_at = 18;
-}
-
-message ProjectExecutionWorkerPolicy {
-  enum SelectionMode {
-    SELECTION_MODE_UNSPECIFIED = 0;
-    SELECTION_MODE_ANY = 1;
-    SELECTION_MODE_ALLOWLIST = 2;
-  }
-
-  SelectionMode selection_mode = 1;
-  optional string default_worker_id = 2;
-  repeated string allowed_worker_ids = 3;
-  optional google.protobuf.Timestamp updated_at = 4;
 }
 
 message ConversationNotification {

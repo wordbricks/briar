@@ -36,6 +36,14 @@ open class BriarAPI_ProjectServiceClientMock: BriarAPI_ProjectServiceClientInter
     public var mockAsyncUpdateProjectTabs = { (_: BriarAPI_UpdateProjectTabsRequest) -> ResponseMessage<BriarAPI_UpdateProjectTabsResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `createProjectAgentToken()`.
     public var mockAsyncCreateProjectAgentToken = { (_: BriarAPI_CreateProjectAgentTokenRequest) -> ResponseMessage<BriarAPI_CreateProjectAgentTokenResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateProjectSettings()`.
+    public var mockAsyncUpdateProjectSettings = { (_: BriarAPI_UpdateProjectSettingsRequest) -> ResponseMessage<BriarAPI_UpdateProjectSettingsResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateCheckpointPolicy()`.
+    public var mockAsyncUpdateCheckpointPolicy = { (_: BriarAPI_UpdateCheckpointPolicyRequest) -> ResponseMessage<BriarAPI_UpdateCheckpointPolicyResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `getProjectExecutionWorkerPolicy()`.
+    public var mockAsyncGetProjectExecutionWorkerPolicy = { (_: BriarAPI_GetProjectExecutionWorkerPolicyRequest) -> ResponseMessage<BriarAPI_GetProjectExecutionWorkerPolicyResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateProjectExecutionWorkerPolicy()`.
+    public var mockAsyncUpdateProjectExecutionWorkerPolicy = { (_: BriarAPI_UpdateProjectExecutionWorkerPolicyRequest) -> ResponseMessage<BriarAPI_UpdateProjectExecutionWorkerPolicyResponse> in .init(result: .success(.init())) }
 
     public init() {}
 
@@ -65,5 +73,21 @@ open class BriarAPI_ProjectServiceClientMock: BriarAPI_ProjectServiceClientInter
 
     open func `createProjectAgentToken`(request: BriarAPI_CreateProjectAgentTokenRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateProjectAgentTokenResponse> {
         return self.mockAsyncCreateProjectAgentToken(request)
+    }
+
+    open func `updateProjectSettings`(request: BriarAPI_UpdateProjectSettingsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateProjectSettingsResponse> {
+        return self.mockAsyncUpdateProjectSettings(request)
+    }
+
+    open func `updateCheckpointPolicy`(request: BriarAPI_UpdateCheckpointPolicyRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateCheckpointPolicyResponse> {
+        return self.mockAsyncUpdateCheckpointPolicy(request)
+    }
+
+    open func `getProjectExecutionWorkerPolicy`(request: BriarAPI_GetProjectExecutionWorkerPolicyRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetProjectExecutionWorkerPolicyResponse> {
+        return self.mockAsyncGetProjectExecutionWorkerPolicy(request)
+    }
+
+    open func `updateProjectExecutionWorkerPolicy`(request: BriarAPI_UpdateProjectExecutionWorkerPolicyRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateProjectExecutionWorkerPolicyResponse> {
+        return self.mockAsyncUpdateProjectExecutionWorkerPolicy(request)
     }
 }

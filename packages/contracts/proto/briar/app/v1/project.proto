@@ -3,6 +3,7 @@ syntax = "proto3";
 package briar.app.v1;
 
 import "briar/app/v1/common.proto";
+import "briar/types/v1/workflow.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -16,6 +17,10 @@ service ProjectService {
   rpc UpdateProjectIssueKeyPrefix(UpdateProjectIssueKeyPrefixRequest) returns (UpdateProjectIssueKeyPrefixResponse);
   rpc UpdateProjectTabs(UpdateProjectTabsRequest) returns (UpdateProjectTabsResponse);
   rpc CreateProjectAgentToken(CreateProjectAgentTokenRequest) returns (CreateProjectAgentTokenResponse);
+  rpc UpdateProjectSettings(UpdateProjectSettingsRequest) returns (UpdateProjectSettingsResponse);
+  rpc UpdateCheckpointPolicy(UpdateCheckpointPolicyRequest) returns (UpdateCheckpointPolicyResponse);
+  rpc GetProjectExecutionWorkerPolicy(GetProjectExecutionWorkerPolicyRequest) returns (GetProjectExecutionWorkerPolicyResponse);
+  rpc UpdateProjectExecutionWorkerPolicy(UpdateProjectExecutionWorkerPolicyRequest) returns (UpdateProjectExecutionWorkerPolicyResponse);
 }
 
 message ListProjectsRequest {}
@@ -79,6 +84,84 @@ message CreateProjectAgentTokenRequest {
 
 message CreateProjectAgentTokenResponse {
   string agent_token = 1;
+}
+
+message LinearSettings {
+  bool enabled = 1;
+  optional string source = 2;
+  optional string team_key = 3;
+}
+
+message ProjectSettings {
+  optional string velen_org = 1;
+  optional string data_source = 2;
+  LinearSettings linear = 3;
+  optional int64 github_repository_id = 4;
+  optional string github_repository = 5;
+  briar.types.v1.AutoHuntWorkflow workflow = 6;
+  optional briar.types.v1.CheckpointPolicy checkpoint_policy = 7;
+}
+
+message UpdateProjectSettingsRequest {
+  string project_id = 1;
+  optional string velen_org = 2;
+  optional string data_source = 3;
+  LinearSettings linear = 4;
+  optional string github_repository = 5;
+  briar.types.v1.AutoHuntWorkflow workflow = 6;
+}
+
+message UpdateProjectSettingsResponse {
+  ProjectSettings settings = 1;
+}
+
+message UpdateCheckpointPolicyRequest {
+  enum Scope {
+    SCOPE_UNSPECIFIED = 0;
+    SCOPE_PROJECT = 1;
+    SCOPE_USER = 2;
+  }
+
+  string project_id = 1;
+  Scope scope = 2;
+  repeated briar.types.v1.WorkflowCheckpointSpec checkpoints = 3;
+  uint64 expected_revision = 4;
+}
+
+message UpdateCheckpointPolicyResponse {
+  briar.types.v1.CheckpointPolicy checkpoint_policy = 1;
+}
+
+message ProjectExecutionWorkerPolicy {
+  enum SelectionMode {
+    SELECTION_MODE_UNSPECIFIED = 0;
+    SELECTION_MODE_ANY = 1;
+    SELECTION_MODE_ALLOWLIST = 2;
+  }
+
+  SelectionMode selection_mode = 1;
+  optional string default_worker_id = 2;
+  repeated string allowed_worker_ids = 3;
+  optional google.protobuf.Timestamp updated_at = 4;
+}
+
+message GetProjectExecutionWorkerPolicyRequest {
+  string project_id = 1;
+}
+
+message GetProjectExecutionWorkerPolicyResponse {
+  ProjectExecutionWorkerPolicy policy = 1;
+}
+
+message UpdateProjectExecutionWorkerPolicyRequest {
+  string project_id = 1;
+  ProjectExecutionWorkerPolicy.SelectionMode selection_mode = 2;
+  optional string default_worker_id = 3;
+  repeated string allowed_worker_ids = 4;
+}
+
+message UpdateProjectExecutionWorkerPolicyResponse {
+  ProjectExecutionWorkerPolicy policy = 1;
 }
 
 message Project {

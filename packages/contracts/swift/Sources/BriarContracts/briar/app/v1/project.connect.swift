@@ -31,6 +31,18 @@ public protocol BriarAPI_ProjectServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
     func `createProjectAgentToken`(request: BriarAPI_CreateProjectAgentTokenRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateProjectAgentTokenResponse>
+
+    @available(iOS 13, *)
+    func `updateProjectSettings`(request: BriarAPI_UpdateProjectSettingsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateProjectSettingsResponse>
+
+    @available(iOS 13, *)
+    func `updateCheckpointPolicy`(request: BriarAPI_UpdateCheckpointPolicyRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateCheckpointPolicyResponse>
+
+    @available(iOS 13, *)
+    func `getProjectExecutionWorkerPolicy`(request: BriarAPI_GetProjectExecutionWorkerPolicyRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_GetProjectExecutionWorkerPolicyResponse>
+
+    @available(iOS 13, *)
+    func `updateProjectExecutionWorkerPolicy`(request: BriarAPI_UpdateProjectExecutionWorkerPolicyRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateProjectExecutionWorkerPolicyResponse>
 }
 
 /// Concrete implementation of `BriarAPI_ProjectServiceClientInterface`.
@@ -76,6 +88,26 @@ public final class BriarAPI_ProjectServiceClient: BriarAPI_ProjectServiceClientI
         return await self.client.unary(path: "/briar.app.v1.ProjectService/CreateProjectAgentToken", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
+    @available(iOS 13, *)
+    public func `updateProjectSettings`(request: BriarAPI_UpdateProjectSettingsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateProjectSettingsResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/UpdateProjectSettings", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `updateCheckpointPolicy`(request: BriarAPI_UpdateCheckpointPolicyRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateCheckpointPolicyResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/UpdateCheckpointPolicy", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `getProjectExecutionWorkerPolicy`(request: BriarAPI_GetProjectExecutionWorkerPolicyRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetProjectExecutionWorkerPolicyResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/GetProjectExecutionWorkerPolicy", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `updateProjectExecutionWorkerPolicy`(request: BriarAPI_UpdateProjectExecutionWorkerPolicyRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateProjectExecutionWorkerPolicyResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/UpdateProjectExecutionWorkerPolicy", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
     public enum Metadata {
         public enum Methods {
             public static let listProjects = Connect.MethodSpec(name: "ListProjects", service: "briar.app.v1.ProjectService", type: .unary)
@@ -85,6 +117,10 @@ public final class BriarAPI_ProjectServiceClient: BriarAPI_ProjectServiceClientI
             public static let updateProjectIssueKeyPrefix = Connect.MethodSpec(name: "UpdateProjectIssueKeyPrefix", service: "briar.app.v1.ProjectService", type: .unary)
             public static let updateProjectTabs = Connect.MethodSpec(name: "UpdateProjectTabs", service: "briar.app.v1.ProjectService", type: .unary)
             public static let createProjectAgentToken = Connect.MethodSpec(name: "CreateProjectAgentToken", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let updateProjectSettings = Connect.MethodSpec(name: "UpdateProjectSettings", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let updateCheckpointPolicy = Connect.MethodSpec(name: "UpdateCheckpointPolicy", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let getProjectExecutionWorkerPolicy = Connect.MethodSpec(name: "GetProjectExecutionWorkerPolicy", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let updateProjectExecutionWorkerPolicy = Connect.MethodSpec(name: "UpdateProjectExecutionWorkerPolicy", service: "briar.app.v1.ProjectService", type: .unary)
         }
     }
 }

@@ -2,10 +2,12 @@
 // @generated from file briar/app/v1/project.proto (package briar.app.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { ProjectRole } from "./common_pb";
 import { file_briar_app_v1_common } from "./common_pb";
+import type { AutoHuntWorkflow, CheckpointPolicy, WorkflowCheckpointSpec } from "../../types/v1/workflow_pb";
+import { file_briar_types_v1_workflow } from "../../types/v1/workflow_pb";
 import type { Empty, Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_empty, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
@@ -14,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/app/v1/project.proto.
  */
 export const file_briar_app_v1_project: GenFile = /*@__PURE__*/
-  fileDesc("Chpicmlhci9hcHAvdjEvcHJvamVjdC5wcm90bxIMYnJpYXIuYXBwLnYxIhUKE0xpc3RQcm9qZWN0c1JlcXVlc3QiPwoUTGlzdFByb2plY3RzUmVzcG9uc2USJwoIcHJvamVjdHMYASADKAsyFS5icmlhci5hcHAudjEuUHJvamVjdCJWChRDcmVhdGVQcm9qZWN0UmVxdWVzdBIMCgRuYW1lGAEgASgJEhwKD29yZ2FuaXphdGlvbl9pZBgCIAEoCUgAiAEBQhIKEF9vcmdhbml6YXRpb25faWQiVAoVQ3JlYXRlUHJvamVjdFJlc3BvbnNlEiYKB3Byb2plY3QYASABKAsyFS5icmlhci5hcHAudjEuUHJvamVjdBITCgthZ2VudF90b2tlbhgCIAEoCSIqChREZWxldGVQcm9qZWN0UmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJIigKFURlbGV0ZVByb2plY3RSZXNwb25zZRIPCgdkZWxldGVkGAEgASgIInsKGFVwZGF0ZVByb2plY3RJY29uUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEg4KBGljb24YAiABKAlIABIsCgpjbGVhcl9pY29uGAMgASgLMhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5SABCDQoLaWNvbl91cGRhdGUiQwoZVXBkYXRlUHJvamVjdEljb25SZXNwb25zZRImCgdwcm9qZWN0GAEgASgLMhUuYnJpYXIuYXBwLnYxLlByb2plY3QiUgoiVXBkYXRlUHJvamVjdElzc3VlS2V5UHJlZml4UmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEhgKEGlzc3VlX2tleV9wcmVmaXgYAiABKAkiTQojVXBkYXRlUHJvamVjdElzc3VlS2V5UHJlZml4UmVzcG9uc2USJgoHcHJvamVjdBgBIAEoCzIVLmJyaWFyLmFwcC52MS5Qcm9qZWN0IkAKGFVwZGF0ZVByb2plY3RUYWJzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEhAKCHNjaGVkdWxlGAIgASgIIkMKGVVwZGF0ZVByb2plY3RUYWJzUmVzcG9uc2USJgoHcHJvamVjdBgBIAEoCzIVLmJyaWFyLmFwcC52MS5Qcm9qZWN0IjQKHkNyZWF0ZVByb2plY3RBZ2VudFRva2VuUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJIjYKH0NyZWF0ZVByb2plY3RBZ2VudFRva2VuUmVzcG9uc2USEwoLYWdlbnRfdG9rZW4YASABKAkihAIKB1Byb2plY3QSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIYChBpc3N1ZV9rZXlfcHJlZml4GAMgASgJEhwKFHNjaGVkdWxlX3RhYl9lbmFibGVkGAQgASgIEhEKBGljb24YBSABKAlIAIgBARIXCg9vcmdhbml6YXRpb25faWQYBiABKAkSGQoRb3JnYW5pemF0aW9uX25hbWUYByABKAkSJwoEcm9sZRgIIAEoDjIZLmJyaWFyLmFwcC52MS5Qcm9qZWN0Um9sZRIuCgpjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIHCgVfaWNvbjLkBQoOUHJvamVjdFNlcnZpY2USVQoMTGlzdFByb2plY3RzEiEuYnJpYXIuYXBwLnYxLkxpc3RQcm9qZWN0c1JlcXVlc3QaIi5icmlhci5hcHAudjEuTGlzdFByb2plY3RzUmVzcG9uc2USWAoNQ3JlYXRlUHJvamVjdBIiLmJyaWFyLmFwcC52MS5DcmVhdGVQcm9qZWN0UmVxdWVzdBojLmJyaWFyLmFwcC52MS5DcmVhdGVQcm9qZWN0UmVzcG9uc2USWAoNRGVsZXRlUHJvamVjdBIiLmJyaWFyLmFwcC52MS5EZWxldGVQcm9qZWN0UmVxdWVzdBojLmJyaWFyLmFwcC52MS5EZWxldGVQcm9qZWN0UmVzcG9uc2USZAoRVXBkYXRlUHJvamVjdEljb24SJi5icmlhci5hcHAudjEuVXBkYXRlUHJvamVjdEljb25SZXF1ZXN0GicuYnJpYXIuYXBwLnYxLlVwZGF0ZVByb2plY3RJY29uUmVzcG9uc2USggEKG1VwZGF0ZVByb2plY3RJc3N1ZUtleVByZWZpeBIwLmJyaWFyLmFwcC52MS5VcGRhdGVQcm9qZWN0SXNzdWVLZXlQcmVmaXhSZXF1ZXN0GjEuYnJpYXIuYXBwLnYxLlVwZGF0ZVByb2plY3RJc3N1ZUtleVByZWZpeFJlc3BvbnNlEmQKEVVwZGF0ZVByb2plY3RUYWJzEiYuYnJpYXIuYXBwLnYxLlVwZGF0ZVByb2plY3RUYWJzUmVxdWVzdBonLmJyaWFyLmFwcC52MS5VcGRhdGVQcm9qZWN0VGFic1Jlc3BvbnNlEnYKF0NyZWF0ZVByb2plY3RBZ2VudFRva2VuEiwuYnJpYXIuYXBwLnYxLkNyZWF0ZVByb2plY3RBZ2VudFRva2VuUmVxdWVzdBotLmJyaWFyLmFwcC52MS5DcmVhdGVQcm9qZWN0QWdlbnRUb2tlblJlc3BvbnNlQgy6AglCcmlhckFQSV9iBnByb3RvMw", [file_briar_app_v1_common, file_google_protobuf_empty, file_google_protobuf_timestamp]);
+  fileDesc("Chpicmlhci9hcHAvdjEvcHJvamVjdC5wcm90bxIMYnJpYXIuYXBwLnYxIhUKE0xpc3RQcm9qZWN0c1JlcXVlc3QiPwoUTGlzdFByb2plY3RzUmVzcG9uc2USJwoIcHJvamVjdHMYASADKAsyFS5icmlhci5hcHAudjEuUHJvamVjdCJWChRDcmVhdGVQcm9qZWN0UmVxdWVzdBIMCgRuYW1lGAEgASgJEhwKD29yZ2FuaXphdGlvbl9pZBgCIAEoCUgAiAEBQhIKEF9vcmdhbml6YXRpb25faWQiVAoVQ3JlYXRlUHJvamVjdFJlc3BvbnNlEiYKB3Byb2plY3QYASABKAsyFS5icmlhci5hcHAudjEuUHJvamVjdBITCgthZ2VudF90b2tlbhgCIAEoCSIqChREZWxldGVQcm9qZWN0UmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJIigKFURlbGV0ZVByb2plY3RSZXNwb25zZRIPCgdkZWxldGVkGAEgASgIInsKGFVwZGF0ZVByb2plY3RJY29uUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEg4KBGljb24YAiABKAlIABIsCgpjbGVhcl9pY29uGAMgASgLMhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5SABCDQoLaWNvbl91cGRhdGUiQwoZVXBkYXRlUHJvamVjdEljb25SZXNwb25zZRImCgdwcm9qZWN0GAEgASgLMhUuYnJpYXIuYXBwLnYxLlByb2plY3QiUgoiVXBkYXRlUHJvamVjdElzc3VlS2V5UHJlZml4UmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEhgKEGlzc3VlX2tleV9wcmVmaXgYAiABKAkiTQojVXBkYXRlUHJvamVjdElzc3VlS2V5UHJlZml4UmVzcG9uc2USJgoHcHJvamVjdBgBIAEoCzIVLmJyaWFyLmFwcC52MS5Qcm9qZWN0IkAKGFVwZGF0ZVByb2plY3RUYWJzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEhAKCHNjaGVkdWxlGAIgASgIIkMKGVVwZGF0ZVByb2plY3RUYWJzUmVzcG9uc2USJgoHcHJvamVjdBgBIAEoCzIVLmJyaWFyLmFwcC52MS5Qcm9qZWN0IjQKHkNyZWF0ZVByb2plY3RBZ2VudFRva2VuUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJIjYKH0NyZWF0ZVByb2plY3RBZ2VudFRva2VuUmVzcG9uc2USEwoLYWdlbnRfdG9rZW4YASABKAkiZQoOTGluZWFyU2V0dGluZ3MSDwoHZW5hYmxlZBgBIAEoCBITCgZzb3VyY2UYAiABKAlIAIgBARIVCgh0ZWFtX2tleRgDIAEoCUgBiAEBQgkKB19zb3VyY2VCCwoJX3RlYW1fa2V5Io0DCg9Qcm9qZWN0U2V0dGluZ3MSFgoJdmVsZW5fb3JnGAEgASgJSACIAQESGAoLZGF0YV9zb3VyY2UYAiABKAlIAYgBARIsCgZsaW5lYXIYAyABKAsyHC5icmlhci5hcHAudjEuTGluZWFyU2V0dGluZ3MSIQoUZ2l0aHViX3JlcG9zaXRvcnlfaWQYBCABKANIAogBARIeChFnaXRodWJfcmVwb3NpdG9yeRgFIAEoCUgDiAEBEjIKCHdvcmtmbG93GAYgASgLMiAuYnJpYXIudHlwZXMudjEuQXV0b0h1bnRXb3JrZmxvdxJAChFjaGVja3BvaW50X3BvbGljeRgHIAEoCzIgLmJyaWFyLnR5cGVzLnYxLkNoZWNrcG9pbnRQb2xpY3lIBIgBAUIMCgpfdmVsZW5fb3JnQg4KDF9kYXRhX3NvdXJjZUIXChVfZ2l0aHViX3JlcG9zaXRvcnlfaWRCFAoSX2dpdGh1Yl9yZXBvc2l0b3J5QhQKEl9jaGVja3BvaW50X3BvbGljeSKaAgocVXBkYXRlUHJvamVjdFNldHRpbmdzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEhYKCXZlbGVuX29yZxgCIAEoCUgAiAEBEhgKC2RhdGFfc291cmNlGAMgASgJSAGIAQESLAoGbGluZWFyGAQgASgLMhwuYnJpYXIuYXBwLnYxLkxpbmVhclNldHRpbmdzEh4KEWdpdGh1Yl9yZXBvc2l0b3J5GAUgASgJSAKIAQESMgoId29ya2Zsb3cYBiABKAsyIC5icmlhci50eXBlcy52MS5BdXRvSHVudFdvcmtmbG93QgwKCl92ZWxlbl9vcmdCDgoMX2RhdGFfc291cmNlQhQKEl9naXRodWJfcmVwb3NpdG9yeSJQCh1VcGRhdGVQcm9qZWN0U2V0dGluZ3NSZXNwb25zZRIvCghzZXR0aW5ncxgBIAEoCzIdLmJyaWFyLmFwcC52MS5Qcm9qZWN0U2V0dGluZ3MikAIKHVVwZGF0ZUNoZWNrcG9pbnRQb2xpY3lSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSQAoFc2NvcGUYAiABKA4yMS5icmlhci5hcHAudjEuVXBkYXRlQ2hlY2twb2ludFBvbGljeVJlcXVlc3QuU2NvcGUSOwoLY2hlY2twb2ludHMYAyADKAsyJi5icmlhci50eXBlcy52MS5Xb3JrZmxvd0NoZWNrcG9pbnRTcGVjEhkKEWV4cGVjdGVkX3JldmlzaW9uGAQgASgEIkEKBVNjb3BlEhUKEVNDT1BFX1VOU1BFQ0lGSUVEEAASEQoNU0NPUEVfUFJPSkVDVBABEg4KClNDT1BFX1VTRVIQAiJdCh5VcGRhdGVDaGVja3BvaW50UG9saWN5UmVzcG9uc2USOwoRY2hlY2twb2ludF9wb2xpY3kYASABKAsyIC5icmlhci50eXBlcy52MS5DaGVja3BvaW50UG9saWN5Iu0CChxQcm9qZWN0RXhlY3V0aW9uV29ya2VyUG9saWN5ElAKDnNlbGVjdGlvbl9tb2RlGAEgASgOMjguYnJpYXIuYXBwLnYxLlByb2plY3RFeGVjdXRpb25Xb3JrZXJQb2xpY3kuU2VsZWN0aW9uTW9kZRIeChFkZWZhdWx0X3dvcmtlcl9pZBgCIAEoCUgAiAEBEhoKEmFsbG93ZWRfd29ya2VyX2lkcxgDIAMoCRIzCgp1cGRhdGVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgBiAEBImUKDVNlbGVjdGlvbk1vZGUSHgoaU0VMRUNUSU9OX01PREVfVU5TUEVDSUZJRUQQABIWChJTRUxFQ1RJT05fTU9ERV9BTlkQARIcChhTRUxFQ1RJT05fTU9ERV9BTExPV0xJU1QQAkIUChJfZGVmYXVsdF93b3JrZXJfaWRCDQoLX3VwZGF0ZWRfYXQiPAomR2V0UHJvamVjdEV4ZWN1dGlvbldvcmtlclBvbGljeVJlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCSJlCidHZXRQcm9qZWN0RXhlY3V0aW9uV29ya2VyUG9saWN5UmVzcG9uc2USOgoGcG9saWN5GAEgASgLMiouYnJpYXIuYXBwLnYxLlByb2plY3RFeGVjdXRpb25Xb3JrZXJQb2xpY3ki4wEKKVVwZGF0ZVByb2plY3RFeGVjdXRpb25Xb3JrZXJQb2xpY3lSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSUAoOc2VsZWN0aW9uX21vZGUYAiABKA4yOC5icmlhci5hcHAudjEuUHJvamVjdEV4ZWN1dGlvbldvcmtlclBvbGljeS5TZWxlY3Rpb25Nb2RlEh4KEWRlZmF1bHRfd29ya2VyX2lkGAMgASgJSACIAQESGgoSYWxsb3dlZF93b3JrZXJfaWRzGAQgAygJQhQKEl9kZWZhdWx0X3dvcmtlcl9pZCJoCipVcGRhdGVQcm9qZWN0RXhlY3V0aW9uV29ya2VyUG9saWN5UmVzcG9uc2USOgoGcG9saWN5GAEgASgLMiouYnJpYXIuYXBwLnYxLlByb2plY3RFeGVjdXRpb25Xb3JrZXJQb2xpY3kihAIKB1Byb2plY3QSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIYChBpc3N1ZV9rZXlfcHJlZml4GAMgASgJEhwKFHNjaGVkdWxlX3RhYl9lbmFibGVkGAQgASgIEhEKBGljb24YBSABKAlIAIgBARIXCg9vcmdhbml6YXRpb25faWQYBiABKAkSGQoRb3JnYW5pemF0aW9uX25hbWUYByABKAkSJwoEcm9sZRgIIAEoDjIZLmJyaWFyLmFwcC52MS5Qcm9qZWN0Um9sZRIuCgpjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIHCgVfaWNvbjL2CQoOUHJvamVjdFNlcnZpY2USVQoMTGlzdFByb2plY3RzEiEuYnJpYXIuYXBwLnYxLkxpc3RQcm9qZWN0c1JlcXVlc3QaIi5icmlhci5hcHAudjEuTGlzdFByb2plY3RzUmVzcG9uc2USWAoNQ3JlYXRlUHJvamVjdBIiLmJyaWFyLmFwcC52MS5DcmVhdGVQcm9qZWN0UmVxdWVzdBojLmJyaWFyLmFwcC52MS5DcmVhdGVQcm9qZWN0UmVzcG9uc2USWAoNRGVsZXRlUHJvamVjdBIiLmJyaWFyLmFwcC52MS5EZWxldGVQcm9qZWN0UmVxdWVzdBojLmJyaWFyLmFwcC52MS5EZWxldGVQcm9qZWN0UmVzcG9uc2USZAoRVXBkYXRlUHJvamVjdEljb24SJi5icmlhci5hcHAudjEuVXBkYXRlUHJvamVjdEljb25SZXF1ZXN0GicuYnJpYXIuYXBwLnYxLlVwZGF0ZVByb2plY3RJY29uUmVzcG9uc2USggEKG1VwZGF0ZVByb2plY3RJc3N1ZUtleVByZWZpeBIwLmJyaWFyLmFwcC52MS5VcGRhdGVQcm9qZWN0SXNzdWVLZXlQcmVmaXhSZXF1ZXN0GjEuYnJpYXIuYXBwLnYxLlVwZGF0ZVByb2plY3RJc3N1ZUtleVByZWZpeFJlc3BvbnNlEmQKEVVwZGF0ZVByb2plY3RUYWJzEiYuYnJpYXIuYXBwLnYxLlVwZGF0ZVByb2plY3RUYWJzUmVxdWVzdBonLmJyaWFyLmFwcC52MS5VcGRhdGVQcm9qZWN0VGFic1Jlc3BvbnNlEnYKF0NyZWF0ZVByb2plY3RBZ2VudFRva2VuEiwuYnJpYXIuYXBwLnYxLkNyZWF0ZVByb2plY3RBZ2VudFRva2VuUmVxdWVzdBotLmJyaWFyLmFwcC52MS5DcmVhdGVQcm9qZWN0QWdlbnRUb2tlblJlc3BvbnNlEnAKFVVwZGF0ZVByb2plY3RTZXR0aW5ncxIqLmJyaWFyLmFwcC52MS5VcGRhdGVQcm9qZWN0U2V0dGluZ3NSZXF1ZXN0GisuYnJpYXIuYXBwLnYxLlVwZGF0ZVByb2plY3RTZXR0aW5nc1Jlc3BvbnNlEnMKFlVwZGF0ZUNoZWNrcG9pbnRQb2xpY3kSKy5icmlhci5hcHAudjEuVXBkYXRlQ2hlY2twb2ludFBvbGljeVJlcXVlc3QaLC5icmlhci5hcHAudjEuVXBkYXRlQ2hlY2twb2ludFBvbGljeVJlc3BvbnNlEo4BCh9HZXRQcm9qZWN0RXhlY3V0aW9uV29ya2VyUG9saWN5EjQuYnJpYXIuYXBwLnYxLkdldFByb2plY3RFeGVjdXRpb25Xb3JrZXJQb2xpY3lSZXF1ZXN0GjUuYnJpYXIuYXBwLnYxLkdldFByb2plY3RFeGVjdXRpb25Xb3JrZXJQb2xpY3lSZXNwb25zZRKXAQoiVXBkYXRlUHJvamVjdEV4ZWN1dGlvbldvcmtlclBvbGljeRI3LmJyaWFyLmFwcC52MS5VcGRhdGVQcm9qZWN0RXhlY3V0aW9uV29ya2VyUG9saWN5UmVxdWVzdBo4LmJyaWFyLmFwcC52MS5VcGRhdGVQcm9qZWN0RXhlY3V0aW9uV29ya2VyUG9saWN5UmVzcG9uc2VCDLoCCUJyaWFyQVBJX2IGcHJvdG8z", [file_briar_app_v1_common, file_briar_types_v1_workflow, file_google_protobuf_empty, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message briar.app.v1.ListProjectsRequest
@@ -288,6 +290,355 @@ export const CreateProjectAgentTokenResponseSchema: GenMessage<CreateProjectAgen
   messageDesc(file_briar_app_v1_project, 13);
 
 /**
+ * @generated from message briar.app.v1.LinearSettings
+ */
+export type LinearSettings = Message<"briar.app.v1.LinearSettings"> & {
+  /**
+   * @generated from field: bool enabled = 1;
+   */
+  enabled: boolean;
+
+  /**
+   * @generated from field: optional string source = 2;
+   */
+  source?: string | undefined;
+
+  /**
+   * @generated from field: optional string team_key = 3;
+   */
+  teamKey?: string | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.LinearSettings.
+ * Use `create(LinearSettingsSchema)` to create a new message.
+ */
+export const LinearSettingsSchema: GenMessage<LinearSettings> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 14);
+
+/**
+ * @generated from message briar.app.v1.ProjectSettings
+ */
+export type ProjectSettings = Message<"briar.app.v1.ProjectSettings"> & {
+  /**
+   * @generated from field: optional string velen_org = 1;
+   */
+  velenOrg?: string | undefined;
+
+  /**
+   * @generated from field: optional string data_source = 2;
+   */
+  dataSource?: string | undefined;
+
+  /**
+   * @generated from field: briar.app.v1.LinearSettings linear = 3;
+   */
+  linear?: LinearSettings | undefined;
+
+  /**
+   * @generated from field: optional int64 github_repository_id = 4;
+   */
+  githubRepositoryId?: bigint | undefined;
+
+  /**
+   * @generated from field: optional string github_repository = 5;
+   */
+  githubRepository?: string | undefined;
+
+  /**
+   * @generated from field: briar.types.v1.AutoHuntWorkflow workflow = 6;
+   */
+  workflow?: AutoHuntWorkflow | undefined;
+
+  /**
+   * @generated from field: optional briar.types.v1.CheckpointPolicy checkpoint_policy = 7;
+   */
+  checkpointPolicy?: CheckpointPolicy | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.ProjectSettings.
+ * Use `create(ProjectSettingsSchema)` to create a new message.
+ */
+export const ProjectSettingsSchema: GenMessage<ProjectSettings> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 15);
+
+/**
+ * @generated from message briar.app.v1.UpdateProjectSettingsRequest
+ */
+export type UpdateProjectSettingsRequest = Message<"briar.app.v1.UpdateProjectSettingsRequest"> & {
+  /**
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
+
+  /**
+   * @generated from field: optional string velen_org = 2;
+   */
+  velenOrg?: string | undefined;
+
+  /**
+   * @generated from field: optional string data_source = 3;
+   */
+  dataSource?: string | undefined;
+
+  /**
+   * @generated from field: briar.app.v1.LinearSettings linear = 4;
+   */
+  linear?: LinearSettings | undefined;
+
+  /**
+   * @generated from field: optional string github_repository = 5;
+   */
+  githubRepository?: string | undefined;
+
+  /**
+   * @generated from field: briar.types.v1.AutoHuntWorkflow workflow = 6;
+   */
+  workflow?: AutoHuntWorkflow | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.UpdateProjectSettingsRequest.
+ * Use `create(UpdateProjectSettingsRequestSchema)` to create a new message.
+ */
+export const UpdateProjectSettingsRequestSchema: GenMessage<UpdateProjectSettingsRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 16);
+
+/**
+ * @generated from message briar.app.v1.UpdateProjectSettingsResponse
+ */
+export type UpdateProjectSettingsResponse = Message<"briar.app.v1.UpdateProjectSettingsResponse"> & {
+  /**
+   * @generated from field: briar.app.v1.ProjectSettings settings = 1;
+   */
+  settings?: ProjectSettings | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.UpdateProjectSettingsResponse.
+ * Use `create(UpdateProjectSettingsResponseSchema)` to create a new message.
+ */
+export const UpdateProjectSettingsResponseSchema: GenMessage<UpdateProjectSettingsResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 17);
+
+/**
+ * @generated from message briar.app.v1.UpdateCheckpointPolicyRequest
+ */
+export type UpdateCheckpointPolicyRequest = Message<"briar.app.v1.UpdateCheckpointPolicyRequest"> & {
+  /**
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
+
+  /**
+   * @generated from field: briar.app.v1.UpdateCheckpointPolicyRequest.Scope scope = 2;
+   */
+  scope: UpdateCheckpointPolicyRequest_Scope;
+
+  /**
+   * @generated from field: repeated briar.types.v1.WorkflowCheckpointSpec checkpoints = 3;
+   */
+  checkpoints: WorkflowCheckpointSpec[];
+
+  /**
+   * @generated from field: uint64 expected_revision = 4;
+   */
+  expectedRevision: bigint;
+};
+
+/**
+ * Describes the message briar.app.v1.UpdateCheckpointPolicyRequest.
+ * Use `create(UpdateCheckpointPolicyRequestSchema)` to create a new message.
+ */
+export const UpdateCheckpointPolicyRequestSchema: GenMessage<UpdateCheckpointPolicyRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 18);
+
+/**
+ * @generated from enum briar.app.v1.UpdateCheckpointPolicyRequest.Scope
+ */
+export enum UpdateCheckpointPolicyRequest_Scope {
+  /**
+   * @generated from enum value: SCOPE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: SCOPE_PROJECT = 1;
+   */
+  PROJECT = 1,
+
+  /**
+   * @generated from enum value: SCOPE_USER = 2;
+   */
+  USER = 2,
+}
+
+/**
+ * Describes the enum briar.app.v1.UpdateCheckpointPolicyRequest.Scope.
+ */
+export const UpdateCheckpointPolicyRequest_ScopeSchema: GenEnum<UpdateCheckpointPolicyRequest_Scope> = /*@__PURE__*/
+  enumDesc(file_briar_app_v1_project, 18, 0);
+
+/**
+ * @generated from message briar.app.v1.UpdateCheckpointPolicyResponse
+ */
+export type UpdateCheckpointPolicyResponse = Message<"briar.app.v1.UpdateCheckpointPolicyResponse"> & {
+  /**
+   * @generated from field: briar.types.v1.CheckpointPolicy checkpoint_policy = 1;
+   */
+  checkpointPolicy?: CheckpointPolicy | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.UpdateCheckpointPolicyResponse.
+ * Use `create(UpdateCheckpointPolicyResponseSchema)` to create a new message.
+ */
+export const UpdateCheckpointPolicyResponseSchema: GenMessage<UpdateCheckpointPolicyResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 19);
+
+/**
+ * @generated from message briar.app.v1.ProjectExecutionWorkerPolicy
+ */
+export type ProjectExecutionWorkerPolicy = Message<"briar.app.v1.ProjectExecutionWorkerPolicy"> & {
+  /**
+   * @generated from field: briar.app.v1.ProjectExecutionWorkerPolicy.SelectionMode selection_mode = 1;
+   */
+  selectionMode: ProjectExecutionWorkerPolicy_SelectionMode;
+
+  /**
+   * @generated from field: optional string default_worker_id = 2;
+   */
+  defaultWorkerId?: string | undefined;
+
+  /**
+   * @generated from field: repeated string allowed_worker_ids = 3;
+   */
+  allowedWorkerIds: string[];
+
+  /**
+   * @generated from field: optional google.protobuf.Timestamp updated_at = 4;
+   */
+  updatedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.ProjectExecutionWorkerPolicy.
+ * Use `create(ProjectExecutionWorkerPolicySchema)` to create a new message.
+ */
+export const ProjectExecutionWorkerPolicySchema: GenMessage<ProjectExecutionWorkerPolicy> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 20);
+
+/**
+ * @generated from enum briar.app.v1.ProjectExecutionWorkerPolicy.SelectionMode
+ */
+export enum ProjectExecutionWorkerPolicy_SelectionMode {
+  /**
+   * @generated from enum value: SELECTION_MODE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: SELECTION_MODE_ANY = 1;
+   */
+  ANY = 1,
+
+  /**
+   * @generated from enum value: SELECTION_MODE_ALLOWLIST = 2;
+   */
+  ALLOWLIST = 2,
+}
+
+/**
+ * Describes the enum briar.app.v1.ProjectExecutionWorkerPolicy.SelectionMode.
+ */
+export const ProjectExecutionWorkerPolicy_SelectionModeSchema: GenEnum<ProjectExecutionWorkerPolicy_SelectionMode> = /*@__PURE__*/
+  enumDesc(file_briar_app_v1_project, 20, 0);
+
+/**
+ * @generated from message briar.app.v1.GetProjectExecutionWorkerPolicyRequest
+ */
+export type GetProjectExecutionWorkerPolicyRequest = Message<"briar.app.v1.GetProjectExecutionWorkerPolicyRequest"> & {
+  /**
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
+};
+
+/**
+ * Describes the message briar.app.v1.GetProjectExecutionWorkerPolicyRequest.
+ * Use `create(GetProjectExecutionWorkerPolicyRequestSchema)` to create a new message.
+ */
+export const GetProjectExecutionWorkerPolicyRequestSchema: GenMessage<GetProjectExecutionWorkerPolicyRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 21);
+
+/**
+ * @generated from message briar.app.v1.GetProjectExecutionWorkerPolicyResponse
+ */
+export type GetProjectExecutionWorkerPolicyResponse = Message<"briar.app.v1.GetProjectExecutionWorkerPolicyResponse"> & {
+  /**
+   * @generated from field: briar.app.v1.ProjectExecutionWorkerPolicy policy = 1;
+   */
+  policy?: ProjectExecutionWorkerPolicy | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.GetProjectExecutionWorkerPolicyResponse.
+ * Use `create(GetProjectExecutionWorkerPolicyResponseSchema)` to create a new message.
+ */
+export const GetProjectExecutionWorkerPolicyResponseSchema: GenMessage<GetProjectExecutionWorkerPolicyResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 22);
+
+/**
+ * @generated from message briar.app.v1.UpdateProjectExecutionWorkerPolicyRequest
+ */
+export type UpdateProjectExecutionWorkerPolicyRequest = Message<"briar.app.v1.UpdateProjectExecutionWorkerPolicyRequest"> & {
+  /**
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
+
+  /**
+   * @generated from field: briar.app.v1.ProjectExecutionWorkerPolicy.SelectionMode selection_mode = 2;
+   */
+  selectionMode: ProjectExecutionWorkerPolicy_SelectionMode;
+
+  /**
+   * @generated from field: optional string default_worker_id = 3;
+   */
+  defaultWorkerId?: string | undefined;
+
+  /**
+   * @generated from field: repeated string allowed_worker_ids = 4;
+   */
+  allowedWorkerIds: string[];
+};
+
+/**
+ * Describes the message briar.app.v1.UpdateProjectExecutionWorkerPolicyRequest.
+ * Use `create(UpdateProjectExecutionWorkerPolicyRequestSchema)` to create a new message.
+ */
+export const UpdateProjectExecutionWorkerPolicyRequestSchema: GenMessage<UpdateProjectExecutionWorkerPolicyRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 23);
+
+/**
+ * @generated from message briar.app.v1.UpdateProjectExecutionWorkerPolicyResponse
+ */
+export type UpdateProjectExecutionWorkerPolicyResponse = Message<"briar.app.v1.UpdateProjectExecutionWorkerPolicyResponse"> & {
+  /**
+   * @generated from field: briar.app.v1.ProjectExecutionWorkerPolicy policy = 1;
+   */
+  policy?: ProjectExecutionWorkerPolicy | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.UpdateProjectExecutionWorkerPolicyResponse.
+ * Use `create(UpdateProjectExecutionWorkerPolicyResponseSchema)` to create a new message.
+ */
+export const UpdateProjectExecutionWorkerPolicyResponseSchema: GenMessage<UpdateProjectExecutionWorkerPolicyResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 24);
+
+/**
  * @generated from message briar.app.v1.Project
  */
 export type Project = Message<"briar.app.v1.Project"> & {
@@ -342,7 +693,7 @@ export type Project = Message<"briar.app.v1.Project"> & {
  * Use `create(ProjectSchema)` to create a new message.
  */
 export const ProjectSchema: GenMessage<Project> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_project, 14);
+  messageDesc(file_briar_app_v1_project, 25);
 
 /**
  * @generated from service briar.app.v1.ProjectService
@@ -403,6 +754,38 @@ export const ProjectService: GenService<{
     methodKind: "unary";
     input: typeof CreateProjectAgentTokenRequestSchema;
     output: typeof CreateProjectAgentTokenResponseSchema;
+  },
+  /**
+   * @generated from rpc briar.app.v1.ProjectService.UpdateProjectSettings
+   */
+  updateProjectSettings: {
+    methodKind: "unary";
+    input: typeof UpdateProjectSettingsRequestSchema;
+    output: typeof UpdateProjectSettingsResponseSchema;
+  },
+  /**
+   * @generated from rpc briar.app.v1.ProjectService.UpdateCheckpointPolicy
+   */
+  updateCheckpointPolicy: {
+    methodKind: "unary";
+    input: typeof UpdateCheckpointPolicyRequestSchema;
+    output: typeof UpdateCheckpointPolicyResponseSchema;
+  },
+  /**
+   * @generated from rpc briar.app.v1.ProjectService.GetProjectExecutionWorkerPolicy
+   */
+  getProjectExecutionWorkerPolicy: {
+    methodKind: "unary";
+    input: typeof GetProjectExecutionWorkerPolicyRequestSchema;
+    output: typeof GetProjectExecutionWorkerPolicyResponseSchema;
+  },
+  /**
+   * @generated from rpc briar.app.v1.ProjectService.UpdateProjectExecutionWorkerPolicy
+   */
+  updateProjectExecutionWorkerPolicy: {
+    methodKind: "unary";
+    input: typeof UpdateProjectExecutionWorkerPolicyRequestSchema;
+    output: typeof UpdateProjectExecutionWorkerPolicyResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_briar_app_v1_project, 0);
