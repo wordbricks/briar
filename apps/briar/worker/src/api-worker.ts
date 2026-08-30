@@ -88,7 +88,7 @@ import {
   HttpError,
   json,
 } from "./http-response";
-import { handleMobileConnectRequest } from "./mobile-connect";
+import { handleAppConnectRequest } from "./app-connect";
 import {
   channelMutationOrganization,
   projectMutationProject,
@@ -628,7 +628,7 @@ export default {
           ? `http://${url.host}`
           : url.origin;
       const auth = createAuth(env, authOrigin, ctx);
-      const connectResponse = await handleMobileConnectRequest({
+      const connectResponse = await handleAppConnectRequest({
         request,
         auth,
         env,

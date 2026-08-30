@@ -35,19 +35,19 @@ import {
   decodeProjectResponse,
   decodeProjectUsageSummaryResponse,
 } from "./api/project-contract";
-import { listProjects } from "./mobile-rpc/project";
-import { listOrganizationMembers as listOrganizationMembersRpc } from "./mobile-rpc/account";
+import { listProjects } from "./app-rpc/project";
+import { listOrganizationMembers as listOrganizationMembersRpc } from "./app-rpc/account";
 import {
   deleteInboxReadStateRpc,
   getInboxFeed,
   getInboxReadStates,
   putInboxReadStates,
-} from "./mobile-rpc/inbox";
+} from "./app-rpc/inbox";
 import {
   getDashboard,
   listRunEventsRpc,
   syncDashboard,
-} from "./mobile-rpc/dashboard";
+} from "./app-rpc/dashboard";
 import type { StructuredAgentResult } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import {

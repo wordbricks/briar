@@ -1,4 +1,4 @@
-import { listProjectsOperation } from "@briar/mobile-contracts";
+import { listProjectsOperation } from "@briar/contracts";
 import { describe, expect, it } from "vitest";
 import { mobileJson } from "./mobile-contract-response";
 

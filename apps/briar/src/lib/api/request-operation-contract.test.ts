@@ -1,7 +1,7 @@
 import {
   listProjectsOperation,
   type AnyMobileOperation,
-} from "@briar/mobile-contracts";
+} from "@briar/contracts";
 import { describe, expect, it } from "vitest";
 import type { MobileOperationAuthentication } from "./request";
 

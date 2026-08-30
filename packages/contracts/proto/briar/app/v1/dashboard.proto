@@ -1,0 +1,312 @@
+syntax = "proto3";
+
+package briar.app.v1;
+
+import "briar/app/v1/common.proto";
+import "briar/app/v1/project.proto";
+import "briar/types/v1/provider.proto";
+import "briar/types/v1/worker.proto";
+import "briar/types/v1/workflow.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarAPI_";
+
+service DashboardService {
+  rpc GetDashboard(GetDashboardRequest) returns (GetDashboardResponse);
+  rpc SyncDashboard(SyncDashboardRequest) returns (SyncDashboardResponse);
+  rpc ListRunEvents(ListRunEventsRequest) returns (ListRunEventsResponse);
+}
+
+message GetDashboardRequest {
+  string project_id = 1;
+}
+
+message GetDashboardResponse {
+  Project project = 1;
+  repeated DashboardRun runs = 2;
+  repeated DashboardWorker workers = 3;
+  repeated briar.types.v1.AgentProvider organization_providers = 4;
+  optional ProjectExecutionWorkerPolicy execution_policy = 5;
+  repeated OrganizationMember members = 6;
+  repeated ConversationNotification conversation_notifications = 7;
+  repeated ChannelNotification channel_notifications = 8;
+  uint64 cursor = 9;
+  google.protobuf.Timestamp generated_at = 10;
+  ProjectSettings settings = 11;
+}
+
+message SyncDashboardRequest {
+  string project_id = 1;
+  uint64 cursor = 2;
+}
+
+message SyncDashboardResponse {
+  uint64 cursor = 1;
+  bool has_more = 2;
+  bool reset = 3;
+  repeated DashboardRun runs = 4;
+  repeated string deleted_run_ids = 5;
+  optional Project project = 6;
+  repeated DashboardWorker workers = 7;
+  repeated briar.types.v1.AgentProvider organization_providers = 8;
+  optional ProjectExecutionWorkerPolicy execution_policy = 9;
+  repeated OrganizationMember members = 10;
+  repeated ConversationNotification conversation_notifications = 11;
+  repeated ChannelNotification channel_notifications = 12;
+  google.protobuf.Timestamp generated_at = 13;
+  optional ProjectSettings settings = 14;
+}
+
+message ListRunEventsRequest {
+  string project_id = 1;
+  string run_id = 2;
+}
+
+message ListRunEventsResponse {
+  repeated RunEvent events = 1;
+}
+
+message LinearSettings {
+  bool enabled = 1;
+  optional string source = 2;
+  optional string team_key = 3;
+}
+
+message ProjectSettings {
+  optional string velen_org = 1;
+  optional string data_source = 2;
+  LinearSettings linear = 3;
+  optional int64 github_repository_id = 4;
+  optional string github_repository = 5;
+  briar.types.v1.AutoHuntWorkflow workflow = 6;
+  optional briar.types.v1.CheckpointPolicy checkpoint_policy = 7;
+}
+
+message IssueDependencyReference {
+  string id = 1;
+  uint32 run_number = 2;
+  string title = 3;
+  RunStatus status = 4;
+}
+
+message DashboardRun {
+  reserved 64;
+  reserved "context";
+
+  enum ExecutionReadiness {
+    EXECUTION_READINESS_UNSPECIFIED = 0;
+    EXECUTION_READINESS_READY = 1;
+    EXECUTION_READINESS_WAITING = 2;
+  }
+
+  enum DispatchMode {
+    DISPATCH_MODE_UNSPECIFIED = 0;
+    DISPATCH_MODE_ANY = 1;
+    DISPATCH_MODE_SPECIFIC = 2;
+  }
+
+  enum Source {
+    SOURCE_UNSPECIFIED = 0;
+    SOURCE_ISSUE = 1;
+    SOURCE_ERROR = 2;
+    SOURCE_FEEDBACK = 3;
+  }
+
+  enum QaStatus {
+    QA_STATUS_UNSPECIFIED = 0;
+    QA_STATUS_PENDING = 1;
+    QA_STATUS_PASSED = 2;
+    QA_STATUS_SKIPPED = 3;
+  }
+
+  string id = 1;
+  uint32 run_number = 2;
+  uint32 current_attempt = 3;
+  uint32 current_revision = 4;
+  string source_key = 5;
+  optional google.protobuf.Timestamp source_created_at = 6;
+  string title = 7;
+  RunStatus status = 8;
+  optional string workflow_stage = 9;
+  briar.types.v1.AutoHuntWorkflow workflow = 10;
+  optional google.protobuf.Timestamp paused_at = 11;
+  optional google.protobuf.Timestamp resume_requested_at = 12;
+  optional briar.types.v1.WorkflowCheckpoint checkpoint = 13;
+  double progress = 14;
+  optional string detail = 15;
+  optional uint32 priority = 16;
+  optional IssueDifficulty difficulty = 17;
+  optional string assignee_user_id = 18;
+  optional string created_by_user_id = 19;
+  repeated IssueSubscriber subscribers = 20;
+  optional string issue_description = 21;
+  optional RelatedMessageReference related_message = 22;
+  repeated IssueAttachment attachments = 23;
+  repeated IssueDependencyReference prerequisites = 24;
+  repeated IssueDependencyReference dependents = 25;
+  optional ExecutionReadiness execution_readiness = 26;
+  optional uint32 waiting_on_prerequisite_count = 27;
+  optional string result_summary = 28;
+  optional StructuredRunResult structured_result = 29;
+  repeated ResultReview result_reviews = 30;
+  repeated string pull_request_urls = 31;
+  optional string branch = 32;
+  optional string commit_sha = 33;
+  optional briar.types.v1.AgentProvider preferred_provider = 34;
+  optional string preferred_model = 35;
+  optional string preferred_effort = 36;
+  optional bool full_auto = 37;
+  optional briar.types.v1.AgentProvider requested_provider = 38;
+  optional string requested_model = 39;
+  optional string requested_effort = 40;
+  optional string requested_worker_id = 41;
+  optional string requested_by_user_id = 42;
+  optional DispatchMode dispatch_mode = 43;
+  optional google.protobuf.Timestamp dispatched_at = 44;
+  optional string claimed_by = 45;
+  optional google.protobuf.Timestamp claimed_at = 46;
+  optional string worker_id = 47;
+  google.protobuf.Timestamp started_at = 48;
+  google.protobuf.Timestamp updated_at = 49;
+  optional google.protobuf.Timestamp completed_at = 50;
+  google.protobuf.Timestamp last_event_at = 51;
+  uint32 event_count = 52;
+  Source source = 53;
+  string repository = 54;
+  optional TrackerReference tracker = 55;
+  optional WaitingCheckpoint waiting_checkpoint = 56;
+  repeated briar.types.v1.WorkflowCheckpointSpec issue_checkpoints = 57;
+  optional AgentExecutionMetrics execution_metrics = 58;
+  optional string target_sha = 59;
+  optional QaStatus staging_qa_status = 60;
+  optional QaStatus production_qa_status = 61;
+  optional string staging_qa_detail = 62;
+  optional string production_qa_detail = 63;
+  optional google.protobuf.Timestamp lease_expires_at = 65;
+  uint32 claim_attempts = 66;
+  optional string agent_id = 67;
+}
+
+message TrackerReference {
+  string provider = 1;
+  optional string issue_id = 2;
+  optional string identifier = 3;
+  optional string url = 4;
+  optional string state = 5;
+}
+
+message WaitingCheckpoint {
+  string key = 1;
+  uint32 revision = 2;
+}
+
+message AgentExecutionMetrics {
+  optional uint64 input_tokens = 1;
+  optional uint64 output_tokens = 2;
+  optional uint64 cache_read_tokens = 3;
+  optional uint64 cache_write_tokens = 4;
+  optional uint64 reasoning_output_tokens = 5;
+  optional uint64 total_tokens = 6;
+  uint64 duration_ms = 7;
+}
+
+message WorkerIcon {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_EMOJI = 1;
+    KIND_IMAGE = 2;
+  }
+
+  Kind kind = 1;
+  string value = 2;
+}
+
+message DashboardWorker {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_ONLINE = 1;
+    STATE_STALE = 2;
+    STATE_DISABLED = 3;
+  }
+
+  enum Readiness {
+    READINESS_UNSPECIFIED = 0;
+    READINESS_AVAILABLE = 1;
+    READINESS_BUSY = 2;
+    READINESS_OFFLINE = 3;
+    READINESS_NEEDS_ATTENTION = 4;
+    READINESS_DISABLED = 5;
+  }
+
+  string id = 1;
+  string label = 2;
+  optional WorkerIcon icon = 3;
+  briar.types.v1.AgentProvider agent_provider = 4;
+  repeated briar.types.v1.AgentProvider providers = 5;
+  briar.types.v1.WorkerCapabilities capabilities = 6;
+  Readiness readiness = 7;
+  bool accepting_work = 8;
+  optional string readiness_detail = 9;
+  uint32 active_sessions = 10;
+  uint32 available_sessions = 11;
+  string device_id = 12;
+  string owner_user_id = 13;
+  map<string, string> versions = 14;
+  State state = 15;
+  uint32 max_concurrent_sessions = 16;
+  google.protobuf.Timestamp last_heartbeat_at = 17;
+  google.protobuf.Timestamp created_at = 18;
+}
+
+message ProjectExecutionWorkerPolicy {
+  enum SelectionMode {
+    SELECTION_MODE_UNSPECIFIED = 0;
+    SELECTION_MODE_ANY = 1;
+    SELECTION_MODE_ALLOWLIST = 2;
+  }
+
+  SelectionMode selection_mode = 1;
+  optional string default_worker_id = 2;
+  repeated string allowed_worker_ids = 3;
+  optional google.protobuf.Timestamp updated_at = 4;
+}
+
+message ConversationNotification {
+  string id = 1;
+  string run_id = 2;
+  string run_title = 3;
+  string root_message_id = 4;
+  string body = 5;
+  repeated MessageBlock blocks = 6;
+  MessageAuthor author = 7;
+  NotificationReason reason = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message ChannelNotification {
+  string id = 1;
+  string channel_id = 2;
+  string channel_name = 3;
+  string root_message_id = 4;
+  string body = 5;
+  MessageAuthor author = 6;
+  NotificationReason reason = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message RunEvent {
+  string id = 1;
+  RunStatus status = 2;
+  optional string workflow_stage = 3;
+  optional string detail = 4;
+  string actor = 5;
+  optional string actor_name = 6;
+  google.protobuf.Timestamp occurred_at = 7;
+  uint32 attempt = 8;
+  uint32 revision = 9;
+  optional DashboardRun.QaStatus qa_status = 10;
+  optional string tracker_state = 11;
+  repeated string pull_request_urls = 12;
+  optional string target_sha = 13;
+  google.protobuf.Timestamp recorded_at = 14;
+}

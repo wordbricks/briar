@@ -2,7 +2,7 @@ import { normalizeProjectAgentLocale } from "../../src/lib/project-agent";
 import {
   listProjectsOperation,
   matchesMobileOperation,
-} from "@briar/mobile-contracts";
+} from "@briar/contracts";
 import type { BriarAuth } from "./auth";
 import { processArchiveCleanupQueue } from "./archive";
 import { sha256 } from "./crypto-digest";

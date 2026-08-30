@@ -1,7 +1,7 @@
 import {
   type AnyMobileOperation,
   validateMobileOperationResponse,
-} from "@briar/mobile-contracts";
+} from "@briar/contracts";
 import { json } from "./http-response";
 
 /** Validate a canonical mobile response while preserving its original JSON. */

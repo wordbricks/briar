@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package briar.realtime.v1;
+
+import "briar/types/v1/agent_event.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarRealtime_";
+
+// Small invalidation frames pushed over the organization WebSocket. Durable
+// snapshots and cursors remain authoritative in the app Connect services.
+message OrganizationNotification {
+  oneof notification {
+    Ready ready = 1;
+    ChannelsChanged channels_changed = 2;
+    InboxChanged inbox_changed = 3;
+    ProjectChanged project_changed = 4;
+    ProjectAgentSessionsChanged project_agent_sessions_changed = 5;
+  }
+}
+
+message Ready {}
+
+message ChannelsChanged {
+  uint64 cursor = 1;
+}
+
+message InboxChanged {
+  uint64 version = 1;
+}
+
+message ProjectChanged {
+  string project_id = 1;
+  uint64 cursor = 2;
+}
+
+message ProjectAgentSessionsChanged {
+  string project_id = 1;
+  uint64 version = 2;
+}
+
+message AgentActivity {
+  string id = 1;
+  briar.types.v1.AgentActivityKind kind = 2;
+  string headline = 3;
+}
+
+message AgentReplyActivityFrame {
+  string reply_job_id = 1;
+  uint32 attempt = 2;
+  uint64 sequence = 3;
+  string trigger_message_id = 4;
+  string parent_message_id = 5;
+  optional AgentActivity activity = 6;
+  google.protobuf.Timestamp sent_at = 7;
+  google.protobuf.Timestamp expires_at = 8;
+
+  oneof scope {
+    ChannelActivityScope channel = 9;
+    IssueActivityScope issue = 10;
+  }
+}
+
+message ChannelActivityScope {
+  string agent_id = 1;
+  string channel_id = 2;
+}
+
+message IssueActivityScope {
+  string project_id = 1;
+  string run_id = 2;
+}

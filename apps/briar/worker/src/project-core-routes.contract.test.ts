@@ -1,4 +1,4 @@
-import { listProjectsOperation } from "@briar/mobile-contracts";
+import { listProjectsOperation } from "@briar/contracts";
 import { describe, expect, it, vi } from "vitest";
 import type { BriarAuth } from "./auth";
 import { authenticateMobileOperation } from "./mobile-contract-auth";

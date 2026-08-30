@@ -5,7 +5,7 @@ import {
   listProjectsOperation,
   mobileProjectSchema,
   type MobileProject,
-} from "@briar/mobile-contracts";
+} from "@briar/contracts";
 import {
   DataImageString,
   mutableArray,

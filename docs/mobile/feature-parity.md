@@ -38,7 +38,7 @@
 ## 병합 기준
 
 - 네이티브 iOS 기능은 Android에서 대응 기능이 이미 제공되는지 확인하고 표를 갱신한다.
-- 서버 필드가 필요하면 `@briar/mobile-contracts`의 Effect Schema와 operation descriptor를 먼저 변경한다. OpenAPI와 Swift DTO/client는 여기서 생성한다.
+- 서버 필드가 필요하면 `@briar/contracts`의 Effect Schema와 operation descriptor를 먼저 변경한다. OpenAPI와 Swift DTO/client는 여기서 생성한다.
 - 읽기·쓰기 계약은 두 모바일 client ID에 공통이며, 생성물 currentness와 실제 Worker 라우트·클라이언트 decoder의 핵심 테스트 및 `mobile:ci`로 검증한다.
 - Android Tauri 릴리스 설정을 변경할 때는 Android 회귀 빌드와 공통 계약을 함께 검증한다.
 

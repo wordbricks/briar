@@ -11,7 +11,7 @@
 
 1. iOS 릴리즈 구현은 `apps/briar/ios/BriarCompanion`의 SwiftUI Xcode 프로젝트 하나만 사용한다. Tauri Apple 생성 프로젝트와 iOS 전용 설정·브리지는 저장소에서 제거한다.
 2. 프로덕션 scheme `BriarCompanion-Production`은 기존 App Store bundle ID `app.briar.companion`을 유지한다. 개발 앱은 `app.briar.companion.native.dev`, scheme은 `BriarCompanion-Dev`를 사용해 프로덕션 앱과 같은 시뮬레이터에 동시에 설치할 수 있다.
-3. 모바일 앱이 사용하는 서버 경계는 `@briar/mobile-contracts`의 Effect Schema와 operation descriptor로 명시한다. OpenAPI 3.1 문서와 Swift DTO/client는 이 실행 가능한 계약에서 생성한다.
+3. 모바일 앱이 사용하는 서버 경계는 `@briar/contracts`의 Effect Schema와 operation descriptor로 명시한다. OpenAPI 3.1 문서와 Swift DTO/client는 이 실행 가능한 계약에서 생성한다.
 4. iOS는 `briar-mobile`, Android는 `briar-android` client ID를 사용하되 응답 모델과 오류 의미는 공유한다. 실제 Worker 라우트와 두 클라이언트의 decoder가 같은 operation descriptor를 사용한다.
 5. 초기 앱 단계에서는 이전 모바일 계약과의 하위 호환성을 유지하지 않는다. 필드 삭제·이름 변경·필수화는 canonical schema에서 직접 수행하며, 누락 필드를 허용하기 위한 default, alias, 이중 wire schema를 두지 않는다. 릴리스 안정화 뒤 호환성 정책이 필요해지면 별도 ADR로 도입한다.
 6. 모바일 플랫폼 빌드는 필수 `app-worker` signoff와 분리한다. 생성물 currentness, 실제 Worker 라우트 validation, TypeScript/Swift decoder의 핵심 경계를 일반 테스트에서 검증하고, SwiftUI App/Unit/UI Test와 Tauri Android 빌드는 명시적인 `bun run mobile:ci`에서 검사한다.

@@ -1,6 +1,6 @@
 import type {
   MobileOperationSecurity,
-} from "@briar/mobile-contracts";
+} from "@briar/contracts";
 import type { BriarAuth } from "./auth";
 import { requireSession } from "./session-auth";
 

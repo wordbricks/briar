@@ -4,14 +4,14 @@ import { fileURLToPath } from "node:url";
 import * as JsonSchema from "effect/JsonSchema";
 import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
-import { mobileOperationCatalog } from "../packages/mobile-contracts/src/index";
+import { mobileOperationCatalog } from "../packages/contracts/src/index";
 
 type JsonObject = Record<string, unknown>;
 
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const openApiPath = resolve(
   workspaceRoot,
-  "packages/mobile-contracts/companion.openapi.yaml",
+  "packages/contracts/companion.openapi.yaml",
 );
 const swiftPath = resolve(
   workspaceRoot,

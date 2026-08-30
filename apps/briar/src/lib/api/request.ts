@@ -1,6 +1,6 @@
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import type { AnyMobileOperation } from "@briar/mobile-contracts";
+import type { AnyMobileOperation } from "@briar/contracts";
 import { briarApiUrl } from "../api-config";
 import { captureErrorDiagnostics } from "../error-diagnostics";
 import { ApiError } from "./errors";

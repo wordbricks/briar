@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package briar.types.v1;
+
+option swift_prefix = "BriarTypes_";
+
+enum AgentActivityKind {
+  AGENT_ACTIVITY_KIND_UNSPECIFIED = 0;
+  AGENT_ACTIVITY_KIND_MESSAGE = 1;
+  AGENT_ACTIVITY_KIND_COMMAND = 2;
+  AGENT_ACTIVITY_KIND_FILE_CHANGE = 3;
+  AGENT_ACTIVITY_KIND_WEB_SEARCH = 4;
+  AGENT_ACTIVITY_KIND_TOOL = 5;
+}
+
+enum AgentActivityStatus {
+  AGENT_ACTIVITY_STATUS_UNSPECIFIED = 0;
+  AGENT_ACTIVITY_STATUS_COMPLETED = 1;
+  AGENT_ACTIVITY_STATUS_FAILED = 2;
+  AGENT_ACTIVITY_STATUS_CANCELLED = 3;
+}
+
+message NormalizedAgentEvent {
+  oneof event {
+    ConversationStarted conversation_started = 1;
+    MessageStarted message_started = 2;
+    MessageDelta message_delta = 3;
+    MessageCompleted message_completed = 4;
+    ActivityStarted activity_started = 5;
+    ActivityDelta activity_delta = 6;
+    ActivityCompleted activity_completed = 7;
+    TurnCompleted turn_completed = 8;
+  }
+}
+
+message ConversationStarted {
+  string conversation_id = 1;
+}
+
+message MessageStarted {
+  string id = 1;
+  optional string phase = 2;
+  string text = 3;
+}
+
+message MessageDelta {
+  string id = 1;
+  string delta = 2;
+}
+
+message MessageCompleted {
+  string id = 1;
+  optional string phase = 2;
+  string text = 3;
+}
+
+message ActivityStarted {
+  string id = 1;
+  AgentActivityKind kind = 2;
+  string title = 3;
+  string text = 4;
+}
+
+message ActivityDelta {
+  string id = 1;
+  string delta = 2;
+}
+
+message ActivityCompleted {
+  string id = 1;
+  AgentActivityKind kind = 2;
+  string title = 3;
+  string text = 4;
+  AgentActivityStatus status = 5;
+}
+
+message TurnCompleted {
+  // Provider completion statuses remain open until Briar assigns
+  // provider-neutral semantics to every observed value.
+  string status = 1;
+}

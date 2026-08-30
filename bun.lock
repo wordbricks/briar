@@ -30,7 +30,7 @@
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "0.3.220",
         "@bufbuild/protobuf": "2.14.0",
-        "@briar/mobile-contracts": "workspace:*",
+        "@briar/contracts": "workspace:*",
         "@connectrpc/connect": "2.1.2",
         "@connectrpc/connect-web": "2.1.2",
         "@effect/atom-react": "4.0.0-rc.112",
@@ -125,8 +125,8 @@
         "wrangler": "4.125.0",
       },
     },
-    "packages/mobile-contracts": {
-      "name": "@briar/mobile-contracts",
+    "packages/contracts": {
+      "name": "@briar/contracts",
       "version": "0.0.0",
       "dependencies": {
         "@bufbuild/protobuf": "2.14.0",
@@ -259,7 +259,7 @@
 
     "@briar/landing": ["@briar/landing@workspace:apps/landing"],
 
-    "@briar/mobile-contracts": ["@briar/mobile-contracts@workspace:packages/mobile-contracts"],
+    "@briar/contracts": ["@briar/contracts@workspace:packages/contracts"],
 
     "@briar/tsconfig": ["@briar/tsconfig@workspace:packages/tsconfig"],
 

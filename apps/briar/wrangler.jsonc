@@ -43,7 +43,7 @@
       "/app",
       "/app/*",
       "/api/*",
-      "/briar.mobile.v1.*",
+      "/briar.app.v1.*",
       "/me",
       "/inbox/*",
       "/invitations*",

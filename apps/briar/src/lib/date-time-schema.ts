@@ -1,4 +1,4 @@
 export {
   IsoDateTimeUtc,
   IsoDateTimeWithOffset,
-} from "@briar/mobile-contracts";
+} from "@briar/contracts";

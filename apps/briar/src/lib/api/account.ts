@@ -2,7 +2,7 @@ import * as Schema from "effect/Schema";
 import type { SessionUser } from "../../types";
 import { ApiResponseDecodeError } from "./errors";
 import { request } from "./request";
-import { getCurrentUser } from "../mobile-rpc/account";
+import { getCurrentUser } from "../app-rpc/account";
 
 const emailPattern =
   /^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/u;
@@ -49,7 +49,7 @@ export async function loadSession(token: string): Promise<SessionUser> {
   } catch (cause) {
     if (Schema.isSchemaError(cause)) {
       throw new ApiResponseDecodeError(
-        "/briar.mobile.v1.AccountService/GetCurrentUser",
+        "/briar.app.v1.AccountService/GetCurrentUser",
         cause,
       );
     }

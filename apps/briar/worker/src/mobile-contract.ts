@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 import {
   mobileProjectSchema as mobileDashboardProjectSchema,
-} from "@briar/mobile-contracts";
+} from "@briar/contracts";
 import {
   AgentProviderCapabilityCatalog,
   ModelEffort as mobileEffortSchema,

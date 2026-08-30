@@ -1,4 +1,4 @@
-import type { MobileProject } from "@briar/mobile-contracts";
+import type { MobileProject } from "@briar/contracts";
 import {
   type AutoHuntQaStatus,
   type AutoHuntRunStatus,

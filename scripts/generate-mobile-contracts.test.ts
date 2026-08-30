@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mobileOperationCatalog } from "../packages/mobile-contracts/src/index";
+import { mobileOperationCatalog } from "../packages/contracts/src/index";
 import {
   renderOpenApi,
   renderSwift,
