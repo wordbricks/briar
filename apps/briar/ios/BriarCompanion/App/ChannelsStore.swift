@@ -1,5 +1,6 @@
 import BriarContracts
 import Foundation
+import SwiftProtobuf
 
 /// Owns the single organization WebSocket used by every native surface.
 /// Domain stores remain authoritative through their regular snapshot/delta APIs;
@@ -161,6 +162,8 @@ final class ChannelsStore: ObservableObject {
     @Published private(set) var errorMessage: String?
 
     private let api: any MobileAPIClientProtocol
+    private let injectedChannelService: (any BriarAPI_ChannelServiceClientInterface)?
+    private var channelService: (any BriarAPI_ChannelServiceClientInterface)?
     private let realtime: (any MobileRealtimeClientProtocol)?
     private let managesRealtime: Bool
     private let attachmentReference: @Sendable () -> String
@@ -199,6 +202,7 @@ final class ChannelsStore: ObservableObject {
 
     init(
         api: any MobileAPIClientProtocol,
+        channelService: (any BriarAPI_ChannelServiceClientInterface)? = nil,
         realtime: (any MobileRealtimeClientProtocol)? = nil,
         managesRealtime: Bool = true,
         pollInterval: Duration = .seconds(60),
@@ -208,6 +212,8 @@ final class ChannelsStore: ObservableObject {
         }
     ) {
         self.api = api
+        injectedChannelService = channelService
+        self.channelService = channelService
         self.realtime = realtime ?? (api as? any MobileRealtimeClientProtocol)
         self.managesRealtime = managesRealtime
         self.pollInterval = pollInterval
@@ -231,6 +237,10 @@ final class ChannelsStore: ObservableObject {
         activityExpiryTask = nil
         self.organizationID = organizationID
         self.token = token
+        channelService = injectedChannelService ?? token.flatMap { token in
+            (api as? any AuthenticatedMobileServicesFactory)?
+                .authenticatedServices(token: token).channel
+        }
         syncCursor = nil
         proposalRevisions = [:]
         latestProposals = [:]
@@ -273,7 +283,7 @@ final class ChannelsStore: ObservableObject {
     }
 
     func refresh() async {
-        guard let organizationID, let token else { return }
+        guard let organizationID, token != nil, let channelService else { return }
         let expectedGeneration = generation
         catalogLoadRevision &+= 1
         let expectedCatalogRevision = catalogLoadRevision
@@ -288,10 +298,13 @@ final class ChannelsStore: ObservableObject {
             }
         }
         do {
-            let response = try await api.listChannels(
-                organizationID: organizationID,
-                token: token
+            var request = BriarAPI_ListChannelsRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            let wireResponse = await channelService.listChannels(
+                request: request,
+                headers: [:]
             )
+            let response = try ChannelsResponse(connectMessage: wireResponse.briarValue())
             guard
                 !Task.isCancelled,
                 expectedGeneration == generation,
@@ -318,36 +331,45 @@ final class ChannelsStore: ObservableObject {
         members: [OrganizationMember],
         agents: [ChannelAgentSummary]
     ) {
-        guard let organizationID, let token else {
+        guard let organizationID, token != nil, let channelService else {
             throw MobileAPIError.invalidRequest
         }
-        let response = try await api.listDirectMessageRecipients(
-            organizationID: organizationID,
-            token: token
+        var request = BriarAPI_ListDirectMessageRecipientsRequest()
+        request.organizationID = coreUUIDString(organizationID)
+        let response = try await channelService.listDirectMessageRecipients(
+            request: request,
+            headers: [:]
+        ).briarValue()
+        return (
+            try response.members.map(OrganizationMember.init(connectMessage:)),
+            try response.agents.map(ChannelAgentSummary.init(connectMessage:))
         )
-        return (response.members, response.agents)
     }
 
     func createDirectMessage(
         memberIDs: [String],
         agentIDs: [UUID]
     ) async throws -> ChannelSummary {
-        guard let organizationID, let token,
+        guard let organizationID, token != nil, let channelService,
               !memberIDs.isEmpty || !agentIDs.isEmpty else {
             throw MobileAPIError.invalidRequest
         }
-        let channel = try await api.createDirectMessage(
-            organizationID: organizationID,
-            memberIDs: memberIDs,
-            agentIDs: agentIDs,
-            token: token,
-        )
+        var request = BriarAPI_CreateDirectMessageRequest()
+        request.organizationID = coreUUIDString(organizationID)
+        request.memberIds = memberIDs
+        request.agentIds = agentIDs.map(coreUUIDString)
+        let response = try await channelService.createDirectMessage(
+            request: request,
+            headers: [:]
+        ).briarValue()
+        guard response.hasChannel else { throw MobileAPIError.invalidResponse }
+        let channel = try ChannelSummary(connectMessage: response.channel)
         upsertChannel(channel)
         return channel
     }
 
     func openChannel(_ channelID: UUID) async {
-        guard let organizationID, let token else { return }
+        guard let organizationID, token != nil else { return }
         cacheFocusedThread()
         cacheFocusedConversation()
         if focusedChannelID != channelID || focusedThreadParentID != nil {
@@ -392,12 +414,16 @@ final class ChannelsStore: ObservableObject {
             }
         }
         do {
-            let response = try await api.getChannel(
-                organizationID: organizationID,
-                channelID: channelID,
-                messageLimit: Self.messagePageSize,
-                token: token
+            guard let channelService else { throw MobileAPIError.invalidRequest }
+            var request = BriarAPI_GetChannelRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            request.channelID = coreUUIDString(channelID)
+            request.messageLimit = UInt32(Self.messagePageSize)
+            let wireResponse = await channelService.getChannel(
+                request: request,
+                headers: [:]
             )
+            let response = try ChannelDetailResponse(connectMessage: wireResponse.briarValue())
             guard
                 !Task.isCancelled,
                 expectedGeneration == generation,
@@ -480,14 +506,17 @@ final class ChannelsStore: ObservableObject {
             }
         }
         do {
-            let response = try await api.listChannelMessages(
-                organizationID: organizationID,
-                channelID: channelID,
-                parentMessageID: nil,
-                cursor: cursor,
-                limit: Self.messagePageSize,
-                token: token
+            guard let channelService else { throw MobileAPIError.invalidRequest }
+            var request = BriarAPI_ListChannelMessagesRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            request.channelID = coreUUIDString(channelID)
+            request.cursor = coreUUIDString(cursor)
+            request.limit = UInt32(Self.messagePageSize)
+            let wireResponse = await channelService.listChannelMessages(
+                request: request,
+                headers: [:]
             )
+            let response = try ChannelMessagesResponse(connectMessage: wireResponse.briarValue())
             guard
                 !Task.isCancelled,
                 expectedGeneration == generation,
@@ -538,14 +567,16 @@ final class ChannelsStore: ObservableObject {
         let expectedGeneration = generation
         let expectedLoadRevision = authoritativeLoadRevision
         do {
-            let response = try await api.listChannelMessages(
-                organizationID: organizationID,
-                channelID: channelID,
-                parentMessageID: messageID,
-                cursor: nil,
-                limit: nil,
-                token: token
+            guard let channelService else { throw MobileAPIError.invalidRequest }
+            var request = BriarAPI_ListChannelMessagesRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            request.channelID = coreUUIDString(channelID)
+            request.parentMessageID = coreUUIDString(messageID)
+            let wireResponse = await channelService.listChannelMessages(
+                request: request,
+                headers: [:]
             )
+            let response = try ChannelMessagesResponse(connectMessage: wireResponse.briarValue())
             guard
                 !Task.isCancelled,
                 expectedGeneration == generation,
@@ -627,14 +658,16 @@ final class ChannelsStore: ObservableObject {
             }
         }
         do {
-            let response = try await api.listChannelMessages(
-                organizationID: organizationID,
-                channelID: channelID,
-                parentMessageID: parentMessageID,
-                cursor: nil,
-                limit: nil,
-                token: token
+            guard let channelService else { throw MobileAPIError.invalidRequest }
+            var request = BriarAPI_ListChannelMessagesRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            request.channelID = coreUUIDString(channelID)
+            request.parentMessageID = coreUUIDString(parentMessageID)
+            let wireResponse = await channelService.listChannelMessages(
+                request: request,
+                headers: [:]
             )
+            let response = try ChannelMessagesResponse(connectMessage: wireResponse.briarValue())
             guard
                 !Task.isCancelled,
                 expectedGeneration == generation,
@@ -687,11 +720,18 @@ final class ChannelsStore: ObservableObject {
         do {
             for _ in 0..<maxDeltaPagesPerRefresh {
                 guard let requestedCursor = syncCursor else { return }
-                let response = try await api.syncChannels(
-                    organizationID: organizationID,
-                    cursor: requestedCursor,
-                    token: token
+                guard let channelService,
+                      let wireCursor = UInt64(exactly: requestedCursor),
+                      wireCursor <= 9_007_199_254_740_991
+                else { throw MobileAPIError.invalidRequest }
+                var request = BriarAPI_SyncChannelsRequest()
+                request.organizationID = coreUUIDString(organizationID)
+                request.cursor = wireCursor
+                let wireResponse = await channelService.syncChannels(
+                    request: request,
+                    headers: [:]
                 )
+                let response = try ChannelDeltaResponse(connectMessage: wireResponse.briarValue())
                 guard
                     !Task.isCancelled,
                     expectedGeneration == generation,
@@ -852,16 +892,24 @@ final class ChannelsStore: ObservableObject {
             }
             let response: CreateChannelMessageResponse
             if attachments.isEmpty {
-                response = try await api.createChannelMessage(
-                    organizationID: organizationID,
-                    channelID: channelID,
-                    clientMessageID: clientMessageID,
-                    body: trimmed,
-                    parentMessageID: parentMessageID,
-                    mentionedUserIDs: mentionedUserIds,
-                    mentionedAgentIDs: mentionedAgentIds,
-                    attachmentReferences: existingAttachmentReferences,
-                    token: token,
+                guard let channelService else { throw MobileAPIError.invalidRequest }
+                var request = BriarAPI_CreateChannelMessageRequest()
+                request.organizationID = coreUUIDString(organizationID)
+                request.channelID = coreUUIDString(channelID)
+                request.clientMessageID = coreUUIDString(clientMessageID)
+                request.body = trimmed
+                if let parentMessageID {
+                    request.parentMessageID = coreUUIDString(parentMessageID)
+                }
+                request.mentionedUserIds = mentionedUserIds
+                request.mentionedAgentIds = mentionedAgentIds.map(coreUUIDString)
+                request.attachmentReferences = existingAttachmentReferences
+                let wireResponse = await channelService.createChannelMessage(
+                    request: request,
+                    headers: [:]
+                )
+                response = try CreateChannelMessageResponse(
+                    connectMessage: wireResponse.briarValue()
                 )
             } else {
                 guard let payload else { throw MobileAPIError.invalidRequest }
@@ -921,16 +969,28 @@ final class ChannelsStore: ObservableObject {
         messageID: UUID,
         subscribed: Bool
     ) async {
-        guard let organizationID, let token, !subscriptionPending else { return }
+        guard let organizationID, token != nil, let channelService,
+              !subscriptionPending else { return }
         subscriptionPending = true
         defer { subscriptionPending = false }
         do {
-            let response = try await api.setChannelThreadSubscription(
-                organizationID: organizationID,
-                channelID: channelID,
-                rootMessageID: messageID,
-                subscribed: subscribed,
-                token: token,
+            var request = BriarAPI_SetChannelThreadSubscriptionRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            request.channelID = coreUUIDString(channelID)
+            request.rootMessageID = coreUUIDString(messageID)
+            request.subscribed = subscribed
+            let wireResponse = try await channelService.setChannelThreadSubscription(
+                request: request,
+                headers: [:]
+            ).briarValue()
+            guard let rootMessageID = UUID(uuidString: wireResponse.rootMessageID) else {
+                throw MobileAPIError.invalidResponse
+            }
+            let response = ChannelThreadSubscriptionResponse(
+                rootMessageId: rootMessageID,
+                subscribers: try wireResponse.subscribers.map(
+                    IssueSubscriber.init(connectMessage:)
+                )
             )
             let apply: (ChannelMessage) -> ChannelMessage = { candidate in
                 guard candidate.id == response.rootMessageId else { return candidate }
@@ -948,16 +1008,22 @@ final class ChannelsStore: ObservableObject {
     }
 
     func toggleReaction(channelID: UUID, messageID: UUID, emoji: String) async {
-        guard let organizationID, let token else { return }
+        guard let organizationID, token != nil, let channelService else { return }
         let trimmed = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         do {
-            let response = try await api.toggleChannelMessageReaction(
-                organizationID: organizationID,
-                channelID: channelID,
-                messageID: messageID,
-                emoji: trimmed,
-                token: token,
+            var request = BriarAPI_ToggleChannelMessageReactionRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            request.channelID = coreUUIDString(channelID)
+            request.messageID = coreUUIDString(messageID)
+            request.emoji = trimmed
+            let wireResponse = try await channelService.toggleChannelMessageReaction(
+                request: request,
+                headers: [:]
+            ).briarValue()
+            guard wireResponse.hasMessage else { throw MobileAPIError.invalidResponse }
+            let response = ToggleChannelMessageReactionResponse(
+                message: try ChannelMessage(connectMessage: wireResponse.message)
             )
             guard response.message.channelId == channelID,
                   response.message.id == messageID
@@ -983,7 +1049,8 @@ final class ChannelsStore: ObservableObject {
     }
 
     func deleteMessage(channelID: UUID, messageID: UUID) async -> Bool {
-        guard let organizationID, let token, focusedChannelID == channelID else {
+        guard let organizationID, token != nil, let channelService,
+              focusedChannelID == channelID else {
             return false
         }
         guard let deletionTarget = messages.first(where: { $0.id == messageID }) ??
@@ -1000,11 +1067,16 @@ final class ChannelsStore: ObservableObject {
                 self.focusedThreadParentID == expectedThreadParentID
         }
         do {
-            let response = try await api.deleteChannelMessage(
-                organizationID: organizationID,
-                channelID: channelID,
-                messageID: messageID,
-                token: token
+            var request = BriarAPI_DeleteChannelMessageRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            request.channelID = coreUUIDString(channelID)
+            request.messageID = coreUUIDString(messageID)
+            let wireResponse = await channelService.deleteChannelMessage(
+                request: request,
+                headers: [:]
+            )
+            let response = try DeleteChannelMessageResponse(
+                connectMessage: wireResponse.briarValue()
             )
             guard response.message?.channelId == nil ||
                     (response.message?.channelId == channelID &&
@@ -1119,13 +1191,19 @@ final class ChannelsStore: ObservableObject {
                     request: execution
                 )
             }
-            let response = try await api.acceptChannelProposal(
-                organizationID: organizationID,
-                channelID: channelID,
-                proposalID: proposalID,
-                projectID: projectID,
-                execution: execution,
-                token: token,
+            guard let channelService else { throw MobileAPIError.invalidRequest }
+            var request = BriarAPI_AcceptChannelProposalRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            request.channelID = coreUUIDString(channelID)
+            request.proposalID = coreUUIDString(proposalID)
+            request.projectID = coreUUIDString(projectID)
+            if let execution { request.execution = try execution.channelConnectMessage() }
+            let wireResponse = await channelService.acceptChannelProposal(
+                request: request,
+                headers: [:]
+            )
+            let response = try AcceptChannelProposalResponse(
+                connectMessage: wireResponse.briarValue()
             )
             guard
                 expectedGeneration == generation,
@@ -1280,12 +1358,16 @@ final class ChannelsStore: ObservableObject {
             }
         }
         do {
-            _ = try await api.declineChannelProposal(
-                organizationID: organizationID,
-                channelID: channelID,
-                proposalID: proposalID,
-                token: token
+            guard let channelService else { throw MobileAPIError.invalidRequest }
+            var request = BriarAPI_DeclineChannelProposalRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            request.channelID = coreUUIDString(channelID)
+            request.proposalID = coreUUIDString(proposalID)
+            let response = await channelService.declineChannelProposal(
+                request: request,
+                headers: [:]
             )
+            _ = try DeclineChannelProposalResponse(connectMessage: response.briarValue())
             guard expectedGeneration == generation,
                   expectedFocusRevision == authoritativeLoadRevision,
                   expectedFocusedChannelID == focusedChannelID,
@@ -1372,12 +1454,18 @@ final class ChannelsStore: ObservableObject {
                 request: request
             )
 
-            let response = try await api.acceptChannelExecutionProposal(
-                organizationID: organizationID,
-                channelID: channelID,
-                proposalID: proposalID,
-                approval: request,
-                token: token,
+            guard let channelService else { throw MobileAPIError.invalidRequest }
+            var approvalRequest = BriarAPI_AcceptChannelExecutionProposalRequest()
+            approvalRequest.organizationID = coreUUIDString(organizationID)
+            approvalRequest.channelID = coreUUIDString(channelID)
+            approvalRequest.proposalID = coreUUIDString(proposalID)
+            approvalRequest.approval = try request.channelConnectMessage()
+            let wireResponse = await channelService.acceptChannelExecutionProposal(
+                request: approvalRequest,
+                headers: [:]
+            )
+            let response = try AcceptChannelExecutionProposalResponse(
+                connectMessage: wireResponse.briarValue()
             )
             guard
                 expectedGeneration == generation,
@@ -1673,12 +1761,18 @@ final class ChannelsStore: ObservableObject {
                 request: request
             )
 
-            let response = try await api.acceptChannelSkillExecutionProposal(
-                organizationID: organizationID,
-                channelID: channelID,
-                proposalID: proposalID,
-                workerID: request.workerId,
-                token: token,
+            guard let channelService else { throw MobileAPIError.invalidRequest }
+            var approvalRequest = BriarAPI_AcceptChannelSkillExecutionProposalRequest()
+            approvalRequest.organizationID = coreUUIDString(organizationID)
+            approvalRequest.channelID = coreUUIDString(channelID)
+            approvalRequest.proposalID = coreUUIDString(proposalID)
+            if let workerID = request.workerId { approvalRequest.workerID = workerID }
+            let wireResponse = await channelService.acceptChannelSkillExecutionProposal(
+                request: approvalRequest,
+                headers: [:]
+            )
+            let response = try AcceptAgentSkillExecutionProposalResponse(
+                connectMessage: wireResponse.briarValue()
             )
             guard expectedGeneration == generation,
                   expectedAcceptanceRevision == acceptanceRevision,
@@ -2345,7 +2439,7 @@ final class ChannelsStore: ObservableObject {
     }
 
     private func markChannelRead(_ channelID: UUID) async {
-        guard let organizationID, let token else { return }
+        guard let organizationID, token != nil, let channelService else { return }
         if let index = channels.firstIndex(where: { $0.id == channelID }) {
             var updated = channels[index]
             updated.hasUnread = false
@@ -2353,12 +2447,16 @@ final class ChannelsStore: ObservableObject {
             channels[index] = updated
         }
         do {
-            let channel = try await api.markChannelRead(
-                organizationID: organizationID,
-                channelID: channelID,
-                lastReadAt: Date(),
-                token: token
-            )
+            var request = BriarAPI_MarkChannelReadRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            request.channelID = coreUUIDString(channelID)
+            request.lastReadAt = Google_Protobuf_Timestamp(date: Date())
+            let response = try await channelService.markChannelRead(
+                request: request,
+                headers: [:]
+            ).briarValue()
+            guard response.hasChannel else { throw MobileAPIError.invalidResponse }
+            let channel = try ChannelSummary(connectMessage: response.channel)
             upsertChannel(channel)
         } catch {
             // The next catalog snapshot restores unread if the write failed.

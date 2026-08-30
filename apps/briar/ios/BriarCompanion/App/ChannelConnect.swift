@@ -1046,7 +1046,7 @@ extension AgentSkillExecutionProposal {
     }
 }
 
-private extension AcceptIssueExecutionProposalRequest {
+extension AcceptIssueExecutionProposalRequest {
     func channelConnectMessage() throws -> BriarAPI_IssueExecutionApproval {
         var message = BriarAPI_IssueExecutionApproval()
         message.provider = channelProviderMessage(provider)

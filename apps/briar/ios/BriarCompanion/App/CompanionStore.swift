@@ -436,6 +436,7 @@ final class RunDetailStore: ObservableObject {
 
     private let api: any MobileAPIClientProtocol
     private let dashboardService: (any BriarAPI_DashboardServiceClientInterface)?
+    private let issueService: (any BriarAPI_IssueServiceClientInterface)?
     private let realtime: (any MobileRealtimeClientProtocol)?
     private let projectID: UUID
     private let runID: UUID
@@ -460,10 +461,12 @@ final class RunDetailStore: ObservableObject {
         projectID: UUID,
         runID: UUID,
         token: String,
-        dashboardService: (any BriarAPI_DashboardServiceClientInterface)? = nil
+        dashboardService: (any BriarAPI_DashboardServiceClientInterface)? = nil,
+        issueService: (any BriarAPI_IssueServiceClientInterface)? = nil
     ) {
         self.api = api
         self.dashboardService = dashboardService
+        self.issueService = issueService
         self.realtime = api as? any MobileRealtimeClientProtocol
         self.projectID = projectID
         self.runID = runID
@@ -485,10 +488,12 @@ final class RunDetailStore: ObservableObject {
         repeat {
             authoritativeReloadPending = false
             do {
-                let dashboard = try dashboardService ?? authenticatedMobileServices(
-                    for: api,
-                    token: token
-                ).dashboard
+                let services = try (dashboardService == nil || issueService == nil)
+                    ? authenticatedMobileServices(for: api, token: token)
+                    : nil
+                guard let dashboard = dashboardService ?? services?.dashboard,
+                      let issue = issueService ?? services?.issue
+                else { throw MobileAPIError.invalidRequest }
                 var eventRequest = BriarAPI_ListRunEventsRequest()
                 eventRequest.projectID = coreUUIDString(projectID)
                 eventRequest.runID = coreUUIDString(runID)
@@ -496,23 +501,33 @@ final class RunDetailStore: ObservableObject {
                     request: eventRequest,
                     headers: [:]
                 )
-                async let messageResponse = api.listIssueMessages(
-                    projectID: projectID,
-                    runID: runID,
-                    token: token
+                var messageRequest = BriarAPI_ListIssueMessagesRequest()
+                messageRequest.projectID = coreUUIDString(projectID)
+                messageRequest.runID = coreUUIDString(runID)
+                async let messageResponse = issue.listIssueMessages(
+                    request: messageRequest,
+                    headers: [:]
                 )
-                async let evidenceResponse = api.listRunEvidence(
-                    projectID: projectID,
-                    runID: runID,
-                    token: token
+                var evidenceRequest = BriarAPI_ListRunEvidenceRequest()
+                evidenceRequest.projectID = coreUUIDString(projectID)
+                evidenceRequest.runID = coreUUIDString(runID)
+                async let evidenceResponse = issue.listRunEvidence(
+                    request: evidenceRequest,
+                    headers: [:]
                 )
                 let loaded = try await (eventResponse, messageResponse, evidenceResponse)
                 guard expectedLifecycleRevision == lifecycleRevision else { return }
                 events = try loaded.0.briarValue().events.map(RunEvent.init(connectMessage:))
-                let stabilizedMessages = preservingLocallyAcceptedSkillExecutionProposals(
-                    in: loaded.1.messages
+                let messageSnapshot = try IssueMessagesResponse(
+                    connectMessage: loaded.1.briarValue()
                 )
-                conversationCursor = loaded.1.cursor
+                let evidenceSnapshot = try RunEvidenceResponse(
+                    connectMessage: loaded.2.briarValue()
+                )
+                let stabilizedMessages = preservingLocallyAcceptedSkillExecutionProposals(
+                    in: messageSnapshot.messages
+                )
+                conversationCursor = messageSnapshot.cursor
                 reconcileExecutionProposals(stabilizedMessages, authoritative: true)
                 let incomingIDs = Set(stabilizedMessages.map(\.id))
                 let pending = messages.filter {
@@ -524,8 +539,8 @@ final class RunDetailStore: ObservableObject {
                     if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
                     return $0.id.uuidString < $1.id.uuidString
                 }
-                agentReplies = loaded.1.agentReplies
-                evidence = loaded.2.evidence
+                agentReplies = messageSnapshot.agentReplies
+                evidence = evidenceSnapshot.evidence
                 errorMessage = nil
             } catch {
                 guard expectedLifecycleRevision == lifecycleRevision else { return }
@@ -582,11 +597,23 @@ final class RunDetailStore: ObservableObject {
                 guard expectedLifecycleRevision == lifecycleRevision,
                       let cursor = conversationCursor
                 else { return }
-                let delta = try await api.syncIssueMessages(
-                    projectID: projectID,
-                    runID: runID,
-                    cursor: cursor,
-                    token: token,
+                guard let wireCursor = UInt64(exactly: cursor),
+                      wireCursor <= 9_007_199_254_740_991
+                else { throw MobileAPIError.invalidRequest }
+                let issue = try issueService ?? authenticatedMobileServices(
+                    for: api,
+                    token: token
+                ).issue
+                var request = BriarAPI_SyncIssueMessagesRequest()
+                request.projectID = coreUUIDString(projectID)
+                request.runID = coreUUIDString(runID)
+                request.cursor = wireCursor
+                let response = await issue.syncIssueMessages(
+                    request: request,
+                    headers: [:]
+                )
+                let delta = try IssueMessagesDeltaResponse(
+                    connectMessage: response.briarValue()
                 )
                 guard expectedLifecycleRevision == lifecycleRevision else { return }
                 conversationCursor = delta.cursor

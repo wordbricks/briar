@@ -1,4 +1,5 @@
 import BriarContracts
+import BriarContractsMocks
 import Foundation
 import SwiftProtobuf
 import XCTest
@@ -95,7 +96,8 @@ final class ChannelsStoreTests: XCTestCase {
             status: .running,
             attempts: 1
         )
-        let api = ChannelStoreAPI(
+        let api = ChannelHTTPRecorder(channel: channel)
+        let scenario = ChannelConnectScenario(
             channel: channel,
             initialMessages: [message(id: oldMessageID, body: "stale")],
             syncResponses: [
@@ -120,8 +122,10 @@ final class ChannelsStoreTests: XCTestCase {
                 ),
             ]
         )
+        let channelService = scenario.service()
         let store = ChannelsStore(
             api: api,
+            channelService: channelService,
             managesRealtime: false,
             pollInterval: .seconds(3_600)
         )
@@ -143,9 +147,11 @@ final class ChannelsStoreTests: XCTestCase {
 
     func testMessageSendUsesConnectWithoutBytesAndMultipartWithBytes() async throws {
         let channel = summary()
-        let api = ChannelStoreAPI(channel: channel, initialMessages: [])
+        let api = ChannelHTTPRecorder(channel: channel)
+        let scenario = ChannelConnectScenario(channel: channel, initialMessages: [])
         let store = ChannelsStore(
             api: api,
+            channelService: scenario.service(),
             managesRealtime: false,
             pollInterval: .seconds(3_600),
             attachmentReference: { "new-upload-ref" }
@@ -162,7 +168,7 @@ final class ChannelsStoreTests: XCTestCase {
             mentions: [],
             attachmentReferences: ["existing-ref"]
         )
-        let connectCalls = await api.connectMessageCalls()
+        let connectCalls = scenario.connectMessageCalls
         let uploadCountAfterConnect = await api.multipartUploadCount()
         XCTAssertEqual(connectCalls.count, 1)
         XCTAssertEqual(connectCalls.first?.attachmentReferences, ["existing-ref"])
@@ -180,7 +186,7 @@ final class ChannelsStoreTests: XCTestCase {
             )],
             attachmentReferences: ["existing-upload-ref"]
         )
-        let finalConnectCalls = await api.connectMessageCalls()
+        let finalConnectCalls = scenario.connectMessageCalls
         let finalUploadCount = await api.multipartUploadCount()
         let uploadReferences = await api.multipartAttachmentReferences()
         XCTAssertEqual(finalConnectCalls.count, 1)
@@ -254,100 +260,17 @@ final class ChannelsStoreTests: XCTestCase {
     }
 }
 
-private actor ChannelStoreAPI: MobileAPIClientProtocol {
-    struct ConnectMessageCall: Sendable {
-        let attachmentReferences: [String]
-    }
-
+private actor ChannelHTTPRecorder: MobileAPIClientProtocol {
     private let channel: ChannelSummary
-    private let initialMessages: [ChannelMessage]
-    private var queuedSyncResponses: [ChannelDeltaResponse]
-    private var connectCalls: [ConnectMessageCall] = []
     private var uploadCount = 0
     private var uploadReferences: [[String]] = []
 
-    init(
-        channel: ChannelSummary,
-        initialMessages: [ChannelMessage],
-        syncResponses: [ChannelDeltaResponse] = []
-    ) {
+    init(channel: ChannelSummary) {
         self.channel = channel
-        self.initialMessages = initialMessages
-        queuedSyncResponses = syncResponses
     }
 
-    func connectMessageCalls() -> [ConnectMessageCall] { connectCalls }
     func multipartUploadCount() -> Int { uploadCount }
     func multipartAttachmentReferences() -> [[String]] { uploadReferences }
-
-    func listChannels(
-        organizationID: UUID,
-        token: String
-    ) async throws -> ChannelsResponse {
-        ChannelsResponse(channels: [channel], cursor: 10)
-    }
-
-    func syncChannels(
-        organizationID: UUID,
-        cursor: Int,
-        token: String
-    ) async throws -> ChannelDeltaResponse {
-        guard !queuedSyncResponses.isEmpty else { throw MobileAPIError.invalidResponse }
-        return queuedSyncResponses.removeFirst()
-    }
-
-    func getChannel(
-        organizationID: UUID,
-        channelID: UUID,
-        messageLimit: Int?,
-        token: String
-    ) async throws -> ChannelDetailResponse {
-        ChannelDetailResponse(
-            channel: channel,
-            members: [],
-            agents: [],
-            messages: initialMessages
-        )
-    }
-
-    func markChannelRead(
-        organizationID: UUID,
-        channelID: UUID,
-        lastReadAt: Date?,
-        token: String
-    ) async throws -> ChannelSummary {
-        channel
-    }
-
-    func createChannelMessage(
-        organizationID: UUID,
-        channelID: UUID,
-        clientMessageID: UUID,
-        body: String,
-        parentMessageID: UUID?,
-        mentionedUserIDs: [String],
-        mentionedAgentIDs: [UUID],
-        attachmentReferences: [String],
-        token: String
-    ) async throws -> CreateChannelMessageResponse {
-        connectCalls.append(ConnectMessageCall(
-            attachmentReferences: attachmentReferences
-        ))
-        return CreateChannelMessageResponse(message: ChannelMessage(
-            id: clientMessageID,
-            channelId: channelID,
-            parentMessageId: parentMessageID,
-            body: body,
-            author: .init(type: .user, name: "Briar User", image: nil, provider: nil),
-            mentionedUserIds: mentionedUserIDs,
-            mentionedAgentIds: mentionedAgentIDs,
-            replyCount: 0,
-            lastReplyAt: nil,
-            document: nil,
-            proposal: nil,
-            createdAt: Date(timeIntervalSince1970: 1_775_260_800)
-        ))
-    }
 
     func upload<Response: Decodable & Sendable>(
         _ path: String,
@@ -385,5 +308,189 @@ private actor ChannelStoreAPI: MobileAPIClientProtocol {
         as responseType: Response.Type
     ) async throws -> Response {
         throw MobileAPIError.invalidRequest
+    }
+}
+
+private final class ChannelConnectScenario: @unchecked Sendable {
+    struct ConnectMessageCall: Sendable {
+        let attachmentReferences: [String]
+    }
+
+    private let lock = NSLock()
+    private let channel: ChannelSummary
+    private let initialMessages: [ChannelMessage]
+    private var queuedSyncResponses: [ChannelDeltaResponse]
+    private var recordedConnectCalls: [ConnectMessageCall] = []
+
+    init(
+        channel: ChannelSummary,
+        initialMessages: [ChannelMessage],
+        syncResponses: [ChannelDeltaResponse] = []
+    ) {
+        self.channel = channel
+        self.initialMessages = initialMessages
+        queuedSyncResponses = syncResponses
+    }
+
+    var connectMessageCalls: [ConnectMessageCall] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedConnectCalls
+    }
+
+    func service() -> BriarAPI_ChannelServiceClientMock {
+        let service = BriarAPI_ChannelServiceClientMock()
+        service.mockAsyncListChannels = { [self] request in
+            .init(result: .success(listChannels(request)))
+        }
+        service.mockAsyncSyncChannels = { [self] request in
+            .init(result: .success(syncChannels(request)))
+        }
+        service.mockAsyncGetChannel = { [self] request in
+            .init(result: .success(getChannel(request)))
+        }
+        service.mockAsyncMarkChannelRead = { [self] request in
+            .init(result: .success(markChannelRead(request)))
+        }
+        service.mockAsyncCreateChannelMessage = { [self] request in
+            .init(result: .success(createMessage(request)))
+        }
+        return service
+    }
+
+    private func listChannels(
+        _ request: BriarAPI_ListChannelsRequest
+    ) -> BriarAPI_ListChannelsResponse {
+        precondition(request.organizationID == channel.organizationId.uuidString.lowercased())
+        var response = BriarAPI_ListChannelsResponse()
+        response.channels = [wireSummary(channel)]
+        response.cursor = 10
+        return response
+    }
+
+    private func syncChannels(
+        _ request: BriarAPI_SyncChannelsRequest
+    ) -> BriarAPI_SyncChannelsResponse {
+        lock.lock()
+        defer { lock.unlock() }
+        precondition(request.organizationID == channel.organizationId.uuidString.lowercased())
+        precondition(!queuedSyncResponses.isEmpty)
+        return wireDelta(queuedSyncResponses.removeFirst())
+    }
+
+    private func getChannel(
+        _ request: BriarAPI_GetChannelRequest
+    ) -> BriarAPI_GetChannelResponse {
+        precondition(request.channelID == channel.id.uuidString.lowercased())
+        var response = BriarAPI_GetChannelResponse()
+        response.channel = wireSummary(channel)
+        response.messages = initialMessages.map(wireMessage)
+        return response
+    }
+
+    private func markChannelRead(
+        _ request: BriarAPI_MarkChannelReadRequest
+    ) -> BriarAPI_MarkChannelReadResponse {
+        precondition(request.channelID == channel.id.uuidString.lowercased())
+        var response = BriarAPI_MarkChannelReadResponse()
+        response.channel = wireSummary(channel)
+        return response
+    }
+
+    private func createMessage(
+        _ request: BriarAPI_CreateChannelMessageRequest
+    ) -> BriarAPI_CreateChannelMessageResponse {
+        lock.lock()
+        defer { lock.unlock() }
+        recordedConnectCalls.append(.init(
+            attachmentReferences: request.attachmentReferences
+        ))
+        let message = ChannelMessage(
+            id: UUID(uuidString: request.clientMessageID)!,
+            channelId: UUID(uuidString: request.channelID)!,
+            parentMessageId: request.hasParentMessageID
+                ? UUID(uuidString: request.parentMessageID)
+                : nil,
+            body: request.body,
+            author: .init(type: .user, name: "Briar User", image: nil, provider: nil),
+            mentionedUserIds: request.mentionedUserIds,
+            mentionedAgentIds: request.mentionedAgentIds.compactMap(UUID.init(uuidString:)),
+            replyCount: 0,
+            lastReplyAt: nil,
+            document: nil,
+            proposal: nil,
+            createdAt: Date(timeIntervalSince1970: 1_775_260_800)
+        )
+        var response = BriarAPI_CreateChannelMessageResponse()
+        response.message = wireMessage(message)
+        return response
+    }
+
+    private func wireDelta(_ value: ChannelDeltaResponse) -> BriarAPI_SyncChannelsResponse {
+        var response = BriarAPI_SyncChannelsResponse()
+        response.cursor = UInt64(value.cursor)
+        response.hasMore_p = value.hasMore
+        response.reset = value.reset
+        response.channels = value.channels.map(wireSummary)
+        response.removedChannelIds = value.removedChannelIds.map { $0.uuidString.lowercased() }
+        response.messages = value.messages.map(wireMessage)
+        response.removedMessageIds = value.removedMessageIds.map { $0.uuidString.lowercased() }
+        response.agentReplies = (value.agentReplies ?? []).map(wireReply)
+        return response
+    }
+
+    private func wireSummary(_ value: ChannelSummary) -> BriarAPI_ChannelSummary {
+        var message = BriarAPI_ChannelSummary()
+        message.id = value.id.uuidString.lowercased()
+        message.organizationID = value.organizationId.uuidString.lowercased()
+        message.slug = value.slug
+        message.name = value.name
+        message.visibility = value.visibility == .org ? .public : .private
+        message.memberCount = UInt32(value.memberCount)
+        message.agentCount = UInt32(value.agentCount)
+        message.createdAt = Google_Protobuf_Timestamp(date: value.createdAt)
+        message.updatedAt = Google_Protobuf_Timestamp(date: value.updatedAt)
+        message.kind = value.kind == .channel ? .channel : .directMessage
+        if let hasUnread = value.hasUnread { message.hasUnread_p = hasUnread }
+        return message
+    }
+
+    private func wireMessage(_ value: ChannelMessage) -> BriarAPI_ChannelMessage {
+        var author = BriarAPI_ChannelMessageAuthor()
+        author.kind = value.author.type == .user ? .user : .agent
+        author.name = value.author.name
+        var message = BriarAPI_ChannelMessage()
+        message.id = value.id.uuidString.lowercased()
+        message.channelID = value.channelId.uuidString.lowercased()
+        if let parentMessageID = value.parentMessageId {
+            message.parentMessageID = parentMessageID.uuidString.lowercased()
+        }
+        message.body = value.body
+        message.author = author
+        message.mentionedUserIds = value.mentionedUserIds
+        message.mentionedAgentIds = value.mentionedAgentIds.map { $0.uuidString.lowercased() }
+        message.replyCount = UInt32(value.replyCount)
+        message.createdAt = Google_Protobuf_Timestamp(date: value.createdAt)
+        return message
+    }
+
+    private func wireReply(_ value: ChannelAgentReply) -> BriarAPI_ChannelAgentReply {
+        var message = BriarAPI_ChannelAgentReply()
+        message.id = value.id.uuidString.lowercased()
+        message.agentID = value.agentId.uuidString.lowercased()
+        message.channelID = value.channelId.uuidString.lowercased()
+        message.triggerMessageID = value.triggerMessageId.uuidString.lowercased()
+        message.parentMessageID = value.parentMessageId.uuidString.lowercased()
+        message.replyMessageID = value.replyMessageId.uuidString.lowercased()
+        switch value.status {
+        case .queued: message.status = .queued
+        case .running: message.status = .running
+        case .completed: message.status = .completed
+        case .failed: message.status = .failed
+        }
+        message.attempts = UInt32(value.attempts)
+        message.createdAt = Google_Protobuf_Timestamp(date: value.createdAt)
+        message.updatedAt = Google_Protobuf_Timestamp(date: value.updatedAt)
+        return message
     }
 }
