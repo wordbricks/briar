@@ -97,7 +97,7 @@ import type {
 import type { ProjectRow } from "./project-repository";
 import type { settingsJson } from "./project-settings-json";
 import type { checkpointPolicyJson } from "./workflow-policy";
-import type { workerJson } from "./worker-json";
+import type { workerJson, WorkerCapabilitiesJson } from "./worker-json";
 
 const projectRole = {
   owner: ProjectRole.OWNER,
@@ -677,8 +677,8 @@ const appProviderCapability = (
   error: capability.error ?? undefined,
 });
 
-const appWorkerCapabilities = (value: object) => {
-  const providerCapabilities = Reflect.get(value, "providerCapabilities");
+const appWorkerCapabilities = (value: WorkerCapabilitiesJson) => {
+  const providerCapabilities = value.providerCapabilities;
   const decoded = providerCapabilities === undefined
     ? null
     : decodeAgentProviderCapabilityCatalogOption(providerCapabilities);
@@ -688,25 +688,30 @@ const appWorkerCapabilities = (value: object) => {
   const catalog = decoded === null ? null : decoded.value;
   const providers = Object.keys(agentProvider) as AgentProviderName[];
 
-  const remoteValue = Reflect.get(value, "remoteUpdates");
+  const remoteValue = value.remoteUpdates;
   let remoteUpdates;
   if (remoteValue !== undefined) {
-    if (
-      typeof remoteValue !== "object" || remoteValue === null ||
-      typeof Reflect.get(remoteValue, "supported") !== "boolean"
-    ) {
+    if (typeof remoteValue !== "object" || remoteValue === null) {
       throw new Error("Worker remote update capability is invalid");
     }
-    const protocol = Reflect.get(remoteValue, "protocol");
+    const candidate = remoteValue as {
+      readonly supported?: unknown;
+      readonly protocol?: unknown;
+    };
+    if (typeof candidate.supported !== "boolean") {
+      throw new Error("Worker remote update capability is invalid");
+    }
+    const protocol = candidate.protocol;
     if (
       protocol !== undefined &&
-      (!Number.isSafeInteger(protocol) || protocol < 0 || protocol > 4_294_967_295)
+      (typeof protocol !== "number" || !Number.isSafeInteger(protocol) ||
+        protocol < 0 || protocol > 4_294_967_295)
     ) {
       throw new Error("Worker remote update protocol is invalid");
     }
     remoteUpdates = create(RemoteUpdateCapabilitySchema, {
-      supported: Reflect.get(remoteValue, "supported") as boolean,
-      protocol: protocol as number | undefined,
+      supported: candidate.supported,
+      protocol,
     });
   }
 

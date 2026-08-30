@@ -2,6 +2,19 @@ import type { AgentProvider } from "../../src/lib/agent-provider";
 import { parseJsonObject } from "./agent-result-json";
 import { executionWorkerProviders, workerStateAt } from "./workers";
 
+export type WorkerCapabilitiesJson = {
+  readonly providerCapabilities?: unknown;
+  readonly remoteUpdates?: unknown;
+  readonly [key: string]: unknown;
+};
+
+const workerCapabilitiesJson = (
+  value: string | undefined,
+): WorkerCapabilitiesJson => {
+  const parsed = value ? parseJsonObject(value) : null;
+  return parsed === null ? {} : parsed as WorkerCapabilitiesJson;
+};
+
 export const workerJson = (
   worker: {
     id: string;
@@ -69,9 +82,7 @@ export const workerJson = (
             ? "busy"
             : "available",
   readinessDetail: worker.readiness_detail ?? null,
-  capabilities: worker.capabilities_json
-    ? parseJsonObject(worker.capabilities_json) ?? {}
-    : {},
+  capabilities: workerCapabilitiesJson(worker.capabilities_json),
   lastHeartbeatAt: worker.last_heartbeat_at,
   createdAt: worker.created_at,
 });
