@@ -14,7 +14,6 @@ service RealtimeService {
 message CreateRealtimeTicketRequest {
   message OrganizationNotifications {
     string organization_id = 1;
-    uint64 cursor = 2;
   }
 
   message IssueActivity {

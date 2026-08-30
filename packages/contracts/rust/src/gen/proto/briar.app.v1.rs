@@ -74100,13 +74100,6 @@ pub mod create_realtime_ticket_request {
             skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
         )]
         pub organization_id: ::buffa::alloc::string::String,
-        /// Field 2: `cursor`
-        #[serde(
-            rename = "cursor",
-            with = "::buffa::json_helpers::uint64",
-            skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-        )]
-        pub cursor: u64,
         #[serde(skip)]
         #[doc(hidden)]
         pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -74115,7 +74108,6 @@ pub mod create_realtime_ticket_request {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_struct("OrganizationNotifications")
                 .field("organization_id", &self.organization_id)
-                .field("cursor", &self.cursor)
                 .finish()
         }
     }
@@ -74152,9 +74144,6 @@ pub mod create_realtime_ticket_request {
                         + ::buffa::types::string_encoded_len(&self.organization_id)
                             as u64;
             }
-            if self.cursor != 0u64 {
-                size += 1u64 + ::buffa::types::uint64_encoded_len(self.cursor) as u64;
-            }
             size += self.__buffa_unknown_fields.encoded_len() as u64;
             ::buffa::saturate_size(size)
         }
@@ -74167,9 +74156,6 @@ pub mod create_realtime_ticket_request {
             use ::buffa::Enumeration as _;
             if !self.organization_id.is_empty() {
                 ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
-            }
-            if self.cursor != 0u64 {
-                ::buffa::types::put_uint64_field(2u32, self.cursor, buf);
             }
             self.__buffa_unknown_fields.write_to(buf);
         }
@@ -74191,13 +74177,6 @@ pub mod create_realtime_ticket_request {
                     )?;
                     ::buffa::types::merge_string(&mut self.organization_id, buf)?;
                 }
-                2u32 => {
-                    ::buffa::encoding::check_wire_type(
-                        tag,
-                        ::buffa::encoding::WireType::Varint,
-                    )?;
-                    self.cursor = ::buffa::types::decode_uint64(buf)?;
-                }
                 _ => {
                     self.__buffa_unknown_fields
                         .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -74207,7 +74186,6 @@ pub mod create_realtime_ticket_request {
         }
         fn clear(&mut self) {
             self.organization_id.clear();
-            self.cursor = 0u64;
             self.__buffa_unknown_fields.clear();
         }
     }
@@ -183662,8 +183640,6 @@ pub mod __buffa {
             pub struct OrganizationNotificationsView<'a> {
                 /// Field 1: `organization_id`
                 pub organization_id: &'a str,
-                /// Field 2: `cursor`
-                pub cursor: u64,
                 pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
             }
             impl<'a> ::buffa::MessageView<'a> for OrganizationNotificationsView<'a> {
@@ -183705,13 +183681,6 @@ pub mod __buffa {
                             )?;
                             view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
                         }
-                        2u32 => {
-                            ::buffa::encoding::check_wire_type(
-                                tag,
-                                ::buffa::encoding::WireType::Varint,
-                            )?;
-                            view.cursor = ::buffa::types::decode_uint64(&mut cur)?;
-                        }
                         _ => {
                             ::buffa::encoding::skip_field_depth(
                                 tag,
@@ -183746,7 +183715,6 @@ pub mod __buffa {
                     let _ = __buffa_src;
                     ::core::result::Result::Ok(super::super::super::create_realtime_ticket_request::OrganizationNotifications {
                         organization_id: self.organization_id.to_string(),
-                        cursor: self.cursor,
                         __buffa_unknown_fields: self
                             .__buffa_unknown_fields
                             .to_owned()?
@@ -183767,11 +183735,6 @@ pub mod __buffa {
                                 + ::buffa::types::string_encoded_len(&self.organization_id)
                                     as u64;
                     }
-                    if self.cursor != 0u64 {
-                        size
-                            += 1u64
-                                + ::buffa::types::uint64_encoded_len(self.cursor) as u64;
-                    }
                     size += self.__buffa_unknown_fields.encoded_len() as u64;
                     ::buffa::saturate_size(size)
                 }
@@ -183789,9 +183752,6 @@ pub mod __buffa {
                             &self.organization_id,
                             buf,
                         );
-                    }
-                    if self.cursor != 0u64 {
-                        ::buffa::types::put_uint64_field(2u32, self.cursor, buf);
                     }
                     self.__buffa_unknown_fields.write_to(buf);
                 }
@@ -183818,13 +183778,6 @@ pub mod __buffa {
                         self.organization_id,
                     ) {
                         __map.serialize_entry("organizationId", self.organization_id)?;
-                    }
-                    if !::buffa::json_helpers::skip_if::is_zero_u64(&self.cursor) {
-                        __map
-                            .serialize_entry(
-                                "cursor",
-                                &::buffa::json_helpers::ProtoJson(&self.cursor),
-                            )?;
                     }
                     __map.end()
                 }
@@ -183931,11 +183884,6 @@ pub mod __buffa {
                 #[must_use]
                 pub fn organization_id(&self) -> &'_ str {
                     self.0.reborrow().organization_id
-                }
-                /// Field 2: `cursor`
-                #[must_use]
-                pub fn cursor(&self) -> u64 {
-                    self.0.reborrow().cursor
                 }
             }
             impl ::core::convert::From<

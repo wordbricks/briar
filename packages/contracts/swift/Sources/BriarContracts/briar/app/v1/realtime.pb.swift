@@ -67,8 +67,6 @@ public nonisolated struct BriarAPI_CreateRealtimeTicketRequest: Sendable {
 
     public var organizationID: String = String()
 
-    public var cursor: UInt64 = 0
-
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
@@ -207,7 +205,7 @@ nonisolated extension BriarAPI_CreateRealtimeTicketRequest: SwiftProtobuf.Messag
 
 nonisolated extension BriarAPI_CreateRealtimeTicketRequest.OrganizationNotifications: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = BriarAPI_CreateRealtimeTicketRequest.protoMessageName + ".OrganizationNotifications"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{1}cursor\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -216,7 +214,6 @@ nonisolated extension BriarAPI_CreateRealtimeTicketRequest.OrganizationNotificat
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
-      case 2: try { try decoder.decodeSingularUInt64Field(value: &self.cursor) }()
       default: break
       }
     }
@@ -226,15 +223,11 @@ nonisolated extension BriarAPI_CreateRealtimeTicketRequest.OrganizationNotificat
     if !self.organizationID.isEmpty {
       try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
     }
-    if self.cursor != 0 {
-      try visitor.visitSingularUInt64Field(value: self.cursor, fieldNumber: 2)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_CreateRealtimeTicketRequest.OrganizationNotifications, rhs: BriarAPI_CreateRealtimeTicketRequest.OrganizationNotifications) -> Bool {
     if lhs.organizationID != rhs.organizationID {return false}
-    if lhs.cursor != rhs.cursor {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
