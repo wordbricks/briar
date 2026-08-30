@@ -12,17 +12,20 @@ import "briar/types/v1/agent_execution.proto";
 import "briar/types/v1/provider.proto";
 import "briar/types/v1/worker.proto";
 import "briar/types/v1/workflow.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
-// The machine Worker queue control plane. Large result uploads, transcripts,
-// evidence, and provider-specific execution endpoints intentionally remain
-// outside this service because they have different lifecycle and transport
-// requirements.
+// The machine Worker queue control plane. Attachment metadata and upload
+// capabilities are negotiated here, while attachment bytes, large evidence,
+// and provider-specific streams intentionally use their dedicated transports.
 service WorkerQueueService {
   rpc ClaimWork(ClaimWorkRequest) returns (ClaimWorkResponse);
   rpc RenewWorkLease(RenewWorkLeaseRequest) returns (RenewWorkLeaseResponse);
   rpc CheckpointChannelReplySession(CheckpointChannelReplySessionRequest) returns (CheckpointChannelReplySessionResponse);
+  rpc PrepareReplyAttachmentUploads(PrepareReplyAttachmentUploadsRequest) returns (PrepareReplyAttachmentUploadsResponse);
+  rpc CompleteIssueReply(CompleteIssueReplyRequest) returns (CompleteIssueReplyResponse);
+  rpc CompleteChannelReply(CompleteChannelReplyRequest) returns (CompleteChannelReplyResponse);
   rpc HandoffWork(HandoffWorkRequest) returns (HandoffWorkResponse);
   rpc CompleteProjectAgentTask(CompleteProjectAgentTaskRequest) returns (CompleteProjectAgentTaskResponse);
   rpc RecordMergeBatchCandidateEnqueued(RecordMergeBatchCandidateEnqueuedRequest) returns (RecordMergeBatchCandidateEnqueuedResponse);
@@ -285,6 +288,218 @@ message CheckpointChannelReplySessionRequest {
 
 message CheckpointChannelReplySessionResponse {
   google.protobuf.Timestamp retained_until = 1;
+}
+
+message PrepareReplyAttachmentUploadsRequest {
+  // Stable across a client retry. Reusing it with different metadata fails.
+  string request_id = 1;
+  string project_id = 2;
+  string worker_id = 3;
+  // Only exact active issue_reply and channel_reply claims are accepted.
+  // Other or unknown oneof variants fail closed.
+  WorkClaimIdentity work = 4;
+  repeated ReplyAttachmentUploadMetadata attachments = 5;
+}
+
+message ReplyAttachmentUploadMetadata {
+  // Correlates an input file with its server-issued reference. It is not an
+  // authorization or storage identifier.
+  string client_id = 1;
+  string filename = 2;
+  string content_type = 3;
+  uint64 byte_size = 4;
+  // Exact 32-byte SHA-256 digest. Attachment content never enters protobuf.
+  bytes sha256 = 5;
+}
+
+message ReplyAttachmentUploadReference {
+  // Opaque server-issued identifier. Completion accepts references belonging
+  // to the exact claim and prepare request only.
+  string attachment_id = 1;
+}
+
+message PreparedReplyAttachmentUpload {
+  string client_id = 1;
+  ReplyAttachmentUploadReference reference = 2;
+  string upload_url = 3;
+  // Short-lived bearer capability for the ordinary HTTP byte upload.
+  string upload_capability = 4;
+  google.protobuf.Timestamp expires_at = 5;
+}
+
+message PrepareReplyAttachmentUploadsResponse {
+  bool replayed = 1;
+  repeated PreparedReplyAttachmentUpload uploads = 2;
+}
+
+message ReplyFailure {
+  string error = 1;
+}
+
+message ReplyIssueDraft {
+  string title = 1;
+  optional string description = 2;
+  optional uint32 priority = 3;
+  // Issue replies accept backlog or queued; channel replies accept backlog
+  // only. Implementations reject unspecified, unknown, and out-of-scope values.
+  briar.app.v1.RunStatus status = 4;
+}
+
+message IssueReplyReworkAction {
+  string workflow_stage = 1;
+  string reason = 2;
+}
+
+message IssueReplyUpdateAction {
+  optional string title = 1;
+
+  oneof description {
+    string set_description = 2;
+    google.protobuf.Empty clear_description = 3;
+  }
+
+  oneof priority {
+    uint32 set_priority = 4;
+    google.protobuf.Empty clear_priority = 5;
+  }
+}
+
+message IssueReplyCreateAction {
+  ReplyIssueDraft issue = 1;
+  bool execute_after_create = 2;
+}
+
+message IssueReplyExecutionAction {}
+message IssueReplySkillExecutionAction {}
+
+message IssueReplySuccess {
+  string body = 1;
+  repeated ReplyAttachmentUploadReference attachments = 2;
+
+  // A reply can propose at most one follow-up action. Unknown action variants
+  // and unspecified nested enums are rejected rather than ignored.
+  oneof action {
+    IssueReplyReworkAction rework = 10;
+    IssueReplyUpdateAction update = 11;
+    IssueReplyCreateAction create = 12;
+    IssueReplyExecutionAction execution = 13;
+    IssueReplySkillExecutionAction skill_execution = 14;
+  }
+}
+
+message CompleteIssueReplyRequest {
+  // Stable across a client retry. The server records the exact outcome before
+  // clearing the claim token so a lost response can be replayed safely.
+  string request_id = 1;
+  string project_id = 2;
+  string worker_id = 3;
+  // Must be the exact active issue_reply claim; other variants fail closed.
+  WorkClaimIdentity work = 4;
+
+  oneof outcome {
+    IssueReplySuccess success = 10;
+    ReplyFailure failure = 11;
+  }
+}
+
+enum ReplyCompletionDisposition {
+  REPLY_COMPLETION_DISPOSITION_UNSPECIFIED = 0;
+  REPLY_COMPLETION_DISPOSITION_COMPLETED = 1;
+  REPLY_COMPLETION_DISPOSITION_REQUEUED = 2;
+  REPLY_COMPLETION_DISPOSITION_FAILED = 3;
+}
+
+message CompleteIssueReplyResponse {
+  bool replayed = 1;
+  // Implementations reject unspecified and unknown values on read.
+  ReplyCompletionDisposition disposition = 2;
+}
+
+message ChannelReplyDocumentAction {
+  string title = 1;
+  string markdown = 2;
+  optional string project_id = 3;
+}
+
+message ChannelReplyIssueAction {
+  optional string project_id = 1;
+  ReplyIssueDraft issue = 2;
+  bool execute_after_create = 3;
+}
+
+message ChannelReplyIssueBatchItem {
+  string key = 1;
+  ReplyIssueDraft issue = 2;
+}
+
+message ChannelReplyIssueBatchDependency {
+  string prerequisite_key = 1;
+  string dependent_key = 2;
+}
+
+message ChannelReplyIssueBatchAction {
+  optional string project_id = 1;
+  repeated ChannelReplyIssueBatchItem items = 2;
+  repeated ChannelReplyIssueBatchDependency dependencies = 3;
+}
+
+message ChannelReplyExecutionAction {
+  string project_id = 1;
+  string run_id = 2;
+}
+
+message ChannelReplySkillExecutionAction {}
+
+message ChannelReplyDelegationAction {
+  string project_id = 1;
+  string agent_id = 2;
+  string request = 3;
+}
+
+message ChannelReplyArtifactsAction {
+  optional ChannelReplyDocumentAction document = 1;
+
+  oneof proposal {
+    ChannelReplyIssueAction issue = 10;
+    ChannelReplyIssueBatchAction issue_batch = 11;
+    ChannelReplyExecutionAction execution = 12;
+  }
+}
+
+message ChannelReplySuccess {
+  string body = 1;
+  optional string conversation_id = 2;
+  repeated ReplyAttachmentUploadReference attachments = 3;
+
+  // A document may accompany at most one proposal. Skill execution and
+  // delegation remain exclusive from every artifact at the wire boundary.
+  // Unknown action variants and unspecified nested enums fail closed.
+  oneof action {
+    ChannelReplyArtifactsAction artifacts = 10;
+    ChannelReplySkillExecutionAction skill_execution = 11;
+    ChannelReplyDelegationAction delegation = 12;
+  }
+}
+
+message CompleteChannelReplyRequest {
+  // Stable across a client retry and bound to the exact claim result.
+  string request_id = 1;
+  string project_id = 2;
+  string worker_id = 3;
+  // Must be the exact active channel_reply claim; other variants fail closed.
+  WorkClaimIdentity work = 4;
+
+  oneof outcome {
+    ChannelReplySuccess success = 10;
+    ReplyFailure failure = 11;
+  }
+}
+
+message CompleteChannelReplyResponse {
+  bool replayed = 1;
+  // Implementations reject unspecified and unknown values on read.
+  ReplyCompletionDisposition disposition = 2;
+  optional google.protobuf.Timestamp retained_until = 3;
 }
 
 message PublishReplyActivityRequest {
