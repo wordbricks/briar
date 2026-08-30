@@ -866,7 +866,7 @@ final class ChannelsStore: ObservableObject {
                 guard let payload else { throw MobileAPIError.invalidRequest }
                 let attachmentReferencesJSON = String(
                     data: try JSONEncoder().encode(
-                        existingAttachmentReferences + payload.references
+                        payload.references
                     ),
                     encoding: .utf8
                 ) ?? "[]"

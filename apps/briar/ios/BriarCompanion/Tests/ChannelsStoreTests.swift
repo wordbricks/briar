@@ -184,7 +184,7 @@ final class ChannelsStoreTests: XCTestCase {
         let uploadReferences = await api.multipartAttachmentReferences()
         XCTAssertEqual(finalConnectCalls.count, 1)
         XCTAssertEqual(finalUploadCount, 1)
-        XCTAssertEqual(uploadReferences, [["existing-upload-ref", "new-upload-ref"]])
+        XCTAssertEqual(uploadReferences, [["new-upload-ref"]])
         store.applicationDidEnterBackground()
     }
 
