@@ -369,6 +369,32 @@ export async function completeProjectIssueResultReview(
   };
 }
 
+export async function updateProjectIssueCheckpoints(
+  input: IssueCoreApplicationInput & { runId: string; request: unknown },
+) {
+  const project = await requireIssueProject(
+    input,
+    "issues:execute",
+    "Issue execution permission required",
+  );
+  const request = decodeIssueCheckpointsInput(input.request);
+  const outcome = await updateIssueCheckpoints(
+    input.db,
+    project.id,
+    input.runId,
+    request.checkpoints,
+    new Date().toISOString(),
+  );
+  if (outcome === "not_found") throw new HttpError(404, "Run not found");
+  if (outcome === "ineligible") {
+    throw new HttpError(
+      409,
+      "Checkpoints can only be changed before issue execution starts",
+    );
+  }
+  return { runId: input.runId, checkpoints: request.checkpoints };
+}
+
 export async function handleIssueCoreRoute(input: {
   request: Request;
   url: URL;
@@ -416,34 +442,13 @@ export async function handleIssueCoreRoute(input: {
   );
   if (issueCheckpointsMatch && request.method === "PUT") {
     const session = await requireSession(auth, request);
-    const project = await getProject(
+    return json(await updateProjectIssueCheckpoints({
       db,
-      issueCheckpointsMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
-      throw new HttpError(403, "Issue execution permission required");
-    }
-    const input = decodeIssueCheckpointsInput(await readJson(request));
-    const outcome = await updateIssueCheckpoints(
-      db,
-      project.id,
-      issueCheckpointsMatch[2],
-      input.checkpoints,
-      new Date().toISOString(),
-    );
-    if (outcome === "not_found") throw new HttpError(404, "Run not found");
-    if (outcome === "ineligible") {
-      throw new HttpError(
-        409,
-        "Checkpoints can only be changed before issue execution starts",
-      );
-    }
-    return json({
+      projectId: issueCheckpointsMatch[1],
       runId: issueCheckpointsMatch[2],
-      checkpoints: input.checkpoints,
-    });
+      userId: session.user.id,
+      request: await readJson(request),
+    }));
   }
   if (
     issueUpdateMatch && request.method === "PATCH" &&

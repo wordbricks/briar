@@ -25,6 +25,7 @@ import {
   appCompleteResultReviewResponse,
   appCreateIssueResponse,
   appCreateIssueMessageResponse,
+  appDeleteIssueMessageResponse,
   appDeleteIssueResponse,
   appDispatchRunResponse,
   appGetIssueAgentReplyResponse,
@@ -32,28 +33,36 @@ import {
   appMoveRunResponse,
   appReassignRunResponse,
   appResetIssueMessagesResponse,
+  appReworkRunResponse,
   appResumeRunResponse,
   appRetryRunResponse,
   appSetIssueDependencyResponse,
   appSetIssueSubscriptionResponse,
   appSyncIssueMessagesResponse,
   appTransferIssueResponse,
+  appUnassignRunResponse,
+  appUpdateIssueCheckpointsResponse,
+  appUpdateIssueMessageResponse,
   appUpdateIssuePreferencesResponse,
   appUpdateIssueResponse,
 } from "./app-connect-issue-mappers";
 import type { BriarAuth } from "./auth";
 import {
   createProjectIssueMessage,
+  deleteProjectIssueMessage,
   getProjectIssueAgentReply,
   listProjectIssueMessages,
   syncProjectIssueMessages,
+  updateProjectIssueMessage,
 } from "./issue-conversation-routes";
 import {
   dispatchProjectIssueRun,
   moveProjectIssueRun,
   recoverProjectIssueRun,
+  reworkProjectIssueRun,
   resumeProjectIssueRun,
   transferProjectIssue,
+  unassignProjectIssueRun,
 } from "./issue-control-routes";
 import {
   completeProjectIssueResultReview,
@@ -62,6 +71,7 @@ import {
   setProjectIssueDependency,
   setProjectIssueSubscription,
   updateProjectIssue,
+  updateProjectIssueCheckpoints,
   updateProjectIssuePreferences,
 } from "./issue-core-routes";
 import { HttpError } from "./http-response";
@@ -99,6 +109,7 @@ export type AppConnectIssueServices = {
   readonly completeResultReview: typeof completeProjectIssueResultReview;
   readonly createIssue: typeof createProjectIssue;
   readonly createMessage: typeof createProjectIssueMessage;
+  readonly deleteMessage: typeof deleteProjectIssueMessage;
   readonly deleteIssue: typeof deleteProjectIssue;
   readonly dispatchRun: typeof dispatchProjectIssueRun;
   readonly getAgentReply: typeof getProjectIssueAgentReply;
@@ -106,13 +117,17 @@ export type AppConnectIssueServices = {
   readonly listMessages: typeof listProjectIssueMessages;
   readonly moveRun: typeof moveProjectIssueRun;
   readonly recoverRun: typeof recoverProjectIssueRun;
+  readonly reworkRun: typeof reworkProjectIssueRun;
   readonly requireSession: typeof requireSession;
   readonly resumeRun: typeof resumeProjectIssueRun;
   readonly setDependency: typeof setProjectIssueDependency;
   readonly setSubscription: typeof setProjectIssueSubscription;
   readonly syncMessages: typeof syncProjectIssueMessages;
   readonly transferIssue: typeof transferProjectIssue;
+  readonly unassignRun: typeof unassignProjectIssueRun;
   readonly updateIssue: typeof updateProjectIssue;
+  readonly updateCheckpoints: typeof updateProjectIssueCheckpoints;
+  readonly updateMessage: typeof updateProjectIssueMessage;
   readonly updatePreferences: typeof updateProjectIssuePreferences;
 };
 
@@ -124,6 +139,7 @@ export const appConnectIssueServices: AppConnectIssueServices = {
   completeResultReview: completeProjectIssueResultReview,
   createIssue: createProjectIssue,
   createMessage: createProjectIssueMessage,
+  deleteMessage: deleteProjectIssueMessage,
   deleteIssue: deleteProjectIssue,
   dispatchRun: dispatchProjectIssueRun,
   getAgentReply: getProjectIssueAgentReply,
@@ -131,13 +147,17 @@ export const appConnectIssueServices: AppConnectIssueServices = {
   listMessages: listProjectIssueMessages,
   moveRun: moveProjectIssueRun,
   recoverRun: recoverProjectIssueRun,
+  reworkRun: reworkProjectIssueRun,
   requireSession,
   resumeRun: resumeProjectIssueRun,
   setDependency: setProjectIssueDependency,
   setSubscription: setProjectIssueSubscription,
   syncMessages: syncProjectIssueMessages,
   transferIssue: transferProjectIssue,
+  unassignRun: unassignProjectIssueRun,
   updateIssue: updateProjectIssue,
+  updateCheckpoints: updateProjectIssueCheckpoints,
+  updateMessage: updateProjectIssueMessage,
   updatePreferences: updateProjectIssuePreferences,
 };
 
@@ -465,6 +485,26 @@ export const createAppIssueService = (
     return appUpdateIssuePreferencesResponse(result);
   }),
 
+  updateIssueCheckpoints: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await mutated(input, [request.projectId], () =>
+      services.updateCheckpoints({
+        db: input.db,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+        request: {
+          checkpoints: request.checkpoints.map((checkpoint) => ({
+            key: checkpoint.key,
+            stage: checkpoint.stage,
+            position: checkpointPositionJson(checkpoint.position),
+          })),
+        },
+      })
+    );
+    return appUpdateIssueCheckpointsResponse(result);
+  }),
+
   setIssueDependency: (request) => rpc(async () => {
     const projectId = canonicalUuid(request.projectId);
     const dependentRunId = canonicalUuid(request.runId);
@@ -554,6 +594,48 @@ export const createAppIssueService = (
       })
     );
     return appResumeRunResponse(result);
+  }),
+
+  reworkRun: (request) => rpc(async () => {
+    if (!request.checkpoint) {
+      throw new ConnectError(
+        "Checkpoint identity is required",
+        Code.InvalidArgument,
+      );
+    }
+    const checkpoint = request.checkpoint;
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await mutated(input, [request.projectId], () =>
+      services.reworkRun({
+        db: input.db,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+        request: {
+          requestId: canonicalUuid(request.requestId),
+          workflowStage: request.workflowStage,
+          reason: request.reason,
+          checkpointKey: checkpoint.key,
+          attempt: checkpoint.attempt,
+          revision: checkpoint.revision,
+        },
+      })
+    );
+    return appReworkRunResponse(result);
+  }),
+
+  unassignRun: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await mutated(input, [request.projectId], () =>
+      services.unassignRun({
+        db: input.db,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        userId: session.user.id,
+        request: { requestId: canonicalUuid(request.requestId) },
+      })
+    );
+    return appUnassignRunResponse(result);
   }),
 
   dispatchRun: (request) => rpc(async () => {
@@ -692,6 +774,42 @@ export const createAppIssueService = (
       })
     );
     return appCreateIssueMessageResponse(result);
+  }),
+
+  updateIssueMessage: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await mutated(input, [request.projectId], () =>
+      services.updateMessage({
+        db: input.db,
+        archivesBucket: input.env.ARCHIVES,
+        attachmentsBucket: input.env.ATTACHMENTS,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        messageId: canonicalUuid(request.messageId),
+        userId: session.user.id,
+        request: {
+          body: request.body,
+          mentionedUserIds: request.mentionedUserIds,
+        },
+      })
+    );
+    return appUpdateIssueMessageResponse(result);
+  }),
+
+  deleteIssueMessage: (request) => rpc(async () => {
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await mutated(input, [request.projectId], () =>
+      services.deleteMessage({
+        db: input.db,
+        archivesBucket: input.env.ARCHIVES,
+        attachmentsBucket: input.env.ATTACHMENTS,
+        projectId: canonicalUuid(request.projectId),
+        runId: canonicalUuid(request.runId),
+        messageId: canonicalUuid(request.messageId),
+        userId: session.user.id,
+      })
+    );
+    return appDeleteIssueMessageResponse(result);
   }),
 
   getIssueAgentReply: (request) => rpc(async () => {

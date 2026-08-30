@@ -264,6 +264,65 @@ export async function dispatchProjectIssueRun(
   return dispatched;
 }
 
+export async function reworkProjectIssueRun(
+  input: IssueControlApplicationInput & { request: unknown },
+) {
+  const project = await requireIssueExecutionProject(
+    input,
+    "issues:execute",
+    "Issue execution permission required",
+  );
+  const request = decodePausedRunReworkInput(input.request);
+  try {
+    const result = await reworkHuntRun(input.db, project.id, {
+      runId: input.runId,
+      workflowStage: request.workflowStage,
+      requestId: request.requestId,
+      actor: `briar-app:${input.userId}`,
+      reason: request.reason,
+      occurredAt: new Date().toISOString(),
+      checkpoint: {
+        key: request.checkpointKey,
+        attempt: request.attempt,
+        revision: request.revision,
+      },
+    });
+    if (result.outcome === "not_found") {
+      throw new HttpError(404, "Run not found");
+    }
+    return { runId: input.runId, ...result };
+  } catch (error) {
+    if (error instanceof HuntTransitionError) {
+      throw new HttpError(409, error.message, "CHECKPOINT_CONFLICT");
+    }
+    throw error;
+  }
+}
+
+export async function unassignProjectIssueRun(
+  input: IssueControlApplicationInput & { request: unknown },
+) {
+  const project = await requireIssueExecutionProject(
+    input,
+    "issues:execute",
+    "Issue execution permission required",
+  );
+  const request = decodeRequestIdInput(input.request);
+  const result = await unassignHuntRun(
+    input.db,
+    project.organization_id,
+    project.id,
+    {
+      runId: input.runId,
+      requestedByUserId: input.userId,
+      requestId: request.requestId,
+      occurredAt: new Date().toISOString(),
+    },
+  );
+  if (!result) throw new HttpError(404, "Run not found");
+  return result;
+}
+
 export async function handleIssueControlRoute(input: {
   request: Request;
   url: URL;
@@ -277,36 +336,13 @@ export async function handleIssueControlRoute(input: {
   );
   if (pausedReworkMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const project = await getProject(db, pausedReworkMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
-      throw new HttpError(403, "Issue execution permission required");
-    }
-    const input = decodePausedRunReworkInput(await readJson(request));
-    try {
-      const result = await reworkHuntRun(db, project.id, {
-        runId: pausedReworkMatch[2],
-        workflowStage: input.workflowStage,
-        requestId: input.requestId,
-        actor: `briar-app:${session.user.id}`,
-        reason: input.reason,
-        occurredAt: new Date().toISOString(),
-        checkpoint: {
-          key: input.checkpointKey,
-          attempt: input.attempt,
-          revision: input.revision,
-        },
-      });
-      if (result.outcome === "not_found") {
-        throw new HttpError(404, "Run not found");
-      }
-      return json({ runId: pausedReworkMatch[2], ...result });
-    } catch (error) {
-      if (error instanceof HuntTransitionError) {
-        throw new HttpError(409, error.message, "CHECKPOINT_CONFLICT");
-      }
-      throw error;
-    }
+    return json(await reworkProjectIssueRun({
+      db,
+      projectId: pausedReworkMatch[1],
+      runId: pausedReworkMatch[2],
+      userId: session.user.id,
+      request: await readJson(request),
+    }));
   }
 
   const unassignRunMatch = url.pathname.match(
@@ -314,20 +350,13 @@ export async function handleIssueControlRoute(input: {
   );
   if (unassignRunMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const project = await getProject(db, unassignRunMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
-      throw new HttpError(403, "Issue execution permission required");
-    }
-    const input = decodeRequestIdInput(await readJson(request));
-    const result = await unassignHuntRun(db, project.organization_id, project.id, {
+    return json(await unassignProjectIssueRun({
+      db,
+      projectId: unassignRunMatch[1],
       runId: unassignRunMatch[2],
-      requestedByUserId: session.user.id,
-      requestId: input.requestId,
-      occurredAt: new Date().toISOString(),
-    });
-    if (!result) throw new HttpError(404, "Run not found");
-    return json(result);
+      userId: session.user.id,
+      request: await readJson(request),
+    }));
   }
 
   return undefined;

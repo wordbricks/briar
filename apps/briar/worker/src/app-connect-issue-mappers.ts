@@ -36,6 +36,7 @@ import {
   CreateIssueResponseSchema,
   CreateIssueMessageResponseSchema,
   DeleteIssueResponseSchema,
+  DeleteIssueMessageResponseSchema,
   DispatchRunResponseSchema,
   GetIssueAgentReplyResponseSchema,
   IssueAgentReplySchema,
@@ -54,6 +55,8 @@ import {
   MoveRunResponseSchema,
   ProposedIssueSchema,
   ReassignRunResponseSchema,
+  ReworkRunResponse_Outcome,
+  ReworkRunResponseSchema,
   ResumeRunResponse_Outcome,
   ResumeRunResponseSchema,
   RetryRunResponseSchema,
@@ -63,10 +66,18 @@ import {
   SyncIssueMessagesResponseSchema,
   TransferIssueResponse_Outcome,
   TransferIssueResponseSchema,
+  UnassignRunResponse_Outcome,
+  UnassignRunResponseSchema,
+  UpdateIssueCheckpointsResponseSchema,
+  UpdateIssueMessageResponseSchema,
   UpdateIssuePreferencesResponseSchema,
   UpdateIssueResponseSchema,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import {
+  WorkflowCheckpoint_Position,
+  WorkflowCheckpointSpecSchema,
+} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
 import * as Schema from "effect/Schema";
 import {
@@ -103,6 +114,11 @@ type CompleteReviewResult = Awaited<
     typeof import("./issue-core-routes").completeProjectIssueResultReview
   >
 >;
+type UpdateCheckpointsResult = Awaited<
+  ReturnType<
+    typeof import("./issue-core-routes").updateProjectIssueCheckpoints
+  >
+>;
 type TransferIssueResult = Awaited<
   ReturnType<typeof import("./issue-control-routes").transferProjectIssue>
 >;
@@ -117,6 +133,12 @@ type ResumeRunResult = Awaited<
 >;
 type DispatchRunResult = Awaited<
   ReturnType<typeof import("./issue-control-routes").dispatchProjectIssueRun>
+>;
+type ReworkRunResult = Awaited<
+  ReturnType<typeof import("./issue-control-routes").reworkProjectIssueRun>
+>;
+type UnassignRunResult = Awaited<
+  ReturnType<typeof import("./issue-control-routes").unassignProjectIssueRun>
 >;
 
 const internal = (message: string): never => {
@@ -277,6 +299,28 @@ export const appUpdateIssuePreferencesResponse = (
     effort: result.effort ?? undefined,
   });
 
+const checkpointPosition = {
+  before: WorkflowCheckpoint_Position.BEFORE,
+  after: WorkflowCheckpoint_Position.AFTER,
+} as const satisfies Record<
+  UpdateCheckpointsResult["checkpoints"][number]["position"],
+  WorkflowCheckpoint_Position
+>;
+
+export const appUpdateIssueCheckpointsResponse = (
+  result: UpdateCheckpointsResult,
+) =>
+  create(UpdateIssueCheckpointsResponseSchema, {
+    runId: result.runId,
+    checkpoints: result.checkpoints.map((checkpoint) =>
+      create(WorkflowCheckpointSpecSchema, {
+        key: checkpoint.key,
+        stage: checkpoint.stage,
+        position: checkpointPosition[checkpoint.position],
+      })
+    ),
+  });
+
 const dependencyOutcome = {
   created: SetIssueDependencyResponse_Outcome.CREATED,
   already_exists: SetIssueDependencyResponse_Outcome.ALREADY_EXISTS,
@@ -356,6 +400,43 @@ export const appResumeRunResponse = (result: ResumeRunResult) =>
     attempt: result.attempt ?? undefined,
     revision: result.revision ?? undefined,
     terminalReviewOnly: result.terminalReviewOnly,
+  });
+
+const reworkOutcome = (outcome: ReworkRunResult["outcome"]) => {
+  switch (outcome) {
+    case "reworked":
+      return ReworkRunResponse_Outcome.REWORKED;
+    case "already_reworked":
+      return ReworkRunResponse_Outcome.ALREADY_REWORKED;
+    case "not_found":
+      return internal("Rework application returned a not-found result");
+  }
+};
+
+export const appReworkRunResponse = (result: ReworkRunResult) =>
+  create(ReworkRunResponseSchema, {
+    runId: result.runId,
+    outcome: reworkOutcome(result.outcome),
+    attempt: requiredUint32(result.attempt, "rework attempt"),
+    revision: requiredUint32(result.revision, "rework revision"),
+    workflowStage: requiredString(
+      result.workflowStage,
+      "rework workflow stage",
+    ),
+  });
+
+const unassignOutcome = {
+  unassigned: UnassignRunResponse_Outcome.UNASSIGNED,
+  not_assigned: UnassignRunResponse_Outcome.NOT_ASSIGNED,
+} as const satisfies Record<
+  UnassignRunResult["outcome"],
+  UnassignRunResponse_Outcome
+>;
+
+export const appUnassignRunResponse = (result: UnassignRunResult) =>
+  create(UnassignRunResponseSchema, {
+    runId: result.runId,
+    outcome: unassignOutcome[result.outcome],
   });
 
 const appDispatchMode = (value: string) => {
@@ -450,6 +531,16 @@ type IssueAgentReplyResult = ConversationSnapshot["agentReplies"][number];
 type CreateMessageResult = Awaited<
   ReturnType<
     typeof import("./issue-conversation-routes").createProjectIssueMessage
+  >
+>;
+type UpdateMessageResult = Awaited<
+  ReturnType<
+    typeof import("./issue-conversation-routes").updateProjectIssueMessage
+  >
+>;
+type DeleteMessageResult = Awaited<
+  ReturnType<
+    typeof import("./issue-conversation-routes").deleteProjectIssueMessage
   >
 >;
 type GetAgentReplyResult = Awaited<
@@ -792,6 +883,14 @@ export const appCreateIssueMessageResponse = (result: CreateMessageResult) =>
       ? undefined
       : appIssueAgentReply(result.agentReply),
   });
+
+export const appUpdateIssueMessageResponse = (result: UpdateMessageResult) =>
+  create(UpdateIssueMessageResponseSchema, {
+    message: appIssueMessage(result.message),
+  });
+
+export const appDeleteIssueMessageResponse = (result: DeleteMessageResult) =>
+  create(DeleteIssueMessageResponseSchema, { deleted: result.deleted });
 
 export const appGetIssueAgentReplyResponse = (result: GetAgentReplyResult) =>
   create(GetIssueAgentReplyResponseSchema, {

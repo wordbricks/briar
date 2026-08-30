@@ -346,6 +346,116 @@ export async function createProjectIssueMessage(
   };
 }
 
+export async function updateProjectIssueMessage(
+  input: IssueConversationApplicationInput & {
+    attachmentsBucket: R2Bucket;
+    messageId: string;
+    request: unknown;
+  },
+) {
+  const project = await requireIssueConversationProject(input);
+  if (!hasOrganizationCapability(project.member_role, "conversations:write")) {
+    throw new HttpError(403, "Conversation editing permission required");
+  }
+  const request = decodeIssueMessageEditInput(input.request);
+  const message = await getIssueMessage(
+    input.db,
+    project.id,
+    input.runId,
+    input.messageId,
+  );
+  if (!message) throw new HttpError(404, "Message not found");
+  if (message.author_user_id !== input.userId) {
+    throw new HttpError(403, "Only the author can edit this message");
+  }
+  const updated = await updateIssueMessage(
+    input.db,
+    project.id,
+    input.runId,
+    message.id,
+    {
+      body: request.body,
+      mentionedUserIds: request.mentionedUserIds,
+      updatedAt: new Date().toISOString(),
+    },
+  );
+  if (!updated) throw new HttpError(404, "Message not found");
+  await removeOrphanedIssueAttachments(
+    input.db,
+    input.archivesBucket,
+    input.attachmentsBucket,
+    project.id,
+    input.runId,
+  );
+  const [
+    attachments,
+    reworkProposals,
+    actionProposals,
+    executionProposals,
+    skillExecutionProposals,
+  ] = await Promise.all([
+    listIssueAttachments(input.db, project.id, input.runId),
+    listIssueReworkProposals(input.db, project.id, input.runId),
+    listIssueActionProposals(input.db, project.id, input.runId),
+    listIssueExecutionProposals(input.db, project.id, input.runId),
+    listIssueAgentSkillExecutionProposals(input.db, project.id, input.runId),
+  ]);
+  const proposal = [...reworkProposals, ...actionProposals].find(
+    (candidate) => candidate.reply_message_id === updated.id,
+  ) ?? null;
+  const executionProposal = executionProposals.find(
+    (candidate) => candidate.reply_message_id === updated.id,
+  ) ?? null;
+  return {
+    message: issueMessageJson(
+      updated,
+      attachments,
+      proposal,
+      executionProposal,
+      skillExecutionProposals.find(
+        (candidate) => candidate.reply_message_id === updated.id,
+      ) ?? null,
+    ),
+  };
+}
+
+export async function deleteProjectIssueMessage(
+  input: IssueConversationApplicationInput & {
+    attachmentsBucket: R2Bucket;
+    messageId: string;
+  },
+) {
+  const project = await requireIssueConversationProject(input);
+  if (!hasOrganizationCapability(project.member_role, "conversations:write")) {
+    throw new HttpError(403, "Conversation editing permission required");
+  }
+  const message = await getIssueMessage(
+    input.db,
+    project.id,
+    input.runId,
+    input.messageId,
+  );
+  if (!message) throw new HttpError(404, "Message not found");
+  if (message.author_user_id !== input.userId) {
+    throw new HttpError(403, "Only the author can delete this message");
+  }
+  const deleted = await deleteIssueMessage(
+    input.db,
+    project.id,
+    input.runId,
+    message.id,
+  );
+  if (!deleted) throw new HttpError(404, "Message not found");
+  await removeOrphanedIssueAttachments(
+    input.db,
+    input.archivesBucket,
+    input.attachmentsBucket,
+    project.id,
+    input.runId,
+  );
+  return { deleted: true as const };
+}
+
 export async function getProjectIssueAgentReply(
   input: IssueConversationApplicationInput & { triggerMessageId: string },
 ) {
@@ -520,115 +630,28 @@ export async function handleIssueConversationRoute(input: {
   );
   if (issueMessageEditMatch && request.method === "PATCH") {
     const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      issueMessageEditMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "conversations:write")) {
-      throw new HttpError(403, "Conversation editing permission required");
-    }
-    const input = decodeIssueMessageEditInput(await readJson(request));
-    const message = await getIssueMessage(
-      db,
-      project.id,
-      issueMessageEditMatch[2],
-      issueMessageEditMatch[3],
-    );
-    if (!message) throw new HttpError(404, "Message not found");
-    if (message.author_user_id !== session.user.id) {
-      throw new HttpError(403, "Only the author can edit this message");
-    }
-    const updated = await updateIssueMessage(
-      db,
-      project.id,
-      issueMessageEditMatch[2],
-      message.id,
-      {
-        body: input.body,
-        mentionedUserIds: input.mentionedUserIds,
-        updatedAt: new Date().toISOString(),
-      },
-    );
-    if (!updated) throw new HttpError(404, "Message not found");
-    await removeOrphanedIssueAttachments(
+    return json(await updateProjectIssueMessage({
       db,
       archivesBucket,
       attachmentsBucket,
-      project.id,
-      issueMessageEditMatch[2],
-    );
-    const [
-      attachments,
-      reworkProposals,
-      actionProposals,
-      executionProposals,
-      skillExecutionProposals,
-    ] = await Promise.all([
-      listIssueAttachments(db, project.id, issueMessageEditMatch[2]),
-      listIssueReworkProposals(db, project.id, issueMessageEditMatch[2]),
-      listIssueActionProposals(db, project.id, issueMessageEditMatch[2]),
-      listIssueExecutionProposals(db, project.id, issueMessageEditMatch[2]),
-      listIssueAgentSkillExecutionProposals(
-        db,
-        project.id,
-        issueMessageEditMatch[2],
-      ),
-    ]);
-    const proposal = [...reworkProposals, ...actionProposals].find(
-      (candidate) => candidate.reply_message_id === updated.id,
-    ) ?? null;
-    const executionProposal = executionProposals.find(
-      (candidate) => candidate.reply_message_id === updated.id,
-    ) ?? null;
-    return json({
-      message: issueMessageJson(
-        updated,
-        attachments,
-        proposal,
-        executionProposal,
-        skillExecutionProposals.find(
-          (candidate) => candidate.reply_message_id === updated.id,
-        ) ?? null,
-      ),
-    });
+      projectId: issueMessageEditMatch[1],
+      runId: issueMessageEditMatch[2],
+      messageId: issueMessageEditMatch[3],
+      userId: session.user.id,
+      request: await readJson(request),
+    }));
   }
   if (issueMessageEditMatch && request.method === "DELETE") {
     const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      issueMessageEditMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "conversations:write")) {
-      throw new HttpError(403, "Conversation editing permission required");
-    }
-    const message = await getIssueMessage(
-      db,
-      project.id,
-      issueMessageEditMatch[2],
-      issueMessageEditMatch[3],
-    );
-    if (!message) throw new HttpError(404, "Message not found");
-    if (message.author_user_id !== session.user.id) {
-      throw new HttpError(403, "Only the author can delete this message");
-    }
-    const deleted = await deleteIssueMessage(
-      db,
-      project.id,
-      issueMessageEditMatch[2],
-      message.id,
-    );
-    if (!deleted) throw new HttpError(404, "Message not found");
-    await removeOrphanedIssueAttachments(
+    await deleteProjectIssueMessage({
       db,
       archivesBucket,
       attachmentsBucket,
-      project.id,
-      issueMessageEditMatch[2],
-    );
+      projectId: issueMessageEditMatch[1],
+      runId: issueMessageEditMatch[2],
+      messageId: issueMessageEditMatch[3],
+      userId: session.user.id,
+    });
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
