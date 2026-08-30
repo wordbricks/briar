@@ -13,6 +13,24 @@ public protocol BriarAPI_ProjectServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
     func `listProjects`(request: BriarAPI_ListProjectsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListProjectsResponse>
+
+    @available(iOS 13, *)
+    func `createProject`(request: BriarAPI_CreateProjectRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateProjectResponse>
+
+    @available(iOS 13, *)
+    func `deleteProject`(request: BriarAPI_DeleteProjectRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_DeleteProjectResponse>
+
+    @available(iOS 13, *)
+    func `updateProjectIcon`(request: BriarAPI_UpdateProjectIconRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateProjectIconResponse>
+
+    @available(iOS 13, *)
+    func `updateProjectIssueKeyPrefix`(request: BriarAPI_UpdateProjectIssueKeyPrefixRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateProjectIssueKeyPrefixResponse>
+
+    @available(iOS 13, *)
+    func `updateProjectTabs`(request: BriarAPI_UpdateProjectTabsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateProjectTabsResponse>
+
+    @available(iOS 13, *)
+    func `createProjectAgentToken`(request: BriarAPI_CreateProjectAgentTokenRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateProjectAgentTokenResponse>
 }
 
 /// Concrete implementation of `BriarAPI_ProjectServiceClientInterface`.
@@ -28,9 +46,45 @@ public final class BriarAPI_ProjectServiceClient: BriarAPI_ProjectServiceClientI
         return await self.client.unary(path: "/briar.app.v1.ProjectService/ListProjects", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
+    @available(iOS 13, *)
+    public func `createProject`(request: BriarAPI_CreateProjectRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateProjectResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/CreateProject", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `deleteProject`(request: BriarAPI_DeleteProjectRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteProjectResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/DeleteProject", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `updateProjectIcon`(request: BriarAPI_UpdateProjectIconRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateProjectIconResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/UpdateProjectIcon", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `updateProjectIssueKeyPrefix`(request: BriarAPI_UpdateProjectIssueKeyPrefixRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateProjectIssueKeyPrefixResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/UpdateProjectIssueKeyPrefix", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `updateProjectTabs`(request: BriarAPI_UpdateProjectTabsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateProjectTabsResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/UpdateProjectTabs", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `createProjectAgentToken`(request: BriarAPI_CreateProjectAgentTokenRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateProjectAgentTokenResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/CreateProjectAgentToken", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
     public enum Metadata {
         public enum Methods {
             public static let listProjects = Connect.MethodSpec(name: "ListProjects", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let createProject = Connect.MethodSpec(name: "CreateProject", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let deleteProject = Connect.MethodSpec(name: "DeleteProject", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let updateProjectIcon = Connect.MethodSpec(name: "UpdateProjectIcon", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let updateProjectIssueKeyPrefix = Connect.MethodSpec(name: "UpdateProjectIssueKeyPrefix", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let updateProjectTabs = Connect.MethodSpec(name: "UpdateProjectTabs", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let createProjectAgentToken = Connect.MethodSpec(name: "CreateProjectAgentToken", service: "briar.app.v1.ProjectService", type: .unary)
         }
     }
 }

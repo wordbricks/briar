@@ -6,15 +6,15 @@ import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegen
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { ProjectRole } from "./common_pb";
 import { file_briar_app_v1_common } from "./common_pb";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Empty, Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_empty, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file briar/app/v1/project.proto.
  */
 export const file_briar_app_v1_project: GenFile = /*@__PURE__*/
-  fileDesc("Chpicmlhci9hcHAvdjEvcHJvamVjdC5wcm90bxIMYnJpYXIuYXBwLnYxIhUKE0xpc3RQcm9qZWN0c1JlcXVlc3QiPwoUTGlzdFByb2plY3RzUmVzcG9uc2USJwoIcHJvamVjdHMYASADKAsyFS5icmlhci5hcHAudjEuUHJvamVjdCKEAgoHUHJvamVjdBIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhgKEGlzc3VlX2tleV9wcmVmaXgYAyABKAkSHAoUc2NoZWR1bGVfdGFiX2VuYWJsZWQYBCABKAgSEQoEaWNvbhgFIAEoCUgAiAEBEhcKD29yZ2FuaXphdGlvbl9pZBgGIAEoCRIZChFvcmdhbml6YXRpb25fbmFtZRgHIAEoCRInCgRyb2xlGAggASgOMhkuYnJpYXIuYXBwLnYxLlByb2plY3RSb2xlEi4KCmNyZWF0ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgcKBV9pY29uMmcKDlByb2plY3RTZXJ2aWNlElUKDExpc3RQcm9qZWN0cxIhLmJyaWFyLmFwcC52MS5MaXN0UHJvamVjdHNSZXF1ZXN0GiIuYnJpYXIuYXBwLnYxLkxpc3RQcm9qZWN0c1Jlc3BvbnNlQgy6AglCcmlhckFQSV9iBnByb3RvMw", [file_briar_app_v1_common, file_google_protobuf_timestamp]);
+  fileDesc("Chpicmlhci9hcHAvdjEvcHJvamVjdC5wcm90bxIMYnJpYXIuYXBwLnYxIhUKE0xpc3RQcm9qZWN0c1JlcXVlc3QiPwoUTGlzdFByb2plY3RzUmVzcG9uc2USJwoIcHJvamVjdHMYASADKAsyFS5icmlhci5hcHAudjEuUHJvamVjdCJWChRDcmVhdGVQcm9qZWN0UmVxdWVzdBIMCgRuYW1lGAEgASgJEhwKD29yZ2FuaXphdGlvbl9pZBgCIAEoCUgAiAEBQhIKEF9vcmdhbml6YXRpb25faWQiVAoVQ3JlYXRlUHJvamVjdFJlc3BvbnNlEiYKB3Byb2plY3QYASABKAsyFS5icmlhci5hcHAudjEuUHJvamVjdBITCgthZ2VudF90b2tlbhgCIAEoCSIqChREZWxldGVQcm9qZWN0UmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJIigKFURlbGV0ZVByb2plY3RSZXNwb25zZRIPCgdkZWxldGVkGAEgASgIInsKGFVwZGF0ZVByb2plY3RJY29uUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEg4KBGljb24YAiABKAlIABIsCgpjbGVhcl9pY29uGAMgASgLMhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5SABCDQoLaWNvbl91cGRhdGUiQwoZVXBkYXRlUHJvamVjdEljb25SZXNwb25zZRImCgdwcm9qZWN0GAEgASgLMhUuYnJpYXIuYXBwLnYxLlByb2plY3QiUgoiVXBkYXRlUHJvamVjdElzc3VlS2V5UHJlZml4UmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEhgKEGlzc3VlX2tleV9wcmVmaXgYAiABKAkiTQojVXBkYXRlUHJvamVjdElzc3VlS2V5UHJlZml4UmVzcG9uc2USJgoHcHJvamVjdBgBIAEoCzIVLmJyaWFyLmFwcC52MS5Qcm9qZWN0IkAKGFVwZGF0ZVByb2plY3RUYWJzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEhAKCHNjaGVkdWxlGAIgASgIIkMKGVVwZGF0ZVByb2plY3RUYWJzUmVzcG9uc2USJgoHcHJvamVjdBgBIAEoCzIVLmJyaWFyLmFwcC52MS5Qcm9qZWN0IjQKHkNyZWF0ZVByb2plY3RBZ2VudFRva2VuUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJIjYKH0NyZWF0ZVByb2plY3RBZ2VudFRva2VuUmVzcG9uc2USEwoLYWdlbnRfdG9rZW4YASABKAkihAIKB1Byb2plY3QSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIYChBpc3N1ZV9rZXlfcHJlZml4GAMgASgJEhwKFHNjaGVkdWxlX3RhYl9lbmFibGVkGAQgASgIEhEKBGljb24YBSABKAlIAIgBARIXCg9vcmdhbml6YXRpb25faWQYBiABKAkSGQoRb3JnYW5pemF0aW9uX25hbWUYByABKAkSJwoEcm9sZRgIIAEoDjIZLmJyaWFyLmFwcC52MS5Qcm9qZWN0Um9sZRIuCgpjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIHCgVfaWNvbjLkBQoOUHJvamVjdFNlcnZpY2USVQoMTGlzdFByb2plY3RzEiEuYnJpYXIuYXBwLnYxLkxpc3RQcm9qZWN0c1JlcXVlc3QaIi5icmlhci5hcHAudjEuTGlzdFByb2plY3RzUmVzcG9uc2USWAoNQ3JlYXRlUHJvamVjdBIiLmJyaWFyLmFwcC52MS5DcmVhdGVQcm9qZWN0UmVxdWVzdBojLmJyaWFyLmFwcC52MS5DcmVhdGVQcm9qZWN0UmVzcG9uc2USWAoNRGVsZXRlUHJvamVjdBIiLmJyaWFyLmFwcC52MS5EZWxldGVQcm9qZWN0UmVxdWVzdBojLmJyaWFyLmFwcC52MS5EZWxldGVQcm9qZWN0UmVzcG9uc2USZAoRVXBkYXRlUHJvamVjdEljb24SJi5icmlhci5hcHAudjEuVXBkYXRlUHJvamVjdEljb25SZXF1ZXN0GicuYnJpYXIuYXBwLnYxLlVwZGF0ZVByb2plY3RJY29uUmVzcG9uc2USggEKG1VwZGF0ZVByb2plY3RJc3N1ZUtleVByZWZpeBIwLmJyaWFyLmFwcC52MS5VcGRhdGVQcm9qZWN0SXNzdWVLZXlQcmVmaXhSZXF1ZXN0GjEuYnJpYXIuYXBwLnYxLlVwZGF0ZVByb2plY3RJc3N1ZUtleVByZWZpeFJlc3BvbnNlEmQKEVVwZGF0ZVByb2plY3RUYWJzEiYuYnJpYXIuYXBwLnYxLlVwZGF0ZVByb2plY3RUYWJzUmVxdWVzdBonLmJyaWFyLmFwcC52MS5VcGRhdGVQcm9qZWN0VGFic1Jlc3BvbnNlEnYKF0NyZWF0ZVByb2plY3RBZ2VudFRva2VuEiwuYnJpYXIuYXBwLnYxLkNyZWF0ZVByb2plY3RBZ2VudFRva2VuUmVxdWVzdBotLmJyaWFyLmFwcC52MS5DcmVhdGVQcm9qZWN0QWdlbnRUb2tlblJlc3BvbnNlQgy6AglCcmlhckFQSV9iBnByb3RvMw", [file_briar_app_v1_common, file_google_protobuf_empty, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message briar.app.v1.ListProjectsRequest
@@ -45,6 +45,247 @@ export type ListProjectsResponse = Message<"briar.app.v1.ListProjectsResponse"> 
  */
 export const ListProjectsResponseSchema: GenMessage<ListProjectsResponse> = /*@__PURE__*/
   messageDesc(file_briar_app_v1_project, 1);
+
+/**
+ * @generated from message briar.app.v1.CreateProjectRequest
+ */
+export type CreateProjectRequest = Message<"briar.app.v1.CreateProjectRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: optional string organization_id = 2;
+   */
+  organizationId?: string | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.CreateProjectRequest.
+ * Use `create(CreateProjectRequestSchema)` to create a new message.
+ */
+export const CreateProjectRequestSchema: GenMessage<CreateProjectRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 2);
+
+/**
+ * @generated from message briar.app.v1.CreateProjectResponse
+ */
+export type CreateProjectResponse = Message<"briar.app.v1.CreateProjectResponse"> & {
+  /**
+   * @generated from field: briar.app.v1.Project project = 1;
+   */
+  project?: Project | undefined;
+
+  /**
+   * @generated from field: string agent_token = 2;
+   */
+  agentToken: string;
+};
+
+/**
+ * Describes the message briar.app.v1.CreateProjectResponse.
+ * Use `create(CreateProjectResponseSchema)` to create a new message.
+ */
+export const CreateProjectResponseSchema: GenMessage<CreateProjectResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 3);
+
+/**
+ * @generated from message briar.app.v1.DeleteProjectRequest
+ */
+export type DeleteProjectRequest = Message<"briar.app.v1.DeleteProjectRequest"> & {
+  /**
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
+};
+
+/**
+ * Describes the message briar.app.v1.DeleteProjectRequest.
+ * Use `create(DeleteProjectRequestSchema)` to create a new message.
+ */
+export const DeleteProjectRequestSchema: GenMessage<DeleteProjectRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 4);
+
+/**
+ * @generated from message briar.app.v1.DeleteProjectResponse
+ */
+export type DeleteProjectResponse = Message<"briar.app.v1.DeleteProjectResponse"> & {
+  /**
+   * @generated from field: bool deleted = 1;
+   */
+  deleted: boolean;
+};
+
+/**
+ * Describes the message briar.app.v1.DeleteProjectResponse.
+ * Use `create(DeleteProjectResponseSchema)` to create a new message.
+ */
+export const DeleteProjectResponseSchema: GenMessage<DeleteProjectResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 5);
+
+/**
+ * @generated from message briar.app.v1.UpdateProjectIconRequest
+ */
+export type UpdateProjectIconRequest = Message<"briar.app.v1.UpdateProjectIconRequest"> & {
+  /**
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
+
+  /**
+   * @generated from oneof briar.app.v1.UpdateProjectIconRequest.icon_update
+   */
+  iconUpdate: {
+    /**
+     * @generated from field: string icon = 2;
+     */
+    value: string;
+    case: "icon";
+  } | {
+    /**
+     * @generated from field: google.protobuf.Empty clear_icon = 3;
+     */
+    value: Empty;
+    case: "clearIcon";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message briar.app.v1.UpdateProjectIconRequest.
+ * Use `create(UpdateProjectIconRequestSchema)` to create a new message.
+ */
+export const UpdateProjectIconRequestSchema: GenMessage<UpdateProjectIconRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 6);
+
+/**
+ * @generated from message briar.app.v1.UpdateProjectIconResponse
+ */
+export type UpdateProjectIconResponse = Message<"briar.app.v1.UpdateProjectIconResponse"> & {
+  /**
+   * @generated from field: briar.app.v1.Project project = 1;
+   */
+  project?: Project | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.UpdateProjectIconResponse.
+ * Use `create(UpdateProjectIconResponseSchema)` to create a new message.
+ */
+export const UpdateProjectIconResponseSchema: GenMessage<UpdateProjectIconResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 7);
+
+/**
+ * @generated from message briar.app.v1.UpdateProjectIssueKeyPrefixRequest
+ */
+export type UpdateProjectIssueKeyPrefixRequest = Message<"briar.app.v1.UpdateProjectIssueKeyPrefixRequest"> & {
+  /**
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
+
+  /**
+   * @generated from field: string issue_key_prefix = 2;
+   */
+  issueKeyPrefix: string;
+};
+
+/**
+ * Describes the message briar.app.v1.UpdateProjectIssueKeyPrefixRequest.
+ * Use `create(UpdateProjectIssueKeyPrefixRequestSchema)` to create a new message.
+ */
+export const UpdateProjectIssueKeyPrefixRequestSchema: GenMessage<UpdateProjectIssueKeyPrefixRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 8);
+
+/**
+ * @generated from message briar.app.v1.UpdateProjectIssueKeyPrefixResponse
+ */
+export type UpdateProjectIssueKeyPrefixResponse = Message<"briar.app.v1.UpdateProjectIssueKeyPrefixResponse"> & {
+  /**
+   * @generated from field: briar.app.v1.Project project = 1;
+   */
+  project?: Project | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.UpdateProjectIssueKeyPrefixResponse.
+ * Use `create(UpdateProjectIssueKeyPrefixResponseSchema)` to create a new message.
+ */
+export const UpdateProjectIssueKeyPrefixResponseSchema: GenMessage<UpdateProjectIssueKeyPrefixResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 9);
+
+/**
+ * @generated from message briar.app.v1.UpdateProjectTabsRequest
+ */
+export type UpdateProjectTabsRequest = Message<"briar.app.v1.UpdateProjectTabsRequest"> & {
+  /**
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
+
+  /**
+   * @generated from field: bool schedule = 2;
+   */
+  schedule: boolean;
+};
+
+/**
+ * Describes the message briar.app.v1.UpdateProjectTabsRequest.
+ * Use `create(UpdateProjectTabsRequestSchema)` to create a new message.
+ */
+export const UpdateProjectTabsRequestSchema: GenMessage<UpdateProjectTabsRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 10);
+
+/**
+ * @generated from message briar.app.v1.UpdateProjectTabsResponse
+ */
+export type UpdateProjectTabsResponse = Message<"briar.app.v1.UpdateProjectTabsResponse"> & {
+  /**
+   * @generated from field: briar.app.v1.Project project = 1;
+   */
+  project?: Project | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.UpdateProjectTabsResponse.
+ * Use `create(UpdateProjectTabsResponseSchema)` to create a new message.
+ */
+export const UpdateProjectTabsResponseSchema: GenMessage<UpdateProjectTabsResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 11);
+
+/**
+ * @generated from message briar.app.v1.CreateProjectAgentTokenRequest
+ */
+export type CreateProjectAgentTokenRequest = Message<"briar.app.v1.CreateProjectAgentTokenRequest"> & {
+  /**
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
+};
+
+/**
+ * Describes the message briar.app.v1.CreateProjectAgentTokenRequest.
+ * Use `create(CreateProjectAgentTokenRequestSchema)` to create a new message.
+ */
+export const CreateProjectAgentTokenRequestSchema: GenMessage<CreateProjectAgentTokenRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 12);
+
+/**
+ * @generated from message briar.app.v1.CreateProjectAgentTokenResponse
+ */
+export type CreateProjectAgentTokenResponse = Message<"briar.app.v1.CreateProjectAgentTokenResponse"> & {
+  /**
+   * @generated from field: string agent_token = 1;
+   */
+  agentToken: string;
+};
+
+/**
+ * Describes the message briar.app.v1.CreateProjectAgentTokenResponse.
+ * Use `create(CreateProjectAgentTokenResponseSchema)` to create a new message.
+ */
+export const CreateProjectAgentTokenResponseSchema: GenMessage<CreateProjectAgentTokenResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_project, 13);
 
 /**
  * @generated from message briar.app.v1.Project
@@ -101,7 +342,7 @@ export type Project = Message<"briar.app.v1.Project"> & {
  * Use `create(ProjectSchema)` to create a new message.
  */
 export const ProjectSchema: GenMessage<Project> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_project, 2);
+  messageDesc(file_briar_app_v1_project, 14);
 
 /**
  * @generated from service briar.app.v1.ProjectService
@@ -114,6 +355,54 @@ export const ProjectService: GenService<{
     methodKind: "unary";
     input: typeof ListProjectsRequestSchema;
     output: typeof ListProjectsResponseSchema;
+  },
+  /**
+   * @generated from rpc briar.app.v1.ProjectService.CreateProject
+   */
+  createProject: {
+    methodKind: "unary";
+    input: typeof CreateProjectRequestSchema;
+    output: typeof CreateProjectResponseSchema;
+  },
+  /**
+   * @generated from rpc briar.app.v1.ProjectService.DeleteProject
+   */
+  deleteProject: {
+    methodKind: "unary";
+    input: typeof DeleteProjectRequestSchema;
+    output: typeof DeleteProjectResponseSchema;
+  },
+  /**
+   * @generated from rpc briar.app.v1.ProjectService.UpdateProjectIcon
+   */
+  updateProjectIcon: {
+    methodKind: "unary";
+    input: typeof UpdateProjectIconRequestSchema;
+    output: typeof UpdateProjectIconResponseSchema;
+  },
+  /**
+   * @generated from rpc briar.app.v1.ProjectService.UpdateProjectIssueKeyPrefix
+   */
+  updateProjectIssueKeyPrefix: {
+    methodKind: "unary";
+    input: typeof UpdateProjectIssueKeyPrefixRequestSchema;
+    output: typeof UpdateProjectIssueKeyPrefixResponseSchema;
+  },
+  /**
+   * @generated from rpc briar.app.v1.ProjectService.UpdateProjectTabs
+   */
+  updateProjectTabs: {
+    methodKind: "unary";
+    input: typeof UpdateProjectTabsRequestSchema;
+    output: typeof UpdateProjectTabsResponseSchema;
+  },
+  /**
+   * @generated from rpc briar.app.v1.ProjectService.CreateProjectAgentToken
+   */
+  createProjectAgentToken: {
+    methodKind: "unary";
+    input: typeof CreateProjectAgentTokenRequestSchema;
+    output: typeof CreateProjectAgentTokenResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_briar_app_v1_project, 0);

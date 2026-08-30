@@ -24,10 +24,46 @@ import SwiftProtobuf
 open class BriarAPI_ProjectServiceClientMock: BriarAPI_ProjectServiceClientInterface, @unchecked Sendable {
     /// Mocked for async calls to `listProjects()`.
     public var mockAsyncListProjects = { (_: BriarAPI_ListProjectsRequest) -> ResponseMessage<BriarAPI_ListProjectsResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `createProject()`.
+    public var mockAsyncCreateProject = { (_: BriarAPI_CreateProjectRequest) -> ResponseMessage<BriarAPI_CreateProjectResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `deleteProject()`.
+    public var mockAsyncDeleteProject = { (_: BriarAPI_DeleteProjectRequest) -> ResponseMessage<BriarAPI_DeleteProjectResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateProjectIcon()`.
+    public var mockAsyncUpdateProjectIcon = { (_: BriarAPI_UpdateProjectIconRequest) -> ResponseMessage<BriarAPI_UpdateProjectIconResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateProjectIssueKeyPrefix()`.
+    public var mockAsyncUpdateProjectIssueKeyPrefix = { (_: BriarAPI_UpdateProjectIssueKeyPrefixRequest) -> ResponseMessage<BriarAPI_UpdateProjectIssueKeyPrefixResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateProjectTabs()`.
+    public var mockAsyncUpdateProjectTabs = { (_: BriarAPI_UpdateProjectTabsRequest) -> ResponseMessage<BriarAPI_UpdateProjectTabsResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `createProjectAgentToken()`.
+    public var mockAsyncCreateProjectAgentToken = { (_: BriarAPI_CreateProjectAgentTokenRequest) -> ResponseMessage<BriarAPI_CreateProjectAgentTokenResponse> in .init(result: .success(.init())) }
 
     public init() {}
 
     open func `listProjects`(request: BriarAPI_ListProjectsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListProjectsResponse> {
         return self.mockAsyncListProjects(request)
+    }
+
+    open func `createProject`(request: BriarAPI_CreateProjectRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateProjectResponse> {
+        return self.mockAsyncCreateProject(request)
+    }
+
+    open func `deleteProject`(request: BriarAPI_DeleteProjectRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteProjectResponse> {
+        return self.mockAsyncDeleteProject(request)
+    }
+
+    open func `updateProjectIcon`(request: BriarAPI_UpdateProjectIconRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateProjectIconResponse> {
+        return self.mockAsyncUpdateProjectIcon(request)
+    }
+
+    open func `updateProjectIssueKeyPrefix`(request: BriarAPI_UpdateProjectIssueKeyPrefixRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateProjectIssueKeyPrefixResponse> {
+        return self.mockAsyncUpdateProjectIssueKeyPrefix(request)
+    }
+
+    open func `updateProjectTabs`(request: BriarAPI_UpdateProjectTabsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateProjectTabsResponse> {
+        return self.mockAsyncUpdateProjectTabs(request)
+    }
+
+    open func `createProjectAgentToken`(request: BriarAPI_CreateProjectAgentTokenRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateProjectAgentTokenResponse> {
+        return self.mockAsyncCreateProjectAgentToken(request)
     }
 }

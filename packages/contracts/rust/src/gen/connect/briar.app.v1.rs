@@ -12050,6 +12050,62 @@ pub type OwnedListProjectsRequestView = ::buffa::view::OwnedView<
 pub type OwnedListProjectsResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::ListProjectsResponseView<'static>,
 >;
+///Shorthand for `OwnedView<CreateProjectRequestView<'static>>`.
+pub type OwnedCreateProjectRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateProjectRequestView<'static>,
+>;
+///Shorthand for `OwnedView<CreateProjectResponseView<'static>>`.
+pub type OwnedCreateProjectResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateProjectResponseView<'static>,
+>;
+///Shorthand for `OwnedView<DeleteProjectRequestView<'static>>`.
+pub type OwnedDeleteProjectRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteProjectRequestView<'static>,
+>;
+///Shorthand for `OwnedView<DeleteProjectResponseView<'static>>`.
+pub type OwnedDeleteProjectResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteProjectResponseView<'static>,
+>;
+///Shorthand for `OwnedView<UpdateProjectIconRequestView<'static>>`.
+pub type OwnedUpdateProjectIconRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconRequestView<'static>,
+>;
+///Shorthand for `OwnedView<UpdateProjectIconResponseView<'static>>`.
+pub type OwnedUpdateProjectIconResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconResponseView<'static>,
+>;
+///Shorthand for `OwnedView<UpdateProjectIssueKeyPrefixRequestView<'static>>`.
+pub type OwnedUpdateProjectIssueKeyPrefixRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateProjectIssueKeyPrefixResponseView<'static>>`.
+pub type OwnedUpdateProjectIssueKeyPrefixResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateProjectTabsRequestView<'static>>`.
+pub type OwnedUpdateProjectTabsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<UpdateProjectTabsResponseView<'static>>`.
+pub type OwnedUpdateProjectTabsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsResponseView<'static>,
+>;
+///Shorthand for `OwnedView<CreateProjectAgentTokenRequestView<'static>>`.
+pub type OwnedCreateProjectAgentTokenRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreateProjectAgentTokenResponseView<'static>>`.
+pub type OwnedCreateProjectAgentTokenResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListProjectsResponse>
 for crate::proto::briar::app::v1::__buffa::view::ListProjectsResponseView<'_> {
     fn encode(
@@ -12084,11 +12140,267 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateProjectResponse>
+for crate::proto::briar::app::v1::__buffa::view::CreateProjectResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateProjectResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateProjectResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteProjectResponse>
+for crate::proto::briar::app::v1::__buffa::view::DeleteProjectResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteProjectResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteProjectResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateProjectIconResponse>
+for crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateProjectIconResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateProjectTabsResponse>
+for crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateProjectTabsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CreateProjectAgentTokenResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CreateProjectAgentTokenResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 /// Full service name for this service.
 pub const PROJECT_SERVICE_SERVICE_NAME: &str = "briar.app.v1.ProjectService";
 /// Static [`Spec`](::connectrpc::Spec) for the `ListProjects` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const PROJECT_SERVICE_LIST_PROJECTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.ProjectService/ListProjects",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CreateProject` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const PROJECT_SERVICE_CREATE_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ProjectService/CreateProject",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `DeleteProject` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const PROJECT_SERVICE_DELETE_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ProjectService/DeleteProject",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateProjectIcon` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const PROJECT_SERVICE_UPDATE_PROJECT_ICON_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ProjectService/UpdateProjectIcon",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateProjectIssueKeyPrefix` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const PROJECT_SERVICE_UPDATE_PROJECT_ISSUE_KEY_PREFIX_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ProjectService/UpdateProjectIssueKeyPrefix",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateProjectTabs` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const PROJECT_SERVICE_UPDATE_PROJECT_TABS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ProjectService/UpdateProjectTabs",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CreateProjectAgentToken` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const PROJECT_SERVICE_CREATE_PROJECT_AGENT_TOKEN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ProjectService/CreateProjectAgentToken",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -12166,6 +12478,144 @@ pub trait ProjectService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// Handle the CreateProject RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_project<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::CreateProjectRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::CreateProjectResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the DeleteProject RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn delete_project<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::DeleteProjectRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::DeleteProjectResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UpdateProjectIcon RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_project_icon<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdateProjectIconRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdateProjectIconResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UpdateProjectIssueKeyPrefix RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_project_issue_key_prefix<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UpdateProjectTabs RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_project_tabs<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdateProjectTabsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdateProjectTabsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the CreateProjectAgentToken RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_project_agent_token<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::CreateProjectAgentTokenRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::CreateProjectAgentTokenResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -12227,6 +12677,180 @@ impl<S: ProjectService> ProjectServiceExt for S {
                 },
             )
             .with_spec(PROJECT_SERVICE_LIST_PROJECTS_SPEC)
+            .route_view(
+                PROJECT_SERVICE_SERVICE_NAME,
+                "CreateProject",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::CreateProjectRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::CreateProjectRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_project(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::CreateProjectResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(PROJECT_SERVICE_CREATE_PROJECT_SPEC)
+            .route_view(
+                PROJECT_SERVICE_SERVICE_NAME,
+                "DeleteProject",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::DeleteProjectRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::DeleteProjectRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.delete_project(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::DeleteProjectResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(PROJECT_SERVICE_DELETE_PROJECT_SPEC)
+            .route_view(
+                PROJECT_SERVICE_SERVICE_NAME,
+                "UpdateProjectIcon",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdateProjectIconRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_project_icon(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdateProjectIconResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_ICON_SPEC)
+            .route_view(
+                PROJECT_SERVICE_SERVICE_NAME,
+                "UpdateProjectIssueKeyPrefix",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_project_issue_key_prefix(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_ISSUE_KEY_PREFIX_SPEC)
+            .route_view(
+                PROJECT_SERVICE_SERVICE_NAME,
+                "UpdateProjectTabs",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdateProjectTabsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_project_tabs(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdateProjectTabsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_TABS_SPEC)
+            .route_view(
+                PROJECT_SERVICE_SERVICE_NAME,
+                "CreateProjectAgentToken",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::CreateProjectAgentTokenRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_project_agent_token(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::CreateProjectAgentTokenResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(PROJECT_SERVICE_CREATE_PROJECT_AGENT_TOKEN_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -12287,6 +12911,42 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
                         .with_spec(PROJECT_SERVICE_LIST_PROJECTS_SPEC),
                 )
             }
+            "CreateProject" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(PROJECT_SERVICE_CREATE_PROJECT_SPEC),
+                )
+            }
+            "DeleteProject" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(PROJECT_SERVICE_DELETE_PROJECT_SPEC),
+                )
+            }
+            "UpdateProjectIcon" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_ICON_SPEC),
+                )
+            }
+            "UpdateProjectIssueKeyPrefix" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_ISSUE_KEY_PREFIX_SPEC),
+                )
+            }
+            "UpdateProjectTabs" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_TABS_SPEC),
+                )
+            }
+            "CreateProjectAgentToken" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(PROJECT_SERVICE_CREATE_PROJECT_AGENT_TOKEN_SPEC),
+                )
+            }
             _ => None,
         }
     }
@@ -12321,6 +12981,138 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::ListProjectsResponse,
+                        >(format)
+                })
+            }
+            "CreateProject" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::CreateProjectRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::CreateProjectRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::CreateProjectRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_project(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::CreateProjectResponse,
+                        >(format)
+                })
+            }
+            "DeleteProject" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::DeleteProjectRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::DeleteProjectRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::DeleteProjectRequest,
+                    >::from_parts(&req, &body);
+                    svc.delete_project(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::DeleteProjectResponse,
+                        >(format)
+                })
+            }
+            "UpdateProjectIcon" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdateProjectIconRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdateProjectIconRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_project_icon(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdateProjectIconResponse,
+                        >(format)
+                })
+            }
+            "UpdateProjectIssueKeyPrefix" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_project_issue_key_prefix(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixResponse,
+                        >(format)
+                })
+            }
+            "UpdateProjectTabs" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdateProjectTabsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdateProjectTabsRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_project_tabs(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdateProjectTabsResponse,
+                        >(format)
+                })
+            }
+            "CreateProjectAgentToken" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::CreateProjectAgentTokenRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::CreateProjectAgentTokenRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_project_agent_token(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::CreateProjectAgentTokenResponse,
                         >(format)
                 })
             }
@@ -12493,6 +13285,276 @@ where
                 &self.transport,
                 &self.config,
                 PROJECT_SERVICE_LIST_PROJECTS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CreateProject RPC. Sends a request to /briar.app.v1.ProjectService/CreateProject.
+    pub async fn create_project(
+        &self,
+        request: crate::proto::briar::app::v1::CreateProjectRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateProjectResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_project_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateProject RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_project_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::CreateProjectRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateProjectResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                PROJECT_SERVICE_CREATE_PROJECT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DeleteProject RPC. Sends a request to /briar.app.v1.ProjectService/DeleteProject.
+    pub async fn delete_project(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteProjectRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteProjectResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.delete_project_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DeleteProject RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_project_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteProjectRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteProjectResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                PROJECT_SERVICE_DELETE_PROJECT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdateProjectIcon RPC. Sends a request to /briar.app.v1.ProjectService/UpdateProjectIcon.
+    pub async fn update_project_icon(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateProjectIconRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_project_icon_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateProjectIcon RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_project_icon_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateProjectIconRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateProjectIconResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                PROJECT_SERVICE_UPDATE_PROJECT_ICON_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdateProjectIssueKeyPrefix RPC. Sends a request to /briar.app.v1.ProjectService/UpdateProjectIssueKeyPrefix.
+    pub async fn update_project_issue_key_prefix(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_project_issue_key_prefix_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateProjectIssueKeyPrefix RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_project_issue_key_prefix_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateProjectIssueKeyPrefixRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateProjectIssueKeyPrefixResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                PROJECT_SERVICE_UPDATE_PROJECT_ISSUE_KEY_PREFIX_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdateProjectTabs RPC. Sends a request to /briar.app.v1.ProjectService/UpdateProjectTabs.
+    pub async fn update_project_tabs(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateProjectTabsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_project_tabs_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateProjectTabs RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_project_tabs_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateProjectTabsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateProjectTabsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                PROJECT_SERVICE_UPDATE_PROJECT_TABS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CreateProjectAgentToken RPC. Sends a request to /briar.app.v1.ProjectService/CreateProjectAgentToken.
+    pub async fn create_project_agent_token(
+        &self,
+        request: crate::proto::briar::app::v1::CreateProjectAgentTokenRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_project_agent_token_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateProjectAgentToken RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_project_agent_token_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::CreateProjectAgentTokenRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentTokenResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                PROJECT_SERVICE_CREATE_PROJECT_AGENT_TOKEN_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

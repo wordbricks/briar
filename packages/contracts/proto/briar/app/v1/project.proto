@@ -3,18 +3,82 @@ syntax = "proto3";
 package briar.app.v1;
 
 import "briar/app/v1/common.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
 option swift_prefix = "BriarAPI_";
 
 service ProjectService {
   rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse);
+  rpc CreateProject(CreateProjectRequest) returns (CreateProjectResponse);
+  rpc DeleteProject(DeleteProjectRequest) returns (DeleteProjectResponse);
+  rpc UpdateProjectIcon(UpdateProjectIconRequest) returns (UpdateProjectIconResponse);
+  rpc UpdateProjectIssueKeyPrefix(UpdateProjectIssueKeyPrefixRequest) returns (UpdateProjectIssueKeyPrefixResponse);
+  rpc UpdateProjectTabs(UpdateProjectTabsRequest) returns (UpdateProjectTabsResponse);
+  rpc CreateProjectAgentToken(CreateProjectAgentTokenRequest) returns (CreateProjectAgentTokenResponse);
 }
 
 message ListProjectsRequest {}
 
 message ListProjectsResponse {
   repeated Project projects = 1;
+}
+
+message CreateProjectRequest {
+  string name = 1;
+  optional string organization_id = 2;
+}
+
+message CreateProjectResponse {
+  Project project = 1;
+  string agent_token = 2;
+}
+
+message DeleteProjectRequest {
+  string project_id = 1;
+}
+
+message DeleteProjectResponse {
+  bool deleted = 1;
+}
+
+message UpdateProjectIconRequest {
+  string project_id = 1;
+
+  oneof icon_update {
+    string icon = 2;
+    google.protobuf.Empty clear_icon = 3;
+  }
+}
+
+message UpdateProjectIconResponse {
+  Project project = 1;
+}
+
+message UpdateProjectIssueKeyPrefixRequest {
+  string project_id = 1;
+  string issue_key_prefix = 2;
+}
+
+message UpdateProjectIssueKeyPrefixResponse {
+  Project project = 1;
+}
+
+message UpdateProjectTabsRequest {
+  string project_id = 1;
+  bool schedule = 2;
+}
+
+message UpdateProjectTabsResponse {
+  Project project = 1;
+}
+
+message CreateProjectAgentTokenRequest {
+  string project_id = 1;
+}
+
+message CreateProjectAgentTokenResponse {
+  string agent_token = 1;
 }
 
 message Project {
