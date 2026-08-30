@@ -18,6 +18,10 @@ if ! cmp -s \
   exit 1
 fi
 
+bun run scripts/generate-contract-fingerprint.ts \
+  --check \
+  --image "$generated_root/briar.contracts.image.binpb"
+
 buf generate \
   "$generated_root/briar.contracts.image.binpb" \
   --template packages/contracts/buf.gen.yaml \

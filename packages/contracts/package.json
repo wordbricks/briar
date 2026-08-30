@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./descriptor-fingerprint": "./src/descriptor-fingerprint.ts",
     "./gen/*": "./src/gen/*.ts",
     "./companion.openapi.yaml": "./companion.openapi.yaml"
   },

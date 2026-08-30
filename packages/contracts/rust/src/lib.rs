@@ -5,6 +5,10 @@
 //! The checked-in files below are generated from
 //! `packages/contracts/briar.contracts.image.binpb`.
 
+mod descriptor_fingerprint;
+
+pub use descriptor_fingerprint::CONTRACTS_DESCRIPTOR_FINGERPRINT;
+
 pub mod proto {
     pub mod briar {
         pub mod app {
