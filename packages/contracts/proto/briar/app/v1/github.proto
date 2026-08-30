@@ -1,0 +1,196 @@
+syntax = "proto3";
+
+package briar.app.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarAPI_";
+
+// GitHubIntegrationService owns organization installation discovery and the
+// start of the browser installation flow. OAuth/install callbacks and signed
+// webhooks intentionally remain ordinary HTTP endpoints.
+service GitHubIntegrationService {
+  rpc GetGitHubIntegration(GetGitHubIntegrationRequest) returns (GetGitHubIntegrationResponse);
+  rpc BeginGitHubInstallation(BeginGitHubInstallationRequest) returns (BeginGitHubInstallationResponse);
+}
+
+// ProjectGitHubService owns typed project-scoped GitHub App operations used by
+// the app and CLI. The arbitrary GraphQL escape hatch intentionally remains an
+// ordinary HTTP endpoint because google.protobuf.Struct would add no contract.
+service ProjectGitHubService {
+  rpc CreateProjectGitHubCredential(CreateProjectGitHubCredentialRequest) returns (CreateProjectGitHubCredentialResponse);
+  rpc GetProjectGitHubRepository(GetProjectGitHubRepositoryRequest) returns (GetProjectGitHubRepositoryResponse);
+  rpc CreateGitHubPullRequest(CreateGitHubPullRequestRequest) returns (CreateGitHubPullRequestResponse);
+  rpc GetGitHubPullRequest(GetGitHubPullRequestRequest) returns (GetGitHubPullRequestResponse);
+  rpc UpdateGitHubPullRequest(UpdateGitHubPullRequestRequest) returns (UpdateGitHubPullRequestResponse);
+  rpc MergeGitHubPullRequest(MergeGitHubPullRequestRequest) returns (MergeGitHubPullRequestResponse);
+  rpc CreateGitHubCommitStatus(CreateGitHubCommitStatusRequest) returns (CreateGitHubCommitStatusResponse);
+}
+
+message GitHubInstallationRepository {
+  uint64 id = 1;
+  string owner = 2;
+  string name = 3;
+  string full_name = 4;
+}
+
+message GetGitHubIntegrationRequest {
+  string organization_id = 1;
+}
+
+message GetGitHubIntegrationResponse {
+  bool configured = 1;
+  bool can_manage = 2;
+  bool connected = 3;
+  optional uint64 installation_id = 4;
+  optional string account_login = 5;
+  optional string account_avatar_url = 6;
+  repeated GitHubInstallationRepository repositories = 7;
+  optional google.protobuf.Timestamp connected_at = 8;
+}
+
+message BeginGitHubInstallationRequest {
+  string organization_id = 1;
+}
+
+message BeginGitHubInstallationResponse {
+  string install_url = 1;
+}
+
+message ProjectGitHubCredential {
+  string project_id = 1;
+  string organization_id = 2;
+  uint64 repository_id = 3;
+  string repository = 4;
+  string clone_url = 5;
+  string username = 6;
+  string password = 7;
+  google.protobuf.Timestamp expires_at = 8;
+}
+
+message CreateProjectGitHubCredentialRequest {
+  string project_id = 1;
+}
+
+message CreateProjectGitHubCredentialResponse {
+  ProjectGitHubCredential credential = 1;
+}
+
+message ProjectGitHubRepository {
+  uint64 id = 1;
+  string full_name = 2;
+  string default_branch = 3;
+  bool allow_squash_merge = 4;
+  bool allow_rebase_merge = 5;
+  bool allow_merge_commit = 6;
+}
+
+message GetProjectGitHubRepositoryRequest {
+  string project_id = 1;
+}
+
+message GetProjectGitHubRepositoryResponse {
+  ProjectGitHubRepository repository = 1;
+}
+
+enum GitHubPullRequestState {
+  GIT_HUB_PULL_REQUEST_STATE_UNSPECIFIED = 0;
+  GIT_HUB_PULL_REQUEST_STATE_OPEN = 1;
+  GIT_HUB_PULL_REQUEST_STATE_CLOSED = 2;
+  GIT_HUB_PULL_REQUEST_STATE_MERGED = 3;
+}
+
+message GitHubPullRequest {
+  uint64 repository_id = 1;
+  string repository = 2;
+  uint64 pull_request_id = 3;
+  string pull_request_node_id = 4;
+  uint64 pull_request_number = 5;
+  string url = 6;
+  GitHubPullRequestState state = 7;
+  bool draft = 8;
+  bool merged = 9;
+  string body = 10;
+  string head_sha = 11;
+  string head_ref = 12;
+  string base_sha = 13;
+  string base_ref = 14;
+}
+
+message CreateGitHubPullRequestRequest {
+  string project_id = 1;
+  string title = 2;
+  string head = 3;
+  string base = 4;
+  string body = 5;
+  bool draft = 6;
+}
+
+message CreateGitHubPullRequestResponse {
+  GitHubPullRequest pull_request = 1;
+}
+
+message GetGitHubPullRequestRequest {
+  string project_id = 1;
+  uint64 pull_request_number = 2;
+}
+
+message GetGitHubPullRequestResponse {
+  GitHubPullRequest pull_request = 1;
+}
+
+message UpdateGitHubPullRequestRequest {
+  string project_id = 1;
+  uint64 pull_request_number = 2;
+  optional string title = 3;
+  optional string body = 4;
+  optional string base = 5;
+  optional GitHubPullRequestState state = 6;
+}
+
+message UpdateGitHubPullRequestResponse {
+  GitHubPullRequest pull_request = 1;
+}
+
+enum GitHubMergeMethod {
+  GIT_HUB_MERGE_METHOD_UNSPECIFIED = 0;
+  GIT_HUB_MERGE_METHOD_MERGE = 1;
+  GIT_HUB_MERGE_METHOD_SQUASH = 2;
+  GIT_HUB_MERGE_METHOD_REBASE = 3;
+}
+
+message MergeGitHubPullRequestRequest {
+  string project_id = 1;
+  uint64 pull_request_number = 2;
+  GitHubMergeMethod merge_method = 3;
+  optional string expected_head_sha = 4;
+}
+
+message GitHubMergeResult {
+  string sha = 1;
+  bool merged = 2;
+  string message = 3;
+}
+
+message MergeGitHubPullRequestResponse {
+  GitHubMergeResult merge = 1;
+}
+
+enum GitHubCommitStatusState {
+  GIT_HUB_COMMIT_STATUS_STATE_UNSPECIFIED = 0;
+  GIT_HUB_COMMIT_STATUS_STATE_ERROR = 1;
+  GIT_HUB_COMMIT_STATUS_STATE_FAILURE = 2;
+  GIT_HUB_COMMIT_STATUS_STATE_PENDING = 3;
+  GIT_HUB_COMMIT_STATUS_STATE_SUCCESS = 4;
+}
+
+message CreateGitHubCommitStatusRequest {
+  string project_id = 1;
+  string sha = 2;
+  GitHubCommitStatusState state = 3;
+  string context = 4;
+  optional string description = 5;
+  optional string target_url = 6;
+}
+
+message CreateGitHubCommitStatusResponse {}
