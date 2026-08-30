@@ -16,22 +16,6 @@ enum MobileAPIContract {
             "/projects/\(projectID.uuidString.lowercased())/issues"
         }
 
-        static func run(projectID: UUID, runID: UUID) -> String {
-            "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())"
-        }
-
-        static func channelEvents(organizationID: UUID, cursor: Int) -> String {
-            "/organizations/\(organizationID.uuidString.lowercased())/channel-events?cursor=\(cursor)"
-        }
-
-        static func channelActivityEvents(organizationID: UUID, channelID: UUID) -> String {
-            "/organizations/\(organizationID.uuidString.lowercased())/channels/\(channelID.uuidString.lowercased())/agent-activity-events"
-        }
-
-        static func issueActivityEvents(projectID: UUID, runID: UUID) -> String {
-            "\(run(projectID: projectID, runID: runID))/agent-activity-events"
-        }
-
         /// Multipart is intentionally kept as HTTP because Connect requests do not carry file bytes.
         static func channelMessageUpload(
             organizationID: UUID,
@@ -335,44 +319,6 @@ enum ChannelRealtimeNotification: Equatable, Sendable {
     }
 }
 
-struct ChannelRealtimeTicketResponse: Codable, Equatable, Sendable {
-    let url: String
-    let expiresAt: String
-}
-
-protocol MobileRealtimeClientProtocol: Sendable {
-    func realtimeEvents(
-        _ path: String,
-        token: String
-    ) -> AsyncThrowingStream<ChannelRealtimeNotification, Error>
-
-    func channelActivityEvents(
-        _ path: String,
-        token: String
-    ) -> AsyncThrowingStream<ChannelAgentActivityFrame, Error>
-
-    func issueActivityEvents(
-        _ path: String,
-        token: String
-    ) -> AsyncThrowingStream<IssueAgentActivityFrame, Error>
-}
-
-extension MobileRealtimeClientProtocol {
-    func channelActivityEvents(
-        _ path: String,
-        token: String
-    ) -> AsyncThrowingStream<ChannelAgentActivityFrame, Error> {
-        AsyncThrowingStream { continuation in continuation.finish() }
-    }
-
-    func issueActivityEvents(
-        _ path: String,
-        token: String
-    ) -> AsyncThrowingStream<IssueAgentActivityFrame, Error> {
-        AsyncThrowingStream { continuation in continuation.finish() }
-    }
-}
-
 extension MobileHTTPClientProtocol {
     func send<Response: Decodable & Sendable>(
         _ path: String,
@@ -399,7 +345,7 @@ extension MobileHTTPClientProtocol {
     }
 }
 
-struct MobileHTTPClient: MobileHTTPClientProtocol, MobileRealtimeClientProtocol, Sendable {
+struct MobileHTTPClient: MobileHTTPClientProtocol, Sendable {
     let baseURL: URL
     let session: URLSession
 
@@ -483,103 +429,6 @@ struct MobileHTTPClient: MobileHTTPClientProtocol, MobileRealtimeClientProtocol,
             throw MobileAPIError.invalidDownload
         }
         return destination
-    }
-
-    /// Exchanges the bearer credential for a short-lived signed URL, then opens
-    /// a WebSocket that only carries cursor notifications. Authoritative data
-    /// still comes from the regular delta endpoint.
-    func realtimeEvents(
-        _ path: String,
-        token: String
-    ) -> AsyncThrowingStream<ChannelRealtimeNotification, Error> {
-        webSocketEvents(path, token: token) { data in
-            let message = try BriarRealtime_OrganizationNotification(
-                serializedBytes: data
-            )
-            return try ChannelRealtimeNotification(protobuf: message)
-        }
-    }
-
-    func channelActivityEvents(
-        _ path: String,
-        token: String
-    ) -> AsyncThrowingStream<ChannelAgentActivityFrame, Error> {
-        webSocketEvents(path, token: token) { data in
-            let message = try BriarRealtime_AgentReplyActivityFrame(
-                serializedBytes: data
-            )
-            guard case .channel(let frame) = try AgentReplyActivityFrame(
-                protobuf: message
-            ) else { throw MobileAPIError.invalidResponse }
-            return frame
-        }
-    }
-
-    func issueActivityEvents(
-        _ path: String,
-        token: String
-    ) -> AsyncThrowingStream<IssueAgentActivityFrame, Error> {
-        webSocketEvents(path, token: token) { data in
-            let message = try BriarRealtime_AgentReplyActivityFrame(
-                serializedBytes: data
-            )
-            guard case .issue(let frame) = try AgentReplyActivityFrame(
-                protobuf: message
-            ) else { throw MobileAPIError.invalidResponse }
-            return frame
-        }
-    }
-
-    private func webSocketEvents<Event: Sendable>(
-        _ path: String,
-        token: String,
-        decode: @escaping @Sendable (Data) throws -> Event
-    ) -> AsyncThrowingStream<Event, Error> {
-        AsyncThrowingStream { continuation in
-            let task = Task {
-                do {
-                    let ticket: ChannelRealtimeTicketResponse = try await send(
-                        path,
-                        method: "POST",
-                        token: token,
-                        body: nil,
-                        as: ChannelRealtimeTicketResponse.self
-                    )
-                    guard
-                        let url = URL(string: ticket.url),
-                        let scheme = url.scheme?.lowercased(),
-                        scheme == "ws" || scheme == "wss"
-                    else {
-                        throw MobileAPIError.invalidRequest
-                    }
-                    let socket = session.webSocketTask(with: url)
-                    socket.resume()
-                    try await withTaskCancellationHandler {
-                        while !Task.isCancelled {
-                            let message = try await socket.receive()
-                            let data: Data
-                            switch message {
-                            case .data(let value):
-                                data = value
-                            case .string:
-                                throw MobileAPIError.invalidResponse
-                            @unknown default:
-                                continue
-                            }
-                            continuation.yield(try decode(data))
-                        }
-                    } onCancel: {
-                        socket.cancel(with: .goingAway, reason: nil)
-                    }
-                    continuation.finish()
-                } catch is CancellationError {
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-            continuation.onTermination = { _ in task.cancel() }
-        }
     }
 
     private func endpointURL(_ path: String) -> URL? {

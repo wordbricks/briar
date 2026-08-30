@@ -732,10 +732,8 @@ final class RunDetailStore: ObservableObject {
                 guard let self, expectedGeneration == self.activityGeneration else { return }
                 do {
                     let events = realtime.issueActivityEvents(
-                        MobileAPIContract.Endpoint.issueActivityEvents(
-                            projectID: self.projectID,
-                            runID: self.runID
-                        ),
+                        projectID: self.projectID,
+                        runID: self.runID,
                         token: self.token
                     )
                     for try await frame in events {

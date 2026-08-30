@@ -63,10 +63,7 @@ final class OrganizationRealtimeStore: ObservableObject {
                 else { return }
                 do {
                     let events = realtime.realtimeEvents(
-                        MobileAPIContract.Endpoint.channelEvents(
-                            organizationID: organizationID,
-                            cursor: 0
-                        ),
+                        organizationID: organizationID,
                         token: token
                     )
                     for try await event in events {
@@ -2591,10 +2588,8 @@ final class ChannelsStore: ObservableObject {
                 else { return }
                 do {
                     let events = realtime.channelActivityEvents(
-                        MobileAPIContract.Endpoint.channelActivityEvents(
-                            organizationID: organizationID,
-                            channelID: channelID
-                        ),
+                        organizationID: organizationID,
+                        channelID: channelID,
                         token: token
                     )
                     for try await frame in events {
@@ -2707,13 +2702,9 @@ final class ChannelsStore: ObservableObject {
                     expectedGeneration == self.generation,
                     self.isForeground
                 else { return }
-                let cursor = self.syncCursor ?? 0
                 do {
                     let events = realtime.realtimeEvents(
-                        MobileAPIContract.Endpoint.channelEvents(
-                            organizationID: organizationID,
-                            cursor: cursor
-                        ),
+                        organizationID: organizationID,
                         token: token
                     )
                     for try await event in events {

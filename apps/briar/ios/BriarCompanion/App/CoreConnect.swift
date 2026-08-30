@@ -48,6 +48,7 @@ struct AuthenticatedMobileServices: Sendable {
     let issue: any BriarAPI_IssueServiceClientInterface
     let channel: any BriarAPI_ChannelServiceClientInterface
     let agent: any BriarAPI_AgentServiceClientInterface
+    let realtime: any BriarAPI_RealtimeServiceClientInterface
 
     init(
         account: any BriarAPI_AccountServiceClientInterface,
@@ -56,7 +57,8 @@ struct AuthenticatedMobileServices: Sendable {
         inbox: any BriarAPI_InboxServiceClientInterface,
         issue: any BriarAPI_IssueServiceClientInterface,
         channel: any BriarAPI_ChannelServiceClientInterface,
-        agent: any BriarAPI_AgentServiceClientInterface
+        agent: any BriarAPI_AgentServiceClientInterface,
+        realtime: any BriarAPI_RealtimeServiceClientInterface
     ) {
         self.account = account
         self.project = project
@@ -65,6 +67,7 @@ struct AuthenticatedMobileServices: Sendable {
         self.issue = issue
         self.channel = channel
         self.agent = agent
+        self.realtime = realtime
     }
 
     init(baseURL: URL, session: URLSession, token: String) {
@@ -85,6 +88,7 @@ struct AuthenticatedMobileServices: Sendable {
         issue = BriarAPI_IssueServiceClient(client: protocolClient)
         channel = BriarAPI_ChannelServiceClient(client: protocolClient)
         agent = BriarAPI_AgentServiceClient(client: protocolClient)
+        realtime = BriarAPI_RealtimeServiceClient(client: protocolClient)
     }
 }
 
