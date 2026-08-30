@@ -4,6 +4,12 @@ import {
 } from "./execution-approval-schema-repository";
 import { type IssueAttachmentInput } from "./issue-attachment-repository";
 import { type IssueAgentReplyJobRow } from "./issue-agent-reply-repository";
+import {
+  consumeReplyAttachmentStatements,
+  replyAttachmentAvailabilityGuard,
+  replyCompletionReceiptStatement,
+  type ReplyCompletionCommit,
+} from "./reply-completion-repository";
 
 export type IssueAgentReplyCompletionOutput = {
   body: string;
@@ -43,6 +49,7 @@ export async function completeIssueAgentReplyOutput(
     claimTokenHash: string;
     completedAt: string;
     output: IssueAgentReplyCompletionOutput;
+    commit?: ReplyCompletionCommit;
   },
 ) {
   const executionApprovalsAvailable =
@@ -118,6 +125,9 @@ export async function completeIssueAgentReplyOutput(
             )
        )`
     : "";
+  const attachmentGuard = input.commit
+    ? replyAttachmentAvailabilityGuard(input.commit)
+    : { sql: "", bindings: [] as unknown[] };
 
   const transition = db
     .prepare(
@@ -215,6 +225,7 @@ export async function completeIssueAgentReplyOutput(
                and trigger.body = job.skill_execution_request_snapshot
            )
          )
+         ${attachmentGuard.sql}
        returning *`,
     )
     .bind(
@@ -229,6 +240,7 @@ export async function completeIssueAgentReplyOutput(
       rework?.workflowStage ?? null,
       input.output.executionProposal ? 1 : 0,
       input.output.skillExecutionProposal ? 1 : 0,
+      ...attachmentGuard.bindings,
     );
 
   const completedClaim = (alias: string) =>
@@ -244,8 +256,20 @@ export async function completeIssueAgentReplyOutput(
     input.claimTokenHash,
     input.completedAt,
   ];
-  const statements: D1PreparedStatement[] = [
-    transition,
+  const statements: D1PreparedStatement[] = [transition];
+  if (input.commit) {
+    statements.push(
+      replyCompletionReceiptStatement(db, {
+        ...input.commit,
+        createdAt: input.completedAt,
+      }),
+      ...consumeReplyAttachmentStatements(db, {
+        ...input.commit,
+        consumedAt: input.completedAt,
+      }),
+    );
+  }
+  statements.push(
     db.prepare(
       `insert into briar_issue_messages (
          id, project_id, run_id, parent_message_id, author_user_id,
@@ -266,7 +290,7 @@ export async function completeIssueAgentReplyOutput(
       input.completedAt,
       ...claimBindings,
     ),
-  ];
+  );
 
   for (const attachment of input.output.attachments ?? []) {
     statements.push(db.prepare(
@@ -276,7 +300,15 @@ export async function completeIssueAgentReplyOutput(
        )
        select ?, job.run_id, job.project_id, ?, ?, ?, ?, ?
        from briar_issue_agent_reply_jobs job
-       where ${completedClaim("job")}`,
+       where ${completedClaim("job")}
+         ${input.commit
+           ? `and exists (
+                select 1 from briar_reply_attachment_uploads upload
+                where upload.attachment_id = ?
+                  and upload.completion_request_id = ?
+                  and upload.consumed_at = ?
+              )`
+           : ""}`,
     ).bind(
       attachment.id,
       attachment.object_key,
@@ -285,6 +317,9 @@ export async function completeIssueAgentReplyOutput(
       attachment.byte_size,
       input.completedAt,
       ...claimBindings,
+      ...(input.commit
+        ? [attachment.id, input.commit.requestId, input.completedAt]
+        : []),
     ));
   }
 
@@ -513,6 +548,13 @@ export async function completeIssueAgentReplyOutput(
 
   const results = await db.batch(statements);
   const completed = results[0]?.results[0] as IssueAgentReplyJobRow | undefined;
+  if (completed && input.commit) {
+    const receipt = results[1]?.results[0];
+    const consumed = results.slice(2, 2 + input.commit.attachmentIds.length);
+    if (!receipt || consumed.some((result) => result.results.length !== 1)) {
+      throw new Error("Issue reply completion receipt was not committed atomically");
+    }
+  }
   return completed
     ? { ...completed, claim_token_hash: null, lease_expires_at: null }
     : null;

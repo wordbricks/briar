@@ -1,4 +1,8 @@
 import { type AgentSkillKind } from "./agent-skills";
+import {
+  replyCompletionReceiptStatement,
+  type ReplyCompletionCommit,
+} from "./reply-completion-repository";
 
 import { agentSkillExecutionApprovalTablesAvailable } from "./execution-approval-schema-repository";
 import {
@@ -519,17 +523,19 @@ export async function failIssueAgentReply(
     claimTokenHash: string;
     error: string;
     updatedAt: string;
+    commit?: ReplyCompletionCommit;
   },
 ) {
-  return await db
-    .prepare(
+  const transition = db.prepare(
       `update briar_issue_agent_reply_jobs
        set status = case when attempts >= 3 then 'failed' else 'queued' end,
            preferred_worker_id = case
              when requires_preferred_worker = 1 then preferred_worker_id
              else null
            end,
-           claim_token_hash = null, claimed_at = null, lease_expires_at = null,
+           ${input.commit
+             ? ""
+             : "claim_token_hash = null, claimed_at = null, lease_expires_at = null,"}
            error = ?, updated_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claimed_worker_id = ? and claim_token_hash = ?
@@ -549,8 +555,35 @@ export async function failIssueAgentReply(
       input.workerId,
       input.claimTokenHash,
       input.updatedAt,
-    )
-    .first<IssueAgentReplyJobRow>();
+    );
+  if (!input.commit) return transition.first<IssueAgentReplyJobRow>();
+  const [transitioned, receipt] = await db.batch([
+    transition,
+    replyCompletionReceiptStatement(db, {
+      ...input.commit,
+      createdAt: input.updatedAt,
+    }),
+    db.prepare(
+      `update briar_issue_agent_reply_jobs
+       set claim_token_hash = null, claimed_at = null, lease_expires_at = null
+       where id = ? and project_id = ? and claimed_worker_id = ?
+         and claim_token_hash = ? and status in ('queued', 'failed')
+         and updated_at = ?`,
+    ).bind(
+      jobId,
+      projectId,
+      input.workerId,
+      input.claimTokenHash,
+      input.updatedAt,
+    ),
+  ]);
+  const failed = transitioned.results[0] as IssueAgentReplyJobRow | undefined;
+  if (failed && !receipt.results[0]) {
+    throw new Error("Issue reply failure receipt was not committed atomically");
+  }
+  return failed
+    ? { ...failed, claim_token_hash: null, claimed_at: null, lease_expires_at: null }
+    : null;
 }
 
 export async function completeIssueAgentReply(

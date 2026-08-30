@@ -15,6 +15,7 @@ import {
 import { flushOrganizationInboxRealtimeOutbox } from "./realtime-scheduling";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { cleanupExpiredChannelReplySessions } from "./channels";
+import { maintainReplyUploadCleanup } from "./reply-completion-repository";
 
 export type ScheduledTaskDependencies = {
   archiveCompletedLogs: typeof archiveCompletedLogs;
@@ -27,6 +28,7 @@ export type ScheduledTaskDependencies = {
   reconcileDrainingManagedComputers: typeof reconcileDrainingManagedComputers;
   reconcileManagedComputers: typeof reconcileManagedComputers;
   cleanupExpiredChannelReplySessions: typeof cleanupExpiredChannelReplySessions;
+  maintainReplyUploadCleanup: typeof maintainReplyUploadCleanup;
 };
 
 interface DashboardChangePruneFailure {
@@ -44,6 +46,7 @@ const scheduledTaskDependencies: ScheduledTaskDependencies = {
   reconcileDrainingManagedComputers,
   reconcileManagedComputers,
   cleanupExpiredChannelReplySessions,
+  maintainReplyUploadCleanup,
 };
 const GITHUB_RECONCILIATION_CRON = "* * * * *";
 const LOG_MAINTENANCE_CRON = "17 */6 * * *";
@@ -117,7 +120,7 @@ export async function handleScheduledTask(
         }));
       }
       const [archive, expired, cleanup, slackRevocations, github, managedComputers,
-        channelReplySessions] =
+        channelReplySessions, replyUploads] =
         await Promise.all([
         dependencies.archiveCompletedLogs(env.DB, env.ARCHIVES, observedAt),
         dependencies.expireArchives(
@@ -136,6 +139,11 @@ export async function handleScheduledTask(
         dependencies.reconcileGithubMergedRuns(env.DB),
         dependencies.reconcileManagedComputers(env.DB, env, observedAt),
         dependencies.cleanupExpiredChannelReplySessions(env.DB, { observedAt }),
+        dependencies.maintainReplyUploadCleanup(
+          env.DB,
+          env.ATTACHMENTS,
+          observedAt,
+        ),
       ]);
       await flushOrganizationInboxRealtimeOutbox(env, env.DB);
       if (dashboardChangePruneFailure !== null) {
@@ -155,6 +163,7 @@ export async function handleScheduledTask(
           sessionId: session.id,
           reason: "ttl_expired",
         })),
+        replyUploads,
       }));
     } catch (error) {
       console.error(JSON.stringify({

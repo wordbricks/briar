@@ -33,6 +33,12 @@ import {
   executionWorkerSupportsSelection,
   hasAvailableChannelReplyWorker,
 } from "./workers";
+import {
+  consumeReplyAttachmentStatements,
+  replyAttachmentAvailabilityGuard,
+  replyCompletionReceiptStatement,
+  type ReplyCompletionCommit,
+} from "./reply-completion-repository";
 
 export type ChannelRow = {
   id: string;
@@ -3907,6 +3913,7 @@ export async function failChannelReply(
     claimTokenHash: string;
     error: string;
     updatedAt: string;
+    commit?: ReplyCompletionCommit;
   },
 ) {
   const claimed = await getClaimedChannelReply(db, {
@@ -3915,13 +3922,16 @@ export async function failChannelReply(
   });
   if (!claimed) return null;
   const retainedUntil = channelReplySessionRetentionUntil(input.updatedAt);
-  const [failed] = await db.batch([
+  const statements: D1PreparedStatement[] = [
     db.prepare(
       `update briar_channel_agent_reply_jobs
        set status = case when attempts >= ? then 'failed' else 'queued' end,
-           error = ?, claimed_device_id = null, claimed_worker_id = null,
-           preferred_device_id = null,
-           claim_token_hash = null, lease_expires_at = null,
+           error = ?,
+           ${input.commit
+             ? ""
+             : `claimed_device_id = null, claimed_worker_id = null,
+                preferred_device_id = null,
+                claim_token_hash = null, lease_expires_at = null,`}
            completed_at = case when attempts >= ? then ? else completed_at end,
            updated_at = ?
        where id = ? and claimed_device_id = ? and claimed_worker_id = ?
@@ -3945,6 +3955,15 @@ export async function failChannelReply(
       input.claimTokenHash,
       input.updatedAt,
     ),
+  ];
+  if (input.commit) {
+    statements.push(replyCompletionReceiptStatement(db, {
+      ...input.commit,
+      retainedUntil,
+      createdAt: input.updatedAt,
+    }));
+  }
+  statements.push(
     db.prepare(
       `insert into briar_channel_messages (
          id, channel_id, parent_message_id, author_user_id, author_agent_id,
@@ -4013,8 +4032,43 @@ export async function failChannelReply(
       input.updatedAt,
       input.updatedAt,
     ),
-  ]);
-  return (failed.results[0] as ChannelReplyJobRow | undefined) ?? null;
+  );
+  if (input.commit) {
+    statements.push(db.prepare(
+      `update briar_channel_agent_reply_jobs
+       set claimed_device_id = null, claimed_worker_id = null,
+           preferred_device_id = null,
+           claim_token_hash = null, lease_expires_at = null
+       where id = ? and claimed_device_id = ? and claimed_worker_id = ?
+         and claim_token_hash = ? and status in ('queued', 'failed')
+         and updated_at = ?`,
+    ).bind(
+      input.jobId,
+      input.deviceId,
+      input.workerId,
+      input.claimTokenHash,
+      input.updatedAt,
+    ));
+  }
+  const results = await db.batch(statements);
+  const failed = results[0]?.results[0] as ChannelReplyJobRow | undefined;
+  if (failed && input.commit && !results[1]?.results[0]) {
+    throw new Error("Channel reply failure receipt was not committed atomically");
+  }
+  return failed
+    ? {
+        ...failed,
+        ...(input.commit
+          ? {
+              claimed_device_id: null,
+              claimed_worker_id: null,
+              preferred_device_id: null,
+              claim_token_hash: null,
+              lease_expires_at: null,
+            }
+          : {}),
+      }
+    : null;
 }
 
 export type ChannelReplyCompletionInput = {
@@ -4050,6 +4104,7 @@ export type ChannelReplyCompletionInput = {
   completedAt: string;
   conversationId?: string | null;
   attachments?: ChannelMessageAttachmentInput[];
+  commit?: ReplyCompletionCommit;
 };
 
 /**
@@ -4276,6 +4331,9 @@ export async function completeChannelReply(
   const skillExecutionGuardBindings = [
     input.skillExecutionProposal ? 1 : 0,
   ];
+  const attachmentGuard = input.commit
+    ? replyAttachmentAvailabilityGuard(input.commit)
+    : { sql: "", bindings: [] as unknown[] };
   const retainedUntil = channelReplySessionRetentionUntil(input.completedAt);
   const skillExecutionProposalId = input.skillExecutionProposal
     ? crypto.randomUUID()
@@ -4344,6 +4402,7 @@ export async function completeChannelReply(
            )
            ${executionGuardSql}
            ${skillExecutionGuardSql}
+           ${attachmentGuard.sql}
          returning *`,
       )
       .bind(
@@ -4357,7 +4416,23 @@ export async function completeChannelReply(
         ...delegationGuardBindings,
         ...executionGuardBindings,
         ...skillExecutionGuardBindings,
+        ...attachmentGuard.bindings,
       ),
+  ];
+  if (input.commit) {
+    statements.push(
+      replyCompletionReceiptStatement(db, {
+        ...input.commit,
+        retainedUntil,
+        createdAt: input.completedAt,
+      }),
+      ...consumeReplyAttachmentStatements(db, {
+        ...input.commit,
+        consumedAt: input.completedAt,
+      }),
+    );
+  }
+  statements.push(
     db
       .prepare(
         `insert into briar_channel_messages (
@@ -4386,7 +4461,7 @@ export async function completeChannelReply(
         input.claimTokenHash,
         input.completedAt,
       ),
-  ];
+  );
   for (const attachment of input.attachments ?? []) {
     statements.push(
       db
@@ -4403,7 +4478,15 @@ export async function completeChannelReply(
              and exists (
                select 1 from briar_channel_messages
                where id = ? and channel_id = ?
-             )`,
+             )
+             ${input.commit
+               ? `and exists (
+                    select 1 from briar_reply_attachment_uploads upload
+                    where upload.attachment_id = ?
+                      and upload.completion_request_id = ?
+                      and upload.consumed_at = ?
+                  )`
+               : ""}`,
         )
         .bind(
           attachment.id,
@@ -4422,6 +4505,9 @@ export async function completeChannelReply(
           input.completedAt,
           job.reply_message_id,
           job.channel_id,
+          ...(input.commit
+            ? [attachment.id, input.commit.requestId, input.completedAt]
+            : []),
         ),
     );
   }
@@ -5060,6 +5146,13 @@ export async function completeChannelReply(
   // read as well: Miniflare can expose that read across a visibility boundary
   // even though the batch has committed successfully.
   const transitioned = results[0]?.results[0] as ChannelReplyJobRow | undefined;
+  if (transitioned && input.commit) {
+    const receipt = results[1]?.results[0];
+    const consumed = results.slice(2, 2 + input.commit.attachmentIds.length);
+    if (!receipt || consumed.some((result) => result.results.length !== 1)) {
+      throw new Error("Channel reply completion receipt was not committed atomically");
+    }
+  }
   return transitioned
     ? {
         ...transitioned,
