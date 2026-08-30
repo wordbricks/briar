@@ -1,34 +1,11 @@
-import {
-  create,
-  fromJson,
-  type DescEnum,
-  type DescField,
-  type DescMessage,
-  type JsonObject,
-  type JsonValue,
-} from "@bufbuild/protobuf";
+import { create } from "@bufbuild/protobuf";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import {
-  AcceptChannelExecutionProposalResponseSchema,
-  AcceptChannelProposalResponseSchema,
-  AcceptChannelSkillExecutionProposalResponseSchema,
-  ChannelIssueBatchResultItemSchema,
   ChannelService,
   ChannelVisibility as ProtoChannelVisibility,
   DeclineChannelProposalResponse_Outcome,
   DeclineChannelProposalResponseSchema,
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
-import {
-  AgentSkillExecutionProposalSchema,
-  ProjectAgentSessionSchema,
-} from "@briar/contracts/gen/briar/app/v1/agent_pb";
-import { ApprovalOutcome } from "@briar/contracts/gen/briar/app/v1/common_pb";
-import {
-  IssueExecutionDispatch_DispatchMode,
-  IssueExecutionDispatch_Outcome,
-  IssueExecutionDispatchSchema,
-  IssueExecutionProposalSchema,
-} from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
   Code,
@@ -36,7 +13,6 @@ import {
   type ConnectRouter,
   type ServiceImpl,
 } from "@connectrpc/connect";
-import * as Predicate from "effect/Predicate";
 import type { BriarAuth } from "./auth";
 import { processArchiveCleanupQueue } from "./archive";
 import {
@@ -107,6 +83,16 @@ import {
   appChannelSummary,
   appChannelWebhook,
 } from "./app-connect-channel-mappers";
+import {
+  appAcceptChannelExecutionProposal,
+  appAcceptChannelProposal,
+  appAcceptChannelSkillExecutionProposal,
+  appChannelAgent,
+  appChannelAgentReply,
+  appChannelMessage,
+  appChannelSubscriber,
+  appChannelSummaryJson,
+} from "./app-connect-channel-response-mappers";
 import { schedulePostCommitCleanup } from "./post-commit-cleanup";
 
 export type AppConnectChannelInput = {
@@ -223,139 +209,6 @@ const rpc = async <A>(operation: () => Promise<A>): Promise<A> => {
   }
 };
 
-const enumJsonName = (descriptor: DescEnum, value: unknown): JsonValue => {
-  if (typeof value === "number") return value;
-  if (typeof value !== "string") {
-    throw new Error(`Expected ${descriptor.typeName} to be a string`);
-  }
-  const normalized = value.trim().replaceAll("-", "_").toUpperCase();
-  const matches = descriptor.values.filter((candidate) =>
-    candidate.name === normalized || candidate.name.endsWith(`_${normalized}`)
-  );
-  if (matches.length !== 1) {
-    throw new Error(`Unknown ${descriptor.typeName} value: ${value}`);
-  }
-  return matches[0].name;
-};
-
-const fieldValue = (field: DescField, value: unknown): JsonValue => {
-  if (value === null) return null;
-  switch (field.fieldKind) {
-    case "scalar":
-      if (
-        typeof value === "string" || typeof value === "number" ||
-        typeof value === "boolean" || typeof value === "bigint"
-      ) return typeof value === "bigint" ? value.toString() : value;
-      throw new Error(`Invalid scalar value for ${field.localName}`);
-    case "enum":
-      return enumJsonName(field.enum, value);
-    case "message":
-      return messageJson(field.message, value);
-    case "list": {
-      if (!Array.isArray(value)) throw new Error(`Expected an array for ${field.localName}`);
-      switch (field.listKind) {
-        case "scalar":
-          return value.map((item) =>
-            typeof item === "bigint" ? item.toString() : item
-          ) as JsonValue[];
-        case "enum":
-          return value.map((item) => enumJsonName(field.enum, item));
-        case "message":
-          return value.map((item) => messageJson(field.message, item));
-      }
-    }
-    case "map": {
-      if (!Predicate.isObject(value)) {
-        throw new Error(`Expected an object for ${field.localName}`);
-      }
-      return Object.fromEntries(
-        Object.entries(value).map(([key, item]) => {
-          switch (field.mapKind) {
-            case "scalar":
-              return [key, item as JsonValue];
-            case "enum":
-              return [key, enumJsonName(field.enum, item)];
-            case "message":
-              return [key, messageJson(field.message, item)];
-          }
-        }),
-      );
-    }
-  }
-};
-
-const sourceWithChannelOneofs = (
-  descriptor: DescMessage,
-  source: { [x: PropertyKey]: unknown },
-) => {
-  const adapted = { ...source };
-  switch (descriptor.typeName) {
-    case "briar.app.v1.ChannelSummary":
-      adapted.directMessageParticipants = source.dmParticipants;
-      break;
-    case "briar.app.v1.DirectMessageParticipant":
-    case "briar.app.v1.ChannelMessageAuthor":
-      adapted.kind = source.type;
-      break;
-    case "briar.app.v1.BlockText":
-      adapted.kind = source.type === "mrkdwn" ? "markdown" : source.type;
-      break;
-    case "briar.app.v1.MessageBlock":
-      if (typeof source.type === "string") adapted[source.type] = source;
-      break;
-    case "briar.app.v1.RichTextInline":
-      if (typeof source.type === "string") adapted[source.type] = source;
-      break;
-    case "briar.app.v1.RichTextElement": {
-      const kind = {
-        rich_text_section: "section",
-        rich_text_list: "list",
-        rich_text_quote: "quote",
-        rich_text_preformatted: "preformatted",
-      }[String(source.type)];
-      if (kind) adapted[kind] = source;
-      break;
-    }
-    case "briar.app.v1.ChannelProposal": {
-      if (!Predicate.isObject(source.payload)) break;
-      const payload = source.payload;
-      if (Predicate.isObject(payload.batch)) adapted.batch = payload.batch;
-      else if (Predicate.isObject(payload.issue)) adapted.issue = payload;
-      break;
-    }
-  }
-  return adapted;
-};
-
-function messageJson(descriptor: DescMessage, value: unknown): JsonValue {
-  if (descriptor.typeName.startsWith("google.protobuf.")) {
-    return value as JsonValue;
-  }
-  if (!Predicate.isObject(value)) {
-    throw new Error(`Expected an object for ${descriptor.typeName}`);
-  }
-  const source = sourceWithChannelOneofs(descriptor, value);
-  const output: JsonObject = {};
-  for (const field of descriptor.fields) {
-    const key = [field.jsonName, field.localName, field.name].find((candidate) =>
-      Object.hasOwn(source, candidate)
-    );
-    if (!key) continue;
-    const input = source[key];
-    if (input === undefined) continue;
-    output[field.jsonName] = fieldValue(field, input);
-  }
-  return output;
-}
-
-const responseMessage = <Descriptor extends DescMessage>(
-  descriptor: Descriptor,
-  value: unknown,
-) => fromJson(
-  descriptor,
-  messageJson(descriptor, value),
-);
-
 const providerJson = (provider: AgentProvider) => {
   switch (provider) {
     case AgentProvider.CODEX:
@@ -373,6 +226,7 @@ const providerJson = (provider: AgentProvider) => {
     case AgentProvider.OPENROUTER:
       return "openrouter";
     case AgentProvider.UNSPECIFIED:
+    default:
       throw new ConnectError("provider is required", Code.InvalidArgument);
   }
 };
@@ -389,75 +243,12 @@ const approvalJson = (approval: {
   workerId: approval.workerId ?? null,
 });
 
-const approvalOutcome = (value: "accepted" | "already_accepted") =>
-  value === "accepted"
-    ? ApprovalOutcome.ACCEPTED
-    : ApprovalOutcome.ALREADY_ACCEPTED;
-
-const executionDispatchMessage = (
-  value: Awaited<
-    ReturnType<typeof acceptOrganizationChannelExecutionProposal>
-  >["dispatch"],
-) => responseMessage(IssueExecutionDispatchSchema, {
-  ...value,
-  dispatchMode: value.dispatchMode === "specific"
-    ? IssueExecutionDispatch_DispatchMode.SPECIFIC
-    : IssueExecutionDispatch_DispatchMode.ANY,
-  outcome: value.outcome === "already_dispatched"
-    ? IssueExecutionDispatch_Outcome.ALREADY_DISPATCHED
-    : IssueExecutionDispatch_Outcome.DISPATCHED,
-});
-
-const acceptProposalMessage = (
-  value: Awaited<ReturnType<typeof acceptOrganizationChannelProposal>>,
-) => create(AcceptChannelProposalResponseSchema, {
-  outcome: approvalOutcome(value.outcome),
-  projectId: value.projectId,
-  resultRunId: value.resultRunId,
-  resultItems: "resultItems" in value
-    ? value.resultItems.map((item) =>
-        create(ChannelIssueBatchResultItemSchema, item)
-      )
-    : [],
-  executionProposal: value.executionProposal
-    ? responseMessage(IssueExecutionProposalSchema, value.executionProposal)
-    : undefined,
-  dispatch: "dispatch" in value && value.dispatch
-    ? executionDispatchMessage(value.dispatch)
-    : undefined,
-});
-
-const acceptExecutionProposalMessage = (
-  value: Awaited<
-    ReturnType<typeof acceptOrganizationChannelExecutionProposal>
-  >,
-) => create(AcceptChannelExecutionProposalResponseSchema, {
-  proposal: responseMessage(IssueExecutionProposalSchema, value.proposal),
-  outcome: approvalOutcome(value.outcome),
-  projectId: value.projectId,
-  runId: value.runId,
-  dispatch: executionDispatchMessage(value.dispatch),
-});
-
 const declineProposalMessage = (
   value: Awaited<ReturnType<typeof declineOrganizationChannelProposal>>,
 ) => create(DeclineChannelProposalResponseSchema, {
   outcome: value.outcome === "declined"
     ? DeclineChannelProposalResponse_Outcome.DECLINED
     : DeclineChannelProposalResponse_Outcome.ALREADY_DECLINED,
-});
-
-const acceptSkillExecutionProposalMessage = (
-  value: Awaited<
-    ReturnType<typeof acceptOrganizationChannelSkillExecutionProposal>
-  >,
-) => create(AcceptChannelSkillExecutionProposalResponseSchema, {
-  outcome: approvalOutcome(value.outcome),
-  proposal: responseMessage(AgentSkillExecutionProposalSchema, value.proposal),
-  projectId: value.projectId,
-  session: value.session
-    ? responseMessage(ProjectAgentSessionSchema, value.session)
-    : undefined,
 });
 
 const scheduleChannelMutation = (
@@ -481,7 +272,10 @@ const createAppChannelService = (
       organizationId: canonicalUuid(request.organizationId),
       userId: session.user.id,
     });
-    return responseMessage(ChannelService.method.listChannels.output, result);
+    return create(ChannelService.method.listChannels.output, {
+      channels: result.channels.map(appChannelSummaryJson),
+      cursor: BigInt(result.cursor),
+    });
   }),
 
   syncChannels: (request) => rpc(async () => {
@@ -495,7 +289,16 @@ const createAppChannelService = (
       userId: session.user.id,
       since: Number(request.cursor),
     });
-    return responseMessage(ChannelService.method.syncChannels.output, result);
+    return create(ChannelService.method.syncChannels.output, {
+      cursor: BigInt(result.cursor),
+      hasMore: result.hasMore,
+      reset: false,
+      channels: result.channels.map(appChannelSummaryJson),
+      removedChannelIds: result.removedChannelIds,
+      messages: result.messages.map(appChannelMessage),
+      removedMessageIds: result.removedMessageIds,
+      agentReplies: result.agentReplies.map(appChannelAgentReply),
+    });
   }),
 
   listDirectMessageRecipients: (request) => rpc(async () => {
@@ -528,7 +331,9 @@ const createAppChannelService = (
       request: { memberIds: request.memberIds, agentIds: request.agentIds },
     });
     scheduleChannelMutation(input, request.organizationId);
-    return responseMessage(ChannelService.method.createDirectMessage.output, result);
+    return create(ChannelService.method.createDirectMessage.output, {
+      channel: appChannelSummaryJson(result.channel),
+    });
   }),
 
   createChannel: (request) => rpc(async () => {
@@ -778,7 +583,14 @@ const createAppChannelService = (
       userId: session.user.id,
       messageLimit: request.messageLimit ?? null,
     });
-    return responseMessage(ChannelService.method.getChannel.output, result);
+    return create(ChannelService.method.getChannel.output, {
+      channel: appChannelSummaryJson(result.channel),
+      members: result.members.map(appChannelMember),
+      agents: result.agents.map(appChannelAgent),
+      messages: result.messages.map(appChannelMessage),
+      agentReplies: result.agentReplies.map(appChannelAgentReply),
+      nextCursor: result.nextCursor ?? undefined,
+    });
   }),
 
   markChannelRead: (request) => rpc(async () => {
@@ -795,7 +607,9 @@ const createAppChannelService = (
       },
     });
     scheduleChannelMutation(input, request.organizationId);
-    return responseMessage(ChannelService.method.markChannelRead.output, result);
+    return create(ChannelService.method.markChannelRead.output, {
+      channel: appChannelSummaryJson(result.channel),
+    });
   }),
 
   listChannelMessages: (request) => rpc(async () => {
@@ -809,7 +623,10 @@ const createAppChannelService = (
       cursor: request.cursor,
       limit: request.limit,
     });
-    return responseMessage(ChannelService.method.listChannelMessages.output, result);
+    return create(ChannelService.method.listChannelMessages.output, {
+      messages: result.messages.map(appChannelMessage),
+      nextCursor: result.nextCursor ?? undefined,
+    });
   }),
 
   createChannelMessage: (request) => rpc(async () => {
@@ -833,7 +650,10 @@ const createAppChannelService = (
       }),
     });
     scheduleChannelMutation(input, request.organizationId);
-    return responseMessage(ChannelService.method.createChannelMessage.output, result);
+    return create(ChannelService.method.createChannelMessage.output, {
+      message: appChannelMessage(result.message),
+      agentReplies: result.agentReplies.map(appChannelAgentReply),
+    });
   }),
 
   deleteChannelMessage: (request) => rpc(async () => {
@@ -849,7 +669,13 @@ const createAppChannelService = (
       context: input.context,
     });
     scheduleChannelMutation(input, request.organizationId);
-    return responseMessage(ChannelService.method.deleteChannelMessage.output, result);
+    return create(ChannelService.method.deleteChannelMessage.output, {
+      deleted: result.deleted,
+      message: result.message ? appChannelMessage(result.message) : undefined,
+      parentMessage: result.parentMessage
+        ? appChannelMessage(result.parentMessage)
+        : undefined,
+    });
   }),
 
   toggleChannelMessageReaction: (request) => rpc(async () => {
@@ -863,10 +689,9 @@ const createAppChannelService = (
       request: { emoji: request.emoji },
     });
     scheduleChannelMutation(input, request.organizationId);
-    return responseMessage(
-      ChannelService.method.toggleChannelMessageReaction.output,
-      result,
-    );
+    return create(ChannelService.method.toggleChannelMessageReaction.output, {
+      message: appChannelMessage(result.message),
+    });
   }),
 
   setChannelThreadSubscription: (request) => rpc(async () => {
@@ -880,10 +705,10 @@ const createAppChannelService = (
       subscribed: request.subscribed,
     });
     scheduleChannelMutation(input, request.organizationId);
-    return responseMessage(
-      ChannelService.method.setChannelThreadSubscription.output,
-      result,
-    );
+    return create(ChannelService.method.setChannelThreadSubscription.output, {
+      rootMessageId: result.rootMessageId,
+      subscribers: result.subscribers.map(appChannelSubscriber),
+    });
   }),
 
   acceptChannelProposal: (request) => rpc(async () => {
@@ -909,7 +734,7 @@ const createAppChannelService = (
         input.context,
       );
     }
-    return acceptProposalMessage(result);
+    return appAcceptChannelProposal(result);
   }),
 
   acceptChannelExecutionProposal: (request) => rpc(async () => {
@@ -935,7 +760,7 @@ const createAppChannelService = (
         input.context,
       );
     }
-    return acceptExecutionProposalMessage(result);
+    return appAcceptChannelExecutionProposal(result);
   }),
 
   declineChannelProposal: (request) => rpc(async () => {
@@ -976,7 +801,7 @@ const createAppChannelService = (
         );
       }
     }
-    return acceptSkillExecutionProposalMessage(result);
+    return appAcceptChannelSkillExecutionProposal(result);
   }),
 });
 
