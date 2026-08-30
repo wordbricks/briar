@@ -868,7 +868,7 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
     ) -> BriarAPI_RetryRunResponse {
         var response = BriarAPI_RetryRunResponse()
         response.runID = request.runID
-        response.outcome = "retried"
+        response.outcome = .retried
         response.attempt = 2
         response.status = .queued
         return response
@@ -879,7 +879,7 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
     ) -> BriarAPI_CancelRunResponse {
         var response = BriarAPI_CancelRunResponse()
         response.runID = request.runID
-        response.outcome = "cancelled"
+        response.outcome = .cancelled
         response.attempt = 1
         response.status = .cancelled
         return response

@@ -2,9 +2,11 @@ import { createClient } from "@connectrpc/connect";
 import {
   IssueChangedField as ProtoIssueChangedField,
   IssueService,
+  CancelRunResponse_Outcome as ProtoCancelOutcome,
   MoveRunResponse_Outcome as ProtoMoveOutcome,
   ReworkRunResponse_Outcome as ProtoReworkOutcome,
   ResumeRunResponse_Outcome as ProtoResumeOutcome,
+  RetryRunResponse_Outcome as ProtoRetryOutcome,
   RunEvidence_Status as ProtoRunEvidenceStatus,
   SetIssueDependencyResponse_Outcome as ProtoDependencyOutcome,
   TransferIssueResponse_Outcome as ProtoTransferOutcome,
@@ -587,18 +589,18 @@ const recoverHuntRun = async (
     const outcome: HuntRecoveryResult["outcome"] = (() => {
       if (action === "retry") {
         switch (response.outcome) {
-          case "retried":
+          case ProtoRetryOutcome.RETRIED:
             return "retried";
-          case "already_retried":
+          case ProtoRetryOutcome.ALREADY_RETRIED:
             return "already_retried";
           default:
             throw new Error(`Unknown retry outcome: ${response.outcome}`);
         }
       }
       switch (response.outcome) {
-        case "cancelled":
+        case ProtoCancelOutcome.CANCELLED:
           return "cancelled";
-        case "already_cancelled":
+        case ProtoCancelOutcome.ALREADY_CANCELLED:
           return "already_cancelled";
         default:
           throw new Error(`Unknown cancel outcome: ${response.outcome}`);

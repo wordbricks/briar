@@ -1,6 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError, type HandlerContext } from "@connectrpc/connect";
 import {
+  RetryRunResponse_Outcome,
   RetryRunRequestSchema,
   ListRunEvidenceRequestSchema,
   RunEvidence_Status,
@@ -252,7 +253,7 @@ describe("WorkerExecutionService execution credential boundary", () => {
     });
     expect(response).toMatchObject({
       runId,
-      outcome: "already_retried",
+      outcome: RetryRunResponse_Outcome.ALREADY_RETRIED,
       attempt: 3,
       status: RunStatus.QUEUED,
     });

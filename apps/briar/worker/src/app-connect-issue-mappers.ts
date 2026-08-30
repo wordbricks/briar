@@ -32,6 +32,7 @@ import {
   AcceptIssueReworkProposalResponseSchema,
   AcceptIssueSkillExecutionProposalResponseSchema,
   CancelRunResponseSchema,
+  CancelRunResponse_Outcome,
   CompleteResultReviewResponseSchema,
   CreateIssueResponseSchema,
   CreateIssueMessageResponseSchema,
@@ -60,6 +61,7 @@ import {
   ResumeRunResponse_Outcome,
   ResumeRunResponseSchema,
   RetryRunResponseSchema,
+  RetryRunResponse_Outcome,
   SetIssueDependencyResponse_Outcome,
   SetIssueDependencyResponseSchema,
   SetIssueSubscriptionResponseSchema,
@@ -364,7 +366,11 @@ export const appMoveRunResponse = (result: MoveRunResult) => {
 export const appRetryRunResponse = (result: RecoverRunResult) =>
   create(RetryRunResponseSchema, {
     runId: result.runId,
-    outcome: result.outcome,
+    outcome: result.outcome === "retried"
+      ? RetryRunResponse_Outcome.RETRIED
+      : result.outcome === "already_retried"
+        ? RetryRunResponse_Outcome.ALREADY_RETRIED
+        : internal("Retry application returned a cancellation outcome"),
     attempt: requiredUint32(result.attempt, "retry attempt"),
     status: RunStatus.QUEUED,
   });
@@ -372,7 +378,11 @@ export const appRetryRunResponse = (result: RecoverRunResult) =>
 export const appCancelRunResponse = (result: RecoverRunResult) =>
   create(CancelRunResponseSchema, {
     runId: result.runId,
-    outcome: result.outcome,
+    outcome: result.outcome === "cancelled"
+      ? CancelRunResponse_Outcome.CANCELLED
+      : result.outcome === "already_cancelled"
+        ? CancelRunResponse_Outcome.ALREADY_CANCELLED
+        : internal("Cancel application returned a retry outcome"),
     attempt: requiredUint32(result.attempt, "cancellation attempt"),
     status: RunStatus.CANCELLED,
   });
