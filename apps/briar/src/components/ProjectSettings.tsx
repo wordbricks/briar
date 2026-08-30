@@ -96,6 +96,7 @@ import type {
   LinearImportConnectResult,
   LinearImportResult,
   LinearImportStatesResult,
+  LinearStatusMapping,
 } from "../lib/linear-import";
 import { requiredWorkflowStages } from "../lib/auto-hunt-contract";
 import {
@@ -173,7 +174,7 @@ export function ProjectSettings({
   onImportLinearIssues: (input: {
     apiKey: string;
     teamIds: string[];
-    statusMapping: Record<string, string>;
+    statusMapping: LinearStatusMapping;
   }) => Promise<LinearImportResult>;
   onIconChange: (projectId: string, icon: string | null) => Promise<unknown>;
   onIssueKeyPrefixChange: (

@@ -169,6 +169,11 @@ export {
   loadStatusTrayRuns,
 } from "./app-rpc/reporting";
 export {
+  connectLinearImport,
+  importLinearIssues,
+  loadLinearImportStates,
+} from "./app-rpc/linear-import";
+export {
   loadMergeQueueProfile,
   loadMergeQueueStatus,
   updateMergeQueueProfile,
@@ -180,11 +185,6 @@ import {
 import type { AgentProvider } from "./agent-provider";
 import type { InboxMessage } from "../hooks/useInbox";
 import type { ChannelMessageAttachment } from "./channels-contract";
-import type {
-  LinearImportConnectResult,
-  LinearImportResult,
-  LinearImportStatesResult,
-} from "./linear-import";
 import type {
   DashboardPayload,
   DashboardDeltaPayload,
@@ -587,54 +587,5 @@ export async function createProjectGithubCredential(
     `/projects/${projectId}/github/credentials`,
     token,
     { method: "POST" },
-  );
-}
-
-export async function connectLinearImport(
-  token: string,
-  projectId: string,
-  apiKey: string,
-) {
-  return request<LinearImportConnectResult>(
-    `/projects/${projectId}/linear/connect`,
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify({ apiKey }),
-    },
-  );
-}
-
-export async function loadLinearImportStates(
-  token: string,
-  projectId: string,
-  input: { apiKey: string; teamIds: string[] },
-) {
-  return request<LinearImportStatesResult>(
-    `/projects/${projectId}/linear/states`,
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
-  );
-}
-
-export async function importLinearIssues(
-  token: string,
-  projectId: string,
-  input: {
-    apiKey: string;
-    teamIds: string[];
-    statusMapping: Record<string, string>;
-  },
-) {
-  return request<LinearImportResult>(
-    `/projects/${projectId}/linear/import`,
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
   );
 }

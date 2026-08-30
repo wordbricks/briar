@@ -24,7 +24,6 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import {
   IssueDifficulty as ProtoIssueDifficulty,
-  RunStatus as ProtoRunStatus,
 } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import type { AutoHuntSession } from "../../hooks/useAutoHuntSessions";
 import type {
@@ -76,6 +75,7 @@ import {
   requiredTimestamp,
   resultReviewFromProto,
   runStatusFromProto,
+  runStatusToProto,
   safeNumber,
 } from "./mappers";
 import { appCallOptions, appRpc, appTransport } from "./core";
@@ -93,27 +93,6 @@ const requireIssueClient = () => {
     throw new Error("Briar API URL이 설정되지 않았습니다.");
   }
   return issueClient;
-};
-
-const runStatusToProto = (status: HuntStatus): ProtoRunStatus => {
-  switch (status) {
-    case "backlog":
-      return ProtoRunStatus.BACKLOG;
-    case "queued":
-      return ProtoRunStatus.QUEUED;
-    case "running":
-      return ProtoRunStatus.RUNNING;
-    case "paused":
-      return ProtoRunStatus.PAUSED;
-    case "blocked":
-      return ProtoRunStatus.BLOCKED;
-    case "failed":
-      return ProtoRunStatus.FAILED;
-    case "completed":
-      return ProtoRunStatus.COMPLETED;
-    case "cancelled":
-      return ProtoRunStatus.CANCELLED;
-  }
 };
 
 const issueDifficultyToProto = (

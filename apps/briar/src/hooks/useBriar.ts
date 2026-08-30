@@ -71,7 +71,10 @@ import {
   demoRepositoryReadiness,
 } from "../lib/demo-data";
 import { deleteAndroidPushRegistration } from "../lib/inbox-notifications";
-import { isRepositoryConnectedForImport } from "../lib/linear-import";
+import {
+  isRepositoryConnectedForImport,
+  type LinearStatusMapping,
+} from "../lib/linear-import";
 import {
   cloneGithubSshRepository,
   configureLocalExecutionWorker,
@@ -2352,7 +2355,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       input: {
         apiKey: string;
         teamIds: string[];
-        statusMapping: Record<string, string>;
+        statusMapping: LinearStatusMapping;
       },
     ) => {
       assertRepositoryReadyForLinearImport(projectId);

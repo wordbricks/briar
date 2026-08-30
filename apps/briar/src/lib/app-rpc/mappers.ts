@@ -185,6 +185,27 @@ export const runStatusFromProto = (value: ProtoRunStatus): HuntStatus => {
   }
 };
 
+export const runStatusToProto = (value: HuntStatus): ProtoRunStatus => {
+  switch (value) {
+    case "backlog":
+      return ProtoRunStatus.BACKLOG;
+    case "queued":
+      return ProtoRunStatus.QUEUED;
+    case "running":
+      return ProtoRunStatus.RUNNING;
+    case "paused":
+      return ProtoRunStatus.PAUSED;
+    case "blocked":
+      return ProtoRunStatus.BLOCKED;
+    case "failed":
+      return ProtoRunStatus.FAILED;
+    case "completed":
+      return ProtoRunStatus.COMPLETED;
+    case "cancelled":
+      return ProtoRunStatus.CANCELLED;
+  }
+};
+
 export const issueDifficultyFromProto = (
   value: ProtoIssueDifficulty | undefined,
 ): IssueDifficulty | null => {

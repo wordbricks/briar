@@ -70,7 +70,7 @@ export function LinearIssueImport({
   onImport: (input: {
     apiKey: string;
     teamIds: string[];
-    statusMapping: Record<string, string>;
+    statusMapping: LinearStatusMapping;
   }) => Promise<LinearImportResult>;
 }) {
   const { t } = useI18n();
@@ -190,14 +190,10 @@ export function LinearIssueImport({
     setBusy(true);
     setError(null);
     try {
-      const serialized: Record<string, string> = {};
-      for (const [stateId, placement] of Object.entries(statusMapping)) {
-        serialized[stateId] = placementKey(placement);
-      }
       const imported = await onImport({
         apiKey,
         teamIds: selectedTeamIds,
-        statusMapping: serialized,
+        statusMapping,
       });
       setResult(imported);
       setStep("done");
