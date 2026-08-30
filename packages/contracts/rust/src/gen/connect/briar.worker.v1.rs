@@ -186,6 +186,26 @@ pub type OwnedReportIssueExecutionTelemetryResponseView = ::buffa::view::OwnedVi
         'static,
     >,
 >;
+///Shorthand for `OwnedView<RecordRunEventRequestView<'static>>`.
+pub type OwnedRecordRunEventRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RecordRunEventRequestView<'static>,
+>;
+///Shorthand for `OwnedView<RecordRunEventResponseView<'static>>`.
+pub type OwnedRecordRunEventResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RecordRunEventResponseView<'static>,
+>;
+///Shorthand for `OwnedView<TransitionWorkflowStageRequestView<'static>>`.
+pub type OwnedTransitionWorkflowStageRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::TransitionWorkflowStageRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<TransitionWorkflowStageResponseView<'static>>`.
+pub type OwnedTransitionWorkflowStageResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::TransitionWorkflowStageResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::ClaimWorkResponse>
 for crate::proto::briar::worker::v1::__buffa::view::ClaimWorkResponseView<'_> {
     fn encode(
@@ -822,6 +842,82 @@ impl ::connectrpc::Encodable<
 >
 for ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::ReportIssueExecutionTelemetryResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::RecordRunEventResponse>
+for crate::proto::briar::worker::v1::__buffa::view::RecordRunEventResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::RecordRunEventResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RecordRunEventResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::TransitionWorkflowStageResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::TransitionWorkflowStageResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::TransitionWorkflowStageResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::TransitionWorkflowStageResponseView<
         'static,
     >,
 > {
@@ -3301,6 +3397,18 @@ pub const WORKER_EXECUTION_SERVICE_REPORT_ISSUE_EXECUTION_TELEMETRY_SPEC: ::conn
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RecordRunEvent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_EXECUTION_SERVICE_RECORD_RUN_EVENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerExecutionService/RecordRunEvent",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `TransitionWorkflowStage` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_EXECUTION_SERVICE_TRANSITION_WORKFLOW_STAGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerExecutionService/TransitionWorkflowStage",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Execution-credential operations shared by the interactive CLI and the
 /// desktop-hosted Auto Hunt runtime.
 ///
@@ -3443,6 +3551,52 @@ pub trait WorkerExecutionService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::worker::v1::ReportIssueExecutionTelemetryResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RecordRunEvent RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn record_run_event<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::RecordRunEventRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::RecordRunEventResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the TransitionWorkflowStage RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn transition_workflow_stage<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::TransitionWorkflowStageRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::TransitionWorkflowStageResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -3594,6 +3748,64 @@ impl<S: WorkerExecutionService> WorkerExecutionServiceExt for S {
                 },
             )
             .with_spec(WORKER_EXECUTION_SERVICE_REPORT_ISSUE_EXECUTION_TELEMETRY_SPEC)
+            .route_view(
+                WORKER_EXECUTION_SERVICE_SERVICE_NAME,
+                "RecordRunEvent",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::RecordRunEventRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::RecordRunEventRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.record_run_event(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::RecordRunEventResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_EXECUTION_SERVICE_RECORD_RUN_EVENT_SPEC)
+            .route_view(
+                WORKER_EXECUTION_SERVICE_SERVICE_NAME,
+                "TransitionWorkflowStage",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::TransitionWorkflowStageRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::TransitionWorkflowStageRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.transition_workflow_stage(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::TransitionWorkflowStageResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_EXECUTION_SERVICE_TRANSITION_WORKFLOW_STAGE_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -3676,6 +3888,20 @@ for WorkerExecutionServiceServer<T> {
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(
                             WORKER_EXECUTION_SERVICE_REPORT_ISSUE_EXECUTION_TELEMETRY_SPEC,
+                        ),
+                )
+            }
+            "RecordRunEvent" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_EXECUTION_SERVICE_RECORD_RUN_EVENT_SPEC),
+                )
+            }
+            "TransitionWorkflowStage" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            WORKER_EXECUTION_SERVICE_TRANSITION_WORKFLOW_STAGE_SPEC,
                         ),
                 )
             }
@@ -3780,6 +4006,50 @@ for WorkerExecutionServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::worker::v1::ReportIssueExecutionTelemetryResponse,
+                        >(format)
+                })
+            }
+            "RecordRunEvent" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::RecordRunEventRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::RecordRunEventRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::RecordRunEventRequest,
+                    >::from_parts(&req, &body);
+                    svc.record_run_event(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::RecordRunEventResponse,
+                        >(format)
+                })
+            }
+            "TransitionWorkflowStage" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::TransitionWorkflowStageRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::TransitionWorkflowStageRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::TransitionWorkflowStageRequest,
+                    >::from_parts(&req, &body);
+                    svc.transition_workflow_stage(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::TransitionWorkflowStageResponse,
                         >(format)
                 })
             }
@@ -4090,6 +4360,96 @@ where
                 &self.transport,
                 &self.config,
                 WORKER_EXECUTION_SERVICE_REPORT_ISSUE_EXECUTION_TELEMETRY_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RecordRunEvent RPC. Sends a request to /briar.worker.v1.WorkerExecutionService/RecordRunEvent.
+    pub async fn record_run_event(
+        &self,
+        request: crate::proto::briar::worker::v1::RecordRunEventRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::RecordRunEventResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.record_run_event_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RecordRunEvent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn record_run_event_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::RecordRunEventRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::RecordRunEventResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_EXECUTION_SERVICE_RECORD_RUN_EVENT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the TransitionWorkflowStage RPC. Sends a request to /briar.worker.v1.WorkerExecutionService/TransitionWorkflowStage.
+    pub async fn transition_workflow_stage(
+        &self,
+        request: crate::proto::briar::worker::v1::TransitionWorkflowStageRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::TransitionWorkflowStageResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.transition_workflow_stage_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the TransitionWorkflowStage RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn transition_workflow_stage_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::TransitionWorkflowStageRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::TransitionWorkflowStageResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_EXECUTION_SERVICE_TRANSITION_WORKFLOW_STAGE_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

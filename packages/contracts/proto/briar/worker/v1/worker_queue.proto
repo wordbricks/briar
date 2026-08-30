@@ -3,6 +3,7 @@ syntax = "proto3";
 package briar.worker.v1;
 
 import "briar/app/v1/issue.proto";
+import "briar/app/v1/common.proto";
 import "briar/app/v1/dashboard.proto";
 import "briar/app/v1/fleet.proto";
 import "briar/types/v1/agent_event.proto";
@@ -48,6 +49,8 @@ service WorkerExecutionService {
   rpc ListRunEvidence(briar.app.v1.ListRunEvidenceRequest) returns (briar.app.v1.ListRunEvidenceResponse);
   rpc AppendTranscriptEvents(AppendTranscriptEventsRequest) returns (AppendTranscriptEventsResponse);
   rpc ReportIssueExecutionTelemetry(ReportIssueExecutionTelemetryRequest) returns (ReportIssueExecutionTelemetryResponse);
+  rpc RecordRunEvent(RecordRunEventRequest) returns (RecordRunEventResponse);
+  rpc TransitionWorkflowStage(TransitionWorkflowStageRequest) returns (TransitionWorkflowStageResponse);
 }
 
 message ClaimIssueRequest {
@@ -103,6 +106,90 @@ message ReportIssueExecutionTelemetryResponse {
   bool execution_metrics_updated = 1;
   uint32 usage_observations_stored = 2;
   uint32 cost_observations_stored = 3;
+}
+
+message RunSourceIdentity {
+  AutoHuntSource source = 1;
+  string source_key = 2;
+  string title = 3;
+}
+
+message RecordRunEventRequest {
+  string project_id = 1;
+
+  // Claimed work requires its exact active claim. A source identity is the
+  // agent-token intake path and may create a run when no matching run exists.
+  oneof target {
+    WorkClaimIdentity work = 2;
+    RunSourceIdentity source_identity = 3;
+  }
+
+  briar.app.v1.RunStatus status = 4;
+  optional string workflow_stage = 5;
+  string event_key = 6;
+  google.protobuf.Timestamp occurred_at = 7;
+  string actor = 8;
+  string repository = 9;
+  optional string detail = 10;
+  optional uint32 priority = 11;
+  optional string branch = 12;
+  optional string commit_sha = 13;
+  optional briar.app.v1.TrackerReference tracker = 14;
+  optional string issue_description = 15;
+  optional string result_summary = 16;
+  optional briar.app.v1.StructuredRunResult structured_result = 17;
+  repeated string pull_request_urls = 18;
+  optional string target_sha = 19;
+  optional google.protobuf.Timestamp source_created_at = 20;
+  optional google.protobuf.Struct context = 21;
+}
+
+message RecordRunEventResponse {
+  string run_id = 1;
+  briar.app.v1.RunStatus status = 2;
+  optional string workflow_stage = 3;
+}
+
+message TransitionWorkflowStageRequest {
+  enum Action {
+    ACTION_UNSPECIFIED = 0;
+    ACTION_START = 1;
+    ACTION_COMPLETE = 2;
+  }
+
+  string project_id = 1;
+  WorkClaimIdentity work = 2;
+  string request_id = 3;
+  string stage = 4;
+  Action action = 5;
+  optional uint32 attempt = 6;
+  optional uint32 revision = 7;
+}
+
+message WorkflowStageLifecycleCheckpoint {
+  string key = 1;
+  string stage = 2;
+  briar.types.v1.WorkflowCheckpoint.Position position = 3;
+  uint32 revision = 4;
+}
+
+message TransitionWorkflowStageResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_STARTED = 1;
+    OUTCOME_COMPLETED = 2;
+    OUTCOME_ALREADY_STARTED = 3;
+    OUTCOME_ALREADY_COMPLETED = 4;
+    OUTCOME_PAUSED = 5;
+  }
+
+  string run_id = 1;
+  string request_id = 2;
+  Outcome outcome = 3;
+  uint32 attempt = 4;
+  uint32 revision = 5;
+  string stage = 6;
+  optional WorkflowStageLifecycleCheckpoint checkpoint = 7;
 }
 
 message ClaimWorkRequest {
