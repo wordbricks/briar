@@ -5,20 +5,54 @@ import {
   IssueAttachmentSchema,
   IssueDifficulty,
   IssueSubscriberSchema,
+  MessageAuthorSchema,
+  ProposalStatus,
+  ReplyJobStatus,
   ResultReviewSchema,
   RunStatus,
 } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
+  AgentSkillApprovalPolicy,
+  AgentSkillExecutionMode,
+  AgentSkillExecutionProposalSchema,
+  AgentSkillExecutionStatus,
+  ProjectAgentSessionEventSchema,
+  ProjectAgentSessionEventType,
+  ProjectAgentSessionFollowUpSchema,
+  ProjectAgentSessionIssueOutcome,
+  ProjectAgentSessionIssueSchema,
+  ProjectAgentSessionSchema,
+  ProjectAgentSessionStatus,
+  ProjectAgentSessionTrigger,
+  ProjectAgentSessionType,
+} from "@briar/contracts/gen/briar/app/v1/agent_pb";
+import {
+  AcceptIssueActionProposalResponseSchema,
+  AcceptIssueExecutionProposalResponseSchema,
+  AcceptIssueReworkProposalResponseSchema,
+  AcceptIssueSkillExecutionProposalResponseSchema,
   CancelRunResponseSchema,
   CompleteResultReviewResponseSchema,
   CreateIssueResponseSchema,
+  CreateIssueMessageResponseSchema,
   DeleteIssueResponseSchema,
   DispatchRunResponseSchema,
+  GetIssueAgentReplyResponseSchema,
+  IssueAgentReplySchema,
+  IssueChangedField,
+  IssueCreateProposalSchema,
+  IssueExecutionProposalSchema,
   IssueExecutionDispatch_DispatchMode,
   IssueExecutionDispatch_Outcome,
   IssueExecutionDispatchSchema,
+  IssueMessageSchema,
+  IssueReworkProposalSchema,
+  IssueUpdateChangesSchema,
+  IssueUpdateProposalSchema,
+  ListIssueMessagesResponseSchema,
   MoveRunResponse_Outcome,
   MoveRunResponseSchema,
+  ProposedIssueSchema,
   ReassignRunResponseSchema,
   ResumeRunResponse_Outcome,
   ResumeRunResponseSchema,
@@ -26,6 +60,7 @@ import {
   SetIssueDependencyResponse_Outcome,
   SetIssueDependencyResponseSchema,
   SetIssueSubscriptionResponseSchema,
+  SyncIssueMessagesResponseSchema,
   TransferIssueResponse_Outcome,
   TransferIssueResponseSchema,
   UpdateIssuePreferencesResponseSchema,
@@ -33,6 +68,13 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
+import * as Schema from "effect/Schema";
+import {
+  IssueCreateProposalAction,
+  IssueUpdateProposalAction,
+} from "./issue-request-contract";
+import { ProjectAgentSessionInput } from "./project-request-contract";
+import { strictSchema } from "./schema-codecs";
 
 type CreateIssueResult = Awaited<
   ReturnType<typeof import("./issue-core-routes").createProjectIssue>
@@ -111,6 +153,13 @@ const requiredUint64 = (value: number, field: string) => {
   return BigInt(value);
 };
 
+const requiredString = (
+  value: string | null | undefined,
+  field: string,
+) => typeof value === "string" && value.length > 0
+  ? value
+  : internal(`Invalid trusted ${field}`);
+
 const provider = {
   codex: AgentProvider.CODEX,
   claude: AgentProvider.CLAUDE,
@@ -122,6 +171,11 @@ const provider = {
 } as const;
 
 const appProvider = (value: keyof typeof provider) => provider[value];
+
+const requiredAppProvider = (
+  value: keyof typeof provider | null | undefined,
+  field: string,
+) => value == null ? internal(`Invalid trusted ${field}`) : appProvider(value);
 
 const runStatus = {
   backlog: RunStatus.BACKLOG,
@@ -240,17 +294,24 @@ export const appSetIssueDependencyResponse = (result: SetDependencyResult) =>
     outcome: dependencyOutcome[result.outcome],
   });
 
-const moveOutcome = {
-  moved: MoveRunResponse_Outcome.MOVED,
-  unchanged: MoveRunResponse_Outcome.UNCHANGED,
-  already_moved: MoveRunResponse_Outcome.ALREADY_MOVED,
-} as const satisfies Record<MoveRunResult["outcome"], MoveRunResponse_Outcome>;
+const appMoveOutcome = (outcome: MoveRunResult["outcome"]) => {
+  switch (outcome) {
+    case "moved":
+      return MoveRunResponse_Outcome.MOVED;
+    case "unchanged":
+      return MoveRunResponse_Outcome.UNCHANGED;
+    case "already_moved":
+      return MoveRunResponse_Outcome.ALREADY_MOVED;
+    case "not_found":
+      return internal("Move application returned a not-found result");
+  }
+};
 
 export const appMoveRunResponse = (result: MoveRunResult) => {
   if (result.status == null) return internal("Move result omitted run status");
   return create(MoveRunResponseSchema, {
     runId: result.runId,
-    outcome: moveOutcome[result.outcome],
+    outcome: appMoveOutcome(result.outcome),
     status: appRunStatus(result.status),
     workflowStage: result.workflowStage ?? undefined,
   });
@@ -272,20 +333,23 @@ export const appCancelRunResponse = (result: RecoverRunResult) =>
     status: RunStatus.CANCELLED,
   });
 
-const resumeOutcome = {
-  approved: ResumeRunResponse_Outcome.APPROVED,
-  already_approved: ResumeRunResponse_Outcome.ALREADY_APPROVED,
-  resumed: ResumeRunResponse_Outcome.RESUMED,
-  already_resumed: ResumeRunResponse_Outcome.ALREADY_RESUMED,
-} as const satisfies Record<
-  ResumeRunResult["outcome"],
-  ResumeRunResponse_Outcome
->;
+const appResumeOutcome = (outcome: ResumeRunResult["outcome"]) => {
+  switch (outcome) {
+    case "approved":
+      return ResumeRunResponse_Outcome.APPROVED;
+    case "already_approved":
+      return ResumeRunResponse_Outcome.ALREADY_APPROVED;
+    case "conflict":
+      return internal("Resume application returned a conflict result");
+    case "not_found":
+      return internal("Resume application returned a not-found result");
+  }
+};
 
 export const appResumeRunResponse = (result: ResumeRunResult) =>
   create(ResumeRunResponseSchema, {
     runId: result.runId,
-    outcome: resumeOutcome[result.outcome],
+    outcome: appResumeOutcome(result.outcome),
     workflowStage: result.workflowStage ?? undefined,
     startStage: result.startStage ?? undefined,
     checkpointKey: result.checkpointKey ?? undefined,
@@ -294,34 +358,48 @@ export const appResumeRunResponse = (result: ResumeRunResult) =>
     terminalReviewOnly: result.terminalReviewOnly,
   });
 
-const dispatchMode = {
-  any: IssueExecutionDispatch_DispatchMode.ANY,
-  specific: IssueExecutionDispatch_DispatchMode.SPECIFIC,
-} as const satisfies Record<
-  DispatchRunResult["dispatchMode"],
-  IssueExecutionDispatch_DispatchMode
->;
+const appDispatchMode = (value: string) => {
+  switch (value) {
+    case "any":
+      return IssueExecutionDispatch_DispatchMode.ANY;
+    case "specific":
+      return IssueExecutionDispatch_DispatchMode.SPECIFIC;
+    default:
+      return internal("Invalid trusted issue dispatch mode");
+  }
+};
 
-const dispatchOutcome = {
-  dispatched: IssueExecutionDispatch_Outcome.DISPATCHED,
-  already_dispatched: IssueExecutionDispatch_Outcome.ALREADY_DISPATCHED,
-} as const satisfies Record<
-  DispatchRunResult["outcome"],
-  IssueExecutionDispatch_Outcome
->;
+const appDispatchOutcome = (value: string) => {
+  switch (value) {
+    case "dispatched":
+      return IssueExecutionDispatch_Outcome.DISPATCHED;
+    case "already_dispatched":
+      return IssueExecutionDispatch_Outcome.ALREADY_DISPATCHED;
+    default:
+      return internal("Invalid trusted issue dispatch outcome");
+  }
+};
 
-export const appIssueExecutionDispatch = (result: DispatchRunResult) =>
+export const appIssueExecutionDispatch = (
+  result: DispatchRunResult | AcceptExecutionResult["dispatch"],
+) =>
   create(IssueExecutionDispatchSchema, {
     runId: result.runId,
     agentId: result.agentId ?? undefined,
-    provider: appProvider(result.provider),
+    provider: requiredAppProvider(result.provider, "issue dispatch provider"),
     model: result.model ?? undefined,
     effort: result.effort ?? undefined,
     requestedWorkerId: result.requestedWorkerId ?? undefined,
-    requestedByUserId: result.requestedByUserId,
-    dispatchMode: dispatchMode[result.dispatchMode],
-    dispatchedAt: requiredTimestamp(result.dispatchedAt, "issue dispatch"),
-    outcome: dispatchOutcome[result.outcome],
+    requestedByUserId: requiredString(
+      result.requestedByUserId,
+      "issue dispatch requester",
+    ),
+    dispatchMode: appDispatchMode(result.dispatchMode),
+    dispatchedAt: requiredTimestamp(
+      requiredString(result.dispatchedAt, "issue dispatch timestamp"),
+      "issue dispatch",
+    ),
+    outcome: appDispatchOutcome(result.outcome),
   });
 
 export const appDispatchRunResponse = (result: DispatchRunResult) =>
@@ -354,3 +432,537 @@ export const appApprovalOutcome = (
 ) => value === "accepted"
   ? ApprovalOutcome.ACCEPTED
   : ApprovalOutcome.ALREADY_ACCEPTED;
+
+type ConversationSnapshot = Awaited<
+  ReturnType<
+    typeof import("./issue-conversation-routes").listProjectIssueMessages
+  >
+>;
+type SyncConversationResult = Awaited<
+  ReturnType<
+    typeof import("./issue-conversation-routes").syncProjectIssueMessages
+  >
+>;
+type SyncConversationWithSnapshot = SyncConversationResult &
+  Partial<Pick<ConversationSnapshot, "messages" | "agentReplies">>;
+type IssueMessageResult = ConversationSnapshot["messages"][number];
+type IssueAgentReplyResult = ConversationSnapshot["agentReplies"][number];
+type CreateMessageResult = Awaited<
+  ReturnType<
+    typeof import("./issue-conversation-routes").createProjectIssueMessage
+  >
+>;
+type GetAgentReplyResult = Awaited<
+  ReturnType<
+    typeof import("./issue-conversation-routes").getProjectIssueAgentReply
+  >
+>;
+type AcceptReworkResult = Awaited<
+  ReturnType<
+    typeof import("./issue-proposal-routes").acceptProjectIssueReworkProposal
+  >
+>;
+type AcceptActionResult = Awaited<
+  ReturnType<
+    typeof import("./issue-proposal-routes").acceptProjectIssueActionProposal
+  >
+>;
+type AcceptExecutionResult = Awaited<
+  ReturnType<
+    typeof import("./issue-proposal-routes").acceptProjectIssueExecutionProposal
+  >
+>;
+type AcceptSkillExecutionResult = Awaited<
+  ReturnType<
+    typeof import("./issue-proposal-routes").acceptProjectIssueSkillExecutionProposal
+  >
+>;
+type IssueExecutionProposalResult = NonNullable<
+  IssueMessageResult["executionProposal"]
+>;
+type AgentSkillExecutionProposalResult = NonNullable<
+  IssueMessageResult["skillExecutionProposal"]
+>;
+type ProjectAgentSessionResult = NonNullable<
+  AcceptSkillExecutionResult["session"]
+>;
+
+const proposalStatus = {
+  pending: ProposalStatus.PENDING,
+  accepted: ProposalStatus.ACCEPTED,
+  declined: ProposalStatus.DECLINED,
+} as const;
+
+const appProposalStatus = (value: keyof typeof proposalStatus) =>
+  proposalStatus[value];
+
+const replyJobStatus = {
+  queued: ReplyJobStatus.QUEUED,
+  running: ReplyJobStatus.RUNNING,
+  completed: ReplyJobStatus.COMPLETED,
+  failed: ReplyJobStatus.FAILED,
+} as const satisfies Record<IssueAgentReplyResult["status"], ReplyJobStatus>;
+
+const trustedProposalMetadata = {
+  id: Schema.String,
+  status: Schema.Literals(["pending", "accepted", "declined"]),
+  acceptedAt: Schema.NullOr(Schema.String),
+  resultRunId: Schema.NullOr(Schema.String),
+};
+
+const TrustedReworkProposal = strictSchema(Schema.Struct({
+  id: Schema.String,
+  type: Schema.Literal("request_issue_rework"),
+  workflowStage: Schema.String,
+  reason: Schema.String,
+  status: Schema.Literals(["pending", "accepted", "declined"]),
+  acceptedAt: Schema.NullOr(Schema.String),
+  appliedRevision: Schema.NullOr(Schema.Int),
+}));
+
+const TrustedUpdateProposal = strictSchema(Schema.Struct({
+  ...IssueUpdateProposalAction.fields,
+  ...trustedProposalMetadata,
+  changedFields: Schema.Array(
+    Schema.Literals(["title", "description", "priority"]),
+  ),
+}));
+
+const TrustedCreateProposal = strictSchema(Schema.Struct({
+  ...IssueCreateProposalAction.fields,
+  ...trustedProposalMetadata,
+}));
+
+const TrustedProposedAction = Schema.Union([
+  TrustedReworkProposal,
+  TrustedUpdateProposal,
+  TrustedCreateProposal,
+]);
+type TrustedProposedAction = typeof TrustedProposedAction.Type;
+
+const decodeTrustedProposedAction = Schema.decodeUnknownSync(
+  TrustedProposedAction,
+);
+
+const trustedProposedAction = (value: unknown) => {
+  try {
+    return decodeTrustedProposedAction(value);
+  } catch {
+    return internal("Issue application returned an invalid proposed action");
+  }
+};
+
+const appIssueReworkProposal = (
+  proposal: Extract<
+    TrustedProposedAction,
+    { readonly type: "request_issue_rework" }
+  >,
+) =>
+  create(IssueReworkProposalSchema, {
+    id: proposal.id,
+    workflowStage: proposal.workflowStage,
+    reason: proposal.reason,
+    status: appProposalStatus(proposal.status),
+    acceptedAt: optionalTimestamp(proposal.acceptedAt, "rework acceptance"),
+    appliedRevision: proposal.appliedRevision ?? undefined,
+  });
+
+const changedField = {
+  title: IssueChangedField.TITLE,
+  description: IssueChangedField.DESCRIPTION,
+  priority: IssueChangedField.PRIORITY,
+} as const satisfies Record<
+  Extract<
+    TrustedProposedAction,
+    { readonly type: "request_issue_update" }
+  >["changedFields"][number],
+  IssueChangedField
+>;
+
+const appIssueUpdateProposal = (
+  proposal: Extract<
+    TrustedProposedAction,
+    { readonly type: "request_issue_update" }
+  >,
+) =>
+  create(IssueUpdateProposalSchema, {
+    id: proposal.id,
+    changes: create(IssueUpdateChangesSchema, {
+      title: proposal.changes.title,
+      description: proposal.changes.description ?? undefined,
+      priority: proposal.changes.priority ?? undefined,
+    }),
+    changedFields: proposal.changedFields.map((field) => changedField[field]),
+    status: appProposalStatus(proposal.status),
+    acceptedAt: optionalTimestamp(proposal.acceptedAt, "update acceptance"),
+    resultRunId: proposal.resultRunId ?? undefined,
+  });
+
+const appIssueCreateProposal = (
+  proposal: Extract<
+    TrustedProposedAction,
+    { readonly type: "request_issue_create" }
+  >,
+) =>
+  create(IssueCreateProposalSchema, {
+    id: proposal.id,
+    issue: create(ProposedIssueSchema, {
+      title: proposal.issue.title,
+      description: proposal.issue.description ?? undefined,
+      priority: proposal.issue.priority ?? undefined,
+      status: appRunStatus(proposal.issue.status),
+    }),
+    executeAfterCreate: proposal.executeAfterCreate,
+    status: appProposalStatus(proposal.status),
+    acceptedAt: optionalTimestamp(proposal.acceptedAt, "create acceptance"),
+    resultRunId: proposal.resultRunId ?? undefined,
+  });
+
+const appIssueExecutionProposal = (
+  proposal: IssueExecutionProposalResult,
+) =>
+  create(IssueExecutionProposalSchema, {
+    id: proposal.id,
+    status: appProposalStatus(proposal.status),
+    projectId: proposal.projectId,
+    runId: proposal.runId,
+    title: proposal.title,
+    createdAt: requiredTimestamp(proposal.createdAt, "execution proposal creation"),
+    acceptedAt: optionalTimestamp(
+      proposal.acceptedAt,
+      "execution proposal acceptance",
+    ),
+    requestedProvider: proposal.requestedProvider == null
+      ? undefined
+      : appProvider(proposal.requestedProvider),
+    requestedModel: proposal.requestedModel ?? undefined,
+    requestedEffort: proposal.requestedEffort ?? undefined,
+    requestedWorkerId: proposal.requestedWorkerId ?? undefined,
+    delegatedByAgentId: proposal.delegatedByAgentId ?? undefined,
+    delegatedByAgentName: proposal.delegatedByAgentName ?? undefined,
+  });
+
+const skillExecutionMode = {
+  conversation: AgentSkillExecutionMode.CONVERSATION,
+  task: AgentSkillExecutionMode.TASK,
+} as const satisfies Record<
+  AgentSkillExecutionProposalResult["executionMode"],
+  AgentSkillExecutionMode
+>;
+
+const skillApprovalPolicy = {
+  invoke_is_consent: AgentSkillApprovalPolicy.INVOKE_IS_CONSENT,
+  explicit: AgentSkillApprovalPolicy.EXPLICIT,
+} as const satisfies Record<
+  AgentSkillExecutionProposalResult["approvalPolicy"],
+  AgentSkillApprovalPolicy
+>;
+
+const skillExecutionStatus = {
+  waiting: AgentSkillExecutionStatus.WAITING,
+  running: AgentSkillExecutionStatus.RUNNING,
+  completed: AgentSkillExecutionStatus.COMPLETED,
+  failed: AgentSkillExecutionStatus.FAILED,
+} as const satisfies Record<
+  AgentSkillExecutionProposalResult["executionStatus"],
+  AgentSkillExecutionStatus
+>;
+
+const appAgentSkillExecutionProposal = (
+  proposal: AgentSkillExecutionProposalResult,
+) =>
+  create(AgentSkillExecutionProposalSchema, {
+    id: proposal.id,
+    status: appProposalStatus(proposal.status),
+    projectId: proposal.projectId,
+    agentId: proposal.agentId,
+    agentName: proposal.agentName,
+    skillId: proposal.skillId,
+    skillName: proposal.skillName,
+    request: proposal.request,
+    provider: appProvider(proposal.provider),
+    model: proposal.model ?? undefined,
+    effort: proposal.effort ?? undefined,
+    executionMode: skillExecutionMode[proposal.executionMode],
+    approvalPolicy: skillApprovalPolicy[proposal.approvalPolicy],
+    executionStatus: skillExecutionStatus[proposal.executionStatus],
+    createdAt: requiredTimestamp(proposal.createdAt, "skill proposal creation"),
+    acceptedAt: optionalTimestamp(
+      proposal.acceptedAt,
+      "skill proposal acceptance",
+    ),
+    requestedWorkerId: proposal.requestedWorkerId ?? undefined,
+    requestedWorkerLabel: proposal.requestedWorkerLabel ?? undefined,
+    resultSessionId: proposal.resultSessionId ?? undefined,
+    resultMessageId: proposal.resultMessageId ?? undefined,
+    error: proposal.error ?? undefined,
+    delegatedByAgentId: proposal.delegatedByAgentId ?? undefined,
+    delegatedByAgentName: proposal.delegatedByAgentName ?? undefined,
+  });
+
+const appMessageAuthor = (author: IssueMessageResult["author"]) =>
+  create(MessageAuthorSchema, {
+    id: author.id ?? undefined,
+    agentId: author.agentId ?? undefined,
+    name: author.name,
+    image: author.image ?? undefined,
+    provider: author.provider == null ? undefined : appProvider(author.provider),
+  });
+
+const appIssueMessage = (message: IssueMessageResult) => {
+  const proposal = message.proposedAction == null
+    ? undefined
+    : trustedProposedAction(message.proposedAction);
+  const proposedAction = proposal === undefined
+    ? { case: undefined } as const
+    : proposal.type === "request_issue_rework"
+    ? { case: "reworkProposal", value: appIssueReworkProposal(proposal) } as const
+    : proposal.type === "request_issue_update"
+    ? { case: "updateProposal", value: appIssueUpdateProposal(proposal) } as const
+    : { case: "createProposal", value: appIssueCreateProposal(proposal) } as const;
+  return create(IssueMessageSchema, {
+    id: message.id,
+    runId: message.runId,
+    parentMessageId: message.parentMessageId ?? undefined,
+    body: message.body,
+    attachments: message.attachments.map(appIssueAttachment),
+    author: appMessageAuthor(message.author),
+    replyCount: message.replyCount,
+    proposedAction,
+    executionProposal: message.executionProposal == null
+      ? undefined
+      : appIssueExecutionProposal(message.executionProposal),
+    skillExecutionProposal: message.skillExecutionProposal == null
+      ? undefined
+      : appAgentSkillExecutionProposal(message.skillExecutionProposal),
+    createdAt: requiredTimestamp(message.createdAt, "issue message creation"),
+    updatedAt: requiredTimestamp(message.updatedAt, "issue message update"),
+  });
+};
+
+const appIssueAgentReply = (reply: IssueAgentReplyResult) =>
+  create(IssueAgentReplySchema, {
+    id: reply.id,
+    triggerMessageId: reply.triggerMessageId,
+    parentMessageId: reply.parentMessageId,
+    agentId: reply.agentId ?? undefined,
+    agentName: reply.agentName ?? undefined,
+    status: replyJobStatus[reply.status],
+    attempts: reply.attempts,
+    error: reply.error ?? undefined,
+    workerId: reply.workerId ?? undefined,
+    provider: reply.provider == null ? undefined : appProvider(reply.provider),
+    updatedAt: requiredTimestamp(reply.updatedAt, "agent reply update"),
+  });
+
+export const appListIssueMessagesResponse = (result: ConversationSnapshot) =>
+  create(ListIssueMessagesResponseSchema, {
+    cursor: requiredUint64(result.cursor, "conversation cursor"),
+    messages: result.messages.map(appIssueMessage),
+    agentReplies: result.agentReplies.map(appIssueAgentReply),
+  });
+
+export const appSyncIssueMessagesResponse = (
+  result: SyncConversationWithSnapshot,
+) =>
+  create(SyncIssueMessagesResponseSchema, {
+    cursor: requiredUint64(result.cursor, "conversation cursor"),
+    hasMore: result.hasMore,
+    changed: result.changed,
+    reset: false,
+    messages: (result.messages ?? []).map(appIssueMessage),
+    agentReplies: (result.agentReplies ?? []).map(appIssueAgentReply),
+  });
+
+export const appResetIssueMessagesResponse = (snapshot: ConversationSnapshot) =>
+  create(SyncIssueMessagesResponseSchema, {
+    cursor: requiredUint64(snapshot.cursor, "conversation cursor"),
+    hasMore: false,
+    changed: true,
+    reset: true,
+    messages: snapshot.messages.map(appIssueMessage),
+    agentReplies: snapshot.agentReplies.map(appIssueAgentReply),
+  });
+
+export const appCreateIssueMessageResponse = (result: CreateMessageResult) =>
+  create(CreateIssueMessageResponseSchema, {
+    message: appIssueMessage(result.message),
+    agentReplies: result.agentReplies.map(appIssueAgentReply),
+    agentReply: result.agentReply == null
+      ? undefined
+      : appIssueAgentReply(result.agentReply),
+  });
+
+export const appGetIssueAgentReplyResponse = (result: GetAgentReplyResult) =>
+  create(GetIssueAgentReplyResponseSchema, {
+    agentReply: appIssueAgentReply(result.agentReply),
+    agentReplies: result.agentReplies.map(appIssueAgentReply),
+    messages: result.messages.map(appIssueMessage),
+    message: result.message == null ? undefined : appIssueMessage(result.message),
+  });
+
+export const appAcceptIssueReworkProposalResponse = (
+  result: AcceptReworkResult,
+) => {
+  const proposal = trustedProposedAction(result.proposal);
+  if (proposal.type !== "request_issue_rework") {
+    return internal("Rework approval returned a different proposal kind");
+  }
+  return create(AcceptIssueReworkProposalResponseSchema, {
+    proposal: appIssueReworkProposal(proposal),
+    outcome: appApprovalOutcome(result.outcome),
+    attempt: requiredUint32(result.attempt, "rework attempt"),
+    revision: requiredUint32(result.revision, "rework revision"),
+    workflowStage: requiredString(result.workflowStage, "rework workflow stage"),
+  });
+};
+
+export const appAcceptIssueActionProposalResponse = (
+  result: AcceptActionResult,
+) => {
+  const proposal = trustedProposedAction(result.proposal);
+  const proposalOneof = proposal.type === "request_issue_update"
+    ? { case: "update", value: appIssueUpdateProposal(proposal) } as const
+    : proposal.type === "request_issue_create"
+    ? { case: "create", value: appIssueCreateProposal(proposal) } as const
+    : internal("Issue action approval returned a rework proposal");
+  const executionProposal = "executionProposal" in result
+    ? result.executionProposal
+    : undefined;
+  return create(AcceptIssueActionProposalResponseSchema, {
+    proposal: proposalOneof,
+    outcome: appApprovalOutcome(result.outcome),
+    resultRunId: result.resultRunId ?? undefined,
+    executionProposal: executionProposal == null
+      ? undefined
+      : appIssueExecutionProposal(executionProposal),
+  });
+};
+
+export const appAcceptIssueExecutionProposalResponse = (
+  result: AcceptExecutionResult,
+) =>
+  create(AcceptIssueExecutionProposalResponseSchema, {
+    proposal: appIssueExecutionProposal(result.proposal),
+    outcome: appApprovalOutcome(result.outcome),
+    projectId: result.projectId,
+    runId: result.runId,
+    dispatch: appIssueExecutionDispatch(result.dispatch),
+  });
+
+const projectAgentSessionType = {
+  task: ProjectAgentSessionType.TASK,
+  dispatch: ProjectAgentSessionType.DISPATCH,
+} as const;
+
+const projectAgentSessionTrigger = {
+  manual: ProjectAgentSessionTrigger.MANUAL,
+  scheduled: ProjectAgentSessionTrigger.SCHEDULED,
+} as const;
+
+const projectAgentSessionStatus = {
+  running: ProjectAgentSessionStatus.RUNNING,
+  completed: ProjectAgentSessionStatus.COMPLETED,
+  failed: ProjectAgentSessionStatus.FAILED,
+  skipped: ProjectAgentSessionStatus.SKIPPED,
+  interrupted: ProjectAgentSessionStatus.INTERRUPTED,
+} as const;
+
+const projectAgentSessionIssueOutcome = {
+  pending: ProjectAgentSessionIssueOutcome.PENDING,
+  completed: ProjectAgentSessionIssueOutcome.COMPLETED,
+  blocked: ProjectAgentSessionIssueOutcome.BLOCKED,
+  failed: ProjectAgentSessionIssueOutcome.FAILED,
+  skipped: ProjectAgentSessionIssueOutcome.SKIPPED,
+} as const;
+
+const projectAgentSessionEventType = {
+  started: ProjectAgentSessionEventType.STARTED,
+  completed: ProjectAgentSessionEventType.COMPLETED,
+  failed: ProjectAgentSessionEventType.FAILED,
+  skipped: ProjectAgentSessionEventType.SKIPPED,
+  interrupted: ProjectAgentSessionEventType.INTERRUPTED,
+  stopped: ProjectAgentSessionEventType.STOPPED,
+} as const;
+
+const TrustedProjectAgentSession = Schema.Struct({
+  id: Schema.String,
+  projectId: Schema.String,
+  requestedByUserId: Schema.NullOr(Schema.String),
+  ...ProjectAgentSessionInput.fields,
+});
+const decodeTrustedProjectAgentSession = Schema.decodeUnknownSync(
+  TrustedProjectAgentSession,
+);
+
+const appProjectAgentSession = (session: ProjectAgentSessionResult) => {
+  let decoded: typeof TrustedProjectAgentSession.Type;
+  try {
+    decoded = decodeTrustedProjectAgentSession(session);
+  } catch {
+    return internal("Issue application returned an invalid Agent session");
+  }
+  return create(ProjectAgentSessionSchema, {
+    id: decoded.id,
+    projectId: decoded.projectId,
+    dispatchGroupId: decoded.dispatchGroupId || undefined,
+    agentId: decoded.agentId ?? undefined,
+    agentName: decoded.agentName ?? undefined,
+    skillId: decoded.skillId ?? undefined,
+    sessionType: projectAgentSessionType[decoded.sessionType],
+    trigger: decoded.trigger == null
+      ? undefined
+      : projectAgentSessionTrigger[decoded.trigger],
+    scheduleId: decoded.scheduleId ?? undefined,
+    scheduleRunId: decoded.scheduleRunId ?? undefined,
+    parentSessionId: decoded.parentSessionId ?? undefined,
+    request: decoded.request ?? undefined,
+    followUps: decoded.followUps.map((followUp) =>
+      create(ProjectAgentSessionFollowUpSchema, {
+        id: followUp.id,
+        message: followUp.message,
+        sentAt: requiredTimestamp(followUp.sentAt, "Agent follow-up"),
+      })
+    ),
+    status: projectAgentSessionStatus[decoded.status],
+    issues: decoded.issues.map((issue) =>
+      create(ProjectAgentSessionIssueSchema, {
+        runId: issue.runId,
+        runNumber: issue.runNumber,
+        sourceKey: issue.sourceKey,
+        title: issue.title,
+        outcome: projectAgentSessionIssueOutcome[issue.outcome],
+        summary: issue.summary ?? undefined,
+      })
+    ),
+    startedAt: requiredTimestamp(decoded.startedAt, "Agent session start"),
+    completedAt: optionalTimestamp(decoded.completedAt, "Agent session completion"),
+    conversationId: decoded.conversationId ?? undefined,
+    requestedWorkerId: decoded.requestedWorkerId ?? undefined,
+    workerId: decoded.workerId ?? undefined,
+    requestedByUserId: decoded.requestedByUserId ?? undefined,
+    summary: decoded.summary ?? undefined,
+    error: decoded.error ?? undefined,
+    events: decoded.events.map((event) =>
+      create(ProjectAgentSessionEventSchema, {
+        id: event.id,
+        type: projectAgentSessionEventType[event.type],
+        occurredAt: requiredTimestamp(event.occurredAt, "Agent session event"),
+      })
+    ),
+    updatedAt: requiredTimestamp(decoded.updatedAt, "Agent session update"),
+    archived: false,
+  });
+};
+
+export const appAcceptIssueSkillExecutionProposalResponse = (
+  result: AcceptSkillExecutionResult,
+) =>
+  create(AcceptIssueSkillExecutionProposalResponseSchema, {
+    outcome: appApprovalOutcome(result.outcome),
+    proposal: appAgentSkillExecutionProposal(result.proposal),
+    projectId: result.projectId,
+    session: result.session == null
+      ? undefined
+      : appProjectAgentSession(result.session),
+  });

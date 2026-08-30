@@ -266,4 +266,72 @@ describe("app Issue Connect adapter", () => {
       }],
     });
   });
+
+  it("encodes the accepted action oneof and rejects an invalid trusted proposal", async () => {
+    const acceptActionProposal = vi.fn<
+      AppConnectIssueServices["acceptActionProposal"]
+    >();
+    acceptActionProposal.mockResolvedValueOnce({
+      proposal: {
+        id: proposalId,
+        type: "request_issue_create",
+        issue: {
+          title: "Generated follow-up",
+          description: null,
+          priority: null,
+          status: "queued",
+        },
+        executeAfterCreate: true,
+        status: "accepted",
+        acceptedAt: "2026-08-30T02:03:04.000Z",
+        resultRunId: runId,
+      },
+      executionProposal: null,
+      outcome: "accepted",
+      resultRunId: runId,
+    } as never);
+
+    const accepted = await invokeIssueRpc("AcceptIssueActionProposal", {
+      projectId,
+      runId,
+      proposalId,
+    }, { acceptActionProposal });
+
+    expect(accepted.status).toBe(200);
+    const acceptedBody = await accepted.json();
+    expect(acceptedBody).toMatchObject({
+      create: {
+        id: proposalId,
+        issue: { title: "Generated follow-up", status: "RUN_STATUS_QUEUED" },
+        executeAfterCreate: true,
+        status: "PROPOSAL_STATUS_ACCEPTED",
+        resultRunId: runId,
+      },
+      outcome: "APPROVAL_OUTCOME_ACCEPTED",
+      resultRunId: runId,
+    });
+    expect(acceptedBody).not.toHaveProperty("update");
+
+    acceptActionProposal.mockResolvedValueOnce({
+      proposal: {
+        id: proposalId,
+        type: "request_issue_rework",
+        workflowStage: "implement",
+        reason: "Wrong proposal kind",
+        status: "accepted",
+        acceptedAt: "2026-08-30T02:03:04.000Z",
+        appliedRevision: 2,
+      },
+      outcome: "accepted",
+      resultRunId: runId,
+    } as never);
+    const invalid = await invokeIssueRpc("AcceptIssueActionProposal", {
+      projectId,
+      runId,
+      proposalId,
+    }, { acceptActionProposal });
+
+    expect(invalid.status).toBe(500);
+    expect(await invalid.json()).toMatchObject({ code: "internal" });
+  });
 });

@@ -1,12 +1,4 @@
 import {
-  fromJson,
-  type DescEnum,
-  type DescField,
-  type DescMessage,
-  type JsonObject,
-  type JsonValue,
-} from "@bufbuild/protobuf";
-import {
   Code,
   ConnectError,
   type ConnectRouter,
@@ -23,20 +15,28 @@ import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
   WorkflowCheckpoint_Position,
 } from "@briar/contracts/gen/briar/types/v1/workflow_pb";
-import * as Predicate from "effect/Predicate";
 import { agentSkillConflictMessage } from "./agent-skills";
 import {
+  appAcceptIssueActionProposalResponse,
+  appAcceptIssueExecutionProposalResponse,
+  appAcceptIssueReworkProposalResponse,
+  appAcceptIssueSkillExecutionProposalResponse,
   appCancelRunResponse,
   appCompleteResultReviewResponse,
   appCreateIssueResponse,
+  appCreateIssueMessageResponse,
   appDeleteIssueResponse,
   appDispatchRunResponse,
+  appGetIssueAgentReplyResponse,
+  appListIssueMessagesResponse,
   appMoveRunResponse,
   appReassignRunResponse,
+  appResetIssueMessagesResponse,
   appResumeRunResponse,
   appRetryRunResponse,
   appSetIssueDependencyResponse,
   appSetIssueSubscriptionResponse,
+  appSyncIssueMessagesResponse,
   appTransferIssueResponse,
   appUpdateIssuePreferencesResponse,
   appUpdateIssueResponse,
@@ -230,155 +230,6 @@ const rpc = async <A>(run: () => Promise<A>): Promise<A> => {
   }
 };
 
-const enumJsonName = (descriptor: DescEnum, value: unknown): JsonValue => {
-  if (typeof value === "number") return value;
-  if (typeof value !== "string") {
-    throw new Error(`Expected ${descriptor.typeName} to be a string`);
-  }
-  const normalized = value.trim().replaceAll("-", "_").toUpperCase();
-  const matches = descriptor.values.filter((candidate) =>
-    candidate.name === normalized || candidate.name.endsWith(`_${normalized}`)
-  );
-  if (matches.length !== 1) {
-    throw new Error(`Unknown ${descriptor.typeName} value: ${value}`);
-  }
-  return matches[0].name;
-};
-
-const fieldValue = (field: DescField, value: unknown): JsonValue => {
-  if (value === null) return null;
-  switch (field.fieldKind) {
-    case "scalar":
-      if (
-        typeof value === "string" || typeof value === "number" ||
-        typeof value === "boolean"
-      ) return value;
-      throw new Error(`Invalid scalar value for ${field}`);
-    case "enum":
-      return enumJsonName(field.enum, value);
-    case "message":
-      return messageJson(field.message, value);
-    case "list": {
-      if (!Array.isArray(value)) throw new Error(`Expected an array for ${field}`);
-      switch (field.listKind) {
-        case "scalar":
-          return value as JsonValue[];
-        case "enum":
-          return value.map((item) => enumJsonName(field.enum, item));
-        case "message":
-          return value.map((item) => messageJson(field.message, item));
-      }
-    }
-    case "map": {
-      if (!Predicate.isObject(value)) {
-        throw new Error(`Expected an object for ${field}`);
-      }
-      return Object.fromEntries(
-        Object.entries(value).map(([key, item]) => {
-          switch (field.mapKind) {
-            case "scalar":
-              return [key, item as JsonValue];
-            case "enum":
-              return [key, enumJsonName(field.enum, item)];
-            case "message":
-              return [key, messageJson(field.message, item)];
-          }
-        }),
-      );
-    }
-  }
-};
-
-const sourceWithLegacyOneofs = (
-  descriptor: DescMessage,
-  source: { [x: PropertyKey]: unknown },
-) => {
-  const adapted = { ...source };
-  if (descriptor.typeName === "briar.app.v1.IssueMessage") {
-    const proposal = source.proposedAction;
-    if (Predicate.isObject(proposal)) {
-      switch (proposal.type) {
-        case "request_issue_rework":
-          adapted.reworkProposal = proposal;
-          break;
-        case "request_issue_update":
-          adapted.updateProposal = proposal;
-          break;
-        case "request_issue_create":
-          adapted.createProposal = proposal;
-          break;
-      }
-    }
-  }
-  if (
-    descriptor.typeName ===
-      "briar.app.v1.AcceptIssueActionProposalResponse"
-  ) {
-    const proposal = source.proposal;
-    if (Predicate.isObject(proposal)) {
-      switch (proposal.type) {
-        case "request_issue_update":
-          adapted.update = proposal;
-          break;
-        case "request_issue_create":
-          adapted.create = proposal;
-          break;
-      }
-    }
-  }
-  return adapted;
-};
-
-function messageJson(descriptor: DescMessage, value: unknown): JsonValue {
-  if (descriptor.typeName.startsWith("google.protobuf.")) {
-    return value as JsonValue;
-  }
-  if (!Predicate.isObject(value)) {
-    throw new Error(`Expected an object for ${descriptor.typeName}`);
-  }
-  const source = sourceWithLegacyOneofs(descriptor, value);
-  const output: JsonObject = {};
-  for (const field of descriptor.fields) {
-    const key = [field.jsonName, field.localName, field.name].find((candidate) =>
-      Object.hasOwn(source, candidate)
-    );
-    const requiredByContract = field.oneof === undefined && (
-      ((field.fieldKind === "scalar" || field.fieldKind === "enum") &&
-        field.presence === 2) ||
-      (field.fieldKind === "message" && !field.proto.proto3Optional)
-    );
-    if (!key) {
-      if (requiredByContract) {
-        throw new Error(
-          `Worker response omitted ${descriptor.typeName}.${field.localName}`,
-        );
-      }
-      continue;
-    }
-    const fieldInput = source[key];
-    if (fieldInput === undefined) continue;
-    if (fieldInput === null && requiredByContract) {
-      throw new Error(
-        `Worker response returned null for ${descriptor.typeName}.${field.localName}`,
-      );
-    }
-    output[field.jsonName] = fieldValue(field, fieldInput);
-  }
-  if (
-    descriptor.typeName ===
-      "briar.app.v1.AcceptIssueActionProposalResponse" &&
-    !Object.hasOwn(output, "update") && !Object.hasOwn(output, "create")
-  ) {
-    throw new Error("Worker response omitted the accepted issue proposal");
-  }
-  return output;
-}
-
-const responseMessage = <Descriptor extends DescMessage>(
-  descriptor: Descriptor,
-  value: unknown,
-) => fromJson(descriptor, messageJson(descriptor, value));
-
 const providerJson = (provider: AgentProvider) => {
   switch (provider) {
     case AgentProvider.CODEX:
@@ -400,7 +251,7 @@ const providerJson = (provider: AgentProvider) => {
   }
 };
 
-const optionalProviderBody = (provider: AgentProvider): JsonObject => {
+const optionalProviderBody = (provider: AgentProvider) => {
   const value = providerJson(provider);
   return value === undefined ? {} : { provider: value };
 };
@@ -785,10 +636,7 @@ export const createAppIssueService = (
       runId: canonicalUuid(request.runId),
       userId: session.user.id,
     });
-    return responseMessage(
-      IssueService.method.listIssueMessages.output,
-      result,
-    );
+    return appListIssueMessagesResponse(result);
   }),
 
   syncIssueMessages: (request) => rpc(async () => {
@@ -811,22 +659,11 @@ export const createAppIssueService = (
         ...applicationInput,
         cursor: Number(request.cursor),
       });
-      return responseMessage(
-        IssueService.method.syncIssueMessages.output,
-        result,
-      );
+      return appSyncIssueMessagesResponse(result);
     } catch (error) {
       if (!(error instanceof HttpError) || error.status !== 410) throw error;
       const snapshot = await services.listMessages(applicationInput);
-      return responseMessage(
-        IssueService.method.syncIssueMessages.output,
-        {
-          ...snapshot,
-          hasMore: false,
-          changed: true,
-          reset: true,
-        },
-      );
+      return appResetIssueMessagesResponse(snapshot);
     }
   }),
 
@@ -854,10 +691,7 @@ export const createAppIssueService = (
         attachmentReferences: request.attachmentReferences,
       })
     );
-    return responseMessage(
-      IssueService.method.createIssueMessage.output,
-      result,
-    );
+    return appCreateIssueMessageResponse(result);
   }),
 
   getIssueAgentReply: (request) => rpc(async () => {
@@ -870,10 +704,7 @@ export const createAppIssueService = (
       triggerMessageId: canonicalUuid(request.triggerMessageId),
       userId: session.user.id,
     });
-    return responseMessage(
-      IssueService.method.getIssueAgentReply.output,
-      result,
-    );
+    return appGetIssueAgentReplyResponse(result);
   }),
 
   listRunEvidence: (request) => rpc(async () => {
@@ -901,10 +732,7 @@ export const createAppIssueService = (
         userId: session.user.id,
       })
     );
-    return responseMessage(
-      IssueService.method.acceptIssueReworkProposal.output,
-      result,
-    );
+    return appAcceptIssueReworkProposalResponse(result);
   }),
 
   acceptIssueActionProposal: (request) => rpc(async () => {
@@ -920,10 +748,7 @@ export const createAppIssueService = (
         userId: session.user.id,
       })
     );
-    return responseMessage(
-      IssueService.method.acceptIssueActionProposal.output,
-      result,
-    );
+    return appAcceptIssueActionProposalResponse(result);
   }),
 
   acceptIssueExecutionProposal: (request) => rpc(async () => {
@@ -949,10 +774,7 @@ export const createAppIssueService = (
         },
       })
     );
-    return responseMessage(
-      IssueService.method.acceptIssueExecutionProposal.output,
-      result,
-    );
+    return appAcceptIssueExecutionProposalResponse(result);
   }),
 
   acceptIssueSkillExecutionProposal: (request) => rpc(async () => {
@@ -969,10 +791,7 @@ export const createAppIssueService = (
         request: { workerId: request.workerId ?? null },
       })
     );
-    if (
-      Predicate.isObject(result) && result.session !== null &&
-      result.session !== undefined
-    ) {
+    if (result.session != null) {
       scheduleProjectAgentSessionRealtimePublish(
         input.env,
         input.db,
@@ -980,10 +799,7 @@ export const createAppIssueService = (
         input.context,
       );
     }
-    return responseMessage(
-      IssueService.method.acceptIssueSkillExecutionProposal.output,
-      result,
-    );
+    return appAcceptIssueSkillExecutionProposalResponse(result);
   }),
 });
 
