@@ -7,14 +7,7 @@ import {
 import {
   IssueService,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
-import {
-  IssueDifficulty,
-  RunStatus,
-} from "@briar/contracts/gen/briar/app/v1/common_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
-import {
-  WorkflowCheckpoint_Position,
-} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import { agentSkillConflictMessage } from "./agent-skills";
 import {
   appAcceptIssueActionProposalResponse,
@@ -91,6 +84,15 @@ import { listProjectRunEvidence } from "./run-evidence-routes";
 import { UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
 import { WorkerConflictError } from "./workers";
+import {
+  appAgentProviderFromProto,
+  appCheckpointPosition,
+  appRunStatus,
+  createIssueApplicationRequest,
+  createIssueMessageApplicationRequest,
+  requiredAppAgentProviderFromProto,
+  updateIssueApplicationRequest,
+} from "./app-mutation-request-mappers";
 
 export type AppConnectIssueRouteInput = {
   readonly request: Request;
@@ -250,89 +252,9 @@ const rpc = async <A>(run: () => Promise<A>): Promise<A> => {
   }
 };
 
-const providerJson = (provider: AgentProvider) => {
-  switch (provider) {
-    case AgentProvider.CODEX:
-      return "codex";
-    case AgentProvider.CLAUDE:
-      return "claude";
-    case AgentProvider.CURSOR:
-      return "cursor";
-    case AgentProvider.GROK:
-      return "grok";
-    case AgentProvider.AGY:
-      return "agy";
-    case AgentProvider.OPENCODE:
-      return "opencode";
-    case AgentProvider.OPENROUTER:
-      return "openrouter";
-    case AgentProvider.UNSPECIFIED:
-      return undefined;
-  }
-};
-
 const optionalProviderBody = (provider: AgentProvider) => {
-  const value = providerJson(provider);
+  const value = appAgentProviderFromProto(provider);
   return value === undefined ? {} : { provider: value };
-};
-
-const requiredProviderJson = (provider: AgentProvider) => {
-  const value = providerJson(provider);
-  if (value === undefined) {
-    throw new ConnectError("Agent provider is required", Code.InvalidArgument);
-  }
-  return value;
-};
-
-const runStatusJson = (status: RunStatus) => {
-  switch (status) {
-    case RunStatus.BACKLOG:
-      return "backlog";
-    case RunStatus.QUEUED:
-      return "queued";
-    case RunStatus.RUNNING:
-      return "running";
-    case RunStatus.PAUSED:
-      return "paused";
-    case RunStatus.BLOCKED:
-      return "blocked";
-    case RunStatus.FAILED:
-      return "failed";
-    case RunStatus.COMPLETED:
-      return "completed";
-    case RunStatus.CANCELLED:
-      return "cancelled";
-    case RunStatus.UNSPECIFIED:
-      throw new ConnectError("Run status is required", Code.InvalidArgument);
-  }
-};
-
-const difficultyJson = (difficulty: IssueDifficulty | undefined) => {
-  switch (difficulty) {
-    case IssueDifficulty.EASY:
-      return "easy";
-    case IssueDifficulty.NORMAL:
-      return "normal";
-    case IssueDifficulty.HARD:
-      return "hard";
-    case IssueDifficulty.UNSPECIFIED:
-    case undefined:
-      return null;
-  }
-};
-
-const checkpointPositionJson = (position: WorkflowCheckpoint_Position) => {
-  switch (position) {
-    case WorkflowCheckpoint_Position.BEFORE:
-      return "before";
-    case WorkflowCheckpoint_Position.AFTER:
-      return "after";
-    case WorkflowCheckpoint_Position.UNSPECIFIED:
-      throw new ConnectError(
-        "Checkpoint position is required",
-        Code.InvalidArgument,
-      );
-  }
 };
 
 const mutated = async <A>(
@@ -364,25 +286,7 @@ export const createAppIssueService = (
         attachmentsBucket: input.env.ATTACHMENTS,
         projectId: canonicalUuid(request.projectId),
         userId: session.user.id,
-        request: {
-          title: request.title,
-          description: request.description ?? null,
-          priority: request.priority ?? null,
-          difficulty: difficultyJson(request.difficulty),
-          assigneeUserId: request.assigneeUserId ?? null,
-          status: runStatusJson(request.status),
-          preferredProvider: request.preferredProvider === undefined
-            ? null
-            : providerJson(request.preferredProvider) ?? null,
-          preferredModel: request.preferredModel ?? null,
-          preferredEffort: request.preferredEffort ?? null,
-          fullAuto: request.fullAuto,
-          checkpoints: request.checkpoints.map((checkpoint) => ({
-            key: checkpoint.key,
-            stage: checkpoint.stage,
-            position: checkpointPositionJson(checkpoint.position),
-          })),
-        },
+        request: createIssueApplicationRequest(request),
         attachments: [],
         attachmentReferences: request.attachmentReferences,
       })
@@ -399,17 +303,7 @@ export const createAppIssueService = (
         projectId: canonicalUuid(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
-        request: {
-          title: request.title,
-          description: request.description ?? null,
-          priority: request.priority ?? null,
-          difficulty: difficultyJson(request.difficulty),
-          ...(request.assigneeUpdate.case === "assigneeUserId"
-            ? { assigneeUserId: request.assigneeUpdate.value }
-            : request.assigneeUpdate.case === "clearAssignee"
-            ? { assigneeUserId: null }
-            : {}),
-        },
+        request: updateIssueApplicationRequest(request),
         attachments: [],
         attachmentReferences: request.attachmentReferences,
         keptAttachmentIds: request.keptAttachmentIds?.values,
@@ -476,7 +370,7 @@ export const createAppIssueService = (
         request: {
           provider: request.provider === undefined
             ? null
-            : providerJson(request.provider) ?? null,
+            : appAgentProviderFromProto(request.provider) ?? null,
           model: request.model ?? null,
           effort: request.effort ?? null,
         },
@@ -497,7 +391,7 @@ export const createAppIssueService = (
           checkpoints: request.checkpoints.map((checkpoint) => ({
             key: checkpoint.key,
             stage: checkpoint.stage,
-            position: checkpointPositionJson(checkpoint.position),
+            position: appCheckpointPosition(checkpoint.position),
           })),
         },
       })
@@ -533,7 +427,7 @@ export const createAppIssueService = (
         userId: session.user.id,
         request: {
           requestId: canonicalUuid(request.requestId),
-          status: runStatusJson(request.status),
+          status: appRunStatus(request.status),
           workflowStage: request.workflowStage ?? null,
         },
       })
@@ -759,16 +653,7 @@ export const createAppIssueService = (
         projectId: canonicalUuid(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
-        request: {
-          clientMessageId: canonicalUuid(request.clientMessageId),
-          body: request.body,
-          parentMessageId: request.parentMessageId
-            ? canonicalUuid(request.parentMessageId)
-            : null,
-          mentionedUserIds: request.mentionedUserIds,
-          mentionedAgentIds: request.mentionedAgentIds.map(canonicalUuid),
-          agentConversationId: request.agentConversationId ?? null,
-        },
+        request: createIssueMessageApplicationRequest(request),
         attachments: [],
         attachmentReferences: request.attachmentReferences,
       })
@@ -885,7 +770,7 @@ export const createAppIssueService = (
         proposalId: canonicalUuid(request.proposalId),
         userId: session.user.id,
         request: {
-          provider: requiredProviderJson(approval.provider),
+          provider: requiredAppAgentProviderFromProto(approval.provider),
           model: approval.model ?? null,
           effort: approval.effort ?? null,
           workerId: approval.workerId ?? null,

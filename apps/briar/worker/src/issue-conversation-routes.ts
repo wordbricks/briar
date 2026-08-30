@@ -615,8 +615,10 @@ export async function handleIssueConversationRoute(input: {
     )
   ) {
     const session = await requireSession(auth, request);
-    const messageRequest =
-      await readIssueMessageRequest(request);
+    const messageRequest = await readIssueMessageRequest(request, {
+      projectId: issueMessagesMatch[1],
+      runId: issueMessagesMatch[2],
+    });
     if (messageRequest.attachments.length === 0) {
       throw new HttpError(400, "Issue message upload requires an attachment");
     }

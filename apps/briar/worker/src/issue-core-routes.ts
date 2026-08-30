@@ -429,8 +429,9 @@ export async function handleIssueCoreRoute(input: {
     )
   ) {
     const session = await requireSession(auth, request);
-    const issueRequest =
-      await readIssueRequest(request);
+    const issueRequest = await readIssueRequest(request, {
+      projectId: issuesMatch[1],
+    });
     if (issueRequest.attachments.length === 0) {
       throw new HttpError(400, "Issue upload requires an attachment");
     }
@@ -460,8 +461,10 @@ export async function handleIssueCoreRoute(input: {
     )
   ) {
     const session = await requireSession(auth, request);
-    const issueRequest =
-      await readIssueUpdateRequest(request);
+    const issueRequest = await readIssueUpdateRequest(request, {
+      projectId: issueUpdateMatch[1],
+      runId: issueUpdateMatch[2],
+    });
     if (issueRequest.attachments.length === 0) {
       throw new HttpError(400, "Issue update upload requires an attachment");
     }

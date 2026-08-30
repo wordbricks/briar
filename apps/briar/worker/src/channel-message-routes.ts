@@ -11,7 +11,6 @@ import {
   channelReplyAssignedWorkerUnavailableError,
   channelReplyNoAvailableWorkerError,
   channelReplyProviderUsageExhaustedError,
-  channelMessageInputSchema,
   type ChannelReplyUnavailableReason,
 } from "../../src/lib/channels-contract";
 import { hydrateAgentSkills } from "./agent-skills";
@@ -60,17 +59,15 @@ import {
 import {
   readChannelMessageRequest,
 } from "./request-readers";
-import { decodeRequestSync } from "./request-schema";
 import { requireSession } from "./session-auth";
 import {
   channelReplyWorkerAvailability,
   userOwnsExecutionWorkerDevice,
 } from "./workers";
 import { schedulePostCommitCleanup } from "./post-commit-cleanup";
-
-export const decodeChannelMessageApplicationInput = decodeRequestSync(
-  channelMessageInputSchema,
-);
+import {
+  decodeChannelMessageApplicationInput,
+} from "./app-mutation-request-mappers";
 
 export type ChannelMessageRouteInput = {
   request: Request;
@@ -528,8 +525,10 @@ export async function handleChannelMessageRoute(
     )
   ) {
     const session = await requireSession(auth, request);
-    const parsed =
-      await readChannelMessageRequest(request);
+    const parsed = await readChannelMessageRequest(request, {
+      organizationId: channelMessagesMatch[1],
+      channelId: channelMessagesMatch[2],
+    });
     if (parsed.attachments.length === 0) {
       throw new HttpError(400, "Channel message upload requires an attachment");
     }

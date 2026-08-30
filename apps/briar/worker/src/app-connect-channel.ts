@@ -28,12 +28,15 @@ import {
 } from "./channel-content-application";
 import {
   createOrganizationChannelMessage,
-  decodeChannelMessageApplicationInput,
   deleteOrganizationChannelMessage,
   listOrganizationChannelMessages,
   setOrganizationChannelThreadSubscription,
   toggleOrganizationChannelMessageReaction,
 } from "./channel-message-routes";
+import {
+  createChannelMessageApplicationRequest,
+  requiredAppAgentProviderFromProto,
+} from "./app-mutation-request-mappers";
 import {
   acceptOrganizationChannelExecutionProposal,
   acceptOrganizationChannelProposal,
@@ -220,35 +223,13 @@ const rpc = async <A>(operation: () => Promise<A>): Promise<A> => {
   }
 };
 
-const providerJson = (provider: AgentProvider) => {
-  switch (provider) {
-    case AgentProvider.CODEX:
-      return "codex";
-    case AgentProvider.CLAUDE:
-      return "claude";
-    case AgentProvider.CURSOR:
-      return "cursor";
-    case AgentProvider.GROK:
-      return "grok";
-    case AgentProvider.AGY:
-      return "agy";
-    case AgentProvider.OPENCODE:
-      return "opencode";
-    case AgentProvider.OPENROUTER:
-      return "openrouter";
-    case AgentProvider.UNSPECIFIED:
-    default:
-      throw new ConnectError("provider is required", Code.InvalidArgument);
-  }
-};
-
 const approvalJson = (approval: {
   provider: AgentProvider;
   model?: string;
   effort?: string;
   workerId?: string;
 }) => ({
-  provider: providerJson(approval.provider),
+  provider: requiredAppAgentProviderFromProto(approval.provider),
   model: approval.model ?? null,
   effort: approval.effort ?? null,
   workerId: approval.workerId ?? null,
@@ -650,15 +631,7 @@ const createAppChannelService = (
       attachmentsBucket: input.attachmentsBucket,
       attachments: [],
       attachmentReferences: request.attachmentReferences,
-      request: decodeChannelMessageApplicationInput({
-        clientMessageId: canonicalUuid(request.clientMessageId),
-        body: request.body,
-        parentMessageId: request.parentMessageId ?? null,
-        mentionedUserIds: request.mentionedUserIds,
-        mentionedAgentIds: request.mentionedAgentIds,
-        skillId: request.skillId ?? null,
-        preferredDeviceId: request.preferredDeviceId ?? null,
-      }),
+      request: createChannelMessageApplicationRequest(request),
     });
     scheduleChannelMutation(input, request.organizationId);
     return appCreateChannelMessageResponse(result);

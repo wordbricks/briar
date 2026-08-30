@@ -1,4 +1,16 @@
 import {
+  fromBinary,
+  type DescMessage,
+} from "@bufbuild/protobuf";
+import {
+  CreateChannelMessageRequestSchema,
+} from "@briar/contracts/gen/briar/app/v1/channel_pb";
+import {
+  CreateIssueMessageRequestSchema,
+  CreateIssueRequestSchema,
+  UpdateIssueRequestSchema,
+} from "@briar/contracts/gen/briar/app/v1/issue_pb";
+import {
   type AutoHuntRunStatus,
   type AutoHuntWorkflowStageId,
   type DashboardStage,
@@ -21,24 +33,25 @@ import {
   issueAttachmentReferences,
 } from "../../src/lib/issue-markdown";
 import {
-  channelMessageInputSchema,
   channelReplyCompleteInputSchema,
 } from "../../src/lib/channels-contract";
 import { HttpError } from "./http-response";
 import {
   decodeIssueAgentReplyCompletion,
-  decodeIssueInput,
-  decodeIssueKeptAttachmentIds,
-  decodeIssueMessageInput,
-  decodeIssueUpdateInput,
 } from "./issue-request-contract";
 import { decodeRequestSync } from "./request-schema";
 import { decodeRunEvidenceInput } from "./run-request-contract";
+import {
+  canonicalAppUuid,
+  createChannelMessageApplicationRequest,
+  createIssueApplicationRequest,
+  createIssueMessageApplicationRequest,
+  updateIssueApplicationRequest,
+} from "./app-mutation-request-mappers";
 
 const decodeChannelReplyCompleteInput = decodeRequestSync(
   channelReplyCompleteInputSchema,
 );
-const decodeChannelMessageInput = decodeRequestSync(channelMessageInputSchema);
 
 async function readBoundedMultipartForm(
   request: Request,
@@ -82,20 +95,69 @@ function readMultipartFiles(
   return files;
 }
 
-function readMultipartJsonArray(
+async function readMultipartProtobuf<Desc extends DescMessage>(
   form: FormData,
-  fieldName: string,
-  invalidMessage = `${fieldName} is invalid`,
-) {
-  const value = form.get(fieldName);
-  if (typeof value !== "string" || !value) return [] as unknown[];
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!Array.isArray(parsed)) throw new Error("not an array");
-    return parsed;
-  } catch {
-    throw new HttpError(400, invalidMessage);
+  schema: Desc,
+  label: string,
+): Promise<ReturnType<typeof fromBinary<Desc>>> {
+  const parts = form.getAll("request");
+  if (
+    parts.length !== 1 || !(parts[0] instanceof File) ||
+    parts[0].type.toLowerCase() !== "application/protobuf"
+  ) {
+    throw new HttpError(
+      400,
+      `Multipart ${label} protobuf request is required`,
+    );
   }
+  try {
+    return fromBinary(
+      schema,
+      new Uint8Array(await parts[0].arrayBuffer()),
+    );
+  } catch {
+    throw new HttpError(400, `Invalid multipart ${label} protobuf request`);
+  }
+}
+
+function requireMultipartIdentity(
+  identities: ReadonlyArray<{
+    actual: string;
+    expected: string;
+    label: string;
+  }>,
+) {
+  try {
+    for (const identity of identities) {
+      if (
+        canonicalAppUuid(identity.actual) !==
+          canonicalAppUuid(identity.expected)
+      ) {
+        throw new HttpError(
+          400,
+          `Multipart ${identity.label} does not match the request path`,
+        );
+      }
+    }
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(400, "Multipart request identity is invalid");
+  }
+}
+
+function validateMultipartAttachmentReferences(
+  references: readonly string[],
+  attachments: readonly File[],
+  input: { required: boolean; message: string },
+) {
+  if (
+    ((input.required || references.length > 0) &&
+      references.length !== attachments.length) ||
+    !references.every(isIssueAttachmentReference)
+  ) {
+    throw new HttpError(400, input.message);
+  }
+  return [...references];
 }
 
 export const dashboardStageForProgress = (
@@ -217,7 +279,10 @@ export function readIssueReplyCompleteRequest(request: Request) {
   });
 }
 
-export async function readIssueMessageRequest(request: Request) {
+export async function readIssueMessageRequest(
+  request: Request,
+  path: { projectId: string; runId: string },
+) {
   const form = await readBoundedMultipartForm(
     request,
     maxIssueMultipartBytes,
@@ -235,52 +300,39 @@ export async function readIssueMessageRequest(request: Request) {
   if (attachments.some((attachment) => !attachment.type.startsWith("image/"))) {
     throw new HttpError(400, "Conversation attachments must be images");
   }
-  const attachmentReferences = readMultipartJsonArray(
+  const message = await readMultipartProtobuf(
     form,
-    "attachmentReferences",
+    CreateIssueMessageRequestSchema,
+    "issue message",
   );
-  if (
-    attachmentReferences.length !== attachments.length ||
-    !attachmentReferences.every(isIssueAttachmentReference)
-  ) {
-    throw new HttpError(400, "Attachment references are invalid");
-  }
-  const rawBody = form.get("body");
-  const bodyReferences = issueAttachmentReferences(
-    typeof rawBody === "string" ? rawBody : null,
+  requireMultipartIdentity([
+    {
+      actual: message.projectId,
+      expected: path.projectId,
+      label: "project ID",
+    },
+    { actual: message.runId, expected: path.runId, label: "run ID" },
+  ]);
+  const attachmentReferences = validateMultipartAttachmentReferences(
+    message.attachmentReferences,
+    attachments,
+    { required: true, message: "Attachment references are invalid" },
   );
-  if (!attachmentReferences.every((reference) => bodyReferences.has(String(reference)))) {
+  const bodyReferences = issueAttachmentReferences(message.body);
+  if (!attachmentReferences.every((reference) => bodyReferences.has(reference))) {
     throw new HttpError(400, "Every message attachment must be referenced in the body");
   }
-  const mentionedUserIds = readMultipartJsonArray(form, "mentionedUserIds");
-  const mentionedAgentIds = readMultipartJsonArray(form, "mentionedAgentIds");
-  const clientMessageId = form.get("clientMessageId");
-  const parentMessageId = form.get("parentMessageId");
-  const agentConversationId = form.get("agentConversationId");
   return {
-    input: decodeIssueMessageInput({
-      body: form.get("body"),
-      clientMessageId:
-        typeof clientMessageId === "string" && clientMessageId
-          ? clientMessageId
-          : undefined,
-      parentMessageId:
-        typeof parentMessageId === "string" && parentMessageId
-          ? parentMessageId
-          : null,
-      mentionedUserIds,
-      mentionedAgentIds,
-      agentConversationId:
-        typeof agentConversationId === "string" && agentConversationId
-          ? agentConversationId
-          : null,
-    }),
+    input: createIssueMessageApplicationRequest(message),
     attachments,
-    attachmentReferences: attachmentReferences as string[],
+    attachmentReferences,
   };
 }
 
-export async function readChannelMessageRequest(request: Request) {
+export async function readChannelMessageRequest(
+  request: Request,
+  path: { organizationId: string; channelId: string },
+) {
   const form = await readBoundedMultipartForm(
     request,
     maxIssueMultipartBytes,
@@ -298,53 +350,43 @@ export async function readChannelMessageRequest(request: Request) {
   if (attachments.some((attachment) => !attachment.type.startsWith("image/"))) {
     throw new HttpError(400, "Channel attachments must be images");
   }
-  const attachmentReferences = readMultipartJsonArray(
+  const message = await readMultipartProtobuf(
     form,
-    "attachmentReferences",
+    CreateChannelMessageRequestSchema,
+    "channel message",
   );
-  if (
-    attachmentReferences.length !== attachments.length ||
-    !attachmentReferences.every(isIssueAttachmentReference)
-  ) {
-    throw new HttpError(400, "Attachment references are invalid");
-  }
-  const rawBody = form.get("body");
-  const bodyReferences = issueAttachmentReferences(
-    typeof rawBody === "string" ? rawBody : null,
+  requireMultipartIdentity([
+    {
+      actual: message.organizationId,
+      expected: path.organizationId,
+      label: "organization ID",
+    },
+    {
+      actual: message.channelId,
+      expected: path.channelId,
+      label: "channel ID",
+    },
+  ]);
+  const attachmentReferences = validateMultipartAttachmentReferences(
+    message.attachmentReferences,
+    attachments,
+    { required: true, message: "Attachment references are invalid" },
   );
-  if (!attachmentReferences.every((reference) => bodyReferences.has(String(reference)))) {
+  const bodyReferences = issueAttachmentReferences(message.body);
+  if (!attachmentReferences.every((reference) => bodyReferences.has(reference))) {
     throw new HttpError(400, "Every channel image must be referenced in the body");
   }
-  const parentMessageId = form.get("parentMessageId");
-  const clientMessageId = form.get("clientMessageId");
-  const skillId = form.get("skillId");
-  const preferredDeviceId = form.get("preferredDeviceId");
   return {
-    input: decodeChannelMessageInput({
-      body: rawBody,
-      clientMessageId:
-        typeof clientMessageId === "string" && clientMessageId
-          ? clientMessageId
-          : undefined,
-      skillId:
-        typeof skillId === "string" && skillId ? skillId : null,
-      parentMessageId:
-        typeof parentMessageId === "string" && parentMessageId
-          ? parentMessageId
-          : null,
-      mentionedUserIds: readMultipartJsonArray(form, "mentionedUserIds"),
-      mentionedAgentIds: readMultipartJsonArray(form, "mentionedAgentIds"),
-      preferredDeviceId:
-        typeof preferredDeviceId === "string" && preferredDeviceId
-          ? preferredDeviceId
-          : null,
-    }),
+    input: createChannelMessageApplicationRequest(message),
     attachments,
-    attachmentReferences: attachmentReferences as string[],
+    attachmentReferences,
   };
 }
 
-export async function readIssueRequest(request: Request) {
+export async function readIssueRequest(
+  request: Request,
+  path: { projectId: string },
+) {
   const form = await readBoundedMultipartForm(
     request,
     maxIssueMultipartBytes,
@@ -359,89 +401,32 @@ export async function readIssueRequest(request: Request) {
     "Attachments must be files",
     validateIssueAttachments,
   );
-
-  const rawAttachmentReferences = form.get("attachmentReferences");
-  let attachmentReferences: string[] = [];
-  if (typeof rawAttachmentReferences === "string" && rawAttachmentReferences) {
-    const parsed = readMultipartJsonArray(
-      form,
-      "attachmentReferences",
-      "Attachment references are invalid",
-    );
-    if (
-      parsed.length !== attachments.length ||
-      !parsed.every(isIssueAttachmentReference)
-    ) {
-      throw new HttpError(400, "Attachment references are invalid");
-    }
-    attachmentReferences = parsed as string[];
-  }
-
-  const description = form.get("description");
-  const priority = form.get("priority");
-  const difficulty = form.get("difficulty");
-  const assigneeUserId = form.get("assigneeUserId");
-  const status = form.get("status");
-  const preferredProvider = form.get("preferredProvider");
-  const preferredModel = form.get("preferredModel");
-  const preferredEffort = form.get("preferredEffort");
-  const fullAuto = form.get("fullAuto");
-  const rawCheckpoints = form.get("checkpoints");
-  const checkpoints = (() => {
-    if (typeof rawCheckpoints !== "string" || !rawCheckpoints) return [];
-    try {
-      const parsed: unknown = JSON.parse(rawCheckpoints);
-      return parsed;
-    } catch {
-      throw new HttpError(400, "Issue checkpoints are invalid");
-    }
-  })();
+  const message = await readMultipartProtobuf(
+    form,
+    CreateIssueRequestSchema,
+    "issue",
+  );
+  requireMultipartIdentity([{
+    actual: message.projectId,
+    expected: path.projectId,
+    label: "project ID",
+  }]);
+  const attachmentReferences = validateMultipartAttachmentReferences(
+    message.attachmentReferences,
+    attachments,
+    { required: false, message: "Attachment references are invalid" },
+  );
   return {
-    input: decodeIssueInput({
-      title: form.get("title"),
-      description:
-        typeof description === "string" && description.trim()
-          ? description
-          : null,
-      priority:
-        typeof priority === "string" && priority ? Number(priority) : null,
-      difficulty:
-        typeof difficulty === "string" && difficulty
-          ? difficulty
-          : undefined,
-      assigneeUserId:
-        typeof assigneeUserId === "string" && assigneeUserId.trim()
-          ? assigneeUserId
-          : null,
-      status: typeof status === "string" && status ? status : undefined,
-      preferredProvider:
-        typeof preferredProvider === "string" && preferredProvider.trim()
-          ? preferredProvider
-          : null,
-      preferredModel:
-        typeof preferredModel === "string" && preferredModel.trim()
-          ? preferredModel
-          : null,
-      preferredEffort:
-        typeof preferredEffort === "string" && preferredEffort.trim()
-          ? preferredEffort
-          : null,
-      fullAuto:
-        fullAuto === null
-          ? undefined
-          : fullAuto === "true"
-            ? true
-            : fullAuto === "false"
-              ? false
-              : fullAuto,
-      checkpoints,
-    }),
+    input: createIssueApplicationRequest(message),
     attachments,
     attachmentReferences,
   };
 }
 
-export async function readIssueUpdateRequest(request: Request) {
+export async function readIssueUpdateRequest(
+  request: Request,
+  path: { projectId: string; runId: string },
+) {
   const form = await readBoundedMultipartForm(
     request,
     maxIssueMultipartBytes,
@@ -456,69 +441,29 @@ export async function readIssueUpdateRequest(request: Request) {
     "Attachments must be files",
     validateIssueAttachments,
   );
-
-  const rawAttachmentReferences = form.get("attachmentReferences");
-  let attachmentReferences: string[] = [];
-  if (typeof rawAttachmentReferences === "string" && rawAttachmentReferences) {
-    const parsed = readMultipartJsonArray(
-      form,
-      "attachmentReferences",
-      "Attachment references are invalid",
-    );
-    if (
-      parsed.length !== attachments.length ||
-      !parsed.every(isIssueAttachmentReference)
-    ) {
-      throw new HttpError(400, "Attachment references are invalid");
-    }
-    attachmentReferences = parsed as string[];
-  }
-
-  const rawKeptAttachmentIds = form.get("keptAttachmentIds");
-  let keptAttachmentIds: string[] | undefined;
-  if (typeof rawKeptAttachmentIds === "string" && rawKeptAttachmentIds) {
-    try {
-      const parsed = readMultipartJsonArray(
-        form,
-        "keptAttachmentIds",
-        "Kept attachment IDs are invalid",
-      );
-      if (!parsed.every((id) => typeof id === "string")) {
-        throw new Error("invalid kept attachment ids");
-      }
-      keptAttachmentIds = decodeIssueKeptAttachmentIds(parsed);
-    } catch {
-      throw new HttpError(400, "Kept attachment IDs are invalid");
-    }
-  }
-
-  const description = form.get("description");
-  const priority = form.get("priority");
-  const difficulty = form.get("difficulty");
-  const assigneeUserId = form.get("assigneeUserId");
+  const message = await readMultipartProtobuf(
+    form,
+    UpdateIssueRequestSchema,
+    "issue update",
+  );
+  requireMultipartIdentity([
+    {
+      actual: message.projectId,
+      expected: path.projectId,
+      label: "project ID",
+    },
+    { actual: message.runId, expected: path.runId, label: "run ID" },
+  ]);
+  const attachmentReferences = validateMultipartAttachmentReferences(
+    message.attachmentReferences,
+    attachments,
+    { required: false, message: "Attachment references are invalid" },
+  );
   return {
-    input: decodeIssueUpdateInput({
-      title: form.get("title"),
-      description:
-        typeof description === "string" && description.trim()
-          ? description
-          : null,
-      priority:
-        typeof priority === "string" && priority ? Number(priority) : null,
-      difficulty:
-        typeof difficulty === "string" && difficulty ? difficulty : null,
-      ...(form.has("assigneeUserId")
-        ? {
-            assigneeUserId:
-              typeof assigneeUserId === "string" && assigneeUserId.trim()
-                ? assigneeUserId
-                : null,
-          }
-        : {}),
-    }),
+    input: updateIssueApplicationRequest(message),
     attachments,
     attachmentReferences,
-    keptAttachmentIds,
+    keptAttachmentIds: message.keptAttachmentIds?.values,
   };
 }
 

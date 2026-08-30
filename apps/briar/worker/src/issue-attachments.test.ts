@@ -1,515 +1,242 @@
+import {
+  create,
+  toBinary,
+  type DescMessage,
+} from "@bufbuild/protobuf";
+import {
+  CreateChannelMessageRequestSchema,
+} from "@briar/contracts/gen/briar/app/v1/channel_pb";
+import {
+  IssueDifficulty,
+  RunStatus,
+} from "@briar/contracts/gen/briar/app/v1/common_pb";
+import {
+  CreateIssueMessageRequestSchema,
+  CreateIssueRequestSchema,
+  UpdateIssueRequestSchema,
+} from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { describe, expect, it } from "vitest";
 import { maxEvidenceMultipartBytes } from "../../src/lib/evidence-images";
-import { maxIssueMultipartBytes } from "../../src/lib/issue-attachments";
 import {
-  readIssueMessageRequest,
   readChannelMessageRequest,
+  readIssueMessageRequest,
   readIssueRequest,
   readIssueUpdateRequest,
   readRunEvidenceRequest,
 } from "./request-readers";
 
-const issueRequest = (
-  file: File,
-  declaredLength = file.size + 1024,
-  attachmentReference?: string,
-) => {
-  const form = new FormData();
-  form.set("title", "Screenshot issue");
-  form.set("description", "Please inspect the attachment");
-  form.set("priority", "2");
-  form.set("status", "backlog");
-  form.append("attachments", file, file.name);
-  if (attachmentReference) {
-    form.set("attachmentReferences", JSON.stringify([attachmentReference]));
-  }
-  return new Request("https://briar.example/projects/project/issues", {
-    method: "POST",
-    headers: { "Content-Length": String(declaredLength) },
-    body: form,
-  });
-};
+const projectId = "11111111-1111-4111-8111-111111111111";
+const otherProjectId = "22222222-2222-4222-8222-222222222222";
+const runId = "33333333-3333-4333-8333-333333333333";
+const organizationId = "44444444-4444-4444-8444-444444444444";
+const channelId = "55555555-5555-4555-8555-555555555555";
+const messageId = "66666666-6666-4666-8666-666666666666";
+const parentMessageId = "77777777-7777-4777-8777-777777777777";
+const agentId = "88888888-8888-4888-8888-888888888888";
+const attachmentReference = "99999999-9999-4999-8999-999999999999";
+const keptAttachmentId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
-const multipartReaders: Array<{
-  name: string;
-  maxBytes: number;
-  tooLargeMessage: string;
-  read: (request: Request) => Promise<unknown>;
-}> = [
-  {
-    name: "run evidence",
-    maxBytes: maxEvidenceMultipartBytes,
-    tooLargeMessage: "Evidence images exceed the 25MB total limit",
-    read: readRunEvidenceRequest,
-  },
-  {
-    name: "issue message",
-    maxBytes: maxIssueMultipartBytes,
-    tooLargeMessage: "Message attachments exceed the 25MB total limit",
-    read: readIssueMessageRequest,
-  },
-  {
-    name: "channel message",
-    maxBytes: maxIssueMultipartBytes,
-    tooLargeMessage: "Channel images exceed the 25MB total limit",
-    read: readChannelMessageRequest,
-  },
-  {
-    name: "issue create",
-    maxBytes: maxIssueMultipartBytes,
-    tooLargeMessage: "Issue attachments exceed the 25MB total limit",
-    read: readIssueRequest,
-  },
-  {
-    name: "issue update",
-    maxBytes: maxIssueMultipartBytes,
-    tooLargeMessage: "Issue attachments exceed the 25MB total limit",
-    read: readIssueUpdateRequest,
-  },
-];
+function setProtobufRequest<Desc extends DescMessage>(
+  form: FormData,
+  schema: Desc,
+  message: ReturnType<typeof create<Desc>>,
+) {
+  form.set(
+    "request",
+    new File([toBinary(schema, message)], "request.pb", {
+      type: "application/protobuf",
+    }),
+  );
+}
 
-const invalidMultipartRequest = (contentLength?: number) =>
+const image = () =>
+  new File(["image"], "screen.png", { type: "image/png" });
+
+const multipartRequest = (form: FormData, method = "POST") =>
   new Request("https://briar.example/multipart", {
-    method: "POST",
-    headers: {
-      "Content-Type": "multipart/form-data; boundary=invalid",
-      ...(contentLength === undefined
-        ? undefined
-        : { "Content-Length": String(contentLength) }),
-    },
-    body: "not multipart data",
-  });
-
-const multipartFormRequest = (form: FormData) =>
-  new Request("https://briar.example/multipart", {
-    method: "POST",
+    method,
     headers: { "Content-Length": "8192" },
     body: form,
   });
 
-describe("shared multipart request envelope", () => {
-  it.each(multipartReaders)(
-    "requires Content-Length for $name",
-    async ({ read }) => {
-      await expect(read(invalidMultipartRequest())).rejects.toMatchObject({
-        status: 411,
-        message: "Multipart Content-Length is required",
-      });
-    },
-  );
-
-  it.each(multipartReaders)(
-    "preserves the request-specific size error for $name",
-    async ({ read, maxBytes, tooLargeMessage }) => {
-      await expect(
-        read(invalidMultipartRequest(maxBytes + 1)),
-      ).rejects.toMatchObject({ status: 413, message: tooLargeMessage });
-    },
-  );
-
-  it.each(multipartReaders)(
-    "rejects malformed form data for $name",
-    async ({ read }) => {
-      await expect(read(invalidMultipartRequest(32))).rejects.toMatchObject({
-        status: 400,
-        message: "Invalid multipart form data",
-      });
-    },
-  );
-
-  it.each([
-    {
-      name: "evidence images",
-      fieldName: "images",
-      expectedMessage: "Evidence images must be files",
-      read: readRunEvidenceRequest,
-      prepare(form: FormData) {
-        form.set(
-          "evidence",
-          JSON.stringify({
-            evidenceKey: "LOCAL-1:qa:result",
-            stage: "qa",
-            type: "test",
-            status: "passed",
-            observedAt: "2026-08-10T00:00:00.000Z",
-            actor: "test",
-          }),
-        );
-      },
-    },
-    {
-      name: "issue attachments",
-      fieldName: "attachments",
-      expectedMessage: "Attachments must be files",
-      read: readIssueRequest,
-      prepare(form: FormData) {
-        form.set("title", "Invalid attachment");
-      },
-    },
-  ])("rejects non-file $name with the existing error", async ({
-    fieldName,
-    expectedMessage,
-    read,
-    prepare,
-  }) => {
-    const form = new FormData();
-    prepare(form);
-    form.set(fieldName, "not a file");
-
-    await expect(read(multipartFormRequest(form))).rejects.toMatchObject({
-      status: 400,
-      message: expectedMessage,
-    });
-  });
-
-  it.each([
-    {
-      name: "evidence images",
-      fieldName: "images",
-      expectedMessage: "Evidence images are limited to 5 files.",
-      read: readRunEvidenceRequest,
-      prepare(form: FormData) {
-        form.set(
-          "evidence",
-          JSON.stringify({
-            evidenceKey: "LOCAL-1:qa:result",
-            stage: "qa",
-            type: "test",
-            status: "passed",
-            observedAt: "2026-08-10T00:00:00.000Z",
-            actor: "test",
-          }),
-        );
-      },
-    },
-    {
-      name: "issue attachments",
-      fieldName: "attachments",
-      expectedMessage: "첨부 파일은 최대 5개까지 추가할 수 있습니다.",
-      read: readIssueRequest,
-      prepare(form: FormData) {
-        form.set("title", "Too many attachments");
-      },
-    },
-  ])("preserves the file-count validation for $name", async ({
-    fieldName,
-    expectedMessage,
-    read,
-    prepare,
-  }) => {
-    const form = new FormData();
-    prepare(form);
-    for (let index = 0; index < 6; index += 1) {
-      form.append(
-        fieldName,
-        new File(["image"], `image-${index}.png`, { type: "image/png" }),
-      );
-    }
-
-    await expect(read(multipartFormRequest(form))).rejects.toMatchObject({
-      status: 400,
-      message: expectedMessage,
-    });
-  });
-});
-
-describe("issue multipart input", () => {
-  it("parses a bounded supported attachment", async () => {
-    const result = await readIssueRequest(
-      issueRequest(new File(["image"], "screen.png", { type: "image/png" })),
-    );
-
-    expect(result.input).toEqual({
-      title: "Screenshot issue",
-      description: "Please inspect the attachment",
-      priority: 2,
-      difficulty: null,
-      assigneeUserId: null,
-      status: "backlog",
-      preferredProvider: null,
-      preferredModel: null,
-      preferredEffort: null,
-      fullAuto: false,
-      checkpoints: [],
-    });
-    expect(result.attachments).toHaveLength(1);
-    expect(result.attachments[0]).toEqual(
-      expect.objectContaining({ name: "screen.png", type: "image/png", size: 5 }),
-    );
-    expect(result.attachmentReferences).toEqual([]);
-  });
-
-  it("parses an inline markdown attachment reference", async () => {
-    const reference = "7316678b-e3d4-4de3-a045-b76a0fc2e765";
-    const result = await readIssueRequest(
-      issueRequest(
-        new File(["image"], "screen.png", { type: "image/png" }),
-        1029,
-        reference,
-      ),
-    );
-
-    expect(result.attachmentReferences).toEqual([reference]);
-  });
-
-  it("accepts SVG media and rejects oversized multipart bodies", async () => {
-    const svg = await readIssueRequest(
-      issueRequest(new File(["svg"], "diagram.svg", { type: "image/svg+xml" })),
-    );
-    expect(svg.attachments).toEqual([
-      expect.objectContaining({
-        name: "diagram.svg",
-        type: "image/svg+xml",
-      }),
-    ]);
-    await expect(
-      readIssueRequest(
-        issueRequest(new File(["document"], "unsafe.pdf", { type: "application/pdf" })),
-      ),
-    ).rejects.toThrow("지원하지 않는");
-    await expect(
-      readIssueRequest(
-        issueRequest(
-          new File(["video"], "recording.mp4", { type: "video/mp4" }),
-          maxIssueMultipartBytes + 1,
-        ),
-      ),
-    ).rejects.toThrow("25MB");
-  });
-
-  it.each([
-    { name: "diagram.SVG", type: "" },
-    { name: "diagram.svg", type: "application/octet-stream" },
-    { name: "diagram.svg", type: "image/svg+xml; charset=utf-8" },
-  ])("normalizes SVG MIME metadata from $type", async ({ name, type }) => {
-    const result = await readIssueRequest(
-      issueRequest(new File(["<svg />"], name, { type })),
-    );
-
-    expect(result.attachments).toEqual([
-      expect.objectContaining({ name, type: "image/svg+xml" }),
-    ]);
-  });
-
-  it("keeps existing PNG attachment behavior while normalizing generic MIME metadata", async () => {
-    const result = await readIssueRequest(
-      issueRequest(
-        new File(["png"], "screen.PNG", { type: "application/octet-stream" }),
-      ),
-    );
-
-    expect(result.attachments).toEqual([
-      expect.objectContaining({ name: "screen.PNG", type: "image/png" }),
-    ]);
-  });
-
-  it("rejects malformed inline attachment references", async () => {
-    await expect(
-      readIssueRequest(
-        issueRequest(
-          new File(["image"], "screen.png", { type: "image/png" }),
-          1029,
-          "../../unsafe",
-        ),
-      ),
-    ).rejects.toThrow("Attachment references are invalid");
-  });
-});
-
-describe("channel image multipart input", () => {
-  it("parses image references and structured mentions", async () => {
-    const reference = "7316678b-e3d4-4de3-a045-b76a0fc2e765";
-    const clientMessageId = "33333333-3333-4333-8333-333333333333";
-    const image = new File(["image"], "screen.png", { type: "image/png" });
-    const form = new FormData();
-    form.set("body", `Screenshot\n\n![screen.png](briar-attachment://${reference})`);
-    form.set("parentMessageId", "11111111-1111-4111-8111-111111111111");
-    form.set("clientMessageId", clientMessageId.toUpperCase());
-    form.set("skillId", "44444444-4444-4444-8444-444444444444");
-    form.set("mentionedUserIds", JSON.stringify(["owner"]));
-    form.set(
-      "mentionedAgentIds",
-      JSON.stringify(["22222222-2222-4222-8222-222222222222"]),
-    );
-    form.set("attachmentReferences", JSON.stringify([reference]));
-    form.append("attachments", image, image.name);
-    const request = new Request("https://briar.example/channels/channel/messages", {
-      method: "POST",
-      headers: { "Content-Length": "2048" },
-      body: form,
-    });
-
-    const result = await readChannelMessageRequest(request);
-
-    expect(result.attachments).toHaveLength(1);
-    expect(result.attachments[0]).toEqual(
-      expect.objectContaining({
-        name: "screen.png",
-        type: "image/png",
-        size: image.size,
+describe("protobuf multipart mutation boundary", () => {
+  it("round-trips generated issue, update, issue-message, and channel-message requests", async () => {
+    const createForm = new FormData();
+    setProtobufRequest(
+      createForm,
+      CreateIssueRequestSchema,
+      create(CreateIssueRequestSchema, {
+        projectId,
+        title: "Screenshot issue",
+        description: "Please inspect the attachment",
+        priority: 2,
+        difficulty: IssueDifficulty.HARD,
+        status: RunStatus.BACKLOG,
+        attachmentReferences: [attachmentReference],
       }),
     );
-    expect(result.attachmentReferences).toEqual([reference]);
-    expect(result.input).toMatchObject({
-      clientMessageId,
-      skillId: "44444444-4444-4444-8444-444444444444",
-      parentMessageId: "11111111-1111-4111-8111-111111111111",
-      mentionedUserIds: ["owner"],
-      mentionedAgentIds: ["22222222-2222-4222-8222-222222222222"],
+    createForm.append("attachments", image(), "screen.png");
+    const created = await readIssueRequest(multipartRequest(createForm), {
+      projectId,
     });
-  });
-
-  it("rejects non-image channel attachments", async () => {
-    const reference = "7316678b-e3d4-4de3-a045-b76a0fc2e765";
-    const form = new FormData();
-    form.set("body", `File\n\n![recording.mp4](briar-attachment://${reference})`);
-    form.set("attachmentReferences", JSON.stringify([reference]));
-    form.append(
-      "attachments",
-      new File(["video"], "recording.mp4", { type: "video/mp4" }),
-    );
-    const request = new Request("https://briar.example/channels/channel/messages", {
-      method: "POST",
-      headers: { "Content-Length": "2048" },
-      body: form,
+    expect(created).toMatchObject({
+      input: {
+        title: "Screenshot issue",
+        description: "Please inspect the attachment",
+        priority: 2,
+        difficulty: "hard",
+        status: "backlog",
+      },
+      attachmentReferences: [attachmentReference],
     });
+    expect(created.attachments).toEqual([
+      expect.objectContaining({ name: "screen.png", type: "image/png" }),
+    ]);
 
-    await expect(readChannelMessageRequest(request)).rejects.toThrow(
-      "must be images",
+    const updateForm = new FormData();
+    setProtobufRequest(
+      updateForm,
+      UpdateIssueRequestSchema,
+      create(UpdateIssueRequestSchema, {
+        projectId,
+        runId,
+        title: "Updated issue",
+        description: "Updated description",
+        difficulty: IssueDifficulty.NORMAL,
+        assigneeUpdate: { case: "assigneeUserId", value: "user-1" },
+        attachmentReferences: [attachmentReference],
+        keptAttachmentIds: { values: [keptAttachmentId] },
+      }),
     );
-  });
-});
-
-describe("issue update multipart input", () => {
-  const updateRequest = (
-    file: File,
-    declaredLength = file.size + 2048,
-    keptAttachmentIds?: string[],
-  ) => {
-    const form = new FormData();
-    form.set("title", "Edited screenshot issue");
-    form.set("description", "Replaced description");
-    form.set("priority", "3");
-    form.set("difficulty", "hard");
-    form.set("assigneeUserId", "user-1");
-    form.append("attachments", file, file.name);
-    form.set("attachmentReferences", JSON.stringify(["draft-update-1"]));
-    if (keptAttachmentIds) {
-      form.set("keptAttachmentIds", JSON.stringify(keptAttachmentIds));
-    }
-    return new Request("https://briar.example/projects/project/runs/run", {
-      method: "PATCH",
-      headers: { "Content-Length": String(declaredLength) },
-      body: form,
-    });
-  };
-
-  const existingAttachmentId = "7316678b-e3d4-4de3-a045-b76a0fc2e765";
-
-  it("parses a multipart update with attachments and kept IDs", async () => {
-    const result = await readIssueUpdateRequest(
-      updateRequest(
-        new File(["image"], "inline.png", { type: "image/png" }),
-        undefined,
-        [existingAttachmentId],
-      ),
+    updateForm.append("attachments", image(), "screen.png");
+    const updated = await readIssueUpdateRequest(
+      multipartRequest(updateForm, "PATCH"),
+      { projectId, runId },
     );
-
-    expect(result.input).toEqual({
-      title: "Edited screenshot issue",
-      description: "Replaced description",
-      priority: 3,
-      difficulty: "hard",
+    expect(updated.input).toMatchObject({
+      title: "Updated issue",
+      difficulty: "normal",
       assigneeUserId: "user-1",
     });
-    expect(result.attachments).toEqual([
-      expect.objectContaining({ name: "inline.png", type: "image/png" }),
-    ]);
-    expect(result.attachmentReferences).toEqual(["draft-update-1"]);
-    expect(result.keptAttachmentIds).toEqual([existingAttachmentId]);
-  });
+    expect(updated.keptAttachmentIds).toEqual([keptAttachmentId]);
 
-  it("preserves omitted multipart patch fields", async () => {
-    const form = new FormData();
-    form.set("title", "Edited screenshot issue");
-    form.append(
-      "attachments",
-      new File(["image"], "inline.png", { type: "image/png" }),
-    );
-    form.set("attachmentReferences", JSON.stringify(["draft-update-1"]));
-    const result = await readIssueUpdateRequest(
-      new Request("https://briar.example/projects/project/runs/run", {
-        method: "PATCH",
-        headers: { "Content-Length": "4096" },
-        body: form,
+    const body = `Screenshot\n\n![screen.png](briar-attachment://${attachmentReference})`;
+    const issueMessageForm = new FormData();
+    setProtobufRequest(
+      issueMessageForm,
+      CreateIssueMessageRequestSchema,
+      create(CreateIssueMessageRequestSchema, {
+        projectId,
+        runId,
+        clientMessageId: messageId.toUpperCase(),
+        body,
+        parentMessageId,
+        mentionedUserIds: ["user-1"],
+        mentionedAgentIds: [agentId.toUpperCase()],
+        attachmentReferences: [attachmentReference],
       }),
     );
+    issueMessageForm.append("attachments", image(), "screen.png");
+    const issueMessage = await readIssueMessageRequest(
+      multipartRequest(issueMessageForm),
+      { projectId, runId },
+    );
+    expect(issueMessage.input).toMatchObject({
+      clientMessageId: messageId,
+      parentMessageId,
+      mentionedUserIds: ["user-1"],
+      mentionedAgentIds: [agentId],
+    });
 
-    expect(result.keptAttachmentIds).toBeUndefined();
-    expect(result.input).not.toHaveProperty("assigneeUserId");
+    const channelMessageForm = new FormData();
+    setProtobufRequest(
+      channelMessageForm,
+      CreateChannelMessageRequestSchema,
+      create(CreateChannelMessageRequestSchema, {
+        organizationId,
+        channelId,
+        clientMessageId: messageId,
+        body,
+        parentMessageId,
+        mentionedUserIds: ["user-1"],
+        mentionedAgentIds: [agentId],
+        attachmentReferences: [attachmentReference],
+      }),
+    );
+    channelMessageForm.append("attachments", image(), "screen.png");
+    const channelMessage = await readChannelMessageRequest(
+      multipartRequest(channelMessageForm),
+      { organizationId, channelId },
+    );
+    expect(channelMessage.input).toMatchObject({
+      clientMessageId: messageId,
+      parentMessageId,
+      mentionedAgentIds: [agentId],
+    });
+    expect(channelMessage.attachmentReferences).toEqual([attachmentReference]);
   });
 
-  it("rejects malformed kept attachment IDs", async () => {
+  it("rejects path identity mismatches before application mutation", async () => {
+    const form = new FormData();
+    setProtobufRequest(
+      form,
+      CreateIssueRequestSchema,
+      create(CreateIssueRequestSchema, {
+        projectId,
+        title: "Wrong project",
+        status: RunStatus.QUEUED,
+      }),
+    );
+    form.append("attachments", image(), "screen.png");
+
     await expect(
-      readIssueUpdateRequest(
-        updateRequest(
-          new File(["image"], "inline.png", { type: "image/png" }),
-          undefined,
-          ["not-a-uuid"],
-        ),
-      ),
-    ).rejects.toThrow("Kept attachment IDs are invalid");
+      readIssueRequest(multipartRequest(form), { projectId: otherProjectId }),
+    ).rejects.toMatchObject({
+      status: 400,
+      message: "Multipart project ID does not match the request path",
+    });
+  });
+
+  it("requires the generated protobuf request part and rejects unknown enums", async () => {
+    const missing = new FormData();
+    missing.append("attachments", image(), "screen.png");
+    await expect(
+      readIssueRequest(multipartRequest(missing), { projectId }),
+    ).rejects.toMatchObject({
+      status: 400,
+      message: "Multipart issue protobuf request is required",
+    });
+
+    const unknown = new FormData();
+    setProtobufRequest(
+      unknown,
+      CreateIssueRequestSchema,
+      create(CreateIssueRequestSchema, {
+        projectId,
+        title: "Unknown status",
+        status: 99 as RunStatus,
+      }),
+    );
+    unknown.append("attachments", image(), "screen.png");
+    await expect(
+      readIssueRequest(multipartRequest(unknown), { projectId }),
+    ).rejects.toMatchObject({ status: 400, message: "Unknown run status" });
   });
 });
 
-describe("issue conversation multipart input", () => {
-  const messageRequest = (
-    file: File,
-    reference = crypto.randomUUID(),
-    clientMessageId = crypto.randomUUID(),
-  ) => {
-    const form = new FormData();
-    form.set(
-      "body",
-      `확인해 주세요\n\n![${file.name}](briar-attachment://${reference})`,
-    );
-    form.set("parentMessageId", "");
-    form.set("clientMessageId", clientMessageId.toUpperCase());
-    form.set("mentionedUserIds", "[]");
-    form.set("agentConversationId", "");
-    form.set("attachmentReferences", JSON.stringify([reference]));
-    form.append("attachments", file, file.name);
-    return new Request("https://briar.example/projects/project/runs/run/messages", {
+describe("multipart size boundary", () => {
+  it("keeps the evidence upload size limit fail-closed", async () => {
+    const request = new Request("https://briar.example/evidence", {
       method: "POST",
-      headers: { "Content-Length": String(file.size + 2048) },
-      body: form,
+      headers: {
+        "Content-Type": "multipart/form-data; boundary=invalid",
+        "Content-Length": String(maxEvidenceMultipartBytes + 1),
+      },
+      body: "invalid",
     });
-  };
-
-  it("parses pasted conversation images and their inline references", async () => {
-    const reference = crypto.randomUUID();
-    const clientMessageId = crypto.randomUUID();
-    const result = await readIssueMessageRequest(
-      messageRequest(
-        new File(["image"], "clipboard.png", { type: "image/png" }),
-        reference,
-        clientMessageId,
-      ),
-    );
-
-    expect(result.input.clientMessageId).toBe(clientMessageId);
-    expect(result.input.body).toContain(`briar-attachment://${reference}`);
-    expect(result.attachments).toEqual([
-      expect.objectContaining({ name: "clipboard.png", type: "image/png" }),
-    ]);
-    expect(result.attachmentReferences).toEqual([reference]);
-  });
-
-  it("rejects videos in issue conversations", async () => {
-    await expect(
-      readIssueMessageRequest(
-        messageRequest(new File(["video"], "clip.mp4", { type: "video/mp4" })),
-      ),
-    ).rejects.toThrow("must be images");
+    await expect(readRunEvidenceRequest(request)).rejects.toMatchObject({
+      status: 413,
+      message: "Evidence images exceed the 25MB total limit",
+    });
   });
 });

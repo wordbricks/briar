@@ -64,9 +64,9 @@ import {
 } from "./channel-webhook-application";
 import {
   createOrganizationChannelMessage,
-  decodeChannelMessageApplicationInput,
   deleteOrganizationChannelMessage,
 } from "./channel-message-routes";
+import { decodeChannelMessageApplicationInput } from "./app-mutation-request-mappers";
 import {
   createOrganizationAgent,
   listOrganizationAgents,
