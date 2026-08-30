@@ -18,7 +18,13 @@ import {
   type StructuredRunResult,
 } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import { AgentProvider as ProtoAgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import type {
+  AgentExecutionMetrics as AgentExecutionMetricsMessage,
+} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import type { StructuredAgentResult } from "../agent-result";
+import type {
+  AgentExecutionMetrics,
+} from "../agent-execution-metrics";
 import type { AgentProvider } from "../agent-provider";
 import type { IssueDifficulty } from "../issue-difficulty";
 import type {
@@ -51,6 +57,43 @@ export const safeNumber = (value: bigint, field: string): number => {
   }
   return result;
 };
+
+export const optionalSafeNumber = (
+  value: bigint | undefined,
+  field: string,
+): number | null => value === undefined ? null : safeNumber(value, field);
+
+export const agentExecutionMetricsFromProto = (
+  value: AgentExecutionMetricsMessage | undefined,
+): AgentExecutionMetrics | null => value === undefined
+  ? null
+  : {
+      inputTokens: optionalSafeNumber(
+        value.inputTokens,
+        "executionMetrics.inputTokens",
+      ),
+      outputTokens: optionalSafeNumber(
+        value.outputTokens,
+        "executionMetrics.outputTokens",
+      ),
+      cacheReadTokens: optionalSafeNumber(
+        value.cacheReadTokens,
+        "executionMetrics.cacheReadTokens",
+      ),
+      cacheWriteTokens: optionalSafeNumber(
+        value.cacheWriteTokens,
+        "executionMetrics.cacheWriteTokens",
+      ),
+      reasoningOutputTokens: optionalSafeNumber(
+        value.reasoningOutputTokens,
+        "executionMetrics.reasoningOutputTokens",
+      ),
+      totalTokens: optionalSafeNumber(
+        value.totalTokens,
+        "executionMetrics.totalTokens",
+      ),
+      durationMs: safeNumber(value.durationMs, "executionMetrics.durationMs"),
+    };
 
 export const agentProviderFromProto = (value: ProtoAgentProvider): AgentProvider => {
   switch (value) {

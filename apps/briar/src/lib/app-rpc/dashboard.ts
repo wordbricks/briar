@@ -29,6 +29,7 @@ import {
 } from "./core";
 import { dashboardWorkerFromProto } from "./fleet-mappers";
 import {
+  agentExecutionMetricsFromProto,
   agentProviderFromProto,
   issueAttachmentFromProto,
   issueDifficultyFromProto,
@@ -125,11 +126,6 @@ const dispatchMode = (
   }
 };
 
-const nullableTokenCount = (
-  value: bigint | undefined,
-  field: string,
-): number | null => value === undefined ? null : safeNumber(value, field);
-
 const dashboardRunFromProto = (run: DashboardRunMessage): HuntRun => ({
   id: run.id,
   runNumber: run.runNumber,
@@ -211,38 +207,7 @@ const dashboardRunFromProto = (run: DashboardRunMessage): HuntRun => ({
   waitingOnPrerequisiteCount: run.waitingOnPrerequisiteCount,
   resultSummary: run.resultSummary ?? null,
   structuredResult: structuredResultFromProto(run.structuredResult),
-  executionMetrics: run.executionMetrics === undefined
-    ? null
-    : {
-        inputTokens: nullableTokenCount(
-          run.executionMetrics.inputTokens,
-          "executionMetrics.inputTokens",
-        ),
-        outputTokens: nullableTokenCount(
-          run.executionMetrics.outputTokens,
-          "executionMetrics.outputTokens",
-        ),
-        cacheReadTokens: nullableTokenCount(
-          run.executionMetrics.cacheReadTokens,
-          "executionMetrics.cacheReadTokens",
-        ),
-        cacheWriteTokens: nullableTokenCount(
-          run.executionMetrics.cacheWriteTokens,
-          "executionMetrics.cacheWriteTokens",
-        ),
-        reasoningOutputTokens: nullableTokenCount(
-          run.executionMetrics.reasoningOutputTokens,
-          "executionMetrics.reasoningOutputTokens",
-        ),
-        totalTokens: nullableTokenCount(
-          run.executionMetrics.totalTokens,
-          "executionMetrics.totalTokens",
-        ),
-        durationMs: safeNumber(
-          run.executionMetrics.durationMs,
-          "executionMetrics.durationMs",
-        ),
-      },
+  executionMetrics: agentExecutionMetricsFromProto(run.executionMetrics),
   resultReviews: run.resultReviews.map(resultReviewFromProto),
   pullRequestUrls: run.pullRequestUrls,
   targetSha: run.targetSha ?? null,

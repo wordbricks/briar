@@ -15,7 +15,6 @@ export {
   updateAccountProfile,
 } from "./api/account";
 import { decodeInboxReadVersions } from "./api/inbox-contract";
-import { decodeProjectUsageSummaryResponse } from "./api/project-usage-contract";
 import { listProjects } from "./app-rpc/project";
 export {
   createAgentToken,
@@ -155,18 +154,18 @@ export {
   updateOrganizationExecutionWorkerIcon,
   validateManagedComputerPromotion,
 } from "./app-rpc/fleet";
+export {
+  loadAgentUsageReport,
+  loadProjectUsageSummary,
+  loadRunCostEstimate,
+  loadStatusTrayRuns,
+} from "./app-rpc/reporting";
 import {
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
   type AutoHuntWorkflowCheckpoint,
 } from "./auto-hunt-contract";
 import type { AgentProvider } from "./agent-provider";
-import type { UsageRangeDays } from "./agent-usage-overview";
-import type {
-  ProjectUsageDateRange,
-  ProjectUsagePeriod,
-} from "./project-usage-summary";
-import { LITELLM_MAIN_PRICING_SOURCE } from "./agent-usage-pricing";
 import type { InboxMessage } from "../hooks/useInbox";
 import type {
   ChannelLinkPreview,
@@ -179,8 +178,6 @@ import type {
   LinearImportStatesResult,
 } from "./linear-import";
 import type {
-  AgentUsageReport,
-  AgentExecutionCostEstimate,
   DashboardPayload,
   DashboardDeltaPayload,
   MergeQueueProfile,
@@ -191,9 +188,7 @@ import type {
   IssueMessage,
   Project,
   ProjectSettings,
-  ProjectUsageSummary,
   RunEvidenceImage,
-  StatusTrayRunsPayload,
 } from "../types";
 
 const apiUrl = briarApiUrl;
@@ -444,51 +439,6 @@ export async function loadDashboard(
   };
 }
 
-export async function loadAgentUsageReport(
-  token: string,
-  organizationId: string,
-  days: UsageRangeDays = 90,
-  signal?: AbortSignal,
-): Promise<AgentUsageReport> {
-  const result = await request<
-    Omit<AgentUsageReport, "pricing"> & {
-      pricing?: AgentUsageReport["pricing"];
-    }
-  >(
-    `/organizations/${encodeURIComponent(organizationId)}/usage/runs?days=${days}`,
-    token,
-    { signal },
-  );
-  return {
-    ...result,
-    pricing: result.pricing ?? {
-      status: "unavailable",
-      source: LITELLM_MAIN_PRICING_SOURCE,
-      fetchedAt: null,
-      knownModels: 0,
-    },
-  };
-}
-
-export async function loadProjectUsageSummary(
-  token: string,
-  projectId: string,
-  period: ProjectUsagePeriod = "day",
-  range?: ProjectUsageDateRange,
-  signal?: AbortSignal,
-): Promise<ProjectUsageSummary> {
-  const search = new URLSearchParams({ period });
-  if (range) {
-    search.set("from", range.from);
-    search.set("to", range.to);
-  }
-  return decodeProjectUsageSummaryResponse(await request<ProjectUsageSummary>(
-    `/projects/${encodeURIComponent(projectId)}/usage/summary?${search}`,
-    token,
-    { signal },
-  ));
-}
-
 export async function loadDashboardDelta(
   token: string,
   projectId: string,
@@ -497,31 +447,6 @@ export async function loadDashboardDelta(
 ): Promise<DashboardDeltaPayload> {
   const delta = await syncDashboard(token, projectId, cursor, signal);
   return { ...delta, runs: normalizeDashboardRuns(delta.runs) };
-}
-
-export async function loadStatusTrayRuns(
-  token: string,
-  organizationId: string,
-  signal?: AbortSignal,
-): Promise<StatusTrayRunsPayload> {
-  return request<StatusTrayRunsPayload>(
-    `/organizations/${encodeURIComponent(organizationId)}/status-tray/runs`,
-    token,
-    { signal },
-  );
-}
-
-export async function loadRunCostEstimate(
-  token: string,
-  projectId: string,
-  runId: string,
-  signal?: AbortSignal,
-): Promise<AgentExecutionCostEstimate> {
-  return request<AgentExecutionCostEstimate>(
-    `/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}/cost-estimate`,
-    token,
-    { signal },
-  );
 }
 
 export async function loadRunEvents(
