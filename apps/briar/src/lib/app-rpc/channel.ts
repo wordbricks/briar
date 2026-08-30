@@ -6,6 +6,7 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/agent_pb";
 import {
   ChannelKind as ProtoChannelKind,
+  ChannelMemberRole as ProtoChannelMemberRole,
   ChannelMessageAuthor_Kind as ProtoChannelMessageAuthorKind,
   ChannelService,
   ChannelVisibility as ProtoChannelVisibility,
@@ -173,14 +174,14 @@ export const channelSummaryFromMessage = (
   ),
 });
 
-const channelMemberFromMessage = (
+export const channelMemberFromMessage = (
   value: ChannelMemberMessage,
 ): ChannelMember => {
   const role = (() => {
     switch (value.role) {
-      case "owner":
+      case ProtoChannelMemberRole.OWNER:
         return "owner" as const;
-      case "member":
+      case ProtoChannelMemberRole.MEMBER:
         return "member" as const;
       default:
         throw new Error(`Unknown channel member role: ${value.role}`);
