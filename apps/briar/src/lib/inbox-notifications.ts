@@ -8,6 +8,8 @@ import {
   isDesktopTauri,
   isMacDesktopTauri,
 } from "./platform";
+import { request } from "./api/request";
+import { inboxSessionMessageVersion } from "./inbox-session-version";
 
 export const inboxNotificationCategories = [
   "urgent",
@@ -30,9 +32,16 @@ const targetStorageKey = "briar.inbox.notification-targets.v1";
 const browserOpenEvent = "briar:inbox-notification-open";
 const desktopOpenEvent = "inbox-notification-open";
 const desktopOpenAvailableEvent = "inbox-notification-open-available";
+const preferencesChangedEvent = "briar:inbox-notification-preferences-changed";
+const androidRemoteOpenEvent = "briar-remote-notification-open";
+const androidPushTokenEvent = "briar-remote-push-token";
+const androidRemoteReceiptStorageKey = "briar.remote-push-receipts.v1";
+const androidRemoteReceiptLifetimeMs = 7 * 24 * 60 * 60 * 1_000;
 
 export type InboxNotificationTarget = {
   messageId: string;
+  messageVersion?: string;
+  notificationId?: string;
   projectId: string;
   targetId: string;
   kind: InboxMessage["kind"];
@@ -100,6 +109,7 @@ export function writeInboxNotificationPreferences(
 ) {
   try {
     window.localStorage.setItem(storageKey, JSON.stringify(preferences));
+    window.dispatchEvent(new Event(preferencesChangedEvent));
   } catch {
     // Keep the preference in the mounted settings screen when storage is unavailable.
   }
@@ -117,6 +127,7 @@ export function readInboxNotificationSoundPreference() {
 export function writeInboxNotificationSoundPreference(enabled: boolean) {
   try {
     window.localStorage.setItem(soundStorageKey, String(enabled));
+    window.dispatchEvent(new Event(preferencesChangedEvent));
   } catch {
     // Keep the preference in the mounted settings screen when storage is unavailable.
   }
@@ -177,6 +188,10 @@ function isInboxNotificationTarget(
   const target = value as Partial<InboxNotificationTarget>;
   return (
     typeof target.messageId === "string" &&
+    (target.messageVersion === undefined ||
+      typeof target.messageVersion === "string") &&
+    (target.notificationId === undefined ||
+      typeof target.notificationId === "string") &&
     typeof target.projectId === "string" &&
     typeof target.targetId === "string" &&
     (target.kind === "issue" ||
@@ -339,12 +354,36 @@ export async function listenForInboxNotificationClicks(
       });
     }
 
+    const handleRemoteOpen = (event: Event) => {
+      const target = (event as CustomEvent<unknown>).detail;
+      if (isInboxNotificationTarget(target)) {
+        recordAndroidRemoteNotificationReceipt(target);
+        onOpen(target);
+      }
+      androidPushBridge()?.drainOpen();
+    };
+    window.addEventListener(androidRemoteOpenEvent, handleRemoteOpen);
+    const pendingRemoteOpen = androidPushBridge()?.drainOpen();
+    if (pendingRemoteOpen) {
+      try {
+        const target: unknown = JSON.parse(pendingRemoteOpen);
+        if (isInboxNotificationTarget(target)) {
+          recordAndroidRemoteNotificationReceipt(target);
+          onOpen(target);
+        }
+      } catch {
+        // Ignore a malformed native payload; the Inbox remains available.
+      }
+    }
     const { onAction } = await import("@tauri-apps/plugin-notification");
     const listener = await onAction((payload) => {
       const target = targetFromNotificationAction(payload);
       if (target) onOpen(target);
     });
-    return () => listener.unregister();
+    return () => {
+      window.removeEventListener(androidRemoteOpenEvent, handleRemoteOpen);
+      listener.unregister();
+    };
   }
 
   const handleOpen = (event: Event) => {
@@ -354,6 +393,128 @@ export async function listenForInboxNotificationClicks(
   window.addEventListener(browserOpenEvent, handleOpen);
   return () => window.removeEventListener(browserOpenEvent, handleOpen);
 }
+
+type AndroidPushBridge = {
+  token: () => string;
+  configured: () => boolean;
+  topic: () => string;
+  drainOpen: () => string;
+  hasActiveInboxNotification: (identity: string) => boolean;
+};
+
+function readAndroidRemoteNotificationReceipts() {
+  try {
+    const parsed: unknown = JSON.parse(
+      window.localStorage.getItem(androidRemoteReceiptStorageKey) ?? "{}",
+    );
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const cutoff = Date.now() - androidRemoteReceiptLifetimeMs;
+    return Object.fromEntries(Object.entries(parsed).filter(
+      (entry): entry is [string, number] =>
+        typeof entry[1] === "number" && entry[1] >= cutoff,
+    ));
+  } catch {
+    return {};
+  }
+}
+
+function recordAndroidRemoteNotificationReceipt(target: InboxNotificationTarget) {
+  if (!target.notificationId || !target.messageVersion) return;
+  try {
+    const receipts = readAndroidRemoteNotificationReceipts();
+    receipts[`${target.notificationId}\u0000${target.messageVersion}`] = Date.now();
+    window.localStorage.setItem(
+      androidRemoteReceiptStorageKey,
+      JSON.stringify(receipts),
+    );
+  } catch {
+    // The active OS notification remains the short-lived duplicate guard.
+  }
+}
+
+function androidRemoteNotificationAlreadyHandled(message: InboxMessage) {
+  const identity = inboxNotificationIdentity(message);
+  const version = message.kind === "session"
+    ? inboxSessionMessageVersion(message.status, message.occurredAt)
+    : message.version;
+  if (readAndroidRemoteNotificationReceipts()[`${identity}\u0000${version}`]) {
+    return true;
+  }
+  try {
+    return androidPushBridge()?.hasActiveInboxNotification(identity) ?? false;
+  } catch {
+    return false;
+  }
+}
+
+function androidPushBridge(): AndroidPushBridge | null {
+  if (getMobilePlatform() !== "android" || typeof window === "undefined") {
+    return null;
+  }
+  const bridge = (window as typeof window & {
+    BriarAndroidPush?: AndroidPushBridge;
+  }).BriarAndroidPush;
+  return bridge?.configured() ? bridge : null;
+}
+
+function pushLocale(): "ko" | "en" | "zh" {
+  const language = document.documentElement.lang.toLowerCase();
+  if (language.startsWith("zh")) return "zh";
+  if (language.startsWith("en")) return "en";
+  return "ko";
+}
+
+export async function synchronizeAndroidPushRegistration(
+  sessionToken: string,
+) {
+  const bridge = androidPushBridge();
+  const token = bridge?.token().trim();
+  const topic = bridge?.topic().trim();
+  if (!bridge || !token || !topic) return false;
+  const preferences = readInboxNotificationPreferences();
+  await request<{ registered: boolean }>(
+    "/inbox/push-registration",
+    sessionToken,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        platform: "fcm",
+        token,
+        environment: "production",
+        topic,
+        locale: pushLocale(),
+        preferences: {
+          playSound: readInboxNotificationSoundPreference(),
+          urgent: preferences.urgent,
+          actionRequired: preferences.action_required,
+          important: preferences.important,
+          activity: preferences.activity,
+        },
+      }),
+    },
+  );
+  return true;
+}
+
+export async function deleteAndroidPushRegistration(sessionToken: string) {
+  const bridge = androidPushBridge();
+  const token = bridge?.token().trim();
+  if (!bridge || !token) return false;
+  await request<{ deleted: boolean }>(
+    "/inbox/push-registration",
+    sessionToken,
+    {
+      method: "DELETE",
+      body: JSON.stringify({ platform: "fcm", token }),
+    },
+  );
+  return true;
+}
+
+export const androidPushRegistrationEvents = {
+  preferencesChanged: preferencesChangedEvent,
+  tokenChanged: androidPushTokenEvent,
+} as const;
 
 export async function requestInboxNotificationPermission() {
   if (isTauriRuntime()) {
@@ -535,6 +696,10 @@ export async function sendInboxNotification(
     const id = inboxNotificationId(inboxNotificationIdentity(message));
     storeNotificationTarget(id, target);
     const mobilePlatform = getMobilePlatform();
+    if (
+      mobilePlatform === "android" &&
+      androidRemoteNotificationAlreadyHandled(message)
+    ) return false;
     const channelId = playSound
       ? "briar-inbox-sound-v1"
       : "briar-inbox-silent-v1";

@@ -6,6 +6,8 @@ import {
   listenForInboxNotificationClicks,
   readInboxNotificationPreferences,
   sendInboxNotification,
+  synchronizeAndroidPushRegistration,
+  androidPushRegistrationEvents,
   type InboxNotificationTarget,
 } from "../lib/inbox-notifications";
 import { inboxSessionMessageVersion } from "../lib/inbox-session-version";
@@ -84,9 +86,45 @@ export function useInboxNotifications(
   viewingChannelThreadRootMessageId: string | null = null,
   viewingIssueConversationRunId: string | null = null,
   initialSyncComplete = true,
+  sessionToken: string | null = null,
 ) {
   const { t } = useI18n();
   const baselineRef = useRef<NotificationBaseline | null>(null);
+
+  useEffect(() => {
+    if (!sessionToken) return;
+    const synchronize = () => {
+      void synchronizeAndroidPushRegistration(sessionToken).catch((error) => {
+        console.error("Failed to synchronize Android push registration", error);
+      });
+    };
+    const synchronizeWhenVisible = () => {
+      if (document.visibilityState === "visible") synchronize();
+    };
+    synchronize();
+    window.addEventListener(
+      androidPushRegistrationEvents.preferencesChanged,
+      synchronize,
+    );
+    window.addEventListener(
+      androidPushRegistrationEvents.tokenChanged,
+      synchronize,
+    );
+    window.addEventListener("online", synchronize);
+    document.addEventListener("visibilitychange", synchronizeWhenVisible);
+    return () => {
+      window.removeEventListener(
+        androidPushRegistrationEvents.preferencesChanged,
+        synchronize,
+      );
+      window.removeEventListener(
+        androidPushRegistrationEvents.tokenChanged,
+        synchronize,
+      );
+      window.removeEventListener("online", synchronize);
+      document.removeEventListener("visibilitychange", synchronizeWhenVisible);
+    };
+  }, [sessionToken]);
 
   useEffect(() => {
     if (!userId || !organizationId || !initialSyncComplete) {

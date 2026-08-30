@@ -70,6 +70,7 @@ import {
   demoRunEvents,
   demoRepositoryReadiness,
 } from "../lib/demo-data";
+import { deleteAndroidPushRegistration } from "../lib/inbox-notifications";
 import { isRepositoryConnectedForImport } from "../lib/linear-import";
 import {
   cloneGithubSshRepository,
@@ -1190,6 +1191,9 @@ export function useBriar(options: UseBriarOptions = {}) {
   const logout = useCallback(async () => {
     reconnectRequest.current += 1;
     cancelLogin();
+    if (token) {
+      await deleteAndroidPushRegistration(token).catch(() => false);
+    }
     await clearSessionToken();
     setToken(null);
     setUser(null);
@@ -1202,7 +1206,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     setActiveProjectId(null);
     setProjectConnection(null);
     setIsCreatingProject(false);
-  }, [cancelLogin]);
+  }, [cancelLogin, token]);
 
   const updateAccountProfile = useCallback(
     async (input: {

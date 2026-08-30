@@ -211,16 +211,6 @@ final class IssueConversationViewTracker: ObservableObject {
     }
 }
 
-final class InboxNotificationForegroundDelegate: NSObject, UNUserNotificationCenterDelegate {
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        completionHandler([.banner, .list, .sound, .badge])
-    }
-}
-
 @MainActor
 final class LocalNotificationService: ObservableObject {
     @Published var preferences = InboxNotificationPreferences.load()
@@ -229,12 +219,8 @@ final class LocalNotificationService: ObservableObject {
     private var knownVersions: [String: String] = [:]
     private var baselineID: String?
     private let center = UNUserNotificationCenter.current()
-    private let foregroundDelegate = InboxNotificationForegroundDelegate()
 
     init() {
-        // iOS does not present local notifications while the app is active
-        // unless its notification center delegate explicitly opts in.
-        center.delegate = foregroundDelegate
         Task { await refreshAuthorizationStatus() }
     }
 
@@ -250,6 +236,9 @@ final class LocalNotificationService: ObservableObject {
         }
         do {
             let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound])
+            if granted {
+                UIApplication.shared.registerForRemoteNotifications()
+            }
             await refreshAuthorizationStatus()
             return granted
         } catch {
@@ -291,10 +280,16 @@ final class LocalNotificationService: ObservableObject {
             return
         }
 
+        let deliveredRemoteVersions = await deliveredRemoteNotificationVersions()
         let newcomers = messages.filter { message in
             let identity = message.notificationGroupId ?? message.id
             return message.isUnread &&
                 knownVersions[identity] != message.version &&
+                !deliveredRemoteVersions.contains("\(identity)\u{0}\(message.version)") &&
+                !RemotePushNotificationReceiptStore.contains(
+                    notificationId: identity,
+                    version: message.version
+                ) &&
                 enabled.contains(InboxMessageBuilder.classify(message)) &&
                 Self.shouldDeliver(
                     message,
@@ -349,6 +344,19 @@ final class LocalNotificationService: ObservableObject {
             trigger: nil
         )
         try? await center.add(request)
+    }
+
+    private func deliveredRemoteNotificationVersions() async -> Set<String> {
+        await withCheckedContinuation { continuation in
+            center.getDeliveredNotifications { notifications in
+                let versions = Set(notifications.compactMap { notification in
+                    RemotePushNotificationTarget.parse(
+                        userInfo: notification.request.content.userInfo
+                    ).map { "\($0.notificationId)\u{0}\($0.messageVersion)" }
+                })
+                continuation.resume(returning: versions)
+            }
+        }
     }
 }
 
