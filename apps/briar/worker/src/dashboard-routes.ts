@@ -30,7 +30,6 @@ export async function handleDashboardRoute(input: {
   url: URL;
   auth: BriarAuth;
   db: D1Database;
-  archivesBucket: R2Bucket;
 }): Promise<Response | undefined> {
   const { request, url, auth, db } = input;
 

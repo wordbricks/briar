@@ -342,7 +342,6 @@ async function route(
     url,
     auth,
     db,
-    archivesBucket: env.ARCHIVES,
   });
   if (dashboardResponse !== undefined) return dashboardResponse;
 
