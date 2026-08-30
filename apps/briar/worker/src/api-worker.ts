@@ -16,7 +16,6 @@ import { handleChannelMessageRoute } from "./channel-message-routes";
 import { handleChannelOrganizationContextRoute } from "./channel-organization-context-routes";
 import { handleChannelReplyResultRoute } from "./channel-reply-result-routes";
 import { handleManagedComputerRoute } from "./managed-computer-routes";
-import { handleOrganizationUsageRoute } from "./organization-usage-routes";
 import { handleProjectAgentRoute } from "./project-agent-routes";
 import { handleProjectAgentTaskWorkerRoute } from "./project-agent-task-worker-routes";
 import { handleProjectGithubRoute } from "./project-github-routes";
@@ -40,7 +39,6 @@ import {
   handleGithubPublicRoute,
   handleOrganizationGithubRoute,
 } from "./github-integration-routes";
-import { handleDashboardRoute } from "./dashboard-routes";
 import {
   getProject,
 } from "./db";
@@ -183,14 +181,6 @@ async function route(
   });
   if (managedComputerResponse !== undefined) return managedComputerResponse;
 
-  const organizationResponse = await handleOrganizationUsageRoute({
-    request,
-    url,
-    auth,
-    db,
-  });
-  if (organizationResponse !== undefined) return organizationResponse;
-
   const realtimeResponse = await handleRealtimeRoute({
     request,
     db,
@@ -265,14 +255,6 @@ async function route(
     db,
   });
   if (projectLinearResponse !== undefined) return projectLinearResponse;
-
-  const dashboardResponse = await handleDashboardRoute({
-    request,
-    url,
-    auth,
-    db,
-  });
-  if (dashboardResponse !== undefined) return dashboardResponse;
 
   const issueConversationResponse = await handleIssueConversationRoute({
     request,

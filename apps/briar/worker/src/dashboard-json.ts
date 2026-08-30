@@ -15,7 +15,6 @@ import type {
   IssueAttachmentRow,
   IssueDependencyRow,
   IssueResultReviewRow,
-  OrganizationStatusTrayRunRow,
 } from "./db";
 import { issueAttachmentJson } from "./issue-conversation-json";
 
@@ -229,25 +228,5 @@ export function dashboardRunJson(
     completedAt: run.completed_at,
     lastEventAt: run.last_event_at,
     eventCount: run.event_count,
-  };
-}
-
-export function statusTrayRunJson(run: OrganizationStatusTrayRunRow) {
-  const workflow = normalizeAutoHuntWorkflow(
-    JSON.parse(run.workflow_snapshot_json),
-  );
-  return {
-    projectId: run.project_id,
-    projectName: run.project_name,
-    id: run.id,
-    title: run.title,
-    status: run.status,
-    workflowStage: run.workflow_stage,
-    workflowStageLabel:
-      workflow.stages.find((stage) => stage.id === run.workflow_stage)?.label ??
-      null,
-    startedAt: run.started_at,
-    updatedAt: run.updated_at,
-    lastEventAt: run.last_event_at,
   };
 }
