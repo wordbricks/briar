@@ -114,7 +114,8 @@ fn records_an_actionable_handoff_for_runtime_blockers() {
         "blocked",
         "workspace-allocation",
         "worktree creation failed",
-    );
+    )
+    .expect("blocked event arguments should serialize");
 
     let detail_index = arguments
         .iter()
@@ -125,19 +126,31 @@ fn records_an_actionable_handoff_for_runtime_blockers() {
 
     let result_index = arguments
         .iter()
-        .position(|argument| argument == "--structured-result")
+        .position(|argument| argument == "--structured-result-proto-json")
         .expect("blocked event should include a structured result");
-    let result: serde_json::Value = serde_json::from_str(&arguments[result_index + 1])
-        .expect("structured result should be valid JSON");
-    assert_eq!(result["outcome"], "blocked");
-    assert_eq!(result["humanActionRequired"], true);
-    assert!(result["summary"]
-        .as_str()
-        .expect("summary should be text")
-        .contains("작업을 시작할 수 없습니다"));
-    assert!(result["nextAction"]
-        .as_str()
-        .expect("next action should be text")
+    let result: app_proto::StructuredRunResult = serde_json::from_str(&arguments[result_index + 1])
+        .expect("structured result should be canonical generated ProtoJSON");
+    assert_eq!(
+        result.outcome.as_known(),
+        Some(app_proto::structured_run_result::Outcome::Blocked)
+    );
+    assert_eq!(
+        result.importance.as_known(),
+        Some(app_proto::structured_run_result::Importance::Important)
+    );
+    assert_eq!(
+        result.urgency.as_known(),
+        Some(app_proto::structured_run_result::Urgency::Normal)
+    );
+    assert_eq!(
+        result.impact.as_known(),
+        Some(app_proto::structured_run_result::Impact::Issue)
+    );
+    assert!(result.human_action_required);
+    assert!(result.summary.contains("작업을 시작할 수 없습니다"));
+    assert!(result
+        .next_action
+        .expect("blocked result should include its next action")
         .contains("저장소 연결을 다시 확인"));
 }
 

@@ -28,7 +28,6 @@ import {
   TransitionWorkflowStageResponse_Outcome,
   TransitionWorkflowStageResponseSchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
-import { decodeStructuredAgentResult } from "../src/lib/agent-result";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {
   briarIssueUrl,
@@ -67,6 +66,7 @@ import {
   appConnectCallOptions,
   appConnectTransport,
 } from "./app-connect-client";
+import { decodeRunStructuredResult } from "./run-structured-result";
 
 async function optionalText(valueFlag: string, fileFlag: string) {
   const path = value(fileFlag);
@@ -210,9 +210,10 @@ async function addRunEvent(forcedStatus?: string) {
     "--structured-result",
     "--structured-result-file",
   );
-  const structuredResult = structuredResultValue
-    ? decodeStructuredAgentResult(JSON.parse(structuredResultValue))
-    : null;
+  const structuredResult = decodeRunStructuredResult({
+    domainJson: structuredResultValue,
+    protoJson: value("--structured-result-proto-json") ?? null,
+  });
   const runIdValue = value("--run") ?? project.activeClaim?.runId ?? null;
   const runId = runIdValue ? decodeUuid(runIdValue).toLowerCase() : null;
   const sourceKey = value("--source-key") ?? project.activeClaim?.sourceKey ?? null;

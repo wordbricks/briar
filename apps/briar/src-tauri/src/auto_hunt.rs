@@ -315,7 +315,7 @@ pub(super) fn auto_hunt_terminal_event_arguments(
     status: &str,
     cause: &str,
     detail: &str,
-) -> Vec<String> {
+) -> Result<Vec<String>, String> {
     let event_key = format!("{source_key}:{status}:{cause}");
     let (status_detail, structured_result) = if status == "blocked" {
         let reason = match cause {
@@ -332,22 +332,19 @@ pub(super) fn auto_hunt_terminal_event_arguments(
             "workspace-allocation" => "프로젝트 저장소에 접근할 수 있는 담당자가 Worker 컴퓨터의 Briar에서 저장소 연결을 다시 확인한 뒤 이 이슈를 재시도해 주세요. 이슈가 ‘진행 중’ 상태로 바뀌면 문제가 해결된 것입니다.",
             _ => "이 문제를 담당할 수 있는 사람이 안내된 원인을 해결한 뒤 이 이슈를 재시도해 주세요. 이슈가 ‘진행 중’ 상태로 바뀌면 문제가 해결된 것입니다.",
         };
-        (
-            technical_detail,
-            Some(
-                serde_json::json!({
-                    "summary": reason,
-                    "outcome": "blocked",
-                    "importance": "important",
-                    "urgency": "normal",
-                    "impact": "issue",
-                    "humanActionRequired": true,
-                    "nextAction": next_action,
-                    "dueAt": null
-                })
-                .to_string(),
-            ),
-        )
+        let result = app_proto::StructuredRunResult {
+            summary: reason,
+            outcome: app_proto::structured_run_result::Outcome::Blocked.into(),
+            importance: app_proto::structured_run_result::Importance::Important.into(),
+            urgency: app_proto::structured_run_result::Urgency::Normal.into(),
+            impact: app_proto::structured_run_result::Impact::Issue.into(),
+            human_action_required: true,
+            next_action: Some(next_action.to_string()),
+            ..Default::default()
+        };
+        let result = serde_json::to_string(&result)
+            .map_err(|error| format!("차단 결과 ProtoJSON을 만들지 못했습니다: {error}"))?;
+        (technical_detail, Some(result))
     } else {
         (detail.to_string(), None)
     };
@@ -367,9 +364,12 @@ pub(super) fn auto_hunt_terminal_event_arguments(
         "briar-auto-hunt-runtime".to_string(),
     ];
     if let Some(structured_result) = structured_result {
-        arguments.extend(["--structured-result".to_string(), structured_result]);
+        arguments.extend([
+            "--structured-result-proto-json".to_string(),
+            structured_result,
+        ]);
     }
-    arguments
+    Ok(arguments)
 }
 
 pub(super) fn record_auto_hunt_terminal_event(
@@ -382,7 +382,7 @@ pub(super) fn record_auto_hunt_terminal_event(
     detail: &str,
 ) -> Result<(), String> {
     let arguments =
-        auto_hunt_terminal_event_arguments(&run.run_id, &run.source_key, status, cause, detail);
+        auto_hunt_terminal_event_arguments(&run.run_id, &run.source_key, status, cause, detail)?;
     let output = cli_environment.run_briar(runner, workspace, arguments)?;
     if output.success() {
         Ok(())
