@@ -36,6 +36,7 @@ const publishReplyActivity = async (
   request: PublishReplyActivityRequest,
   services: Partial<ReplyActivityApplicationServices>,
 ) => {
+  const token = bearerCapability(input.request);
   let activity;
   try {
     activity = replyActivityInputFromProto(request);
@@ -49,7 +50,7 @@ const publishReplyActivity = async (
   try {
     await publishReplyActivityApplication({
       env: input.env,
-      token: bearerCapability(input.request),
+      token,
       replyJobId: request.replyJobId,
       activity,
     }, services);

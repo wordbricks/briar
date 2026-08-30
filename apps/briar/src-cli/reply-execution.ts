@@ -27,6 +27,8 @@ import {
 } from "./detached-provider-turn";
 import { materializeDetachedAgentSkillCatalog } from "./agent-skill-discovery";
 import { ChannelActivityPublisher } from "./channel-activity-publisher";
+import { createReplyActivityClient } from "./reply-activity-client";
+import { createWorkerQueueClient } from "./worker-queue-client";
 import { createWorkerTranscriptBatcher } from "./worker-transcript-client";
 import {
   workerCliPath,
@@ -306,22 +308,15 @@ async function runClaimedIssueReply(
   const imageDirectory = await mkdtemp(join(tmpdir(), "briar-issue-reply-images-"));
   let imagesCleaned = false;
   let lastActivityErrorAt = Number.NEGATIVE_INFINITY;
+  const replyActivity = createReplyActivityClient(config.apiUrl);
   const activityPublisher = new ChannelActivityPublisher({
     credential: issue.activity,
-    send: async (credential, input) => {
-      await request(
-        config.apiUrl,
-        `/issue-reply-claims/${issue.workId}/activity`,
-        null,
-        {
-          method: "POST",
-          headers: {
-            "X-Briar-Channel-Activity-Token": credential.token,
-          },
-          body: JSON.stringify(input),
-        },
-      );
-    },
+    send: (credential, activity) =>
+      replyActivity.publishReplyActivity({
+        replyJobId: issue.workId,
+        capability: credential.token,
+        activity,
+      }).then(() => undefined),
     onError: (error) => {
       const now = Date.now();
       if (now - lastActivityErrorAt < 60_000) return;
@@ -638,22 +633,16 @@ async function runClaimedChannelReply(
   let imagesCleaned = false;
   let workspaceCleaned = false;
   let lastActivityErrorAt = Number.NEGATIVE_INFINITY;
+  const replyActivity = createReplyActivityClient(config.apiUrl);
+  const workerQueue = createWorkerQueueClient(config.apiUrl, workerToken);
   const activityPublisher = new ChannelActivityPublisher({
     credential: reply.activity,
-    send: async (credential, input) => {
-      await request(
-        config.apiUrl,
-        `/channel-reply-claims/${reply.workId}/activity`,
-        null,
-        {
-          method: "POST",
-          headers: {
-            "X-Briar-Channel-Activity-Token": credential.token,
-          },
-          body: JSON.stringify(input),
-        },
-      );
-    },
+    send: (credential, activity) =>
+      replyActivity.publishReplyActivity({
+        replyJobId: reply.workId,
+        capability: credential.token,
+        activity,
+      }).then(() => undefined),
     onError: (error) => {
       const now = Date.now();
       if (now - lastActivityErrorAt < 60_000) return;
@@ -805,20 +794,12 @@ async function runClaimedChannelReply(
           conversationId = nextConversationId;
           reportCheckpoint?.({ conversationId: nextConversationId });
           if (reply.session) {
-            const checkpoint = await request<{ retainedUntil: string }>(
-              config.apiUrl,
-              `/channel-reply-claims/${reply.workId}/session`,
-              workerToken,
-              {
-                method: "POST",
-                body: JSON.stringify({
-                  organizationId: reply.organizationId,
-                  workerId: registered.workerId,
-                  claimToken: reply.claimToken,
-                  conversationId: nextConversationId,
-                }),
-              },
-            );
+            const checkpoint = await workerQueue.checkpointChannelReplySession({
+              projectId: project.id,
+              workerId: registered.workerId,
+              work: reply,
+              conversationId: nextConversationId,
+            });
             retainedUntil = checkpoint.retainedUntil;
             if (sessionWorktree) {
               await extendCachedAnalysisWorktreeRetention({
