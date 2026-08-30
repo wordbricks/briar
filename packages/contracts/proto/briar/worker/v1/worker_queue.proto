@@ -22,7 +22,18 @@ service WorkerQueueService {
 // desktop-hosted Auto Hunt runtime. Result mutation and uploads remain on
 // their dedicated transports.
 service WorkerExecutionService {
+  rpc ClaimIssue(ClaimIssueRequest) returns (ClaimIssueResponse);
   rpc ListRunEvidence(ListRunEvidenceRequest) returns (ListRunEvidenceResponse);
+}
+
+message ClaimIssueRequest {
+  string project_id = 1;
+  optional string run_id = 2;
+  string claimed_by = 3;
+}
+
+message ClaimIssueResponse {
+  optional ClaimedIssue issue = 1;
 }
 
 message ListRunEvidenceRequest {

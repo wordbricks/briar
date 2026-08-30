@@ -24,6 +24,14 @@ pub type OwnedHandoffWorkRequestView = ::buffa::view::OwnedView<
 pub type OwnedHandoffWorkResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::HandoffWorkResponseView<'static>,
 >;
+///Shorthand for `OwnedView<ClaimIssueRequestView<'static>>`.
+pub type OwnedClaimIssueRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ClaimIssueRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ClaimIssueResponseView<'static>>`.
+pub type OwnedClaimIssueResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ClaimIssueResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<ListRunEvidenceRequestView<'static>>`.
 pub type OwnedListRunEvidenceRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::ListRunEvidenceRequestView<'static>,
@@ -112,6 +120,40 @@ for crate::proto::briar::worker::v1::__buffa::view::HandoffWorkResponseView<'_> 
 impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::HandoffWorkResponse>
 for ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::HandoffWorkResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::ClaimIssueResponse>
+for crate::proto::briar::worker::v1::__buffa::view::ClaimIssueResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::ClaimIssueResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ClaimIssueResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -853,6 +895,12 @@ where
 }
 /// Full service name for this service.
 pub const WORKER_EXECUTION_SERVICE_SERVICE_NAME: &str = "briar.worker.v1.WorkerExecutionService";
+/// Static [`Spec`](::connectrpc::Spec) for the `ClaimIssue` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_EXECUTION_SERVICE_CLAIM_ISSUE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerExecutionService/ClaimIssue",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `ListRunEvidence` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const WORKER_EXECUTION_SERVICE_LIST_RUN_EVIDENCE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.worker.v1.WorkerExecutionService/ListRunEvidence",
@@ -912,6 +960,29 @@ pub const WORKER_EXECUTION_SERVICE_LIST_RUN_EVIDENCE_SPEC: ::connectrpc::Spec = 
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait WorkerExecutionService: Send + Sync + 'static {
+    /// Handle the ClaimIssue RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn claim_issue<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::ClaimIssueRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::ClaimIssueResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
     /// Handle the ListRunEvidence RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -967,6 +1038,35 @@ impl<S: WorkerExecutionService> WorkerExecutionServiceExt for S {
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router {
         router
+            .route_view(
+                WORKER_EXECUTION_SERVICE_SERVICE_NAME,
+                "ClaimIssue",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::ClaimIssueRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::ClaimIssueRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.claim_issue(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::ClaimIssueResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_EXECUTION_SERVICE_CLAIM_ISSUE_SPEC)
             .route_view(
                 WORKER_EXECUTION_SERVICE_SERVICE_NAME,
                 "ListRunEvidence",
@@ -1053,6 +1153,12 @@ for WorkerExecutionServiceServer<T> {
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
         let method = path.strip_prefix("briar.worker.v1.WorkerExecutionService/")?;
         match method {
+            "ClaimIssue" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_EXECUTION_SERVICE_CLAIM_ISSUE_SPEC),
+                )
+            }
             "ListRunEvidence" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -1075,6 +1181,28 @@ for WorkerExecutionServiceServer<T> {
         };
         let _ = (&ctx, &request, &format);
         match method {
+            "ClaimIssue" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::ClaimIssueRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::ClaimIssueRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::ClaimIssueRequest,
+                    >::from_parts(&req, &body);
+                    svc.claim_issue(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::ClaimIssueResponse,
+                        >(format)
+                })
+            }
             "ListRunEvidence" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -1167,7 +1295,7 @@ for WorkerExecutionServiceServer<T> {
 /// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
 ///
 /// let client = WorkerExecutionServiceClient::new(conn, config);
-/// let response = client.list_run_evidence(request).await?;
+/// let response = client.claim_issue(request).await?;
 /// ```
 ///
 /// # Example (Connect / HTTP/1.1 or ALPN)
@@ -1179,7 +1307,7 @@ for WorkerExecutionServiceServer<T> {
 /// let config = ClientConfig::new("http://localhost:8080".parse()?);
 ///
 /// let client = WorkerExecutionServiceClient::new(http, config);
-/// let response = client.list_run_evidence(request).await?;
+/// let response = client.claim_issue(request).await?;
 /// ```
 ///
 /// # Working with the response
@@ -1189,7 +1317,7 @@ for WorkerExecutionServiceServer<T> {
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.list_run_evidence(request).await?;
+/// let resp = client.claim_issue(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -1197,7 +1325,7 @@ for WorkerExecutionServiceServer<T> {
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.list_run_evidence(request).await?.into_owned();
+/// let owned = client.claim_issue(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -1229,6 +1357,51 @@ where
     /// Get a mutable reference to the client configuration.
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
+    }
+    /// Call the ClaimIssue RPC. Sends a request to /briar.worker.v1.WorkerExecutionService/ClaimIssue.
+    pub async fn claim_issue(
+        &self,
+        request: crate::proto::briar::worker::v1::ClaimIssueRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::ClaimIssueResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.claim_issue_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ClaimIssue RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn claim_issue_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::ClaimIssueRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::ClaimIssueResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_EXECUTION_SERVICE_CLAIM_ISSUE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
     }
     /// Call the ListRunEvidence RPC. Sends a request to /briar.worker.v1.WorkerExecutionService/ListRunEvidence.
     pub async fn list_run_evidence(
