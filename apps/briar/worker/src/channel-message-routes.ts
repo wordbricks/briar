@@ -1,4 +1,7 @@
 import {
+  CreateChannelMessageResponseSchema,
+} from "@briar/contracts/gen/briar/app/v1/channel_pb";
+import {
   canonicalizeIssueAttachmentReferences,
   isIssueAttachmentReference,
 } from "../../src/lib/issue-markdown";
@@ -53,7 +56,11 @@ import {
   HttpError,
   json,
   privateNoStoreJson,
+  privateNoStoreProtobufResponse,
 } from "./http-response";
+import {
+  appCreateChannelMessageResponse,
+} from "./app-connect-channel-response-mappers";
 import { getOrganizationRole } from "./organization-repository";
 import {
   decodeChannelMessageQuery,
@@ -607,7 +614,7 @@ export async function handleChannelMessageRoute(
     if (parsed.attachments.length === 0) {
       throw new HttpError(400, "Channel message upload requires an attachment");
     }
-    return json(await createOrganizationChannelMessage({
+    const result = await createOrganizationChannelMessage({
       db,
       organizationId: channelMessagesMatch[1],
       channelId: channelMessagesMatch[2],
@@ -616,7 +623,12 @@ export async function handleChannelMessageRoute(
       request: parsed.input,
       attachments: parsed.attachments,
       attachmentReferences: parsed.attachmentReferences,
-    }), 201);
+    });
+    return privateNoStoreProtobufResponse(
+      CreateChannelMessageResponseSchema,
+      appCreateChannelMessageResponse(result),
+      201,
+    );
   }
 
   return undefined;

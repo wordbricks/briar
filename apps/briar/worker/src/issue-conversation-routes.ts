@@ -1,4 +1,7 @@
 import {
+  CreateIssueMessageResponseSchema,
+} from "@briar/contracts/gen/briar/app/v1/issue_pb";
+import {
   agentReplyDisplayParentMessageId,
   issueReplyAgentIds,
 } from "../../src/lib/issue-reply-decision";
@@ -33,7 +36,12 @@ import {
   type IssueAgentReplyJobRow,
   type IssueMessageRow,
 } from "./db";
-import { HttpError, json } from "./http-response";
+import {
+  HttpError,
+  json,
+  privateNoStoreProtobufResponse,
+} from "./http-response";
+import { appCreateIssueMessageResponse } from "./app-connect-issue-mappers";
 import { hasOrganizationCapability } from "./organization-access";
 import {
   deleteUnreferencedUploadedIssueObjects,
@@ -612,7 +620,7 @@ export async function handleIssueConversationRoute(input: {
     if (messageRequest.attachments.length === 0) {
       throw new HttpError(400, "Issue message upload requires an attachment");
     }
-    return json(await createProjectIssueMessage({
+    const result = await createProjectIssueMessage({
       db,
       archivesBucket,
       attachmentsBucket,
@@ -622,7 +630,12 @@ export async function handleIssueConversationRoute(input: {
       request: messageRequest.input,
       attachments: messageRequest.attachments,
       attachmentReferences: messageRequest.attachmentReferences,
-    }), 201);
+    });
+    return privateNoStoreProtobufResponse(
+      CreateIssueMessageResponseSchema,
+      appCreateIssueMessageResponse(result),
+      201,
+    );
   }
 
   return undefined;

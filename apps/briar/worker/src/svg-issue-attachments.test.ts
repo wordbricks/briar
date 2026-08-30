@@ -1,3 +1,7 @@
+import { fromBinary } from "@bufbuild/protobuf";
+import {
+  CreateIssueResponseSchema,
+} from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import worker from "./index";
@@ -10,6 +14,15 @@ const sessionToken = "svg-attachment-session-token";
 const initialAt = "2026-08-20T11:16:44.987Z";
 const svgBody =
   '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10" /></svg>';
+
+const decodeCreateIssueResponse = async (response: Response) => {
+  expect(response.headers.get("Content-Type")).toBe("application/protobuf");
+  expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+  return fromBinary(
+    CreateIssueResponseSchema,
+    new Uint8Array(await response.arrayBuffer()),
+  );
+};
 
 describe("SVG issue attachment lifecycle", () => {
   let miniflare: Miniflare;
@@ -154,11 +167,8 @@ describe("SVG issue attachment lifecycle", () => {
         env(),
       );
       expect(legacyPngResponse.status).toBe(201);
-      const legacyPng = await legacyPngResponse.json<{
-        difficulty: string | null;
-        attachments: Array<{ url: string; contentType: string }>;
-      }>();
-      expect(legacyPng.difficulty).toBeNull();
+      const legacyPng = await decodeCreateIssueResponse(legacyPngResponse);
+      expect(legacyPng.difficulty).toBeUndefined();
 
       const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
       const legacyResponse = await worker.fetch(
@@ -242,21 +252,12 @@ describe("SVG issue attachment lifecycle", () => {
         env(),
       );
       expect(createdResponse.status).toBe(201);
-      const created = await createdResponse.json<{
-        runId: string;
-        attachments: Array<{
-          id: string;
-          filename: string;
-          contentType: string;
-          byteSize: number;
-          url: string;
-        }>;
-      }>();
+      const created = await decodeCreateIssueResponse(createdResponse);
       expect(created.attachments).toEqual([
         expect.objectContaining({
           filename: "diagram.svg",
           contentType: "image/svg+xml",
-          byteSize: new TextEncoder().encode(svgBody).byteLength,
+          byteSize: BigInt(new TextEncoder().encode(svgBody).byteLength),
         }),
       ]);
 
@@ -299,7 +300,7 @@ describe("SVG issue attachment lifecycle", () => {
       const response = await worker.fetch(issueRequest(title, file), env());
 
       expect(response.status).toBe(201);
-      await expect(response.json()).resolves.toMatchObject({
+      await expect(decodeCreateIssueResponse(response)).resolves.toMatchObject({
         attachments: [{ filename: file.name, contentType: expectedType }],
       });
     },

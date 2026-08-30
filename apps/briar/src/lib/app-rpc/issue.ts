@@ -11,6 +11,10 @@ import {
   SetIssueDependencyResponse_Outcome as ProtoDependencyOutcome,
   TransferIssueResponse_Outcome as ProtoTransferOutcome,
   UnassignRunResponse_Outcome as ProtoUnassignOutcome,
+  CreateIssueMessageResponseSchema,
+  CreateIssueResponseSchema,
+  UpdateIssueResponseSchema,
+  type CreateIssueMessageResponse as CreateIssueMessageResponseMessage,
   type CreateIssueResponse as CreateIssueResponseMessage,
   type IssueAgentReply as IssueAgentReplyMessage,
   type IssueCreateProposal as IssueCreateProposalMessage,
@@ -51,7 +55,7 @@ import type {
 } from "../../types";
 import type { AutoHuntWorkflowCheckpoint } from "../auto-hunt-contract";
 import type { AgentProvider } from "../agent-provider";
-import { request } from "../api/request";
+import { requestProtobuf } from "../api/request";
 import { validateIssueAttachments } from "../issue-attachments";
 import { projectAgentSessionFromMessage } from "./agent";
 import {
@@ -203,10 +207,12 @@ const createIssueMultipart = async (
   for (const attachment of input.attachments) {
     form.append("attachments", attachment, attachment.name);
   }
-  return request<CreateIssueResult>(`/projects/${projectId}/issues`, token, {
-    method: "POST",
-    body: form,
-  });
+  return createIssueResultFromMessage(await requestProtobuf(
+    `/projects/${projectId}/issues`,
+    token,
+    CreateIssueResponseSchema,
+    { method: "POST", body: form },
+  ));
 };
 
 export async function createIssue(
@@ -288,11 +294,12 @@ const updateIssueMultipart = async (
   for (const attachment of input.attachments) {
     form.append("attachments", attachment, attachment.name);
   }
-  return request<UpdateIssueResult>(
+  return updateIssueResultFromMessage(await requestProtobuf(
     `/projects/${projectId}/runs/${runId}`,
     token,
+    UpdateIssueResponseSchema,
     { method: "PATCH", body: form },
-  );
+  ));
 };
 
 export async function updateIssue(
@@ -1092,15 +1099,26 @@ const createIssueMessageMultipart = async (
   for (const attachment of attachments) {
     form.append("attachments", attachment, attachment.name);
   }
-  return request<{
-    message: IssueMessage;
-    agentReply: IssueAgentReplyState | null;
-    agentReplies?: IssueAgentReplyState[];
-  }>(`/projects/${projectId}/runs/${runId}/messages`, token, {
-    method: "POST",
-    body: form,
-  });
+  return createIssueMessageResultFromMessage(await requestProtobuf(
+    `/projects/${projectId}/runs/${runId}/messages`,
+    token,
+    CreateIssueMessageResponseSchema,
+    { method: "POST", body: form },
+  ));
 };
+
+const createIssueMessageResultFromMessage = (
+  response: CreateIssueMessageResponseMessage,
+) => ({
+  message: issueMessageFromMessage(requiredMessage(
+    response.message,
+    "createIssueMessage.message",
+  )),
+  agentReply: response.agentReply
+    ? issueAgentReplyFromMessage(response.agentReply)
+    : null,
+  agentReplies: response.agentReplies.map(issueAgentReplyFromMessage),
+});
 
 export async function createIssueMessage(
   token: string,
@@ -1113,22 +1131,12 @@ export async function createIssueMessage(
     return createIssueMessageMultipart(token, projectId, runId, input);
   }
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const response = await client.createIssueMessage(
+  return appRpc(async () => createIssueMessageResultFromMessage(
+    await client.createIssueMessage(
       createIssueMessageRequestFromInput(projectId, runId, input),
       appCallOptions(token),
-    );
-    return {
-      message: issueMessageFromMessage(requiredMessage(
-        response.message,
-        "createIssueMessage.message",
-      )),
-      agentReply: response.agentReply
-        ? issueAgentReplyFromMessage(response.agentReply)
-        : null,
-      agentReplies: response.agentReplies.map(issueAgentReplyFromMessage),
-    };
-  });
+    ),
+  ));
 }
 
 export const updatedIssueMessageFromMessage = (

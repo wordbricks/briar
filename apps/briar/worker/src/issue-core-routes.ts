@@ -1,3 +1,7 @@
+import {
+  CreateIssueResponseSchema,
+  UpdateIssueResponseSchema,
+} from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { maxIssueAttachmentCount } from "../../src/lib/issue-attachments";
 import { isIssueAttachmentReference } from "../../src/lib/issue-markdown";
 import { processArchiveCleanupQueue } from "./archive";
@@ -16,7 +20,15 @@ import {
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
 } from "./db";
-import { HttpError, json } from "./http-response";
+import {
+  HttpError,
+  json,
+  privateNoStoreProtobufResponse,
+} from "./http-response";
+import {
+  appCreateIssueResponse,
+  appUpdateIssueResponse,
+} from "./app-connect-issue-mappers";
 import { issueAttachmentJson } from "./issue-conversation-json";
 import { hasOrganizationCapability } from "./organization-access";
 import {
@@ -422,7 +434,7 @@ export async function handleIssueCoreRoute(input: {
     if (issueRequest.attachments.length === 0) {
       throw new HttpError(400, "Issue upload requires an attachment");
     }
-    return json(await createProjectIssue({
+    const result = await createProjectIssue({
       db,
       projectId: issuesMatch[1],
       userId: session.user.id,
@@ -430,7 +442,12 @@ export async function handleIssueCoreRoute(input: {
       request: issueRequest.input,
       attachments: issueRequest.attachments,
       attachmentReferences: issueRequest.attachmentReferences,
-    }), 201);
+    });
+    return privateNoStoreProtobufResponse(
+      CreateIssueResponseSchema,
+      appCreateIssueResponse(result),
+      201,
+    );
   }
 
   const issueUpdateMatch = url.pathname.match(
@@ -448,7 +465,7 @@ export async function handleIssueCoreRoute(input: {
     if (issueRequest.attachments.length === 0) {
       throw new HttpError(400, "Issue update upload requires an attachment");
     }
-    return json(await updateProjectIssue({
+    const result = await updateProjectIssue({
       db,
       projectId: issueUpdateMatch[1],
       userId: session.user.id,
@@ -458,7 +475,11 @@ export async function handleIssueCoreRoute(input: {
       attachments: issueRequest.attachments,
       attachmentReferences: issueRequest.attachmentReferences,
       keptAttachmentIds: issueRequest.keptAttachmentIds,
-    }));
+    });
+    return privateNoStoreProtobufResponse(
+      UpdateIssueResponseSchema,
+      appUpdateIssueResponse(result),
+    );
   }
   return undefined;
 }

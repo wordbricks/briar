@@ -98,6 +98,7 @@ import {
   appChannelMessage,
   appChannelSubscriber,
   appChannelSummaryJson,
+  appCreateChannelMessageResponse,
 } from "./app-connect-channel-response-mappers";
 import { schedulePostCommitCleanup } from "./post-commit-cleanup";
 
@@ -660,10 +661,7 @@ const createAppChannelService = (
       }),
     });
     scheduleChannelMutation(input, request.organizationId);
-    return create(ChannelService.method.createChannelMessage.output, {
-      message: appChannelMessage(result.message),
-      agentReplies: result.agentReplies.map(appChannelAgentReply),
-    });
+    return appCreateChannelMessageResponse(result);
   }),
 
   deleteChannelMessage: (request) => rpc(async () => {

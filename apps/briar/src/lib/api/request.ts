@@ -1,3 +1,7 @@
+import {
+  fromBinary,
+  type DescMessage,
+} from "@bufbuild/protobuf";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { briarApiUrl } from "../api-config";
@@ -22,14 +26,19 @@ const decodeIssues = Schema.decodeUnknownOption(Schema.Array(Schema.Unknown));
 const methodFor = (init?: RequestInit) =>
   (init?.method ?? "GET").toUpperCase();
 
-async function requestUnknown(
+async function requestResponse(
   path: string,
   token: string | null,
+  accept: string,
   init?: RequestInit,
-): Promise<unknown> {
+): Promise<{
+  response: Response;
+  method: string;
+  startedAt: number;
+}> {
   if (!briarApiUrl) throw new Error("Briar API URL이 설정되지 않았습니다.");
   const headers = new Headers(init?.headers);
-  headers.set("Accept", "application/json");
+  headers.set("Accept", accept);
   if (!(init?.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
@@ -78,6 +87,20 @@ async function requestUnknown(
     });
     throw error;
   }
+  return { response, method, startedAt };
+}
+
+async function requestUnknown(
+  path: string,
+  token: string | null,
+  init?: RequestInit,
+): Promise<unknown> {
+  const { response, method, startedAt } = await requestResponse(
+    path,
+    token,
+    "application/json",
+    init,
+  );
   if (response.status === 204) return undefined;
   try {
     const body: unknown = await response.json();
@@ -101,4 +124,30 @@ export async function request<T>(
 ): Promise<T> {
   const body = await requestUnknown(path, token, init);
   return body as T;
+}
+
+export async function requestProtobuf<Desc extends DescMessage>(
+  path: string,
+  token: string | null,
+  schema: Desc,
+  init?: RequestInit,
+): Promise<ReturnType<typeof fromBinary<Desc>>> {
+  const { response, method, startedAt } = await requestResponse(
+    path,
+    token,
+    "application/protobuf",
+    init,
+  );
+  try {
+    return fromBinary(schema, new Uint8Array(await response.arrayBuffer()));
+  } catch (caught) {
+    captureErrorDiagnostics(caught, {
+      durationMs: performance.now() - startedAt,
+      method,
+      path,
+      scope: "api_response_parse",
+      status: response.status,
+    });
+    throw caught;
+  }
 }

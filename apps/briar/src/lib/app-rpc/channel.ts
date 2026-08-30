@@ -10,6 +10,7 @@ import {
   ChannelMessageAuthor_Kind as ProtoChannelMessageAuthorKind,
   ChannelService,
   ChannelVisibility as ProtoChannelVisibility,
+  CreateChannelMessageResponseSchema,
   DeclineChannelProposalResponse_Outcome as ProtoDeclineOutcome,
   DirectMessageParticipant_Kind as ProtoDirectMessageParticipantKind,
   type ChannelAgentReply as ChannelAgentReplyMessage,
@@ -22,6 +23,7 @@ import {
   type ChannelProposal as ChannelProposalMessage,
   type ChannelSummary as ChannelSummaryMessage,
   type ChannelWebhook as ChannelWebhookMessage,
+  type CreateChannelMessageResponse as CreateChannelMessageResponseMessage,
   type SyncChannelsResponse as SyncChannelsResponseMessage,
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
 import {
@@ -49,7 +51,7 @@ import type {
   IssueExecutionApprovalInput,
   OrganizationMember,
 } from "../../types";
-import { request } from "../api/request";
+import { requestProtobuf } from "../api/request";
 import type {
   AgentSkillExecutionProposal,
   ChannelAgentReply,
@@ -1153,16 +1155,17 @@ export async function sendChannelMessage(
     for (const attachment of input.attachments) {
       form.append("attachments", attachment, attachment.name);
     }
-    return request<{ message: ChannelMessage; agentReplies: ChannelAgentReply[] }>(
+    return createChannelMessageResultFromMessage(await requestProtobuf(
       `/organizations/${organizationId}/channels/${channelId}/messages`,
       token,
+      CreateChannelMessageResponseSchema,
       { method: "POST", body: form },
-    );
+    ));
   }
 
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.createChannelMessage(
+  return appRpc(async () => createChannelMessageResultFromMessage(
+    await client.createChannelMessage(
       {
         organizationId,
         channelId,
@@ -1176,16 +1179,19 @@ export async function sendChannelMessage(
         attachmentReferences: input.attachmentReferences ?? [],
       },
       appCallOptions(token),
-    );
-    return {
-      message: channelMessageFromMessage(requiredMessage(
-        response.message,
-        "createChannelMessage.message",
-      )),
-      agentReplies: response.agentReplies.map(channelAgentReplyFromMessage),
-    };
-  });
+    ),
+  ));
 }
+
+const createChannelMessageResultFromMessage = (
+  response: CreateChannelMessageResponseMessage,
+) => ({
+  message: channelMessageFromMessage(requiredMessage(
+    response.message,
+    "createChannelMessage.message",
+  )),
+  agentReplies: response.agentReplies.map(channelAgentReplyFromMessage),
+});
 
 export async function deleteChannelMessage(
   token: string,

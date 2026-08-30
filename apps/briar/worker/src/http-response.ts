@@ -1,3 +1,7 @@
+import {
+  toBinary,
+  type DescMessage,
+} from "@bufbuild/protobuf";
 import { cors } from "@connectrpc/connect";
 
 const allowedHeaders = new Set([
@@ -37,6 +41,20 @@ export const withCorsHeaders = (response: Response): Response => {
 
 export const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: corsHeaders });
+
+export const privateNoStoreProtobufResponse = <Desc extends DescMessage>(
+  schema: Desc,
+  body: Parameters<typeof toBinary<Desc>>[1],
+  status = 200,
+) =>
+  new Response(toBinary(schema, body), {
+    status,
+    headers: {
+      ...corsHeaders,
+      "Cache-Control": "private, no-store",
+      "Content-Type": "application/protobuf",
+    },
+  });
 
 export const privateNoStoreJson = (body: unknown) =>
   Response.json(body, {

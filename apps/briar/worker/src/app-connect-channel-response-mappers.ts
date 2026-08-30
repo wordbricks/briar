@@ -67,6 +67,7 @@ import {
   ChannelProposalSchema,
   ChannelSummarySchema,
   ChannelVisibility,
+  CreateChannelMessageResponseSchema,
   DirectMessageParticipant_Kind,
   DirectMessageParticipantSchema,
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
@@ -773,6 +774,15 @@ export const appChannelAgentReply = (reply: ChannelAgentReply) =>
     error: reply.error ?? undefined,
     createdAt: requiredTimestamp(reply.createdAt, "channel reply creation"),
     updatedAt: requiredTimestamp(reply.updatedAt, "channel reply update"),
+  });
+
+export const appCreateChannelMessageResponse = (result: {
+  message: ChannelMessage;
+  agentReplies: ChannelAgentReply[];
+}) =>
+  create(CreateChannelMessageResponseSchema, {
+    message: appChannelMessage(result.message),
+    agentReplies: result.agentReplies.map(appChannelAgentReply),
   });
 
 type ExecutionApprovalResult = Awaited<
