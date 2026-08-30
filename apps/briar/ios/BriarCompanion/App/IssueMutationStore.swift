@@ -551,7 +551,10 @@ final class IssueMutationStore: ObservableObject {
             }
             for _ in 0..<maximumPolls {
                 try await Task.sleep(for: pollInterval)
-                let polled: IssueAgentReplyResponse
+                let polledAgentReply: IssueAgentReplyJob
+                let polledMessage: IssueMessage?
+                let polledReplies: [IssueAgentReplyJob]
+                let polledMessages: [IssueMessage]
                 do {
                     var request = BriarAPI_GetIssueAgentReplyRequest()
                     request.projectID = coreUUIDString(projectID)
@@ -561,18 +564,29 @@ final class IssueMutationStore: ObservableObject {
                         request: request,
                         headers: [:]
                     )
-                    polled = try IssueAgentReplyResponse(
-                        connectMessage: wireResponse.briarValue()
+                    let message = try wireResponse.briarValue()
+                    guard message.hasAgentReply else {
+                        throw MobileAPIError.invalidResponse
+                    }
+                    polledAgentReply = try IssueAgentReplyJob(
+                        connectMessage: message.agentReply
+                    )
+                    polledMessage = message.hasMessage
+                        ? try IssueMessage(connectMessage: message.message)
+                        : nil
+                    polledReplies = try message.agentReplies.map(
+                        IssueAgentReplyJob.init(connectMessage:)
+                    )
+                    polledMessages = try message.messages.map(
+                        IssueMessage.init(connectMessage:)
                     )
                 } catch is CancellationError {
                     throw CancellationError()
                 } catch {
                     throw IssueMutationError.agentReplyPollingFailed
                 }
-                let polledReplies = polled.agentReplies.isEmpty
-                    ? [polled.agentReply]
-                    : polled.agentReplies
-                for polledReply in polledReplies {
+                let replies = polledReplies.isEmpty ? [polledAgentReply] : polledReplies
+                for polledReply in replies {
                     onAgentReplyChanged?(polledReply)
                     if polledReply.status == .failed {
                         throw IssueMutationError.agentReplyFailed(
@@ -580,11 +594,11 @@ final class IssueMutationStore: ObservableObject {
                         )
                     }
                 }
-                if polledReplies.count >= initialReplies.count &&
-                    polledReplies.allSatisfy({ $0.status == .completed }) {
-                    let completedMessages = polled.messages.isEmpty
-                        ? polled.message.map { [$0] } ?? []
-                        : polled.messages
+                if replies.count >= initialReplies.count &&
+                    replies.allSatisfy({ $0.status == .completed }) {
+                    let completedMessages = polledMessages.isEmpty
+                        ? polledMessage.map { [$0] } ?? []
+                        : polledMessages
                     return [response.message] + completedMessages.filter {
                         $0.id != response.message.id
                     }

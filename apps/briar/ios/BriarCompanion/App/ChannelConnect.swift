@@ -732,10 +732,6 @@ private extension AcceptAgentSkillExecutionProposalResponse.Outcome {
     }
 }
 
-private func channelUUIDString(_ value: UUID) -> String {
-    value.uuidString.lowercased()
-}
-
 private func channelUUID(_ value: String) throws -> UUID {
     guard let value = UUID(uuidString: value) else { throw MobileAPIError.invalidResponse }
     return value
@@ -755,28 +751,6 @@ private func channelDate(_ value: Google_Protobuf_Timestamp) throws -> Date {
           (0 ... 999_999_999).contains(value.nanos)
     else { throw MobileAPIError.invalidResponse }
     return value.date
-}
-
-private func channelTimestamp(_ value: Date) throws -> Google_Protobuf_Timestamp {
-    let interval = value.timeIntervalSince1970
-    guard interval.isFinite else { throw MobileAPIError.invalidRequest }
-
-    var secondsValue = floor(interval)
-    var nanosValue = ((interval - secondsValue) * 1_000_000_000).rounded()
-    if nanosValue == 1_000_000_000 {
-        secondsValue += 1
-        nanosValue = 0
-    }
-    guard (-62_135_596_800 ... 253_402_300_799).contains(secondsValue),
-          let seconds = Int64(exactly: secondsValue),
-          let nanos = Int32(exactly: nanosValue),
-          (0 ... 999_999_999).contains(nanos)
-    else { throw MobileAPIError.invalidRequest }
-
-    var timestamp = Google_Protobuf_Timestamp()
-    timestamp.seconds = seconds
-    timestamp.nanos = nanos
-    return timestamp
 }
 
 private func channelOptionalDate(

@@ -294,7 +294,7 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
         services = AuthenticatedMobileServices(
             account: BriarAPI_AccountServiceClientMock(),
             project: BriarAPI_ProjectServiceClientMock(),
-            dashboard: DashboardServiceMock(),
+            dashboard: BriarAPI_DashboardServiceClientMock(),
             inbox: BriarAPI_InboxServiceClientMock(),
             issue: IssueServiceMock(scenario: scenario),
             channel: ChannelServiceMock(scenario: scenario),
@@ -408,17 +408,6 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
                 try await Task.sleep(for: .seconds(2))
             }
             return UITestAPIClient.createIssueMessageResponse(request)
-        }
-    }
-
-    private final class DashboardServiceMock: BriarAPI_DashboardServiceClientMock,
-        @unchecked Sendable
-    {
-        override func listRunEvents(
-            request _: BriarAPI_ListRunEventsRequest,
-            headers _: Connect.Headers = [:]
-        ) async -> ResponseMessage<BriarAPI_ListRunEventsResponse> {
-            .init(result: .success(.init()))
         }
     }
 

@@ -892,46 +892,6 @@ struct CreateIssueMessageResponse: Codable, Sendable {
     }
 }
 
-struct IssueAgentReplyResponse: Codable, Sendable {
-    let agentReply: IssueAgentReplyJob
-    let message: IssueMessage?
-    let agentReplies: [IssueAgentReplyJob]
-    let messages: [IssueMessage]
-
-    private enum CodingKeys: String, CodingKey {
-        case agentReply
-        case message
-        case agentReplies
-        case messages
-    }
-
-    init(
-        agentReply: IssueAgentReplyJob,
-        message: IssueMessage?,
-        agentReplies: [IssueAgentReplyJob],
-        messages: [IssueMessage]
-    ) {
-        self.agentReply = agentReply
-        self.message = message
-        self.agentReplies = agentReplies
-        self.messages = messages
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        agentReply = try container.decode(IssueAgentReplyJob.self, forKey: .agentReply)
-        message = try container.decodeIfPresent(IssueMessage.self, forKey: .message)
-        agentReplies = try container.decodeIfPresent(
-            [IssueAgentReplyJob].self,
-            forKey: .agentReplies
-        ) ?? []
-        messages = try container.decodeIfPresent(
-            [IssueMessage].self,
-            forKey: .messages
-        ) ?? []
-    }
-}
-
 enum IssueMutationError: LocalizedError, Equatable {
     case duplicateAction
     case invalidTitle

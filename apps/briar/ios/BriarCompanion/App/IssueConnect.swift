@@ -139,18 +139,6 @@ extension CreateIssueMessageResponse {
     }
 }
 
-extension IssueAgentReplyResponse {
-    init(connectMessage message: BriarAPI_GetIssueAgentReplyResponse) throws {
-        guard message.hasAgentReply else { throw MobileAPIError.invalidResponse }
-        self.init(
-            agentReply: try .init(connectMessage: message.agentReply),
-            message: message.hasMessage ? try .init(connectMessage: message.message) : nil,
-            agentReplies: try message.agentReplies.map { try .init(connectMessage: $0) },
-            messages: try message.messages.map { try .init(connectMessage: $0) }
-        )
-    }
-}
-
 extension IssueMessage {
     init(connectMessage message: BriarAPI_IssueMessage) throws {
         guard message.hasAuthor, message.hasCreatedAt, message.hasUpdatedAt else {
