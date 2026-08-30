@@ -448,10 +448,14 @@ export function App({
               return;
             }
             channelCatalogCursorRef.current = delta.cursor;
-            if (delta.channels.length || delta.removedChannelIds.length) {
+            if (
+              delta.reset ||
+              delta.channels.length ||
+              delta.removedChannelIds.length
+            ) {
               setOrganizationChannels((current) => {
                 const byId = new Map(
-                  current.map((channel) => [channel.id, channel]),
+                  (delta.reset ? [] : current).map((channel) => [channel.id, channel]),
                 );
                 for (const channel of delta.channels) byId.set(channel.id, channel);
                 for (const id of delta.removedChannelIds) byId.delete(id);

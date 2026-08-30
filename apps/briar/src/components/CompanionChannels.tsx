@@ -378,7 +378,11 @@ export function CompanionChannels({
   const applyChannelCatalogDelta = useCallback(
     (delta: ChannelDelta) => {
       setChannels((current) =>
-        mergeChannels(current, delta.channels, delta.removedChannelIds)
+        mergeChannels(
+          delta.reset ? [] : current,
+          delta.channels,
+          delta.removedChannelIds,
+        )
       );
     },
     [],
@@ -402,7 +406,11 @@ export function CompanionChannels({
     [markSelectedChannelRead],
   );
   const applyCachedDeltaMessages = useCallback(
-    (incoming: ChannelMessage[], removedMessageIds: string[]) => {
+    (
+      incoming: ChannelMessage[],
+      removedMessageIds: string[],
+      reset: boolean,
+    ) => {
       const activeId = channel?.id;
       if (!activeId) return;
       const storedThreads = resolvedChannelCache.get(activeId)?.threads;
@@ -412,17 +420,12 @@ export function CompanionChannels({
           storedThreads.delete(parentId);
           continue;
         }
-        storedThreads.set(
-          parentId,
-          mergeChannelMessages(
-            storedThread,
-            incoming.filter(
-              (item) =>
-                item.id === parentId || item.parentMessageId === parentId,
-            ),
-            removedMessageIds,
-          ),
+        const relevant = incoming.filter(
+          (item) => item.id === parentId || item.parentMessageId === parentId,
         );
+        storedThreads.set(parentId, reset
+          ? relevant
+          : mergeChannelMessages(storedThread, relevant, removedMessageIds));
       }
     },
     [channel?.id, resolvedChannelCache],

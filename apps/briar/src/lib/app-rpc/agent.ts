@@ -55,7 +55,7 @@ const requireAgentClient = () => {
   return agentClient;
 };
 
-const skillKindFromProto = (
+export const skillKindFromProto = (
   value: ProtoAgentSkillKind,
 ): ProjectAgentSkillKind => {
   switch (value) {
@@ -68,7 +68,7 @@ const skillKindFromProto = (
   }
 };
 
-const skillExecutionModeFromProto = (
+export const skillExecutionModeFromProto = (
   value: ProtoAgentSkillExecutionMode,
 ): ProjectAgentSkillExecutionMode => {
   switch (value) {
@@ -81,7 +81,7 @@ const skillExecutionModeFromProto = (
   }
 };
 
-const skillApprovalPolicyFromProto = (
+export const skillApprovalPolicyFromProto = (
   value: ProtoAgentSkillApprovalPolicy,
 ): ProjectAgentSkillApprovalPolicy => {
   switch (value) {
@@ -94,7 +94,7 @@ const skillApprovalPolicyFromProto = (
   }
 };
 
-const projectAgentSkillFromMessage = (
+export const projectAgentSkillFromMessage = (
   skill: ProjectAgentSkillMessage,
 ): ProjectAgentSkill => ({
   id: skill.id,
@@ -161,7 +161,7 @@ export const projectAgentFromMessage = (
   updatedAt: requiredTimestamp(agent.updatedAt, "projectAgent.updatedAt"),
 });
 
-const organizationAgentFromMessage = (
+export const organizationAgentFromMessage = (
   agent: OrganizationAgentMessage,
 ): ChannelAgentSummary => ({
   agentId: agent.agentId,

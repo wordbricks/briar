@@ -56,6 +56,23 @@ export {
   type ProjectAgentSessionSyncState,
   upsertProjectAgentSession,
 } from "./app-rpc/agent";
+export {
+  acceptChannelExecutionProposal,
+  acceptChannelProposal,
+  acceptChannelSkillExecutionProposal,
+  createDirectMessage,
+  declineChannelProposal,
+  deleteChannelMessage,
+  listChannelMessages,
+  listChannels,
+  listDirectMessageRecipients,
+  loadChannel,
+  loadChannelDelta,
+  markChannelRead,
+  sendChannelMessage,
+  toggleChannelMessageReaction,
+  updateChannelThreadSubscription,
+} from "./app-rpc/channel";
 import type { StructuredAgentResult } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import {
@@ -74,17 +91,12 @@ import { LITELLM_MAIN_PRICING_SOURCE } from "./agent-usage-pricing";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type { InboxMessage } from "../hooks/useInbox";
 import type {
-  ChannelAgentReply,
   ChannelAgentSkillInput,
   ChannelAgentSummary,
-  ChannelDelta,
   ChannelLinkPreview,
   ChannelMember,
-  ChannelMessage,
   ChannelMessageAttachment,
   ChannelMessageDocumentContent,
-  DeleteChannelMessageResponse,
-  ChannelExecutionProposal,
   ChannelSummary,
   ChannelVisibility,
   ChannelWebhook,
@@ -1271,13 +1283,6 @@ export async function createIssue(
   }>(`/projects/${projectId}/issues`, token, { method: "POST", body: form });
 }
 
-export async function listChannels(token: string, organizationId: string) {
-  return request<{ channels: ChannelSummary[]; cursor: number }>(
-    `/organizations/${organizationId}/channels`,
-    token,
-  );
-}
-
 export async function createChannel(
   token: string,
   organizationId: string,
@@ -1293,52 +1298,6 @@ export async function createChannel(
     `/organizations/${organizationId}/channels`,
     token,
     { method: "POST", body: JSON.stringify(input) },
-  );
-}
-
-export async function createDirectMessage(
-  token: string,
-  organizationId: string,
-  input: { memberIds: string[]; agentIds: string[] },
-) {
-  return request<{ channel: ChannelSummary }>(
-    `/organizations/${organizationId}/dms`,
-    token,
-    { method: "POST", body: JSON.stringify(input) },
-  );
-}
-
-export async function loadChannel(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  options: { messageLimit?: number; signal?: AbortSignal } = {},
-) {
-  const query = options.messageLimit
-    ? `?limit=${encodeURIComponent(String(options.messageLimit))}`
-    : "";
-  return request<{
-    channel: ChannelSummary;
-    members: ChannelMember[];
-    agents: ChannelAgentSummary[];
-    messages: ChannelMessage[];
-    agentReplies?: ChannelAgentReply[];
-    nextCursor?: string | null;
-  }>(`/organizations/${organizationId}/channels/${channelId}${query}`, token, {
-    signal: options.signal,
-  });
-}
-
-export async function markChannelRead(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  input: { lastReadAt?: string } = {},
-) {
-  return request<{ channel: ChannelSummary }>(
-    `/organizations/${organizationId}/channels/${channelId}/read`,
-    token,
-    { method: "PUT", body: JSON.stringify(input) },
   );
 }
 
@@ -1368,97 +1327,6 @@ export async function deleteChannel(
 ) {
   return request<{ deleted: boolean }>(
     `/organizations/${organizationId}/channels/${channelId}`,
-    token,
-    { method: "DELETE" },
-  );
-}
-
-export async function listChannelMessages(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  parentMessageId?: string,
-  page: { limit?: number; cursor?: string; signal?: AbortSignal } = {},
-) {
-  const params = new URLSearchParams();
-  if (parentMessageId) params.set("parentMessageId", parentMessageId);
-  if (page.limit) params.set("limit", String(page.limit));
-  if (page.cursor) params.set("cursor", page.cursor);
-  const query = params.size > 0 ? `?${params.toString()}` : "";
-  return request<{ messages: ChannelMessage[]; nextCursor?: string | null }>(
-    `/organizations/${organizationId}/channels/${channelId}/messages${query}`,
-    token,
-    { signal: page.signal },
-  );
-}
-
-export async function sendChannelMessage(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  input: {
-    body: string;
-    clientMessageId?: string;
-    skillId?: string | null;
-    parentMessageId?: string | null;
-    mentionedUserIds?: string[];
-    mentionedAgentIds?: string[];
-    preferredDeviceId?: string | null;
-    attachments?: File[];
-    attachmentReferences?: string[];
-  },
-) {
-  const clientMessageId = input.clientMessageId?.toLowerCase();
-  let body: BodyInit;
-  if (input.attachments?.length) {
-    const form = new FormData();
-    form.set("body", input.body);
-    if (clientMessageId) {
-      form.set("clientMessageId", clientMessageId);
-    }
-    if (input.skillId) {
-      form.set("skillId", input.skillId);
-    }
-    form.set("parentMessageId", input.parentMessageId ?? "");
-    form.set("mentionedUserIds", JSON.stringify(input.mentionedUserIds ?? []));
-    form.set("mentionedAgentIds", JSON.stringify(input.mentionedAgentIds ?? []));
-    if (input.preferredDeviceId) {
-      form.set("preferredDeviceId", input.preferredDeviceId);
-    }
-    form.set(
-      "attachmentReferences",
-      JSON.stringify(input.attachmentReferences ?? []),
-    );
-    for (const attachment of input.attachments) {
-      form.append("attachments", attachment, attachment.name);
-    }
-    body = form;
-  } else {
-    const {
-      attachments: _attachments,
-      attachmentReferences: _attachmentReferences,
-      ...jsonInput
-    } = input;
-    body = JSON.stringify({ ...jsonInput, clientMessageId });
-  }
-  return request<{
-    message: ChannelMessage;
-    agentReplies: ChannelAgentReply[];
-  }>(
-    `/organizations/${organizationId}/channels/${channelId}/messages`,
-    token,
-    { method: "POST", body },
-  );
-}
-
-export async function deleteChannelMessage(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  messageId: string,
-) {
-  return request<DeleteChannelMessageResponse>(
-    `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}`,
     token,
     { method: "DELETE" },
   );
@@ -1502,21 +1370,6 @@ export async function loadChannelLinkPreview(
   return request<{ preview: ChannelLinkPreview | null }>(
     `/organizations/${organizationId}/channels/${channelId}/link-preview?${params}`,
     token,
-  );
-}
-
-/** Toggle the current user's emoji reaction on a channel message. */
-export async function toggleChannelMessageReaction(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  messageId: string,
-  emoji: string,
-) {
-  return request<{ message: ChannelMessage }>(
-    `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/reactions`,
-    token,
-    { method: "PUT", body: JSON.stringify({ emoji }) },
   );
 }
 
@@ -1615,68 +1468,6 @@ export async function revokeChannelWebhook(
   );
 }
 
-export async function acceptChannelProposal(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  proposalId: string,
-  projectId: string | null,
-  execution: IssueExecutionApprovalInput | null = null,
-) {
-  return request<{
-    outcome: "accepted" | "already_accepted";
-    projectId: string;
-    resultRunId: string;
-    /** Present for an accepted issue batch, in proposal order. */
-    resultItems?: Array<{ localKey: string; runId: string }>;
-    /** Present when create approval materializes or accepts execution. */
-    executionProposal?: ChannelExecutionProposal | null;
-    dispatch?: HuntDispatchResult | null;
-  }>(
-    `/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/accept`,
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify(execution
-        ? { projectId, execution }
-        : { projectId }),
-    },
-  );
-}
-
-export async function declineChannelProposal(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  proposalId: string,
-) {
-  return request<{ outcome: "declined" | "already_declined" }>(
-    `/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/decline`,
-    token,
-    { method: "POST" },
-  );
-}
-
-export async function acceptChannelExecutionProposal(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  proposalId: string,
-  input: IssueExecutionApprovalInput,
-) {
-  return request<{
-    proposal: ChannelExecutionProposal;
-    outcome: "accepted" | "already_accepted";
-    projectId: string;
-    runId: string;
-    dispatch: HuntDispatchResult;
-  }>(
-    `/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/accept-execution`,
-    token,
-    { method: "POST", body: JSON.stringify(input) },
-  );
-}
-
 type AgentSkillExecutionAcceptResponse = {
   proposal: AgentSkillExecutionProposal;
   outcome: "accepted" | "already_accepted";
@@ -1766,44 +1557,6 @@ function validateAgentSkillExecutionAcceptance(
     );
   }
   return { ...result, session };
-}
-
-export async function acceptChannelSkillExecutionProposal(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  expectedProposal: AgentSkillExecutionProposal,
-  input: AgentSkillExecutionApprovalInput,
-) {
-  assertPendingAgentSkillExecutionApproval(expectedProposal, input);
-  const result = await request<{
-    proposal: AgentSkillExecutionProposal;
-    outcome: "accepted" | "already_accepted";
-    projectId: string;
-    session: unknown;
-  }>(
-    `/organizations/${organizationId}/channels/${channelId}/skill-execution-proposals/${expectedProposal.id}/accept`,
-    token,
-    { method: "POST", body: JSON.stringify(input) },
-  );
-  return validateAgentSkillExecutionAcceptance(
-    result,
-    expectedProposal,
-    input,
-  );
-}
-
-export async function loadChannelDelta(
-  token: string,
-  organizationId: string,
-  since: number,
-  signal?: AbortSignal,
-) {
-  return request<ChannelDelta>(
-    `/organizations/${organizationId}/channel-changes?since=${since}`,
-    token,
-    { signal },
-  );
 }
 
 export async function createOrganizationAgent(
@@ -1908,23 +1661,6 @@ export async function updateIssue(
     `/projects/${projectId}/runs/${runId}`,
     token,
     { method: "PATCH", body: form },
-  );
-}
-
-export async function updateChannelThreadSubscription(
-  token: string,
-  organizationId: string,
-  channelId: string,
-  messageId: string,
-  subscribed: boolean,
-) {
-  return request<{
-    rootMessageId: string;
-    subscribers: Array<{ userId: string; subscribedAt: string }>;
-  }>(
-    `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/subscription`,
-    token,
-    { method: subscribed ? "PUT" : "DELETE" },
   );
 }
 

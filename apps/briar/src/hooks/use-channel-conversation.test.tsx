@@ -389,6 +389,7 @@ describe("useChannelConversation", () => {
     api.loadChannelDelta.mockResolvedValueOnce({
       cursor: 1,
       hasMore: false,
+      reset: false,
       channels: [],
       removedChannelIds: [],
       messages: [message("realtime")],
@@ -412,6 +413,35 @@ describe("useChannelConversation", () => {
       expect.any(AbortSignal),
     );
     expect(current().messages.map((item) => item.id)).toEqual(["realtime"]);
+  });
+
+  it("replaces stale messages and replies on a reset delta", async () => {
+    const freshReply = agentReply("reply-fresh", { status: "running" });
+    api.loadChannelDelta.mockResolvedValueOnce({
+      cursor: 8,
+      hasMore: false,
+      reset: true,
+      channels: [channel("channel-a")],
+      removedChannelIds: [],
+      messages: [message("fresh")],
+      removedMessageIds: [],
+      agentReplies: [freshReply],
+    });
+    ({ cleanup, root } = await renderHarness({
+      activeChannel: channel("channel-a"),
+      initialMessages: [message("stale")],
+      initialReplies: [agentReply("reply-stale")],
+      realtimeEnabled: true,
+    }));
+
+    await act(async () => {
+      realtimeTransport.emit({ topic: "channels", cursor: 8 });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(current().messages.map((item) => item.id)).toEqual(["fresh"]);
+    expect(current().replies).toEqual([freshReply]);
   });
 
   it("replaces active replies from an authoritative detail and tombstones absences", async () => {
@@ -485,6 +515,7 @@ describe("useChannelConversation", () => {
     api.loadChannelDelta.mockResolvedValueOnce({
       cursor: 1,
       hasMore: false,
+      reset: false,
       channels: [],
       removedChannelIds: [],
       messages: [],

@@ -946,6 +946,7 @@ export type ChannelAgentReply = {
 export type ChannelDelta = {
   cursor: number;
   hasMore: boolean;
+  reset: boolean;
   channels: ChannelSummary[];
   removedChannelIds: string[];
   messages: ChannelMessage[];

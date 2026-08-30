@@ -47,12 +47,11 @@ import { useHorizontalPaneResize } from "../hooks/useHorizontalPaneResize";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import {
   createChannelWebhook,
+  listDirectMessageRecipients,
   listChannelWebhooks,
   listChannels,
-  listOrganizationAgents,
   loadChannel,
   markChannelRead,
-  loadOrganizationMembers,
   revokeChannelWebhook,
   rotateChannelWebhook,
   setChannelAgent,
@@ -471,7 +470,9 @@ export function Channels({
   const applyChannelCatalogDelta = useCallback(
     (delta: ChannelDelta) => {
       onChannelsChange((current) => {
-        const byId = new Map(current.map((item) => [item.id, item]));
+        const byId = new Map(
+          (delta.reset ? [] : current).map((item) => [item.id, item]),
+        );
         for (const item of delta.channels) byId.set(item.id, item);
         for (const id of delta.removedChannelIds) byId.delete(id);
         return [...byId.values()].sort((left, right) =>
@@ -605,14 +606,11 @@ export function Channels({
     setInviteError(null);
     setInviteMembers([]);
     setInviteAgents([]);
-    void Promise.all([
-      loadOrganizationMembers(token, organizationId),
-      listOrganizationAgents(token, organizationId),
-    ])
-      .then(([organizationMembers, organizationAgents]) => {
+    void listDirectMessageRecipients(token, organizationId)
+      .then(({ members, agents }) => {
         if (activeChannelIdRef.current !== channelId) return;
-        setInviteMembers(organizationMembers);
-        setInviteAgents(organizationAgents.agents);
+        setInviteMembers(members);
+        setInviteAgents(agents);
       })
       .catch((cause) => {
         if (activeChannelIdRef.current === channelId) {

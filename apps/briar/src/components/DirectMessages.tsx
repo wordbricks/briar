@@ -18,8 +18,7 @@ import {
 import { useI18n } from "../i18n";
 import {
   createDirectMessage,
-  listOrganizationAgents,
-  loadOrganizationMembers,
+  listDirectMessageRecipients,
 } from "../lib/api";
 import type {
   ChannelAgentSummary,
@@ -184,11 +183,8 @@ export function DirectMessages({
     let cancelled = false;
     setLoadingCandidates(true);
     setError(null);
-    void Promise.all([
-      loadOrganizationMembers(token, organizationId),
-      listOrganizationAgents(token, organizationId),
-    ])
-      .then(([members, agentResult]) => {
+    void listDirectMessageRecipients(token, organizationId)
+      .then(({ members, agents }) => {
         if (cancelled) return;
         const memberCandidates: Candidate[] = members.map(
           (member: OrganizationMember) => ({
@@ -202,7 +198,7 @@ export function DirectMessages({
             isSelf: member.userId === currentUserId,
           }),
         );
-        const agentCandidates: Candidate[] = agentResult.agents.map(
+        const agentCandidates: Candidate[] = agents.map(
           (agent: ChannelAgentSummary) => ({
             type: "agent",
             id: agent.agentId,

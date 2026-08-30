@@ -121,6 +121,7 @@ export type ChannelConversationRealtimeOptions = {
   onSelectedMessages?: (
     messages: ChannelMessage[],
     removedMessageIds: string[],
+    reset: boolean,
   ) => void;
   onIncomingRootMessages?: (messages: ChannelMessage[]) => void;
   warningLabel: string;
@@ -479,19 +480,17 @@ export function useChannelConversation({
   );
 
   const applyAgentReplies = useCallback(
-    (incoming: ChannelAgentReply[]) => {
-      if (incoming.length === 0) return;
+    (incoming: ChannelAgentReply[], reset = false) => {
+      if (incoming.length === 0 && !reset) return;
       for (const reply of incoming) {
         replyVersion.current += 1;
         replyVersions.current.set(reply.id, replyVersion.current);
         if (channelReplyIsTerminal(reply)) replyTombstones.current.add(reply.id);
       }
       setReplies((current) => {
-        const next = mergeChannelReplies(
-          current,
-          incoming,
-          replyTombstones.current,
-        );
+        const next = reset
+          ? [...incoming]
+          : mergeChannelReplies(current, incoming, replyTombstones.current);
         repliesRef.current = next;
         return next;
       });
@@ -560,6 +559,7 @@ export function useChannelConversation({
       incoming: ChannelMessage[],
       removedMessageIds: string[],
       includeRepliesInRoot = false,
+      reset = false,
     ) => {
       const activeId = channelIdRef.current;
       const relevant = incoming.filter((item) => item.channelId === activeId);
@@ -567,20 +567,27 @@ export function useChannelConversation({
       const rootUpdates = includeRepliesInRoot
         ? relevant
         : relevant.filter((item) => item.parentMessageId === null);
-      if (rootUpdates.length || removedMessageIds.length) {
+      if (reset || rootUpdates.length || removedMessageIds.length) {
         updateRootMessages((current) =>
-          mergeChannelMessages(current, rootUpdates, removedMessageIds)
+          reset
+            ? [...rootUpdates]
+            : mergeChannelMessages(current, rootUpdates, removedMessageIds)
         );
       }
       const activeThreadId = threadParentIdRef.current;
-      if (activeThreadId && (relevant.length || removedMessageIds.length)) {
+      if (
+        activeThreadId &&
+        (reset || relevant.length || removedMessageIds.length)
+      ) {
         const threadUpdates = relevant.filter(
           (item) =>
             item.id === activeThreadId ||
             item.parentMessageId === activeThreadId,
         );
         updateThreadMessages((current) =>
-          mergeChannelMessages(current, threadUpdates, removedMessageIds)
+          reset
+            ? [...threadUpdates]
+            : mergeChannelMessages(current, threadUpdates, removedMessageIds)
         );
       }
     },
@@ -651,17 +658,18 @@ export function useChannelConversation({
             currentOptions.onCatalogDelta(delta);
 
             const selectedChannelId = channelIdRef.current;
+            const selectedSummary = delta.channels.find(
+              (item) => item.id === selectedChannelId,
+            );
             if (
               selectedChannelId &&
-              delta.removedChannelIds.includes(selectedChannelId)
+              (delta.removedChannelIds.includes(selectedChannelId) ||
+                (delta.reset && !selectedSummary))
             ) {
               invalidateChannelSurface(null, null);
               currentOptions.onSelectedChannelRemoved();
               return;
             }
-            const selectedSummary = delta.channels.find(
-              (item) => item.id === selectedChannelId,
-            );
             if (selectedSummary) {
               currentOptions.onSelectedChannelSummary?.(selectedSummary);
             }
@@ -671,13 +679,14 @@ export function useChannelConversation({
             currentOptions.onSelectedMessages?.(
               selectedMessages,
               delta.removedMessageIds,
+              delta.reset,
             );
             const rootMessages = currentOptions.includeRepliesInRoot
               ? selectedMessages
               : selectedMessages.filter(
                   (item) => item.parentMessageId === null,
                 );
-            if (rootMessages.length > 0) {
+            if (!delta.reset && rootMessages.length > 0) {
               currentOptions.onIncomingRootMessages?.(rootMessages);
             }
             if (selectedChannelId) {
@@ -685,10 +694,14 @@ export function useChannelConversation({
                 selectedMessages,
                 delta.removedMessageIds,
                 currentOptions.includeRepliesInRoot,
+                delta.reset,
               );
-              applyAgentReplies(delta.agentReplies.filter(
-                (item) => item.channelId === selectedChannelId,
-              ));
+              applyAgentReplies(
+                delta.agentReplies.filter(
+                  (item) => item.channelId === selectedChannelId,
+                ),
+                delta.reset,
+              );
             }
             if (!delta.hasMore || delta.cursor <= requestedCursor) break;
           }
