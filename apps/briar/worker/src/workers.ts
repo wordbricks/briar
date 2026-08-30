@@ -1095,6 +1095,7 @@ export async function registerExecutionWorker(
     providers?: AgentProvider[];
     providerHealth?: ProviderHealthMap;
     providerCapabilities?: AgentProviderCapabilityCatalog;
+    capabilities?: Record<string, unknown>;
     versions: Record<string, string>;
     maxConcurrentSessions?: number;
     observedAt: string;
@@ -1130,7 +1131,7 @@ export async function registerExecutionWorker(
   }
 
   const versions = JSON.stringify(input.versions ?? {});
-  const capabilities = JSON.stringify({
+  const capabilities = JSON.stringify(input.capabilities ?? {
     providers: input.providers ?? [],
     providerHealth: input.providerHealth ?? {},
     providerCapabilities: input.providerCapabilities,
@@ -1256,6 +1257,7 @@ export async function bindExecutionWorkerProject(
     providers?: AgentProvider[];
     providerHealth?: ProviderHealthMap;
     providerCapabilities?: AgentProviderCapabilityCatalog;
+    capabilities?: Record<string, unknown>;
     versions: Record<string, string>;
     observedAt: string;
   },
@@ -1313,7 +1315,7 @@ export async function bindExecutionWorkerProject(
       input.deviceIdentityHash,
       input.agentProvider,
       JSON.stringify(input.versions ?? {}),
-      JSON.stringify({
+      JSON.stringify(input.capabilities ?? {
         providers: input.providers ?? [],
         providerHealth: input.providerHealth ?? {},
         providerCapabilities: input.providerCapabilities,

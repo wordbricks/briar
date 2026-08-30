@@ -31,14 +31,21 @@ import {
 } from "./managed-computer-setup-relay-service";
 import { hasOrganizationCapability } from "./organization-access";
 import { getOrganizationRole } from "./organization-repository";
+import { getProject } from "./project-command-repository";
 import { readLatestVersion } from "./releases";
+import { sha256 } from "./crypto-digest";
 import {
   recoverMissingWorkerHardDelete,
 } from "./worker-lifecycle-repository";
+import type { WorkerRuntimeMetadata } from "./worker-runtime-mappers";
 import {
   deleteExecutionWorker,
+  bindExecutionWorkerProject,
+  executionWorkerDeviceForBinding,
   listOrganizationExecutionWorkers,
+  registerExecutionWorker,
   requestExecutionWorkerUpdate,
+  unbindExecutionWorker,
   updateExecutionWorkerConcurrency,
   updateExecutionWorkerIcon,
 } from "./workers";
@@ -51,6 +58,7 @@ export type FleetApplicationErrorReason =
   | "managed_computer_setup_forbidden"
   | "managed_computer_retire_unavailable"
   | "organization_not_found"
+  | "project_not_found"
   | "remote_session_not_found"
   | "worker_disabled"
   | "worker_not_found"
@@ -73,6 +81,130 @@ const applicationError = (
 ): never => {
   throw new FleetApplicationError(reason, message);
 };
+
+const projectManagement = async (input: {
+  db: D1Database;
+  projectId: string;
+  userId: string;
+}) => {
+  const project = await getProject(input.db, input.projectId, input.userId);
+  if (!project) return applicationError("project_not_found", "Project not found");
+  requireDevelopmentManagement(project.member_role);
+  return project;
+};
+
+export async function registerProjectExecutionWorkerApplication(input: {
+  db: D1Database;
+  projectId: string;
+  userId: string;
+  label: string;
+  deviceIdentity: string;
+  runtime: WorkerRuntimeMetadata;
+  maxConcurrentSessions?: number;
+  observedAt: string;
+}) {
+  const project = await projectManagement(input);
+  const workerToken =
+    `briar_worker_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+  const registration = await registerExecutionWorker(input.db, input.projectId, {
+    id: crypto.randomUUID(),
+    deviceId: crypto.randomUUID(),
+    organizationId: project.organization_id,
+    ownerUserId: input.userId,
+    label: input.label,
+    deviceIdentityHash: await sha256(input.deviceIdentity),
+    credentialTokenHash: await sha256(workerToken),
+    agentProvider: input.runtime.agentProvider,
+    providers: input.runtime.providers,
+    providerHealth: input.runtime.providerHealth,
+    providerCapabilities: input.runtime.providerCapabilities,
+    capabilities: input.runtime.capabilities,
+    maxConcurrentSessions: input.maxConcurrentSessions,
+    versions: input.runtime.versions,
+    observedAt: input.observedAt,
+  });
+  return {
+    ...registration,
+    organizationId: project.organization_id,
+    workerToken,
+  };
+}
+
+export async function bindProjectExecutionWorkerApplication(input: {
+  db: D1Database;
+  projectId: string;
+  userId: string;
+  deviceIdentity: string;
+  runtime: WorkerRuntimeMetadata;
+  observedAt: string;
+}) {
+  const project = await projectManagement(input);
+  const binding = await bindExecutionWorkerProject(input.db, input.projectId, {
+    id: crypto.randomUUID(),
+    organizationId: project.organization_id,
+    ownerUserId: input.userId,
+    deviceIdentityHash: await sha256(input.deviceIdentity),
+    agentProvider: input.runtime.agentProvider,
+    providers: input.runtime.providers,
+    providerHealth: input.runtime.providerHealth,
+    providerCapabilities: input.runtime.providerCapabilities,
+    capabilities: input.runtime.capabilities,
+    versions: input.runtime.versions,
+    observedAt: input.observedAt,
+  });
+  return { ...binding, organizationId: project.organization_id };
+}
+
+export async function unbindProjectExecutionWorkerApplication(input: {
+  db: D1Database;
+  env: Env;
+  projectId: string;
+  workerId: string;
+  userId: string;
+  requestId: string;
+  reason: "explicit_user_unlink" | "managed_deprovision";
+  observedAt: string;
+}) {
+  const project = await projectManagement(input);
+  const device = await executionWorkerDeviceForBinding(input.db, input.workerId);
+  if (!device || device.organization_id !== project.organization_id) {
+    const recovered = await recoverMissingWorkerHardDelete(input.db, {
+      requestId: input.requestId,
+      organizationId: project.organization_id,
+      projectId: input.projectId,
+      workerId: input.workerId,
+      operation: "binding_delete",
+      observedAt: input.observedAt,
+    });
+    if (recovered) return { alreadyUnbound: true };
+    return applicationError("worker_not_found", "Worker not found");
+  }
+  const managedComputer = await managedComputerByDeviceId(input.db, device.id);
+  const remainingBindings = await input.db.prepare(
+    `select count(*) binding_count from briar_execution_workers
+     where device_id = ?`,
+  ).bind(device.id).first<{ binding_count: number }>();
+  const unbound = await unbindExecutionWorker(
+    input.db,
+    device.id,
+    input.projectId,
+    input.observedAt,
+    {
+      requestId: input.requestId,
+      organizationId: project.organization_id,
+      workerId: input.workerId,
+      reason: input.reason,
+    },
+  );
+  if (managedComputer && (remainingBindings?.binding_count ?? 0) <= 1) {
+    await endManagedComputerRemoteSessionsAndDisconnect(input.db, input.env, {
+      managedComputerId: managedComputer.id,
+      reason: "worker_credential_revoked",
+      observedAt: input.observedAt,
+    });
+  }
+  return { alreadyUnbound: !unbound };
+}
 
 const organizationRole = async (
   db: D1Database,

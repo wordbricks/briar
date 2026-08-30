@@ -6,6 +6,7 @@ import {
   FleetService,
   ManagedComputerCurrency,
   RequestExecutionWorkerUpdateResponse_Outcome,
+  UnbindProjectExecutionWorkerRequest_Reason,
 } from "@briar/contracts/gen/briar/app/v1/fleet_pb";
 import {
   Code,
@@ -31,6 +32,7 @@ import {
 import { appDashboardWorker } from "./app-connect-mappers";
 import {
   applyForManagedComputerApplication,
+  bindProjectExecutionWorkerApplication,
   createManagedComputerRemoteSessionApplication,
   createManagedComputerSetupSessionApplication,
   deleteExecutionWorkerApplication,
@@ -41,9 +43,11 @@ import {
   getManagedComputerSetupStatusApplication,
   listExecutionWorkersApplication,
   listManagedComputersApplication,
+  registerProjectExecutionWorkerApplication,
   requestExecutionWorkerUpdateApplication,
   retireManagedComputerApplication,
   retryManagedComputerApplication,
+  unbindProjectExecutionWorkerApplication,
   updateExecutionWorkerApplication,
   validateManagedComputerPromotionApplication,
 } from "./fleet-application";
@@ -63,6 +67,11 @@ import { WorkerLifecycleConflictError } from "./worker-lifecycle-repository";
 import { decodeWorkerLifecycleRequestId } from "./worker-lifecycle-request";
 import { decodeWorkerSettings } from "./worker-request-contract";
 import { WorkerConflictError } from "./workers";
+import { workerJson } from "./worker-json";
+import {
+  workerRuntimeMetadataFromProto,
+  WorkerRuntimeValidationError,
+} from "./worker-runtime-mappers";
 
 export type AppConnectFleetInput = {
   readonly request: Request;
@@ -74,6 +83,34 @@ export type AppConnectFleetInput = {
 
 const decodeUuid = decodeRequestSync(UuidString);
 const decodeDeviceId = decodeRequestSync(trimmedText(1, 128));
+
+const workerDeviceIdentity = (value: string) => {
+  if (!/^briar_device_[0-9a-f]{64}$/u.test(value)) {
+    throw new ConnectError("Worker device identity is invalid", Code.InvalidArgument);
+  }
+  return value;
+};
+
+const workerLabel = (value: string) => {
+  const label = value.trim();
+  if (label.length < 1 || label.length > 100) {
+    throw new ConnectError("Worker label must be 1-100 characters", Code.InvalidArgument);
+  }
+  return label;
+};
+
+const unbindReason = (value: UnbindProjectExecutionWorkerRequest_Reason) => {
+  switch (value) {
+    case UnbindProjectExecutionWorkerRequest_Reason.EXPLICIT_USER_UNLINK:
+      return "explicit_user_unlink" as const;
+    case UnbindProjectExecutionWorkerRequest_Reason.MANAGED_DEPROVISION:
+      return "managed_deprovision" as const;
+    case UnbindProjectExecutionWorkerRequest_Reason.UNSPECIFIED:
+      throw new ConnectError("Worker unlink reason is required", Code.InvalidArgument);
+    default:
+      throw new ConnectError(`Unknown Worker unlink reason: ${value}`, Code.InvalidArgument);
+  }
+};
 
 const workerIconFromMessage = (
   icon: WorkerIcon,
@@ -94,6 +131,9 @@ const workerIconFromMessage = (
 };
 
 const throwFleetError = (error: unknown): never => {
+  if (error instanceof WorkerRuntimeValidationError) {
+    throw new HttpError(400, error.message);
+  }
   if (error instanceof ManagedComputerServiceError) {
     throw new HttpError(error.status, error.message, error.code);
   }
@@ -106,6 +146,7 @@ const throwFleetError = (error: unknown): never => {
   if (!(error instanceof FleetApplicationError)) throw error;
   switch (error.reason) {
     case "organization_not_found":
+    case "project_not_found":
     case "worker_not_found":
     case "managed_computer_not_found":
     case "remote_session_not_found":
@@ -151,6 +192,61 @@ const withFleetErrors = async <A>(operation: Promise<A>): Promise<A> => {
 export const createAppFleetService = (
   { request, auth, db, env, context }: AppConnectFleetInput,
 ): ServiceImpl<typeof FleetService> => ({
+  registerProjectExecutionWorker: (input) => withConnectErrors(async () => {
+    const session = await requireSession(auth, request);
+    const observedAt = new Date().toISOString();
+    const result = await withFleetErrors(
+      registerProjectExecutionWorkerApplication({
+        db,
+        projectId: decodeUuid(input.projectId),
+        userId: session.user.id,
+        label: workerLabel(input.label),
+        deviceIdentity: workerDeviceIdentity(input.deviceIdentity),
+        runtime: workerRuntimeMetadataFromProto(input.runtime),
+        maxConcurrentSessions: input.maxConcurrentSessions,
+        observedAt,
+      }),
+    );
+    return {
+      organizationId: result.organizationId,
+      deviceId: result.device.id,
+      worker: appDashboardWorker(workerJson(result.worker, observedAt)),
+      workerToken: result.workerToken,
+    };
+  }),
+
+  bindProjectExecutionWorker: (input) => withConnectErrors(async () => {
+    const session = await requireSession(auth, request);
+    const observedAt = new Date().toISOString();
+    const result = await withFleetErrors(bindProjectExecutionWorkerApplication({
+      db,
+      projectId: decodeUuid(input.projectId),
+      userId: session.user.id,
+      deviceIdentity: workerDeviceIdentity(input.deviceIdentity),
+      runtime: workerRuntimeMetadataFromProto(input.runtime),
+      observedAt,
+    }));
+    return {
+      organizationId: result.organizationId,
+      deviceId: result.device.id,
+      worker: appDashboardWorker(workerJson(result.worker, observedAt)),
+    };
+  }),
+
+  unbindProjectExecutionWorker: (input) => withConnectErrors(async () => {
+    const session = await requireSession(auth, request);
+    return await withFleetErrors(unbindProjectExecutionWorkerApplication({
+      db,
+      env,
+      projectId: decodeUuid(input.projectId),
+      workerId: decodeDeviceId(input.workerId),
+      userId: session.user.id,
+      requestId: decodeWorkerLifecycleRequestId(input.requestId),
+      reason: unbindReason(input.reason),
+      observedAt: new Date().toISOString(),
+    }));
+  }),
+
   listExecutionWorkers: (input) => withConnectErrors(async () => {
     const session = await requireSession(auth, request);
     const result = await withFleetErrors(listExecutionWorkersApplication({

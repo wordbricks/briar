@@ -21,6 +21,7 @@ import {
   registerAppProjectService,
 } from "./app-connect-project";
 import { registerWorkerExecutionService } from "./worker-connect-execution";
+import { registerWorkerControlService } from "./worker-connect-control";
 import { registerWorkerQueueService } from "./worker-connect-queue";
 
 export type AppConnectRouteInput = {
@@ -112,6 +113,10 @@ export async function handleAppConnectRequest(
     db: input.env.DB,
     env: input.env,
     context: input.context,
+  });
+  registerWorkerControlService(router, {
+    request: input.request,
+    db: input.env.DB,
   });
   registerWorkerExecutionService(router, {
     request: input.request,

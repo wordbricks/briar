@@ -73,6 +73,22 @@ const handoffState = {
   failed: ExecutionWorkerHandoffState.FAILED,
 } as const;
 
+export const appExecutionWorkerUpdateRequestState = (update: {
+  readonly id: string;
+  readonly targetVersion: string;
+  readonly status: keyof typeof updateStatus;
+  readonly requestedAt: string;
+  readonly handoffState: keyof typeof handoffState;
+  readonly handoffError?: string | null;
+}) => create(ExecutionWorkerUpdateRequestStateSchema, {
+  id: update.id,
+  targetVersion: update.targetVersion,
+  status: updateStatus[update.status],
+  requestedAt: appFleetTimestamp(update.requestedAt),
+  handoffState: handoffState[update.handoffState],
+  handoffError: update.handoffError ?? undefined,
+});
+
 export const appFleetWorkerIcon = (
   icon: { readonly type: "emoji" | "image"; readonly value: string } | null,
 ) => icon
@@ -98,14 +114,7 @@ export const appOrganizationExecutionWorker = (
   versions: { ...worker.versions },
   remoteUpdateSupported: worker.remoteUpdateSupported,
   updateRequest: worker.updateRequest
-    ? create(ExecutionWorkerUpdateRequestStateSchema, {
-      id: worker.updateRequest.id,
-      targetVersion: worker.updateRequest.targetVersion,
-      status: updateStatus[worker.updateRequest.status],
-      requestedAt: appFleetTimestamp(worker.updateRequest.requestedAt),
-      handoffState: handoffState[worker.updateRequest.handoffState],
-      handoffError: worker.updateRequest.handoffError ?? undefined,
-    })
+    ? appExecutionWorkerUpdateRequestState(worker.updateRequest)
     : undefined,
   bindings: worker.bindings.map((binding) =>
     create(ExecutionWorkerBindingSchema, {
