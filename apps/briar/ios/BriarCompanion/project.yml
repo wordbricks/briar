@@ -23,12 +23,46 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     TARGETED_DEVICE_FAMILY: "1,2"
 targets:
+  BriarContracts:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../../../../packages/contracts/swift/Sources/BriarContracts
+    dependencies:
+      - package: Connect
+        product: Connect
+      - package: SwiftProtobuf
+        product: SwiftProtobuf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion.contracts
+        GENERATE_INFOPLIST_FILE: true
+        SKIP_INSTALL: true
+  BriarContractsMocks:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../../../../packages/contracts/swift/Sources/BriarContractsMocks
+    dependencies:
+      - target: BriarContracts
+      - package: Connect
+        product: Connect
+      - package: Connect
+        product: ConnectMocks
+      - package: SwiftProtobuf
+        product: SwiftProtobuf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion.contracts.mocks
+        GENERATE_INFOPLIST_FILE: true
+        SKIP_INSTALL: true
   BriarCompanion:
     type: application
     platform: iOS
     sources:
       - path: App
     dependencies:
+      - target: BriarContracts
       - package: Connect
         product: Connect
       - package: SwiftProtobuf
@@ -107,6 +141,11 @@ targets:
       - path: Tests
     dependencies:
       - target: BriarCompanion
+      - target: BriarContractsMocks
+      - package: Connect
+        product: Connect
+      - package: SwiftProtobuf
+        product: SwiftProtobuf
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion.native.dev.tests

@@ -31,7 +31,8 @@ generated_paths=(
   "packages/contracts/src/gen"
   "packages/contracts/rust/src/gen/proto"
   "packages/contracts/rust/src/gen/connect"
-  "apps/briar/ios/BriarCompanion/App/Generated/Connect"
+  "packages/contracts/swift/Sources/BriarContracts"
+  "packages/contracts/swift/Sources/BriarContractsMocks"
 )
 
 for generated_path in "${generated_paths[@]}"; do

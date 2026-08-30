@@ -1,3 +1,4 @@
+import BriarContracts
 import SwiftUI
 
 func issueProposalAcceptanceSystemImage(

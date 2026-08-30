@@ -1,3 +1,4 @@
+import BriarContracts
 import SwiftProtobuf
 import XCTest
 @testable import BriarCompanion

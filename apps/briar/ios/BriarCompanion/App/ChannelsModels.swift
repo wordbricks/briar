@@ -1,3 +1,4 @@
+import BriarContracts
 import Foundation
 
 struct ChannelSummary: Codable, Hashable, Identifiable, Sendable {

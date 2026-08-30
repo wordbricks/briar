@@ -1,3 +1,4 @@
+import BriarContracts
 import Foundation
 import SwiftProtobuf
 import XCTest

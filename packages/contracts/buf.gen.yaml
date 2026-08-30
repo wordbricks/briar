@@ -6,21 +6,30 @@ plugins:
     opt:
       - target=ts
   - remote: buf.build/apple/swift:v1.38.1
-    out: apps/briar/ios/BriarCompanion/App/Generated/Connect
+    out: packages/contracts/swift/Sources/BriarContracts
     types:
       - briar.app.v1
       - briar.realtime.v1
       - briar.types.v1
     opt:
-      - Visibility=Internal
+      - Visibility=Public
   - remote: buf.build/connectrpc/swift:v1.2.3
-    out: apps/briar/ios/BriarCompanion/App/Generated/Connect
+    out: packages/contracts/swift/Sources/BriarContracts
     types:
       - briar.app.v1
     opt:
-      - Visibility=Internal
+      - Visibility=Public
       - GenerateAsyncMethods=true
       - GenerateCallbackMethods=false
+  - remote: buf.build/connectrpc/swift-mocks:v1.2.3
+    out: packages/contracts/swift/Sources/BriarContractsMocks
+    types:
+      - briar.app.v1
+    opt:
+      - Visibility=Public
+      - GenerateAsyncMethods=true
+      - GenerateCallbackMethods=false
+      - ExtraModuleImports=BriarContracts
   - remote: buf.build/anthropics/buffa:v0.9.1
     out: packages/contracts/rust/src/gen/proto
     opt:

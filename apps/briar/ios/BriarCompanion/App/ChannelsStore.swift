@@ -1,3 +1,4 @@
+import BriarContracts
 import Foundation
 
 /// Owns the single organization WebSocket used by every native surface.

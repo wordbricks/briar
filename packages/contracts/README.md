@@ -10,6 +10,11 @@ command refreshes the compiled image and all generated language bindings.
 `mise exec -- bun run contracts:check` verifies lint, image currentness,
 generated source currentness, and compilation of the Rust bindings.
 
+Swift output is split into two Xcode modules under `swift/Sources/`:
+`BriarContracts` contains the public protobuf messages and generated Connect
+clients used by the app, while `BriarContractsMocks` contains the official
+Connect-Swift generated mocks and is linked only by the iOS test target.
+
 Protobuf packages remain bounded by transport and ownership. `briar.app.v1`
 defines the Connect app control plane, `briar.worker.v1` defines the machine
 Worker queue control plane, `briar.sidecar.v1` defines the framed runner

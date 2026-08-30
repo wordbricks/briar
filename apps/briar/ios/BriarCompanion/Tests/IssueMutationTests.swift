@@ -1,3 +1,4 @@
+import BriarContracts
 import Connect
 import Foundation
 import SwiftProtobuf
