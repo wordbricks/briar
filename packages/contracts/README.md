@@ -20,7 +20,9 @@ Connect-Swift generated mocks and is linked only by the iOS test target.
 Protobuf packages remain bounded by transport and ownership. `briar.app.v1`
 defines the Connect app control plane, `briar.worker.v1` defines the machine
 Worker queue control plane, `briar.sidecar.v1` defines the framed runner
-protocol, `briar.realtime.v1` defines WebSocket frames, and `briar.types.v1`
-contains the small set of values truly shared by those boundaries. Effect
-schemas remain responsible for domain invariants and cross-field rules that
-protobuf cannot express.
+protocol, `briar.realtime.v1` defines WebSocket frames, `briar.local.v1`
+defines stable ProtoJSON emitted by local CLI commands, and `briar.types.v1`
+contains the small set of values truly shared by those boundaries. Local
+messages compose secret-free Worker payloads so claim credentials cannot be
+serialized into CLI output. Effect schemas remain responsible for domain
+invariants and cross-field rules that protobuf cannot express.
