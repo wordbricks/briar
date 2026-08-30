@@ -10,21 +10,19 @@ import {
   codexServerRequestResponse,
   consumeCodexAppServerMessage,
   createCodexAppServerState,
-  decodeCodexRunnerRequest,
   normalizeCodexAppServerMessage,
   type CodexMcpIsolation,
   type CodexMcpTurnFailure,
   type CodexRunnerOutput,
-  type CodexRunnerRequest,
   type CodexRpcMessage,
 } from "./codex-runner-lib";
 import { decodeJsonRpcMessageJsonResult } from "./json-rpc-message";
 import { createRunnerIo } from "./runner-io";
+import type { RunnerRequest } from "./runner-request";
 
 let activeChild: ChildProcessWithoutNullStreams | null = null;
-const runnerIo = createRunnerIo<CodexRunnerRequest, CodexRunnerOutput>({
+const runnerIo = createRunnerIo<CodexRunnerOutput>({
   closeError: "Briar closed the Codex runner input.",
-  decodeRequest: decodeCodexRunnerRequest,
   onClose: () => {
     if (activeChild && activeChild.exitCode === null) {
       activeChild.kill("SIGTERM");
@@ -70,7 +68,7 @@ type CodexAttemptResult =
 const maxOptionalMcpRecoveries = 3;
 
 async function runCodexAttempt(
-  request: CodexRunnerRequest,
+  request: RunnerRequest,
   isolation: CodexMcpIsolation,
   emittedSessions: Set<string>,
 ): Promise<CodexAttemptResult> {

@@ -3,7 +3,6 @@ import {
   BRIAR_OAUTH_REFERRER,
   buildGrokPromptParts,
   createGrokEventState,
-  decodeGrokRunnerRequest,
   finalizeGrokMessage,
   GROK_OAUTH2_REFERRER_ENV,
   grokSessionMeta,
@@ -20,7 +19,6 @@ import {
   shouldAutoApprovePermission,
   shouldDenyGrokPermission,
   type GrokRunnerOutput,
-  type GrokRunnerRequest,
   type JsonRpcMessage,
 } from "./grok-runner-lib";
 import { createRunnerIo } from "./runner-io";
@@ -188,7 +186,7 @@ export function shouldSuppressGrokNotification(
 }
 
 type GrokRunnerIo = ReturnType<
-  typeof createRunnerIo<GrokRunnerRequest, GrokRunnerOutput>
+  typeof createRunnerIo<GrokRunnerOutput>
 >;
 
 async function main(runnerIo: GrokRunnerIo) {
@@ -422,9 +420,8 @@ async function main(runnerIo: GrokRunnerIo) {
 }
 
 export async function runGrokRunner() {
-  const runnerIo = createRunnerIo<GrokRunnerRequest, GrokRunnerOutput>({
+  const runnerIo = createRunnerIo<GrokRunnerOutput>({
     closeError: "Briar closed the Grok runner input.",
-    decodeRequest: decodeGrokRunnerRequest,
   });
   const { emit } = runnerIo;
   try {

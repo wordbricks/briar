@@ -5,7 +5,6 @@ import type {
   SDKMessage,
   SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
-import * as Schema from "effect/Schema";
 import { parse, resolve } from "node:path";
 import {
   normalizedActivityText,
@@ -14,32 +13,13 @@ import {
   type NormalizedAgentEvent,
 } from "./normalized-agent-event";
 import { readAgentImage } from "./runner-attachments";
-import {
-  commonRunnerRequestFields,
-  runnerRequestDecoderOptions,
-} from "./runner-request";
+import type { RunnerRequest } from "./runner-request";
 
 export type {
   AgentActivityKind,
   AgentActivityStatus,
   NormalizedAgentEvent,
 } from "./normalized-agent-event";
-
-export const ClaudeRunnerRequest = Schema.Struct({
-  ...commonRunnerRequestFields,
-  effort: Schema.optional(Schema.NullOr(Schema.String)),
-  /** Directories outside cwd the agent may write in (Auto Hunt worktrees). */
-  additionalDirectories: Schema.optional(
-    Schema.mutable(Schema.Array(Schema.String)),
-  ),
-});
-
-export type ClaudeRunnerRequest = typeof ClaudeRunnerRequest.Type;
-
-export const decodeClaudeRunnerRequest = Schema.decodeUnknownResult(
-  ClaudeRunnerRequest,
-  runnerRequestDecoderOptions,
-);
 
 export type ClaudeEventState = {
   activeMessageId: string | null;
@@ -100,7 +80,7 @@ export function createClaudeEventState(): ClaudeEventState {
 }
 
 export async function* claudePrompt(
-  request: ClaudeRunnerRequest,
+  request: RunnerRequest,
 ): AsyncIterable<SDKUserMessage> {
   const content: Array<Record<string, unknown>> = [];
   if (request.message.trim()) {
@@ -133,7 +113,7 @@ export async function* claudePrompt(
 }
 
 export function claudeOptions(
-  request: ClaudeRunnerRequest,
+  request: RunnerRequest,
   canUseTool: CanUseTool,
 ): Options {
   const readOnly = request.sandboxMode === "readOnly";

@@ -1,5 +1,12 @@
+import { create } from "@bufbuild/protobuf";
 import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
-import { RunnerToParentSchema } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
+import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
+import {
+  ApprovalPolicy,
+  RunRequestSchema,
+  RunnerToParentSchema,
+  SandboxMode,
+} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -8,22 +15,21 @@ import { describe, expect, it } from "vitest";
 import {
   decodeSidecarRunnerOutput,
   encodeSidecarRunRequest,
-  type SidecarRunRequest,
 } from "./sidecar-protocol";
 
-const runnerRequest: Omit<SidecarRunRequest, "providerBinaryPath"> = {
-  type: "run",
-  message: "Review the repository without using Figma.",
-  workspaceRoot: process.cwd(),
-  conversationId: null,
-  instructions: "Complete the assigned workflow.",
-  outputSchema: null,
-  model: "gpt-5",
-  effort: "high",
-  approvalPolicy: "never",
-  sandboxMode: "workspaceWrite",
-  networkAccess: true,
-};
+const runnerRequest = (providerBinaryPath: string) =>
+  create(RunRequestSchema, {
+    message: "Review the repository without using Figma.",
+    workspaceRoot: process.cwd(),
+    instructions: "Complete the assigned workflow.",
+    model: "gpt-5",
+    effort: "high",
+    approvalPolicy: ApprovalPolicy.NEVER,
+    sandboxMode: SandboxMode.WORKSPACE_WRITE,
+    networkAccess: true,
+    providerBinaryPath,
+    protocolFingerprint: CONTRACTS_DESCRIPTOR_FINGERPRINT,
+  });
 
 describe("Codex runner MCP isolation", () => {
   it("restarts with an unused unauthenticated Figma plugin disabled", async () => {
@@ -124,10 +130,7 @@ async function runScenario(scenario: "invalid" | "optional" | "required") {
   child.stderr.on("data", (chunk: string) => {
     stderr += chunk;
   });
-  child.stdin.write(encodeSidecarRunRequest({
-    ...runnerRequest,
-    providerBinaryPath: fakeCodex,
-  }));
+  child.stdin.write(encodeSidecarRunRequest(runnerRequest(fakeCodex)));
 
   const timeout = setTimeout(() => child.kill("SIGKILL"), 10_000);
   try {

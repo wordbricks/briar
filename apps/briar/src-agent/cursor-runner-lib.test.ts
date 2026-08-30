@@ -6,11 +6,10 @@ import {
   finalizeCursorMessage,
   normalizeCursorSessionUpdate,
   shouldAutoApproveCursorPermission,
-  type CursorRunnerRequest,
 } from "./cursor-runner-lib";
+import type { RunnerRequest } from "./runner-request";
 
-const request: CursorRunnerRequest = {
-  type: "run",
+const request: RunnerRequest = {
   message: "Inspect the repository",
   workspaceRoot: "/repo",
   model: "gpt-5.4-medium-fast[reasoning=medium]",
@@ -18,6 +17,8 @@ const request: CursorRunnerRequest = {
   approvalPolicy: "never",
   sandboxMode: "workspaceWrite",
   networkAccess: true,
+  attachments: [],
+  additionalDirectories: [],
   providerBinaryPath: "/usr/local/bin/cursor-agent",
 };
 

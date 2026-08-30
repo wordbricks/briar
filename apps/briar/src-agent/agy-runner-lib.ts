@@ -1,4 +1,3 @@
-import * as Schema from "effect/Schema";
 import type {
   AgentActivityKind,
   NormalizedAgentEvent,
@@ -7,22 +6,7 @@ import {
   normalizedActivityText,
   normalizedActivityTitle,
 } from "./normalized-agent-event";
-import {
-  commonRunnerRequestFields,
-  runnerRequestDecoderOptions,
-} from "./runner-request";
-
-export const AgyRunnerRequest = Schema.Struct({
-  ...commonRunnerRequestFields,
-  effort: Schema.optional(Schema.NullOr(Schema.String)),
-});
-
-export type AgyRunnerRequest = typeof AgyRunnerRequest.Type;
-
-export const decodeAgyRunnerRequest = Schema.decodeUnknownResult(
-  AgyRunnerRequest,
-  runnerRequestDecoderOptions,
-);
+import type { RunnerRequest } from "./runner-request";
 
 export type AgyBlockedRetry =
   | {
@@ -314,14 +298,14 @@ export function normalizeAgyEvent(
   return [];
 }
 
-export function mapEffortToAgy(effort: AgyRunnerRequest["effort"]) {
+export function mapEffortToAgy(effort: RunnerRequest["effort"]) {
   if (!effort) return undefined;
   return effort === "xhigh" || effort === "max" || effort === "ultra"
     ? "high"
     : effort;
 }
 
-export function buildAgyPrompt(request: AgyRunnerRequest) {
+export function buildAgyPrompt(request: RunnerRequest) {
   const sections: string[] = [];
   if (request.instructions?.trim()) {
     sections.push(`<briar_trusted_instructions>\n${request.instructions.trim()}\n</briar_trusted_instructions>`);
@@ -338,7 +322,7 @@ export function buildAgyPrompt(request: AgyRunnerRequest) {
   return sections.join("\n\n");
 }
 
-export function agyArgs(request: AgyRunnerRequest) {
+export function agyArgs(request: RunnerRequest) {
   const args = ["--output-format", "stream-json"];
   if (request.outputSchema !== null && request.outputSchema !== undefined) {
     args.push("--json-schema", JSON.stringify(request.outputSchema));

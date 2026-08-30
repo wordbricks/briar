@@ -1,13 +1,12 @@
 import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
 import { ParentToRunnerSchema } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import * as Result from "effect/Result";
-import type { SchemaError } from "effect/Schema";
 import {
   decodeSidecarRunRequest,
   encodeSidecarRunnerOutput,
-  type SidecarRunRequest,
   type SidecarRunnerOutput,
 } from "./sidecar-protocol";
+import { decodeRunnerRequest, type RunnerRequest } from "./runner-request";
 
 type PendingApproval = {
   abort?: () => void;
@@ -19,9 +18,8 @@ type RunnerInput = AsyncIterable<Uint8Array> & {
   destroy?: () => void;
 };
 
-export type RunnerIoOptions<Request> = {
+export type RunnerIoOptions = {
   closeError: string;
-  decodeRequest: (input: unknown) => Result.Result<Request, SchemaError>;
   input?: RunnerInput;
   onClose?: () => void;
   output?: Pick<NodeJS.WritableStream, "write">;
@@ -34,20 +32,16 @@ const maxSidecarFrameBytes = 16 * 1024 * 1024;
  * Owns the size-delimited protobuf control channel shared by the bundled
  * agent runners. Stdout contains frames only; diagnostics belong on stderr.
  */
-export function createRunnerIo<
-  Request extends SidecarRunRequest,
-  Output extends SidecarRunnerOutput,
->({
+export function createRunnerIo<Output extends SidecarRunnerOutput>({
   closeError,
-  decodeRequest,
   input = process.stdin,
   onClose,
   output = process.stdout,
   terminate = () => process.exit(1),
-}: RunnerIoOptions<Request>) {
-  let resolveRequest: ((request: Request) => void) | undefined;
+}: RunnerIoOptions) {
+  let resolveRequest: ((request: RunnerRequest) => void) | undefined;
   let rejectRequest: ((error: Error) => void) | undefined;
-  const request = new Promise<Request>((resolve, reject) => {
+  const request = new Promise<RunnerRequest>((resolve, reject) => {
     resolveRequest = resolve;
     rejectRequest = reject;
   });
@@ -122,7 +116,7 @@ export function createRunnerIo<
           throw new Error("The sidecar parent sent more than one run request.");
         }
         runReceived = true;
-        const decoded = decodeRequest(decodeSidecarRunRequest(message));
+        const decoded = decodeRunnerRequest(decodeSidecarRunRequest(message));
         if (Result.isFailure(decoded)) {
           throw decoded.failure;
         }

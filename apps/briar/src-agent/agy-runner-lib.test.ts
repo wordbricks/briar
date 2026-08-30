@@ -9,16 +9,17 @@ import {
   createAgyEventState,
   mapEffortToAgy,
   normalizeAgyEvent,
-  type AgyRunnerRequest,
 } from "./agy-runner-lib";
+import type { RunnerRequest } from "./runner-request";
 
-const request = (overrides: Partial<AgyRunnerRequest> = {}): AgyRunnerRequest => ({
-  type: "run",
+const request = (overrides: Partial<RunnerRequest> = {}): RunnerRequest => ({
   message: "Fix the tests",
   workspaceRoot: "/repo",
   approvalPolicy: "never",
   sandboxMode: "workspaceWrite",
   networkAccess: false,
+  attachments: [],
+  additionalDirectories: [],
   providerBinaryPath: "/bin/agy",
   ...overrides,
 });

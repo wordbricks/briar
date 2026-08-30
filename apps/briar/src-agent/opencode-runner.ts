@@ -13,7 +13,6 @@ import {
   buildOpenCodeParts,
   completeOpenCodeMessages,
   createOpenCodeEventState,
-  decodeOpenCodeRunnerRequest,
   isOpenCodeWritePermission,
   mapEffortToOpenCode,
   normalizeOpenCodeEvent,
@@ -28,9 +27,9 @@ import {
   type OpenCodeBlockedRetry,
   type OpenCodeEventState,
   type OpenCodeRunnerOutput,
-  type OpenCodeRunnerRequest,
 } from "./opencode-runner-lib";
 import { createRunnerIo } from "./runner-io";
+import type { RunnerRequest } from "./runner-request";
 import { waitForOpenCodeServerUrl } from "./opencode-server-startup";
 import {
   providerInstructionSeatbeltPattern,
@@ -228,7 +227,7 @@ class OpenCodeServer {
 
 async function resolveSession(
   client: OpencodeClient,
-  request: OpenCodeRunnerRequest,
+  request: RunnerRequest,
 ): Promise<string> {
   const permissions = buildOpenCodePermissionRules(request);
   if (request.conversationId) {
@@ -297,7 +296,7 @@ export function openCodeFinalTurnOutputs(
 }
 
 type OpenCodeRunnerIo = ReturnType<
-  typeof createRunnerIo<OpenCodeRunnerRequest, OpenCodeRunnerOutput>
+  typeof createRunnerIo<OpenCodeRunnerOutput>
 >;
 
 async function main(runnerIo: OpenCodeRunnerIo) {
@@ -449,9 +448,8 @@ async function main(runnerIo: OpenCodeRunnerIo) {
 
 export async function runOpenCodeRunner() {
   emitRunnerDiagnostic("runner.started");
-  const runnerIo = createRunnerIo<OpenCodeRunnerRequest, OpenCodeRunnerOutput>({
+  const runnerIo = createRunnerIo<OpenCodeRunnerOutput>({
     closeError: "Briar closed the OpenCode runner input.",
-    decodeRequest: decodeOpenCodeRunnerRequest,
     onClose: () => emitRunnerDiagnostic("runner.input_closed"),
   });
   const { emit } = runnerIo;

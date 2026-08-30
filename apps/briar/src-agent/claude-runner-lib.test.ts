@@ -10,11 +10,10 @@ import {
   createClaudeEventState,
   normalizeClaudeMessage,
   type ClaudeEventState,
-  type ClaudeRunnerRequest,
 } from "./claude-runner-lib";
+import type { RunnerRequest } from "./runner-request";
 
-const request: ClaudeRunnerRequest = {
-  type: "run",
+const request: RunnerRequest = {
   message: "Inspect the repository",
   workspaceRoot: "/repo",
   model: "sonnet",
@@ -22,6 +21,8 @@ const request: ClaudeRunnerRequest = {
   approvalPolicy: "never",
   sandboxMode: "readOnly",
   networkAccess: false,
+  attachments: [],
+  additionalDirectories: [],
   providerBinaryPath: "/usr/local/bin/claude",
 };
 

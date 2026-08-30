@@ -18,11 +18,10 @@ import {
   resolveGrokFinalMessage,
   shouldAutoApprovePermission,
   shouldDenyGrokPermission,
-  type GrokRunnerRequest,
 } from "./grok-runner-lib";
+import type { RunnerRequest } from "./runner-request";
 
-const request: GrokRunnerRequest = {
-  type: "run",
+const request: RunnerRequest = {
   message: "Inspect the repository",
   workspaceRoot: "/repo",
   model: "grok-4.5",
@@ -30,6 +29,8 @@ const request: GrokRunnerRequest = {
   approvalPolicy: "never",
   sandboxMode: "readOnly",
   networkAccess: false,
+  attachments: [],
+  additionalDirectories: [],
   providerBinaryPath: "/usr/local/bin/grok",
 };
 
@@ -549,7 +550,7 @@ describe("Grok runner", () => {
     expect(
       resolveGrokFinalMessage(state, undefined, { type: "object" }),
     ).toBe('{"action":"respond"}');
-    expect(resolveGrokFinalMessage(state, undefined, null)).toBe(
+    expect(resolveGrokFinalMessage(state, undefined, undefined)).toBe(
       '```json\\n{"action":"respond"}\\n```',
     );
   });

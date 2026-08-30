@@ -13,16 +13,17 @@ import {
   parseOpenCodeModel,
   parseOpenCodeServerUrl,
   shouldAutoApproveOpenCodePermission,
-  type OpenCodeRunnerRequest,
 } from "./opencode-runner-lib";
+import type { RunnerRequest } from "./runner-request";
 
-const request = (overrides: Partial<OpenCodeRunnerRequest> = {}): OpenCodeRunnerRequest => ({
-  type: "run",
+const request = (overrides: Partial<RunnerRequest> = {}): RunnerRequest => ({
   message: "Fix the tests",
   workspaceRoot: "/repo",
   approvalPolicy: "on-request",
   sandboxMode: "workspaceWrite",
   networkAccess: false,
+  attachments: [],
+  additionalDirectories: [],
   providerBinaryPath: "/bin/opencode",
   ...overrides,
 });

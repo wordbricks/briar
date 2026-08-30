@@ -8,18 +8,17 @@ import {
   agyFinalMessage,
   agyEnvironment,
   createAgyEventState,
-  decodeAgyRunnerRequest,
   normalizeAgyEvent,
   type AgyRunnerOutput,
-  type AgyRunnerRequest,
 } from "./agy-runner-lib";
 import { createRunnerIo } from "./runner-io";
+import type { RunnerRequest } from "./runner-request";
 import {
   providerInstructionSeatbeltPattern,
   readOnlySeatbeltSpawnSpec,
 } from "./read-only-seatbelt";
 
-function agySpawnSpec(request: AgyRunnerRequest) {
+function agySpawnSpec(request: RunnerRequest) {
   const args = agyArgs(request);
   if (request.sandboxMode !== "readOnly") {
     return { command: request.providerBinaryPath, arguments: args };
@@ -46,7 +45,7 @@ function stop(child: ChildProcessWithoutNullStreams | null) {
 }
 
 type AgyRunnerIo = ReturnType<
-  typeof createRunnerIo<AgyRunnerRequest, AgyRunnerOutput>
+  typeof createRunnerIo<AgyRunnerOutput>
 >;
 
 function parseAgyLine(line: string) {
@@ -131,9 +130,8 @@ async function main(io: AgyRunnerIo) {
 }
 
 let activeChild: ChildProcessWithoutNullStreams | null = null;
-const io = createRunnerIo<AgyRunnerRequest, AgyRunnerOutput>({
+const io = createRunnerIo<AgyRunnerOutput>({
   closeError: "Antigravity runner 입력이 요청 전에 닫혔습니다.",
-  decodeRequest: decodeAgyRunnerRequest,
   onClose: () => stop(activeChild),
 });
 

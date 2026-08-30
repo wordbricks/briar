@@ -8,16 +8,13 @@ import {
   claudeOptions,
   claudePrompt,
   createClaudeEventState,
-  decodeClaudeRunnerRequest,
   normalizeClaudeMessage,
   type ClaudeRunnerOutput,
-  type ClaudeRunnerRequest,
 } from "./claude-runner-lib";
 import { createRunnerIo } from "./runner-io";
 
-const runnerIo = createRunnerIo<ClaudeRunnerRequest, ClaudeRunnerOutput>({
+const runnerIo = createRunnerIo<ClaudeRunnerOutput>({
   closeError: "Briar closed the Claude runner input.",
-  decodeRequest: decodeClaudeRunnerRequest,
 });
 const { emit, request: requestPromise, waitForApproval } = runnerIo;
 

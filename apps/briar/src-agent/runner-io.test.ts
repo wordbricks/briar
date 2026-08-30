@@ -1,32 +1,39 @@
+import { create } from "@bufbuild/protobuf";
 import { sizeDelimitedDecodeStream, sizeDelimitedEncode } from "@bufbuild/protobuf/wire";
+import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
 import {
+  ApprovalPolicy,
+  JsonSchemaSchema,
   ParentToRunnerSchema,
+  RunRequestSchema,
   RunnerToParentSchema,
+  SandboxMode,
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import { PassThrough } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import {
-  decodeCodexRunnerRequest,
   type CodexRunnerOutput,
-  type CodexRunnerRequest,
 } from "./codex-runner-lib";
 import { createRunnerIo } from "./runner-io";
 import {
   decodeSidecarRunnerOutput,
   encodeSidecarApprovalResponse,
   encodeSidecarRunRequest,
-  type SidecarRunRequest,
 } from "./sidecar-protocol";
+import type { RunnerRequest } from "./runner-request";
 
-const runRequest: SidecarRunRequest = {
-  type: "run",
+const runRequest = create(RunRequestSchema, {
   message: "Fix it",
   workspaceRoot: "/repo",
-  approvalPolicy: "on-request",
-  sandboxMode: "workspaceWrite",
+  outputSchema: create(JsonSchemaSchema, {
+    value: { case: "object", value: { type: "object" } },
+  }),
+  approvalPolicy: ApprovalPolicy.ON_REQUEST,
+  sandboxMode: SandboxMode.WORKSPACE_WRITE,
   networkAccess: true,
   providerBinaryPath: "/bin/codex",
-};
+  protocolFingerprint: CONTRACTS_DESCRIPTOR_FINGERPRINT,
+});
 
 async function firstFrame(bytes: Uint8Array) {
   async function* source() {
@@ -47,9 +54,8 @@ function testIo(onClose = vi.fn()) {
   const written: Buffer[] = [];
   const terminate = vi.fn();
   output.on("data", (chunk: Buffer) => written.push(chunk));
-  const io = createRunnerIo<CodexRunnerRequest, CodexRunnerOutput>({
+  const io = createRunnerIo<CodexRunnerOutput>({
     closeError: "input closed",
-    decodeRequest: decodeCodexRunnerRequest,
     input,
     onClose,
     output,
@@ -66,7 +72,7 @@ function testIo(onClose = vi.fn()) {
 
 async function beginRun(
   input: PassThrough,
-  request: Promise<CodexRunnerRequest>,
+  request: Promise<RunnerRequest>,
 ) {
   input.write(encodeSidecarRunRequest(runRequest));
   return request;
@@ -79,7 +85,14 @@ describe("runner protobuf I/O", () => {
     input.write(frame.subarray(0, 3));
     input.write(frame.subarray(3));
 
-    await expect(io.request).resolves.toMatchObject(runRequest);
+    await expect(io.request).resolves.toMatchObject({
+      message: "Fix it",
+      workspaceRoot: "/repo",
+      approvalPolicy: "on-request",
+      sandboxMode: "workspaceWrite",
+      outputSchema: { type: "object" },
+      providerBinaryPath: "/bin/codex",
+    });
     io.emit({ type: "result", sessionId: "session-1", message: "done" });
     await expect(firstFrame(written())).resolves.toEqual({
       type: "result",
@@ -92,12 +105,21 @@ describe("runner protobuf I/O", () => {
   it("routes approval frames and denies pending approvals when input closes", async () => {
     const { input, io } = testIo();
     await beginRun(input, io.request);
-    const approved = io.waitForApproval("approval-1");
-    input.write(encodeSidecarApprovalResponse("approval-1", true));
+    const cancelledSignal = new AbortController();
+    const cancelled = io.waitForApproval(
+      "approval-cancelled",
+      cancelledSignal.signal,
+    );
+    const approved = io.waitForApproval("approval-approved");
+    input.write(encodeSidecarApprovalResponse("approval-approved", true));
     await expect(approved).resolves.toBe(true);
+    cancelledSignal.abort();
+    await expect(cancelled).resolves.toBe(false);
 
+    const deniedOnClose = io.waitForApproval("approval-closed");
     io.emit({ type: "result", sessionId: "session-1", message: "done" });
     io.close();
+    await expect(deniedOnClose).resolves.toBe(false);
   });
 
   it("rejects a runner built from a different descriptor image", async () => {
@@ -124,6 +146,17 @@ describe("runner protobuf I/O", () => {
     ));
 
     await expect(io.request).rejects.toThrow("fingerprint");
+    io.close();
+  });
+
+  it("rejects an unspecified provider policy before execution", async () => {
+    const { input, io } = testIo();
+    input.write(encodeSidecarRunRequest(create(RunRequestSchema, {
+      ...runRequest,
+      approvalPolicy: ApprovalPolicy.UNSPECIFIED,
+    })));
+
+    await expect(io.request).rejects.toThrow("approval policy");
     io.close();
   });
 

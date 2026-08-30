@@ -16,24 +16,20 @@ import {
 } from "@bufbuild/protobuf/wkt";
 import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
 import {
-  ApprovalPolicy,
   ApprovalRequestSchema,
   ApprovalResponseSchema,
   BlockReason,
   EventDirection,
-  JsonSchemaSchema,
   ParentToRunnerSchema,
   ProviderEventSchema,
   RunBlockedSchema,
   RunErrorCode,
   RunErrorSchema,
   RunResultSchema,
-  RunRequestSchema,
   RunnerToParentSchema,
-  SandboxMode,
   SessionStartedSchema,
-  type JsonSchema as ProtoJsonSchema,
   type ParentToRunner,
+  type RunRequest,
   type RunnerToParent,
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import {
@@ -44,29 +40,6 @@ import {
 } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import { timingSafeEqual } from "node:crypto";
 import type { NormalizedAgentEvent } from "./normalized-agent-event";
-
-export type SidecarRunRequest = {
-  type: "run";
-  message: string;
-  workspaceRoot: string;
-  conversationId?: string | null;
-  instructions?: string | null;
-  outputSchema?: Record<string, unknown> | boolean | null;
-  model?: string | null;
-  effort?: string | null;
-  approvalPolicy: "untrusted" | "on-request" | "never";
-  sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
-  networkAccess: boolean;
-  attachments?: ReadonlyArray<{
-    type: "image";
-    path: string;
-    name: string;
-    mimeType: string;
-  }>;
-  additionalDirectories?: ReadonlyArray<string>;
-  externalTools?: boolean;
-  providerBinaryPath: string;
-};
 
 export type SidecarRunnerOutput =
   | { type: "session"; sessionId: string }
@@ -98,48 +71,6 @@ export type SidecarRunnerOutput =
       statusCode?: number;
     }
   | { type: "error"; message: string };
-
-const approvalPolicyToProto = {
-  untrusted: ApprovalPolicy.UNTRUSTED,
-  "on-request": ApprovalPolicy.ON_REQUEST,
-  never: ApprovalPolicy.NEVER,
-} as const;
-
-const approvalPolicyFromProto = (
-  value: ApprovalPolicy,
-): SidecarRunRequest["approvalPolicy"] => {
-  switch (value) {
-    case ApprovalPolicy.UNTRUSTED:
-      return "untrusted";
-    case ApprovalPolicy.ON_REQUEST:
-      return "on-request";
-    case ApprovalPolicy.NEVER:
-      return "never";
-    default:
-      throw new Error(`Unsupported sidecar approval policy: ${value}`);
-  }
-};
-
-const sandboxModeToProto = {
-  readOnly: SandboxMode.READ_ONLY,
-  workspaceWrite: SandboxMode.WORKSPACE_WRITE,
-  dangerFullAccess: SandboxMode.DANGER_FULL_ACCESS,
-} as const;
-
-const sandboxModeFromProto = (
-  value: SandboxMode,
-): SidecarRunRequest["sandboxMode"] => {
-  switch (value) {
-    case SandboxMode.READ_ONLY:
-      return "readOnly";
-    case SandboxMode.WORKSPACE_WRITE:
-      return "workspaceWrite";
-    case SandboxMode.DANGER_FULL_ACCESS:
-      return "dangerFullAccess";
-    default:
-      throw new Error(`Unsupported sidecar sandbox mode: ${value}`);
-  }
-};
 
 const activityKindToProto = {
   command: ProtoAgentActivityKind.COMMAND,
@@ -352,34 +283,6 @@ function normalizedEventFromProto(
   }
 }
 
-function jsonSchemaToProto(
-  value: SidecarRunRequest["outputSchema"],
-) {
-  if (value === undefined || value === null) return undefined;
-  return create(JsonSchemaSchema, {
-    value:
-      typeof value === "boolean"
-        ? { case: "boolean", value }
-        : {
-            case: "object",
-            value: normalizedJson(value) as JsonObject,
-          },
-  });
-}
-
-function jsonSchemaFromProto(
-  value: ProtoJsonSchema | undefined,
-): SidecarRunRequest["outputSchema"] {
-  if (!value) return undefined;
-  switch (value.value.case) {
-    case "boolean":
-    case "object":
-      return value.value.value;
-    case undefined:
-      return undefined;
-  }
-}
-
 function assertProtocolFingerprint(actual: Uint8Array) {
   if (
     actual.byteLength !== CONTRACTS_DESCRIPTOR_FINGERPRINT.byteLength ||
@@ -391,64 +294,21 @@ function assertProtocolFingerprint(actual: Uint8Array) {
   }
 }
 
-export function decodeSidecarRunRequest(message: ParentToRunner): SidecarRunRequest {
+export function decodeSidecarRunRequest(message: ParentToRunner): RunRequest {
   if (message.payload.case !== "run") {
     throw new Error("The first sidecar frame must contain a run request.");
   }
-  const request = message.payload.value;
-  assertProtocolFingerprint(request.protocolFingerprint);
-  return {
-      type: "run" as const,
-    message: request.message,
-    workspaceRoot: request.workspaceRoot,
-    conversationId: request.conversationId,
-    instructions: request.instructions,
-    outputSchema: jsonSchemaFromProto(request.outputSchema),
-    model: request.model,
-    effort: request.effort,
-    approvalPolicy: approvalPolicyFromProto(request.approvalPolicy),
-    sandboxMode: sandboxModeFromProto(request.sandboxMode),
-    networkAccess: request.networkAccess,
-    attachments: request.attachments.map((attachment) => ({
-      type: "image" as const,
-      path: attachment.path,
-      name: attachment.name,
-      mimeType: attachment.mimeType,
-    })),
-    additionalDirectories: request.additionalDirectories,
-    externalTools: request.externalTools,
-    providerBinaryPath: request.providerBinaryPath,
-  };
+  assertProtocolFingerprint(message.payload.value.protocolFingerprint);
+  return message.payload.value;
 }
 
 export function encodeSidecarRunRequest(
-  request: SidecarRunRequest,
+  request: RunRequest,
 ): Uint8Array {
-  const run = create(RunRequestSchema, {
-    message: request.message,
-    workspaceRoot: request.workspaceRoot,
-    conversationId: request.conversationId ?? undefined,
-    instructions: request.instructions ?? undefined,
-    outputSchema: jsonSchemaToProto(request.outputSchema),
-    model: request.model ?? undefined,
-    effort: request.effort ?? undefined,
-    approvalPolicy: approvalPolicyToProto[request.approvalPolicy],
-    sandboxMode: sandboxModeToProto[request.sandboxMode],
-    networkAccess: request.networkAccess,
-    attachments: (request.attachments ?? []).map(({ path, name, mimeType }) => ({
-      path,
-      name,
-      mimeType,
-    })),
-    additionalDirectories: [...(request.additionalDirectories ?? [])],
-    externalTools: request.externalTools,
-    providerBinaryPath: request.providerBinaryPath,
-    protocolFingerprint: CONTRACTS_DESCRIPTOR_FINGERPRINT,
-  });
   return sizeDelimitedEncode(
     ParentToRunnerSchema,
     create(ParentToRunnerSchema, {
-      payload: { case: "run", value: run },
+      payload: { case: "run", value: request },
     }),
   );
 }

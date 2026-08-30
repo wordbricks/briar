@@ -2,7 +2,10 @@ import { Buffer } from "node:buffer";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
-import { RunnerToParentSchema } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
+import {
+  RunnerToParentSchema,
+  SandboxMode,
+} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
 import {
   decodeSidecarRunnerOutput,
@@ -371,7 +374,7 @@ async function executeDetachedProviderTurn(
         child.stdin.write(
           encodeSidecarApprovalResponse(
             payload.id,
-            runnerRequest.sandboxMode !== "readOnly",
+            runnerRequest.sandboxMode !== SandboxMode.READ_ONLY,
           ),
         );
       }

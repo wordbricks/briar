@@ -3,7 +3,6 @@ import type {
   PermissionRuleset,
   QuestionRequest,
 } from "@opencode-ai/sdk/v2";
-import * as Schema from "effect/Schema";
 import { pathToFileURL } from "node:url";
 import {
   normalizedActivityText,
@@ -11,28 +10,13 @@ import {
   type AgentActivityKind,
   type NormalizedAgentEvent,
 } from "./normalized-agent-event";
-import {
-  commonRunnerRequestFields,
-  runnerRequestDecoderOptions,
-} from "./runner-request";
+import type { RunnerRequest } from "./runner-request";
 
 export type {
   AgentActivityKind,
   AgentActivityStatus,
   NormalizedAgentEvent,
 } from "./normalized-agent-event";
-
-export const OpenCodeRunnerRequest = Schema.Struct({
-  ...commonRunnerRequestFields,
-  effort: Schema.optional(Schema.NullOr(Schema.String)),
-});
-
-export type OpenCodeRunnerRequest = typeof OpenCodeRunnerRequest.Type;
-
-export const decodeOpenCodeRunnerRequest = Schema.decodeUnknownResult(
-  OpenCodeRunnerRequest,
-  runnerRequestDecoderOptions,
-);
 
 export type OpenCodeRunnerOutput =
   | { type: "session"; sessionId: string }
@@ -122,13 +106,13 @@ export function parseOpenCodeModel(
 }
 
 export function mapEffortToOpenCode(
-  effort: OpenCodeRunnerRequest["effort"],
+  effort: RunnerRequest["effort"],
 ): string | undefined {
   if (!effort) return undefined;
   return effort;
 }
 
-export function buildOpenCodePrompt(request: OpenCodeRunnerRequest): string {
+export function buildOpenCodePrompt(request: RunnerRequest): string {
   const sections: string[] = [];
   if (request.outputSchema !== null && request.outputSchema !== undefined) {
     sections.push(
@@ -140,12 +124,12 @@ export function buildOpenCodePrompt(request: OpenCodeRunnerRequest): string {
 }
 
 export function openCodeSystemPrompt(
-  request: OpenCodeRunnerRequest,
+  request: RunnerRequest,
 ): string | undefined {
   return request.instructions?.trim() || undefined;
 }
 
-export function buildOpenCodeParts(request: OpenCodeRunnerRequest) {
+export function buildOpenCodeParts(request: RunnerRequest) {
   return [
     { type: "text" as const, text: buildOpenCodePrompt(request) },
     ...(request.attachments ?? []).map((attachment) => ({
@@ -170,7 +154,7 @@ const writePermissions = new Set([
 const readOnlyPermissions = new Set(["glob", "grep", "list", "read"]);
 
 function isOpenCodeReadOnlyPermission(
-  request: OpenCodeRunnerRequest,
+  request: RunnerRequest,
   permission: string,
 ) {
   const normalized = permission.trim().toLowerCase();
@@ -192,7 +176,7 @@ export function isOpenCodeWritePermission(permission: string): boolean {
 }
 
 export function shouldAutoApproveOpenCodePermission(
-  request: OpenCodeRunnerRequest,
+  request: RunnerRequest,
   permission: string,
 ): boolean {
   if (request.sandboxMode === "readOnly") {
@@ -211,7 +195,7 @@ export function shouldAutoApproveOpenCodePermission(
 }
 
 export function buildOpenCodePermissionRules(
-  request: OpenCodeRunnerRequest,
+  request: RunnerRequest,
 ): PermissionRuleset {
   const defaultAction = request.sandboxMode === "readOnly"
     ? "deny"

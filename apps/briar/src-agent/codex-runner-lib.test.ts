@@ -13,20 +13,20 @@ import {
   consumeCodexAppServerMessage,
   createCodexAppServerState,
   normalizeCodexAppServerMessage,
-  type CodexRunnerRequest,
 } from "./codex-runner-lib";
+import type { RunnerRequest } from "./runner-request";
 
-const request: CodexRunnerRequest = {
-  type: "run",
+const request: RunnerRequest = {
   message: "Inspect the repository",
   workspaceRoot: "/worktree",
   instructions: "Use the Briar workflow.",
-  outputSchema: null,
   model: "gpt-5",
   effort: "high",
   approvalPolicy: "never",
   sandboxMode: "workspaceWrite",
   networkAccess: true,
+  attachments: [],
+  additionalDirectories: [],
   providerBinaryPath: "/usr/local/bin/codex",
 };
 
@@ -331,7 +331,7 @@ describe("Codex App Server runner", () => {
 
   it("reads effective config before starting a thread and turn", () => {
     const state = createCodexAppServerState();
-    const defaultRequest = { ...request, model: null };
+    const defaultRequest = { ...request, model: undefined };
     const initialized = consumeCodexAppServerMessage(state, defaultRequest, {
       id: 1,
       result: {},
@@ -471,7 +471,7 @@ describe("Codex App Server runner", () => {
 
   it("falls back to the provider model catalog when config has no model", () => {
     const state = createCodexAppServerState();
-    const defaultRequest = { ...request, model: null };
+    const defaultRequest = { ...request, model: undefined };
     consumeCodexAppServerMessage(state, defaultRequest, {
       id: 1,
       result: {},
@@ -499,7 +499,7 @@ describe("Codex App Server runner", () => {
 
   it("keeps running when model-discovery RPCs are unavailable", () => {
     const state = createCodexAppServerState();
-    const defaultRequest = { ...request, model: null };
+    const defaultRequest = { ...request, model: undefined };
     consumeCodexAppServerMessage(state, defaultRequest, {
       id: 1,
       result: {},

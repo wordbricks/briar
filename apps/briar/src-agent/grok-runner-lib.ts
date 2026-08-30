@@ -7,7 +7,6 @@ import {
   sep,
   win32,
 } from "node:path";
-import * as Schema from "effect/Schema";
 import {
   normalizedActivityText,
   normalizedActivityTitle,
@@ -17,10 +16,7 @@ import {
 import { readAgentImage } from "./runner-attachments";
 import { extractSingleJsonObject } from "../src/lib/single-json-object";
 import type { AcpJsonRpcMessage } from "./acp-json-rpc";
-import {
-  commonRunnerRequestFields,
-  runnerRequestDecoderOptions,
-} from "./runner-request";
+import type { RunnerRequest } from "./runner-request";
 
 export type {
   AgentActivityKind,
@@ -35,18 +31,6 @@ export type {
  * authenticate → session/new|load → optional set_model → session/prompt,
  * while mapping stream updates into Briar's provider-neutral agent events.
  */
-
-export const GrokRunnerRequest = Schema.Struct({
-  ...commonRunnerRequestFields,
-  effort: Schema.optional(Schema.NullOr(Schema.String)),
-});
-
-export type GrokRunnerRequest = typeof GrokRunnerRequest.Type;
-
-export const decodeGrokRunnerRequest = Schema.decodeUnknownResult(
-  GrokRunnerRequest,
-  runnerRequestDecoderOptions,
-);
 
 export type GrokEventState = {
   activeMessageId: string | null;
@@ -108,7 +92,7 @@ export function resolveGrokAuthMethodId(
 }
 
 export function shouldAutoApprovePermission(
-  request: GrokRunnerRequest,
+  request: RunnerRequest,
 ): boolean {
   return (
     request.sandboxMode === "dangerFullAccess" ||
@@ -371,7 +355,7 @@ async function grokPathIsWithinWorkspace(
 }
 
 async function grokWorkspaceReadInputIsAllowed(
-  request: GrokRunnerRequest,
+  request: RunnerRequest,
   toolName: string,
   input: Record<string, unknown>,
 ) {
@@ -392,7 +376,7 @@ async function grokWorkspaceReadInputIsAllowed(
 }
 
 export async function shouldDenyGrokPermission(
-  request: GrokRunnerRequest,
+  request: RunnerRequest,
   toolName: string,
   input: Record<string, unknown> = {},
 ): Promise<boolean> {
@@ -440,13 +424,13 @@ export type GrokPromptPart =
   | { type: "image"; data: string; mimeType: string };
 
 export function grokSessionMeta(
-  request: GrokRunnerRequest,
+  request: RunnerRequest,
 ): { rules: string } | undefined {
   const instructions = request.instructions?.trim();
   return instructions ? { rules: instructions } : undefined;
 }
 
-export function buildPromptParts(request: GrokRunnerRequest): GrokPromptPart[] {
+export function buildPromptParts(request: RunnerRequest): GrokPromptPart[] {
   const parts: GrokPromptPart[] = [];
   if (
     request.outputSchema !== null &&
@@ -462,7 +446,7 @@ export function buildPromptParts(request: GrokRunnerRequest): GrokPromptPart[] {
 }
 
 export async function buildGrokPromptParts(
-  request: GrokRunnerRequest,
+  request: RunnerRequest,
 ): Promise<GrokPromptPart[]> {
   const parts = buildPromptParts(request);
   for (const attachment of request.attachments ?? []) {
@@ -481,7 +465,7 @@ export function resolveGrokModelId(model: string | null | undefined): string | u
 }
 
 export function mapEffortToGrok(
-  effort: GrokRunnerRequest["effort"],
+  effort: RunnerRequest["effort"],
 ): string | undefined {
   if (!effort) return undefined;
   return effort;
@@ -750,7 +734,7 @@ export function extractJsonObject(raw: string): string {
 export function resolveGrokFinalMessage(
   state: GrokEventState,
   promptResultText: string | undefined,
-  outputSchema: GrokRunnerRequest["outputSchema"],
+  outputSchema: RunnerRequest["outputSchema"],
 ): string {
   const message =
     state.lastAssistantText.trim() || promptResultText?.trim() || "";

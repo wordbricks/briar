@@ -1,4 +1,12 @@
 import { Buffer } from "node:buffer";
+import { create, type JsonObject } from "@bufbuild/protobuf";
+import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
+import {
+  ApprovalPolicy,
+  JsonSchemaSchema,
+  RunRequestSchema,
+  SandboxMode,
+} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
 import type { ModelEffort } from "../src/lib/agent-provider-contract";
 import type { AgentProvider } from "../src/lib/agent-provider";
@@ -1445,43 +1453,50 @@ export function detachedProviderRequest(input: {
   outputSchema?: JsonSchema | null;
   agentBinary: string;
 }) {
+  const outputSchema = input.outputSchema === null || input.outputSchema === undefined
+    ? undefined
+    : create(JsonSchemaSchema, {
+      value: typeof input.outputSchema === "boolean"
+        ? { case: "boolean", value: input.outputSchema }
+        : { case: "object", value: input.outputSchema as JsonObject },
+    });
   return {
     kind: "runner" as const,
     arguments: [] as string[],
-    request: {
-      type: "run" as const,
+    request: create(RunRequestSchema, {
       message: input.prompt,
       workspaceRoot: input.workspacePath,
-      conversationId: input.conversationId ?? null,
+      conversationId: input.conversationId ?? undefined,
       instructions: detachedAgentContext(input.agent, {
         organizationContextManifestPath:
           input.organizationContextManifestPath ?? null,
         delegationTargets: input.delegationTargets,
         skillCatalog: input.skillCatalog ?? null,
       }),
-      outputSchema: input.outputSchema ?? null,
-      model: input.agent.model,
-      effort: input.agent.effort,
-      approvalPolicy: "never" as const,
+      outputSchema,
+      model: input.agent.model ?? undefined,
+      effort: input.agent.effort ?? undefined,
+      approvalPolicy: ApprovalPolicy.NEVER,
       sandboxMode: input.readOnly
-        ? "readOnly" as const
+        ? SandboxMode.READ_ONLY
         : input.fullAccess
-          ? "dangerFullAccess" as const
-          : "workspaceWrite" as const,
+          ? SandboxMode.DANGER_FULL_ACCESS
+          : SandboxMode.WORKSPACE_WRITE,
       // Read-only conversational turns must also be side-effect free outside
       // the filesystem. Provider transport runs in the runner process; this
       // flag governs network-capable model tools inside its sandbox.
       networkAccess: !input.readOnly,
       providerBinaryPath: input.agentBinary,
-      ...(input.attachments?.length
-        ? { attachments: input.attachments }
-        : {}),
-      ...(input.agent.provider === "codex"
-        ? {
-            externalTools: !input.readOnly,
-          }
-        : {}),
-    },
+      attachments: input.attachments?.map(({ path, name, mimeType }) => ({
+        path,
+        name,
+        mimeType,
+      })) ?? [],
+      externalTools: input.agent.provider === "codex"
+        ? !input.readOnly
+        : undefined,
+      protocolFingerprint: CONTRACTS_DESCRIPTOR_FINGERPRINT,
+    }),
   };
 }
 

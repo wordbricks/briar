@@ -1,3 +1,8 @@
+import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
+import {
+  ApprovalPolicy,
+  SandboxMode,
+} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import { describe, expect, it } from "vitest";
 import {
   boundedTranscriptPayload,
@@ -316,12 +321,16 @@ describe("detached Agent runner", () => {
     expect(prompt).not.toContain("claimToken");
     expect(launch.kind).toBe("runner");
     expect(launch.request).toMatchObject({
-      conversationId: null,
-      sandboxMode: "workspaceWrite",
+      $typeName: "briar.sidecar.v1.RunRequest",
+      sandboxMode: SandboxMode.WORKSPACE_WRITE,
       providerBinaryPath: "/bin/codex",
       model: "gpt-5",
       effort: "high",
     });
+    expect(launch.request.conversationId).toBeUndefined();
+    expect(launch.request.protocolFingerprint).toEqual(
+      CONTRACTS_DESCRIPTOR_FINGERPRINT,
+    );
   });
 
   it("adds trusted identity, responsibility, and every skill to provider instructions", () => {
@@ -805,8 +814,12 @@ describe("detached Agent runner", () => {
       agentBinary: "/bin/codex",
     });
     expect(launch.request).toMatchObject({
-      attachments,
-      sandboxMode: "readOnly",
+      attachments: attachments.map(({ path, name, mimeType }) => ({
+        path,
+        name,
+        mimeType,
+      })),
+      sandboxMode: SandboxMode.READ_ONLY,
       networkAccess: false,
       externalTools: false,
     });
@@ -820,7 +833,13 @@ describe("detached Agent runner", () => {
       attachments,
       agentBinary: "/bin/claude",
     });
-    expect(claudeLaunch.request).toMatchObject({ attachments });
+    expect(claudeLaunch.request).toMatchObject({
+      attachments: attachments.map(({ path, name, mimeType }) => ({
+        path,
+        name,
+        mimeType,
+      })),
+    });
   });
 
   it("prevents terminal-stage replay after the final checkpoint resumes", () => {
@@ -854,40 +873,27 @@ describe("detached Agent runner", () => {
     });
     expect(launch.kind).toBe("runner");
     expect(launch.request).toMatchObject({
-      approvalPolicy: "never",
+      approvalPolicy: ApprovalPolicy.NEVER,
       effort: "high",
-      sandboxMode: "dangerFullAccess",
+      sandboxMode: SandboxMode.DANGER_FULL_ACCESS,
       providerBinaryPath: "/bin/claude",
     });
   });
 
-  it("passes reply schemas through every provider-neutral runner request", () => {
-    for (const provider of [
-      "codex",
-      "claude",
-      "grok",
-      "agy",
-      "opencode",
-    ] as const) {
-      const launch = detachedProviderRequest({
-        agent: { ...agent, provider },
-        prompt: "reply",
-        workspacePath: "/worktree",
-        fullAccess: false,
-        outputSchema: detachedIssueReplyOutputSchema,
-        agentBinary: `/bin/${provider}`,
-      });
-      expect(launch.request.outputSchema).toBe(detachedIssueReplyOutputSchema);
-    }
-
-    expect(detachedProviderRequest({
+  it("encodes structured output in the generated JsonSchema oneof", () => {
+    const request = detachedProviderRequest({
       agent,
-      prompt: "channel reply",
+      prompt: "reply",
       workspacePath: "/worktree",
       fullAccess: false,
-      outputSchema: detachedChannelReplyOutputSchema,
+      outputSchema: detachedIssueReplyOutputSchema,
       agentBinary: "/bin/codex",
-    }).request.outputSchema).toBe(detachedChannelReplyOutputSchema);
+    }).request;
+
+    expect(request.outputSchema?.value).toEqual({
+      case: "object",
+      value: detachedIssueReplyOutputSchema,
+    });
   });
 
   it("keeps every structured-output object strict and fully required", () => {
@@ -947,7 +953,7 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("confirmation button");
     expect(launch.kind).toBe("runner");
     expect(launch.request).toMatchObject({
-      sandboxMode: "dangerFullAccess",
+      sandboxMode: SandboxMode.DANGER_FULL_ACCESS,
       networkAccess: true,
       externalTools: true,
       providerBinaryPath: "/bin/codex",

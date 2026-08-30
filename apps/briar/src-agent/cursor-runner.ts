@@ -3,7 +3,6 @@ import { AcpJsonRpcConnection, type AcpJsonRpcMessage } from "./acp-json-rpc";
 import {
   buildCursorPromptParts,
   createCursorEventState,
-  decodeCursorRunnerRequest,
   cursorPermissionDecisionResult,
   cursorPermissionInput,
   cursorPermissionOptions,
@@ -18,7 +17,6 @@ import {
   shouldAutoApproveCursorPermission,
   shouldDenyCursorPermission,
   type CursorRunnerOutput,
-  type CursorRunnerRequest,
 } from "./cursor-runner-lib";
 import {
   providerInstructionSeatbeltPattern,
@@ -146,7 +144,7 @@ export function cursorModelConfigId(setup: CursorSessionSetup | undefined) {
 }
 
 type CursorRunnerIo = ReturnType<
-  typeof createRunnerIo<CursorRunnerRequest, CursorRunnerOutput>
+  typeof createRunnerIo<CursorRunnerOutput>
 >;
 
 async function main(runnerIo: CursorRunnerIo) {
@@ -374,9 +372,8 @@ async function main(runnerIo: CursorRunnerIo) {
 }
 
 export async function runCursorRunner() {
-  const runnerIo = createRunnerIo<CursorRunnerRequest, CursorRunnerOutput>({
+  const runnerIo = createRunnerIo<CursorRunnerOutput>({
     closeError: "Briar closed the Cursor runner input.",
-    decodeRequest: decodeCursorRunnerRequest,
   });
   try {
     await main(runnerIo);

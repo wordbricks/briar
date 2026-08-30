@@ -1,4 +1,3 @@
-import * as Schema from "effect/Schema";
 import type { JsonRpcMessage } from "./json-rpc-message";
 import {
   normalizedActivityText,
@@ -7,29 +6,13 @@ import {
   type AgentActivityStatus,
   type NormalizedAgentEvent,
 } from "./normalized-agent-event";
-import {
-  commonRunnerRequestFields,
-  runnerRequestDecoderOptions,
-} from "./runner-request";
+import type { RunnerRequest } from "./runner-request";
 
 export type {
   AgentActivityKind,
   AgentActivityStatus,
   NormalizedAgentEvent,
 } from "./normalized-agent-event";
-
-export const CodexRunnerRequest = Schema.Struct({
-  ...commonRunnerRequestFields,
-  effort: Schema.optional(Schema.NullOr(Schema.String)),
-  externalTools: Schema.optional(Schema.Boolean),
-});
-
-export type CodexRunnerRequest = typeof CodexRunnerRequest.Type;
-
-export const decodeCodexRunnerRequest = Schema.decodeUnknownResult(
-  CodexRunnerRequest,
-  runnerRequestDecoderOptions,
-);
 
 export type CodexRunnerOutput =
   | {
@@ -166,7 +149,7 @@ export function createCodexAppServerState(
 }
 
 export function codexAppServerArgs(
-  request: Pick<CodexRunnerRequest, "networkAccess" | "externalTools">,
+  request: Pick<RunnerRequest, "networkAccess" | "externalTools">,
   browserAutomationProvider?: string,
 ): string[] {
   const argumentsList = ["app-server", "--listen", "stdio://"];
@@ -271,7 +254,7 @@ export function codexInitializedNotification(): CodexRpcMessage {
 }
 
 export function codexConfigReadRequest(
-  request: Pick<CodexRunnerRequest, "workspaceRoot">,
+  request: Pick<RunnerRequest, "workspaceRoot">,
 ): CodexRpcMessage {
   return {
     method: "config/read",
@@ -298,7 +281,7 @@ export function codexAppsInstalledRequest(): CodexRpcMessage {
 
 interface CodexThreadParams {
   cwd: string;
-  approvalPolicy: CodexRunnerRequest["approvalPolicy"];
+  approvalPolicy: RunnerRequest["approvalPolicy"];
   sandbox?: ReturnType<typeof sandboxModeValue>;
   config?: NonNullable<ReturnType<typeof codexMcpSessionConfig>>;
   developerInstructions?: string;
@@ -306,7 +289,7 @@ interface CodexThreadParams {
 }
 
 export function codexThreadRequest(
-  request: CodexRunnerRequest,
+  request: RunnerRequest,
   isolation: CodexMcpIsolation = emptyCodexMcpIsolation(),
 ): CodexRpcMessage {
   const params: CodexThreadParams = {
@@ -335,18 +318,18 @@ export function codexThreadRequest(
 interface CodexTurnParams {
   threadId: string;
   cwd: string;
-  approvalPolicy: CodexRunnerRequest["approvalPolicy"];
+  approvalPolicy: RunnerRequest["approvalPolicy"];
   input: Array<
     | { type: "text"; text: string }
     | { type: "localImage"; path: string }
   >;
-  outputSchema?: NonNullable<CodexRunnerRequest["outputSchema"]>;
+  outputSchema?: NonNullable<RunnerRequest["outputSchema"]>;
   model?: string;
   effort?: string;
 }
 
 export function codexTurnRequest(
-  request: CodexRunnerRequest,
+  request: RunnerRequest,
   threadId: string,
 ): CodexRpcMessage {
   const params: CodexTurnParams = {
@@ -625,7 +608,7 @@ export function codexServerRequestResponse(
 
 export function consumeCodexAppServerMessage(
   state: CodexAppServerState,
-  request: CodexRunnerRequest,
+  request: RunnerRequest,
   message: CodexRpcMessage,
 ): CodexAppServerTransition {
   captureCodexMcpMessage(state, message);
@@ -1116,7 +1099,7 @@ export function codexFinalMessage(state: CodexAppServerState): string | null {
 }
 
 function sandboxModeValue(
-  mode: CodexRunnerRequest["sandboxMode"],
+  mode: RunnerRequest["sandboxMode"],
 ): "read-only" | "workspace-write" | "danger-full-access" {
   if (mode === "readOnly") return "read-only";
   if (mode === "dangerFullAccess") return "danger-full-access";
