@@ -4,8 +4,10 @@ import {
   MobilePushEndpoint as ProtoMobilePushEndpoint,
   MobilePushLocale as ProtoMobilePushLocale,
 } from "@briar/contracts/gen/briar/app/v1/account_pb";
+import type { User } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import type { SessionUser } from "../../types";
 import { appCallOptions, appRpc, appTransport } from "./core";
+import { requiredMessage } from "./mappers";
 
 const accountClient = appTransport
   ? createClient(AccountService, appTransport)
@@ -17,6 +19,30 @@ const requireAccountClient = () => {
   }
   return accountClient;
 };
+
+export type AccountProfileInput = {
+  readonly username: string | null;
+  readonly name: string;
+  readonly image: string | null;
+};
+
+export const sessionUserFromProto = (user: User): SessionUser => ({
+  id: user.id,
+  username: user.username ?? null,
+  name: user.name,
+  email: user.email,
+  image: user.image ?? null,
+});
+
+export const accountProfileUpdateToProto = (input: AccountProfileInput) => ({
+  usernameUpdate: input.username === null
+    ? { case: "clearUsername" as const, value: {} }
+    : { case: "username" as const, value: input.username },
+  name: input.name,
+  imageUpdate: input.image === null
+    ? { case: "clearImage" as const, value: {} }
+    : { case: "image" as const, value: input.image },
+});
 
 export type MobilePushDeviceEndpoint =
   | "apns-development"
@@ -61,14 +87,40 @@ export async function getCurrentUser(
       {},
       appCallOptions(token, signal),
     );
-    if (response.user === undefined) throw new Error("Current user is missing");
-    return {
-      id: response.user.id,
-      username: response.user.username ?? null,
-      name: response.user.name,
-      email: response.user.email,
-      image: response.user.image ?? null,
-    };
+    return sessionUserFromProto(requiredMessage(
+      response.user,
+      "getCurrentUser.user",
+    ));
+  });
+}
+
+export async function updateCurrentUserProfile(
+  token: string,
+  input: AccountProfileInput,
+): Promise<SessionUser> {
+  const client = requireAccountClient();
+  return appRpc(async () => {
+    const response = await client.updateAccountProfile(
+      accountProfileUpdateToProto(input),
+      appCallOptions(token),
+    );
+    return sessionUserFromProto(requiredMessage(
+      response.user,
+      "updateAccountProfile.user",
+    ));
+  });
+}
+
+export async function deleteCurrentUser(
+  token: string,
+  confirmation: string,
+): Promise<void> {
+  const client = requireAccountClient();
+  await appRpc(async () => {
+    await client.deleteAccount(
+      { confirmation },
+      appCallOptions(token),
+    );
   });
 }
 
