@@ -1811,17 +1811,26 @@ export async function toggleChannelMessageReaction(
 export async function listChannelRootMessages(
   db: D1Database,
   channelId: string,
-  limit = 200,
+  options: {
+    limit?: number;
+    createdAfter?: string;
+  } = {},
 ) {
+  const limit = options.limit ?? 200;
   const select = await messageSelectFor(db);
   const rows = await db
     .prepare(
       `${select}
        where message.channel_id = ? and message.parent_message_id is null
+         ${options.createdAfter ? "and message.created_at > ?" : ""}
        order by message.created_at desc, message.id desc
        limit ?`,
     )
-    .bind(channelId, limit)
+    .bind(
+      channelId,
+      ...(options.createdAfter ? [options.createdAfter] : []),
+      limit,
+    )
     .all<ChannelMessageRow>();
   return attachMessageRelations(db, rows.results.reverse());
 }
