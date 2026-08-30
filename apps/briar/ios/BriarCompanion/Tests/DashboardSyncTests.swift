@@ -1,4 +1,5 @@
 import BriarContracts
+import BriarContractsMocks
 import SwiftProtobuf
 import XCTest
 @testable import BriarCompanion
@@ -59,27 +60,34 @@ final class DashboardSyncTests: XCTestCase {
             id: "44444444-4444-4444-8444-444444444444",
             title: "Authoritative"
         )
-        let initial = snapshot(cursor: 10, runs: [initialRun])
-        let replacement = snapshot(cursor: 20, runs: [replacementRun])
-        let reset = DashboardDelta(
-            cursor: 11,
-            hasMore: false,
-            reset: true,
-            runs: [],
-            deletedRunIds: [],
-            project: nil,
-            generatedAt: Date(timeIntervalSince1970: 1_700_000_200)
+        let scenario = DashboardMockScenario(
+            snapshots: [
+                wireSnapshot(cursor: 10, run: initialRun),
+                wireSnapshot(cursor: 20, run: replacementRun),
+            ],
+            deltas: [wireReset(cursor: 11)]
         )
-        let api = DashboardConnectStub(snapshots: [initial, replacement], deltas: [reset])
-        let store = DashboardStore(api: api, pollInterval: .seconds(3_600))
+        let dashboard = BriarAPI_DashboardServiceClientMock()
+        dashboard.mockAsyncGetDashboard = { request in
+            .init(result: .success(scenario.nextSnapshot(request: request)))
+        }
+        dashboard.mockAsyncSyncDashboard = { request in
+            .init(result: .success(scenario.nextDelta(request: request)))
+        }
+        let store = DashboardStore(
+            api: DashboardHTTPStub(),
+            dashboardService: dashboard,
+            pollInterval: .seconds(3_600)
+        )
 
         store.select(projectID: project.id, token: "token")
         await store.refresh(forceSnapshot: true)
         await store.refresh()
 
-        XCTAssertEqual(store.snapshot, replacement)
-        let calls = await api.calls()
-        XCTAssertEqual(calls, ["get", "sync:10", "get"])
+        XCTAssertEqual(store.snapshot?.cursor, 20)
+        XCTAssertEqual(store.snapshot?.runs.map(\.id), [replacementRun.id])
+        XCTAssertEqual(store.snapshot?.runs.map(\.title), ["Authoritative"])
+        XCTAssertEqual(scenario.calls, ["get", "sync:10", "get"])
         store.applicationDidEnterBackground()
     }
 
@@ -150,33 +158,106 @@ final class DashboardSyncTests: XCTestCase {
             updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
     }
+
+    private func wireSnapshot(
+        cursor: UInt64,
+        run: DashboardRun
+    ) -> BriarAPI_GetDashboardResponse {
+        var projectMessage = BriarAPI_Project()
+        projectMessage.id = project.id.uuidString.lowercased()
+        projectMessage.name = project.name
+        projectMessage.issueKeyPrefix = project.issueKeyPrefix
+        projectMessage.scheduleTabEnabled = project.scheduleTabEnabled
+        projectMessage.organizationID = project.organizationId.uuidString.lowercased()
+        projectMessage.organizationName = project.organizationName
+        projectMessage.role = .owner
+        projectMessage.createdAt = Google_Protobuf_Timestamp(date: project.createdAt)
+
+        var settings = BriarAPI_ProjectSettings()
+        settings.linear = BriarAPI_LinearSettings()
+        settings.workflow = wireWorkflow()
+
+        var runMessage = BriarAPI_DashboardRun()
+        runMessage.id = run.id.uuidString.lowercased()
+        runMessage.title = run.title
+        runMessage.status = .running
+        runMessage.workflow = wireWorkflow()
+        runMessage.source = .issue
+        runMessage.startedAt = Google_Protobuf_Timestamp(date: run.updatedAt)
+        runMessage.updatedAt = Google_Protobuf_Timestamp(date: run.updatedAt)
+        runMessage.lastEventAt = Google_Protobuf_Timestamp(date: run.updatedAt)
+
+        var response = BriarAPI_GetDashboardResponse()
+        response.project = projectMessage
+        response.settings = settings
+        response.runs = [runMessage]
+        response.cursor = cursor
+        response.generatedAt = Google_Protobuf_Timestamp(
+            date: Date(timeIntervalSince1970: 1_700_000_000 + Double(cursor))
+        )
+        return response
+    }
+
+    private func wireReset(cursor: UInt64) -> BriarAPI_SyncDashboardResponse {
+        var response = BriarAPI_SyncDashboardResponse()
+        response.cursor = cursor
+        response.reset = true
+        response.generatedAt = Google_Protobuf_Timestamp(
+            date: Date(timeIntervalSince1970: 1_700_000_200)
+        )
+        return response
+    }
+
+    private func wireWorkflow() -> BriarTypes_AutoHuntWorkflow {
+        var workflow = BriarTypes_AutoHuntWorkflow()
+        workflow.version = 2
+        workflow.execution = BriarTypes_WorkflowExecution()
+        workflow.completion = BriarTypes_WorkflowCompletion()
+        return workflow
+    }
 }
 
-private actor DashboardConnectStub: MobileAPIClientProtocol {
-    private var snapshots: [DashboardSnapshot]
-    private var deltas: [DashboardDelta]
+private struct DashboardHTTPStub: MobileAPIClientProtocol {}
+
+private final class DashboardMockScenario: @unchecked Sendable {
+    private let lock = NSLock()
+    private var snapshots: [BriarAPI_GetDashboardResponse]
+    private var deltas: [BriarAPI_SyncDashboardResponse]
     private var recordedCalls: [String] = []
 
-    init(snapshots: [DashboardSnapshot], deltas: [DashboardDelta]) {
+    init(
+        snapshots: [BriarAPI_GetDashboardResponse],
+        deltas: [BriarAPI_SyncDashboardResponse]
+    ) {
         self.snapshots = snapshots
         self.deltas = deltas
     }
 
-    func getDashboard(projectID: UUID, token: String) async throws -> DashboardSnapshot {
+    func nextSnapshot(
+        request: BriarAPI_GetDashboardRequest
+    ) -> BriarAPI_GetDashboardResponse {
+        lock.lock()
+        defer { lock.unlock() }
         recordedCalls.append("get")
-        guard !snapshots.isEmpty else { throw MobileAPIError.invalidResponse }
+        precondition(!request.projectID.isEmpty)
+        precondition(!snapshots.isEmpty)
         return snapshots.removeFirst()
     }
 
-    func syncDashboard(
-        projectID: UUID,
-        cursor: Int,
-        token: String
-    ) async throws -> DashboardDelta {
-        recordedCalls.append("sync:\(cursor)")
-        guard !deltas.isEmpty else { throw MobileAPIError.invalidResponse }
+    func nextDelta(
+        request: BriarAPI_SyncDashboardRequest
+    ) -> BriarAPI_SyncDashboardResponse {
+        lock.lock()
+        defer { lock.unlock() }
+        recordedCalls.append("sync:\(request.cursor)")
+        precondition(!request.projectID.isEmpty)
+        precondition(!deltas.isEmpty)
         return deltas.removeFirst()
     }
 
-    func calls() -> [String] { recordedCalls }
+    var calls: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedCalls
+    }
 }

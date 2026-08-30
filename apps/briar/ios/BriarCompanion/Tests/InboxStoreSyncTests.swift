@@ -1,4 +1,6 @@
 import BriarContracts
+import BriarContractsMocks
+import Connect
 import SwiftProtobuf
 import XCTest
 @testable import BriarCompanion
@@ -77,26 +79,29 @@ final class InboxStoreSyncTests: XCTestCase {
     }
 
     func testFeedVersionDrivesConditionalRefreshWithoutClearingUnchangedRows() async throws {
-        let message = inboxMessage(id: "issue:1", version: "message-v1")
-        let api = FeedConnectStub(responses: [
-            InboxFeedUpdate(
-                messages: [message],
-                subscribedIssueIDs: [],
-                generatedAt: Date(timeIntervalSince1970: 1_700_000_000),
-                version: "feed-v1",
-                unchanged: false
-            ),
-            InboxFeedUpdate(
-                messages: [],
-                subscribedIssueIDs: [],
-                generatedAt: Date(timeIntervalSince1970: 1_700_000_001),
-                version: "feed-v1",
-                unchanged: true
-            ),
+        var issue = BriarAPI_InboxIssueMessage()
+        issue.status = .blocked
+        var message = wireMessage(
+            id: "issue:1",
+            occurredAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        message.issue = issue
+        let scenario = InboxFeedMockScenario(responses: [
+            wireFeed(messages: [message], version: "feed-v1", unchanged: false),
+            wireFeed(messages: [], version: "feed-v1", unchanged: true),
         ])
+        let inbox = BriarAPI_InboxServiceClientMock()
+        inbox.mockAsyncGetInboxFeed = { request in
+            .init(result: .success(scenario.next(request: request)))
+        }
         let (defaults, suiteName) = isolatedDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
-        let store = InboxStore(defaults: defaults, api: api, pollInterval: .seconds(3_600))
+        let store = InboxStore(
+            defaults: defaults,
+            api: InboxHTTPStub(),
+            inboxService: inbox,
+            pollInterval: .seconds(3_600)
+        )
 
         store.configure(
             token: "token",
@@ -106,8 +111,8 @@ final class InboxStoreSyncTests: XCTestCase {
         await store.refreshFeed()
         await store.refreshFeed()
 
-        XCTAssertEqual(store.messages.map(\.id), [message.id])
-        let versions = await api.knownVersions()
+        XCTAssertEqual(store.messages.map(\.id), ["issue:1"])
+        let versions = scenario.knownVersions
         XCTAssertEqual(versions.count, 2)
         XCTAssertNil(versions[0])
         XCTAssertEqual(versions[1], "feed-v1")
@@ -115,26 +120,31 @@ final class InboxStoreSyncTests: XCTestCase {
     }
 
     func testOlderReadStateFetchCannotUndoCompletedMutation() async throws {
-        let api = ReadStateConnectStub()
+        let scenario = InboxReadStateMockScenario()
+        let inbox = ControlledInboxServiceMock(scenario: scenario)
         let (defaults, suiteName) = isolatedDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
-        let store = InboxStore(defaults: defaults, api: api)
+        let store = InboxStore(
+            defaults: defaults,
+            api: InboxHTTPStub(),
+            inboxService: inbox
+        )
         let project = makeProject()
 
         store.configure(token: "token", userID: "user-1")
         store.update(snapshot: makeSnapshot(project: project), sessions: [], project: project)
-        try await waitForRequestCount(1, method: "GET", api: api)
+        try await waitForRequestCount(1, method: "GET", scenario: scenario)
         let message = try XCTUnwrap(store.messages.first)
 
         store.markAllRead()
-        try await waitForRequestCount(1, method: "PUT", api: api)
-        try await api.resolveNext(method: "PUT", values: [message.id: message.version])
+        try await waitForRequestCount(1, method: "PUT", scenario: scenario)
+        try await scenario.resolveNextPut(values: [message.id: message.version])
         try await Task.sleep(for: .milliseconds(20))
-        try await api.resolveNext(method: "GET", values: [message.id: "stale"])
+        try await scenario.resolveNextGet(values: [message.id: "stale"])
         try await Task.sleep(for: .milliseconds(20))
 
         XCTAssertEqual(store.messages.first?.isUnread, false)
-        let lastPut = await api.lastPut()
+        let lastPut = await scenario.lastPut()
         XCTAssertEqual(lastPut, [message.id: message.version])
     }
 
@@ -152,24 +162,19 @@ final class InboxStoreSyncTests: XCTestCase {
         return message
     }
 
-    private func inboxMessage(id: String, version: String) -> InboxMessage {
-        InboxMessage(
-            id: id,
-            kind: .issue,
-            projectId: projectID,
-            projectName: "Briar",
-            targetId: "88888888-8888-4888-8888-888888888888",
-            title: "Review",
-            occurredAt: Date(timeIntervalSince1970: 1_700_000_000),
-            version: version,
-            body: nil,
-            authorName: nil,
-            statusLabel: "Blocked",
-            requiresAttention: true,
-            priority: 1,
-            structuredResult: nil,
-            rootMessageId: nil
+    private func wireFeed(
+        messages: [BriarAPI_InboxFeedMessage],
+        version: String,
+        unchanged: Bool
+    ) -> BriarAPI_GetInboxFeedResponse {
+        var response = BriarAPI_GetInboxFeedResponse()
+        response.messages = messages
+        response.generatedAt = Google_Protobuf_Timestamp(
+            date: Date(timeIntervalSince1970: 1_700_000_000)
         )
+        response.version = version
+        response.unchanged = unchanged
+        return response
     }
 
     private func makeProject() -> Project {
@@ -208,64 +213,65 @@ final class InboxStoreSyncTests: XCTestCase {
     private func waitForRequestCount(
         _ count: Int,
         method: String,
-        api: ReadStateConnectStub
+        scenario: InboxReadStateMockScenario
     ) async throws {
         for _ in 0..<200 {
-            if await api.requestCount(method: method) >= count { return }
+            if await scenario.requestCount(method: method) >= count { return }
             try await Task.sleep(for: .milliseconds(5))
         }
         XCTFail("Timed out waiting for \(method) request \(count)")
     }
 }
 
-private actor FeedConnectStub: MobileAPIClientProtocol {
-    private var responses: [InboxFeedUpdate]
+private struct InboxHTTPStub: MobileAPIClientProtocol {}
+
+private final class InboxFeedMockScenario: @unchecked Sendable {
+    private let lock = NSLock()
+    private var responses: [BriarAPI_GetInboxFeedResponse]
     private var requestedVersions: [String?] = []
 
-    init(responses: [InboxFeedUpdate]) {
+    init(responses: [BriarAPI_GetInboxFeedResponse]) {
         self.responses = responses
     }
 
-    func getInboxFeed(
-        organizationID: UUID,
-        knownVersion: String?,
-        token: String
-    ) async throws -> InboxFeedUpdate {
-        requestedVersions.append(knownVersion)
-        guard !responses.isEmpty else { throw MobileAPIError.invalidResponse }
+    func next(request: BriarAPI_GetInboxFeedRequest) -> BriarAPI_GetInboxFeedResponse {
+        lock.lock()
+        defer { lock.unlock() }
+        precondition(!request.organizationID.isEmpty)
+        requestedVersions.append(request.hasKnownVersion ? request.knownVersion : nil)
+        precondition(!responses.isEmpty)
         return responses.removeFirst()
     }
 
-    func getInboxReadStates(token: String) async throws -> [String: String] { [:] }
-
-    func knownVersions() -> [String?] { requestedVersions }
+    var knownVersions: [String?] {
+        lock.lock()
+        defer { lock.unlock() }
+        return requestedVersions
+    }
 }
 
-private actor ReadStateConnectStub: MobileAPIClientProtocol {
-    private struct Pending {
-        let method: String
-        let continuation: CheckedContinuation<[String: String], any Error>
-    }
-
+private actor InboxReadStateMockScenario {
     private var requests: [String] = []
-    private var pending: [Pending] = []
+    private var pendingGets: [CheckedContinuation<ResponseMessage<BriarAPI_GetInboxReadStatesResponse>, Never>] = []
+    private var pendingPuts: [CheckedContinuation<ResponseMessage<BriarAPI_PutInboxReadStatesResponse>, Never>] = []
     private var putPayloads: [[String: String]] = []
 
-    func getInboxReadStates(token: String) async throws -> [String: String] {
+    func get(
+        _ request: BriarAPI_GetInboxReadStatesRequest
+    ) async -> ResponseMessage<BriarAPI_GetInboxReadStatesResponse> {
         requests.append("GET")
-        return try await withCheckedThrowingContinuation { continuation in
-            pending.append(Pending(method: "GET", continuation: continuation))
+        return await withCheckedContinuation { continuation in
+            pendingGets.append(continuation)
         }
     }
 
-    func putInboxReadStates(
-        _ readVersions: [String: String],
-        token: String
-    ) async throws -> [String: String] {
+    func put(
+        _ request: BriarAPI_PutInboxReadStatesRequest
+    ) async -> ResponseMessage<BriarAPI_PutInboxReadStatesResponse> {
         requests.append("PUT")
-        putPayloads.append(readVersions)
-        return try await withCheckedThrowingContinuation { continuation in
-            pending.append(Pending(method: "PUT", continuation: continuation))
+        putPayloads.append(request.readVersions)
+        return await withCheckedContinuation { continuation in
+            pendingPuts.append(continuation)
         }
     }
 
@@ -275,10 +281,42 @@ private actor ReadStateConnectStub: MobileAPIClientProtocol {
 
     func lastPut() -> [String: String]? { putPayloads.last }
 
-    func resolveNext(method: String, values: [String: String]) throws {
-        guard let index = pending.firstIndex(where: { $0.method == method }) else {
-            throw MobileAPIError.invalidRequest
-        }
-        pending.remove(at: index).continuation.resume(returning: values)
+    func resolveNextGet(values: [String: String]) throws {
+        guard !pendingGets.isEmpty else { throw MobileAPIError.invalidRequest }
+        var response = BriarAPI_GetInboxReadStatesResponse()
+        response.readVersions = values
+        pendingGets.removeFirst().resume(returning: .init(result: .success(response)))
+    }
+
+    func resolveNextPut(values: [String: String]) throws {
+        guard !pendingPuts.isEmpty else { throw MobileAPIError.invalidRequest }
+        var response = BriarAPI_PutInboxReadStatesResponse()
+        response.readVersions = values
+        pendingPuts.removeFirst().resume(returning: .init(result: .success(response)))
+    }
+}
+
+private final class ControlledInboxServiceMock: BriarAPI_InboxServiceClientMock,
+    @unchecked Sendable
+{
+    private let scenario: InboxReadStateMockScenario
+
+    init(scenario: InboxReadStateMockScenario) {
+        self.scenario = scenario
+        super.init()
+    }
+
+    override func getInboxReadStates(
+        request: BriarAPI_GetInboxReadStatesRequest,
+        headers: Connect.Headers = [:]
+    ) async -> ResponseMessage<BriarAPI_GetInboxReadStatesResponse> {
+        await scenario.get(request)
+    }
+
+    override func putInboxReadStates(
+        request: BriarAPI_PutInboxReadStatesRequest,
+        headers: Connect.Headers = [:]
+    ) async -> ResponseMessage<BriarAPI_PutInboxReadStatesResponse> {
+        await scenario.put(request)
     }
 }
