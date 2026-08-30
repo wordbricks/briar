@@ -32,7 +32,6 @@ import {
   enqueueChannelAgentReplies,
   getChannelMessage,
   getChannelMessageAttachment,
-  getChannelMessageDocument,
   getChannelReplySessionForThread,
   getProjectAgentChannel,
   getProjectOrganizationChannel,
@@ -55,7 +54,6 @@ import {
   json,
   privateNoStoreJson,
 } from "./http-response";
-import { fetchChannelLinkPreview } from "./link-preview";
 import { getOrganizationRole } from "./organization-repository";
 import {
   decodeChannelMessageQuery,
@@ -569,49 +567,6 @@ export async function handleChannelMessageRoute(
   const channelAttachmentMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/attachments\/([0-9a-f-]+)$/u,
   );
-  const channelDocumentMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/document$/u,
-  );
-  const channelLinkPreviewMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/link-preview$/u,
-  );
-  if (channelLinkPreviewMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    await requireChannelAccess(
-      db,
-      channelLinkPreviewMatch[1],
-      channelLinkPreviewMatch[2],
-      session.user.id,
-    );
-    const targetUrl = url.searchParams.get("url");
-    if (!targetUrl) throw new HttpError(400, "Link preview URL is required");
-    return privateNoStoreJson({
-      preview: await fetchChannelLinkPreview(targetUrl),
-    });
-  }
-  if (channelDocumentMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    await requireChannelAccess(
-      db,
-      channelDocumentMatch[1],
-      channelDocumentMatch[2],
-      session.user.id,
-    );
-    const document = await getChannelMessageDocument(
-      db,
-      channelDocumentMatch[2],
-      channelDocumentMatch[3],
-    );
-    if (!document) throw new HttpError(404, "Document not found");
-    return privateNoStoreJson({
-      document: {
-        messageId: document.message_id,
-        title: document.title,
-        markdown: document.markdown,
-        projectId: document.project_id,
-      },
-    });
-  }
   if (
     channelAttachmentMatch &&
     (request.method === "GET" || request.method === "HEAD")

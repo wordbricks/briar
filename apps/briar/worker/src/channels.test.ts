@@ -31,7 +31,6 @@ import {
   getChannelReplySession,
   getChannelMessage,
   getChannelMessageAttachment,
-  getChannelMessageDocument,
   getChannelSyncCursor,
   getIncomingChannelWebhook,
   listChannelAgents,
@@ -962,7 +961,7 @@ describe("organization channels", () => {
     ).resolves.toMatchObject({ object_key: expect.stringContaining(attachmentId) });
   });
 
-  it("returns a channel document body only through the authenticated document route", async () => {
+  it("returns a channel document through the authenticated Connect boundary", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000150";
     const messageId = "f0000000-0000-4000-8000-000000000150";
     await createChannel(db, {
@@ -995,13 +994,6 @@ describe("organization channels", () => {
        ) values (?, ?, null, 'Rollout plan', '# Rollout\n\n- Verify access', ?, ?)`,
     ).bind(messageId, channelId, at(8), at(8)).run();
 
-    await expect(getChannelMessageDocument(db, channelId, messageId))
-      .resolves.toMatchObject({
-        message_id: messageId,
-        title: "Rollout plan",
-        markdown: "# Rollout\n\n- Verify access",
-      });
-
     const apiEnv = {
       DB: db,
       ARCHIVES: archives,
@@ -1010,18 +1002,24 @@ describe("organization channels", () => {
       GOOGLE_CLIENT_SECRET: "google-secret-test",
     } as unknown as Env;
     const response = await apiWorker.fetch(new Request(
-      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/document`,
-      { headers: { authorization: `Bearer ${ownerSessionToken}` } },
+      "https://briar-api.example/briar.app.v1.ChannelService/GetChannelMessageDocument",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerSessionToken}`,
+          "connect-protocol-version": "1",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ organizationId, channelId, messageId }),
+      },
     ), apiEnv);
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     await expect(response.json()).resolves.toEqual({
       document: {
         messageId,
         title: "Rollout plan",
         markdown: "# Rollout\n\n- Verify access",
-        projectId: null,
       },
     });
   });
