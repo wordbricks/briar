@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { repositoryWorkflowBootstrap } from "../src/lib/auto-hunt-contract";
 import { decodeConfig, type Config } from "./config-contract";
-import { HttpRequestError } from "./execution-metrics-upload";
+import { HttpRequestError } from "./http-request-error";
 import {
   projectDoctor,
   type ProjectDoctorDependencies,

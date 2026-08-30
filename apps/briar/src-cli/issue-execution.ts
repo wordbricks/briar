@@ -1,4 +1,3 @@
-import { Buffer } from "node:buffer";
 import {
   readFile,
   rm,
@@ -35,9 +34,11 @@ import {
   logDetachedProviderTurnDiagnostic,
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
-import { TranscriptBatcher } from "./transcript-batcher";
 import { ChannelActivityPublisher } from "./channel-activity-publisher";
-import { uploadExecutionMetricsWithCostCompatibility } from "./execution-metrics-upload";
+import {
+  createWorkerTranscriptBatcher,
+  reportIssueExecutionTelemetry,
+} from "./worker-transcript-client";
 import {
   errorDelayMs,
   issueWorkerSessionDirectory,
@@ -72,8 +73,6 @@ import {
   value,
   saveConfigAt,
   request,
-  serializeTranscriptRequest,
-  isTranscriptPayloadTooLarge,
   runGit,
   worktreeSettings,
 } from "./command-support";
@@ -330,30 +329,13 @@ async function runClaimedIssueInRuntime(
   const usageCollector = createAgentExecutionUsageCollector(provider, {
     configuredModel: execution.model,
   });
-  const transcriptEnvelope = {
+  const transcriptBatcher = createWorkerTranscriptBatcher({
+    apiUrl: config.apiUrl,
+    token: workerToken,
     projectId: project.id,
+    work: issue,
     sessionId,
-    runId: issue.runId,
-    workType: "issue" as const,
-    workId: issue.runId,
-    claimToken: issue.claimToken,
-    ...(issue.executionId ? { executionId: issue.executionId } : {}),
-    workerId: activeProject.executionWorker?.workerId,
     agentProvider: provider,
-  };
-  const transcriptBatcher = new TranscriptBatcher({
-    send: async (events) => {
-      await request(config.apiUrl, "/transcripts", workerToken, {
-        method: "POST",
-        body: serializeTranscriptRequest(transcriptEnvelope, events),
-      });
-    },
-    measureBytes: (events) =>
-      Buffer.byteLength(
-        serializeTranscriptRequest(transcriptEnvelope, events),
-        "utf8",
-      ),
-    isPayloadTooLarge: isTranscriptPayloadTooLarge,
     onError: (error) => {
       console.error(
         `transcript upload failed for ${issue.sourceKey}: ${
@@ -514,39 +496,15 @@ async function runClaimedIssueInRuntime(
       agentExecutionTokenUsageFromObservations(usageObservations),
     );
     try {
-      const metricsPayload = {
+      await reportIssueExecutionTelemetry({
+        apiUrl: config.apiUrl,
+        token: workerToken,
         projectId: project.id,
-        sessionId,
-        runId: issue.runId,
-        runAttempt: issue.currentAttempt,
-        workType: "issue" as const,
-        workId: issue.runId,
-        claimToken: issue.claimToken,
-        ...(issue.executionId ? { executionId: issue.executionId } : {}),
-        workerId: activeProject.executionWorker?.workerId,
+        work: issue,
         agentProvider: provider,
         executionMetrics,
-        ...(issue.executionId && usageRecords.length > 0
-          ? { usageRecords }
-          : {}),
-        ...(issue.executionId && costRecords.length > 0
-          ? { costRecords }
-          : {}),
-        events: [
-          {
-            sequence: transcriptSequencer.next(),
-            direction: "server",
-            payload: { type: "execution.metrics", executionMetrics },
-          },
-        ],
-      };
-      await uploadExecutionMetricsWithCostCompatibility({
-        payload: metricsPayload,
-        send: (payload) =>
-          request(config.apiUrl, "/transcripts", workerToken, {
-            method: "POST",
-            body: JSON.stringify(payload),
-          }),
+        usageObservations: usageRecords,
+        costObservations: costRecords,
       });
     } catch (error) {
       console.error(

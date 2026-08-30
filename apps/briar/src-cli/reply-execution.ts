@@ -1,4 +1,3 @@
-import { Buffer } from "node:buffer";
 import {
   mkdtemp,
   mkdir,
@@ -27,8 +26,8 @@ import {
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
 import { materializeDetachedAgentSkillCatalog } from "./agent-skill-discovery";
-import { TranscriptBatcher } from "./transcript-batcher";
 import { ChannelActivityPublisher } from "./channel-activity-publisher";
+import { createWorkerTranscriptBatcher } from "./worker-transcript-client";
 import {
   workerCliPath,
   workerExecutionPath,
@@ -86,8 +85,6 @@ import {
   has,
   required,
   request,
-  serializeTranscriptRequest,
-  isTranscriptPayloadTooLarge,
   runGit,
   worktreeSettings,
   worktreesEnabled,
@@ -149,28 +146,13 @@ async function runClaimedProjectAgentTask(
     // Direct Agent tasks are not Hunt runs. Their task/session UUID is the
     // durable transcript key, while attempt-scoped sequence ranges make Worker
     // retries append safely without requiring a Hunt-run binding.
-    const transcriptEnvelope = {
+    const transcriptBatcher = createWorkerTranscriptBatcher({
+      apiUrl: config.apiUrl,
+      token: workerToken,
       projectId: project.id,
+      work: task,
       sessionId: task.workId,
-      workType: "projectAgentTask" as const,
-      workId: task.workId,
-      claimToken: task.claimToken,
-      workerId,
       agentProvider: agent.provider,
-    };
-    const transcriptBatcher = new TranscriptBatcher({
-      send: async (events) => {
-        await request(config.apiUrl, "/transcripts", workerToken, {
-          method: "POST",
-          body: serializeTranscriptRequest(transcriptEnvelope, events),
-        });
-      },
-      measureBytes: (events) =>
-        Buffer.byteLength(
-          serializeTranscriptRequest(transcriptEnvelope, events),
-          "utf8",
-        ),
-      isPayloadTooLarge: isTranscriptPayloadTooLarge,
       onError: (error) => {
         console.error(
           `transcript upload failed for ${task.sourceKey}: ${
@@ -474,29 +456,13 @@ async function runClaimedIssueReply(
       skillExecutionTarget: issue.skillExecutionTarget,
     });
     let sequence = 0;
-    const transcriptEnvelope = {
+    const transcriptBatcher = createWorkerTranscriptBatcher({
+      apiUrl: config.apiUrl,
+      token: workerToken,
       projectId: project.id,
+      work: issue,
       sessionId: `reply-${issue.workId}`,
-      runId: issue.runId,
-      workType: "issueReply" as const,
-      workId: issue.workId,
-      claimToken: issue.claimToken,
-      workerId: registered.workerId,
       agentProvider: provider,
-    };
-    const transcriptBatcher = new TranscriptBatcher({
-      send: async (events) => {
-        await request(config.apiUrl, "/transcripts", workerToken, {
-          method: "POST",
-          body: serializeTranscriptRequest(transcriptEnvelope, events),
-        });
-      },
-      measureBytes: (events) =>
-        Buffer.byteLength(
-          serializeTranscriptRequest(transcriptEnvelope, events),
-          "utf8",
-        ),
-      isPayloadTooLarge: isTranscriptPayloadTooLarge,
       onError: (error) => {
         console.error(
           `transcript upload failed for reply ${issue.workId}: ${

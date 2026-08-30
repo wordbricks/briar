@@ -51,7 +51,7 @@ import {
   isUnauthenticatedConnectError,
   updateRemoteProjectSettings,
 } from "./app-connect-client";
-import { HttpRequestError } from "./execution-metrics-upload";
+import { HttpRequestError } from "./http-request-error";
 import {
   configWithRemoteProjectSettings,
   type FetchRemoteProjectSettings,

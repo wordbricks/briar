@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { autoHuntRequirementKinds } from "../src/lib/auto-hunt-contract";
 import { organizationAgentContextCapability } from "../src/lib/organization-agent-context-contract";
 import { runProjectAgentTaskCompletionFlow } from "./agent-runner";
-import { HttpRequestError } from "./execution-metrics-upload";
+import { HttpRequestError } from "./http-request-error";
 import {
   inspectWorkflowRequirements,
   workflowRequirementReadinessDetail,

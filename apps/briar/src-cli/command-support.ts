@@ -16,8 +16,7 @@ import {
 } from "node:path";
 import packageJson from "../../../package.json";
 import { type AgentProvider } from "../src/lib/agent-provider";
-import { type TranscriptBatchEvent } from "./transcript-batcher";
-import { HttpRequestError } from "./execution-metrics-upload";
+import { HttpRequestError } from "./http-request-error";
 import {
   defaultWorktreeRoot,
   samePath,
@@ -209,14 +208,6 @@ async function request<T>(
   }
   return body as T;
 }
-
-const serializeTranscriptRequest = (
-  envelope: Record<string, unknown>,
-  events: TranscriptBatchEvent[],
-) => JSON.stringify({ ...envelope, events });
-
-const isTranscriptPayloadTooLarge = (error: unknown) =>
-  error instanceof HttpRequestError && error.status === 413;
 
 type BrowserLaunchHandle = {
   exited: Promise<number | null>;
@@ -493,8 +484,6 @@ export {
   saveConfig,
   saveConfigAt,
   request,
-  serializeTranscriptRequest,
-  isTranscriptPayloadTooLarge,
   openBrowser,
   type LoginDependencies,
   login,

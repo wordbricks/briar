@@ -84,6 +84,27 @@ const agentProvider = (value: ProtoAgentProvider): AgentProvider => {
   }
 };
 
+export const agentProviderToProto = (
+  value: AgentProvider,
+): ProtoAgentProvider => {
+  switch (value) {
+    case "codex":
+      return ProtoAgentProvider.CODEX;
+    case "claude":
+      return ProtoAgentProvider.CLAUDE;
+    case "cursor":
+      return ProtoAgentProvider.CURSOR;
+    case "grok":
+      return ProtoAgentProvider.GROK;
+    case "agy":
+      return ProtoAgentProvider.AGY;
+    case "opencode":
+      return ProtoAgentProvider.OPENCODE;
+    case "openrouter":
+      return ProtoAgentProvider.OPENROUTER;
+  }
+};
+
 const optionalAgentProvider = (
   value: ProtoAgentProvider | undefined,
 ): AgentProvider | null => value === undefined ? null : agentProvider(value);

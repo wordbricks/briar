@@ -40,7 +40,9 @@ const activity = (
       expiresAt: requiredIsoTimestamp(value.expiresAt, "activity.expiresAt"),
     };
 
-const claimIdentity = (work: ClaimedWork): WorkClaimIdentity => ({
+export const workClaimIdentityToProto = (
+  work: ClaimedWork,
+): WorkClaimIdentity => ({
   $typeName: "briar.worker.v1.WorkClaimIdentity",
   workId: work.workId,
   runId: work.runId,
@@ -105,7 +107,7 @@ export function createWorkerQueueClient(apiUrl: string, token: string) {
       const response = await client.renewWorkLease({
         projectId: input.projectId,
         workerId: input.workerId,
-        work: claimIdentity(input.work),
+        work: workClaimIdentityToProto(input.work),
       }, options);
       if (
         response.work.case !== input.work.workType &&
@@ -145,7 +147,7 @@ export function createWorkerQueueClient(apiUrl: string, token: string) {
         requestId: input.requestId,
         projectId: input.projectId,
         workerId: input.workerId,
-        work: claimIdentity(input.work),
+        work: workClaimIdentityToProto(input.work),
         checkpoint: {
           conversationId: input.checkpoint.conversationId ?? undefined,
           workspacePath: input.checkpoint.workspacePath ?? undefined,
