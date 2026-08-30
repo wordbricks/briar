@@ -1,3 +1,6 @@
+import {
+  RecordRunEvidenceResponseSchema,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { contentDisposition } from "./attachment-storage";
 import { sha256Bytes } from "./crypto-digest";
 import {
@@ -8,8 +11,12 @@ import {
   recordRunEvidence,
   type RunEvidenceImageInput,
 } from "./db";
-import { HttpError, json } from "./http-response";
+import {
+  HttpError,
+  privateNoStoreProtobufResponse,
+} from "./http-response";
 import { readRunEvidenceRequest } from "./request-readers";
+import { recordRunEvidenceResponseMessage } from "./run-evidence-connect";
 import { evidenceImageJson } from "./run-evidence-json";
 
 export type RunAgentRouteInput = {
@@ -43,10 +50,14 @@ export async function handleRunAgentRoute(
       request,
       evidenceMatch[1],
       );
-    const { input: parsed, images } = await readRunEvidenceRequest(request);
+    const runId = evidenceMatch[1];
+    const { input: parsed, images } = await readRunEvidenceRequest(request, {
+      projectId,
+      runId,
+    });
     try {
       const evidence = await recordRunEvidence(db, projectId, {
-        runId: evidenceMatch[1],
+        runId,
         ...parsed,
         detail: parsed.detail ?? null,
         command: parsed.command ?? null,
@@ -155,15 +166,19 @@ export async function handleRunAgentRoute(
           }
         }
       }
-      return json({
+      const response = recordRunEvidenceResponseMessage({
         runId: evidence.run_id,
         attempt: evidence.attempt,
-        key: evidence.evidence_key,
+        evidenceKey: evidence.evidence_key,
         stage: evidence.workflow_stage,
         type: evidence.evidence_type,
         status: evidence.status,
         images: storedImages.map(evidenceImageJson),
       });
+      return privateNoStoreProtobufResponse(
+        RecordRunEvidenceResponseSchema,
+        response,
+      );
     } catch (error) {
       if (
         error instanceof EventKeyConflictError ||

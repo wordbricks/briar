@@ -9,9 +9,6 @@ import {
 } from "./channel-proposal-helpers";
 import { projectMutationProject } from "./realtime-scheduling";
 import {
-  readRunEvidenceRequest,
-} from "./request-readers";
-import {
   handleScheduledTask,
   type ScheduledTaskDependencies,
 } from "./scheduled-task";
@@ -38,7 +35,6 @@ import {
 } from "./project-request-contract";
 import {
   decodePausedRunReworkInput,
-  decodeRunEvidenceInput,
 } from "./run-request-contract";
 import {
   decodeProjectAgentScheduleRunCompletion,
@@ -702,51 +698,6 @@ describe("Worker HTTP contract", () => {
     expect(() =>
       decodeOrganizationMemberRoleInput({ role: "admin" }),
     ).toThrow();
-  });
-
-  it("accepts exact workflow evidence names containing spaces and slashes", () => {
-    expect(
-      decodeRunEvidenceInput({
-        evidenceKey: "LOCAL-1:local_qa:signoff",
-        stage: "local_qa",
-        type: "  signoff/app worker  ",
-        status: "passed",
-        observedAt: "2026-07-28T00:00:00.000Z",
-        actor: "briar-workflow",
-      }).type,
-    ).toBe("signoff/app worker");
-  });
-
-  it("parses evidence images from multipart CLI requests", async () => {
-    const evidence = {
-      evidenceKey: "LOCAL-1:local_qa:screenshot",
-      stage: "local_qa",
-      type: "ui_screenshot",
-      status: "passed",
-      observedAt: "2026-07-28T00:00:00.000Z",
-      actor: "briar-workflow",
-    };
-    const form = new FormData();
-    form.append("evidence", JSON.stringify(evidence));
-    form.append(
-      "images",
-      new File([new Uint8Array([137, 80, 78, 71])], "dashboard.png", {
-        type: "image/png",
-      }),
-    );
-
-    const parsed = await readRunEvidenceRequest(
-      new Request("https://briar-api.example/runs/run/evidence", {
-        method: "POST",
-        headers: { "Content-Length": "1024" },
-        body: form,
-      }),
-    );
-
-    expect(parsed.input).toEqual(evidence);
-    expect(parsed.images).toHaveLength(1);
-    expect(parsed.images[0]?.name).toBe("dashboard.png");
-    expect(parsed.images[0]?.type).toBe("image/png");
   });
 
   it("requires exact checkpoint identity for paused run rework", () => {

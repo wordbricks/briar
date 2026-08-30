@@ -14,6 +14,10 @@ import {
   join,
   resolve,
 } from "node:path";
+import {
+  fromBinary,
+  type DescMessage,
+} from "@bufbuild/protobuf";
 import packageJson from "../../../package.json";
 import { type AgentProvider } from "../src/lib/agent-provider";
 import { HttpRequestError } from "./http-request-error";
@@ -207,6 +211,47 @@ async function request<T>(
     );
   }
   return body as T;
+}
+
+async function requestProtobuf<Desc extends DescMessage>(
+  apiUrl: string,
+  path: string,
+  token: string | null,
+  schema: Desc,
+  init?: RequestInit,
+): Promise<ReturnType<typeof fromBinary<Desc>>> {
+  const headers = new Headers(init?.headers);
+  if (!headers.has("Accept")) headers.set("Accept", "application/protobuf");
+  if (!(init?.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/protobuf");
+  }
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const response = await fetch(`${apiUrl.replace(/\/$/u, "")}${path}`, {
+    ...init,
+    headers,
+  });
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null);
+    throw new HttpRequestError(
+      httpErrorMessage(body) || `request failed (${response.status})`,
+      response.status,
+      body,
+    );
+  }
+  const contentType = response.headers.get("content-type")
+    ?.split(";", 1)[0]
+    ?.trim()
+    .toLowerCase();
+  if (contentType !== "application/protobuf") {
+    throw new HttpRequestError(
+      "Expected an application/protobuf response",
+      response.status,
+      null,
+    );
+  }
+  return fromBinary(schema, new Uint8Array(await response.arrayBuffer()));
 }
 
 type BrowserLaunchHandle = {
@@ -484,6 +529,7 @@ export {
   saveConfig,
   saveConfigAt,
   request,
+  requestProtobuf,
   openBrowser,
   type LoginDependencies,
   login,

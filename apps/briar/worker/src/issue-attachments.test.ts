@@ -3,6 +3,7 @@ import {
   toBinary,
   type DescMessage,
 } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   CreateChannelMessageRequestSchema,
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
@@ -13,8 +14,12 @@ import {
 import {
   CreateIssueMessageRequestSchema,
   CreateIssueRequestSchema,
+  RunEvidence_Status,
   UpdateIssueRequestSchema,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
+import {
+  RecordRunEvidenceRequestSchema,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { describe, expect, it } from "vitest";
 import { maxEvidenceMultipartBytes } from "../../src/lib/evidence-images";
 import {
@@ -222,6 +227,123 @@ describe("protobuf multipart mutation boundary", () => {
       readIssueRequest(multipartRequest(unknown), { projectId }),
     ).rejects.toMatchObject({ status: 400, message: "Unknown run status" });
   });
+
+  it("decodes generated run evidence metadata and image bytes once", async () => {
+    const form = new FormData();
+    setProtobufRequest(
+      form,
+      RecordRunEvidenceRequestSchema,
+      create(RecordRunEvidenceRequestSchema, {
+        projectId,
+        runId,
+        evidenceKey: "LOCAL-1:local_qa:screenshot",
+        stage: "local_qa",
+        type: "  signoff/app worker  ",
+        status: RunEvidence_Status.PASSED,
+        observedAt: timestampFromDate(
+          new Date("2026-07-28T00:00:00.000Z"),
+        ),
+        actor: "briar-workflow",
+        url: "https://example.com/evidence",
+        metadata: { durationMs: 100 },
+      }),
+    );
+    form.append("images", image(), "dashboard.png");
+
+    const parsed = await readRunEvidenceRequest(multipartRequest(form), {
+      projectId,
+      runId,
+    });
+
+    expect(parsed.input).toEqual({
+      evidenceKey: "LOCAL-1:local_qa:screenshot",
+      stage: "local_qa",
+      type: "signoff/app worker",
+      status: "passed",
+      observedAt: "2026-07-28T00:00:00.000Z",
+      actor: "briar-workflow",
+      detail: null,
+      command: null,
+      url: "https://example.com/evidence",
+      metadata: { durationMs: 100 },
+    });
+    expect(parsed.images).toEqual([
+      expect.objectContaining({ name: "dashboard.png", type: "image/png" }),
+    ]);
+  });
+
+  it("rejects legacy evidence JSON, forged identity, and unsafe proto values", async () => {
+    const legacy = new FormData();
+    legacy.set("evidence", JSON.stringify({ status: "passed" }));
+    await expect(
+      readRunEvidenceRequest(multipartRequest(legacy), { projectId, runId }),
+    ).rejects.toMatchObject({
+      status: 400,
+      message: "Multipart run evidence protobuf request is required",
+    });
+
+    const forged = new FormData();
+    setProtobufRequest(
+      forged,
+      RecordRunEvidenceRequestSchema,
+      create(RecordRunEvidenceRequestSchema, {
+        projectId: otherProjectId,
+        runId,
+      }),
+    );
+    await expect(
+      readRunEvidenceRequest(multipartRequest(forged), { projectId, runId }),
+    ).rejects.toMatchObject({
+      status: 400,
+      message: "Multipart project ID does not match the request path",
+    });
+
+    const unsafe = new FormData();
+    setProtobufRequest(
+      unsafe,
+      RecordRunEvidenceRequestSchema,
+      create(RecordRunEvidenceRequestSchema, {
+        projectId,
+        runId,
+        evidenceKey: "key",
+        stage: "local_qa",
+        type: "test",
+        status: 99 as RunEvidence_Status,
+        observedAt: timestampFromDate(new Date()),
+        actor: "worker",
+        url: "http://example.com/evidence",
+      }),
+    );
+    await expect(
+      readRunEvidenceRequest(multipartRequest(unsafe), { projectId, runId }),
+    ).rejects.toMatchObject({
+      status: 400,
+      message: "Unknown evidence status",
+    });
+
+    const insecureUrl = new FormData();
+    setProtobufRequest(
+      insecureUrl,
+      RecordRunEvidenceRequestSchema,
+      create(RecordRunEvidenceRequestSchema, {
+        projectId,
+        runId,
+        evidenceKey: "key",
+        stage: "local_qa",
+        type: "test",
+        status: RunEvidence_Status.PASSED,
+        observedAt: timestampFromDate(new Date()),
+        actor: "worker",
+        url: "http://example.com/evidence",
+      }),
+    );
+    await expect(
+      readRunEvidenceRequest(multipartRequest(insecureUrl), {
+        projectId,
+        runId,
+      }),
+    ).rejects.toThrow("HTTPS URL required");
+  });
 });
 
 describe("multipart size boundary", () => {
@@ -234,7 +356,9 @@ describe("multipart size boundary", () => {
       },
       body: "invalid",
     });
-    await expect(readRunEvidenceRequest(request)).rejects.toMatchObject({
+    await expect(
+      readRunEvidenceRequest(request, { projectId, runId }),
+    ).rejects.toMatchObject({
       status: 413,
       message: "Evidence images exceed the 25MB total limit",
     });

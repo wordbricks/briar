@@ -5,13 +5,9 @@ import {
   issueTitleAbsoluteMaxLength,
   issueTitleOverLimitMessage,
 } from "../src/lib/issue-title";
-import { EvidenceType, WorkflowStageId } from "./config-contract";
+import { WorkflowStageId } from "./config-contract";
 
 const Uuid = Schema.String.check(Schema.isUUID());
-const UrlString = Schema.String.check(
-  Schema.makeFilter((value) => URL.canParse(value) || "Expected a valid URL"),
-);
-const StringRecord = Schema.Record(Schema.String, Schema.Unknown);
 
 const HttpErrorBody = Schema.Struct({
   message: Schema.optional(Schema.String),
@@ -74,20 +70,3 @@ export const CreateIssueInput = Schema.Struct({
 });
 export type CreateIssueInput = typeof CreateIssueInput.Type;
 export const decodeCreateIssueInput = Schema.decodeUnknownSync(CreateIssueInput);
-
-export const RunEvidenceInput = Schema.Struct({
-  evidenceKey: Schema.String.check(Schema.isLengthBetween(1, 300)),
-  stage: WorkflowStageId,
-  type: EvidenceType,
-  status: Schema.Literals(["pending", "passed", "failed", "skipped"]),
-  observedAt: IsoDateTimeWithOffset,
-  actor: Schema.NonEmptyString,
-  detail: Schema.NullOr(Schema.String),
-  command: Schema.NullOr(
-    Schema.String.check(Schema.isLengthBetween(1, 2_000)),
-  ),
-  url: Schema.NullOr(UrlString),
-  metadata: Schema.mutableKey(Schema.NullOr(StringRecord)),
-});
-export type RunEvidenceInput = typeof RunEvidenceInput.Type;
-export const decodeRunEvidenceInput = Schema.decodeUnknownSync(RunEvidenceInput);

@@ -6,14 +6,17 @@ import {
 import {
   create,
   type JsonObject,
+  toBinary,
   toJsonString,
 } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { createClient } from "@connectrpc/connect";
 import {
   CancelRunResponseSchema,
   CreateIssueResponseSchema,
   IssueService,
   ListRunEvidenceResponseSchema,
+  RunEvidence_Status,
   ReworkRunResponseSchema,
   ResumeRunResponseSchema,
   RetryRunResponseSchema,
@@ -21,6 +24,8 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
+  RecordRunEvidenceRequestSchema,
+  RecordRunEvidenceResponseSchema,
   RecordRunEventResponseSchema,
   ListProjectChannelMessagesResponseSchema,
   RunSourceIdentitySchema,
@@ -35,7 +40,6 @@ import {
 } from "./github-pr";
 import {
   decodeCreateIssueInput,
-  decodeRunEvidenceInput,
   decodeUuid,
   decodeWorkflowStageId,
 } from "./command-contract";
@@ -48,6 +52,7 @@ import {
   loadConfig,
   saveConfig,
   request,
+  requestProtobuf,
   login,
   gitValue,
   currentRepositoryPath,
@@ -74,16 +79,41 @@ async function optionalText(valueFlag: string, fileFlag: string) {
   return value(valueFlag) ?? null;
 }
 
-const jsonObject = (value: string): JsonObject => {
+const jsonObject = (value: string, label: string): JsonObject => {
   const parsed: unknown = JSON.parse(value);
   if (
     typeof parsed !== "object" ||
     parsed === null ||
     Array.isArray(parsed)
   ) {
-    throw new Error("Run context must be a JSON object");
+    throw new Error(`${label} must be a JSON object`);
   }
   return parsed as JsonObject;
+};
+
+const runEvidenceStatus = (value: string): RunEvidence_Status => {
+  switch (value) {
+    case "pending":
+      return RunEvidence_Status.PENDING;
+    case "passed":
+      return RunEvidence_Status.PASSED;
+    case "failed":
+      return RunEvidence_Status.FAILED;
+    case "skipped":
+      return RunEvidence_Status.SKIPPED;
+    default:
+      throw new Error(
+        "--status must be one of: pending, passed, failed, skipped",
+      );
+  }
+};
+
+const evidenceTimestamp = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("--observed-at must be an ISO date-time");
+  }
+  return timestampFromDate(date);
 };
 
 const activeIssueWork = (
@@ -253,7 +283,7 @@ async function addRunEvent(forcedStatus?: string) {
     pullRequestUrls: values("--pull-request-url"),
     targetSha: value("--target-sha") ?? null,
     sourceCreatedAt: value("--source-created-at") ?? null,
-    context: contextValue ? jsonObject(contextValue) : null,
+    context: contextValue ? jsonObject(contextValue, "Run context") : null,
   };
   if (forcedStatus === "completed" && !input.structuredResult) {
     throw new Error(
@@ -342,36 +372,48 @@ async function addRunEvidence() {
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
   const metadataValue = value("--metadata-json");
-  const input = {
-    evidenceKey: required("--key"),
-    stage: required("--stage"),
-    type: required("--type"),
-    status: required("--status"),
-    observedAt: value("--observed-at") ?? new Date().toISOString(),
-    actor: value("--actor") ?? "briar-workflow",
-    detail: await optionalText("--detail", "--detail-file"),
-    command: value("--command") ?? null,
-    url: value("--url") ?? null,
-    metadata: metadataValue ? JSON.parse(metadataValue) : null,
-  };
-  const parsed = decodeRunEvidenceInput(input);
+  const status = runEvidenceStatus(required("--status"));
+  const type = required("--type").trim();
+  const url = value("--url");
+  let metadata = metadataValue
+    ? jsonObject(metadataValue, "Evidence metadata")
+    : undefined;
   if (
-    parsed.type === "pull_request" &&
-    parsed.url &&
-    (parsed.status === "passed" || parsed.status === "pending")
+    type === "pull_request" &&
+    url &&
+    (status === RunEvidence_Status.PASSED ||
+      status === RunEvidence_Status.PENDING)
   ) {
     const github = await ensureBriarIssueLinkInGithubPullRequest({
       apiUrl: config.apiUrl,
       projectId: project.id,
       token: executionToken(project),
-      pullRequestUrl: parsed.url,
+      pullRequestUrl: url,
       issueUrl: briarIssueUrl(config.apiUrl, project.id, runId),
     });
-    parsed.metadata = {
-      ...(parsed.metadata ?? {}),
-      githubPullRequest: github.identity,
-    };
+    if (github.identity) {
+      metadata = {
+        ...(metadata ?? {}),
+        githubPullRequest: github.identity,
+      };
+    }
   }
+  const evidence = create(RecordRunEvidenceRequestSchema, {
+    projectId: project.id,
+    runId,
+    evidenceKey: required("--key"),
+    stage: required("--stage"),
+    type,
+    status,
+    observedAt: evidenceTimestamp(
+      value("--observed-at") ?? new Date().toISOString(),
+    ),
+    actor: value("--actor") ?? "briar-workflow",
+    detail: (await optionalText("--detail", "--detail-file")) ?? undefined,
+    command: value("--command"),
+    url,
+    metadata,
+  });
   const imagePaths = values("--image").map((path) => resolve(path));
   const images = await Promise.all(
     imagePaths.map(async (path) => {
@@ -390,20 +432,22 @@ async function addRunEvidence() {
     })),
   );
   if (imageError) throw new Error(imageError);
-  const body = images.length
-    ? (() => {
-        const form = new FormData();
-        form.append("evidence", JSON.stringify(parsed));
-        for (const { image, name } of images) {
-          form.append("images", image, name);
-        }
-        return form;
-      })()
-    : JSON.stringify(parsed);
-  const result = await request(
+  const body = new FormData();
+  body.set(
+    "request",
+    new Blob([toBinary(RecordRunEvidenceRequestSchema, evidence)], {
+      type: "application/protobuf",
+    }),
+    "request.pb",
+  );
+  for (const { image, name } of images) {
+    body.append("images", image, name);
+  }
+  const result = await requestProtobuf(
     config.apiUrl,
     `/runs/${runId}/evidence`,
     executionToken(project),
+    RecordRunEvidenceResponseSchema,
     {
       method: "POST",
       body,
@@ -413,7 +457,7 @@ async function addRunEvidence() {
           : undefined,
     },
   );
-  console.log(JSON.stringify(result));
+  console.log(toJsonString(RecordRunEvidenceResponseSchema, result));
 }
 
 async function listCurrentRunEvidence() {

@@ -11,6 +11,9 @@ import {
   UpdateIssueRequestSchema,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import {
+  RecordRunEvidenceRequestSchema,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import {
   type AutoHuntRunStatus,
   type AutoHuntWorkflowStageId,
   type DashboardStage,
@@ -30,7 +33,9 @@ import {
 } from "../../src/lib/issue-markdown";
 import { HttpError } from "./http-response";
 import { decodeRequestSync } from "./request-schema";
-import { decodeRunEvidenceInput } from "./run-request-contract";
+import {
+  recordRunEvidenceApplicationRequest,
+} from "./run-evidence-request-mapper";
 import {
   canonicalAppUuid,
   createChannelMessageApplicationRequest,
@@ -175,27 +180,17 @@ export const dashboardStageForProgress = (
     ? (workflowStage as DashboardStage)
     : "implementing";
 };
-export async function readRunEvidenceRequest(request: Request) {
+export async function readRunEvidenceRequest(
+  request: Request,
+  path: { projectId: string; runId: string },
+) {
   const form = await readBoundedMultipartForm(
     request,
     maxEvidenceMultipartBytes,
     "Evidence images exceed the 25MB total limit",
   );
   if (!form) {
-    return {
-      input: decodeRunEvidenceInput(await readJson(request)),
-      images: [] as File[],
-    };
-  }
-  const payload = form.get("evidence");
-  if (typeof payload !== "string") {
-    throw new HttpError(400, "Multipart evidence JSON is required");
-  }
-  let input: unknown;
-  try {
-    input = JSON.parse(payload);
-  } catch {
-    throw new HttpError(400, "Invalid multipart evidence JSON");
+    throw new HttpError(415, "Evidence uploads must be multipart");
   }
   const images = readMultipartFiles(
     form,
@@ -203,7 +198,27 @@ export async function readRunEvidenceRequest(request: Request) {
     "Evidence images must be files",
     validateEvidenceImages,
   );
-  return { input: decodeRunEvidenceInput(input), images };
+  const evidence = await readMultipartProtobuf(
+    form,
+    RecordRunEvidenceRequestSchema,
+    "run evidence",
+  );
+  requireMultipartIdentity([
+    {
+      actual: evidence.projectId,
+      expected: path.projectId,
+      label: "project ID",
+    },
+    {
+      actual: evidence.runId,
+      expected: path.runId,
+      label: "run ID",
+    },
+  ]);
+  return {
+    input: recordRunEvidenceApplicationRequest(evidence),
+    images,
+  };
 }
 
 export async function readIssueMessageRequest(

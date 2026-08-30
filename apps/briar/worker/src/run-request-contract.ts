@@ -120,7 +120,7 @@ export const HttpsUrl = Schema.String.check(
   }),
 );
 
-export const RunEvidenceInput = strictSchema(Schema.Struct({
+export const RunEvidenceApplicationInput = strictSchema(Schema.Struct({
   evidenceKey: trimmedText(1, 300),
   stage: WorkflowStageId,
   type: EvidenceType,
@@ -278,7 +278,9 @@ export const decodeProjectUsagePeriod = decodeRequestSync(ProjectUsagePeriod);
 export const decodeProjectUsageDateRange = decodeRequestSync(
   ProjectUsageDateRangeInput,
 );
-export const decodeRunEvidenceInput = decodeRequestSync(RunEvidenceInput);
+export const decodeRunEvidenceApplicationInput = decodeRequestSync(
+  RunEvidenceApplicationInput,
+);
 export const decodeRecoveryUserInput = decodeRequestSync(RecoveryUserInput);
 export const decodeResumeUserInput = decodeRequestSync(ResumeUserInput);
 export const decodePausedRunReworkInput = decodeRequestSync(
