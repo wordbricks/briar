@@ -73730,6 +73730,964 @@ pub mod inbox_feed_message {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::inbox_feed_message::Content as ContentView;
 }
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct CreateRealtimeTicketRequest {
+    #[serde(flatten)]
+    pub scope: ::core::option::Option<
+        __buffa::oneof::create_realtime_ticket_request::Scope,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateRealtimeTicketRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateRealtimeTicketRequest")
+            .field("scope", &self.scope)
+            .finish()
+    }
+}
+impl CreateRealtimeTicketRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest";
+}
+::buffa::impl_default_instance!(CreateRealtimeTicketRequest);
+impl ::buffa::MessageName for CreateRealtimeTicketRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "CreateRealtimeTicketRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.CreateRealtimeTicketRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest";
+}
+impl ::buffa::Message for CreateRealtimeTicketRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if let ::core::option::Option::Some(ref v) = self.scope {
+            match v {
+                __buffa::oneof::create_realtime_ticket_request::Scope::OrganizationNotifications(
+                    x,
+                ) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+                __buffa::oneof::create_realtime_ticket_request::Scope::IssueActivity(
+                    x,
+                ) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+                __buffa::oneof::create_realtime_ticket_request::Scope::ChannelActivity(
+                    x,
+                ) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let ::core::option::Option::Some(ref v) = self.scope {
+            match v {
+                __buffa::oneof::create_realtime_ticket_request::Scope::OrganizationNotifications(
+                    x,
+                ) => {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::create_realtime_ticket_request::Scope::IssueActivity(
+                    x,
+                ) => {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::create_realtime_ticket_request::Scope::ChannelActivity(
+                    x,
+                ) => {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::create_realtime_ticket_request::Scope::OrganizationNotifications(
+                        ref mut existing,
+                    ),
+                ) = self.scope
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.scope = ::core::option::Option::Some(
+                        __buffa::oneof::create_realtime_ticket_request::Scope::OrganizationNotifications(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::create_realtime_ticket_request::Scope::IssueActivity(
+                        ref mut existing,
+                    ),
+                ) = self.scope
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.scope = ::core::option::Option::Some(
+                        __buffa::oneof::create_realtime_ticket_request::Scope::IssueActivity(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::create_realtime_ticket_request::Scope::ChannelActivity(
+                        ref mut existing,
+                    ),
+                ) = self.scope
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.scope = ::core::option::Option::Some(
+                        __buffa::oneof::create_realtime_ticket_request::Scope::ChannelActivity(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.scope = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateRealtimeTicketRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.CreateRealtimeTicketRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for CreateRealtimeTicketRequest {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = CreateRealtimeTicketRequest;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct CreateRealtimeTicketRequest")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<CreateRealtimeTicketRequest, A::Error> {
+                let mut __oneof_scope: ::core::option::Option<
+                    __buffa::oneof::create_realtime_ticket_request::Scope,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "organizationNotifications" | "organization_notifications" => {
+                            let v: ::core::option::Option<
+                                create_realtime_ticket_request::OrganizationNotifications,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            create_realtime_ticket_request::OrganizationNotifications,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_scope.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'scope'",
+                                        ),
+                                    );
+                                }
+                                __oneof_scope = Some(
+                                    __buffa::oneof::create_realtime_ticket_request::Scope::OrganizationNotifications(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "issueActivity" | "issue_activity" => {
+                            let v: ::core::option::Option<
+                                create_realtime_ticket_request::IssueActivity,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            create_realtime_ticket_request::IssueActivity,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_scope.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'scope'",
+                                        ),
+                                    );
+                                }
+                                __oneof_scope = Some(
+                                    __buffa::oneof::create_realtime_ticket_request::Scope::IssueActivity(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "channelActivity" | "channel_activity" => {
+                            let v: ::core::option::Option<
+                                create_realtime_ticket_request::ChannelActivity,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            create_realtime_ticket_request::ChannelActivity,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_scope.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'scope'",
+                                        ),
+                                    );
+                                }
+                                __oneof_scope = Some(
+                                    __buffa::oneof::create_realtime_ticket_request::Scope::ChannelActivity(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <CreateRealtimeTicketRequest as ::core::default::Default>::default();
+                __r.scope = __oneof_scope;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateRealtimeTicketRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_REALTIME_TICKET_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest",
+    to_json: ::buffa::type_registry::any_to_json::<CreateRealtimeTicketRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateRealtimeTicketRequest>,
+    is_wkt: false,
+};
+pub mod create_realtime_ticket_request {
+    #[allow(unused_imports)]
+    use super::*;
+    #[derive(Clone, PartialEq, Default)]
+    #[derive(::serde::Serialize, ::serde::Deserialize)]
+    #[serde(default)]
+    pub struct OrganizationNotifications {
+        /// Field 1: `organization_id`
+        #[serde(
+            rename = "organizationId",
+            alias = "organization_id",
+            with = "::buffa::json_helpers::proto_string",
+            skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        )]
+        pub organization_id: ::buffa::alloc::string::String,
+        /// Field 2: `cursor`
+        #[serde(
+            rename = "cursor",
+            with = "::buffa::json_helpers::uint64",
+            skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+        )]
+        pub cursor: u64,
+        #[serde(skip)]
+        #[doc(hidden)]
+        pub __buffa_unknown_fields: ::buffa::UnknownFields,
+    }
+    impl ::core::fmt::Debug for OrganizationNotifications {
+        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+            f.debug_struct("OrganizationNotifications")
+                .field("organization_id", &self.organization_id)
+                .field("cursor", &self.cursor)
+                .finish()
+        }
+    }
+    impl OrganizationNotifications {
+        /// Protobuf type URL for this message, for use with `Any::pack` and
+        /// `Any::unpack_if`.
+        ///
+        /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+        pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest.OrganizationNotifications";
+    }
+    ::buffa::impl_default_instance!(OrganizationNotifications);
+    impl ::buffa::MessageName for OrganizationNotifications {
+        const PACKAGE: &'static str = "briar.app.v1";
+        const NAME: &'static str = "CreateRealtimeTicketRequest.OrganizationNotifications";
+        const FULL_NAME: &'static str = "briar.app.v1.CreateRealtimeTicketRequest.OrganizationNotifications";
+        const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest.OrganizationNotifications";
+    }
+    impl ::buffa::Message for OrganizationNotifications {
+        /// Returns the total encoded size in bytes.
+        ///
+        /// Accumulates in `u64` (which cannot overflow for in-memory
+        /// data) and saturates to `u32` at return, so a message whose
+        /// encoded size exceeds the 2 GiB protobuf limit yields a value
+        /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+        /// points reject, never a silently wrapped size.
+        #[allow(clippy::let_and_return)]
+        fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            #[allow(unused_imports)]
+            use ::buffa::Enumeration as _;
+            let mut size = 0u64;
+            if !self.organization_id.is_empty() {
+                size
+                    += 1u64
+                        + ::buffa::types::string_encoded_len(&self.organization_id)
+                            as u64;
+            }
+            if self.cursor != 0u64 {
+                size += 1u64 + ::buffa::types::uint64_encoded_len(self.cursor) as u64;
+            }
+            size += self.__buffa_unknown_fields.encoded_len() as u64;
+            ::buffa::saturate_size(size)
+        }
+        fn write_to(
+            &self,
+            _cache: &mut ::buffa::SizeCache,
+            buf: &mut impl ::buffa::EncodeSink,
+        ) {
+            #[allow(unused_imports)]
+            use ::buffa::Enumeration as _;
+            if !self.organization_id.is_empty() {
+                ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+            }
+            if self.cursor != 0u64 {
+                ::buffa::types::put_uint64_field(2u32, self.cursor, buf);
+            }
+            self.__buffa_unknown_fields.write_to(buf);
+        }
+        fn merge_field(
+            &mut self,
+            tag: ::buffa::encoding::Tag,
+            buf: &mut impl ::buffa::bytes::Buf,
+            ctx: ::buffa::DecodeContext<'_>,
+        ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+            #[allow(unused_imports)]
+            use ::buffa::bytes::Buf as _;
+            #[allow(unused_imports)]
+            use ::buffa::Enumeration as _;
+            match tag.field_number() {
+                1u32 => {
+                    ::buffa::encoding::check_wire_type(
+                        tag,
+                        ::buffa::encoding::WireType::LengthDelimited,
+                    )?;
+                    ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                }
+                2u32 => {
+                    ::buffa::encoding::check_wire_type(
+                        tag,
+                        ::buffa::encoding::WireType::Varint,
+                    )?;
+                    self.cursor = ::buffa::types::decode_uint64(buf)?;
+                }
+                _ => {
+                    self.__buffa_unknown_fields
+                        .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+                }
+            }
+            ::core::result::Result::Ok(())
+        }
+        fn clear(&mut self) {
+            self.organization_id.clear();
+            self.cursor = 0u64;
+            self.__buffa_unknown_fields.clear();
+        }
+    }
+    impl ::buffa::ExtensionSet for OrganizationNotifications {
+        const PROTO_FQN: &'static str = "briar.app.v1.CreateRealtimeTicketRequest.OrganizationNotifications";
+        fn unknown_fields(&self) -> &::buffa::UnknownFields {
+            &self.__buffa_unknown_fields
+        }
+        fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+            &mut self.__buffa_unknown_fields
+        }
+    }
+    impl ::buffa::json_helpers::ProtoElemJson for OrganizationNotifications {
+        fn serialize_proto_json<S: ::serde::Serializer>(
+            v: &Self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            ::serde::Serialize::serialize(v, s)
+        }
+        fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            <Self as ::serde::Deserialize>::deserialize(d)
+        }
+    }
+    #[doc(hidden)]
+    pub const __ORGANIZATION_NOTIFICATIONS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+        type_url: "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest.OrganizationNotifications",
+        to_json: ::buffa::type_registry::any_to_json::<OrganizationNotifications>,
+        from_json: ::buffa::type_registry::any_from_json::<OrganizationNotifications>,
+        is_wkt: false,
+    };
+    #[derive(Clone, PartialEq, Default)]
+    #[derive(::serde::Serialize, ::serde::Deserialize)]
+    #[serde(default)]
+    pub struct IssueActivity {
+        /// Field 1: `project_id`
+        #[serde(
+            rename = "projectId",
+            alias = "project_id",
+            with = "::buffa::json_helpers::proto_string",
+            skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        )]
+        pub project_id: ::buffa::alloc::string::String,
+        /// Field 2: `run_id`
+        #[serde(
+            rename = "runId",
+            alias = "run_id",
+            with = "::buffa::json_helpers::proto_string",
+            skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        )]
+        pub run_id: ::buffa::alloc::string::String,
+        #[serde(skip)]
+        #[doc(hidden)]
+        pub __buffa_unknown_fields: ::buffa::UnknownFields,
+    }
+    impl ::core::fmt::Debug for IssueActivity {
+        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+            f.debug_struct("IssueActivity")
+                .field("project_id", &self.project_id)
+                .field("run_id", &self.run_id)
+                .finish()
+        }
+    }
+    impl IssueActivity {
+        /// Protobuf type URL for this message, for use with `Any::pack` and
+        /// `Any::unpack_if`.
+        ///
+        /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+        pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest.IssueActivity";
+    }
+    ::buffa::impl_default_instance!(IssueActivity);
+    impl ::buffa::MessageName for IssueActivity {
+        const PACKAGE: &'static str = "briar.app.v1";
+        const NAME: &'static str = "CreateRealtimeTicketRequest.IssueActivity";
+        const FULL_NAME: &'static str = "briar.app.v1.CreateRealtimeTicketRequest.IssueActivity";
+        const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest.IssueActivity";
+    }
+    impl ::buffa::Message for IssueActivity {
+        /// Returns the total encoded size in bytes.
+        ///
+        /// Accumulates in `u64` (which cannot overflow for in-memory
+        /// data) and saturates to `u32` at return, so a message whose
+        /// encoded size exceeds the 2 GiB protobuf limit yields a value
+        /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+        /// points reject, never a silently wrapped size.
+        #[allow(clippy::let_and_return)]
+        fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            #[allow(unused_imports)]
+            use ::buffa::Enumeration as _;
+            let mut size = 0u64;
+            if !self.project_id.is_empty() {
+                size
+                    += 1u64
+                        + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+            }
+            if !self.run_id.is_empty() {
+                size += 1u64 + ::buffa::types::string_encoded_len(&self.run_id) as u64;
+            }
+            size += self.__buffa_unknown_fields.encoded_len() as u64;
+            ::buffa::saturate_size(size)
+        }
+        fn write_to(
+            &self,
+            _cache: &mut ::buffa::SizeCache,
+            buf: &mut impl ::buffa::EncodeSink,
+        ) {
+            #[allow(unused_imports)]
+            use ::buffa::Enumeration as _;
+            if !self.project_id.is_empty() {
+                ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+            }
+            if !self.run_id.is_empty() {
+                ::buffa::types::put_string_field(2u32, &self.run_id, buf);
+            }
+            self.__buffa_unknown_fields.write_to(buf);
+        }
+        fn merge_field(
+            &mut self,
+            tag: ::buffa::encoding::Tag,
+            buf: &mut impl ::buffa::bytes::Buf,
+            ctx: ::buffa::DecodeContext<'_>,
+        ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+            #[allow(unused_imports)]
+            use ::buffa::bytes::Buf as _;
+            #[allow(unused_imports)]
+            use ::buffa::Enumeration as _;
+            match tag.field_number() {
+                1u32 => {
+                    ::buffa::encoding::check_wire_type(
+                        tag,
+                        ::buffa::encoding::WireType::LengthDelimited,
+                    )?;
+                    ::buffa::types::merge_string(&mut self.project_id, buf)?;
+                }
+                2u32 => {
+                    ::buffa::encoding::check_wire_type(
+                        tag,
+                        ::buffa::encoding::WireType::LengthDelimited,
+                    )?;
+                    ::buffa::types::merge_string(&mut self.run_id, buf)?;
+                }
+                _ => {
+                    self.__buffa_unknown_fields
+                        .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+                }
+            }
+            ::core::result::Result::Ok(())
+        }
+        fn clear(&mut self) {
+            self.project_id.clear();
+            self.run_id.clear();
+            self.__buffa_unknown_fields.clear();
+        }
+    }
+    impl ::buffa::ExtensionSet for IssueActivity {
+        const PROTO_FQN: &'static str = "briar.app.v1.CreateRealtimeTicketRequest.IssueActivity";
+        fn unknown_fields(&self) -> &::buffa::UnknownFields {
+            &self.__buffa_unknown_fields
+        }
+        fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+            &mut self.__buffa_unknown_fields
+        }
+    }
+    impl ::buffa::json_helpers::ProtoElemJson for IssueActivity {
+        fn serialize_proto_json<S: ::serde::Serializer>(
+            v: &Self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            ::serde::Serialize::serialize(v, s)
+        }
+        fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            <Self as ::serde::Deserialize>::deserialize(d)
+        }
+    }
+    #[doc(hidden)]
+    pub const __ISSUE_ACTIVITY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+        type_url: "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest.IssueActivity",
+        to_json: ::buffa::type_registry::any_to_json::<IssueActivity>,
+        from_json: ::buffa::type_registry::any_from_json::<IssueActivity>,
+        is_wkt: false,
+    };
+    #[derive(Clone, PartialEq, Default)]
+    #[derive(::serde::Serialize, ::serde::Deserialize)]
+    #[serde(default)]
+    pub struct ChannelActivity {
+        /// Field 1: `organization_id`
+        #[serde(
+            rename = "organizationId",
+            alias = "organization_id",
+            with = "::buffa::json_helpers::proto_string",
+            skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        )]
+        pub organization_id: ::buffa::alloc::string::String,
+        /// Field 2: `channel_id`
+        #[serde(
+            rename = "channelId",
+            alias = "channel_id",
+            with = "::buffa::json_helpers::proto_string",
+            skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        )]
+        pub channel_id: ::buffa::alloc::string::String,
+        #[serde(skip)]
+        #[doc(hidden)]
+        pub __buffa_unknown_fields: ::buffa::UnknownFields,
+    }
+    impl ::core::fmt::Debug for ChannelActivity {
+        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+            f.debug_struct("ChannelActivity")
+                .field("organization_id", &self.organization_id)
+                .field("channel_id", &self.channel_id)
+                .finish()
+        }
+    }
+    impl ChannelActivity {
+        /// Protobuf type URL for this message, for use with `Any::pack` and
+        /// `Any::unpack_if`.
+        ///
+        /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+        pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest.ChannelActivity";
+    }
+    ::buffa::impl_default_instance!(ChannelActivity);
+    impl ::buffa::MessageName for ChannelActivity {
+        const PACKAGE: &'static str = "briar.app.v1";
+        const NAME: &'static str = "CreateRealtimeTicketRequest.ChannelActivity";
+        const FULL_NAME: &'static str = "briar.app.v1.CreateRealtimeTicketRequest.ChannelActivity";
+        const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest.ChannelActivity";
+    }
+    impl ::buffa::Message for ChannelActivity {
+        /// Returns the total encoded size in bytes.
+        ///
+        /// Accumulates in `u64` (which cannot overflow for in-memory
+        /// data) and saturates to `u32` at return, so a message whose
+        /// encoded size exceeds the 2 GiB protobuf limit yields a value
+        /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+        /// points reject, never a silently wrapped size.
+        #[allow(clippy::let_and_return)]
+        fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            #[allow(unused_imports)]
+            use ::buffa::Enumeration as _;
+            let mut size = 0u64;
+            if !self.organization_id.is_empty() {
+                size
+                    += 1u64
+                        + ::buffa::types::string_encoded_len(&self.organization_id)
+                            as u64;
+            }
+            if !self.channel_id.is_empty() {
+                size
+                    += 1u64
+                        + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
+            }
+            size += self.__buffa_unknown_fields.encoded_len() as u64;
+            ::buffa::saturate_size(size)
+        }
+        fn write_to(
+            &self,
+            _cache: &mut ::buffa::SizeCache,
+            buf: &mut impl ::buffa::EncodeSink,
+        ) {
+            #[allow(unused_imports)]
+            use ::buffa::Enumeration as _;
+            if !self.organization_id.is_empty() {
+                ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+            }
+            if !self.channel_id.is_empty() {
+                ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
+            }
+            self.__buffa_unknown_fields.write_to(buf);
+        }
+        fn merge_field(
+            &mut self,
+            tag: ::buffa::encoding::Tag,
+            buf: &mut impl ::buffa::bytes::Buf,
+            ctx: ::buffa::DecodeContext<'_>,
+        ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+            #[allow(unused_imports)]
+            use ::buffa::bytes::Buf as _;
+            #[allow(unused_imports)]
+            use ::buffa::Enumeration as _;
+            match tag.field_number() {
+                1u32 => {
+                    ::buffa::encoding::check_wire_type(
+                        tag,
+                        ::buffa::encoding::WireType::LengthDelimited,
+                    )?;
+                    ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                }
+                2u32 => {
+                    ::buffa::encoding::check_wire_type(
+                        tag,
+                        ::buffa::encoding::WireType::LengthDelimited,
+                    )?;
+                    ::buffa::types::merge_string(&mut self.channel_id, buf)?;
+                }
+                _ => {
+                    self.__buffa_unknown_fields
+                        .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+                }
+            }
+            ::core::result::Result::Ok(())
+        }
+        fn clear(&mut self) {
+            self.organization_id.clear();
+            self.channel_id.clear();
+            self.__buffa_unknown_fields.clear();
+        }
+    }
+    impl ::buffa::ExtensionSet for ChannelActivity {
+        const PROTO_FQN: &'static str = "briar.app.v1.CreateRealtimeTicketRequest.ChannelActivity";
+        fn unknown_fields(&self) -> &::buffa::UnknownFields {
+            &self.__buffa_unknown_fields
+        }
+        fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+            &mut self.__buffa_unknown_fields
+        }
+    }
+    impl ::buffa::json_helpers::ProtoElemJson for ChannelActivity {
+        fn serialize_proto_json<S: ::serde::Serializer>(
+            v: &Self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            ::serde::Serialize::serialize(v, s)
+        }
+        fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            <Self as ::serde::Deserialize>::deserialize(d)
+        }
+    }
+    #[doc(hidden)]
+    pub const __CHANNEL_ACTIVITY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+        type_url: "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest.ChannelActivity",
+        to_json: ::buffa::type_registry::any_to_json::<ChannelActivity>,
+        from_json: ::buffa::type_registry::any_from_json::<ChannelActivity>,
+        is_wkt: false,
+    };
+    #[doc(inline)]
+    pub use super::__buffa::oneof::create_realtime_ticket_request::Scope;
+    #[doc(inline)]
+    pub use super::__buffa::view::create_realtime_ticket_request::OrganizationNotificationsView;
+    #[doc(inline)]
+    pub use super::__buffa::view::create_realtime_ticket_request::OrganizationNotificationsOwnedView;
+    #[doc(inline)]
+    pub use super::__buffa::view::create_realtime_ticket_request::IssueActivityView;
+    #[doc(inline)]
+    pub use super::__buffa::view::create_realtime_ticket_request::IssueActivityOwnedView;
+    #[doc(inline)]
+    pub use super::__buffa::view::create_realtime_ticket_request::ChannelActivityView;
+    #[doc(inline)]
+    pub use super::__buffa::view::create_realtime_ticket_request::ChannelActivityOwnedView;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::create_realtime_ticket_request::Scope as ScopeView;
+}
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateRealtimeTicketResponse {
+    /// Field 1: `url`
+    #[serde(
+        rename = "url",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub url: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateRealtimeTicketResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateRealtimeTicketResponse").field("url", &self.url).finish()
+    }
+}
+impl CreateRealtimeTicketResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateRealtimeTicketResponse";
+}
+::buffa::impl_default_instance!(CreateRealtimeTicketResponse);
+impl ::buffa::MessageName for CreateRealtimeTicketResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "CreateRealtimeTicketResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.CreateRealtimeTicketResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateRealtimeTicketResponse";
+}
+impl ::buffa::Message for CreateRealtimeTicketResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.url.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.url) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.url.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.url, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.url, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.url.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateRealtimeTicketResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.CreateRealtimeTicketResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateRealtimeTicketResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_REALTIME_TICKET_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CreateRealtimeTicketResponse",
+    to_json: ::buffa::type_registry::any_to_json::<CreateRealtimeTicketResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateRealtimeTicketResponse>,
+    is_wkt: false,
+};
 #[allow(
     non_camel_case_types,
     dead_code,
@@ -182218,6 +183176,1682 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateRealtimeTicketRequestView<'a> {
+            pub scope: ::core::option::Option<
+                super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CreateRealtimeTicketRequestView<'a> {
+            type Owned = super::super::CreateRealtimeTicketRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::OrganizationNotifications(
+                                ref mut existing,
+                            ),
+                        ) = view.scope
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.scope = Some(
+                                super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::OrganizationNotifications(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::create_realtime_ticket_request::OrganizationNotificationsView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::IssueActivity(
+                                ref mut existing,
+                            ),
+                        ) = view.scope
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.scope = Some(
+                                super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::IssueActivity(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::create_realtime_ticket_request::IssueActivityView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::ChannelActivity(
+                                ref mut existing,
+                            ),
+                        ) = view.scope
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.scope = Some(
+                                super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::ChannelActivity(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::create_realtime_ticket_request::ChannelActivityView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateRealtimeTicketRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateRealtimeTicketRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateRealtimeTicketRequest {
+                    scope: match self.scope.as_ref() {
+                        ::core::option::Option::Some(v) => {
+                            ::core::option::Option::Some(
+                                match v {
+                                    super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::OrganizationNotifications(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::create_realtime_ticket_request::Scope::OrganizationNotifications(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::IssueActivity(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::create_realtime_ticket_request::Scope::IssueActivity(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::ChannelActivity(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::create_realtime_ticket_request::Scope::ChannelActivity(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        ::core::option::Option::None => ::core::option::Option::None,
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CreateRealtimeTicketRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if let ::core::option::Option::Some(ref v) = self.scope {
+                    match v {
+                        super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::OrganizationNotifications(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                        super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::IssueActivity(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                        super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::ChannelActivity(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let ::core::option::Option::Some(ref v) = self.scope {
+                    match v {
+                        super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::OrganizationNotifications(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                1u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::IssueActivity(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                2u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::ChannelActivity(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                3u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CreateRealtimeTicketRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(ref __ov) = self.scope {
+                    match __ov {
+                        super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::OrganizationNotifications(
+                            v,
+                        ) => {
+                            __map.serialize_entry("organizationNotifications", v)?;
+                        }
+                        super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::IssueActivity(
+                            v,
+                        ) => {
+                            __map.serialize_entry("issueActivity", v)?;
+                        }
+                        super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope::ChannelActivity(
+                            v,
+                        ) => {
+                            __map.serialize_entry("channelActivity", v)?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateRealtimeTicketRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "CreateRealtimeTicketRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.CreateRealtimeTicketRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest";
+        }
+        ::buffa::impl_default_view_instance!(CreateRealtimeTicketRequestView);
+        ::buffa::impl_view_reborrow!(CreateRealtimeTicketRequestView);
+        /** Self-contained, `'static` owned view of a `CreateRealtimeTicketRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateRealtimeTicketRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateRealtimeTicketRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateRealtimeTicketRequestOwnedView(
+            ::buffa::OwnedView<CreateRealtimeTicketRequestView<'static>>,
+        );
+        impl CreateRealtimeTicketRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateRealtimeTicketRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateRealtimeTicketRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateRealtimeTicketRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateRealtimeTicketRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CreateRealtimeTicketRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateRealtimeTicketRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::CreateRealtimeTicketRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Oneof `scope`.
+            #[must_use]
+            pub fn scope(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope<
+                    '_,
+                >,
+            > {
+                self.0.reborrow().scope.as_ref()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateRealtimeTicketRequestView<'static>>,
+        > for CreateRealtimeTicketRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<CreateRealtimeTicketRequestView<'static>>,
+            ) -> Self {
+                CreateRealtimeTicketRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateRealtimeTicketRequestOwnedView>
+        for ::buffa::OwnedView<CreateRealtimeTicketRequestView<'static>> {
+            fn from(wrapper: CreateRealtimeTicketRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateRealtimeTicketRequestView<'static>>,
+        > for CreateRealtimeTicketRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CreateRealtimeTicketRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CreateRealtimeTicketRequest {
+            type View<'a> = CreateRealtimeTicketRequestView<'a>;
+            type ViewHandle = CreateRealtimeTicketRequestOwnedView;
+        }
+        impl ::serde::Serialize for CreateRealtimeTicketRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        pub mod create_realtime_ticket_request {
+            #[allow(unused_imports)]
+            use super::*;
+            #[derive(Clone, Debug, Default)]
+            pub struct OrganizationNotificationsView<'a> {
+                /// Field 1: `organization_id`
+                pub organization_id: &'a str,
+                /// Field 2: `cursor`
+                pub cursor: u64,
+                pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+            }
+            impl<'a> ::buffa::MessageView<'a> for OrganizationNotificationsView<'a> {
+                type Owned = super::super::super::create_realtime_ticket_request::OrganizationNotifications;
+                fn decode_view(
+                    buf: &'a [u8],
+                ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                    let __limit = ::core::cell::Cell::new(
+                        ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                    );
+                    <Self as ::buffa::MessageView>::decode_view_ctx(
+                        buf,
+                        ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                    )
+                }
+                fn decode_view_with_ctx(
+                    buf: &'a [u8],
+                    ctx: ::buffa::DecodeContext<'_>,
+                ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                    <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+                }
+                #[inline]
+                fn merge_view_field(
+                    &mut self,
+                    tag: ::buffa::encoding::Tag,
+                    cur: &'a [u8],
+                    before_tag: &'a [u8],
+                    ctx: ::buffa::DecodeContext<'_>,
+                ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                    let _ = ctx;
+                    #[allow(unused_variables)]
+                    let view = self;
+                    let mut cur = cur;
+                    match tag.field_number() {
+                        1u32 => {
+                            ::buffa::encoding::check_wire_type(
+                                tag,
+                                ::buffa::encoding::WireType::LengthDelimited,
+                            )?;
+                            view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        }
+                        2u32 => {
+                            ::buffa::encoding::check_wire_type(
+                                tag,
+                                ::buffa::encoding::WireType::Varint,
+                            )?;
+                            view.cursor = ::buffa::types::decode_uint64(&mut cur)?;
+                        }
+                        _ => {
+                            ::buffa::encoding::skip_field_depth(
+                                tag,
+                                &mut cur,
+                                ctx.depth(),
+                            )?;
+                            let span_len = before_tag.len() - cur.len();
+                            view.__buffa_unknown_fields
+                                .push_record(before_tag, span_len, ctx)?;
+                        }
+                    }
+                    ::core::result::Result::Ok(cur)
+                }
+                fn to_owned_message(
+                    &self,
+                ) -> ::core::result::Result<
+                    super::super::super::create_realtime_ticket_request::OrganizationNotifications,
+                    ::buffa::DecodeError,
+                > {
+                    self.to_owned_from_source(None)
+                }
+                #[allow(clippy::useless_conversion, clippy::needless_update)]
+                fn to_owned_from_source(
+                    &self,
+                    __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+                ) -> ::core::result::Result<
+                    super::super::super::create_realtime_ticket_request::OrganizationNotifications,
+                    ::buffa::DecodeError,
+                > {
+                    #[allow(unused_imports)]
+                    use ::buffa::alloc::string::ToString as _;
+                    let _ = __buffa_src;
+                    ::core::result::Result::Ok(super::super::super::create_realtime_ticket_request::OrganizationNotifications {
+                        organization_id: self.organization_id.to_string(),
+                        cursor: self.cursor,
+                        __buffa_unknown_fields: self
+                            .__buffa_unknown_fields
+                            .to_owned()?
+                            .into(),
+                        ..::core::default::Default::default()
+                    })
+                }
+            }
+            impl<'a> ::buffa::ViewEncode<'a> for OrganizationNotificationsView<'a> {
+                #[allow(clippy::needless_borrow, clippy::let_and_return)]
+                fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                    #[allow(unused_imports)]
+                    use ::buffa::Enumeration as _;
+                    let mut size = 0u64;
+                    if !self.organization_id.is_empty() {
+                        size
+                            += 1u64
+                                + ::buffa::types::string_encoded_len(&self.organization_id)
+                                    as u64;
+                    }
+                    if self.cursor != 0u64 {
+                        size
+                            += 1u64
+                                + ::buffa::types::uint64_encoded_len(self.cursor) as u64;
+                    }
+                    size += self.__buffa_unknown_fields.encoded_len() as u64;
+                    ::buffa::saturate_size(size)
+                }
+                #[allow(clippy::needless_borrow)]
+                fn write_to(
+                    &self,
+                    _cache: &mut ::buffa::SizeCache,
+                    buf: &mut impl ::buffa::EncodeSink,
+                ) {
+                    #[allow(unused_imports)]
+                    use ::buffa::Enumeration as _;
+                    if !self.organization_id.is_empty() {
+                        ::buffa::types::put_string_field(
+                            1u32,
+                            &self.organization_id,
+                            buf,
+                        );
+                    }
+                    if self.cursor != 0u64 {
+                        ::buffa::types::put_uint64_field(2u32, self.cursor, buf);
+                    }
+                    self.__buffa_unknown_fields.write_to(buf);
+                }
+            }
+            /// Serializes this view as protobuf JSON.
+            ///
+            /// Implicit-presence fields with default values are omitted, `required`
+            /// fields are always emitted, explicit-presence (`optional`) fields are
+            /// emitted only when set, bytes fields are base64-encoded, and enum
+            /// values are their proto name strings.
+            ///
+            /// This impl uses `serialize_map(None)` because the number of emitted
+            /// fields depends on default-omission rules; serializers that require
+            /// known map lengths (e.g. `bincode`) will return a runtime error.
+            /// Use the owned message type for those formats.
+            impl<'__a> ::serde::Serialize for OrganizationNotificationsView<'__a> {
+                fn serialize<__S: ::serde::Serializer>(
+                    &self,
+                    __s: __S,
+                ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                    use ::serde::ser::SerializeMap as _;
+                    let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                    if !::buffa::json_helpers::skip_if::is_empty_str(
+                        self.organization_id,
+                    ) {
+                        __map.serialize_entry("organizationId", self.organization_id)?;
+                    }
+                    if !::buffa::json_helpers::skip_if::is_zero_u64(&self.cursor) {
+                        __map
+                            .serialize_entry(
+                                "cursor",
+                                &::buffa::json_helpers::ProtoJson(&self.cursor),
+                            )?;
+                    }
+                    __map.end()
+                }
+            }
+            impl<'a> ::buffa::MessageName for OrganizationNotificationsView<'a> {
+                const PACKAGE: &'static str = "briar.app.v1";
+                const NAME: &'static str = "CreateRealtimeTicketRequest.OrganizationNotifications";
+                const FULL_NAME: &'static str = "briar.app.v1.CreateRealtimeTicketRequest.OrganizationNotifications";
+                const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest.OrganizationNotifications";
+            }
+            ::buffa::impl_default_view_instance!(OrganizationNotificationsView);
+            ::buffa::impl_view_reborrow!(OrganizationNotificationsView);
+            /** Self-contained, `'static` owned view of a `OrganizationNotifications` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`OrganizationNotificationsView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`OrganizationNotificationsView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+            #[derive(Clone, Debug)]
+            pub struct OrganizationNotificationsOwnedView(
+                ::buffa::OwnedView<OrganizationNotificationsView<'static>>,
+            );
+            impl OrganizationNotificationsOwnedView {
+                /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+                ///
+                /// The view borrows directly from the buffer's data; the buffer is
+                /// retained inside the returned handle.
+                ///
+                /// # Errors
+                ///
+                /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+                /// protobuf data.
+                pub fn decode(
+                    bytes: ::buffa::bytes::Bytes,
+                ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                    ::core::result::Result::Ok(
+                        OrganizationNotificationsOwnedView(
+                            ::buffa::OwnedView::decode(bytes)?,
+                        ),
+                    )
+                }
+                /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+                /// max message size).
+                ///
+                /// # Errors
+                ///
+                /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+                /// exceeds the configured limits.
+                pub fn decode_with_options(
+                    bytes: ::buffa::bytes::Bytes,
+                    opts: &::buffa::DecodeOptions,
+                ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                    ::core::result::Result::Ok(
+                        OrganizationNotificationsOwnedView(
+                            ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                        ),
+                    )
+                }
+                /// Build from an owned message via an encode → decode round-trip.
+                ///
+                /// # Errors
+                ///
+                /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+                /// message's encoded size exceeds the 2 GiB protobuf limit, or
+                /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+                /// somehow invalid (should not happen for well-formed messages).
+                pub fn from_owned(
+                    msg: &super::super::super::create_realtime_ticket_request::OrganizationNotifications,
+                ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                    ::core::result::Result::Ok(
+                        OrganizationNotificationsOwnedView(
+                            ::buffa::OwnedView::from_owned(msg)?,
+                        ),
+                    )
+                }
+                /// Borrow the full [`OrganizationNotificationsView`] with its lifetime tied to `&self`.
+                #[must_use]
+                pub fn view(&self) -> &OrganizationNotificationsView<'_> {
+                    self.0.reborrow()
+                }
+                /// Convert to the owned message type.
+                ///
+                /// Infallible: this type's constructors wire-decode their
+                /// buffer, and a view produced by wire decoding always
+                /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+                /// whose contract also governs handles converted from a raw
+                /// [`::buffa::OwnedView`].
+                #[must_use]
+                pub fn to_owned_message(
+                    &self,
+                ) -> super::super::super::create_realtime_ticket_request::OrganizationNotifications {
+                    self.0.to_owned_message()
+                }
+                /// The underlying bytes buffer.
+                #[must_use]
+                pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                    self.0.bytes()
+                }
+                /// Consume the handle, returning the underlying bytes buffer.
+                #[must_use]
+                pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                    self.0.into_bytes()
+                }
+                /// Field 1: `organization_id`
+                #[must_use]
+                pub fn organization_id(&self) -> &'_ str {
+                    self.0.reborrow().organization_id
+                }
+                /// Field 2: `cursor`
+                #[must_use]
+                pub fn cursor(&self) -> u64 {
+                    self.0.reborrow().cursor
+                }
+            }
+            impl ::core::convert::From<
+                ::buffa::OwnedView<OrganizationNotificationsView<'static>>,
+            > for OrganizationNotificationsOwnedView {
+                fn from(
+                    inner: ::buffa::OwnedView<OrganizationNotificationsView<'static>>,
+                ) -> Self {
+                    OrganizationNotificationsOwnedView(inner)
+                }
+            }
+            impl ::core::convert::From<OrganizationNotificationsOwnedView>
+            for ::buffa::OwnedView<OrganizationNotificationsView<'static>> {
+                fn from(wrapper: OrganizationNotificationsOwnedView) -> Self {
+                    wrapper.0
+                }
+            }
+            impl ::core::convert::AsRef<
+                ::buffa::OwnedView<OrganizationNotificationsView<'static>>,
+            > for OrganizationNotificationsOwnedView {
+                fn as_ref(
+                    &self,
+                ) -> &::buffa::OwnedView<OrganizationNotificationsView<'static>> {
+                    &self.0
+                }
+            }
+            impl ::buffa::HasMessageView
+            for super::super::super::create_realtime_ticket_request::OrganizationNotifications {
+                type View<'a> = OrganizationNotificationsView<'a>;
+                type ViewHandle = OrganizationNotificationsOwnedView;
+            }
+            impl ::serde::Serialize for OrganizationNotificationsOwnedView {
+                fn serialize<__S: ::serde::Serializer>(
+                    &self,
+                    __s: __S,
+                ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                    ::serde::Serialize::serialize(&self.0, __s)
+                }
+            }
+            #[derive(Clone, Debug, Default)]
+            pub struct IssueActivityView<'a> {
+                /// Field 1: `project_id`
+                pub project_id: &'a str,
+                /// Field 2: `run_id`
+                pub run_id: &'a str,
+                pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+            }
+            impl<'a> ::buffa::MessageView<'a> for IssueActivityView<'a> {
+                type Owned = super::super::super::create_realtime_ticket_request::IssueActivity;
+                fn decode_view(
+                    buf: &'a [u8],
+                ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                    let __limit = ::core::cell::Cell::new(
+                        ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                    );
+                    <Self as ::buffa::MessageView>::decode_view_ctx(
+                        buf,
+                        ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                    )
+                }
+                fn decode_view_with_ctx(
+                    buf: &'a [u8],
+                    ctx: ::buffa::DecodeContext<'_>,
+                ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                    <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+                }
+                #[inline]
+                fn merge_view_field(
+                    &mut self,
+                    tag: ::buffa::encoding::Tag,
+                    cur: &'a [u8],
+                    before_tag: &'a [u8],
+                    ctx: ::buffa::DecodeContext<'_>,
+                ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                    let _ = ctx;
+                    #[allow(unused_variables)]
+                    let view = self;
+                    let mut cur = cur;
+                    match tag.field_number() {
+                        1u32 => {
+                            ::buffa::encoding::check_wire_type(
+                                tag,
+                                ::buffa::encoding::WireType::LengthDelimited,
+                            )?;
+                            view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                        }
+                        2u32 => {
+                            ::buffa::encoding::check_wire_type(
+                                tag,
+                                ::buffa::encoding::WireType::LengthDelimited,
+                            )?;
+                            view.run_id = ::buffa::types::borrow_str(&mut cur)?;
+                        }
+                        _ => {
+                            ::buffa::encoding::skip_field_depth(
+                                tag,
+                                &mut cur,
+                                ctx.depth(),
+                            )?;
+                            let span_len = before_tag.len() - cur.len();
+                            view.__buffa_unknown_fields
+                                .push_record(before_tag, span_len, ctx)?;
+                        }
+                    }
+                    ::core::result::Result::Ok(cur)
+                }
+                fn to_owned_message(
+                    &self,
+                ) -> ::core::result::Result<
+                    super::super::super::create_realtime_ticket_request::IssueActivity,
+                    ::buffa::DecodeError,
+                > {
+                    self.to_owned_from_source(None)
+                }
+                #[allow(clippy::useless_conversion, clippy::needless_update)]
+                fn to_owned_from_source(
+                    &self,
+                    __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+                ) -> ::core::result::Result<
+                    super::super::super::create_realtime_ticket_request::IssueActivity,
+                    ::buffa::DecodeError,
+                > {
+                    #[allow(unused_imports)]
+                    use ::buffa::alloc::string::ToString as _;
+                    let _ = __buffa_src;
+                    ::core::result::Result::Ok(super::super::super::create_realtime_ticket_request::IssueActivity {
+                        project_id: self.project_id.to_string(),
+                        run_id: self.run_id.to_string(),
+                        __buffa_unknown_fields: self
+                            .__buffa_unknown_fields
+                            .to_owned()?
+                            .into(),
+                        ..::core::default::Default::default()
+                    })
+                }
+            }
+            impl<'a> ::buffa::ViewEncode<'a> for IssueActivityView<'a> {
+                #[allow(clippy::needless_borrow, clippy::let_and_return)]
+                fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                    #[allow(unused_imports)]
+                    use ::buffa::Enumeration as _;
+                    let mut size = 0u64;
+                    if !self.project_id.is_empty() {
+                        size
+                            += 1u64
+                                + ::buffa::types::string_encoded_len(&self.project_id)
+                                    as u64;
+                    }
+                    if !self.run_id.is_empty() {
+                        size
+                            += 1u64
+                                + ::buffa::types::string_encoded_len(&self.run_id) as u64;
+                    }
+                    size += self.__buffa_unknown_fields.encoded_len() as u64;
+                    ::buffa::saturate_size(size)
+                }
+                #[allow(clippy::needless_borrow)]
+                fn write_to(
+                    &self,
+                    _cache: &mut ::buffa::SizeCache,
+                    buf: &mut impl ::buffa::EncodeSink,
+                ) {
+                    #[allow(unused_imports)]
+                    use ::buffa::Enumeration as _;
+                    if !self.project_id.is_empty() {
+                        ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                    }
+                    if !self.run_id.is_empty() {
+                        ::buffa::types::put_string_field(2u32, &self.run_id, buf);
+                    }
+                    self.__buffa_unknown_fields.write_to(buf);
+                }
+            }
+            /// Serializes this view as protobuf JSON.
+            ///
+            /// Implicit-presence fields with default values are omitted, `required`
+            /// fields are always emitted, explicit-presence (`optional`) fields are
+            /// emitted only when set, bytes fields are base64-encoded, and enum
+            /// values are their proto name strings.
+            ///
+            /// This impl uses `serialize_map(None)` because the number of emitted
+            /// fields depends on default-omission rules; serializers that require
+            /// known map lengths (e.g. `bincode`) will return a runtime error.
+            /// Use the owned message type for those formats.
+            impl<'__a> ::serde::Serialize for IssueActivityView<'__a> {
+                fn serialize<__S: ::serde::Serializer>(
+                    &self,
+                    __s: __S,
+                ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                    use ::serde::ser::SerializeMap as _;
+                    let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                    if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
+                        __map.serialize_entry("projectId", self.project_id)?;
+                    }
+                    if !::buffa::json_helpers::skip_if::is_empty_str(self.run_id) {
+                        __map.serialize_entry("runId", self.run_id)?;
+                    }
+                    __map.end()
+                }
+            }
+            impl<'a> ::buffa::MessageName for IssueActivityView<'a> {
+                const PACKAGE: &'static str = "briar.app.v1";
+                const NAME: &'static str = "CreateRealtimeTicketRequest.IssueActivity";
+                const FULL_NAME: &'static str = "briar.app.v1.CreateRealtimeTicketRequest.IssueActivity";
+                const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest.IssueActivity";
+            }
+            ::buffa::impl_default_view_instance!(IssueActivityView);
+            ::buffa::impl_view_reborrow!(IssueActivityView);
+            /** Self-contained, `'static` owned view of a `IssueActivity` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`IssueActivityView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`IssueActivityView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+            #[derive(Clone, Debug)]
+            pub struct IssueActivityOwnedView(
+                ::buffa::OwnedView<IssueActivityView<'static>>,
+            );
+            impl IssueActivityOwnedView {
+                /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+                ///
+                /// The view borrows directly from the buffer's data; the buffer is
+                /// retained inside the returned handle.
+                ///
+                /// # Errors
+                ///
+                /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+                /// protobuf data.
+                pub fn decode(
+                    bytes: ::buffa::bytes::Bytes,
+                ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                    ::core::result::Result::Ok(
+                        IssueActivityOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    )
+                }
+                /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+                /// max message size).
+                ///
+                /// # Errors
+                ///
+                /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+                /// exceeds the configured limits.
+                pub fn decode_with_options(
+                    bytes: ::buffa::bytes::Bytes,
+                    opts: &::buffa::DecodeOptions,
+                ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                    ::core::result::Result::Ok(
+                        IssueActivityOwnedView(
+                            ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                        ),
+                    )
+                }
+                /// Build from an owned message via an encode → decode round-trip.
+                ///
+                /// # Errors
+                ///
+                /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+                /// message's encoded size exceeds the 2 GiB protobuf limit, or
+                /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+                /// somehow invalid (should not happen for well-formed messages).
+                pub fn from_owned(
+                    msg: &super::super::super::create_realtime_ticket_request::IssueActivity,
+                ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                    ::core::result::Result::Ok(
+                        IssueActivityOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    )
+                }
+                /// Borrow the full [`IssueActivityView`] with its lifetime tied to `&self`.
+                #[must_use]
+                pub fn view(&self) -> &IssueActivityView<'_> {
+                    self.0.reborrow()
+                }
+                /// Convert to the owned message type.
+                ///
+                /// Infallible: this type's constructors wire-decode their
+                /// buffer, and a view produced by wire decoding always
+                /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+                /// whose contract also governs handles converted from a raw
+                /// [`::buffa::OwnedView`].
+                #[must_use]
+                pub fn to_owned_message(
+                    &self,
+                ) -> super::super::super::create_realtime_ticket_request::IssueActivity {
+                    self.0.to_owned_message()
+                }
+                /// The underlying bytes buffer.
+                #[must_use]
+                pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                    self.0.bytes()
+                }
+                /// Consume the handle, returning the underlying bytes buffer.
+                #[must_use]
+                pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                    self.0.into_bytes()
+                }
+                /// Field 1: `project_id`
+                #[must_use]
+                pub fn project_id(&self) -> &'_ str {
+                    self.0.reborrow().project_id
+                }
+                /// Field 2: `run_id`
+                #[must_use]
+                pub fn run_id(&self) -> &'_ str {
+                    self.0.reborrow().run_id
+                }
+            }
+            impl ::core::convert::From<::buffa::OwnedView<IssueActivityView<'static>>>
+            for IssueActivityOwnedView {
+                fn from(inner: ::buffa::OwnedView<IssueActivityView<'static>>) -> Self {
+                    IssueActivityOwnedView(inner)
+                }
+            }
+            impl ::core::convert::From<IssueActivityOwnedView>
+            for ::buffa::OwnedView<IssueActivityView<'static>> {
+                fn from(wrapper: IssueActivityOwnedView) -> Self {
+                    wrapper.0
+                }
+            }
+            impl ::core::convert::AsRef<::buffa::OwnedView<IssueActivityView<'static>>>
+            for IssueActivityOwnedView {
+                fn as_ref(&self) -> &::buffa::OwnedView<IssueActivityView<'static>> {
+                    &self.0
+                }
+            }
+            impl ::buffa::HasMessageView
+            for super::super::super::create_realtime_ticket_request::IssueActivity {
+                type View<'a> = IssueActivityView<'a>;
+                type ViewHandle = IssueActivityOwnedView;
+            }
+            impl ::serde::Serialize for IssueActivityOwnedView {
+                fn serialize<__S: ::serde::Serializer>(
+                    &self,
+                    __s: __S,
+                ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                    ::serde::Serialize::serialize(&self.0, __s)
+                }
+            }
+            #[derive(Clone, Debug, Default)]
+            pub struct ChannelActivityView<'a> {
+                /// Field 1: `organization_id`
+                pub organization_id: &'a str,
+                /// Field 2: `channel_id`
+                pub channel_id: &'a str,
+                pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+            }
+            impl<'a> ::buffa::MessageView<'a> for ChannelActivityView<'a> {
+                type Owned = super::super::super::create_realtime_ticket_request::ChannelActivity;
+                fn decode_view(
+                    buf: &'a [u8],
+                ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                    let __limit = ::core::cell::Cell::new(
+                        ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                    );
+                    <Self as ::buffa::MessageView>::decode_view_ctx(
+                        buf,
+                        ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                    )
+                }
+                fn decode_view_with_ctx(
+                    buf: &'a [u8],
+                    ctx: ::buffa::DecodeContext<'_>,
+                ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                    <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+                }
+                #[inline]
+                fn merge_view_field(
+                    &mut self,
+                    tag: ::buffa::encoding::Tag,
+                    cur: &'a [u8],
+                    before_tag: &'a [u8],
+                    ctx: ::buffa::DecodeContext<'_>,
+                ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                    let _ = ctx;
+                    #[allow(unused_variables)]
+                    let view = self;
+                    let mut cur = cur;
+                    match tag.field_number() {
+                        1u32 => {
+                            ::buffa::encoding::check_wire_type(
+                                tag,
+                                ::buffa::encoding::WireType::LengthDelimited,
+                            )?;
+                            view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        }
+                        2u32 => {
+                            ::buffa::encoding::check_wire_type(
+                                tag,
+                                ::buffa::encoding::WireType::LengthDelimited,
+                            )?;
+                            view.channel_id = ::buffa::types::borrow_str(&mut cur)?;
+                        }
+                        _ => {
+                            ::buffa::encoding::skip_field_depth(
+                                tag,
+                                &mut cur,
+                                ctx.depth(),
+                            )?;
+                            let span_len = before_tag.len() - cur.len();
+                            view.__buffa_unknown_fields
+                                .push_record(before_tag, span_len, ctx)?;
+                        }
+                    }
+                    ::core::result::Result::Ok(cur)
+                }
+                fn to_owned_message(
+                    &self,
+                ) -> ::core::result::Result<
+                    super::super::super::create_realtime_ticket_request::ChannelActivity,
+                    ::buffa::DecodeError,
+                > {
+                    self.to_owned_from_source(None)
+                }
+                #[allow(clippy::useless_conversion, clippy::needless_update)]
+                fn to_owned_from_source(
+                    &self,
+                    __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+                ) -> ::core::result::Result<
+                    super::super::super::create_realtime_ticket_request::ChannelActivity,
+                    ::buffa::DecodeError,
+                > {
+                    #[allow(unused_imports)]
+                    use ::buffa::alloc::string::ToString as _;
+                    let _ = __buffa_src;
+                    ::core::result::Result::Ok(super::super::super::create_realtime_ticket_request::ChannelActivity {
+                        organization_id: self.organization_id.to_string(),
+                        channel_id: self.channel_id.to_string(),
+                        __buffa_unknown_fields: self
+                            .__buffa_unknown_fields
+                            .to_owned()?
+                            .into(),
+                        ..::core::default::Default::default()
+                    })
+                }
+            }
+            impl<'a> ::buffa::ViewEncode<'a> for ChannelActivityView<'a> {
+                #[allow(clippy::needless_borrow, clippy::let_and_return)]
+                fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                    #[allow(unused_imports)]
+                    use ::buffa::Enumeration as _;
+                    let mut size = 0u64;
+                    if !self.organization_id.is_empty() {
+                        size
+                            += 1u64
+                                + ::buffa::types::string_encoded_len(&self.organization_id)
+                                    as u64;
+                    }
+                    if !self.channel_id.is_empty() {
+                        size
+                            += 1u64
+                                + ::buffa::types::string_encoded_len(&self.channel_id)
+                                    as u64;
+                    }
+                    size += self.__buffa_unknown_fields.encoded_len() as u64;
+                    ::buffa::saturate_size(size)
+                }
+                #[allow(clippy::needless_borrow)]
+                fn write_to(
+                    &self,
+                    _cache: &mut ::buffa::SizeCache,
+                    buf: &mut impl ::buffa::EncodeSink,
+                ) {
+                    #[allow(unused_imports)]
+                    use ::buffa::Enumeration as _;
+                    if !self.organization_id.is_empty() {
+                        ::buffa::types::put_string_field(
+                            1u32,
+                            &self.organization_id,
+                            buf,
+                        );
+                    }
+                    if !self.channel_id.is_empty() {
+                        ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
+                    }
+                    self.__buffa_unknown_fields.write_to(buf);
+                }
+            }
+            /// Serializes this view as protobuf JSON.
+            ///
+            /// Implicit-presence fields with default values are omitted, `required`
+            /// fields are always emitted, explicit-presence (`optional`) fields are
+            /// emitted only when set, bytes fields are base64-encoded, and enum
+            /// values are their proto name strings.
+            ///
+            /// This impl uses `serialize_map(None)` because the number of emitted
+            /// fields depends on default-omission rules; serializers that require
+            /// known map lengths (e.g. `bincode`) will return a runtime error.
+            /// Use the owned message type for those formats.
+            impl<'__a> ::serde::Serialize for ChannelActivityView<'__a> {
+                fn serialize<__S: ::serde::Serializer>(
+                    &self,
+                    __s: __S,
+                ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                    use ::serde::ser::SerializeMap as _;
+                    let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                    if !::buffa::json_helpers::skip_if::is_empty_str(
+                        self.organization_id,
+                    ) {
+                        __map.serialize_entry("organizationId", self.organization_id)?;
+                    }
+                    if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
+                        __map.serialize_entry("channelId", self.channel_id)?;
+                    }
+                    __map.end()
+                }
+            }
+            impl<'a> ::buffa::MessageName for ChannelActivityView<'a> {
+                const PACKAGE: &'static str = "briar.app.v1";
+                const NAME: &'static str = "CreateRealtimeTicketRequest.ChannelActivity";
+                const FULL_NAME: &'static str = "briar.app.v1.CreateRealtimeTicketRequest.ChannelActivity";
+                const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateRealtimeTicketRequest.ChannelActivity";
+            }
+            ::buffa::impl_default_view_instance!(ChannelActivityView);
+            ::buffa::impl_view_reborrow!(ChannelActivityView);
+            /** Self-contained, `'static` owned view of a `ChannelActivity` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ChannelActivityView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ChannelActivityView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+            #[derive(Clone, Debug)]
+            pub struct ChannelActivityOwnedView(
+                ::buffa::OwnedView<ChannelActivityView<'static>>,
+            );
+            impl ChannelActivityOwnedView {
+                /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+                ///
+                /// The view borrows directly from the buffer's data; the buffer is
+                /// retained inside the returned handle.
+                ///
+                /// # Errors
+                ///
+                /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+                /// protobuf data.
+                pub fn decode(
+                    bytes: ::buffa::bytes::Bytes,
+                ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                    ::core::result::Result::Ok(
+                        ChannelActivityOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    )
+                }
+                /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+                /// max message size).
+                ///
+                /// # Errors
+                ///
+                /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+                /// exceeds the configured limits.
+                pub fn decode_with_options(
+                    bytes: ::buffa::bytes::Bytes,
+                    opts: &::buffa::DecodeOptions,
+                ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                    ::core::result::Result::Ok(
+                        ChannelActivityOwnedView(
+                            ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                        ),
+                    )
+                }
+                /// Build from an owned message via an encode → decode round-trip.
+                ///
+                /// # Errors
+                ///
+                /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+                /// message's encoded size exceeds the 2 GiB protobuf limit, or
+                /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+                /// somehow invalid (should not happen for well-formed messages).
+                pub fn from_owned(
+                    msg: &super::super::super::create_realtime_ticket_request::ChannelActivity,
+                ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                    ::core::result::Result::Ok(
+                        ChannelActivityOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    )
+                }
+                /// Borrow the full [`ChannelActivityView`] with its lifetime tied to `&self`.
+                #[must_use]
+                pub fn view(&self) -> &ChannelActivityView<'_> {
+                    self.0.reborrow()
+                }
+                /// Convert to the owned message type.
+                ///
+                /// Infallible: this type's constructors wire-decode their
+                /// buffer, and a view produced by wire decoding always
+                /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+                /// whose contract also governs handles converted from a raw
+                /// [`::buffa::OwnedView`].
+                #[must_use]
+                pub fn to_owned_message(
+                    &self,
+                ) -> super::super::super::create_realtime_ticket_request::ChannelActivity {
+                    self.0.to_owned_message()
+                }
+                /// The underlying bytes buffer.
+                #[must_use]
+                pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                    self.0.bytes()
+                }
+                /// Consume the handle, returning the underlying bytes buffer.
+                #[must_use]
+                pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                    self.0.into_bytes()
+                }
+                /// Field 1: `organization_id`
+                #[must_use]
+                pub fn organization_id(&self) -> &'_ str {
+                    self.0.reborrow().organization_id
+                }
+                /// Field 2: `channel_id`
+                #[must_use]
+                pub fn channel_id(&self) -> &'_ str {
+                    self.0.reborrow().channel_id
+                }
+            }
+            impl ::core::convert::From<::buffa::OwnedView<ChannelActivityView<'static>>>
+            for ChannelActivityOwnedView {
+                fn from(
+                    inner: ::buffa::OwnedView<ChannelActivityView<'static>>,
+                ) -> Self {
+                    ChannelActivityOwnedView(inner)
+                }
+            }
+            impl ::core::convert::From<ChannelActivityOwnedView>
+            for ::buffa::OwnedView<ChannelActivityView<'static>> {
+                fn from(wrapper: ChannelActivityOwnedView) -> Self {
+                    wrapper.0
+                }
+            }
+            impl ::core::convert::AsRef<::buffa::OwnedView<ChannelActivityView<'static>>>
+            for ChannelActivityOwnedView {
+                fn as_ref(&self) -> &::buffa::OwnedView<ChannelActivityView<'static>> {
+                    &self.0
+                }
+            }
+            impl ::buffa::HasMessageView
+            for super::super::super::create_realtime_ticket_request::ChannelActivity {
+                type View<'a> = ChannelActivityView<'a>;
+                type ViewHandle = ChannelActivityOwnedView;
+            }
+            impl ::serde::Serialize for ChannelActivityOwnedView {
+                fn serialize<__S: ::serde::Serializer>(
+                    &self,
+                    __s: __S,
+                ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                    ::serde::Serialize::serialize(&self.0, __s)
+                }
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateRealtimeTicketResponseView<'a> {
+            /// Field 1: `url`
+            pub url: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CreateRealtimeTicketResponseView<'a> {
+            type Owned = super::super::CreateRealtimeTicketResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.url = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateRealtimeTicketResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateRealtimeTicketResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateRealtimeTicketResponse {
+                    url: self.url.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CreateRealtimeTicketResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.url.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.url) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.url.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.url, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CreateRealtimeTicketResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.url) {
+                    __map.serialize_entry("url", self.url)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateRealtimeTicketResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "CreateRealtimeTicketResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.CreateRealtimeTicketResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateRealtimeTicketResponse";
+        }
+        ::buffa::impl_default_view_instance!(CreateRealtimeTicketResponseView);
+        ::buffa::impl_view_reborrow!(CreateRealtimeTicketResponseView);
+        /** Self-contained, `'static` owned view of a `CreateRealtimeTicketResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateRealtimeTicketResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateRealtimeTicketResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateRealtimeTicketResponseOwnedView(
+            ::buffa::OwnedView<CreateRealtimeTicketResponseView<'static>>,
+        );
+        impl CreateRealtimeTicketResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateRealtimeTicketResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateRealtimeTicketResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateRealtimeTicketResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateRealtimeTicketResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CreateRealtimeTicketResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateRealtimeTicketResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::CreateRealtimeTicketResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `url`
+            #[must_use]
+            pub fn url(&self) -> &'_ str {
+                self.0.reborrow().url
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateRealtimeTicketResponseView<'static>>,
+        > for CreateRealtimeTicketResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<CreateRealtimeTicketResponseView<'static>>,
+            ) -> Self {
+                CreateRealtimeTicketResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateRealtimeTicketResponseOwnedView>
+        for ::buffa::OwnedView<CreateRealtimeTicketResponseView<'static>> {
+            fn from(wrapper: CreateRealtimeTicketResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateRealtimeTicketResponseView<'static>>,
+        > for CreateRealtimeTicketResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CreateRealtimeTicketResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CreateRealtimeTicketResponse {
+            type View<'a> = CreateRealtimeTicketResponseView<'a>;
+            type ViewHandle = CreateRealtimeTicketResponseOwnedView;
+        }
+        impl ::serde::Serialize for CreateRealtimeTicketResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         pub mod oneof {
             #[allow(unused_imports)]
             use super::*;
@@ -182535,6 +185169,34 @@ pub mod __buffa {
                     Session(
                         ::buffa::alloc::boxed::Box<
                             super::super::super::super::__buffa::view::InboxSessionMessageView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                }
+            }
+            pub mod create_realtime_ticket_request {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum Scope<'a> {
+                    OrganizationNotifications(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::create_realtime_ticket_request::OrganizationNotificationsView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    IssueActivity(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::create_realtime_ticket_request::IssueActivityView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    ChannelActivity(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::create_realtime_ticket_request::ChannelActivityView<
                                 'a,
                             >,
                         >,
@@ -183483,6 +186145,102 @@ pub mod __buffa {
                 }
             }
         }
+        pub mod create_realtime_ticket_request {
+            #[allow(unused_imports)]
+            use super::*;
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Scope {
+                OrganizationNotifications(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::create_realtime_ticket_request::OrganizationNotifications,
+                    >,
+                ),
+                IssueActivity(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::create_realtime_ticket_request::IssueActivity,
+                    >,
+                ),
+                ChannelActivity(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::create_realtime_ticket_request::ChannelActivity,
+                    >,
+                ),
+            }
+            impl ::buffa::Oneof for Scope {}
+            impl From<
+                super::super::super::create_realtime_ticket_request::OrganizationNotifications,
+            > for Scope {
+                fn from(
+                    v: super::super::super::create_realtime_ticket_request::OrganizationNotifications,
+                ) -> Self {
+                    Self::OrganizationNotifications(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<
+                super::super::super::create_realtime_ticket_request::OrganizationNotifications,
+            > for ::core::option::Option<Scope> {
+                fn from(
+                    v: super::super::super::create_realtime_ticket_request::OrganizationNotifications,
+                ) -> Self {
+                    Self::Some(Scope::from(v))
+                }
+            }
+            impl From<super::super::super::create_realtime_ticket_request::IssueActivity>
+            for Scope {
+                fn from(
+                    v: super::super::super::create_realtime_ticket_request::IssueActivity,
+                ) -> Self {
+                    Self::IssueActivity(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::create_realtime_ticket_request::IssueActivity>
+            for ::core::option::Option<Scope> {
+                fn from(
+                    v: super::super::super::create_realtime_ticket_request::IssueActivity,
+                ) -> Self {
+                    Self::Some(Scope::from(v))
+                }
+            }
+            impl From<
+                super::super::super::create_realtime_ticket_request::ChannelActivity,
+            > for Scope {
+                fn from(
+                    v: super::super::super::create_realtime_ticket_request::ChannelActivity,
+                ) -> Self {
+                    Self::ChannelActivity(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<
+                super::super::super::create_realtime_ticket_request::ChannelActivity,
+            > for ::core::option::Option<Scope> {
+                fn from(
+                    v: super::super::super::create_realtime_ticket_request::ChannelActivity,
+                ) -> Self {
+                    Self::Some(Scope::from(v))
+                }
+            }
+            impl serde::Serialize for Scope {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::OrganizationNotifications(v) => {
+                            map.serialize_entry("organizationNotifications", v)?;
+                        }
+                        Self::IssueActivity(v) => {
+                            map.serialize_entry("issueActivity", v)?;
+                        }
+                        Self::ChannelActivity(v) => {
+                            map.serialize_entry("channelActivity", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -183803,6 +186561,17 @@ pub mod __buffa {
         reg.register_json_any(super::__INBOX_CHANNEL_MESSAGE_JSON_ANY);
         reg.register_json_any(super::__INBOX_SESSION_MESSAGE_JSON_ANY);
         reg.register_json_any(super::__INBOX_FEED_MESSAGE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_REALTIME_TICKET_REQUEST_JSON_ANY);
+        reg.register_json_any(
+            super::create_realtime_ticket_request::__ORGANIZATION_NOTIFICATIONS_JSON_ANY,
+        );
+        reg.register_json_any(
+            super::create_realtime_ticket_request::__ISSUE_ACTIVITY_JSON_ANY,
+        );
+        reg.register_json_any(
+            super::create_realtime_ticket_request::__CHANNEL_ACTIVITY_JSON_ANY,
+        );
+        reg.register_json_any(super::__CREATE_REALTIME_TICKET_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -184761,5 +187530,13 @@ pub use self::__buffa::view::InboxSessionMessageOwnedView;
 pub use self::__buffa::view::InboxFeedMessageView;
 #[doc(inline)]
 pub use self::__buffa::view::InboxFeedMessageOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateRealtimeTicketRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateRealtimeTicketRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateRealtimeTicketResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateRealtimeTicketResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;
