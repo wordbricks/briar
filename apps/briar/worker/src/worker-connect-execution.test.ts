@@ -1,9 +1,11 @@
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError, type HandlerContext } from "@connectrpc/connect";
 import {
+  RetryRunRequestSchema,
   ListRunEvidenceRequestSchema,
   RunEvidence_Status,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
+import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   ClaimIssueRequestSchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
@@ -205,6 +207,54 @@ describe("WorkerExecutionService execution credential boundary", () => {
       metadata: { suite: "worker" },
       images: [{ byteSize: 2_048n }],
       canonical: true,
+    });
+  });
+
+  it("derives the run-control actor from the authenticated Worker", async () => {
+    const recoverRun = vi.fn<WorkerExecutionServices["recoverRun"]>();
+    recoverRun.mockResolvedValue({
+      runId,
+      outcome: "already_retried",
+      attempt: 3,
+      stage: "queued",
+    });
+    const worker = {
+      binding: { id: "worker-42" },
+    } as NonNullable<IssueClaimAuthorization["authenticatedWorker"]>;
+    const service = createWorkerExecutionService({
+      request: new Request("https://briar.example", {
+        headers: { authorization: "Bearer briar_worker_test" },
+      }),
+      db,
+      env,
+      archivesBucket,
+      requireRunExecutionProject: vi.fn(async () => projectId),
+    }, {
+      recoverRun,
+      requireWorkerProjectBinding: vi.fn(async () => worker),
+    });
+
+    const response = await service.retryRun(create(RetryRunRequestSchema, {
+      projectId,
+      runId,
+      requestId: "44444444-4444-4444-8444-444444444444",
+      reason: " Retry the provider turn ",
+    }), context);
+
+    expect(recoverRun).toHaveBeenCalledWith({
+      db,
+      projectId,
+      runId,
+      requestId: "44444444-4444-4444-8444-444444444444",
+      reason: "Retry the provider turn",
+      action: "retry",
+      actor: "briar-worker:worker-42",
+    });
+    expect(response).toMatchObject({
+      runId,
+      outcome: "already_retried",
+      attempt: 3,
+      status: RunStatus.QUEUED,
     });
   });
 });

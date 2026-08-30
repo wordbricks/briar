@@ -11,6 +11,12 @@ import {
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { WorkflowCheckpoint_Position } from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
+import {
+  appCancelRunResponse,
+  appReworkRunResponse,
+  appResumeRunResponse,
+  appRetryRunResponse,
+} from "./app-connect-issue-mappers";
 import { withConnectErrors } from "./app-connect-errors";
 import { HttpError } from "./http-response";
 import { claimNextQueueWork } from "./queue-claim-routes";
@@ -46,10 +52,20 @@ import {
   type WorkerRunExecutionPrincipal,
 } from "./worker-run-execution-application";
 import {
+  recoverRunApplication,
+  reworkRunApplication,
+  resumeRunApplication,
+} from "./run-control-application";
+import {
   workerRunEvent,
   workerRunStatusMessage,
   workflowStageTransition,
 } from "./worker-run-execution-mappers";
+import {
+  recoveryRunCommand,
+  reworkRunCommand,
+  resumeRunCommand,
+} from "./worker-run-control-mappers";
 
 export type IssueClaimAuthorization = {
   readonly projectId: string;
@@ -106,6 +122,9 @@ export type WorkerExecutionServices = {
   readonly recordRunEvent: typeof recordWorkerRunEventApplication;
   readonly transitionWorkflowStage:
     typeof transitionWorkerWorkflowStageApplication;
+  readonly recoverRun: typeof recoverRunApplication;
+  readonly resumeRun: typeof resumeRunApplication;
+  readonly reworkRun: typeof reworkRunApplication;
 };
 
 const workerExecutionServices: WorkerExecutionServices = {
@@ -118,6 +137,9 @@ const workerExecutionServices: WorkerExecutionServices = {
   requireAgentProject,
   recordRunEvent: recordWorkerRunEventApplication,
   transitionWorkflowStage: transitionWorkerWorkflowStageApplication,
+  recoverRun: recoverRunApplication,
+  resumeRun: resumeRunApplication,
+  reworkRun: reworkRunApplication,
 };
 
 const canonicalUuid = decodeRequestSync(UuidString);
@@ -198,6 +220,28 @@ const scheduleRunMutation = (input: WorkerConnectExecutionInput, projectId: stri
   if (!input.env.CHANNEL_REALTIME) {
     scheduleInboxRealtimeFlush(input.env, input.db, input.context);
   }
+};
+
+const runControlActor = async (
+  input: WorkerConnectExecutionInput,
+  services: WorkerExecutionServices,
+  projectId: string,
+  runId: string,
+) => {
+  const authenticatedProjectId = await input.requireRunExecutionProject(runId);
+  if (authenticatedProjectId !== projectId) {
+    throw new HttpError(404, "Run not found");
+  }
+  const authorization = input.request.headers.get("authorization") ?? "";
+  if (!authorization.startsWith("Bearer briar_worker_")) {
+    return "briar-workflow";
+  }
+  const worker = await services.requireWorkerProjectBinding(
+    input.db,
+    input.request,
+    projectId,
+  );
+  return `briar-worker:${worker.binding.id}`;
 };
 
 export function createWorkerExecutionService(
@@ -373,6 +417,72 @@ export function createWorkerExecutionService(
             })
           : undefined,
       });
+    }),
+    retryRun: (request) => withConnectErrors(async () => {
+      const command = recoveryRunCommand(request);
+      const actor = await runControlActor(
+        input,
+        services,
+        command.projectId,
+        command.runId,
+      );
+      const result = await services.recoverRun({
+        db: input.db,
+        ...command,
+        action: "retry",
+        actor,
+      });
+      scheduleRunMutation(input, command.projectId);
+      return appRetryRunResponse(result);
+    }),
+    cancelRun: (request) => withConnectErrors(async () => {
+      const command = recoveryRunCommand(request);
+      const actor = await runControlActor(
+        input,
+        services,
+        command.projectId,
+        command.runId,
+      );
+      const result = await services.recoverRun({
+        db: input.db,
+        ...command,
+        action: "cancel",
+        actor,
+      });
+      scheduleRunMutation(input, command.projectId);
+      return appCancelRunResponse(result);
+    }),
+    resumeRun: (request) => withConnectErrors(async () => {
+      const command = resumeRunCommand(request);
+      const actor = await runControlActor(
+        input,
+        services,
+        command.projectId,
+        command.runId,
+      );
+      const result = await services.resumeRun({
+        db: input.db,
+        ...command,
+        actor,
+      });
+      scheduleRunMutation(input, command.projectId);
+      return appResumeRunResponse(result);
+    }),
+    reworkRun: (request) => withConnectErrors(async () => {
+      const command = reworkRunCommand(request);
+      const actor = await runControlActor(
+        input,
+        services,
+        command.projectId,
+        command.runId,
+      );
+      const result = await services.reworkRun({
+        db: input.db,
+        ...command,
+        actor,
+      });
+      scheduleRunMutation(input, command.projectId);
+      return appReworkRunResponse(result);
     }),
   };
 }
