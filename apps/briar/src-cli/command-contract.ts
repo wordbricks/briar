@@ -11,7 +11,6 @@ const Uuid = Schema.String.check(Schema.isUUID());
 const UrlString = Schema.String.check(
   Schema.makeFilter((value) => URL.canParse(value) || "Expected a valid URL"),
 );
-const PositiveInteger = Schema.Int.check(Schema.isGreaterThan(0));
 const StringRecord = Schema.Record(Schema.String, Schema.Unknown);
 
 const HttpErrorBody = Schema.Struct({
@@ -106,52 +105,3 @@ export const RunEvidenceInput = Schema.Struct({
 });
 export type RunEvidenceInput = typeof RunEvidenceInput.Type;
 export const decodeRunEvidenceInput = Schema.decodeUnknownSync(RunEvidenceInput);
-
-const RecoveryRunInput = Schema.Struct({
-  requestId: Uuid,
-  actor: Schema.String.check(Schema.isLengthBetween(1, 128)),
-  reason: Schema.NullOr(
-    Schema.String.check(Schema.isLengthBetween(1, 4_000)),
-  ),
-});
-const decodeRecoveryRunInput = Schema.decodeUnknownSync(RecoveryRunInput);
-
-export function validateRecoveryRunInput(input: unknown): void {
-  decodeRecoveryRunInput(input);
-}
-
-const ReworkRunInput = Schema.Struct({
-  requestId: Uuid,
-  actor: Schema.String.check(Schema.isLengthBetween(1, 128)),
-  workflowStage: WorkflowStageId,
-  reason: Schema.Trim.check(Schema.isLengthBetween(1, 4_000)),
-});
-const decodeReworkRunInput = Schema.decodeUnknownSync(ReworkRunInput);
-
-export function validateReworkRunInput(input: unknown): void {
-  decodeReworkRunInput(input);
-}
-
-const ResumeRunInput = Schema.Struct({
-  requestId: Uuid,
-  actor: Schema.String.check(Schema.isLengthBetween(1, 128)),
-  checkpointKey: Schema.optional(WorkflowStageId),
-  attempt: Schema.optional(PositiveInteger),
-  revision: Schema.optional(PositiveInteger),
-}).check(
-  Schema.makeFilter((candidate) => {
-    const supplied = [
-      candidate.checkpointKey,
-      candidate.attempt,
-      candidate.revision,
-    ].filter((item) => item !== undefined).length;
-    return supplied === 0 || supplied === 3
-      ? undefined
-      : "--checkpoint, --attempt, and --revision must be supplied together";
-  }),
-);
-const decodeResumeRunInput = Schema.decodeUnknownSync(ResumeRunInput);
-
-export function validateResumeRunInput(input: unknown): void {
-  decodeResumeRunInput(input);
-}

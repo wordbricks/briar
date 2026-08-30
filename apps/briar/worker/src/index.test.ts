@@ -41,7 +41,6 @@ import {
 import {
   decodePausedRunReworkInput,
   decodeRunEvidenceInput,
-  decodeRunReworkInput,
 } from "./run-request-contract";
 import {
   decodeProjectAgentScheduleRunCompletion,
@@ -925,30 +924,6 @@ describe("Worker HTTP contract", () => {
         }),
       ),
     ).rejects.toThrow("cannot include attachments");
-  });
-
-  it("requires an explicit earlier stage and reason for run rework", () => {
-    expect(
-      decodeRunReworkInput({
-        requestId: "11111111-1111-4111-8111-111111111111",
-        workflowStage: "implementing",
-        reason: "Local QA found a product-code defect.",
-        actor: "briar-workflow",
-      }),
-    ).toEqual({
-      requestId: "11111111-1111-4111-8111-111111111111",
-      workflowStage: "implementing",
-      reason: "Local QA found a product-code defect.",
-      actor: "briar-workflow",
-    });
-    expect(() =>
-      decodeRunReworkInput({
-        requestId: "11111111-1111-4111-8111-111111111111",
-        workflowStage: "implementing",
-        reason: " ",
-        actor: "briar-workflow",
-      }),
-    ).toThrow();
   });
 
   it("requires exact checkpoint identity for paused run rework", () => {

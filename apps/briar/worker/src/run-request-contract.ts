@@ -141,11 +141,6 @@ export const RecoveryUserInput = strictSchema(Schema.Struct({
   requestId: UuidString,
   reason: Schema.optional(Schema.NullOr(trimmedText(1, 4_000))),
 }));
-export const RecoveryAgentInput = strictSchema(Schema.Struct({
-  requestId: UuidString,
-  reason: Schema.optional(Schema.NullOr(trimmedText(1, 4_000))),
-  actor: trimmedText(1, 128),
-}));
 
 export const ResumeUserInput = strictSchema(Schema.Struct({
   requestId: UuidString,
@@ -154,21 +149,6 @@ export const ResumeUserInput = strictSchema(Schema.Struct({
   revision: PositiveSafeInteger,
 }));
 export type ResumeUserInput = typeof ResumeUserInput.Type;
-
-export const ResumeAgentInput = strictSchema(Schema.Struct({
-  requestId: UuidString,
-  checkpointKey: WorkflowStageId,
-  attempt: PositiveSafeInteger,
-  revision: PositiveSafeInteger,
-  actor: trimmedText(1, 128),
-}));
-
-export const RunReworkInput = strictSchema(Schema.Struct({
-  requestId: UuidString,
-  workflowStage: WorkflowStageId,
-  reason: trimmedText(1, 4_000),
-  actor: trimmedText(1, 128),
-}));
 
 export const PausedRunReworkInput = strictSchema(Schema.Struct({
   requestId: UuidString,
@@ -300,10 +280,7 @@ export const decodeProjectUsageDateRange = decodeRequestSync(
 );
 export const decodeRunEvidenceInput = decodeRequestSync(RunEvidenceInput);
 export const decodeRecoveryUserInput = decodeRequestSync(RecoveryUserInput);
-export const decodeRecoveryAgentInput = decodeRequestSync(RecoveryAgentInput);
 export const decodeResumeUserInput = decodeRequestSync(ResumeUserInput);
-export const decodeResumeAgentInput = decodeRequestSync(ResumeAgentInput);
-export const decodeRunReworkInput = decodeRequestSync(RunReworkInput);
 export const decodePausedRunReworkInput = decodeRequestSync(
   PausedRunReworkInput,
 );

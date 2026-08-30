@@ -2,8 +2,6 @@ import {
   getProject,
   HuntTransitionError,
   moveHuntRun,
-  recoverHuntRun,
-  reworkHuntRun,
   transferIssue,
 } from "./db";
 import { HttpError } from "./http-response";
@@ -17,7 +15,11 @@ import {
   decodeResumeUserInput,
 } from "./run-request-contract";
 import { decodeDispatchRun } from "./worker-request-contract";
-import { resumeRunWithCheckpointIdentity } from "./workflow-resume";
+import {
+  recoverRunApplication,
+  reworkRunApplication,
+  resumeRunApplication,
+} from "./run-control-application";
 import {
   auditExecutionEvent,
   dispatchHuntRun,
@@ -126,25 +128,15 @@ export async function recoverProjectIssueRun(
     "Issue execution permission required",
   );
   const request = decodeRecoveryUserInput(input.request);
-  const result = await recoverHuntRun(input.db, project.id, {
+  const result = await recoverRunApplication({
+    db: input.db,
+    projectId: project.id,
     runId: input.runId,
     action: input.action,
     requestId: request.requestId,
     actor: `briar-app:${input.userId}`,
     reason: request.reason ?? null,
-    occurredAt: new Date().toISOString(),
   });
-  if (result.outcome === "not_found") {
-    throw new HttpError(404, "Run not found");
-  }
-  if (result.outcome === "ineligible") {
-    throw new HttpError(
-      409,
-      input.action === "retry"
-        ? "Only blocked or failed runs can be retried"
-        : "Completed or cancelled runs cannot be cancelled",
-    );
-  }
   if (
     input.action === "cancel" &&
     (result.outcome === "cancelled" || result.outcome === "already_cancelled")
@@ -160,7 +152,7 @@ export async function recoverProjectIssueRun(
       occurredAt: new Date().toISOString(),
     });
   }
-  return { runId: input.runId, ...result };
+  return result;
 }
 
 export async function resumeProjectIssueRun(
@@ -172,29 +164,16 @@ export async function resumeProjectIssueRun(
     "Issue execution permission required",
   );
   const request = decodeResumeUserInput(input.request);
-  const result = await resumeRunWithCheckpointIdentity(
-    input.db,
-    project.id,
-    input.runId,
-    request,
-    `briar-app:${input.userId}`,
-  );
-  if (result.outcome === "not_found") {
-    throw new HttpError(404, "Run not found");
-  }
-  if (result.outcome === "conflict") {
-    throw new HttpError(
-      409,
-      "The paused checkpoint changed before it could be resumed",
-      "CHECKPOINT_CONFLICT",
-    );
-  }
-  return {
+  return resumeRunApplication({
+    db: input.db,
+    projectId: project.id,
     runId: input.runId,
-    ...result,
-    workflowStage: result.nextStage,
-    startStage: result.nextStage,
-  };
+    requestId: request.requestId,
+    checkpointKey: request.checkpointKey,
+    attempt: request.attempt,
+    revision: request.revision,
+    actor: `briar-app:${input.userId}`,
+  });
 }
 
 export async function moveProjectIssueRun(
@@ -270,30 +249,20 @@ export async function reworkProjectIssueRun(
     "Issue execution permission required",
   );
   const request = decodePausedRunReworkInput(input.request);
-  try {
-    const result = await reworkHuntRun(input.db, project.id, {
-      runId: input.runId,
-      workflowStage: request.workflowStage,
-      requestId: request.requestId,
-      actor: `briar-app:${input.userId}`,
-      reason: request.reason,
-      occurredAt: new Date().toISOString(),
-      checkpoint: {
-        key: request.checkpointKey,
-        attempt: request.attempt,
-        revision: request.revision,
-      },
-    });
-    if (result.outcome === "not_found") {
-      throw new HttpError(404, "Run not found");
-    }
-    return { runId: input.runId, ...result };
-  } catch (error) {
-    if (error instanceof HuntTransitionError) {
-      throw new HttpError(409, error.message, "CHECKPOINT_CONFLICT");
-    }
-    throw error;
-  }
+  return reworkRunApplication({
+    db: input.db,
+    projectId: project.id,
+    runId: input.runId,
+    workflowStage: request.workflowStage,
+    requestId: request.requestId,
+    actor: `briar-app:${input.userId}`,
+    reason: request.reason,
+    checkpoint: {
+      key: request.checkpointKey,
+      attempt: request.attempt,
+      revision: request.revision,
+    },
+  });
 }
 
 export async function unassignProjectIssueRun(

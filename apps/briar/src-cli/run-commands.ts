@@ -215,7 +215,8 @@ async function addRunEvent(forcedStatus?: string) {
   const structuredResult = structuredResultValue
     ? decodeStructuredAgentResult(JSON.parse(structuredResultValue))
     : null;
-  const runId = value("--run") ?? project.activeClaim?.runId ?? null;
+  const runIdValue = value("--run") ?? project.activeClaim?.runId ?? null;
+  const runId = runIdValue ? decodeUuid(runIdValue).toLowerCase() : null;
   const sourceKey = value("--source-key") ?? project.activeClaim?.sourceKey ?? null;
   const title = value("--title");
   const status = workerRunEventStatus(forcedStatus ?? value("--status"));
@@ -438,7 +439,7 @@ async function recoverRun(action: "retry" | "cancel") {
   const project = await currentProject(config);
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
-  const canonicalRunId = decodeUuid(runId);
+  const canonicalRunId = decodeUuid(runId).toLowerCase();
   const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
     executionToken(project),
@@ -452,7 +453,7 @@ async function recoverRun(action: "retry" | "cancel") {
   const result = action === "retry"
     ? await executionRpc.client.retryRun(input, executionRpc.options)
     : await executionRpc.client.cancelRun(input, executionRpc.options);
-  if (project.activeClaim?.runId === runId) {
+  if (project.activeClaim?.runId === canonicalRunId) {
     // The server released this claim while queueing the new revision. Make the
     // current provider turn stop instead of continuing with a stale token.
     config.projects = config.projects.map((candidate) =>
@@ -473,18 +474,19 @@ async function reworkRun() {
   const project = await currentProject(config);
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
+  const canonicalRunId = decodeUuid(runId).toLowerCase();
   const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
     executionToken(project),
   );
   const result = await executionRpc.client.reworkRun({
     projectId: project.id,
-    runId: decodeUuid(runId),
+    runId: canonicalRunId,
     requestId: decodeUuid(value("--request-id") ?? crypto.randomUUID()),
     workflowStage: decodeWorkflowStageId(required("--to")),
     reason: required("--reason"),
   }, executionRpc.options);
-  if (project.activeClaim?.runId === runId) {
+  if (project.activeClaim?.runId === canonicalRunId) {
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
         ? { ...candidate, activeClaim: undefined }
@@ -500,19 +502,20 @@ async function resumeRun() {
   const project = await currentProject(config);
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
+  const canonicalRunId = decodeUuid(runId).toLowerCase();
   const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
     executionToken(project),
   );
   const result = await executionRpc.client.resumeRun({
     projectId: project.id,
-    runId: decodeUuid(runId),
+    runId: canonicalRunId,
     requestId: decodeUuid(value("--request-id") ?? crypto.randomUUID()),
     checkpointKey: decodeWorkflowStageId(required("--checkpoint")),
     attempt: positiveIntegerFlag("--attempt"),
     revision: positiveIntegerFlag("--revision"),
   }, executionRpc.options);
-  if (project.activeClaim?.runId === runId) {
+  if (project.activeClaim?.runId === canonicalRunId) {
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
         ? { ...candidate, activeClaim: undefined }
@@ -528,6 +531,7 @@ async function transitionWorkflowStage(action: "start" | "complete") {
   const project = await currentProject(config);
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
+  const canonicalRunId = decodeUuid(runId).toLowerCase();
   const stage = decodeWorkflowStageId(required("--stage"));
   const requestId = decodeUuid(
     value("--request-id") ?? crypto.randomUUID(),
@@ -548,7 +552,7 @@ async function transitionWorkflowStage(action: "start" | "complete") {
   const result = await executionRpc.client.transitionWorkflowStage(
     {
       projectId: project.id,
-      work: activeIssueWork(project, decodeUuid(runId)),
+      work: activeIssueWork(project, canonicalRunId),
       requestId,
       stage,
       action: action === "start"
@@ -561,7 +565,7 @@ async function transitionWorkflowStage(action: "start" | "complete") {
   );
   if (
     result.outcome === TransitionWorkflowStageResponse_Outcome.PAUSED &&
-    project.activeClaim?.runId === runId
+    project.activeClaim?.runId === canonicalRunId
   ) {
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id

@@ -1647,21 +1647,26 @@ describe("channel issue proposal approval route", () => {
       });
 
       const agentRetry = await worker.fetch(new Request(
-        `https://briar.example/runs/${acceptedBody.resultRunId}/retry`,
+        "https://briar.example/briar.worker.v1.WorkerExecutionService/RetryRun",
         {
           method: "POST",
           headers: {
             authorization: `Bearer ${projectBAgentToken}`,
+            "connect-protocol-version": "1",
             "content-type": "application/json",
           },
           body: JSON.stringify({
+            projectId: projectBId,
+            runId: acceptedBody.resultRunId,
             requestId: `81000000-0000-4000-8000-${suffix}`,
-            actor: "target-project-agent",
             reason: "Retry after transfer",
           }),
         },
       ), env());
-      expect(agentRetry.status).toBe(409);
+      expect(agentRetry.status).toBe(400);
+      await expect(agentRetry.json()).resolves.toMatchObject({
+        code: "failed_precondition",
+      });
 
       const userRetry = await invokeIssueApplication(memberToken, (userId) =>
         recoverProjectIssueRun({

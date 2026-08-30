@@ -5,27 +5,18 @@ import {
   EventKeyConflictError,
   HuntTransitionError,
   listEvidenceImagesForEvidence,
-  recoverHuntRun,
   recordRunEvidence,
-  reworkHuntRun,
   type RunEvidenceImageInput,
 } from "./db";
 import { HttpError, json } from "./http-response";
-import { readJson, readRunEvidenceRequest } from "./request-readers";
+import { readRunEvidenceRequest } from "./request-readers";
 import { evidenceImageJson } from "./run-evidence-json";
-import {
-  decodeRecoveryAgentInput,
-  decodeResumeAgentInput,
-  decodeRunReworkInput,
-} from "./run-request-contract";
-import { resumeRunWithCheckpointIdentity } from "./workflow-resume";
 
 export type RunAgentRouteInput = {
   request: Request;
   url: URL;
   db: D1Database;
   attachmentsBucket: R2Bucket;
-  requireRunExecutionProject: (runId: string) => Promise<string>;
   requireActiveWorkerRunClaim: (runId: string) => Promise<{
     projectId: string;
     claimTokenHash: string;
@@ -38,107 +29,11 @@ export async function handleRunAgentRoute(
 ): Promise<Response | undefined> {
   const { request, url, db, attachmentsBucket } = routeInput;
   const { pathname } = url;
-  const requireRunExecutionProject = (
-    _db: D1Database,
-    _request: Request,
-    runId: string,
-  ) => routeInput.requireRunExecutionProject(runId);
   const requireActiveWorkerRunClaim = (
     _db: D1Database,
     _request: Request,
     runId: string,
   ) => routeInput.requireActiveWorkerRunClaim(runId);
-
-  const agentRecoveryMatch = pathname.match(
-    /^\/runs\/([0-9a-f-]+)\/(retry|cancel)$/u,
-  );
-  if (agentRecoveryMatch && request.method === "POST") {
-    const projectId = await requireRunExecutionProject(
-      db,
-      request,
-      agentRecoveryMatch[1],
-    );
-    const input = decodeRecoveryAgentInput(await readJson(request));
-    const result = await recoverHuntRun(db, projectId, {
-      runId: agentRecoveryMatch[1],
-      action: agentRecoveryMatch[2] as "retry" | "cancel",
-      requestId: input.requestId,
-      actor: input.actor,
-      reason: input.reason ?? null,
-      occurredAt: new Date().toISOString(),
-    });
-    if (result.outcome === "not_found") {
-      throw new HttpError(404, "Run not found");
-    }
-    if (result.outcome === "ineligible") {
-      throw new HttpError(409, "Only blocked or failed runs can be recovered");
-    }
-    return json({ runId: agentRecoveryMatch[1], ...result });
-  }
-
-  const agentResumeMatch = pathname.match(
-    /^\/runs\/([0-9a-f-]+)\/resume$/u,
-  );
-  if (agentResumeMatch && request.method === "POST") {
-    const projectId = await requireRunExecutionProject(
-      db,
-      request,
-      agentResumeMatch[1],
-    );
-    const input = decodeResumeAgentInput(await readJson(request));
-    const result = await resumeRunWithCheckpointIdentity(
-      db,
-      projectId,
-      agentResumeMatch[1],
-      input,
-      input.actor,
-    );
-    if (result.outcome === "not_found") {
-      throw new HttpError(404, "Run not found");
-    }
-    if (result.outcome === "conflict") {
-      throw new HttpError(
-        409,
-        "The paused checkpoint changed before it could be resumed",
-        "CHECKPOINT_CONFLICT",
-      );
-    }
-    return json({
-      runId: agentResumeMatch[1],
-      ...result,
-      workflowStage: result.nextStage,
-      startStage: result.nextStage,
-    });
-  }
-
-  const reworkMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/rework$/u);
-  if (reworkMatch && request.method === "POST") {
-    const projectId = await requireRunExecutionProject(
-      db,
-      request,
-      reworkMatch[1],
-    );
-    const input = decodeRunReworkInput(await readJson(request));
-    try {
-      const result = await reworkHuntRun(db, projectId, {
-        runId: reworkMatch[1],
-        workflowStage: input.workflowStage,
-        requestId: input.requestId,
-        actor: input.actor,
-        reason: input.reason,
-        occurredAt: new Date().toISOString(),
-      });
-      if (result.outcome === "not_found") {
-        throw new HttpError(404, "Run not found");
-      }
-      return json({ runId: reworkMatch[1], ...result });
-    } catch (error) {
-      if (error instanceof HuntTransitionError) {
-        throw new HttpError(409, error.message);
-      }
-      throw error;
-    }
-  }
 
   const evidenceMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/evidence$/u);
   if (evidenceMatch && request.method === "POST") {
