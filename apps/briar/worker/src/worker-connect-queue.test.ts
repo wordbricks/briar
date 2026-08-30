@@ -2,6 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError, type HandlerContext } from "@connectrpc/connect";
 import {
   ClaimWorkRequestSchema,
+  CompleteProjectAgentTaskRequestSchema,
   HandoffWorkRequestSchema,
   HandoffWorkResponse_Outcome,
   IssueClaimIdentitySchema,
@@ -155,5 +156,45 @@ describe("WorkerQueueService lifecycle semantics", () => {
         metadata: { conversationId: "conversation-1", workspacePath: null },
       }),
     );
+  });
+
+  it("completes a typed project task claim through the application boundary", async () => {
+    const authenticate = authentication();
+    const complete = vi.fn<WorkerQueueServices["completeProjectAgentTaskWork"]>();
+    complete.mockResolvedValue({ replayed: true });
+    const service = createWorkerQueueService(input, {
+      requireWorkerProjectBinding: authenticate,
+      sha256: async () => "d".repeat(64),
+      completeProjectAgentTaskWork: complete,
+    });
+    const request = create(CompleteProjectAgentTaskRequestSchema, {
+      projectId,
+      workerId,
+      work: taskIdentity(),
+      result: {
+        case: "success",
+        value: {
+          summary: "Completed the approved task.",
+          conversationId: "conversation-1",
+        },
+      },
+    });
+
+    await expect(service.completeProjectAgentTask(request, context))
+      .resolves.toEqual({ replayed: true });
+    expect(complete).toHaveBeenCalledWith({
+      db: input.db,
+      env: input.env,
+      context: undefined,
+      projectId,
+      taskId: workId,
+      workerId,
+      claimTokenHash: "d".repeat(64),
+      result: {
+        case: "success",
+        summary: "Completed the approved task.",
+        conversationId: "conversation-1",
+      },
+    });
   });
 });

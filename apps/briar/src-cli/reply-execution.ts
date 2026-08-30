@@ -231,56 +231,6 @@ async function runClaimedProjectAgentTask(
   }
 }
 
-async function completeClaimedProjectAgentTask(
-  config: Config,
-  task: ClaimedProjectAgentTask,
-  workerToken: string,
-  completion: {
-    projectId: string;
-    workerId: string;
-    claimToken: string;
-    summary: string;
-    conversationId: string | null;
-  },
-  signal: AbortSignal,
-) {
-  await request(
-    config.apiUrl,
-    `/agent-task-claims/${task.workId}/complete`,
-    workerToken,
-    {
-      method: "POST",
-      signal,
-      body: JSON.stringify(completion),
-    },
-  );
-}
-
-async function failClaimedProjectAgentTask(
-  config: Config,
-  project: ProjectConfig,
-  task: ClaimedProjectAgentTask,
-  workerToken: string,
-  error: unknown,
-) {
-  const workerId = project.executionWorker?.workerId;
-  if (!workerId) throw error;
-  await request(
-    config.apiUrl,
-    `/agent-task-claims/${task.workId}/complete`,
-    workerToken,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        projectId: project.id,
-        workerId,
-        claimToken: task.claimToken,
-        error: error instanceof Error ? error.message : String(error),
-      }),
-    },
-  );
-}
-
 async function runClaimedIssueReply(
   config: Config,
   project: ProjectConfig,
@@ -1058,8 +1008,6 @@ async function failClaimedChannelReply(
 
 export {
   runClaimedProjectAgentTask,
-  completeClaimedProjectAgentTask,
-  failClaimedProjectAgentTask,
   runClaimedIssueReply,
   failClaimedIssueReply,
   runClaimedChannelReply,

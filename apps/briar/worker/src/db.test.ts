@@ -2326,24 +2326,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         lease_expires_at: atMinute(15),
       });
 
-      const wrongTokenResponse = await apiWorker.fetch(new Request(
-        `https://briar.example/agent-task-claims/${taskId}/complete`,
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${workerCredential}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            projectId,
-            workerId: selected.worker.id,
-            claimToken: "briar_agent_task_claim_wrong_token",
-            summary: "This completion must not be acknowledged.",
-          }),
-        },
-      ), { DB: db } as Env);
-      expect(wrongTokenResponse.status).toBe(409);
-
       await expect(
         completeProjectAgentTask(db, projectId, taskId, {
           workerId: selected.worker.id,

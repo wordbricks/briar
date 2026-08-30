@@ -2,10 +2,10 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { platform } from "node:os";
 import { join } from "node:path";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { autoHuntRequirementKinds } from "../src/lib/auto-hunt-contract";
 import { organizationAgentContextCapability } from "../src/lib/organization-agent-context-contract";
 import { runProjectAgentTaskCompletionFlow } from "./agent-runner";
-import { HttpRequestError } from "./http-request-error";
 import {
   inspectWorkflowRequirements,
   workflowRequirementReadinessDetail,
@@ -75,8 +75,6 @@ import {
 } from "./issue-execution";
 import {
   runClaimedProjectAgentTask,
-  completeClaimedProjectAgentTask,
-  failClaimedProjectAgentTask,
   runClaimedIssueReply,
   failClaimedIssueReply,
   runClaimedChannelReply,
@@ -85,6 +83,16 @@ import {
 import { loadManagedComputerCredential } from "./managed-computer-credential";
 
 const WORKER_SERVER_MAINTENANCE_INTERVAL_MS = 5 * 60_000;
+
+const retryableCompletionCodes = new Set([
+  Code.DeadlineExceeded,
+  Code.ResourceExhausted,
+  Code.Internal,
+  Code.Unavailable,
+]);
+
+const isRetryableWorkerCompletionError = (error: unknown) =>
+  !(error instanceof ConnectError) || retryableCompletionCodes.has(error.code);
 
 async function workerRegisterCommand() {
   const config = await loadConfig();
@@ -763,27 +771,31 @@ async function workerCommand() {
               signal,
               reportCheckpoint,
             ),
-            completeSuccess: (completion) => completeClaimedProjectAgentTask(
-              config,
-              task,
-              workerToken,
-              completion,
-              signal,
-            ),
+            completeSuccess: (completion) =>
+              workerQueue.completeProjectAgentTask({
+                projectId: project.id,
+                workerId,
+                work: task,
+                result: {
+                  case: "success",
+                  summary: completion.summary,
+                  conversationId: completion.conversationId,
+                },
+                signal,
+              }),
             completeFailure: async (error) => {
               if (signal.aborted) throw error;
-              return failClaimedProjectAgentTask(
-                config,
-                project,
-                task,
-                workerToken,
-                error,
-              );
+              return workerQueue.completeProjectAgentTask({
+                projectId: project.id,
+                workerId,
+                work: task,
+                result: {
+                  case: "failure",
+                  error: error instanceof Error ? error.message : String(error),
+                },
+              });
             },
-            isRetryableCompletionError: (error) =>
-              !(error instanceof HttpRequestError) ||
-              error.status === 408 || error.status === 429 ||
-              error.status >= 500,
+            isRetryableCompletionError: isRetryableWorkerCompletionError,
             sleep: interruptibleSleep,
             signal,
           });

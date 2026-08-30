@@ -180,37 +180,16 @@ export const ProjectAgentTaskInput = strictSchema(Schema.Struct({
   requestId: UuidString,
 }));
 
-export const ProjectAgentTaskClaimInput = strictSchema(Schema.Struct({
-  projectId: UuidString,
-  workerId: trimmedText(1, 128),
-}));
-
-const AgentTaskClaimToken = Schema.String.check(
-  Schema.isStartsWith("briar_agent_task_claim_"),
-);
-
-export const ProjectAgentTaskLease = strictSchema(Schema.Struct({
-  projectId: UuidString,
-  workerId: trimmedText(1, 128),
-  claimToken: AgentTaskClaimToken,
-}));
-
-export const ProjectAgentTaskCompletion = strictSchema(Schema.Struct({
-  projectId: UuidString,
-  workerId: trimmedText(1, 128),
-  claimToken: AgentTaskClaimToken,
-  summary: Schema.optional(trimmedText(1, 50_000)),
+export const ProjectAgentTaskSuccess = strictSchema(Schema.Struct({
+  summary: trimmedText(1, 50_000),
   conversationId: Schema.optional(
     Schema.NullOr(Schema.Trim.check(Schema.isMaxLength(128))),
   ),
-  error: Schema.optional(trimmedText(1, 20_000)),
-}).check(
-  Schema.makeFilter((input) =>
-    Boolean(input.summary) !== Boolean(input.error)
-      ? undefined
-      : "Provide exactly one of summary or error"
-  ),
-));
+}));
+
+export const ProjectAgentTaskFailure = strictSchema(Schema.Struct({
+  error: trimmedText(1, 20_000),
+}));
 
 const ScheduleSource = strictSchema(Schema.Struct({
   agentId: UuidString,
@@ -338,14 +317,11 @@ export const decodeProjectAgentSessionInput = decodeRequestSync(
 export const decodeProjectAgentTaskInput = decodeRequestSync(
   ProjectAgentTaskInput,
 );
-export const decodeProjectAgentTaskClaimInput = decodeRequestSync(
-  ProjectAgentTaskClaimInput,
+export const decodeProjectAgentTaskSuccess = decodeRequestSync(
+  ProjectAgentTaskSuccess,
 );
-export const decodeProjectAgentTaskLease = decodeRequestSync(
-  ProjectAgentTaskLease,
-);
-export const decodeProjectAgentTaskCompletion = decodeRequestSync(
-  ProjectAgentTaskCompletion,
+export const decodeProjectAgentTaskFailure = decodeRequestSync(
+  ProjectAgentTaskFailure,
 );
 export const decodeProjectAgentScheduleInput = decodeRequestSync(
   ProjectAgentScheduleInput,

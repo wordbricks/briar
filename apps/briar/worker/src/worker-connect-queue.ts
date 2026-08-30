@@ -5,6 +5,7 @@ import {
   HandoffWorkResponse_State,
   RenewWorkLeaseResponseSchema,
   WorkerQueueService,
+  type CompleteProjectAgentTaskRequest,
   type WorkClaimIdentity,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
@@ -27,7 +28,14 @@ import {
   releaseMergeBatchLease,
   renewMergeBatchLease,
 } from "./merge-batches";
-import { claimNextProjectAgentTaskWork } from "./project-agent-task-worker-routes";
+import {
+  claimNextProjectAgentTaskWork,
+  completeProjectAgentTaskWork,
+} from "./project-agent-task-worker";
+import {
+  decodeProjectAgentTaskFailure,
+  decodeProjectAgentTaskSuccess,
+} from "./project-request-contract";
 import { claimNextQueueWork } from "./queue-claim-routes";
 import {
   channelActivityCredential,
@@ -63,6 +71,7 @@ export type WorkerQueueServices = {
   readonly claimNextMergeBatchWork: typeof claimNextMergeBatchWork;
   readonly claimNextIssueReplyWork: typeof claimNextIssueReplyWork;
   readonly claimNextProjectAgentTaskWork: typeof claimNextProjectAgentTaskWork;
+  readonly completeProjectAgentTaskWork: typeof completeProjectAgentTaskWork;
   readonly claimNextChannelReplyWork: typeof claimNextChannelReplyWork;
   readonly claimNextQueueWork: typeof claimNextQueueWork;
   readonly sha256: typeof sha256;
@@ -86,6 +95,7 @@ const workerQueueServices: WorkerQueueServices = {
   claimNextMergeBatchWork,
   claimNextIssueReplyWork,
   claimNextProjectAgentTaskWork,
+  completeProjectAgentTaskWork,
   claimNextChannelReplyWork,
   claimNextQueueWork,
   sha256,
@@ -516,6 +526,63 @@ async function handoffWork(
   };
 }
 
+async function completeProjectAgentTask(
+  input: WorkerConnectQueueInput,
+  request: CompleteProjectAgentTaskRequest,
+  services: WorkerQueueServices,
+) {
+  const identity = requiredWork(request.work);
+  if (
+    identity.work.case !== "projectAgentTask" ||
+    identity.workId !== identity.runId
+  ) {
+    throw new HttpError(400, "Project Agent task claim identity is required");
+  }
+  const worker = await authenticatedWorker(
+    input,
+    request.projectId,
+    request.workerId,
+    services,
+  );
+  const result = request.result;
+  if (result.case === "success") {
+    const success = decodeProjectAgentTaskSuccess({
+      summary: result.value.summary,
+      conversationId: result.value.conversationId,
+    });
+    return services.completeProjectAgentTaskWork({
+      db: input.db,
+      env: input.env,
+      context: input.context,
+      projectId: request.projectId,
+      taskId: identity.workId,
+      workerId: worker.binding.id,
+      claimTokenHash: await services.sha256(identity.claimToken),
+      result: {
+        case: "success",
+        summary: success.summary,
+        conversationId: success.conversationId ?? null,
+      },
+    });
+  }
+  if (result.case === "failure") {
+    const failure = decodeProjectAgentTaskFailure({
+      error: result.value.error,
+    });
+    return services.completeProjectAgentTaskWork({
+      db: input.db,
+      env: input.env,
+      context: input.context,
+      projectId: request.projectId,
+      taskId: identity.workId,
+      workerId: worker.binding.id,
+      claimTokenHash: await services.sha256(identity.claimToken),
+      result: { case: "failure", error: failure.error },
+    });
+  }
+  throw new HttpError(400, "Project Agent task result is required");
+}
+
 export function createWorkerQueueService(
   input: WorkerConnectQueueInput,
   overrides: Partial<WorkerQueueServices> = {},
@@ -528,6 +595,8 @@ export function createWorkerQueueService(
       withConnectErrors(() => renewWorkLease(input, request, services)),
     handoffWork: (request) =>
       withConnectErrors(() => handoffWork(input, request, services)),
+    completeProjectAgentTask: (request) =>
+      withConnectErrors(() => completeProjectAgentTask(input, request, services)),
   };
 }
 

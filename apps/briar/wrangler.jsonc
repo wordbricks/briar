@@ -56,7 +56,6 @@
       "/merge-batch-claims*",
       "/runs*",
       "/issue-reply-claims*",
-      "/agent-task-claims/*",
       "/agent-schedule-runs/claim",
       "/channel-reply-claims*",
       "/queue*",

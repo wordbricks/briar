@@ -62,7 +62,7 @@ import {
 import type { claimNextChannelReplyWork } from "./channel-reply-claim-routes";
 import type { claimNextIssueReplyWork } from "./issue-reply-worker-routes";
 import type { claimNextMergeBatchWork } from "./merge-batch-routes";
-import type { claimNextProjectAgentTaskWork } from "./project-agent-task-worker-routes";
+import type { claimNextProjectAgentTaskWork } from "./project-agent-task-worker";
 import type { claimNextQueueWork } from "./queue-claim-routes";
 
 type AwaitedClaim<Fn extends (...args: never[]) => unknown> = NonNullable<

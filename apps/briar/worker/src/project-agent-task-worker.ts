@@ -9,13 +9,8 @@ import {
   reapProjectAgentTaskJobs,
   upsertProjectAgentSessionSummary,
 } from "./db";
-import { HttpError, json } from "./http-response";
-import { projectAgentSessionJson } from "./project-agent-session-json";
+import { HttpError } from "./http-response";
 import { syncProjectAgentTaskSession } from "./project-agent-task-session";
-import {
-  decodeProjectAgentTaskCompletion,
-} from "./project-request-contract";
-import { readJson } from "./request-readers";
 import {
   scheduleChannelRealtimePublish,
   scheduleProjectAgentSessionRealtimePublish,
@@ -23,7 +18,6 @@ import {
 } from "./realtime-scheduling";
 import {
   type AuthenticatedWorkerProject,
-  requireWorkerProjectBinding,
 } from "./worker-route-auth";
 import { latestExecutionWorkerUpdateHandoff } from "./worker-update-repository";
 import {
@@ -167,111 +161,99 @@ export async function claimNextProjectAgentTaskWork(input: {
     };
 }
 
-export async function handleProjectAgentTaskWorkerRoute(input: {
-  request: Request;
-  url: URL;
+export async function completeProjectAgentTaskWork(input: {
   db: D1Database;
   env: Env;
   context?: ExecutionContext;
-}): Promise<Response | undefined> {
-  const { request, url, db, env, context } = input;
-
-  const projectAgentTaskClaimMatch = url.pathname.match(
-    /^\/agent-task-claims\/([0-9a-f-]+)\/complete$/u,
+  projectId: string;
+  taskId: string;
+  workerId: string;
+  claimTokenHash: string;
+  result:
+    | { readonly case: "success"; readonly summary: string; readonly conversationId: string | null }
+    | { readonly case: "failure"; readonly error: string };
+}) {
+  const {
+    db,
+    env,
+    context,
+    projectId,
+    taskId,
+    workerId,
+    claimTokenHash,
+    result,
+  } = input;
+  const observedAt = new Date().toISOString();
+  const completion = await completeProjectAgentTaskWithReceipt(
+    db,
+    projectId,
+    taskId,
+    {
+      workerId,
+      claimTokenHash,
+      updatedAt: observedAt,
+      summary: result.case === "success" ? result.summary : null,
+      conversationId: result.case === "success" ? result.conversationId : null,
+      error: result.case === "failure" ? result.error : undefined,
+    },
   );
-  if (projectAgentTaskClaimMatch && request.method === "POST") {
-    const body = await readJson(request);
-    const input = decodeProjectAgentTaskCompletion(body);
-    const worker = await requireWorkerProjectBinding(
-      db,
-      request,
-      input.projectId,
-      input.workerId,
-    );
-    const claimTokenHash = await sha256(input.claimToken);
-    const observedAt = new Date().toISOString();
-    const completion = await completeProjectAgentTaskWithReceipt(
-      db,
-      input.projectId,
-      projectAgentTaskClaimMatch[1],
-      {
-        workerId: worker.binding.id,
-        claimTokenHash,
-        updatedAt: observedAt,
-        summary: input.summary ?? null,
-        conversationId: input.conversationId ?? null,
-        error: input.error,
-      },
-    );
-    if (!completion) {
-      throw new HttpError(409, "Agent task completion conflicts with its receipt");
-    }
-    const completed = completion.job;
-    const hotSession = await getProjectAgentSession(
-      db,
-      input.projectId,
-      projectAgentTaskClaimMatch[1],
-    );
-    let session = hotSession ? projectAgentSessionJson(hotSession) : null;
-    let sessionChanged = false;
-    if (
-      completed && !completed.skill_execution_proposal_id &&
-      hotSession &&
-      (
-        !completion.replayed || hotSession.updated_at !== completed.updated_at ||
-        hotSession.status !== (completed.status === "queued" ? "running" : completed.status)
-      )
-    ) {
-      session = await syncProjectAgentTaskSession(db, completed, {
-        summary: completed.result_summary ?? input.summary ?? null,
-        conversationId:
-          completed.result_conversation_id ?? input.conversationId ?? null,
-        error: completed.error ?? input.error ?? null,
-      });
-      sessionChanged = session !== null;
-    }
-    if (completed?.skill_execution_proposal_id && hotSession) {
-      const summaryResult = await upsertProjectAgentSessionSummary(
-        db,
-        hotSession,
-        false,
-      );
-      sessionChanged ||= (summaryResult.meta.changes ?? 0) > 0;
-    }
-    const publishedResult = completed
-      ? await publishAgentSkillTaskResult(db, completed, observedAt)
-      : null;
-    if (publishedResult?.source_kind === "channel") {
-      scheduleChannelRealtimePublish(
-        env,
-        db,
-        publishedResult.organization_id,
-        context,
-      );
-    } else if (publishedResult?.source_kind === "issue") {
-      scheduleProjectRealtimePublish(env, db, input.projectId, context);
-    }
-    if (sessionChanged) {
-      scheduleProjectAgentSessionRealtimePublish(
-        env,
-        db,
-        input.projectId,
-        context,
-      );
-    }
-    if (!session) {
-      const archived = await getArchivedProjectAgentSession(
-        db,
-        env.ARCHIVES,
-        input.projectId,
-        projectAgentTaskClaimMatch[1],
-      );
-      session = archived ? projectAgentSessionJson(archived) : null;
-    }
-    if (!session) throw new HttpError(409, "Agent task session is missing");
-    return json({ session });
+  if (!completion) {
+    throw new HttpError(409, "Agent task completion conflicts with its receipt");
   }
-
-
-  return undefined;
+  const completed = completion.job;
+  const hotSession = await getProjectAgentSession(db, projectId, taskId);
+  let sessionExists = hotSession !== null;
+  let sessionChanged = false;
+  if (
+    completed && !completed.skill_execution_proposal_id &&
+    hotSession &&
+    (
+      !completion.replayed || hotSession.updated_at !== completed.updated_at ||
+      hotSession.status !== (completed.status === "queued" ? "running" : completed.status)
+    )
+  ) {
+    const synchronized = await syncProjectAgentTaskSession(db, completed, {
+      summary: completed.result_summary ??
+        (result.case === "success" ? result.summary : null),
+      conversationId: completed.result_conversation_id ??
+        (result.case === "success" ? result.conversationId : null),
+      error: completed.error ?? (result.case === "failure" ? result.error : null),
+    });
+    sessionExists ||= synchronized !== null;
+    sessionChanged = synchronized !== null;
+  }
+  if (completed?.skill_execution_proposal_id && hotSession) {
+    const summaryResult = await upsertProjectAgentSessionSummary(
+      db,
+      hotSession,
+      false,
+    );
+    sessionChanged ||= (summaryResult.meta.changes ?? 0) > 0;
+  }
+  const publishedResult = completed
+    ? await publishAgentSkillTaskResult(db, completed, observedAt)
+    : null;
+  if (publishedResult?.source_kind === "channel") {
+    scheduleChannelRealtimePublish(
+      env,
+      db,
+      publishedResult.organization_id,
+      context,
+    );
+  } else if (publishedResult?.source_kind === "issue") {
+    scheduleProjectRealtimePublish(env, db, projectId, context);
+  }
+  if (sessionChanged) {
+    scheduleProjectAgentSessionRealtimePublish(env, db, projectId, context);
+  }
+  if (!sessionExists) {
+    sessionExists = await getArchivedProjectAgentSession(
+      db,
+      env.ARCHIVES,
+      projectId,
+      taskId,
+    ) !== null;
+  }
+  if (!sessionExists) throw new HttpError(409, "Agent task session is missing");
+  return { replayed: completion.replayed };
 }

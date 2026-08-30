@@ -12,6 +12,7 @@ import type { WorkerExecutionCheckpoint } from "./worker";
 import {
   claimedWorkFromProto,
   type ChannelActivityCredential,
+  type ClaimedProjectAgentTask,
   type ClaimedWork,
   type WorkerLeaseRenewal,
 } from "./worker-queue-contract";
@@ -161,6 +162,39 @@ export function createWorkerQueueClient(apiUrl: string, token: string) {
       }
       return response;
     },
+
+    completeProjectAgentTask: (input: {
+      projectId: string;
+      workerId: string;
+      work: ClaimedProjectAgentTask;
+      result:
+        | {
+          case: "success";
+          summary: string;
+          conversationId: string | null;
+        }
+        | { case: "failure"; error: string };
+      signal?: AbortSignal;
+    }) => client.completeProjectAgentTask({
+      projectId: input.projectId,
+      workerId: input.workerId,
+      work: workClaimIdentityToProto(input.work),
+      result: input.result.case === "success"
+        ? {
+          case: "success",
+          value: {
+            summary: input.result.summary,
+            conversationId: input.result.conversationId ?? undefined,
+          },
+        }
+        : {
+          case: "failure",
+          value: { error: input.result.error },
+        },
+    }, {
+      ...options,
+      signal: input.signal,
+    }),
   };
 }
 

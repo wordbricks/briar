@@ -16,7 +16,6 @@ import { handleChannelOrganizationContextRoute } from "./channel-organization-co
 import { handleChannelReplyResultRoute } from "./channel-reply-result-routes";
 import { handleManagedComputerRoute } from "./managed-computer-routes";
 import { handleProjectAgentRoute } from "./project-agent-routes";
-import { handleProjectAgentTaskWorkerRoute } from "./project-agent-task-worker-routes";
 import { handleProjectGithubRoute } from "./project-github-routes";
 import { handlePublicRoute } from "./public-routes";
 import { handleIncomingChannelWebhookRoute } from "./incoming-channel-webhook";
@@ -285,18 +284,6 @@ async function route(
   });
   if (channelReplyResultResponse !== undefined) {
     return channelReplyResultResponse;
-  }
-
-  const projectAgentTaskWorkerResponse =
-    await handleProjectAgentTaskWorkerRoute({
-      request,
-      url,
-      db,
-      env,
-      context,
-    });
-  if (projectAgentTaskWorkerResponse !== undefined) {
-    return projectAgentTaskWorkerResponse;
   }
 
   const runAgentResponse = await handleRunAgentRoute({

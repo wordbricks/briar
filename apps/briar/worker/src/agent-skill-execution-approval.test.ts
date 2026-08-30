@@ -533,18 +533,26 @@ describe("conversational Agent Skill execution approval", () => {
     selectedWorkerId = workerId,
     credential = "briar_worker_skill_credential_one",
   ) => apiWorker.fetch(new Request(
-    `https://briar.example/agent-task-claims/${taskId}/complete`,
+    "https://briar.example/briar.worker.v1.WorkerQueueService/CompleteProjectAgentTask",
     {
       method: "POST",
       headers: {
         authorization: `Bearer ${credential}`,
+        "connect-protocol-version": "1",
         "content-type": "application/json",
       },
       body: JSON.stringify({
         projectId,
         workerId: selectedWorkerId,
-        claimToken,
-        ...payload,
+        work: {
+          workId: taskId,
+          runId: taskId,
+          claimToken,
+          projectAgentTask: {},
+        },
+        ...(Object.hasOwn(payload, "summary")
+          ? { success: payload }
+          : { failure: payload }),
       }),
     },
   ), env());
@@ -751,16 +759,7 @@ describe("conversational Agent Skill execution approval", () => {
       workerId,
       requestedByUserId: ownerId,
     });
-    expect(completedBody).toMatchObject({
-      session: {
-        id: claimed!.id,
-        status: "completed",
-        summary: completionPayload.summary,
-        conversationId: completionPayload.conversationId,
-        workerId,
-        requestedByUserId: ownerId,
-      },
-    });
+    expect(completedBody).toEqual({});
     const publishedIssueResult = await db.prepare(
       `select proposal.result_message_id, message.body
        from briar_agent_skill_execution_proposals proposal
@@ -780,23 +779,23 @@ describe("conversational Agent Skill execution approval", () => {
       completionPayload,
     );
     expect(hotReplay.status).toBe(200);
-    expect(await hotReplay.json()).toEqual(completedBody);
+    expect(await hotReplay.json()).toEqual({ replayed: true });
     expect((await completeTask(claimed!.id, claimToken, {
       ...completionPayload,
       summary: "Different terminal payload.",
-    })).status).toBe(409);
+    })).status).toBe(400);
     expect((await completeTask(
       claimed!.id,
       "briar_agent_task_claim_wrong_token",
       completionPayload,
-    )).status).toBe(409);
+    )).status).toBe(400);
     expect((await completeTask(
       claimed!.id,
       claimToken,
       completionPayload,
       otherWorkerId,
       "briar_worker_skill_credential_two",
-    )).status).toBe(409);
+    )).status).toBe(400);
     expect(await db.prepare(
       `select count(*) as count
        from briar_project_agent_task_completion_receipts
@@ -828,7 +827,7 @@ describe("conversational Agent Skill execution approval", () => {
       completionPayload,
     );
     expect(archivedCompletionReplay.status).toBe(200);
-    expect(await archivedCompletionReplay.json()).toEqual(completedBody);
+    expect(await archivedCompletionReplay.json()).toEqual({ replayed: true });
     const archivedRetry = await acceptIssue(seeded.runId, seeded.proposal.id);
     expect(archivedRetry.status).toBe(200);
     expect(await archivedRetry.json()).toMatchObject({
@@ -1255,15 +1254,15 @@ describe("conversational Agent Skill execution approval", () => {
     const first = await completeTask(taskId, claimToken, payload);
     expect(first.status).toBe(200);
     const firstBody = await first.json();
-    expect(firstBody).toMatchObject({
-      session: { id: taskId, status: "running", error: null },
-    });
+    expect(firstBody).toEqual({});
+    expect(await getProjectAgentSession(db, projectId, taskId))
+      .toMatchObject({ id: taskId, status: "running" });
     const replay = await completeTask(taskId, claimToken, payload);
     expect(replay.status).toBe(200);
-    expect(await replay.json()).toEqual(firstBody);
+    expect(await replay.json()).toEqual({ replayed: true });
     expect((await completeTask(taskId, claimToken, {
       error: "A different failure payload.",
-    })).status).toBe(409);
+    })).status).toBe(400);
     expect(await db.prepare(
       `select status, attempts from briar_project_agent_task_jobs where id = ?`,
     ).bind(taskId).first()).toEqual({ status: "queued", attempts: 1 });
@@ -1407,20 +1406,13 @@ describe("conversational Agent Skill execution approval", () => {
 
     const reconciled = await completeTask(taskId, work.claimToken, payload);
     expect(reconciled.status).toBe(200);
-    expect(await reconciled.json()).toMatchObject({
-      session: {
-        id: taskId,
-        status: "completed",
-        summary: payload.summary,
-        conversationId: payload.conversationId,
-      },
-    });
+    expect(await reconciled.json()).toEqual({ replayed: true });
     expect((await getProjectAgentSession(db, projectId, taskId))?.status)
       .toBe("completed");
     expect((await completeTask(taskId, work.claimToken, {
       ...payload,
       conversationId: "different-conversation",
-    })).status).toBe(409);
+    })).status).toBe(400);
   }, 60_000);
 
   it("enforces device capacity in both claim directions without a 500", async () => {
@@ -1591,13 +1583,7 @@ describe("conversational Agent Skill execution approval", () => {
       { error: "retryable failure 3" },
     );
     expect(terminalFailureReplay.status).toBe(200);
-    expect(await terminalFailureReplay.json()).toMatchObject({
-      session: {
-        id: body.proposal.resultSessionId,
-        status: "failed",
-        error: "retryable failure 3",
-      },
-    });
+    expect(await terminalFailureReplay.json()).toEqual({ replayed: true });
     expect(await db.prepare(
       `select message.body
        from briar_agent_skill_execution_proposals proposal
@@ -1611,7 +1597,7 @@ describe("conversational Agent Skill execution approval", () => {
       body.proposal.resultSessionId,
       "briar_agent_task_claim_retry_claim_3",
       { error: "different terminal failure" },
-    )).status).toBe(409);
+    )).status).toBe(400);
 
     const reapedSeed = await seedIssueProposal();
     const reapedAccepted = await acceptIssue(
