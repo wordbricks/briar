@@ -33,9 +33,13 @@ import type { AgentProviderCapabilityCatalog } from "../src/lib/agent-provider-c
 import type { WorkerLoopUpdateDirective } from "./worker";
 import type { WorkerProviderHealthMap } from "./provider-health";
 
-const workerConnectTransport = (apiUrl: string) => createConnectTransport({
+export const workerConnectTransport = (apiUrl: string) => createConnectTransport({
   baseUrl: apiUrl.replace(/\/+$/u, ""),
   useBinaryFormat: true,
+});
+
+export const workerConnectOptions = (token: string) => ({
+  headers: { Authorization: `Bearer ${token}` },
 });
 
 const protoAgentProvider = {
@@ -228,7 +232,7 @@ const workflowRequirement = (value: {
 
 export function createWorkerEnrollmentClient(apiUrl: string, token: string) {
   const client = createClient(FleetService, workerConnectTransport(apiUrl));
-  const options = { headers: { Authorization: `Bearer ${token}` } };
+  const options = workerConnectOptions(token);
   return {
     register: async (input: {
       projectId: string;
@@ -285,7 +289,7 @@ export function createWorkerEnrollmentClient(apiUrl: string, token: string) {
 
 export function createWorkerControlClient(apiUrl: string, token: string) {
   const client = createClient(WorkerControlService, workerConnectTransport(apiUrl));
-  const options = { headers: { Authorization: `Bearer ${token}` } };
+  const options = workerConnectOptions(token);
   return {
     heartbeat: async (input: {
       workerId: string;

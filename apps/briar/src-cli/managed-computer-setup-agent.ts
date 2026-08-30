@@ -11,6 +11,13 @@ import {
 import { homedir } from "node:os";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
+import { timestampDate } from "@bufbuild/protobuf/wkt";
+import {
+  ManagedComputerSetupSessionStatus,
+} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
+import type {
+  ProjectGitHubCredential,
+} from "@briar/contracts/gen/briar/app/v1/github_pb";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import {
@@ -28,7 +35,11 @@ import {
   managedComputerRemoteHeartbeatResponse,
   managedComputerRemoteHeartbeatTimeoutMs,
 } from "../src/lib/managed-computer-remote-protocol";
-import { cliVersion, gitValueAt, loadConfig, request, saveConfig } from "./command-support";
+import { dashboardWorkerFromProto } from "../src/lib/app-rpc/fleet-mappers";
+import { requiredMessage } from "../src/lib/app-rpc/mappers";
+import { projectSettingsFromProto } from "../src/lib/app-rpc/project-configuration-mappers";
+import { cliVersion, gitValueAt, loadConfig, saveConfig } from "./command-support";
+import { createManagedComputerSetupClient } from "./managed-computer-setup-client";
 import type { ManagedComputerRemoteAgentConfig } from "./managed-computer-remote-session-agent";
 import { discoverWorkerProviderCapabilities } from "./provider-capabilities";
 import {
@@ -39,65 +50,7 @@ import {
   opencodeAuthenticated,
 } from "./provider-health";
 import { projectWithRemoteSettings } from "./project-settings-sync";
-import { WorkflowConfig } from "./config-contract";
-
-const SetupContextResponse = Schema.Struct({
-  session: Schema.Struct({
-    id: Schema.String.check(Schema.isUUID()),
-    projectId: Schema.String.check(Schema.isUUID()),
-    expiresAt: Schema.String,
-  }),
-  project: Schema.Struct({
-    id: Schema.String.check(Schema.isUUID()),
-    name: Schema.String.check(Schema.isLengthBetween(1, 200)),
-  }),
-  settings: Schema.Struct({
-    velenOrg: Schema.NullOr(Schema.String),
-    dataSource: Schema.NullOr(Schema.String),
-    linear: Schema.Struct({
-      enabled: Schema.Boolean,
-      source: Schema.NullOr(Schema.String),
-      teamKey: Schema.NullOr(Schema.String),
-    }),
-    githubRepository: Schema.NullOr(
-      Schema.String.check(
-        Schema.isPattern(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u),
-      ),
-    ),
-    githubRepositoryId: Schema.optional(Schema.NullOr(
-      Schema.Int.check(Schema.isGreaterThan(0)),
-    )),
-    workflow: WorkflowConfig,
-  }),
-  repositoryCredential: Schema.optional(Schema.Struct({
-    project: Schema.Struct({
-      id: Schema.String.check(Schema.isUUID()),
-      organizationId: Schema.String.check(Schema.isUUID()),
-    }),
-    repository: Schema.Struct({
-      id: Schema.Int.check(Schema.isGreaterThan(0)),
-      fullName: Schema.String,
-      cloneUrl: Schema.String,
-    }),
-    username: Schema.String,
-    password: Schema.String.check(Schema.isMinLength(1)),
-    expiresAt: Schema.String,
-  })),
-}).annotate({ parseOptions: { onExcessProperty: "preserve" } });
-
-const SetupBindResponse = Schema.Struct({
-  managedComputerId: Schema.String.check(Schema.isUUID()),
-  organizationId: Schema.String.check(Schema.isUUID()),
-  projectId: Schema.String.check(Schema.isUUID()),
-  deviceId: Schema.String,
-  worker: Schema.Struct({
-    id: Schema.String.check(Schema.isLengthBetween(1, 128)),
-    label: Schema.String,
-    maxConcurrentSessions: Schema.Int,
-    readiness: Schema.String,
-  }),
-  duplicate: Schema.Boolean,
-}).annotate({ parseOptions: { onExcessProperty: "preserve" } });
+import { workerRuntimeToProto } from "./worker-control-client";
 
 const SetupRelayControl = Schema.Union([
   Schema.Struct({
@@ -110,12 +63,6 @@ const SetupRelayControl = Schema.Union([
   }),
 ]);
 
-const decodeContext = Schema.decodeUnknownSync(SetupContextResponse, {
-  errors: "all",
-});
-const decodeBinding = Schema.decodeUnknownSync(SetupBindResponse, {
-  errors: "all",
-});
 const decodeRelayControl = Schema.decodeUnknownOption(SetupRelayControl);
 
 type CommandSpec = {
@@ -349,20 +296,22 @@ function githubRepositoryFromRemote(remote: string) {
 }
 
 async function ensureRepository(
-  credential: NonNullable<
-    typeof SetupContextResponse.Type["repositoryCredential"]
-  >,
+  credential: ProjectGitHubCredential,
   signal: AbortSignal,
 ) {
-  const repository = credential.repository.fullName;
+  const repository = credential.repository;
   if (
-    credential.project.id.length === 0 ||
-    credential.repository.id <= 0 ||
-    credential.repository.cloneUrl !== `https://github.com/${repository}.git`
+    credential.projectId.length === 0 ||
+    credential.organizationId.length === 0 ||
+    credential.repositoryId <= 0n ||
+    credential.cloneUrl !== `https://github.com/${repository}.git`
   ) {
     throw new Error("Managed repository credential identity is invalid");
   }
-  if (Date.parse(credential.expiresAt) <= Date.now() + 30_000) {
+  const expiresAt = credential.expiresAt
+    ? timestampDate(credential.expiresAt)
+    : null;
+  if (!expiresAt || expiresAt.getTime() <= Date.now() + 30_000) {
     throw new Error("Managed repository credential expired; restart setup to retry");
   }
   const configuredRoot = process.env.BRIAR_MANAGED_WORKSPACE_ROOT?.trim();
@@ -373,8 +322,8 @@ async function ensureRepository(
   const repositoryName = repository.split("/")[1]!;
   const projectRoot = join(
     workspaceRoot,
-    credential.project.organizationId,
-    credential.project.id,
+    credential.organizationId,
+    credential.projectId,
   );
   const repositoryPath = join(projectRoot, repositoryName);
   await mkdir(projectRoot, { recursive: true, mode: 0o700 });
@@ -393,7 +342,7 @@ async function ensureRepository(
       "--get",
       "briar.githubRepositoryId",
     ]);
-    if (marker && marker !== String(credential.repository.id)) {
+    if (marker && marker !== String(credential.repositoryId)) {
       throw new Error("Managed clone has a different GitHub repository ID");
     }
   }
@@ -418,7 +367,7 @@ async function ensureRepository(
     if (await pathExists(repositoryPath)) {
       await runSimpleCommand(
         "git",
-        ["-c", "credential.helper=", "ls-remote", "--exit-code", credential.repository.cloneUrl, "HEAD"],
+        ["-c", "credential.helper=", "ls-remote", "--exit-code", credential.cloneUrl, "HEAD"],
         signal,
         { cwd: repositoryPath, env },
       );
@@ -427,7 +376,7 @@ async function ensureRepository(
       const checkout = join(cloneStagingDirectory, "repository");
       await runSimpleCommand(
         "git",
-        ["-c", "credential.helper=", "clone", "--origin", "origin", "--", credential.repository.cloneUrl, checkout],
+        ["-c", "credential.helper=", "clone", "--origin", "origin", "--", credential.cloneUrl, checkout],
         signal,
         { env },
       );
@@ -441,7 +390,7 @@ async function ensureRepository(
   }
   await runSimpleCommand(
     "git",
-    ["config", "--local", "briar.githubRepositoryId", String(credential.repository.id)],
+    ["config", "--local", "briar.githubRepositoryId", String(credential.repositoryId)],
     signal,
     { cwd: repositoryPath },
   );
@@ -561,16 +510,34 @@ export async function runManagedComputerGuidedSetup(
   },
   dependencies: GuidedSetupDependencies,
 ) {
-  const context = decodeContext(await request<unknown>(
+  const setupRpc = createManagedComputerSetupClient(
     config.apiOrigin,
-    `/managed-computers/${config.managedComputerId}/setup/context`,
     config.credential,
-    {
-      method: "POST",
-      body: JSON.stringify({ setupToken: input.setupToken }),
-    },
+  );
+  const context = await setupRpc.client.getManagedComputerSetupContext({
+    managedComputerId: config.managedComputerId,
+    setupToken: input.setupToken,
+  }, setupRpc.options);
+  const session = requiredMessage(
+    context.session,
+    "managedComputerSetupContext.session",
+  );
+  const setupProject = requiredMessage(
+    context.project,
+    "managedComputerSetupContext.project",
+  );
+  const settings = projectSettingsFromProto(requiredMessage(
+    context.settings,
+    "managedComputerSetupContext.settings",
   ));
-  const settings = context.settings;
+  if (
+    session.managedComputerId !== config.managedComputerId ||
+    session.organizationId !== config.organizationId ||
+    session.projectId !== setupProject.id ||
+    session.status !== ManagedComputerSetupSessionStatus.PENDING
+  ) {
+    throw new Error("Managed setup context did not match this computer");
+  }
   if (!settings.githubRepository) {
     throw new Error("Connect a GitHub repository to this project before setup");
   }
@@ -580,8 +547,10 @@ export async function runManagedComputerGuidedSetup(
 
   dependencies.emit({ type: "state", phase: "github", status: "working" });
   if (
-    context.repositoryCredential.repository.id !== settings.githubRepositoryId ||
-    context.repositoryCredential.repository.fullName.toLowerCase() !==
+    settings.githubRepositoryId === null ||
+    context.repositoryCredential.repositoryId !==
+      BigInt(settings.githubRepositoryId) ||
+    context.repositoryCredential.repository.toLowerCase() !==
       settings.githubRepository.toLowerCase()
   ) {
     throw new Error("Managed repository credential does not match project settings");
@@ -629,28 +598,29 @@ export async function runManagedComputerGuidedSetup(
   if (!providerHealth[input.provider].healthy) {
     throw new Error(`${input.provider} is authenticated but not ready`);
   }
-  const binding = decodeBinding(await request<unknown>(
-    config.apiOrigin,
-    `/managed-computers/${config.managedComputerId}/setup/bind`,
-    config.credential,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        setupToken: input.setupToken,
-        worker: {
-          agentProvider: input.provider,
-          providers: healthyWorkerProviders(providerHealth),
-          providerHealth,
-          providerCapabilities,
-          versions: { briar: cliVersion },
-        },
-      }),
-    },
-  ));
+  const response = await setupRpc.client.bindManagedComputerSetup({
+    managedComputerId: config.managedComputerId,
+    setupToken: input.setupToken,
+    runtime: workerRuntimeToProto({
+      agentProvider: input.provider,
+      providers: healthyWorkerProviders(providerHealth),
+      providerHealth,
+      providerCapabilities,
+      versions: { briar: cliVersion },
+      worktrees: true,
+    }),
+  }, setupRpc.options);
+  const binding = {
+    ...response,
+    worker: dashboardWorkerFromProto(requiredMessage(
+      response.worker,
+      "managedComputerSetup.worker",
+    )),
+  };
   if (
     binding.managedComputerId !== config.managedComputerId ||
     binding.organizationId !== config.organizationId ||
-    binding.projectId !== context.project.id ||
+    binding.projectId !== setupProject.id ||
     binding.deviceId !== config.deviceId
   ) {
     throw new Error("Managed setup response did not match this computer");
@@ -658,7 +628,7 @@ export async function runManagedComputerGuidedSetup(
 
   const stored = await loadConfig();
   const existingProject = stored.projects.find((project) =>
-    project.id === context.project.id
+    project.id === setupProject.id
   );
   const repositoryRemote = gitValueAt(
     repositoryPath,
@@ -666,7 +636,7 @@ export async function runManagedComputerGuidedSetup(
   ) ?? undefined;
   const project = projectWithRemoteSettings({
     ...existingProject,
-    id: context.project.id,
+    id: setupProject.id,
     repositoryPath,
     repositoryRemote,
     apiUrl: config.apiOrigin,
@@ -699,7 +669,7 @@ export async function runManagedComputerGuidedSetup(
   dependencies.emit({ type: "state", phase: "worker", status: "complete" });
   dependencies.emit({
     type: "complete",
-    projectId: context.project.id,
+    projectId: setupProject.id,
     provider: input.provider,
     workerId: binding.worker.id,
   });

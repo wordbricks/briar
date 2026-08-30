@@ -9,10 +9,11 @@ import {
   gitValueAt,
   loadConfig,
   login,
-  request,
   saveConfig,
   value,
 } from "./command-support";
+import { dashboardWorkerFromProto } from "../src/lib/app-rpc/fleet-mappers";
+import { requiredMessage } from "../src/lib/app-rpc/mappers";
 import {
   configuredManagedComputerCredentialPath,
   loadManagedComputerCredential,
@@ -35,24 +36,12 @@ import {
   fetchManagedComputer,
   fetchManagedComputerSetupStatus,
 } from "./app-connect-client";
-import { createWorkerControlClient } from "./worker-control-client";
+import { createManagedComputerSetupClient } from "./managed-computer-setup-client";
+import {
+  createWorkerControlClient,
+  workerRuntimeToProto,
+} from "./worker-control-client";
 export { managedComputerWorkerSupervisor } from "./managed-computer-supervisor";
-
-type SetupBindResponse = {
-  managedComputerId: string;
-  organizationId: string;
-  projectId: string;
-  deviceId: string;
-  worker: {
-    id: string;
-    label: string;
-    state: "online" | "stale" | "disabled";
-    maxConcurrentSessions: number;
-    acceptingWork: boolean;
-    readiness: string;
-  };
-  duplicate: boolean;
-};
 
 const sameOrigin = (left: string, right: string) => {
   try {
@@ -242,24 +231,28 @@ export async function managedComputerSetupCommand() {
     projectId,
     requestId,
   );
-  const binding = await request<SetupBindResponse>(
+  const setupRpc = createManagedComputerSetupClient(
     credential.apiOrigin,
-    `/managed-computers/${credential.managedComputerId}/setup/bind`,
     credential.credential,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        setupToken: setup.setupToken,
-        worker: {
-          agentProvider: provider,
-          providers: healthyWorkerProviders(providerHealth),
-          providerHealth,
-          providerCapabilities,
-          versions: { briar: cliVersion },
-        },
-      }),
-    },
   );
+  const response = await setupRpc.client.bindManagedComputerSetup({
+    managedComputerId: credential.managedComputerId,
+    setupToken: setup.setupToken,
+    runtime: workerRuntimeToProto({
+      agentProvider: provider,
+      providers: healthyWorkerProviders(providerHealth),
+      providerHealth,
+      providerCapabilities,
+      versions: { briar: cliVersion },
+      worktrees: true,
+    }),
+  }, setupRpc.options);
+  const binding = {
+    ...response,
+    worker: dashboardWorkerFromProto(
+      requiredMessage(response.worker, "managedComputerSetup.worker"),
+    ),
+  };
   if (
     binding.managedComputerId !== credential.managedComputerId ||
     binding.organizationId !== credential.organizationId ||
