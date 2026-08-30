@@ -1,4 +1,3 @@
-import { collectStorageMetrics } from "./archive";
 import type { BriarAuth } from "./auth";
 import {
   getGithubConnectionForOrganization,
@@ -188,21 +187,5 @@ export async function handleProjectSettingsRoute(
     return json({ profile: mergeQueueProfileJson(configured.profile) });
   }
 
-  const storageMetricsMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/storage-metrics$/u,
-  );
-  if (storageMetricsMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      storageMetricsMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
-      throw new HttpError(403, "Development management permission required");
-    }
-    return json({ metrics: await collectStorageMetrics(db, project.id) });
-  }
-
+  return undefined;
 }

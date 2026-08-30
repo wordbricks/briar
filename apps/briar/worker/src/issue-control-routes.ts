@@ -1,4 +1,3 @@
-import { listArchivedExecutionAuditEvents } from "./archive";
 import type { BriarAuth } from "./auth";
 import {
   getProject,
@@ -8,7 +7,6 @@ import {
   reworkHuntRun,
   transferIssue,
 } from "./db";
-import { parseJsonObject } from "./agent-result-json";
 import { HttpError, json } from "./http-response";
 import { hasOrganizationCapability } from "./organization-access";
 import { decodeProjectTransferInput } from "./project-request-contract";
@@ -26,7 +24,6 @@ import { resumeRunWithCheckpointIdentity } from "./workflow-resume";
 import {
   auditExecutionEvent,
   dispatchHuntRun,
-  listExecutionAuditEvents,
   unassignHuntRun,
 } from "./workers";
 
@@ -272,9 +269,8 @@ export async function handleIssueControlRoute(input: {
   url: URL;
   auth: BriarAuth;
   db: D1Database;
-  archivesBucket: R2Bucket;
 }): Promise<Response | undefined> {
-  const { request, url, auth, db, archivesBucket } = input;
+  const { request, url, auth, db } = input;
 
   const pausedReworkMatch = url.pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/rework$/u,
@@ -332,51 +328,6 @@ export async function handleIssueControlRoute(input: {
     });
     if (!result) throw new HttpError(404, "Run not found");
     return json(result);
-  }
-
-  const executionAuditMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/execution-audit$/u,
-  );
-  if (executionAuditMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, executionAuditMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
-      throw new HttpError(403, "Issue execution permission required");
-    }
-    const runId = new URL(request.url).searchParams.get("runId") ?? undefined;
-    const [hotEvents, archivedEvents] = await Promise.all([
-      listExecutionAuditEvents(db, project.id, runId),
-      listArchivedExecutionAuditEvents(
-        db,
-        archivesBucket,
-        project.id,
-        runId,
-      ),
-    ]);
-    const events = [
-      ...new Map(
-        [...archivedEvents, ...hotEvents].map((event) => [event.id, event]),
-      ).values(),
-    ].sort(
-      (left, right) =>
-        right.occurred_at.localeCompare(left.occurred_at) ||
-        right.id.localeCompare(left.id),
-    );
-    return json({
-      events: events.map((event) => ({
-        id: event.id,
-        runId: event.run_id,
-        workerId: event.worker_id,
-        agentId: event.agent_id,
-        actorUserId: event.actor_user_id,
-        actorDeviceId: event.actor_device_id,
-        action: event.action,
-        requestId: event.request_id,
-        detail: parseJsonObject(event.detail_json) ?? {},
-        occurredAt: event.occurred_at,
-      })),
-    });
   }
 
   return undefined;

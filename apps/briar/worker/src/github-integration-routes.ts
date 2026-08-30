@@ -9,7 +9,6 @@ import {
   consumeGithubInstallState,
   consumeGithubOAuthState,
   createGithubOAuthState,
-  disconnectGithubInstallation,
   disconnectGithubInstallationById,
   disconnectGithubInstallationsByAuthorizedUser,
   getGithubConnectionByInstallation,
@@ -31,7 +30,7 @@ import {
   verifyGithubOAuthInstallation,
   verifyGitHubWebhook,
 } from "./github";
-import { corsHeaders, HttpError, json } from "./http-response";
+import { HttpError, json } from "./http-response";
 import {
   integrationHtml as html,
   noStoreRedirect,
@@ -606,21 +605,6 @@ export async function handleOrganizationGithubRoute(input: {
       connectedAt: connection.connected_at,
     });
   }
-  if (organizationGithubMatch && request.method === "DELETE") {
-    const session = await requireSession(auth, request);
-    const organizationId = organizationGithubMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!hasOrganizationCapability(role, "development:manage")) {
-      throw new HttpError(403, "Development management permission required");
-    }
-    await disconnectGithubInstallation(
-      db,
-      organizationId,
-      new Date().toISOString(),
-    );
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-
   const organizationGithubInstallMatch = url.pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/integrations\/github\/install-url$/u,
   );

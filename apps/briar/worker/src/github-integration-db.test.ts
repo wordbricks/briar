@@ -547,12 +547,11 @@ describe("GitHub integration D1 state", () => {
       }],
     });
 
-    const disconnectResponse = await worker.fetch(new Request(
-      `https://briar.example/organizations/${firstOrganizationId}/integrations/github`,
-      { method: "DELETE", headers },
-    ), env);
-    expect(disconnectResponse.status).toBe(204);
-
+    await disconnectGithubInstallation(
+      db,
+      firstOrganizationId,
+      "2026-08-05T00:10:00.000Z",
+    );
     const installResponse = await worker.fetch(new Request(
       `https://briar.example/organizations/${firstOrganizationId}/integrations/github/install-url`,
       { method: "POST", headers },

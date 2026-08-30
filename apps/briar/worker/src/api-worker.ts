@@ -21,7 +21,6 @@ import { handleProjectAgentTaskWorkerRoute } from "./project-agent-task-worker-r
 import { handleProjectGithubRoute } from "./project-github-routes";
 import { handleProjectLinearRoute } from "./project-linear-routes";
 import { handleProjectSettingsRoute } from "./project-settings-routes";
-import { handleProjectWorkerRoute } from "./project-worker-routes";
 import { handlePublicRoute } from "./public-routes";
 import { handleIncomingChannelWebhookRoute } from "./incoming-channel-webhook";
 import { handleRealtimeRoute } from "./realtime-routes";
@@ -60,10 +59,7 @@ import {
   agentSkillConflictMessage,
 } from "./agent-skills";
 import { handleScheduledTask } from "./scheduled-task";
-import {
-  handleOrganizationSlackRoute,
-  handleSlackAppPublicRoute,
-} from "./slack-app-routes";
+import { handleSlackAppPublicRoute } from "./slack-app-routes";
 import { handleSlackEventPublicRoute } from "./slack-event-routes";
 import { sha256 } from "./crypto-digest";
 import {
@@ -210,18 +206,6 @@ async function route(
     return organizationGithubResponse;
   }
 
-  const organizationSlackResponse = await handleOrganizationSlackRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-    context,
-  });
-  if (organizationSlackResponse !== undefined) {
-    return organizationSlackResponse;
-  }
-
   const projectGithubResponse = await handleProjectGithubRoute({
     request,
     url,
@@ -296,7 +280,6 @@ async function route(
     url,
     auth,
     db,
-    archivesBucket: env.ARCHIVES,
   });
   if (issueControlResponse !== undefined) return issueControlResponse;
 
@@ -324,15 +307,6 @@ async function route(
       requireProjectAccess(auth, db, request, projectId),
   });
   if (transcriptResponse !== undefined) return transcriptResponse;
-
-  const projectWorkerResponse = await handleProjectWorkerRoute({
-    request,
-    url,
-    db,
-    requireProjectAccess: (projectId) =>
-      requireProjectAccess(auth, db, request, projectId),
-  });
-  if (projectWorkerResponse !== undefined) return projectWorkerResponse;
 
   const mergeBatchResponse = await handleMergeBatchRoute({
     request,
