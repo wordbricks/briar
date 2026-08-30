@@ -162,7 +162,6 @@ import type {
   AgentExecutionCostEstimate,
   DashboardPayload,
   DashboardDeltaPayload,
-  ExecutionWorker,
   OrganizationExecutionWorker,
   ManagedComputer,
   ManagedComputerProduct,
@@ -1100,22 +1099,6 @@ export async function unassignHuntRun(token: string, projectId: string, runId: s
     method: "POST",
     body: JSON.stringify({ requestId: crypto.randomUUID() }),
   });
-}
-
-export async function updateExecutionWorkerConcurrency(
-  token: string,
-  projectId: string,
-  workerId: string,
-  maxConcurrentSessions: number,
-) {
-  return request<ExecutionWorker>(
-    `/projects/${projectId}/workers/${workerId}`,
-    token,
-    {
-      method: "PATCH",
-      body: JSON.stringify({ maxConcurrentSessions }),
-    },
-  );
 }
 
 export type ProjectGithubCredential = {
