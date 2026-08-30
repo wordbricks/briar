@@ -13,6 +13,7 @@ import {
   type GetDashboardResponse,
 } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import { FleetService } from "@briar/contracts/gen/briar/app/v1/fleet_pb";
+import { MergeQueueService } from "@briar/contracts/gen/briar/app/v1/merge_queue_pb";
 import {
   ProjectService,
   type ListProjectsResponse,
@@ -23,6 +24,10 @@ import {
   managedComputerSetupSessionTicketFromProto,
   managedComputerSetupStatusFromProto,
 } from "../src/lib/app-rpc/fleet-mappers";
+import {
+  mergeQueueProfileFromProto,
+  mergeQueueQuietWindowToProto,
+} from "../src/lib/app-rpc/merge-queue-mappers";
 import { requiredMessage } from "../src/lib/app-rpc/mappers";
 
 const transport = (apiUrl: string) =>
@@ -123,6 +128,52 @@ export async function fetchManagedComputerSetupStatus(
     callOptions(token),
   );
   return managedComputerSetupStatusFromProto(response);
+}
+
+export async function fetchMergeQueueProfile(
+  apiUrl: string,
+  token: string,
+  projectId: string,
+) {
+  const response = await createClient(
+    MergeQueueService,
+    transport(apiUrl),
+  ).getMergeQueueProfile({ projectId }, callOptions(token));
+  return response.profile
+    ? mergeQueueProfileFromProto(response.profile)
+    : null;
+}
+
+export async function updateRemoteMergeQueueProfile(
+  apiUrl: string,
+  token: string,
+  input: {
+    projectId: string;
+    enabled: boolean;
+    readinessStageId?: string;
+    quietWindowMs?: number;
+    maxBatchSize?: number;
+  },
+) {
+  const response = await createClient(
+    MergeQueueService,
+    transport(apiUrl),
+  ).updateMergeQueueProfile(
+    {
+      projectId: input.projectId,
+      enabled: input.enabled,
+      readinessStageId: input.readinessStageId,
+      quietWindow: input.quietWindowMs === undefined
+        ? undefined
+        : mergeQueueQuietWindowToProto(input.quietWindowMs),
+      maxBatchSize: input.maxBatchSize,
+    },
+    callOptions(token),
+  );
+  return mergeQueueProfileFromProto(requiredMessage(
+    response.profile,
+    "updateMergeQueueProfile.profile",
+  ));
 }
 
 export const isUnauthenticatedConnectError = (error: unknown) =>

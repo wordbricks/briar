@@ -13,6 +13,7 @@ import {
   MERGE_QUEUE_VALIDATION_SOURCE_REF_PREFIX,
 } from "../src/lib/merge-queue-validation-contract";
 import type { ClaimedMergeBatch } from "./worker-queue-contract";
+import type { MergeQueueProfile } from "../src/types";
 
 export type MergeQueueCommandResult = {
   exitCode: number;
@@ -1038,44 +1039,6 @@ export async function executeClaimedMergeBatch(
     }
     throw error;
   }
-}
-
-const MergeQueueProfileSchema = Schema.Struct({
-  projectId: Schema.String.check(Schema.isUUID()),
-  repositoryId: PositiveInteger,
-  repository: Schema.String.check(
-    Schema.isPattern(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u),
-  ),
-  baseBranch: Schema.Literal("main"),
-  enabled: Schema.Boolean,
-  readinessStageId: Schema.String.check(
-    Schema.isPattern(/^[a-z][a-z0-9_-]{0,63}$/u),
-  ),
-  validationCommands: Schema.mutable(Schema.Array(
-    Schema.String.check(Schema.isLengthBetween(1, 500)),
-  )).check(Schema.isLengthBetween(1, MERGE_QUEUE_VALIDATION_MAX_COMMANDS)),
-  quietWindowMs: Schema.Int.check(
-    Schema.isGreaterThanOrEqualTo(1_000),
-    Schema.isLessThanOrEqualTo(300_000),
-  ),
-  maxBatchSize: Schema.Int.check(
-    Schema.isGreaterThanOrEqualTo(1),
-    Schema.isLessThanOrEqualTo(5),
-  ),
-  updatedAt: Schema.String,
-});
-
-export type MergeQueueProfile = typeof MergeQueueProfileSchema.Type;
-
-const MergeQueueProfileResponse = Schema.Struct({
-  profile: Schema.NullOr(MergeQueueProfileSchema),
-});
-const decodeMergeQueueProfileResponse = Schema.decodeUnknownSync(
-  MergeQueueProfileResponse,
-);
-
-export function mergeQueueProfileFromResponse(input: unknown) {
-  return decodeMergeQueueProfileResponse(input).profile;
 }
 
 const GithubRepositoryResponse = Schema.Struct({

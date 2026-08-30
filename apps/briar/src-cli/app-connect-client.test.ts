@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createManagedComputerSetupSession,
+  fetchMergeQueueProfile,
   fetchManagedComputer,
   fetchManagedComputerSetupStatus,
+  updateRemoteMergeQueueProfile,
 } from "./app-connect-client";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -103,6 +105,69 @@ describe("Fleet Connect CLI client", () => {
         body: {
           organizationId: "organization-1",
           managedComputerId: "computer-1",
+        },
+      },
+    ]);
+  });
+});
+
+describe("Merge queue Connect CLI client", () => {
+  it("uses the generated service and preserves duration and uint64 values", async () => {
+    const requests: Array<{ method: string; body: unknown }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const method = new URL(request.url).pathname.split("/").at(-1)!;
+      expect(request.headers.get("authorization")).toBe("Bearer user-token");
+      requests.push({ method, body: await request.json() });
+      return new Response(JSON.stringify({
+        profile: {
+          projectId: "project-1",
+          repositoryId: "42",
+          repository: "briar-dev/briar",
+          baseBranch: "main",
+          enabled: method === "UpdateMergeQueueProfile",
+          readinessStageId: "validate",
+          validationCommands: ["bun test"],
+          quietWindow: "1.250s",
+          maxBatchSize: 5,
+          updatedAt: "2026-08-31T03:04:05Z",
+        },
+      }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }));
+
+    await expect(fetchMergeQueueProfile(
+      "https://briar.example/",
+      "user-token",
+      "project-1",
+    )).resolves.toMatchObject({ repositoryId: 42, quietWindowMs: 1_250 });
+    await expect(updateRemoteMergeQueueProfile(
+      "https://briar.example/",
+      "user-token",
+      {
+        projectId: "project-1",
+        enabled: true,
+        readinessStageId: "validate",
+        quietWindowMs: 1_250,
+        maxBatchSize: 5,
+      },
+    )).resolves.toMatchObject({ enabled: true, quietWindowMs: 1_250 });
+
+    expect(requests).toEqual([
+      {
+        method: "GetMergeQueueProfile",
+        body: { projectId: "project-1" },
+      },
+      {
+        method: "UpdateMergeQueueProfile",
+        body: {
+          projectId: "project-1",
+          enabled: true,
+          readinessStageId: "validate",
+          quietWindow: "1.250s",
+          maxBatchSize: 5,
         },
       },
     ]);
