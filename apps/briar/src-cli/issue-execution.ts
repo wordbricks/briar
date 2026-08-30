@@ -73,7 +73,6 @@ import {
   configDirectory,
   value,
   saveConfigAt,
-  request,
   runGit,
   worktreeSettings,
 } from "./command-support";
@@ -81,6 +80,11 @@ import {
   downloadClaimAttachment,
   allocateClaimWorkspace,
 } from "./worktree-commands";
+import {
+  createAuthenticatedWorkerExecutionClient,
+  workClaimIdentityToProto,
+} from "./worker-queue-client";
+import { workerRunEventRequest } from "./run-event-proto";
 
 const activeReplyActivityPublishers = new Map<
   string,
@@ -224,6 +228,14 @@ async function runClaimedIssueInRuntime(
   }
   const activeProject =
     config.projects.find((candidate) => candidate.id === project.id) ?? project;
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
+    config.apiUrl,
+    workerToken,
+  );
+  const runEventTarget = {
+    case: "work" as const,
+    value: workClaimIdentityToProto(issue),
+  };
   const { workspace, workspaceError } = await allocateClaimWorkspace(
     config,
     activeProject,
@@ -400,11 +412,11 @@ async function runClaimedIssueInRuntime(
       await transcriptBatcher.flush();
       conversationId = turn.conversationId;
       if (runnerBlock) {
-        await request(config.apiUrl, "/run-events", workerToken, {
-          method: "POST",
-          headers: { "X-Briar-Claim-Token": issue.claimToken },
-          body: JSON.stringify(
-            detachedProviderBlockedRunEvent({
+        await executionRpc.client.recordRunEvent(
+          workerRunEventRequest({
+            projectId: project.id,
+            target: runEventTarget,
+            event: detachedProviderBlockedRunEvent({
               block: runnerBlock,
               runId: issue.runId,
               attempt: issue.currentAttempt,
@@ -413,8 +425,9 @@ async function runClaimedIssueInRuntime(
               model: execution.model,
               occurredAt: new Date().toISOString(),
             }),
-          ),
-        });
+          }),
+          executionRpc.options,
+        );
         return;
       }
       const turnFailure = detachedProviderTurnFailure(turn);
@@ -465,21 +478,23 @@ async function runClaimedIssueInRuntime(
   } catch (error) {
     if (!signal.aborted) {
       try {
-        await request(config.apiUrl, "/run-events", workerToken, {
-          method: "POST",
-          headers: { "X-Briar-Claim-Token": issue.claimToken },
-          body: JSON.stringify({
-            runId: issue.runId,
-            status: "failed",
-            workflowStage: null,
-            eventKey: `detached:${issue.currentAttempt}:agent-failed`,
-            occurredAt: new Date().toISOString(),
-            actor: `briar-worker:${activeProject.executionWorker?.workerId ?? "unknown"}`,
-            repository: issue.repository,
-            detail: error instanceof Error ? error.message : String(error),
-            pullRequestUrls: [],
+        await executionRpc.client.recordRunEvent(
+          workerRunEventRequest({
+            projectId: project.id,
+            target: runEventTarget,
+            event: {
+              status: "failed",
+              workflowStage: null,
+              eventKey: `detached:${issue.currentAttempt}:agent-failed`,
+              occurredAt: new Date().toISOString(),
+              actor: `briar-worker:${activeProject.executionWorker?.workerId ?? "unknown"}`,
+              repository: issue.repository,
+              detail: error instanceof Error ? error.message : String(error),
+              pullRequestUrls: [],
+            },
           }),
-        });
+          executionRpc.options,
+        );
       } catch {
         // A cancellation or reassignment invalidates the claim before the
         // process exits. That expected late write must not hide the root error.

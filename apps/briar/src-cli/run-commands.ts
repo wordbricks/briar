@@ -3,7 +3,11 @@ import {
   basename,
   resolve,
 } from "node:path";
-import { toJsonString } from "@bufbuild/protobuf";
+import {
+  create,
+  type JsonObject,
+  toJsonString,
+} from "@bufbuild/protobuf";
 import { createClient } from "@connectrpc/connect";
 import {
   CreateIssueResponseSchema,
@@ -12,6 +16,13 @@ import {
   SetIssueDependencyResponseSchema,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
+import {
+  RecordRunEventResponseSchema,
+  RunSourceIdentitySchema,
+  TransitionWorkflowStageRequest_Action,
+  TransitionWorkflowStageResponse_Outcome,
+  TransitionWorkflowStageResponseSchema,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { decodeStructuredAgentResult } from "../src/lib/agent-result";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {
@@ -27,8 +38,6 @@ import {
   validateRecoveryRunInput,
   validateResumeRunInput,
   validateReworkRunInput,
-  validateRunEventInput,
-  validateWorkflowTransitionInput,
 } from "./command-contract";
 import {
   executionToken,
@@ -48,6 +57,12 @@ import {
   createAuthenticatedWorkerExecutionClient,
 } from "./worker-queue-client";
 import {
+  issueWorkClaimIdentityToProto,
+  workerRunEventRequest,
+  workerRunEventStatus,
+  workerRunSource,
+} from "./run-event-proto";
+import {
   appConnectCallOptions,
   appConnectTransport,
 } from "./app-connect-client";
@@ -57,6 +72,29 @@ async function optionalText(valueFlag: string, fileFlag: string) {
   if (path) return readFile(resolve(path), "utf8");
   return value(valueFlag) ?? null;
 }
+
+const jsonObject = (value: string): JsonObject => {
+  const parsed: unknown = JSON.parse(value);
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    Array.isArray(parsed)
+  ) {
+    throw new Error("Run context must be a JSON object");
+  }
+  return parsed as JsonObject;
+};
+
+const activeIssueWork = (
+  project: Awaited<ReturnType<typeof currentProject>>,
+  runId: string,
+) => {
+  const claim = project.activeClaim;
+  if (claim?.runId !== runId || !claim.token) {
+    throw new Error("This run requires its active issue claim");
+  }
+  return issueWorkClaimIdentityToProto(runId, claim.token);
+};
 
 async function createIssueCommand() {
   const config = await loadConfig();
@@ -171,12 +209,13 @@ async function addRunEvent(forcedStatus?: string) {
   const runId = value("--run") ?? project.activeClaim?.runId ?? null;
   const sourceKey = value("--source-key") ?? project.activeClaim?.sourceKey ?? null;
   const title = value("--title");
+  const status = workerRunEventStatus(forcedStatus ?? value("--status"));
   const input = {
     runId,
     source: value("--source") ?? (runId ? null : "issue"),
     sourceKey,
     title: title ?? null,
-    status: forcedStatus ?? value("--status"),
+    status,
     workflowStage: value("--workflow-stage"),
     eventKey: required("--event-key"),
     occurredAt: value("--observed-at") ?? value("--occurred-at") ?? new Date().toISOString(),
@@ -205,7 +244,7 @@ async function addRunEvent(forcedStatus?: string) {
     pullRequestUrls: values("--pull-request-url"),
     targetSha: value("--target-sha") ?? null,
     sourceCreatedAt: value("--source-created-at") ?? null,
-    context: contextValue ? JSON.parse(contextValue) : null,
+    context: contextValue ? jsonObject(contextValue) : null,
   };
   if (forcedStatus === "completed" && !input.structuredResult) {
     throw new Error(
@@ -241,24 +280,27 @@ async function addRunEvent(forcedStatus?: string) {
       "--status blocked requires humanActionRequired and an exact nextAction",
     );
   }
-  validateRunEventInput(input);
-  const result = await request<{
-    runId: string;
-    status: string;
-    workflowStage: string | null;
-    stage: string;
-  }>(
+  const target = runId
+    ? { case: "work" as const, value: activeIssueWork(project, runId) }
+    : {
+        case: "sourceIdentity" as const,
+        value: create(RunSourceIdentitySchema, {
+          source: workerRunSource(input.source ?? undefined),
+          sourceKey: sourceKey ?? required("--source-key"),
+          title: title ?? required("--title"),
+        }),
+      };
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    "/run-events",
     agentToken,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-      headers:
-        project.activeClaim?.runId === input.runId && project.activeClaim.token
-          ? { "X-Briar-Claim-Token": project.activeClaim.token }
-          : undefined,
-    },
+  );
+  const result = await executionRpc.client.recordRunEvent(
+    workerRunEventRequest({
+      projectId: project.id,
+      target,
+      event: input,
+    }),
+    executionRpc.options,
   );
   if (project.activeClaim?.runId === result.runId) {
     const terminal = ["completed", "cancelled", "blocked", "failed"].includes(
@@ -282,7 +324,7 @@ async function addRunEvent(forcedStatus?: string) {
     );
     await saveConfig(config);
   }
-  console.log(JSON.stringify(result));
+  console.log(toJsonString(RecordRunEventResponseSchema, result));
 }
 
 async function addRunEvidence() {
@@ -496,43 +538,41 @@ async function transitionWorkflowStage(action: "start" | "complete") {
   const project = await currentProject(config);
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
-  const stage = required("--stage");
-  const input = {
-    requestId: value("--request-id") ?? crypto.randomUUID(),
-    actor: value("--actor") ?? "briar-workflow",
-    attempt: value("--attempt") ? Number(value("--attempt")) : undefined,
-    revision: value("--revision") ? Number(value("--revision")) : undefined,
-  };
-  validateWorkflowTransitionInput(input);
-  decodeUuid(runId);
-  decodeWorkflowStageId(stage);
-  const result = await request<{
-    runId: string;
-    requestId: string;
-    outcome: "started" | "completed" | "already_started" | "already_completed" | "paused";
-    attempt: number;
-    revision: number;
-    stage: string;
-    checkpoint: {
-      key: string;
-      stage: string;
-      position: "before" | "after";
-      revision: number;
-    } | null;
-  }>(
-    config.apiUrl,
-    `/runs/${runId}/stages/${stage}/${action}`,
-    executionToken(project),
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-      headers:
-        project.activeClaim?.runId === runId && project.activeClaim.token
-          ? { "X-Briar-Claim-Token": project.activeClaim.token }
-          : undefined,
-    },
+  const stage = decodeWorkflowStageId(required("--stage"));
+  const requestId = decodeUuid(
+    value("--request-id") ?? crypto.randomUUID(),
   );
-  if (result.outcome === "paused" && project.activeClaim?.runId === runId) {
+  const positiveOption = (flag: "--attempt" | "--revision") => {
+    const raw = value(flag);
+    if (raw === undefined) return undefined;
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      throw new Error(`${flag} must be a positive integer`);
+    }
+    return parsed;
+  };
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
+    config.apiUrl,
+    executionToken(project),
+  );
+  const result = await executionRpc.client.transitionWorkflowStage(
+    {
+      projectId: project.id,
+      work: activeIssueWork(project, decodeUuid(runId)),
+      requestId,
+      stage,
+      action: action === "start"
+        ? TransitionWorkflowStageRequest_Action.START
+        : TransitionWorkflowStageRequest_Action.COMPLETE,
+      attempt: positiveOption("--attempt"),
+      revision: positiveOption("--revision"),
+    },
+    executionRpc.options,
+  );
+  if (
+    result.outcome === TransitionWorkflowStageResponse_Outcome.PAUSED &&
+    project.activeClaim?.runId === runId
+  ) {
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
         ? { ...candidate, activeClaim: undefined }
@@ -540,7 +580,7 @@ async function transitionWorkflowStage(action: "start" | "complete") {
     );
     await saveConfig(config);
   }
-  console.log(JSON.stringify(result));
+  console.log(toJsonString(TransitionWorkflowStageResponseSchema, result));
 }
 
 export {
