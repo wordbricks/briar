@@ -1,12 +1,20 @@
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError, type HandlerContext } from "@connectrpc/connect";
 import {
+  BlockMergeBatchRequestSchema,
   ClaimWorkRequestSchema,
+  CompleteMergeBatchPublicationRequestSchema,
   CompleteProjectAgentTaskRequestSchema,
   HandoffWorkRequestSchema,
   HandoffWorkResponse_Outcome,
   IssueClaimIdentitySchema,
+  MergeBatchClaimIdentitySchema,
+  MergeBatchState,
+  MergeBatchValidationFailureCode,
   ProjectAgentTaskClaimIdentitySchema,
+  RecordMergeBatchAuthorityRequestSchema,
+  RecordMergeBatchCandidateEnqueuedRequestSchema,
+  RecordMergeBatchValidationRequestSchema,
   RenewWorkLeaseRequestSchema,
   WorkClaimIdentitySchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
@@ -63,6 +71,16 @@ const issueIdentity = () => create(WorkClaimIdentitySchema, {
   work: {
     case: "issue",
     value: create(IssueClaimIdentitySchema),
+  },
+});
+
+const mergeBatchIdentity = () => create(WorkClaimIdentitySchema, {
+  workId,
+  runId: workId,
+  claimToken: `briar_merge_claim_${"a".repeat(64)}`,
+  work: {
+    case: "mergeBatch",
+    value: create(MergeBatchClaimIdentitySchema),
   },
 });
 
@@ -196,5 +214,167 @@ describe("WorkerQueueService lifecycle semantics", () => {
         conversationId: "conversation-1",
       },
     });
+  });
+
+  it("reports a full merge-batch progression through one typed claim identity", async () => {
+    const authenticate = authentication();
+    const candidate = vi.fn<
+      WorkerQueueServices["recordMergeBatchCandidateEnqueuedWork"]
+    >().mockResolvedValue({
+      batchId: workId,
+      candidateId: "candidate-1",
+      state: "waiting_tail",
+    });
+    const authority = vi.fn<
+      WorkerQueueServices["recordMergeBatchAuthorityWork"]
+    >().mockResolvedValue({
+      batchId: workId,
+      state: "validating",
+      mergeGroupSha: "b".repeat(40),
+    });
+    const validation = vi.fn<
+      WorkerQueueServices["recordMergeBatchValidationWork"]
+    >().mockResolvedValue({
+      batchId: workId,
+      state: "publishing",
+      validatedAt: "2026-08-31T01:00:00.000Z",
+    });
+    const publication = vi.fn<
+      WorkerQueueServices["completeMergeBatchPublicationWork"]
+    >().mockResolvedValue({
+      batchId: workId,
+      state: "completed",
+      publishedAt: "2026-08-31T01:01:00.000Z",
+    });
+    const block = vi.fn<WorkerQueueServices["blockMergeBatchWork"]>()
+      .mockResolvedValue({
+        batchId: workId,
+        state: "blocked",
+      });
+    const service = createWorkerQueueService(input, {
+      requireWorkerProjectBinding: authenticate,
+      sha256: async () => "e".repeat(64),
+      recordMergeBatchCandidateEnqueuedWork: candidate,
+      recordMergeBatchAuthorityWork: authority,
+      recordMergeBatchValidationWork: validation,
+      completeMergeBatchPublicationWork: publication,
+      blockMergeBatchWork: block,
+    });
+    const common = {
+      projectId,
+      workerId,
+      work: mergeBatchIdentity(),
+    };
+
+    const enqueued = await service.recordMergeBatchCandidateEnqueued(
+      create(RecordMergeBatchCandidateEnqueuedRequestSchema, {
+        ...common,
+        candidateId: "candidate-1",
+        expectedHeadSha: "a".repeat(40),
+        expectedBaseSha: "c".repeat(40),
+        queueEntryId: "queue-entry-1",
+      }),
+      context,
+    );
+    const prepared = await service.recordMergeBatchAuthority(
+      create(RecordMergeBatchAuthorityRequestSchema, {
+        ...common,
+        integrationRef: `refs/heads/briar/merge-queue/${workId}`,
+        integrationSha: "b".repeat(40),
+        baseSha: "c".repeat(40),
+      }),
+      context,
+    );
+    const validated = await service.recordMergeBatchValidation(
+      create(RecordMergeBatchValidationRequestSchema, {
+        ...common,
+        mergeGroupSha: "b".repeat(40),
+        validationResults: {
+          results: [{
+            context: "merge-queue",
+            passed: true,
+            exitCode: 0,
+            log: "passed",
+            logSha256: "d".repeat(64),
+          }],
+        },
+      }),
+      context,
+    );
+    const published = await service.completeMergeBatchPublication(
+      create(CompleteMergeBatchPublicationRequestSchema, {
+        ...common,
+        mergeGroupSha: "b".repeat(40),
+      }),
+      context,
+    );
+    const blocked = await service.blockMergeBatch(
+      create(BlockMergeBatchRequestSchema, {
+        ...common,
+        code: "authority_changed",
+        detail: "The sealed pull request changed",
+      }),
+      context,
+    );
+
+    expect(enqueued.state).toBe(MergeBatchState.WAITING_TAIL);
+    expect(prepared.state).toBe(MergeBatchState.VALIDATING);
+    expect(validated.state).toBe(MergeBatchState.PUBLISHING);
+    expect(published.state).toBe(MergeBatchState.COMPLETED);
+    expect(blocked.state).toBe(MergeBatchState.BLOCKED);
+    expect(candidate).toHaveBeenCalledWith(
+      input.db,
+      {
+        batchId: workId,
+        projectId,
+        workerId,
+        claimTokenHash: "e".repeat(64),
+      },
+      expect.objectContaining({ candidateId: "candidate-1" }),
+    );
+    expect(validation).toHaveBeenCalledWith(
+      input.db,
+      expect.objectContaining({ batchId: workId, claimTokenHash: "e".repeat(64) }),
+      expect.objectContaining({
+        validationResults: [expect.objectContaining({
+          context: "merge-queue",
+          failureCode: null,
+        })],
+      }),
+    );
+  });
+
+  it("rejects an unknown protobuf validation failure enum", async () => {
+    const application = vi.fn<
+      WorkerQueueServices["recordMergeBatchValidationWork"]
+    >();
+    const service = createWorkerQueueService(input, {
+      requireWorkerProjectBinding: authentication(),
+      sha256: async () => "e".repeat(64),
+      recordMergeBatchValidationWork: application,
+    });
+    const request = create(RecordMergeBatchValidationRequestSchema, {
+      projectId,
+      workerId,
+      work: mergeBatchIdentity(),
+      mergeGroupSha: "b".repeat(40),
+      validationResults: {
+        results: [{
+          context: "merge-queue",
+          passed: false,
+          exitCode: 1,
+          failureCode: 999 as MergeBatchValidationFailureCode,
+          log: "failed",
+          logSha256: "d".repeat(64),
+        }],
+      },
+    });
+
+    const error = await Promise.resolve(
+      service.recordMergeBatchValidation(request, context),
+    ).catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(ConnectError);
+    expect((error as ConnectError).code).toBe(Code.InvalidArgument);
+    expect(application).not.toHaveBeenCalled();
   });
 });

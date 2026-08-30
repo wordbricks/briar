@@ -1,11 +1,23 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
+  BlockMergeBatchResponseSchema,
+  CompleteMergeBatchPublicationResponseSchema,
   HandoffWorkResponse_Outcome,
   HandoffWorkResponse_State,
+  MergeBatchState,
+  MergeBatchValidationFailureCode,
+  RecordMergeBatchAuthorityResponseSchema,
+  RecordMergeBatchCandidateEnqueuedResponseSchema,
+  RecordMergeBatchValidationResponseSchema,
   RenewWorkLeaseResponseSchema,
   WorkerQueueService,
+  type BlockMergeBatchRequest,
+  type CompleteMergeBatchPublicationRequest,
   type CompleteProjectAgentTaskRequest,
+  type RecordMergeBatchAuthorityRequest,
+  type RecordMergeBatchCandidateEnqueuedRequest,
+  type RecordMergeBatchValidationRequest,
   type WorkClaimIdentity,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
@@ -22,12 +34,18 @@ import {
 import { HttpError } from "./http-response";
 import { claimNextIssueReplyWork } from "./issue-reply-worker-routes";
 import {
-  claimNextMergeBatchWork,
-} from "./merge-batch-routes";
-import {
   releaseMergeBatchLease,
   renewMergeBatchLease,
+  type MergeBatchState as MergeBatchStateDomain,
 } from "./merge-batches";
+import {
+  blockMergeBatchWork,
+  claimNextMergeBatchWork,
+  completeMergeBatchPublicationWork,
+  recordMergeBatchAuthorityWork,
+  recordMergeBatchCandidateEnqueuedWork,
+  recordMergeBatchValidationWork,
+} from "./merge-batch-worker";
 import {
   claimNextProjectAgentTaskWork,
   completeProjectAgentTaskWork,
@@ -88,6 +106,13 @@ export type WorkerQueueServices = {
   readonly handoffExecutionWorkerClaim: typeof handoffExecutionWorkerClaim;
   readonly failExecutionWorkerUpdateHandoff: typeof failExecutionWorkerUpdateHandoff;
   readonly executionWorkerUpdateStatus: typeof executionWorkerUpdateStatus;
+  readonly recordMergeBatchCandidateEnqueuedWork:
+    typeof recordMergeBatchCandidateEnqueuedWork;
+  readonly recordMergeBatchAuthorityWork: typeof recordMergeBatchAuthorityWork;
+  readonly recordMergeBatchValidationWork: typeof recordMergeBatchValidationWork;
+  readonly completeMergeBatchPublicationWork:
+    typeof completeMergeBatchPublicationWork;
+  readonly blockMergeBatchWork: typeof blockMergeBatchWork;
 };
 
 const workerQueueServices: WorkerQueueServices = {
@@ -112,6 +137,11 @@ const workerQueueServices: WorkerQueueServices = {
   handoffExecutionWorkerClaim,
   failExecutionWorkerUpdateHandoff,
   executionWorkerUpdateStatus,
+  recordMergeBatchCandidateEnqueuedWork,
+  recordMergeBatchAuthorityWork,
+  recordMergeBatchValidationWork,
+  completeMergeBatchPublicationWork,
+  blockMergeBatchWork,
 };
 
 const requiredWork = (value: WorkClaimIdentity | undefined) => {
@@ -131,6 +161,22 @@ const timestamp = (value: string | null, field: string) => {
     throw new Error(`Invalid Worker ${field} timestamp`);
   }
   return timestampFromDate(date);
+};
+
+const mergeBatchState = (value: MergeBatchStateDomain): MergeBatchState => {
+  switch (value) {
+    case "collecting": return MergeBatchState.COLLECTING;
+    case "frozen": return MergeBatchState.FROZEN;
+    case "enqueueing": return MergeBatchState.ENQUEUEING;
+    case "waiting_tail": return MergeBatchState.WAITING_TAIL;
+    case "validating": return MergeBatchState.VALIDATING;
+    case "publishing": return MergeBatchState.PUBLISHING;
+    case "awaiting_merge": return MergeBatchState.AWAITING_MERGE;
+    case "blocked": return MergeBatchState.BLOCKED;
+    case "draining": return MergeBatchState.DRAINING;
+    case "completed": return MergeBatchState.COMPLETED;
+    case "failed": return MergeBatchState.FAILED;
+  }
 };
 
 const activityMessage = (
@@ -583,6 +629,160 @@ async function completeProjectAgentTask(
   throw new HttpError(400, "Project Agent task result is required");
 }
 
+async function mergeBatchIdentity(
+  input: WorkerConnectQueueInput,
+  request: {
+    projectId: string;
+    workerId: string;
+    work?: WorkClaimIdentity;
+  },
+  services: WorkerQueueServices,
+) {
+  const work = requiredWork(request.work);
+  if (work.work.case !== "mergeBatch" || work.workId !== work.runId) {
+    throw new HttpError(400, "Merge batch claim identity is required");
+  }
+  const worker = await authenticatedWorker(
+    input,
+    request.projectId,
+    request.workerId,
+    services,
+  );
+  return {
+    batchId: work.workId,
+    projectId: request.projectId,
+    workerId: worker.binding.id,
+    claimTokenHash: await services.sha256(work.claimToken),
+  };
+}
+
+async function recordMergeBatchCandidateEnqueuedRpc(
+  input: WorkerConnectQueueInput,
+  request: RecordMergeBatchCandidateEnqueuedRequest,
+  services: WorkerQueueServices,
+) {
+  const identity = await mergeBatchIdentity(input, request, services);
+  const result = await services.recordMergeBatchCandidateEnqueuedWork(
+    input.db,
+    identity,
+    {
+      candidateId: request.candidateId,
+      expectedHeadSha: request.expectedHeadSha,
+      expectedBaseSha: request.expectedBaseSha,
+      queueEntryId: request.queueEntryId,
+    },
+  );
+  return create(RecordMergeBatchCandidateEnqueuedResponseSchema, {
+    batchId: result.batchId,
+    candidateId: result.candidateId,
+    state: mergeBatchState(result.state),
+  });
+}
+
+async function recordMergeBatchAuthorityRpc(
+  input: WorkerConnectQueueInput,
+  request: RecordMergeBatchAuthorityRequest,
+  services: WorkerQueueServices,
+) {
+  const identity = await mergeBatchIdentity(input, request, services);
+  const result = await services.recordMergeBatchAuthorityWork(
+    input.db,
+    identity,
+    {
+      integrationRef: request.integrationRef,
+      integrationSha: request.integrationSha,
+      baseSha: request.baseSha,
+    },
+  );
+  return create(RecordMergeBatchAuthorityResponseSchema, {
+    batchId: result.batchId,
+    state: mergeBatchState(result.state),
+    mergeGroupSha: result.mergeGroupSha,
+  });
+}
+
+const validationFailure = (
+  value: MergeBatchValidationFailureCode | undefined,
+) => {
+  switch (value) {
+    case undefined:
+    case MergeBatchValidationFailureCode.UNSPECIFIED:
+      return null;
+    case MergeBatchValidationFailureCode.CI_FAILED:
+      return "ci_failed" as const;
+    case MergeBatchValidationFailureCode.OUTPUT_LIMIT:
+      return "output_limit" as const;
+    default:
+      throw new HttpError(400, "Unknown merge batch validation failure code");
+  }
+};
+
+async function recordMergeBatchValidationRpc(
+  input: WorkerConnectQueueInput,
+  request: RecordMergeBatchValidationRequest,
+  services: WorkerQueueServices,
+) {
+  if (!request.validationResults) {
+    throw new HttpError(400, "Merge batch validation results are required");
+  }
+  const identity = await mergeBatchIdentity(input, request, services);
+  const result = await services.recordMergeBatchValidationWork(
+    input.db,
+    identity,
+    {
+      mergeGroupSha: request.mergeGroupSha,
+      validationResults: request.validationResults.results.map((item) => ({
+        context: item.context,
+        passed: item.passed,
+        exitCode: item.exitCode,
+        failureCode: validationFailure(item.failureCode),
+        log: item.log,
+        logSha256: item.logSha256,
+        logTruncated: item.logTruncated,
+      })),
+    },
+  );
+  return create(RecordMergeBatchValidationResponseSchema, {
+    batchId: result.batchId,
+    state: mergeBatchState(result.state),
+    validatedAt: timestamp(result.validatedAt, "validation"),
+  });
+}
+
+async function completeMergeBatchPublicationRpc(
+  input: WorkerConnectQueueInput,
+  request: CompleteMergeBatchPublicationRequest,
+  services: WorkerQueueServices,
+) {
+  const identity = await mergeBatchIdentity(input, request, services);
+  const result = await services.completeMergeBatchPublicationWork(
+    input.db,
+    identity,
+    { mergeGroupSha: request.mergeGroupSha },
+  );
+  return create(CompleteMergeBatchPublicationResponseSchema, {
+    batchId: result.batchId,
+    state: mergeBatchState(result.state),
+    publishedAt: timestamp(result.publishedAt, "publication"),
+  });
+}
+
+async function blockMergeBatchRpc(
+  input: WorkerConnectQueueInput,
+  request: BlockMergeBatchRequest,
+  services: WorkerQueueServices,
+) {
+  const identity = await mergeBatchIdentity(input, request, services);
+  const result = await services.blockMergeBatchWork(input.db, identity, {
+    code: request.code,
+    detail: request.detail,
+  });
+  return create(BlockMergeBatchResponseSchema, {
+    batchId: result.batchId,
+    state: mergeBatchState(result.state),
+  });
+}
+
 export function createWorkerQueueService(
   input: WorkerConnectQueueInput,
   overrides: Partial<WorkerQueueServices> = {},
@@ -597,6 +797,20 @@ export function createWorkerQueueService(
       withConnectErrors(() => handoffWork(input, request, services)),
     completeProjectAgentTask: (request) =>
       withConnectErrors(() => completeProjectAgentTask(input, request, services)),
+    recordMergeBatchCandidateEnqueued: (request) =>
+      withConnectErrors(() =>
+        recordMergeBatchCandidateEnqueuedRpc(input, request, services)
+      ),
+    recordMergeBatchAuthority: (request) =>
+      withConnectErrors(() => recordMergeBatchAuthorityRpc(input, request, services)),
+    recordMergeBatchValidation: (request) =>
+      withConnectErrors(() => recordMergeBatchValidationRpc(input, request, services)),
+    completeMergeBatchPublication: (request) =>
+      withConnectErrors(() =>
+        completeMergeBatchPublicationRpc(input, request, services)
+      ),
+    blockMergeBatch: (request) =>
+      withConnectErrors(() => blockMergeBatchRpc(input, request, services)),
   };
 }
 
