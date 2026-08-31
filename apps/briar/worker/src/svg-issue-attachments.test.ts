@@ -85,6 +85,9 @@ describe("SVG issue attachment lifecycle", () => {
           initialAt,
         ),
     ]);
+    await db.prepare(
+      `create view briar_teams as select * from briar_projects`,
+    ).run();
     await db
       .prepare(
         `insert into briar_project_settings (

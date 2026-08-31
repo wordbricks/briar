@@ -514,7 +514,7 @@ export async function handleRunAgentRoute(
       const runId = await recordHuntEvent(db, projectId, input);
       if (input.status === "completed" && run?.worker_id) {
         const project = await db
-          .prepare(`select organization_id from briar_projects where id = ?`)
+          .prepare(`select organization_id from briar_teams where id = ?`)
           .bind(projectId)
           .first<{ organization_id: string }>();
         if (project) {

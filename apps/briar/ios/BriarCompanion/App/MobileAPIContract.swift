@@ -13,6 +13,7 @@ enum MobileAPIContract {
         static let deviceToken = "/api/auth/device/token"
         static let currentUser = "/me"
         static let projects = "/projects"
+        static let workspaces = "/workspaces"
         static let inboxReadStates = "/inbox/read-states"
         static let pushRegistration = "/inbox/push-registration"
 
@@ -22,6 +23,26 @@ enum MobileAPIContract {
 
         static func issues(projectID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/issues"
+        }
+
+        static func workspaceTeams(workspaceID: UUID) -> String {
+            "/workspaces/\(workspaceID.uuidString.lowercased())/teams"
+        }
+
+        static func teamProjects(teamID: UUID) -> String {
+            "/teams/\(teamID.uuidString.lowercased())/projects"
+        }
+
+        static func planningProject(projectID: UUID) -> String {
+            "/projects/\(projectID.uuidString.lowercased())"
+        }
+
+        static func planningProjectIssue(projectID: UUID, runID: UUID) -> String {
+            "\(planningProject(projectID: projectID))/issues/\(runID.uuidString.lowercased())"
+        }
+
+        static func issueHierarchyLocation(teamID: UUID, runID: UUID) -> String {
+            "/teams/\(teamID.uuidString.lowercased())/issues/\(runID.uuidString.lowercased())/location"
         }
 
         static func run(projectID: UUID, runID: UUID) -> String {
@@ -378,6 +399,8 @@ struct ProjectsResponse: Codable, Equatable, Sendable {
 
     struct Project: Codable, Equatable, Sendable {
         let id: UUID
+        var workspaceId: UUID? = nil
+        var teamId: UUID? = nil
         let name: String
         var issueKeyPrefix: String? = nil
         let icon: String?
@@ -388,10 +411,121 @@ struct ProjectsResponse: Codable, Equatable, Sendable {
 
         enum Role: String, Codable, Sendable {
             case owner
+            case coOwner = "co-owner"
+            case developer
+            case editor
+            case viewer
             case admin
             case member
         }
     }
+}
+
+struct WorkspacesResponse: Codable, Equatable, Sendable {
+    let workspaces: [Workspace]
+
+    struct Workspace: Codable, Equatable, Identifiable, Sendable {
+        let id: UUID
+        let name: String
+        let handle: String
+        let logo: String?
+        let role: ProjectsResponse.Project.Role
+        let createdAt: Date
+    }
+}
+
+struct WorkspaceTeamsResponse: Codable, Equatable, Sendable {
+    let workspaceId: UUID
+    let teams: [Team]
+
+    struct Team: Codable, Equatable, Identifiable, Sendable {
+        let id: UUID
+        let workspaceId: UUID
+        let workspaceName: String
+        let name: String
+        let issueKeyPrefix: String
+        let icon: String?
+        let role: ProjectsResponse.Project.Role
+        let repository: Repository?
+        let createdAt: Date
+        let updatedAt: Date
+
+        struct Repository: Codable, Equatable, Sendable {
+            let id: Double?
+            let name: String
+        }
+    }
+}
+
+enum PlanningProjectStatus: String, Codable, CaseIterable, Sendable {
+    case planned
+    case active
+    case completed
+    case cancelled
+}
+
+struct PlanningProject: Codable, Equatable, Identifiable, Sendable {
+    let id: UUID
+    let workspaceId: UUID
+    let workspaceName: String
+    let teamId: UUID
+    let teamName: String
+    let name: String
+    let description: String
+    let status: PlanningProjectStatus
+    let leadUserId: String?
+    let leadName: String?
+    let startDate: String?
+    let targetDate: String?
+    let icon: String?
+    let color: String?
+    let sortOrder: Double
+    let isDefault: Bool
+    let role: ProjectsResponse.Project.Role
+    let createdAt: Date
+    let updatedAt: Date
+}
+
+struct TeamProjectsResponse: Codable, Equatable, Sendable {
+    let workspaceId: UUID
+    let teamId: UUID
+    let projects: [PlanningProject]
+}
+
+struct PlanningProjectResponse: Codable, Equatable, Sendable {
+    let project: PlanningProject
+}
+
+struct PlanningProjectCreateRequest: Codable, Equatable, Sendable {
+    let name: String
+    let description: String?
+    let status: PlanningProjectStatus?
+}
+
+struct PlanningProjectUpdateRequest: Codable, Equatable, Sendable {
+    let name: String?
+    let description: String?
+    let status: PlanningProjectStatus?
+}
+
+struct IssueProjectMoveRequest: Codable, Equatable, Sendable {
+    let targetProjectId: UUID
+}
+
+struct IssueProjectMoveResponse: Codable, Equatable, Sendable {
+    let outcome: String
+    let issueId: UUID
+    let workspaceId: UUID
+    let teamId: UUID
+    let projectId: UUID
+}
+
+struct IssueHierarchyLocationResponse: Codable, Equatable, Sendable {
+    let runId: UUID
+    let workspaceId: UUID
+    let teamId: UUID
+    let projectId: UUID
+    let projectName: String
 }
 
 extension ProjectsResponse.Project {

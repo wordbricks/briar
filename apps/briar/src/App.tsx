@@ -62,6 +62,7 @@ import { LoginScreen } from "./components/LoginScreen";
 import { OrganizationSettings } from "./components/OrganizationSettings";
 import { OrganizationCreate } from "./components/OrganizationCreate";
 import { ProjectOnboarding } from "./components/ProjectOnboarding";
+import { PlanningProjectDialog } from "./components/PlanningProjectDialog";
 import { ProjectLobby } from "./components/ProjectLobby";
 import { ProjectAgents } from "./components/ProjectAgents";
 import { ProjectIcon } from "./components/ProjectIcon";
@@ -196,6 +197,7 @@ import {
   loadProjectUsageSummary,
   runProjectAgentTaskOnWorker,
   retryHuntRun,
+  resolveIssueHierarchyLocation,
 } from "./lib/api";
 import type {
   ChannelSummary,
@@ -1344,6 +1346,15 @@ export function App({
   const [createIssueProjectId, setCreateIssueProjectId] = useState<string | null>(
     null,
   );
+  const [planningProjectTeamId, setPlanningProjectTeamId] = useState<
+    string | null
+  >(null);
+  const [planningProjectEditId, setPlanningProjectEditId] = useState<
+    string | null
+  >(null);
+  const [activePlanningProjectId, setActivePlanningProjectId] = useState<
+    string | null
+  >(null);
   const [quickStartingRunId, setQuickStartingRunId] = useState<string | null>(
     null,
   );
@@ -1450,22 +1461,42 @@ export function App({
     if (pendingBriarLink.kind === "issue") {
       const target = pendingBriarLink;
       setPendingBriarLink(null);
-      void navigateToIssueLink({
-        target,
-        activeProjectId: briar.activeProjectId,
-        availableProjectIds: briar.projects.map((project) => project.id),
-        lockedProjectId: projectWindowProjectId,
-        ensureProjectSelected: briar.ensureProjectSelected,
-        openIssue: ({ projectId, runId }) => {
-          setRequestedSessionId(null);
-          setRequestedRunMessageId(null);
-          setRequestedRunInitialTab(null);
-          setRequestedRunId(runId);
-          setCompanionPage("issues");
-          setCompanionStatus("all");
-          navigateToIssue(runId, projectId);
-        },
-      }).then((outcome) => {
+      void (async () => {
+        let resolvedTarget = target;
+        if (briar.token) {
+          try {
+            const location = await resolveIssueHierarchyLocation(
+              briar.token,
+              target.projectId,
+              target.runId,
+            );
+            resolvedTarget = {
+              ...target,
+              projectId: location.teamId,
+              runId: location.runId,
+            };
+            setActivePlanningProjectId(location.projectId);
+          } catch {
+            // Compatibility with servers that predate hierarchy resolution.
+          }
+        }
+        return navigateToIssueLink({
+          target: resolvedTarget,
+          activeProjectId: briar.activeProjectId,
+          availableProjectIds: briar.projects.map((project) => project.id),
+          lockedProjectId: projectWindowProjectId,
+          ensureProjectSelected: briar.ensureProjectSelected,
+          openIssue: ({ projectId, runId }) => {
+            setRequestedSessionId(null);
+            setRequestedRunMessageId(null);
+            setRequestedRunInitialTab(null);
+            setRequestedRunId(runId);
+            setCompanionPage("issues");
+            setCompanionStatus("all");
+            navigateToIssue(runId, projectId);
+          },
+        });
+      })().then((outcome) => {
         if (outcome.status !== "rejected") return;
         toast(
           t(
@@ -3768,6 +3799,22 @@ export function App({
             connectedProjectIds={briar.connectedProjectIds}
             isOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
+            onAddPlanningProject={(teamId) => {
+              setPlanningProjectEditId(null);
+              setPlanningProjectTeamId(teamId);
+            }}
+            onPlanningProjectEdit={(projectId) => {
+              setPlanningProjectTeamId(null);
+              setPlanningProjectEditId(projectId);
+            }}
+            onPlanningProjectOpen={(planningProjectId, teamId) => {
+              setActivePlanningProjectId(planningProjectId);
+              navigationActiveProjectIdRef.current = teamId;
+              briar.setActiveProjectId(teamId);
+              setRequestedRunId(null);
+              setIssueListRequestKey((key) => key + 1);
+              navigateToPage("issues");
+            }}
             onAgentSessionOpen={(sessionId) => {
               setRequestedRunId(null);
               setRequestedSessionId(sessionId);
@@ -3810,6 +3857,7 @@ export function App({
                 : undefined
             }
             onIssuesOpen={() => {
+              setActivePlanningProjectId(null);
               setRequestedRunId(null);
               setIssueListRequestKey((key) => key + 1);
               navigateToPage("issues");
@@ -3831,6 +3879,7 @@ export function App({
               navigateToPage("lobby", project?.id ?? null);
             }}
             onProjectChange={(projectId) => {
+              setActivePlanningProjectId(null);
               navigationActiveProjectIdRef.current = projectId;
               briar.setActiveProjectId(projectId);
               setRequestedRunId(null);
@@ -3855,6 +3904,7 @@ export function App({
             onLogout={() => void briar.logout()}
             organizations={briar.organizations}
             projects={visibleProjects}
+            planningProjects={briar.planningProjects}
             projectReadiness={briar.projectReadiness}
             projectReadinessError={briar.projectReadinessError}
             projectWindowProjectId={projectWindowProjectId}
@@ -4373,6 +4423,7 @@ export function App({
                 );
               }
             }}
+            onMoveIssueProject={briar.moveIssueProject}
             onAddIssueDependency={briar.addIssueDependency}
             onAcceptIssueAction={briar.acceptConversationIssueAction}
             onAcceptIssueExecution={briar.acceptConversationIssueExecution}
@@ -4408,6 +4459,8 @@ export function App({
             onDeleteIssueMessage={briar.removeIssueMessage}
             processingIssueIds={processingIssueIds}
             projects={activeOrganizationProjects}
+            issueProjects={briar.planningProjects}
+            activeIssueProjectId={activePlanningProjectId}
             sessions={autoHunt.sessions}
             token={briar.token}
           />
@@ -4726,6 +4779,7 @@ export function App({
             onViewingIssueConversationChange={setViewingIssueConversationRunId}
             onDeleteIssue={briar.deleteIssue}
             onTransferIssue={briar.transferIssue}
+            onMoveIssueProject={briar.moveIssueProject}
             onAddIssueDependency={briar.addIssueDependency}
             onAcceptIssueAction={briar.acceptConversationIssueAction}
             onAcceptIssueExecution={briar.acceptConversationIssueExecution}
@@ -4761,6 +4815,8 @@ export function App({
             onDeleteIssueMessage={briar.removeIssueMessage}
             processingIssueIds={processingIssueIds}
             projects={activeOrganizationProjects}
+            issueProjects={briar.planningProjects}
+            activeIssueProjectId={activePlanningProjectId}
             sessions={autoHunt.sessions}
             token={briar.token}
           />
@@ -4787,6 +4843,35 @@ export function App({
   return (
     <>
       {content}
+      <PlanningProjectDialog
+        onCreate={(input) => {
+          if (!planningProjectTeamId) {
+            return Promise.reject(new Error("프로젝트를 추가할 팀이 없습니다."));
+          }
+          return briar.addPlanningProject(planningProjectTeamId, input);
+        }}
+        onUpdate={briar.editPlanningProject}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPlanningProjectTeamId(null);
+            setPlanningProjectEditId(null);
+          }
+        }}
+        open={planningProjectTeamId !== null || planningProjectEditId !== null}
+        project={
+          briar.planningProjects.find(
+            (project) => project.id === planningProjectEditId,
+          ) ?? null
+        }
+        teamName={
+          briar.projects.find((team) => team.id === (
+            planningProjectTeamId ?? briar.planningProjects.find(
+              (project) => project.id === planningProjectEditId,
+            )?.teamId
+          ))
+            ?.name ?? ""
+        }
+      />
       {commandPaletteAvailable && isCommandPaletteOpen ? (
         <CommandPalette
           contextLabel={commandPaletteContextLabel}

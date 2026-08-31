@@ -197,7 +197,7 @@ describe("conversational issue execution approval", () => {
     ]) {
       await db.batch([
         db.prepare(
-          `insert into briar_projects (
+          `insert into briar_teams (
              id, owner_user_id, organization_id, name, agent_token_hash,
              created_at, updated_at
            ) values (?, ?, ?, ?, ?, ?, ?)`,
@@ -1692,7 +1692,7 @@ describe("conversational issue execution approval", () => {
       }
       await db.batch([
         db.prepare(
-          `insert into briar_projects (
+          `insert into briar_teams (
              id, owner_user_id, organization_id, name, agent_token_hash,
              created_at, updated_at
            ) values (?, ?, ?, ?, ?, ?, ?)`,
@@ -1789,7 +1789,7 @@ describe("conversational issue execution approval", () => {
     ).bind(projectCascade.proposalId).run()).rejects.toThrow(
       "reserved execution proposal cannot be deleted",
     );
-    await expect(db.prepare(`delete from briar_projects where id = ?`)
+    await expect(db.prepare(`delete from briar_teams where id = ?`)
       .bind(projectCascade.cascadeProjectId).run()).resolves.toBeDefined();
     await expect(db.prepare(
       `select count(*) as count from briar_issue_execution_proposals

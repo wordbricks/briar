@@ -344,6 +344,134 @@
         }
       }
     },
+    "/workspaces": {
+      "get": {
+        "operationId": "listWorkspaces",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Workspaces visible to the authenticated user",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkspacesResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/teams": {
+      "get": {
+        "operationId": "listWorkspaceTeams",
+        "parameters": [{
+          "name": "workspaceId", "in": "path", "required": true,
+          "schema": { "type": "string", "format": "uuid" }
+        }],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Repository-backed Teams in a Workspace",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkspaceTeamsResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/teams/{teamId}/projects": {
+      "get": {
+        "operationId": "listTeamProjects",
+        "parameters": [{
+          "name": "teamId", "in": "path", "required": true,
+          "schema": { "type": "string", "format": "uuid" }
+        }],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Planning Projects in a Team",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TeamProjectsResponse" } } }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createPlanningProject",
+        "parameters": [{
+          "name": "teamId", "in": "path", "required": true,
+          "schema": { "type": "string", "format": "uuid" }
+        }],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlanningProjectCreateRequest" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Created planning Project",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlanningProjectResponse" } } }
+          }
+        }
+      }
+    },
+    "/projects/{planningProjectId}": {
+      "patch": {
+        "operationId": "updatePlanningProject",
+        "parameters": [{
+          "name": "planningProjectId", "in": "path", "required": true,
+          "schema": { "type": "string", "format": "uuid" }
+        }],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlanningProjectUpdateRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated planning Project",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlanningProjectResponse" } } }
+          }
+        }
+      }
+    },
+    "/projects/{planningProjectId}/issues/{runId}": {
+      "patch": {
+        "operationId": "moveIssueProject",
+        "parameters": [
+          {
+            "name": "planningProjectId", "in": "path", "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/RunId" }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IssueProjectMoveRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Issue moved within its Team without changing its key",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IssueProjectMoveResponse" } } }
+          },
+          "409": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/teams/{teamId}/issues/{runId}/location": {
+      "get": {
+        "operationId": "resolveIssueHierarchyLocation",
+        "parameters": [
+          {
+            "name": "teamId", "in": "path", "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/RunId" }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Canonical location for current and aliased Issue links",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IssueHierarchyLocationResponse" } } }
+          },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
     "/projects/{projectId}/dashboard": {
       "get": {
         "operationId": "getDashboardSnapshot",
@@ -2143,6 +2271,10 @@
           },
           "projectId": { "type": "string", "format": "uuid" },
           "projectName": { "type": "string" },
+          "workspaceId": { "type": "string", "format": "uuid" },
+          "teamId": { "type": "string", "format": "uuid" },
+          "planningProjectId": { "type": ["string", "null"], "format": "uuid" },
+          "planningProjectName": { "type": ["string", "null"] },
           "targetId": { "type": "string" },
           "title": { "type": "string" },
           "occurredAt": { "type": "string", "format": "date-time" },
@@ -2486,6 +2618,16 @@
             "type": "string",
             "format": "uuid"
           },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Workspace identity; organizationId remains a compatibility alias"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Repository and execution boundary identity"
+          },
           "name": {
             "type": "string"
           },
@@ -2540,6 +2682,149 @@
           }
         },
         "additionalProperties": true
+      },
+      "Workspace": {
+        "type": "object",
+        "required": ["id", "name", "handle", "logo", "role", "createdAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "handle": { "type": "string" },
+          "logo": { "type": ["string", "null"] },
+          "role": { "type": "string", "enum": ["owner", "co-owner", "developer", "editor", "viewer"] },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": true
+      },
+      "WorkspacesResponse": {
+        "type": "object",
+        "required": ["workspaces"],
+        "properties": {
+          "workspaces": { "type": "array", "items": { "$ref": "#/components/schemas/Workspace" } }
+        }
+      },
+      "Team": {
+        "type": "object",
+        "required": ["id", "workspaceId", "workspaceName", "name", "issueKeyPrefix", "role", "repository", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "workspaceId": { "type": "string", "format": "uuid" },
+          "workspaceName": { "type": "string" },
+          "name": { "type": "string" },
+          "issueKeyPrefix": { "type": "string" },
+          "icon": { "type": ["string", "null"] },
+          "role": { "type": "string", "enum": ["owner", "co-owner", "developer", "editor", "viewer"] },
+          "repository": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                  "id": { "type": ["number", "null"] },
+                  "name": { "type": "string" }
+                }
+              }
+            ]
+          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": true
+      },
+      "WorkspaceTeamsResponse": {
+        "type": "object",
+        "required": ["workspaceId", "teams"],
+        "properties": {
+          "workspaceId": { "type": "string", "format": "uuid" },
+          "teams": { "type": "array", "items": { "$ref": "#/components/schemas/Team" } }
+        }
+      },
+      "PlanningProject": {
+        "type": "object",
+        "required": ["id", "workspaceId", "workspaceName", "teamId", "teamName", "name", "description", "status", "leadUserId", "leadName", "startDate", "targetDate", "icon", "color", "sortOrder", "isDefault", "role", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "workspaceId": { "type": "string", "format": "uuid" },
+          "workspaceName": { "type": "string" },
+          "teamId": { "type": "string", "format": "uuid" },
+          "teamName": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "status": { "type": "string", "enum": ["planned", "active", "completed", "cancelled"] },
+          "leadUserId": { "type": ["string", "null"] },
+          "leadName": { "type": ["string", "null"] },
+          "startDate": { "type": ["string", "null"], "format": "date" },
+          "targetDate": { "type": ["string", "null"], "format": "date" },
+          "icon": { "type": ["string", "null"] },
+          "color": { "type": ["string", "null"] },
+          "sortOrder": { "type": "number" },
+          "isDefault": { "type": "boolean" },
+          "role": { "type": "string", "enum": ["owner", "co-owner", "developer", "editor", "viewer"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "TeamProjectsResponse": {
+        "type": "object",
+        "required": ["workspaceId", "teamId", "projects"],
+        "properties": {
+          "workspaceId": { "type": "string", "format": "uuid" },
+          "teamId": { "type": "string", "format": "uuid" },
+          "projects": { "type": "array", "items": { "$ref": "#/components/schemas/PlanningProject" } }
+        }
+      },
+      "PlanningProjectResponse": {
+        "type": "object",
+        "required": ["project"],
+        "properties": { "project": { "$ref": "#/components/schemas/PlanningProject" } }
+      },
+      "PlanningProjectCreateRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "status": { "type": "string", "enum": ["planned", "active", "completed", "cancelled"] }
+        },
+        "additionalProperties": false
+      },
+      "PlanningProjectUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "status": { "type": "string", "enum": ["planned", "active", "completed", "cancelled"] }
+        },
+        "additionalProperties": false
+      },
+      "IssueProjectMoveRequest": {
+        "type": "object",
+        "required": ["targetProjectId"],
+        "properties": { "targetProjectId": { "type": "string", "format": "uuid" } },
+        "additionalProperties": false
+      },
+      "IssueProjectMoveResponse": {
+        "type": "object",
+        "required": ["outcome", "issueId", "workspaceId", "teamId", "projectId"],
+        "properties": {
+          "outcome": { "type": "string", "enum": ["moved", "same_project"] },
+          "issueId": { "type": "string", "format": "uuid" },
+          "workspaceId": { "type": "string", "format": "uuid" },
+          "teamId": { "type": "string", "format": "uuid" },
+          "projectId": { "type": "string", "format": "uuid" }
+        }
+      },
+      "IssueHierarchyLocationResponse": {
+        "type": "object",
+        "required": ["runId", "workspaceId", "teamId", "projectId", "projectName"],
+        "properties": {
+          "runId": { "type": "string", "format": "uuid" },
+          "workspaceId": { "type": "string", "format": "uuid" },
+          "teamId": { "type": "string", "format": "uuid" },
+          "projectId": { "type": "string", "format": "uuid" },
+          "projectName": { "type": "string" }
+        }
       },
       "IssueAttachment": {
         "type": "object",
@@ -2696,6 +2981,10 @@
             "type": "string",
             "format": "uuid"
           },
+          "workspaceId": { "type": "string", "format": "uuid" },
+          "teamId": { "type": "string", "format": "uuid" },
+          "projectId": { "type": "string", "format": "uuid" },
+          "projectName": { "type": ["string", "null"] },
           "runNumber": {
             "type": "integer",
             "minimum": 1

@@ -128,7 +128,7 @@ async function requireProjectGithubAccess(input: {
     throw new HttpError(401, "Unauthorized");
   }
   const project = await input.db
-    .prepare(`select id, organization_id from briar_projects where id = ?`)
+    .prepare(`select id, organization_id from briar_teams where id = ?`)
     .bind(input.projectId)
     .first<{ id: string; organization_id: string }>();
   if (!project) throw new HttpError(404, "Project not found");

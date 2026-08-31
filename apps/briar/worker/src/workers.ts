@@ -999,7 +999,7 @@ export async function getProjectDesignatedWorker(
     `select worker.id, worker.device_id, worker.label
      from briar_execution_workers worker
      join briar_execution_worker_devices device on device.id = worker.device_id
-     join briar_projects project on project.id = worker.project_id
+     join briar_teams project on project.id = worker.project_id
      where worker.id = ? and worker.project_id = ?
        and device.organization_id = ?
        and project.organization_id = device.organization_id`,
@@ -1122,7 +1122,7 @@ export async function registerExecutionWorker(
     );
   }
   const project = await db
-    .prepare(`select organization_id from briar_projects where id = ?`)
+    .prepare(`select organization_id from briar_teams where id = ?`)
     .bind(projectId)
     .first<{ organization_id: string }>();
   if (!project || project.organization_id !== input.organizationId) {
@@ -1280,7 +1280,7 @@ export async function bindExecutionWorkerProject(
     );
   }
   const project = await db
-    .prepare(`select organization_id from briar_projects where id = ?`)
+    .prepare(`select organization_id from briar_teams where id = ?`)
     .bind(projectId)
     .first<{ organization_id: string }>();
   if (!project || project.organization_id !== device.organization_id) {
@@ -1453,7 +1453,7 @@ export async function executionWorkerBindingForProject(
       `select worker.*, device.max_concurrent_sessions,
               device.icon_type, device.icon_value
        from briar_execution_workers worker
-       join briar_projects project on project.id = worker.project_id
+       join briar_teams project on project.id = worker.project_id
        join briar_execution_worker_devices device on device.id = worker.device_id
        where worker.project_id = ? and worker.device_id = ?
          and project.organization_id = device.organization_id`,
@@ -2083,7 +2083,7 @@ export async function listOrganizationExecutionWorkers(
        join "user" owner on owner.id = device.owner_user_id
        left join briar_execution_workers worker
          on worker.device_id = device.id
-       left join briar_projects project on project.id = worker.project_id
+       left join briar_teams project on project.id = worker.project_id
        where device.organization_id = ?
        order by device.last_heartbeat_at desc, device.id, project.created_at`,
     )
@@ -2212,7 +2212,7 @@ export async function listOrganizationExecutionProviders(
        join "user" owner on owner.id = device.owner_user_id
        left join briar_execution_workers worker
          on worker.device_id = device.id
-       left join briar_projects project on project.id = worker.project_id
+       left join briar_teams project on project.id = worker.project_id
        where device.organization_id = ?
        order by device.last_heartbeat_at desc, device.id, project.created_at`,
     )
@@ -3345,7 +3345,7 @@ export async function reapStalledHuntRuns(
               run.resume_requested_at,
               project.organization_id
        from briar_hunt_runs run
-       join briar_projects project on project.id = run.project_id
+       join briar_teams project on project.id = run.project_id
        where run.project_id = ?
          and status not in (
            'backlog', 'queued', 'completed', 'cancelled', 'blocked', 'failed'

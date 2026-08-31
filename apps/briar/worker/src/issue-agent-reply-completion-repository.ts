@@ -189,7 +189,7 @@ export async function completeIssueAgentReplyOutput(
            or exists (
              select 1
              from briar_hunt_runs run
-             join briar_projects project on project.id = run.project_id
+             join briar_teams project on project.id = run.project_id
              join briar_project_agents agent
                on agent.id = coalesce(job.agent_id, run.agent_id)
               and agent.project_id = run.project_id
@@ -392,7 +392,7 @@ export async function completeIssueAgentReplyOutput(
        from briar_issue_agent_reply_jobs job
        join briar_hunt_runs run
          on run.id = job.run_id and run.project_id = job.project_id
-       join briar_projects project on project.id = job.project_id
+       join briar_teams project on project.id = job.project_id
        where ${completedClaim("job")}`,
     ).bind(
       executionProposalId,
@@ -430,7 +430,7 @@ export async function completeIssueAgentReplyOutput(
        from briar_issue_agent_reply_jobs job
        join briar_hunt_runs run
          on run.id = job.run_id and run.project_id = job.project_id
-       join briar_projects project on project.id = job.project_id
+       join briar_teams project on project.id = job.project_id
        join briar_project_agents agent
          on agent.id = coalesce(job.agent_id, run.agent_id)
         and agent.project_id = run.project_id

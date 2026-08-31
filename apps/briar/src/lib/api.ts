@@ -36,6 +36,10 @@ import {
   decodeProjectsResponse,
   decodeProjectUsageSummaryResponse,
 } from "./api/project-contract";
+import {
+  decodePlanningProjectResponse,
+  decodePlanningProjectsResponse,
+} from "./api/hierarchy-contract";
 import type { StructuredAgentResult } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import {
@@ -108,6 +112,8 @@ import type {
   IssueResultReview,
   ClaimedProjectAgentScheduleRun,
   Project,
+  PlanningProject,
+  PlanningProjectStatus,
   ProjectAgent,
   ProjectAgentSchedule,
   ProjectAgentScheduleRun,
@@ -327,6 +333,95 @@ export async function deleteInboxReadState(
 export async function loadProjects(token: string): Promise<Project[]> {
   const result = await request<{ projects: unknown[] }>("/projects", token);
   return decodeProjectsResponse(result.projects);
+}
+
+export async function loadTeamProjects(
+  token: string,
+  teamId: string,
+): Promise<PlanningProject[]> {
+  const result = await request<{ projects: unknown[] }>(
+    `/teams/${teamId}/projects`,
+    token,
+  );
+  return decodePlanningProjectsResponse(result.projects);
+}
+
+export async function createPlanningProject(
+  token: string,
+  teamId: string,
+  input: {
+    name: string;
+    description?: string;
+    status?: PlanningProjectStatus;
+    leadUserId?: string | null;
+    startDate?: string | null;
+    targetDate?: string | null;
+    icon?: string | null;
+    color?: string | null;
+    sortOrder?: number;
+  },
+): Promise<PlanningProject> {
+  const result = await request<{ project: unknown }>(
+    `/teams/${teamId}/projects`,
+    token,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  return decodePlanningProjectResponse(result.project);
+}
+
+export async function updatePlanningProject(
+  token: string,
+  projectId: string,
+  input: Partial<{
+    name: string;
+    description: string;
+    status: PlanningProjectStatus;
+    leadUserId: string | null;
+    startDate: string | null;
+    targetDate: string | null;
+    icon: string | null;
+    color: string | null;
+    sortOrder: number;
+  }>,
+): Promise<PlanningProject> {
+  const result = await request<{ project: unknown }>(
+    `/projects/${projectId}`,
+    token,
+    { method: "PATCH", body: JSON.stringify(input) },
+  );
+  return decodePlanningProjectResponse(result.project);
+}
+
+export async function moveIssueToPlanningProject(
+  token: string,
+  sourceProjectId: string,
+  runId: string,
+  targetProjectId: string,
+) {
+  return request<{
+    outcome: "moved" | "same_project";
+    issueId: string;
+    workspaceId: string;
+    teamId: string;
+    projectId: string;
+  }>(`/projects/${sourceProjectId}/issues/${runId}`, token, {
+    method: "PATCH",
+    body: JSON.stringify({ targetProjectId }),
+  });
+}
+
+export async function resolveIssueHierarchyLocation(
+  token: string,
+  sourceTeamId: string,
+  runId: string,
+) {
+  return request<{
+    runId: string;
+    workspaceId: string;
+    teamId: string;
+    projectId: string;
+    projectName: string;
+  }>(`/teams/${sourceTeamId}/issues/${runId}/location`, token);
 }
 
 export async function loadOrganizations(

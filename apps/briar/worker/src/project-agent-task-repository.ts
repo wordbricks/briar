@@ -471,7 +471,7 @@ export async function completeProjectAgentTaskWithReceipt(
                   else 'queued' end end,
               ?, ?, ?, ?, ?
        from briar_project_agent_task_jobs task
-       join briar_projects project on project.id = task.project_id
+       join briar_teams project on project.id = task.project_id
        where task.id = ? and task.project_id = ? and task.status = 'running'
          and task.claimed_worker_id = ? and task.claim_token_hash = ?
        on conflict (project_id, task_id, worker_id, claim_token_hash)

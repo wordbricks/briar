@@ -12,7 +12,7 @@ import { issueTitleInputMaxLength, issueTitleLength, isIssueTitleWithinLimit } f
 import { clearCreateIssueDraft, loadCreateIssueDraft, saveCreateIssueDraft } from "@/lib/create-issue-draft";
 import { removeIssueAttachmentMarkdown } from "@/lib/issue-markdown";
 import { type IssueDifficulty } from "@/lib/issue-difficulty";
-import type { CreateIssueInput, OrganizationMember, Project } from "@/types";
+import type { CreateIssueInput, OrganizationMember } from "@/types";
 import { agentEffortOptions, agentProviders, type AgentProvider, type ModelEffort } from "@/lib/project-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
 import { useAgentProviderModelPreferences } from "@/hooks/useAgentProviderModelPreferences";
@@ -33,7 +33,8 @@ export function CreateIssueDialog({
   members = [],
   projects,
   workflow,
-  workflowProjectId
+  workflowProjectId,
+  workflowTeamId,
 }: {
   availableProviders?: readonly AgentProvider[];
   compactHeader?: boolean;
@@ -45,9 +46,10 @@ export function CreateIssueDialog({
   onClose: () => void;
   onCreate: (projectId: string, input: CreateIssueInput) => Promise<void>;
   members?: OrganizationMember[];
-  projects: Project[];
+  projects: Array<{ id: string; name: string; teamId?: string }>;
   workflow?: AutoHuntWorkflow;
   workflowProjectId?: string;
+  workflowTeamId?: string;
 }) {
   const {
     locale,
@@ -78,7 +80,11 @@ export function CreateIssueDialog({
   const [preferredEffort, setPreferredEffort] = useState(initialDraft?.preferredEffort ?? "high");
   const [fullAuto, setFullAuto] = useState(initialDraft?.fullAuto ?? false);
   const [projectId, setProjectId] = useState(() => projects.some(project => project.id === initialDraft?.projectId) ? initialDraft!.projectId : projects.some(project => project.id === defaultProjectId) ? defaultProjectId! : projects[0]?.id ?? "");
-  const [checkpoints, setCheckpoints] = useState<AutoHuntWorkflowCheckpoint[]>(initialDraft && initialDraft.projectId === workflowProjectId ? initialDraft.checkpoints ?? [] : []);
+  const selectedProject = projects.find(project => project.id === projectId);
+  const selectedProjectUsesWorkflow = workflowTeamId
+    ? selectedProject?.teamId === workflowTeamId
+    : projectId === workflowProjectId;
+  const [checkpoints, setCheckpoints] = useState<AutoHuntWorkflowCheckpoint[]>(initialDraft && (projects.find(project => project.id === initialDraft.projectId)?.teamId === workflowTeamId || initialDraft.projectId === workflowProjectId) ? initialDraft.checkpoints ?? [] : []);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const {
     addAttachments,
@@ -179,7 +185,8 @@ export function CreateIssueDialog({
                 {!compactHeader && <span aria-hidden="true">/</span>}
                 <SelectMenu className="issue-project-context" disabled={isSubmitting} label={t("issue.project")} onValueChange={nextProjectId => {
               setProjectId(nextProjectId);
-              if (nextProjectId !== workflowProjectId) {
+              const nextProject = projects.find(project => project.id === nextProjectId);
+              if (workflowTeamId ? nextProject?.teamId !== workflowTeamId : nextProjectId !== workflowProjectId) {
                 setCheckpoints([]);
               }
             }} options={projects.map(project => ({
@@ -243,7 +250,7 @@ export function CreateIssueDialog({
                 {t("issue.fullAutoDescription")}
               </small>
             </label>
-            {workflow && projectId === workflowProjectId ? <IssueCheckpointDropdown checkpoints={checkpoints} disabled={isSubmitting || fullAuto} onChange={setCheckpoints} workflow={fullAuto ? {
+            {workflow && selectedProjectUsesWorkflow ? <IssueCheckpointDropdown checkpoints={checkpoints} disabled={isSubmitting || fullAuto} onChange={setCheckpoints} workflow={fullAuto ? {
             ...workflow,
             execution: {
               checkpoints: []

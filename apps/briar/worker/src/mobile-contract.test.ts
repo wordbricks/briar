@@ -46,7 +46,10 @@ const openapi = JSON.parse(readFileSync(
   "utf8",
 )) as {
   openapi: string;
-  paths: Record<string, Record<string, { operationId: string }>>;
+  paths: Record<string, Record<string, {
+    operationId: string;
+    responses: Record<string, unknown>;
+  }>>;
   components: {
     schemas: {
       ChannelIssueProposalPayload: {
@@ -79,7 +82,10 @@ describe("Companion mobile API contract", () => {
         operation.method.toLowerCase()
       ];
       expect(documentedOperation?.operationId).toBe(operationId);
-      expect(operation.status).toBe(200);
+      expect(operation.status).toBeGreaterThanOrEqual(200);
+      expect(operation.status).toBeLessThan(300);
+      expect(documentedOperation?.responses[String(operation.status)])
+        .toBeDefined();
     }
   });
 

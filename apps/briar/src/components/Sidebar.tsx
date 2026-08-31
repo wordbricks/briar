@@ -35,6 +35,7 @@ import type {
 } from "../lib/channels-contract";
 import type {
   Organization,
+  PlanningProject,
   Project,
   ProjectAgent,
   SessionUser,
@@ -75,6 +76,9 @@ export function Sidebar({
   connectedProjectIds,
   isOpen,
   onAddProject,
+  onAddPlanningProject,
+  onPlanningProjectEdit,
+  onPlanningProjectOpen,
   onAgentSessionOpen,
   onAgentsOpen,
   onLobbyOpen,
@@ -98,6 +102,7 @@ export function Sidebar({
   onLogout,
   organizations,
   projects,
+  planningProjects = [],
   projectReadiness,
   projectReadinessError,
   projectWindowProjectId = null,
@@ -117,6 +122,9 @@ export function Sidebar({
   connectedProjectIds: string[] | null;
   isOpen: boolean;
   onAddProject: () => void;
+  onAddPlanningProject?: (teamId: string) => void;
+  onPlanningProjectEdit?: (projectId: string) => void;
+  onPlanningProjectOpen?: (projectId: string, teamId: string) => void;
   onAgentSessionOpen: (sessionId: string) => void;
   onAgentsOpen: () => void;
   onLobbyOpen: () => void;
@@ -144,6 +152,7 @@ export function Sidebar({
   onLogout: () => void;
   organizations: Organization[];
   projects: Project[];
+  planningProjects?: PlanningProject[];
   projectReadiness: Record<string, RepositoryReadiness>;
   projectReadinessError: Record<string, string>;
   projectWindowProjectId?: string | null;
@@ -157,7 +166,7 @@ export function Sidebar({
   const { toast } = useToast();
   const [isOrganizationMenuOpen, setIsOrganizationMenuOpen] = useState(false);
   const organizationMenuRef = useRef<HTMLDivElement | null>(null);
-  // Projects start expanded; only explicitly collapsed IDs are stored.
+  // Teams start expanded; only explicitly collapsed IDs are stored.
   const [collapsedProjectIds, setCollapsedProjectIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -606,7 +615,12 @@ export function Sidebar({
                 <button
                   aria-label={t("dashboard.createIssue")}
                   className="sidebar-issue-add"
-                  onClick={() => onCreateIssue(projectWindowProject.id)}
+                  onClick={() => onCreateIssue(
+                    planningProjects.find(
+                      candidate => candidate.teamId === projectWindowProject.id &&
+                        candidate.isDefault,
+                    )?.id ?? projectWindowProject.id,
+                  )}
                   title={t("dashboard.createIssue")}
                   type="button"
                 >
@@ -707,7 +721,7 @@ export function Sidebar({
       ) : (
       <div className="sidebar-projects">
         <div className="sidebar-section-heading">
-          <span>{t("sidebar.projects")}</span>
+          <span>{t("sidebar.teams")}</span>
           <button
             aria-label={t("sidebar.addProject")}
             onClick={onAddProject}
@@ -876,6 +890,82 @@ export function Sidebar({
                     className="sidebar-project-views"
                     id={`project-views-${project.id}`}
                   >
+                    <div className="sidebar-planning-projects">
+                      <div className="sidebar-planning-projects-heading">
+                        <span>{t("sidebar.projects")}</span>
+                        {onAddPlanningProject ? (
+                          <button
+                            aria-label={t("sidebar.addPlanningProject", {
+                              name: project.name,
+                            })}
+                            onClick={() => onAddPlanningProject(project.id)}
+                            title={t("sidebar.addPlanningProject", {
+                              name: project.name,
+                            })}
+                            type="button"
+                          >
+                            <Plus size={13} strokeWidth={1.8} />
+                          </button>
+                        ) : null}
+                      </div>
+                      {planningProjects
+                        .filter(candidate => candidate.teamId === project.id)
+                        .map(planningProject => (
+                          <div
+                            className="sidebar-planning-project-row"
+                            data-project-status={planningProject.status}
+                            key={planningProject.id}
+                          >
+                            <button
+                              onClick={() => openProjectPage(() => {
+                                if (onPlanningProjectOpen) {
+                                  onPlanningProjectOpen(
+                                    planningProject.id,
+                                    planningProject.teamId,
+                                  );
+                                } else {
+                                  onIssuesOpen();
+                                }
+                              })}
+                              title={planningProject.description || planningProject.name}
+                              type="button"
+                            >
+                              <ListTodo size={13} strokeWidth={1.7} />
+                              <span>{planningProject.name}</span>
+                            </button>
+                            {onPlanningProjectEdit ? (
+                              <button
+                                aria-label={t("sidebar.editPlanningProject", {
+                                  name: planningProject.name,
+                                })}
+                                onClick={() => onPlanningProjectEdit(
+                                  planningProject.id,
+                                )}
+                                title={t("sidebar.editPlanningProject", {
+                                  name: planningProject.name,
+                                })}
+                                type="button"
+                              >
+                                <Settings size={12} strokeWidth={1.7} />
+                              </button>
+                            ) : null}
+                            <button
+                              aria-label={t("sidebar.createIssueInProject", {
+                                name: planningProject.name,
+                              })}
+                              onClick={() => openProjectPage(
+                                () => onCreateIssue(planningProject.id),
+                              )}
+                              title={t("sidebar.createIssueInProject", {
+                                name: planningProject.name,
+                              })}
+                              type="button"
+                            >
+                              <Plus size={13} strokeWidth={1.8} />
+                            </button>
+                          </div>
+                        ))}
+                    </div>
                     <div className="sidebar-project-view-row">
                       <a
                         aria-current={
@@ -897,7 +987,12 @@ export function Sidebar({
                         aria-label={t("dashboard.createIssue")}
                         className="sidebar-issue-add"
                         onClick={() =>
-                          openProjectPage(() => onCreateIssue(project.id))
+                          openProjectPage(() => onCreateIssue(
+                            planningProjects.find(
+                              candidate => candidate.teamId === project.id &&
+                                candidate.isDefault,
+                            )?.id ?? project.id,
+                          ))
                         }
                         title={t("dashboard.createIssue")}
                         type="button"

@@ -24,7 +24,7 @@ import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
 import { type IssueDetailTab } from "@/lib/issue-detail-tab";
 import { readKanbanColumnIds, toggleKanbanColumnId, writeKanbanColumnIds } from "@/lib/kanban-column-storage";
 import { formatIssueKey } from "@/lib/issue-key";
-import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, CreateIssueInput, DashboardPayload, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, Project, ProjectAgent, RelatedMessageReference, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
+import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, CreateIssueInput, DashboardPayload, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, PlanningProject, Project, ProjectAgent, RelatedMessageReference, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
 import { sortAgentProviders, type AgentProvider } from "@/lib/project-llm";
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
@@ -99,6 +99,7 @@ function HuntDashboardContent({
   conversationInboxSyncSignal,
   currentUserId = null,
   createIssueDefaultProjectId,
+  activeIssueProjectId = null,
   dashboard,
   error,
   isCreatingIssue,
@@ -112,9 +113,11 @@ function HuntDashboardContent({
   onAddProject,
   onCreateIssue,
   projects = [],
+  issueProjects = [],
   onIssueDialogOpenChange,
   onDeleteIssue,
   onTransferIssue,
+  onMoveIssueProject,
   onAddIssueDependency,
   onAcceptIssueAction,
   onAcceptIssueExecution,
@@ -168,6 +171,7 @@ function HuntDashboardContent({
   conversationInboxSyncSignal?: string;
   currentUserId?: string | null;
   createIssueDefaultProjectId?: string | null;
+  activeIssueProjectId?: string | null;
   dashboard: DashboardPayload | null;
   error: string | null;
   isCreatingIssue: boolean;
@@ -181,9 +185,15 @@ function HuntDashboardContent({
   onAddProject?: () => void;
   onCreateIssue: (projectId: string, input: CreateIssueInput) => Promise<unknown>;
   projects?: Project[];
+  issueProjects?: PlanningProject[];
   onIssueDialogOpenChange?: (isOpen: boolean) => void;
   onDeleteIssue: (runId: string) => Promise<unknown>;
   onTransferIssue?: (runId: string, targetProjectId: string) => Promise<unknown>;
+  onMoveIssueProject?: (
+    runId: string,
+    sourceProjectId: string,
+    targetProjectId: string,
+  ) => Promise<unknown>;
   onAddIssueDependency?: (dependentRunId: string, prerequisiteRunId: string) => Promise<unknown>;
   onAcceptIssueAction?: (runId: string, proposal: IssueProposedAction) => Promise<IssueProposedAction>;
   onAcceptIssueExecution?: (runId: string, proposal: IssueExecutionProposal, input: IssueExecutionApprovalInput) => Promise<IssueExecutionProposal>;
@@ -420,7 +430,10 @@ function HuntDashboardContent({
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [isSourceFilterOpen]);
-  const runs = dashboard?.runs ?? [];
+  const allRuns = dashboard?.runs ?? [];
+  const runs = activeIssueProjectId
+    ? allRuns.filter((run) => run.projectId === activeIssueProjectId)
+    : allRuns;
   const issuesLoading = dashboard === null && !noProject && !error && !recoveryError;
   const selected = runs.find(run => run.id === selectedRunId) ?? null;
   const displayedError = error ?? recoveryError;
@@ -448,6 +461,34 @@ function HuntDashboardContent({
     if (!activeProjectId) return [];
     return projects.filter(project => project.id !== activeProjectId && (!organizationId || project.organizationId === organizationId));
   }, [dashboard?.project.id, dashboard?.project.organizationId, projects]);
+  const transferDestinationOptions = useMemo(() => {
+    const sourcePlanningProjectId = transferringRunFromMenu?.projectId;
+    const teamId = dashboard?.project.id;
+    const planningOptions = teamId
+      ? issueProjects
+        .filter((project) =>
+          project.teamId === teamId &&
+          project.id !== sourcePlanningProjectId &&
+          project.status !== "cancelled")
+        .map((project) => ({
+          label: `${project.name} · ${t("sidebar.projects")}`,
+          value: `planning:${project.id}`,
+        }))
+      : [];
+    return [
+      ...planningOptions,
+      ...transferDestinationProjects.map((project) => ({
+        label: `${project.name} · ${t("sidebar.teams")}`,
+        value: `team:${project.id}`,
+      })),
+    ];
+  }, [
+    dashboard?.project.id,
+    issueProjects,
+    transferDestinationProjects,
+    transferringRunFromMenu?.projectId,
+    t,
+  ]);
   const activeCount = runs.filter(run => !["completed", "cancelled"].includes(run.status)).length;
   const attentionCount = runs.filter(run => ["paused", "blocked", "failed"].includes(run.status)).length;
   const completedCount = runs.filter(run => ["completed", "cancelled"].includes(run.status)).length;
@@ -706,7 +747,19 @@ function HuntDashboardContent({
         : current
     );
   }, [keyboardKanbanRunIds]);
-  const createIssueDialog = isIssueDialogOpen ? <CreateIssueDialog availableProviders={availableProviders} compactHeader={companionMode} currentUserId={currentUserId} defaultProjectId={createIssueDefaultProjectId ?? dashboard?.project.id} defaultStatus={createIssuePlacement?.status === "backlog" ? "backlog" : "queued"} isSubmitting={isCreatingIssue} onClose={() => {
+  const selectableIssueProjects = issueProjects.length > 0
+    ? dashboard
+      ? issueProjects.filter(project => project.teamId === dashboard.project.id)
+      : issueProjects
+    : (projects.length > 0 ? projects : dashboard ? [dashboard.project] : [])
+      .map(project => ({ ...project, teamId: project.id, isDefault: true }));
+  const defaultIssueProjectId = selectableIssueProjects.some(
+    project => project.id === createIssueDefaultProjectId,
+  )
+    ? createIssueDefaultProjectId
+    : selectableIssueProjects.find(project => project.isDefault)?.id ??
+      selectableIssueProjects[0]?.id;
+  const createIssueDialog = isIssueDialogOpen ? <CreateIssueDialog availableProviders={availableProviders} compactHeader={companionMode} currentUserId={currentUserId} defaultProjectId={defaultIssueProjectId ?? undefined} defaultStatus={createIssuePlacement?.status === "backlog" ? "backlog" : "queued"} isSubmitting={isCreatingIssue} onClose={() => {
     setCreateIssuePlacement(null);
     setIsIssueDialogOpen(false);
   }} onCreate={async (projectId, input) => {
@@ -722,12 +775,12 @@ function HuntDashboardContent({
     }
     setCreateIssuePlacement(null);
     setIsIssueDialogOpen(false);
-  }} projects={projects.length > 0 ? projects : dashboard ? [dashboard.project] : []} members={dashboard?.members ?? []} workflow={dashboard ? {
+  }} projects={selectableIssueProjects} members={dashboard?.members ?? []} workflow={dashboard ? {
     ...dashboard.settings.workflow,
     execution: {
       checkpoints: dashboard.settings.checkpointPolicy?.effective ?? dashboard.settings.workflow.execution.checkpoints
     }
-  } : undefined} workflowProjectId={dashboard?.project.id} /> : null;
+  } : undefined} workflowTeamId={dashboard?.project.id} /> : null;
   const collectionState = useMemo<IssueCollectionState>(() => ({
     propertyFilters,
     query,
@@ -1117,12 +1170,9 @@ function HuntDashboardContent({
               {t("issue.transferDescription")}
             </DialogDescription>
           </DialogHeader>
-          {transferDestinationProjects.length === 0 ? <p className="text-sm text-muted-foreground">
+          {transferDestinationOptions.length === 0 ? <p className="text-sm text-muted-foreground">
               {t("issue.transferNoProjects")}
-            </p> : <NativeSelect disabled={Boolean(deletingIssueId)} label={t("issue.transferTarget")} onValueChange={setTransferTargetProjectId} options={transferDestinationProjects.map(project => ({
-          label: project.name,
-          value: project.id
-        }))} placeholder={t("issue.transferTargetPlaceholder")} value={transferTargetProjectId} />}
+            </p> : <NativeSelect disabled={Boolean(deletingIssueId)} label={t("issue.transferTarget")} onValueChange={setTransferTargetProjectId} options={transferDestinationOptions} placeholder={t("issue.transferTargetPlaceholder")} value={transferTargetProjectId} />}
           {contextTransferError ? <p className="text-xs text-destructive" role="alert">
               {contextTransferError}
             </p> : null}
@@ -1133,10 +1183,20 @@ function HuntDashboardContent({
           }} type="button" variant="outline">
               {t("common.cancel")}
             </Button>
-            <Button disabled={Boolean(deletingIssueId) || !onTransferIssue || !transferTargetProjectId || transferDestinationProjects.length === 0} onClick={() => {
-            if (!transferringRunFromMenu || !onTransferIssue) return;
+            <Button disabled={Boolean(deletingIssueId) || !transferTargetProjectId || transferDestinationOptions.length === 0} onClick={() => {
+            if (!transferringRunFromMenu) return;
             setContextTransferError(null);
-            void onTransferIssue(transferringRunFromMenu.id, transferTargetProjectId).then(() => {
+            const [scope, targetId] = transferTargetProjectId.split(":", 2);
+            const move = scope === "planning" && transferringRunFromMenu.projectId && onMoveIssueProject
+              ? onMoveIssueProject(
+                transferringRunFromMenu.id,
+                transferringRunFromMenu.projectId,
+                targetId,
+              )
+              : scope === "team" && onTransferIssue
+                ? onTransferIssue(transferringRunFromMenu.id, targetId)
+                : Promise.reject(new Error("이슈 이동 기능을 사용할 수 없습니다."));
+            void move.then(() => {
               setTransferringRunFromMenuId(null);
               if (selectedRunId === transferringRunFromMenu.id) {
                 setSelectedRunMessageId(null);

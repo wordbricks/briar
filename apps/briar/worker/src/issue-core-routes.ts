@@ -27,6 +27,11 @@ import {
 import { listProjectMembers } from "./organization-repository";
 import { responseWithPostCommitCleanup } from "./post-commit-cleanup";
 import {
+  assignIssueToPlanningProject,
+  getDefaultProjectForTeam,
+  getPlanningProjectForUser,
+} from "./hierarchy-repository";
+import {
   readIssueRequest,
   readIssueUpdateRequest,
   readJson,
@@ -72,7 +77,26 @@ export async function handleIssueCoreRoute(input: {
   const issuesMatch = url.pathname.match(/^\/projects\/([0-9a-f-]+)\/issues$/u);
   if (issuesMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const project = await getProject(db, issuesMatch[1], session.user.id);
+    let hierarchyAvailable = true;
+    let planningProject = null;
+    try {
+      planningProject = await getPlanningProjectForUser(
+        db,
+        issuesMatch[1],
+        session.user.id,
+      );
+    } catch (error) {
+      // A Worker can roll out before the additive hierarchy migration. In
+      // that compatibility window /projects/{legacyTeamId}/issues must keep
+      // using the promoted Team identity instead of failing schema lookup.
+      const detail = String(error);
+      if (!detail.includes("no such table") && !detail.includes("no such column")) {
+        throw error;
+      }
+      hierarchyAvailable = false;
+    }
+    const teamId = planningProject?.team_id ?? issuesMatch[1];
+    const project = await getProject(db, teamId, session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
     if (!hasOrganizationCapability(project.member_role, "issues:write")) {
       throw new HttpError(403, "Issue editing permission required");
@@ -112,9 +136,27 @@ export async function handleIssueCoreRoute(input: {
       issueId,
       createdByUserId: session.user.id,
     });
+    const targetProject = hierarchyAvailable
+      ? planningProject ?? await getDefaultProjectForTeam(db, project.id)
+      : null;
+    if (hierarchyAvailable) {
+      if (
+        !targetProject ||
+        !(await assignIssueToPlanningProject(db, {
+          runId: created.runId,
+          teamId: project.id,
+          projectId: targetProject.id,
+        }))
+      ) {
+        throw new HttpError(500, "Issue project assignment failed");
+      }
+    }
     return json(
       {
         runId: created.runId,
+        workspaceId: project.organization_id,
+        teamId: project.id,
+        projectId: targetProject?.id ?? project.id,
         sourceKey,
         stage: "queued",
         status: input.status,

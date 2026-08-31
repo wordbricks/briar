@@ -137,7 +137,7 @@ export async function addOrganizationMember(
          project_id, organization_id, user_id, created_at, updated_at
        )
        select project.id, project.organization_id, ?, ?, ?
-       from briar_projects project
+       from briar_teams project
        join briar_organization_members member
          on member.organization_id = project.organization_id
         and member.user_id = ?
@@ -165,7 +165,7 @@ export async function createOrganizationInvitation(
   const [project, existingMember] = await Promise.all([
     db
       .prepare(
-        `select id from briar_projects
+        `select id from briar_teams
          where id = ? and organization_id = ?`,
       )
       .bind(input.initialProjectId, input.organizationId)
@@ -314,7 +314,7 @@ export async function acceptOrganizationInvitation(
            project_id, organization_id, user_id, created_at, updated_at
          )
          select project.id, project.organization_id, ?, ?, ?
-         from briar_projects project
+         from briar_teams project
          join briar_organization_members member
            on member.organization_id = project.organization_id
           and member.user_id = ?
@@ -360,7 +360,7 @@ export async function updateOrganizationMemberRole(
            project_id, organization_id, user_id, created_at, updated_at
          )
          select project.id, project.organization_id, member.user_id, ?, ?
-         from briar_projects project
+         from briar_teams project
          join briar_organization_members member
            on member.organization_id = project.organization_id
           and member.user_id = ?
@@ -405,7 +405,7 @@ export async function updateOrganizationMemberProjects(
     const row = await db
       .prepare(
         `select count(*) as count
-         from briar_projects
+         from briar_teams
          where organization_id = ? and id in (${placeholders})`,
       )
       .bind(organizationId, ...uniqueProjectIds)
@@ -471,7 +471,7 @@ export async function removeOrganizationMember(
          set assignee_user_id = null, updated_at = ?
          where assignee_user_id = ?
            and project_id in (
-             select id from briar_projects where organization_id = ?
+             select id from briar_teams where organization_id = ?
            )
            and exists (
              select 1 from briar_organization_members
@@ -484,7 +484,7 @@ export async function removeOrganizationMember(
         `delete from briar_project_agent_tokens
          where issued_to_user_id = ?
            and project_id in (
-             select id from briar_projects where organization_id = ?
+             select id from briar_teams where organization_id = ?
            )
            and exists (
              select 1 from briar_organization_members

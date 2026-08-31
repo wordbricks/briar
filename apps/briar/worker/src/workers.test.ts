@@ -259,12 +259,15 @@ describe("detached execution workers", () => {
         "0141_agent_designated_workers.sql",
       ],
     });
+    await db.prepare(
+      `create view briar_teams as select * from briar_projects`,
+    ).run();
     await executeD1Sql(
       db,
       `alter table briar_project_agents add column organization_id text;
        update briar_project_agents
        set organization_id = (
-         select project.organization_id from briar_projects project
+         select project.organization_id from briar_teams project
          where project.id = briar_project_agents.project_id
        );
        alter table briar_issue_agent_reply_jobs add column skill_id text;
