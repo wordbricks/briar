@@ -35,6 +35,13 @@ learning quality targets require measured results, not module existence.
   the pending index. This is fixture evidence, not authenticated production QA.
 - Native validation exposed an existing missing return in `CompanionViews.runs`;
   the PR restores the return without changing its ordering behavior.
+- Full migration coverage caught duplicate Inbox events from internal memory
+  counters. The migration keeps ordinary channel/message notifications intact
+  while ignoring counter-only updates; the existing Inbox regression and the
+  memory source-edit event-count check pass.
+- The native project-selection UI test was updated for the existing nested
+  team/project menu. It now selects the leaf and verifies the resulting scope;
+  the focused rerun passed without changing product navigation.
 
 Index jobs intentionally remain pending until PR 2. Recall and automatic learning
 capabilities are false; automatic-learning opt-in is rejected until PR 4. No
