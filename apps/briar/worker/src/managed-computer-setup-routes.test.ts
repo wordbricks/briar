@@ -11,13 +11,10 @@ import {
   ManagedComputerSetupService,
 } from "@briar/contracts/gen/briar/worker/v1/managed_computer_setup_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
 import { sha256Hex } from "./managed-computer-crypto";
-import {
-  createIsolatedTestDatabase,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
 import { workerRuntimeFixture } from "./test-helpers/worker-runtime";
 
 const organizationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -33,14 +30,9 @@ const machineToken = `briar_worker_${"m".repeat(43)}`;
 const now = "2026-08-24T00:00:00.000Z";
 
 describe("managed computer setup", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+  const db = cloudflareEnv.DB;
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "managed-computer-setup-routes",
-    });
-    db = database.db;
     await db.batch([
       db.prepare(
         `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
@@ -138,8 +130,6 @@ describe("managed computer setup", () => {
     ]);
   }, 60_000);
 
-  afterAll(async () => database.dispose());
-
   const env = () => ({
     DB: db,
     BETTER_AUTH_SECRET: "briar-test-secret-that-is-at-least-32-characters",
@@ -153,7 +143,7 @@ describe("managed computer setup", () => {
   const transport = () => createConnectTransport({
     baseUrl: "https://briar.example",
     fetch: async (input, init) =>
-      worker.fetch(new Request(input, init), env()),
+      worker.fetch(new Request(input, { ...init, redirect: "manual" }), env()),
   });
 
   const fleet = () => createClient(FleetService, transport());

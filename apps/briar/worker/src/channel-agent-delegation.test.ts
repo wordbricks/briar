@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import { channelReplyClaimTokenHeader } from "../../src/lib/channels-contract";
 import { claimNextChannelReplyWork } from "./channel-reply-claim-routes";
 import {
@@ -24,7 +24,7 @@ import {
 import { HttpError } from "./http-response";
 import { createOrganizationAgent } from "./organization-agents";
 import { rethrowReplyCompletionHttpError } from "./reply-completion-http-error";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
+import { workerCapabilitiesFixture } from "./test-helpers/worker-runtime";
 import {
   completeChannelReplyApplication,
 } from "./worker-reply-completion-application";
@@ -74,9 +74,8 @@ const backlogEvent = (sourceKey: string): HuntEventInput => ({
 });
 
 describe("Organization Agent channel delegation", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
-  let archives: R2Bucket;
+  const db = cloudflareEnv.DB;
+  const archives = cloudflareEnv.ARCHIVES;
   let projectAgent: Awaited<ReturnType<typeof createProjectAgent>>;
   let otherProjectAgent: Awaited<ReturnType<typeof createProjectAgent>>;
   let organizationAgent: NonNullable<
@@ -84,17 +83,6 @@ describe("Organization Agent channel delegation", () => {
   >;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "channel-agent-delegation",
-      miniflareOptions: {
-        modules: true,
-        script: "export default { fetch() { return new Response('ok') } }",
-        r2Buckets: ["ARCHIVES"],
-      },
-    });
-    miniflare = database.miniflare;
-    db = database.db;
-    archives = await miniflare.getR2Bucket("ARCHIVES") as unknown as R2Bucket;
     const now = new Date().toISOString();
     await db.batch([
       db.prepare(
@@ -158,10 +146,10 @@ describe("Organization Agent channel delegation", () => {
         id,
         boundProjectId,
         id === projectWorkerId ? "d".repeat(64) : "e".repeat(64),
-        JSON.stringify({
+        JSON.stringify(workerCapabilitiesFixture({
+          agentProvider: "claude",
           providers: ["claude"],
-          providerHealth: { claude: { healthy: true } },
-        }),
+        })),
         now,
         now,
         now,
@@ -232,10 +220,6 @@ describe("Organization Agent channel delegation", () => {
       createdAt: now,
     });
   }, 60_000);
-
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
 
   const env = () => ({
     DB: db,

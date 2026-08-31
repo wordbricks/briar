@@ -1,24 +1,15 @@
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   acknowledgeMobilePushOutbox,
   listMobilePushOutbox,
 } from "./mobile-push-repository";
-import {
-  createIsolatedTestDatabase,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1";
 
 describe("mobile push repository", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
+  const db = env.DB;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "mobile-push-repository",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
     const now = "2026-08-30T10:00:00.000Z";
     await executeD1Sql(db, `
       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
@@ -36,10 +27,6 @@ describe("mobile push repository", () => {
         organization_id, current_version
       ) values ('push-org', 7);
     `);
-  });
-
-  afterAll(async () => {
-    await miniflare.dispose();
   });
 
   it("coalesces sync revisions in the independent push outbox", async () => {

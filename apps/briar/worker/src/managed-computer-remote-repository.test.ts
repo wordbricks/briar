@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import { sha256Hex } from "./managed-computer-crypto";
 import {
   consumeManagedComputerRemoteSessionToken,
@@ -8,11 +9,7 @@ import {
   recordManagedComputerRemoteAuditEvent,
 } from "./managed-computer-remote-repository";
 import { createPromotionalManagedComputer } from "./managed-computer-repository";
-import {
-  createIsolatedTestDatabase,
-  executeD1Sql,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const userId = "remote-owner";
@@ -20,14 +17,9 @@ const computerId = "33333333-3333-4333-8333-333333333333";
 const observedAt = "2026-08-22T00:00:00.000Z";
 
 describe("managed computer remote session repository", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+  const db = cloudflareEnv.DB;
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "managed-computer-remote-repository",
-    });
-    db = database.db;
     await executeD1Sql(db, `
       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values ('${userId}', 'Remote Owner', 'remote@example.com', 1, '${observedAt}', '${observedAt}');
@@ -59,8 +51,6 @@ describe("managed computer remote session repository", () => {
       observedAt,
     });
   }, 30_000);
-
-  afterAll(async () => database.dispose());
 
   it("allows one controller, rotates reconnect tokens, and consumes each once", async () => {
     const sessionId = "66666666-6666-4666-8666-666666666666";

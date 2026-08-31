@@ -1,5 +1,5 @@
-import type { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   listOrganizations,
   listProjectMembers,
@@ -9,23 +9,14 @@ import {
   listOrganizationProjects,
   listProjects,
 } from "./project-repository";
-import {
-  createIsolatedTestDatabase,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1";
 
 describe("organization and project repositories", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
+  const db = env.DB;
   const organizationId = "11111111-1111-4111-8111-111111111111";
   const projectId = "22222222-2222-4222-8222-222222222222";
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "project-repository",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
     const now = "2026-08-20T00:00:00.000Z";
     await executeD1Sql(
       db,
@@ -61,10 +52,6 @@ describe("organization and project repositories", () => {
       );
       `,
     );
-  });
-
-  afterAll(async () => {
-    await miniflare.dispose();
   });
 
   it("decodes organizations with the caller membership role", async () => {

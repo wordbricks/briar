@@ -2,15 +2,12 @@ import * as Predicate from "effect/Predicate";
 import { Code, ConnectError, createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { FleetService } from "@briar/contracts/gen/briar/app/v1/fleet_pb";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import worker from "./index";
 import { sha256Hex } from "./managed-computer-crypto";
 import { createPromotionalManagedComputer } from "./managed-computer-repository";
-import {
-  createIsolatedTestDatabase,
-  executeD1Sql,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const computerId = "22222222-2222-4222-8222-222222222222";
@@ -23,8 +20,7 @@ const deviceId = `managed-${computerId}`;
 const now = "2026-08-22T00:00:00.000Z";
 
 describe("managed computer remote desktop routes", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+  const db = cloudflareEnv.DB;
   const relayFetch = vi.fn(async (input: RequestInfo | URL) => {
     const url = new URL(Predicate.isString(input) ? input : input.toString());
     if (url.pathname === "/status") {
@@ -34,10 +30,6 @@ describe("managed computer remote desktop routes", () => {
   });
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "managed-computer-remote-routes",
-    });
-    db = database.db;
     await executeD1Sql(db, `
       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values ('${ownerId}', 'Remote Owner', 'remote-owner@example.com', 1, '${now}', '${now}');
@@ -107,8 +99,6 @@ describe("managed computer remote desktop routes", () => {
     ]);
   }, 60_000);
 
-  afterAll(async () => database.dispose());
-
   const env = () => ({
     DB: db,
     BETTER_AUTH_SECRET: "briar-test-secret-that-is-at-least-32-characters",
@@ -127,7 +117,7 @@ describe("managed computer remote desktop routes", () => {
     createConnectTransport({
       baseUrl: "https://briar.example",
       fetch: async (input, init) =>
-        worker.fetch(new Request(input, init), env()),
+        worker.fetch(new Request(input, { ...init, redirect: "manual" }), env()),
     }),
   );
 

@@ -1,7 +1,8 @@
 import { create } from "@bufbuild/protobuf";
 import { UploadFileMetadataSchema } from "@briar/contracts/gen/briar/types/v1/upload_pb";
 import { createHash } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   prepareCreateIssueAttachmentsApplication,
   prepareUpdateIssueAttachmentsApplication,
@@ -25,10 +26,6 @@ import {
   enqueueUploadObjectCleanup,
   processUploadCleanupQueue,
 } from "./upload-repository";
-import {
-  createIsolatedTestDatabase,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
 
 const organizationId = "a7100000-0000-4000-8000-000000000001";
 const projectId = "b7100000-0000-4000-8000-000000000001";
@@ -39,21 +36,10 @@ const digest = (body: ArrayBuffer) =>
   Uint8Array.from(createHash("sha256").update(new Uint8Array(body)).digest());
 
 describe("issue create and update attachment mutations", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
-  const objects = new Map<string, ArrayBuffer>();
-  const bucket = {
-    put: vi.fn(async (key: string, value: ArrayBuffer) => {
-      objects.set(key, value.slice(0));
-      return {};
-    }),
-  } as unknown as R2Bucket;
+  const db = env.DB;
+  const bucket = env.ATTACHMENTS;
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "issue-attachment-mutations",
-    });
-    db = database.db;
     const now = new Date().toISOString();
     await db.batch([
       db.prepare(
@@ -93,8 +79,6 @@ describe("issue create and update attachment mutations", () => {
       completion: { requiredStages: ["implementing"] },
     }), now, now).run();
   }, 60_000);
-
-  afterAll(async () => database.dispose());
 
   const prepareAndUpload = async (input: {
     purpose: "create" | "update";
@@ -417,7 +401,9 @@ describe("issue create and update attachment mutations", () => {
   });
 
   it("durably retries provider-upload cleanup after issue finalization fails", async () => {
-    const existingObjectKeys = new Set(objects.keys());
+    const existingObjectKeys = new Set(
+      (await bucket.list()).objects.map((object) => object.key),
+    );
     const finalizeFailure = new Error("forced D1 issue finalize failure");
     const createIssue: ServerIssueCreateApplicationServices["createIssue"] = async () => {
       throw finalizeFailure;
@@ -445,7 +431,7 @@ describe("issue create and update attachment mutations", () => {
       },
     }, { createIssue })).rejects.toBe(finalizeFailure);
 
-    const objectKey = [...objects.keys()].find(
+    const objectKey = (await bucket.list()).objects.map((object) => object.key).find(
       (key) => !existingObjectKeys.has(key),
     );
     expect(objectKey).toBeDefined();

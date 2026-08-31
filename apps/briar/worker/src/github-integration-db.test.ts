@@ -1,5 +1,5 @@
-import { Miniflare } from "miniflare";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { env } from "cloudflare:workers";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import worker from "./index";
 import {
   connectGithubInstallation,
@@ -15,11 +15,9 @@ import {
   syncGithubConnectionRepositories,
 } from "./db";
 import { githubSha256Hex } from "./github";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 describe("GitHub integration D1 state", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
+  const db = env.DB;
   const firstOrganizationId = "11111111-1111-4111-8111-111111111111";
   const secondOrganizationId = "22222222-2222-4222-8222-222222222222";
   const thirdOrganizationId = "33333333-3333-4333-8333-333333333333";
@@ -28,11 +26,6 @@ describe("GitHub integration D1 state", () => {
   const now = "2026-08-05T00:00:00.000Z";
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "github-integration-db",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
     await db.prepare(
       `insert into user (id, name, email, emailVerified, createdAt, updatedAt)
        values (?, 'Owner', 'owner@example.com', 1, ?, ?)`,
@@ -60,10 +53,6 @@ describe("GitHub integration D1 state", () => {
          ) values (?, ?, 'owner', ?, ?)`,
       ).bind(id, ownerId, now, now).run();
     }
-  });
-
-  afterAll(async () => {
-    await miniflare.dispose();
   });
 
   afterEach(() => {

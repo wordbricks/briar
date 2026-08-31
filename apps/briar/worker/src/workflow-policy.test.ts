@@ -1,5 +1,5 @@
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
 import {
   createOrganization,
@@ -15,7 +15,6 @@ import {
   isStoredWorkflowUnchanged,
   loadWorkflowCheckpointPolicy,
 } from "./workflow-policy";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 const queuedEvent = (
   sourceKey: string,
@@ -48,16 +47,10 @@ const queuedEvent = (
 });
 
 describe("workflow checkpoint policy persistence", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
+  const db = cloudflareEnv.DB;
   let projectId: string;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "workflow-policy",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
     await db
       .prepare(
         `insert into user (id, name, email, emailVerified, createdAt, updatedAt)
@@ -99,8 +92,6 @@ describe("workflow checkpoint policy persistence", () => {
       .bind(JSON.stringify(workflow), projectId)
       .run();
   }, 60_000);
-
-  afterAll(async () => miniflare.dispose());
 
   it("treats a normalized workflow resubmission as unchanged", () => {
     const workflow = {

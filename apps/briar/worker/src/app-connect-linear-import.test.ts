@@ -8,8 +8,8 @@ import {
 } from "@connectrpc/connect";
 import { createFetchHandler } from "@connectrpc/connect/protocol";
 import { createConnectTransport } from "@connectrpc/connect-web";
+import { env } from "cloudflare:workers";
 import {
-  afterAll,
   beforeAll,
   beforeEach,
   describe,
@@ -25,10 +25,6 @@ import {
 } from "./app-connect-linear-import";
 import { LinearApiError } from "./linear";
 import { linearImportApplicationServices } from "./linear-import-application";
-import {
-  createIsolatedTestDatabase,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
 import { requireConnectHandlerForRequest } from "./test-helpers/connect";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
@@ -53,8 +49,7 @@ const workflow = JSON.stringify({
 });
 
 describe("LinearImportService", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+  const db = env.DB;
   let responseBodies: string[];
 
   const fetchLinearViewerAndTeams = vi.fn<
@@ -85,10 +80,6 @@ describe("LinearImportService", () => {
   });
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "app-connect-linear-import",
-    });
-    db = database.db;
     await db.batch([
       ...[
         [ownerId, "Owner", "linear-owner@example.com"],
@@ -142,14 +133,12 @@ describe("LinearImportService", () => {
     ]);
   }, 60_000);
 
-  afterAll(async () => database.dispose());
-
   const client = () => createClient(
     LinearImportService,
     createConnectTransport({
       baseUrl: "https://briar.example",
       fetch: async (input, init) => {
-        const request = new Request(input, init);
+        const request = new Request(input, { ...init, redirect: "manual" });
         const router = createConnectRouter({
           connect: true,
           grpc: false,

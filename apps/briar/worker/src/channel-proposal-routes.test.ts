@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   addChannelAgent,
   createChannel,
@@ -33,7 +33,6 @@ import {
   recordHuntEvent,
   transferIssue,
 } from "./db";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import { workerCapabilitiesFixture } from "./test-helpers/worker-runtime";
 import { RequestDecodeError } from "./request-schema";
 import {
@@ -122,25 +121,10 @@ const providerCapabilities = {
 };
 
 describe("channel issue proposal approval route", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
-  let attachments: R2Bucket;
+  const db = cloudflareEnv.DB;
+  const attachments = cloudflareEnv.ATTACHMENTS;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "channel-proposal-routes",
-      miniflareOptions: {
-        modules: true,
-        script: "export default { fetch() { return new Response('ok') } }",
-        r2Buckets: ["ATTACHMENTS"],
-      },
-    });
-    miniflare = database.miniflare;
-    db = database.db;
-    attachments = await miniflare.getR2Bucket(
-      "ATTACHMENTS",
-    ) as unknown as R2Bucket;
-
     for (const [id, name, token] of [
       [ownerId, "Owner", ownerToken],
       [memberId, "Member", memberToken],
@@ -276,10 +260,6 @@ describe("channel issue proposal approval route", () => {
       createdAt: now,
     });
   }, 60_000);
-
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
 
   const env = (
     authSecret = "channel-proposal-test-secret-at-least-32-characters",

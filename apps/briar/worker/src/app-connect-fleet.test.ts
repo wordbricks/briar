@@ -9,12 +9,9 @@ import {
   ManagedComputerState,
   UnbindProjectExecutionWorkerRequest_Reason,
 } from "@briar/contracts/gen/briar/app/v1/fleet_pb";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import worker from "./index";
-import {
-  createIsolatedTestDatabase,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
 import { workerRuntimeFixture } from "./test-helpers/worker-runtime";
 
 const organizationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -26,18 +23,13 @@ const memberToken = "fleet-connect-member-token";
 const now = "2026-08-22T00:00:00.000Z";
 
 describe("FleetService", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+  const db = cloudflareEnv.DB;
   const createWorkflow = vi.fn(async (input: { id: string }) => ({
     id: input.id,
   }));
   const getWorkflow = vi.fn(async (id: string) => ({ id }));
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "app-connect-fleet",
-    });
-    db = database.db;
     await db.batch([
       db.prepare(
         `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
@@ -79,8 +71,6 @@ describe("FleetService", () => {
       ).bind(organizationId, memberId, now, now),
     ]);
   }, 60_000);
-
-  afterAll(async () => database.dispose());
 
   const env = () => ({
     DB: db,
@@ -130,7 +120,11 @@ describe("FleetService", () => {
     createConnectTransport({
       baseUrl: "https://briar.example",
       fetch: async (input, init) => {
-        const response = await worker.fetch(new Request(input, init), env(), context);
+        const response = await worker.fetch(
+          new Request(input, { ...init, redirect: "manual" }),
+          env(),
+          context,
+        );
         onResponse?.(response);
         return response;
       },

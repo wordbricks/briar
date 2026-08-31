@@ -5,9 +5,9 @@ import {
   MergeQueueCandidateState,
   MergeQueueService,
 } from "@briar/contracts/gen/briar/app/v1/merge_queue_pb";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
-import { createIsolatedTestDatabase, type IsolatedTestDatabase } from "./test-helpers/d1";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const projectId = "22222222-2222-4222-8222-222222222222";
@@ -40,14 +40,9 @@ const workflow = JSON.stringify({
 });
 
 describe("MergeQueueService", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+  const db = env.DB;
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "app-connect-merge-queue",
-    });
-    db = database.db;
     await db.batch([
       ...[
         [ownerId, "Owner", "merge-queue-owner@example.com"],
@@ -178,15 +173,13 @@ describe("MergeQueueService", () => {
     ]);
   }, 60_000);
 
-  afterAll(async () => database.dispose());
-
   const client = () =>
     createClient(
       MergeQueueService,
       createConnectTransport({
         baseUrl: "https://briar.example",
         fetch: async (input, init) =>
-          worker.fetch(new Request(input, init), {
+          worker.fetch(new Request(input, { ...init, redirect: "manual" }), {
             DB: db,
             ATTACHMENTS: {},
             ARCHIVES: {},

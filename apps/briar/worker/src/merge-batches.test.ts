@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   blockMergeBatch,
   claimNextMergeBatch,
@@ -74,13 +74,10 @@ type ReadyRun = {
 };
 
 describe("repository merge queue coordinator", () => {
-  let fixture: Awaited<ReturnType<typeof createIsolatedTestDatabase>>;
-  let db: D1Database;
+  const db = env.DB;
   let runSequence = 0;
 
   beforeAll(async () => {
-    fixture = await createIsolatedTestDatabase({ suite: "merge-batches-v2" });
-    db = fixture.db;
     await db.batch([
       db.prepare(
         `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
@@ -107,8 +104,6 @@ describe("repository merge queue coordinator", () => {
       ).bind(installationId, at(0, 0), at(0, 0)),
     ]);
   });
-
-  afterAll(async () => fixture.dispose());
 
   const setupLane = async (
     scenario: number,

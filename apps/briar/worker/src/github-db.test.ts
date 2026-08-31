@@ -1,12 +1,11 @@
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
 import type {
   GithubPullRequestSyncInput,
   HuntEventInput,
   RunPullRequestRow,
 } from "./db";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import {
   claimGithubDelivery,
   connectGithubInstallation,
@@ -131,8 +130,7 @@ const workflowFor = (checkpoint: Checkpoint) => {
 };
 
 describe("GitHub pull request D1 integration", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
+  const db = env.DB;
   let organizationId: string;
 
   const createScenario = async (
@@ -311,11 +309,6 @@ describe("GitHub pull request D1 integration", () => {
       .first<RunPullRequestRow>();
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "github-db",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
     const createdAt = nextTime();
     await db
       .prepare(
@@ -338,10 +331,6 @@ describe("GitHub pull request D1 integration", () => {
     });
     organizationId = organization.id;
   }, 60_000);
-
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
 
   it("links pull_request evidence to the current attempt and revision", async () => {
     const scenario = await createScenario();

@@ -5,8 +5,8 @@ import {
   WorkClaimIdentitySchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { createHash } from "node:crypto";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   addChannelAgent,
   createChannel,
@@ -45,7 +45,6 @@ import {
 import { HttpError } from "./http-response";
 import { createOrganizationAgent } from "./organization-agents";
 import { RequestDecodeError } from "./request-schema";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import { workerCapabilitiesFixture } from "./test-helpers/worker-runtime";
 import { completeIssueReplyApplication } from "./worker-reply-completion-application";
 import { completeIssueReplyInputFromProto } from "./worker-reply-completion-mappers";
@@ -158,25 +157,12 @@ const event = (
   context: null,
 });
 describe("conversational issue execution approval", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
-  let attachments: R2Bucket;
+  const db = cloudflareEnv.DB;
+  const attachments = cloudflareEnv.ATTACHMENTS;
   let sequence = 0;
   let projectAgentId: string;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "issue-execution-approval",
-      miniflareOptions: {
-        modules: true,
-        script: "export default { fetch() { return new Response('ok') } }",
-        r2Buckets: ["ATTACHMENTS"],
-      },
-    });
-    miniflare = database.miniflare;
-    db = database.db;
-    attachments = await miniflare.getR2Bucket("ATTACHMENTS") as unknown as R2Bucket;
-
     for (const [id, name, token] of [
       [ownerId, "Owner", ownerToken],
       [memberId, "Member", memberToken],
@@ -282,10 +268,6 @@ describe("conversational issue execution approval", () => {
       observedAt: new Date().toISOString(),
     });
   }, 60_000);
-
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
 
   const env = () => ({
     DB: db,

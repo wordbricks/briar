@@ -5,18 +5,16 @@ import {
   ProjectUsagePeriod,
   ReportingService,
 } from "@briar/contracts/gen/briar/app/v1/reporting_pb";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
-import {
-  createIsolatedTestDatabase,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const projectId = "22222222-2222-4222-8222-222222222222";
 const hiddenProjectId = "33333333-3333-4333-8333-333333333333";
 const runId = "44444444-4444-4444-8444-444444444444";
 const hiddenRunId = "55555555-5555-4555-8555-555555555555";
+const executionId = "66666666-6666-4666-8666-666666666666";
 const ownerId = "reporting-owner";
 const developerId = "reporting-developer";
 const outsiderId = "reporting-outsider";
@@ -27,8 +25,7 @@ const tokens = {
 } as const;
 
 describe("ReportingService", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+  const db = env.DB;
   const workflowStage = {
     id: "implementing",
     label: "Implement",
@@ -43,10 +40,6 @@ describe("ReportingService", () => {
   } as const;
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "app-connect-reporting",
-    });
-    db = database.db;
     await db.batch([
       ...[
         [ownerId, "Owner", "reporting-owner@example.com"],
@@ -171,16 +164,42 @@ describe("ReportingService", () => {
         observedAt,
       ),
     ]);
+    await db.batch([
+      db.prepare(
+        `insert into briar_run_execution_attempts (
+           id, organization_id, project_id, run_id, run_attempt,
+           claim_attempt, worker_id, claimed_by, claimed_at, recorded_at
+         ) values (?, ?, ?, ?, 1, 1, 'reporting-worker', 'worker', ?, ?)`,
+      ).bind(
+        executionId,
+        organizationId,
+        projectId,
+        runId,
+        observedAt,
+        observedAt,
+      ),
+      db.prepare(
+        `insert into briar_run_usage_records (
+           execution_id, usage_key, session_id, turn_id, scope_id,
+           agent_provider, model_provider, model, canonical_model,
+           model_source, source, uncached_input_tokens, cache_read_tokens,
+           cache_write_tokens, output_tokens, reasoning_output_tokens,
+           total_tokens, observed_at, recorded_at
+         ) values (
+           ?, 'usage-1', 'session-1', 'turn-1', 'turn-1',
+           'codex', 'openai', 'gpt-5.6-sol', null, 'providerReported',
+           'codex.result.usage', 10, 20, 2, 5, null, 37, ?, ?
+         )`,
+      ).bind(executionId, observedAt, observedAt),
+    ]);
   }, 60_000);
-
-  afterAll(async () => database.dispose());
 
   const client = (token: string) => createClient(
     ReportingService,
     createConnectTransport({
       baseUrl: "https://briar.example",
       fetch: async (input, init) =>
-        worker.fetch(new Request(input, init), {
+        worker.fetch(new Request(input, { ...init, redirect: "manual" }), {
           DB: db,
           ATTACHMENTS: {},
           ARCHIVES: {},

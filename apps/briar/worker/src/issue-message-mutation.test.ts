@@ -1,7 +1,8 @@
 import { create } from "@bufbuild/protobuf";
 import { UploadFileMetadataSchema } from "@briar/contracts/gen/briar/types/v1/upload_pb";
 import { createHash } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { HuntEventInput } from "./db";
 import {
   createIssueMessage,
@@ -14,10 +15,6 @@ import { createProjectIssueMessage } from "./issue-conversation-routes";
 import { commitIssueMessageMutation } from "./issue-message-mutation-repository";
 import { decodeIssueMessageInput } from "./issue-request-contract";
 import { uploadReservedFileApplication } from "./upload-application";
-import {
-  createIsolatedTestDatabase,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
 
 const organizationId = "a7000000-0000-4000-8000-000000000001";
 const projectId = "b7000000-0000-4000-8000-000000000001";
@@ -57,23 +54,12 @@ const huntEvent = (sourceKey: string): HuntEventInput => ({
 });
 
 describe("issue message mutation", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+  const db = env.DB;
+  const bucket = env.ATTACHMENTS;
   let runId: string;
   let agentIds: string[];
-  const objects = new Map<string, ArrayBuffer>();
-  const bucket = {
-    put: vi.fn(async (key: string, value: ArrayBuffer) => {
-      objects.set(key, value.slice(0));
-      return {};
-    }),
-  } as unknown as R2Bucket;
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "issue-message-mutation",
-    });
-    db = database.db;
     const now = new Date().toISOString();
     await db.batch([
       db.prepare(
@@ -136,8 +122,6 @@ describe("issue message mutation", () => {
       ),
     );
   }, 60_000);
-
-  afterAll(async () => database.dispose());
 
   const prepareAndUpload = async (
     messageId: string,

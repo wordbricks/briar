@@ -2,10 +2,9 @@ import { ProjectRole } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import { OrganizationService } from "@briar/contracts/gen/briar/app/v1/organization_pb";
 import { Code, ConnectError, createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 describe("OrganizationService", () => {
   const organizationId = "11111111-1111-4111-8111-111111111111";
@@ -23,16 +22,9 @@ describe("OrganizationService", () => {
     invitee: "organization-connect-invitee-token",
     mismatch: "organization-connect-mismatch-token",
   } as const;
-  let miniflare: Miniflare;
-  let db: D1Database;
+  const db = env.DB;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "app-connect-organization",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
-
     const users = [
       [ownerId, "Owner", "owner@example.com", tokens.owner],
       [developerId, "Developer", "developer@example.com", tokens.developer],
@@ -99,17 +91,13 @@ describe("OrganizationService", () => {
     ]);
   }, 60_000);
 
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
-
   const client = () =>
     createClient(
       OrganizationService,
       createConnectTransport({
         baseUrl: "https://briar.example",
         fetch: async (input, init) =>
-          worker.fetch(new Request(input, init), {
+          worker.fetch(new Request(input, { ...init, redirect: "manual" }), {
             DB: db,
             ATTACHMENTS: {},
             ARCHIVES: {},

@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   configureMergeQueueProfile,
   getMergeQueueProfile,
@@ -11,12 +11,9 @@ const firstProject = "11111111-1111-4111-8111-111111111111";
 const secondProject = "22222222-2222-4222-8222-222222222222";
 
 describe("merge queue profile", () => {
-  let fixture: Awaited<ReturnType<typeof createIsolatedTestDatabase>>;
-  let db: D1Database;
+  const db = env.DB;
 
   beforeAll(async () => {
-    fixture = await createIsolatedTestDatabase({ suite: "merge-queue-profile" });
-    db = fixture.db;
     await db.batch([
       db.prepare(
         `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
@@ -45,8 +42,6 @@ describe("merge queue profile", () => {
       )),
     ]);
   });
-
-  afterAll(async () => fixture.dispose());
 
   it("allows exactly one enabled project to own repository/main", async () => {
     await expect(configureMergeQueueProfile(db, {

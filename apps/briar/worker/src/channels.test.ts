@@ -13,8 +13,8 @@ import {
   OrganizationAgentContextServiceLookupResponseSchema,
 } from "@briar/contracts/gen/briar/worker/v1/organization_agent_context_pb";
 import { createMethodUrl } from "@connectrpc/connect/protocol";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import { channelReplyAttachmentPath } from "../../src/lib/channel-reply-attachment-path";
 import { emptyAgentProviderCapabilityCatalog } from "../../src/lib/agent-provider-contract";
 import {
@@ -92,7 +92,6 @@ import {
   listOrganizationChannels,
 } from "./organization-channel-routes";
 import { channelReplyWorkerAvailability } from "./workers";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import { workerClaimRuntimeFixture } from "./test-helpers/worker-runtime";
 import { requireWorkerProjectBinding } from "./worker-route-auth";
 
@@ -114,23 +113,10 @@ const at = (minute: number) =>
   new Date(Date.UTC(2026, 0, 1, 0, minute)).toISOString();
 
 describe("organization channels", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
-  let archives: R2Bucket;
+  const db = cloudflareEnv.DB;
+  const archives = cloudflareEnv.ARCHIVES;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "channels",
-      miniflareOptions: {
-        modules: true,
-        script: "export default { fetch() { return new Response('ok') } }",
-        r2Buckets: ["ARCHIVES"],
-      },
-    });
-    miniflare = database.miniflare;
-    db = database.db;
-    archives = await miniflare.getR2Bucket("ARCHIVES") as unknown as R2Bucket;
-
     for (const [id, name] of [
       [ownerId, "Owner"],
       [outsiderId, "Outsider"],
@@ -231,10 +217,6 @@ describe("organization channels", () => {
       ),
     ]);
   }, 60_000);
-
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
 
   const createDirectMessageThroughApplication = (
     request: { memberIds: string[]; agentIds: string[] },
@@ -4613,7 +4595,14 @@ describe("organization channels", () => {
       projectId,
       rootId,
       replyId,
-      JSON.stringify({ title: "Must not remain actionable" }),
+      JSON.stringify({
+        issue: {
+          title: "Must not remain actionable",
+          description: null,
+          priority: null,
+          status: "backlog",
+        },
+      }),
       at(62),
       at(62),
     ).run();

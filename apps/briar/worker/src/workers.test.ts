@@ -10,8 +10,8 @@ import {
   WorkerControlService,
   WorkerReadinessState,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { AgentProviderCapabilityCatalog } from "../../src/lib/agent-provider-contract";
 import apiWorker from "./index";
 import {
@@ -73,7 +73,7 @@ import {
   latestExecutionWorkerUpdateHandoff,
   pendingExecutionWorkerUpdate,
 } from "./worker-update-repository";
-import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1";
 import {
   workerCapabilitiesFixture,
   workerRuntimeFixture,
@@ -96,7 +96,11 @@ const workerControlClient = (env: Env, credential: string) => ({
     WorkerControlService,
     createConnectTransport({
       baseUrl: "https://briar-api.example",
-      fetch: (input, init) => apiWorker.fetch(new Request(input, init), env),
+      fetch: (input, init) =>
+        apiWorker.fetch(
+          new Request(input, { ...init, redirect: "manual" }),
+          env,
+        ),
     }),
   ),
   options: { headers: { authorization: `Bearer ${credential}` } },
@@ -188,185 +192,10 @@ const queuedEvent = (sourceKey: string, minute: number): HuntEventInput => ({
 });
 
 describe("detached execution workers", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-workers-test" },
-    r2Buckets: ["ARCHIVES"],
-  });
-  let db: D1Database;
-  let archives: R2Bucket;
+  const db = cloudflareEnv.DB;
+  const archives = cloudflareEnv.ARCHIVES;
 
   beforeAll(async () => {
-    db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-    archives = (await miniflare.getR2Bucket("ARCHIVES")) as unknown as R2Bucket;
-    await applyD1Migrations(db, {
-      files: [
-        "0001_briar.sql",
-        "0002_remove_repository_path.sql",
-        "0003_generalize_auto_hunt.sql",
-        "0004_auto_hunt_claims.sql",
-        "0005_auto_hunt_recovery.sql",
-        "0006_issue_attachments.sql",
-        "0007_configurable_workflows.sql",
-        "0008_organizations.sql",
-        "0009_auto_hunt_automation.sql",
-        "0010_issue_messages.sql",
-        "0011_issue_message_agents.sql",
-        "0012_organization_handles.sql",
-        "0013_execution_workers.sql",
-        "0014_agent_provider_grok.sql",
-        "0015_backlog_status.sql",
-        "0016_project_agents.sql",
-        "0017_default_auto_hunt_agent.sql",
-        "0018_project_agent_schedules.sql",
-        "0019_project_agent_schedule_runs.sql",
-        "0020_project_agent_calendar_color.sql",
-        "0021_run_evidence.sql",
-        "0022_remove_workflow_presets.sql",
-        "0023_project_agent_skills.sql",
-        "0024_project_agent_avatars.sql",
-        "0025_project_agent_codex_pets.sql",
-        "0026_flexible_project_agent_schedules.sql",
-        "0027_run_revisions.sql",
-        "0029_structured_agent_results.sql",
-        "0030_run_evidence_images.sql",
-        "0031_organization_logos.sql",
-        "0032_slack_integration.sql",
-        "0033_organization_logo_browser_formats.sql",
-        "0034_execution_worker_credentials.sql",
-        "0035_detached_worker_dispatch.sql",
-        "0036_execution_worker_concurrency.sql",
-        "0038_project_execution_worker_policies.sql",
-        "0039_project_agent_tokens.sql",
-        "0040_run_execution_provider.sql",
-        "0041_issue_message_mentions.sql",
-        "0043_execution_worker_icons.sql",
-        "0044_issue_agent_reply_jobs.sql",
-        "0045_issue_execution_preferences.sql",
-        "0046_project_icons.sql",
-        "0047_project_icon_browser_formats.sql",
-        "0048_issue_dependencies.sql",
-        "0049_dashboard_delta_sync.sql",
-        "0051_log_archives.sql",
-        "0054_run_execution_metrics.sql",
-        "0057_organization_invitations.sql",
-        "0058_workflow_pause_after_stage.sql",
-        "0059_workflow_v2_progress.sql",
-        "0060_workflow_checkpoint_policies.sql",
-        "0061_resume_requested_state.sql",
-        "0061_workflow_stage_status_events.sql",
-        "0062_issue_assignees.sql",
-        "0063_inbox_read_states.sql",
-        "0063_github_pull_request_sync.sql",
-        "0065_issue_rework_proposals.sql",
-        "0067_issue_checkpoints.sql",
-        "0068_issue_action_proposals.sql",
-        "0069_project_agent_effort.sql",
-        "0070_project_issue_key_prefix.sql",
-        "0073_organization_channels.sql",
-        "0074_channel_delta_sync.sql",
-        "0076_execution_worker_updates.sql",
-        "0077_project_agent_task_jobs.sql",
-        "0079_agent_skills.sql",
-        "0084_run_usage_ledger.sql",
-        "0085_run_cost_ledger.sql",
-        "0087_channel_reply_worker_scope.sql",
-        "0098_issue_subscriptions.sql",
-        "0099_project_usage_analytics.sql",
-        "0103_agent_worklog_projection.sql",
-        "0113_project_schedule_tab.sql",
-        "0119_execution_worker_update_handoffs.sql",
-        "0121_repository_merge_batches.sql",
-        "0122_remove_repository_merge_batches.sql",
-        "0123_native_merge_queue_coordinator.sql",
-        "0125_managed_computers.sql",
-        "0128_agent_skill_documents.sql",
-        "0133_channel_reply_sessions.sql",
-        "0136_issue_difficulty.sql",
-        "0137_execution_worker_lifecycle_telemetry.sql",
-        "0138_project_members.sql",
-        "0140_issue_difficulty_optional.sql",
-        "0141_agent_designated_workers.sql",
-      ],
-    });
-    await executeD1Sql(
-      db,
-      `alter table briar_project_agents add column organization_id text;
-       update briar_project_agents
-       set organization_id = (
-         select project.organization_id from briar_projects project
-         where project.id = briar_project_agents.project_id
-       );
-       alter table briar_issue_agent_reply_jobs add column skill_id text;
-       alter table briar_issue_agent_reply_jobs
-         add column selected_skill_id_snapshot text;
-       alter table briar_issue_agent_reply_jobs
-         add column selected_agent_name_snapshot text;
-       alter table briar_issue_agent_reply_jobs
-         add column selected_agent_responsibility_snapshot text;
-       alter table briar_issue_agent_reply_jobs
-         add column selected_skill_name_snapshot text;
-       alter table briar_issue_agent_reply_jobs
-         add column selected_skill_instructions_snapshot text;
-       alter table briar_issue_agent_reply_jobs
-         add column selected_skill_kind_snapshot text;
-       alter table briar_issue_agent_reply_jobs
-         add column selected_skill_provider_snapshot text;
-       alter table briar_issue_agent_reply_jobs
-         add column selected_skill_model_snapshot text;
-       alter table briar_issue_agent_reply_jobs
-         add column selected_skill_effort_snapshot text;
-       alter table briar_issue_messages add column author_agent_id text;
-       alter table briar_issue_messages add column author_agent_name text;
-       alter table briar_issue_agent_reply_jobs add column agent_id text;
-       alter table briar_issue_agent_reply_jobs
-         add column requires_preferred_worker integer not null default 0;
-       alter table briar_issue_agent_reply_jobs add column agent_name_snapshot text;
-       alter table briar_issue_agent_reply_jobs
-         add column agent_responsibility_snapshot text;
-       alter table briar_issue_agent_reply_jobs
-         add column skill_execution_request_snapshot text;
-       alter table briar_project_agent_task_jobs
-         add column skill_execution_proposal_id text;
-       create unique index briar_issue_agent_reply_jobs_agent_test_idx
-         on briar_issue_agent_reply_jobs (project_id, trigger_message_id, agent_id);
-       create table briar_channel_issue_approval_audit (
-         run_id text,
-         issue_source_key text,
-         project_id text,
-         result_verification text not null
-       );
-       create table briar_issue_execution_proposals (
-         target_run_id text not null,
-         project_id text not null,
-         dispatch_request_id text
-       );
-       create table briar_issue_execution_approval_audit (
-         run_id text not null,
-         project_id text not null,
-         dispatch_request_id text not null
-       );
-       create table briar_channel_thread_subscriptions (
-         root_message_id text not null
-           references briar_channel_messages (id) on delete cascade,
-         channel_id text not null
-           references briar_channels (id) on delete cascade,
-         organization_id text not null,
-         user_id text not null,
-         created_at text not null,
-         primary key (root_message_id, user_id),
-         foreign key (organization_id, user_id)
-           references briar_organization_members (organization_id, user_id)
-           on delete cascade
-       );`,
-    );
-    await applyD1Migrations(db, {
-      files: [
-        "0146_organization_capability_roles.sql",
-        "0147_project_github_repository_identity.sql",
-      ],
-    });
     await executeD1Sql(
       db,
       `drop trigger briar_issue_execution_org_member_remove_invalidate;`,
@@ -399,18 +228,20 @@ describe("detached execution workers", () => {
         '${atMinute(0)}', '${atMinute(0)}'
       );
       insert into briar_project_settings (
-        project_id, velen_org, linear_enabled, workflow_json, created_at, updated_at
+        project_id, velen_org, linear_enabled, workflow_json,
+        mandatory_checkpoints_json, created_at, updated_at
       ) values (
         '${projectId}', 'example', 0,
         '{"version":2,"requirements":[],"stages":[{"id":"analyzing","label":"분석","required":true},{"id":"implementing","label":"구현","required":true}],"execution":{"checkpoints":[]},"completion":{"requiredStages":["analyzing","implementing"]}}',
-        '${atMinute(0)}', '${atMinute(0)}'
+        '[]', '${atMinute(0)}', '${atMinute(0)}'
       );
       insert into briar_project_settings (
-        project_id, velen_org, linear_enabled, workflow_json, created_at, updated_at
+        project_id, velen_org, linear_enabled, workflow_json,
+        mandatory_checkpoints_json, created_at, updated_at
       ) values (
         '${secondProjectId}', 'example', 0,
         '{"version":2,"requirements":[],"stages":[{"id":"analyzing","label":"분석","required":true},{"id":"implementing","label":"구현","required":true}],"execution":{"checkpoints":[]},"completion":{"requiredStages":["analyzing","implementing"]}}',
-        '${atMinute(0)}', '${atMinute(0)}'
+        '[]', '${atMinute(0)}', '${atMinute(0)}'
       );
       insert into briar_project_agents (
         id, project_id, organization_id, name, provider, model, responsibility,
@@ -423,10 +254,6 @@ describe("detached execution workers", () => {
     `,
     );
   }, 30_000);
-
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
 
   beforeEach(async () => {
     await executeD1Sql(
@@ -2738,12 +2565,12 @@ describe("detached execution workers", () => {
     await db
       .prepare(
         `insert into briar_project_agents (
-           id, project_id, name, provider, model, responsibility,
+           id, project_id, organization_id, name, provider, model, responsibility,
            skill_markdown, created_at, updated_at
-         ) values (?, ?, 'Claude Agent', 'claude', null, 'Review the issue.',
+         ) values (?, ?, ?, 'Claude Agent', 'claude', null, 'Review the issue.',
                    '# Claude Agent', ?, ?)`,
       )
-      .bind(claudeAgentId, projectId, atMinute(2), atMinute(2))
+      .bind(claudeAgentId, projectId, projectId, atMinute(2), atMinute(2))
       .run();
     const runId = await recordHuntEvent(
       db,

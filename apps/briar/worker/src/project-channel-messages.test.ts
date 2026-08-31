@@ -4,18 +4,16 @@ import {
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { Code, createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
 import {
   addChannelAgent,
   createChannel,
   createChannelMessage,
 } from "./channels";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 describe("Project Agent channel message history", () => {
-  let miniflare: Miniflare;
   const organizationId = "11000000-0000-4000-8000-000000000001";
   const projectId = "22000000-0000-4000-8000-000000000001";
   const otherProjectId = "22000000-0000-4000-8000-000000000002";
@@ -35,7 +33,7 @@ describe("Project Agent channel message history", () => {
     "77000000-0000-4000-8000-000000000002",
     "77000000-0000-4000-8000-000000000003",
   ];
-  let db: D1Database;
+  const db = cloudflareEnv.DB;
 
   const at = (minute: number) =>
     `2026-08-12T00:${String(minute).padStart(2, "0")}:00.000Z`;
@@ -43,11 +41,6 @@ describe("Project Agent channel message history", () => {
     createHash("sha256").update(value).digest("hex");
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "project-channel-messages",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
     await db.batch([
       db.prepare(
         `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
@@ -176,10 +169,6 @@ describe("Project Agent channel message history", () => {
     ]);
   }, 60_000);
 
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
-
   const env = () => ({
     DB: db,
     BETTER_AUTH_SECRET: "briar-test-secret-that-is-at-least-32-characters",
@@ -193,7 +182,7 @@ describe("Project Agent channel message history", () => {
       baseUrl: "https://briar.example",
       useBinaryFormat: true,
       fetch: async (input, init) =>
-        worker.fetch(new Request(input, init), env()),
+        worker.fetch(new Request(input, { ...init, redirect: "manual" }), env()),
     }),
   );
 

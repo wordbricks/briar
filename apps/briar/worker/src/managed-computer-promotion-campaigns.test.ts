@@ -1,21 +1,17 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   applyForPromotionalManagedComputer,
   validateManagedComputerPromotion,
 } from "./managed-computer-service";
-import {
-  createIsolatedTestDatabase,
-  executeD1Sql,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const userId = "promotion-owner";
 const observedAt = "2026-08-25T00:00:00.000Z";
 
 describe("managed computer promotion campaigns", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+  const db = cloudflareEnv.DB;
   const createWorkflow = vi.fn(async (input: { id: string }) => ({
     id: input.id,
   }));
@@ -44,10 +40,6 @@ describe("managed computer promotion campaigns", () => {
   }) as never;
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "managed-computer-promotion-campaigns",
-    });
-    db = database.db;
     await executeD1Sql(db, `
       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values ('${userId}', 'Promotion Owner', 'promotion@example.com', 1, '${observedAt}', '${observedAt}');
@@ -58,8 +50,6 @@ describe("managed computer promotion campaigns", () => {
       ) values ('${organizationId}', '${userId}', 'owner', '${observedAt}', '${observedAt}');
     `);
   }, 30_000);
-
-  afterAll(async () => database.dispose());
 
   it("allows the next campaign after the previous computer is stopped", async () => {
     const first = await applyForPromotionalManagedComputer(db, env(), {

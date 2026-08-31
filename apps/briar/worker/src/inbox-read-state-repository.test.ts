@@ -1,25 +1,16 @@
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   deleteInboxReadState,
   listInboxReadStates,
   upsertInboxReadStates,
 } from "./inbox-read-state-repository";
-import {
-  createIsolatedTestDatabase,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1";
 
 describe("inbox read state repository", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
+  const db = env.DB;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "inbox-read-state-repository",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
     const now = "2026-08-02T00:00:00.000Z";
     await executeD1Sql(
       db,
@@ -30,10 +21,6 @@ describe("inbox read state repository", () => {
       values ('member', 'Member', 'member@example.com', 1, '${now}', '${now}');
       `,
     );
-  });
-
-  afterAll(async () => {
-    await miniflare.dispose();
   });
 
   it("atomically upserts account-scoped read versions", async () => {

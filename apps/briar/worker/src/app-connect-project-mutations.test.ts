@@ -8,10 +8,9 @@ import {
 import {
   WorkflowCheckpoint_Position,
 } from "@briar/contracts/gen/briar/types/v1/workflow_pb";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 describe("ProjectService mutations", () => {
   const organizationId = "11111111-1111-4111-8111-111111111111";
@@ -24,16 +23,9 @@ describe("ProjectService mutations", () => {
     developer: "project-connect-developer-token",
     viewer: "project-connect-viewer-token",
   } as const;
-  let miniflare: Miniflare;
-  let db: D1Database;
+  const db = env.DB;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "app-connect-project-mutations",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
-
     const users = [
       [ownerId, "Owner", "owner@example.com", "owner", tokens.owner],
       [
@@ -82,17 +74,13 @@ describe("ProjectService mutations", () => {
     ]);
   }, 60_000);
 
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
-
   const client = (token: string) =>
     createClient(
       ProjectService,
       createConnectTransport({
         baseUrl: "https://briar.example",
         fetch: async (input, init) =>
-          worker.fetch(new Request(input, init), {
+          worker.fetch(new Request(input, { ...init, redirect: "manual" }), {
             DB: db,
             ATTACHMENTS: {},
             ARCHIVES: {},

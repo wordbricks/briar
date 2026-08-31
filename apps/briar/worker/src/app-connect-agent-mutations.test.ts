@@ -7,10 +7,9 @@ import {
   AgentSkillKind,
 } from "@briar/contracts/gen/briar/app/v1/agent_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import { emptyAgentProviderCapabilityCatalog } from "../../src/lib/agent-provider-contract";
 
 describe("AgentService mutations", () => {
@@ -22,8 +21,7 @@ describe("AgentService mutations", () => {
   const editorId = "agent-connect-editor";
   const viewerId = "agent-connect-viewer";
   const now = "2026-08-31T00:00:00.000Z";
-  let miniflare: Miniflare;
-  let db: D1Database;
+  const db = env.DB;
 
   const tokens = {
     owner: "agent-connect-owner-token",
@@ -33,12 +31,6 @@ describe("AgentService mutations", () => {
   } as const;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "app-connect-agent-mutations",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
-
     const users = [
       [ownerId, "Owner", "owner@example.com", "owner", tokens.owner],
       [developerId, "Developer", "developer@example.com", "developer", tokens.developer],
@@ -107,17 +99,13 @@ describe("AgentService mutations", () => {
     ]);
   }, 60_000);
 
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
-
   const client = (token: string) =>
     createClient(
       AgentService,
       createConnectTransport({
         baseUrl: "https://briar.example",
         fetch: async (input, init) =>
-          worker.fetch(new Request(input, init), {
+          worker.fetch(new Request(input, { ...init, redirect: "manual" }), {
             DB: db,
             ATTACHMENTS: {},
             ARCHIVES: {},

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   addChannelAgent,
   claimNextChannelAgentReply,
@@ -33,7 +33,6 @@ import apiWorker from "./index";
 import {
   acceptOrganizationChannelSkillExecutionProposal,
 } from "./channel-proposal-routes";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import {
   workerCapabilitiesFixture,
   workerClaimRuntimeFixture,
@@ -151,59 +150,11 @@ const backlogEvent = (
 });
 
 describe("conversational Agent Skill execution approval", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
-  let archives: ArchiveBucket;
+  const db = cloudflareEnv.DB;
+  const archives: ArchiveBucket = cloudflareEnv.ARCHIVES;
   let sequence = 0;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "agent-skill-execution-approval",
-      miniflareOptions: {
-        modules: true,
-        script: "export default { fetch() { return new Response('ok') } }",
-        r2Buckets: ["ARCHIVES"],
-      },
-    });
-    miniflare = database.miniflare;
-    db = database.db;
-    const miniflareBucket = await miniflare.getR2Bucket("ARCHIVES");
-    archives = {
-      async head(key) {
-        const object = await miniflareBucket.head(key);
-        if (!object) return null;
-        return {
-          size: object.size,
-          checksums: {
-            sha256: object.checksums.sha256
-              ? new Uint8Array(object.checksums.sha256).slice().buffer
-              : undefined,
-          },
-          customMetadata: object.customMetadata,
-        };
-      },
-      async get(key) {
-        const object = await miniflareBucket.get(key);
-        if (!object) return null;
-        const bytes = await object.arrayBuffer();
-        return {
-          size: object.size,
-          checksums: {
-            sha256: object.checksums.sha256
-              ? new Uint8Array(object.checksums.sha256).slice().buffer
-              : undefined,
-          },
-          customMetadata: object.customMetadata,
-          body: new Blob([bytes]).stream(),
-        };
-      },
-      async put(key, value, options) {
-        return miniflareBucket.put(key, value, options);
-      },
-      async delete(keys) {
-        await miniflareBucket.delete(keys);
-      },
-    };
     const observedAt = new Date().toISOString();
     for (const [id, name, token] of [
       [ownerId, "Owner", ownerToken],
@@ -358,10 +309,6 @@ describe("conversational Agent Skill execution approval", () => {
       createdAt: observedAt,
     });
   }, 60_000);
-
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
 
   const env = () => ({
     DB: db,

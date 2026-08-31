@@ -1,5 +1,5 @@
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   decodeOrganizationAgentContextManifest,
 } from "../../src/lib/organization-agent-context-contract";
@@ -14,7 +14,6 @@ import {
   organizationAgentContextMaxEncodedPageBytes,
   OrganizationAgentContextPageTooLargeError,
 } from "./organization-agent-context";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const otherOrganizationId = "10000000-0000-4000-8000-000000000002";
@@ -49,9 +48,7 @@ const mutateEncodedCursor = (
     .replace(/=+$/u, "");
 };
 
-let miniflare: Miniflare;
-
-let db: D1Database;
+const db = cloudflareEnv.DB;
 let archives: ArchiveBucket;
 
 const insertProject = async (input: {
@@ -196,20 +193,10 @@ const insertIssue = async (input: {
 };
 
 beforeAll(async () => {
-  const database = await createIsolatedTestDatabase({
-    suite: "organization-agent-context",
-    miniflareOptions: {
-      modules: true,
-      script: "export default { fetch() { return new Response('ok') } }",
-      r2Buckets: ["ARCHIVES"],
-    },
-  });
-  miniflare = database.miniflare;
-  db = database.db;
-  const miniflareBucket = await miniflare.getR2Bucket("ARCHIVES");
+  const archiveBucket = cloudflareEnv.ARCHIVES;
   archives = {
     async head(key) {
-      const object = await miniflareBucket.head(key);
+      const object = await archiveBucket.head(key);
       if (!object) return null;
       return {
         size: object.size,
@@ -222,7 +209,7 @@ beforeAll(async () => {
       };
     },
     async get(key) {
-      const object = await miniflareBucket.get(key);
+      const object = await archiveBucket.get(key);
       if (!object) return null;
       const bytes = await object.arrayBuffer();
       return {
@@ -237,10 +224,10 @@ beforeAll(async () => {
       };
     },
     async put(key, value, options) {
-      return miniflareBucket.put(key, value, options);
+      return archiveBucket.put(key, value, options);
     },
     async delete(keys) {
-      await miniflareBucket.delete(keys);
+      await archiveBucket.delete(keys);
     },
   };
 
@@ -415,10 +402,6 @@ beforeAll(async () => {
     projectId: secondProjectId,
     createdAt: currentDataAt,
   });
-});
-
-afterAll(async () => {
-  await miniflare.dispose();
 });
 
 describe("Organization Agent context lookup", () => {

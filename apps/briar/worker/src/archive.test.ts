@@ -1,6 +1,6 @@
 import * as Predicate from "effect/Predicate";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { HuntEventInput } from "./db";
 import {
   completeWorkflowStageLifecycle,
@@ -28,10 +28,7 @@ import {
   readArchivedWorkLog,
   readLatestArchivedWorkLogForRun,
 } from "./archive";
-import {
-  createIsolatedTestDatabase,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1";
 import { archiveFormatVersion } from "./archive-contract";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
@@ -108,25 +105,14 @@ const event = (
 });
 
 describe("D1 to R2 log archives", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
+  const db = cloudflareEnv.DB;
   let bucket: ArchiveBucket;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "archive",
-      miniflareOptions: {
-        modules: true,
-        script: "export default { fetch() { return new Response('ok') } }",
-        r2Buckets: ["ARCHIVES"],
-      },
-    });
-    miniflare = database.miniflare;
-    db = database.db;
-    const miniflareBucket = await miniflare.getR2Bucket("ARCHIVES");
+    const archiveBucket = cloudflareEnv.ARCHIVES;
     bucket = {
       async head(key) {
-        const object = await miniflareBucket.head(key);
+        const object = await archiveBucket.head(key);
         if (!object) return null;
         return {
           size: object.size,
@@ -139,7 +125,7 @@ describe("D1 to R2 log archives", () => {
         };
       },
       async get(key) {
-        const object = await miniflareBucket.get(key);
+        const object = await archiveBucket.get(key);
         if (!object) return null;
         const bytes = await object.arrayBuffer();
         return {
@@ -154,10 +140,10 @@ describe("D1 to R2 log archives", () => {
         };
       },
       async put(key, value, options) {
-        return miniflareBucket.put(key, value, options);
+        return archiveBucket.put(key, value, options);
       },
       async delete(keys) {
-        await miniflareBucket.delete(keys);
+        await archiveBucket.delete(keys);
       },
     };
     await executeD1Sql(
@@ -388,10 +374,6 @@ describe("D1 to R2 log archives", () => {
       ).bind("session-archive"),
     ]);
   }, 60_000);
-
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
 
   it("archives large fixtures in bounded verified batches and restores every view", async () => {
     const before = await db

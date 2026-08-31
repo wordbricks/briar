@@ -1,23 +1,9 @@
-import type { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { describe, expect, it } from "vitest";
 import { listDashboardChanges } from "./dashboard-change-repository";
-import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 describe("dashboard change repository", () => {
-  let miniflare: Miniflare;
-  let db: D1Database;
-
-  beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "dashboard-change-repository",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
-  });
-
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
+  const db = env.DB;
 
   it("expires a cursor outside the available version window", async () => {
     await expect(

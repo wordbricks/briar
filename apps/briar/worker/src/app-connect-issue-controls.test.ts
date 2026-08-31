@@ -2,7 +2,8 @@ import { IssueService } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { WorkflowCheckpoint_Position } from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import { Code, ConnectError, createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   createIssueAttachments,
   createIssueMessage,
@@ -10,10 +11,6 @@ import {
   listIssueAttachments,
 } from "./db";
 import worker from "./index";
-import {
-  createIsolatedTestDatabase,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
 
 describe("IssueService controls", () => {
   const organizationId = "11111111-1111-4111-8111-111111111111";
@@ -34,8 +31,7 @@ describe("IssueService controls", () => {
   const attachmentObjectKey =
     `issue-attachments/${projectId}/${messageRunId}/${attachmentId}`;
   const deleteAttachmentObjects = vi.fn().mockResolvedValue(undefined);
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+  const db = env.DB;
 
   const workflow = {
     version: 2,
@@ -46,10 +42,6 @@ describe("IssueService controls", () => {
   } as const;
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "app-connect-issue-controls",
-    });
-    db = database.db;
     const users = [
       [ownerId, "Owner", "owner@example.com", "owner", tokens.owner],
       [
@@ -174,15 +166,13 @@ describe("IssueService controls", () => {
     });
   }, 60_000);
 
-  afterAll(async () => database.dispose());
-
   const client = (token: string) =>
     createClient(
       IssueService,
       createConnectTransport({
         baseUrl: "https://briar.example",
         fetch: async (input, init) =>
-          worker.fetch(new Request(input, init), {
+          worker.fetch(new Request(input, { ...init, redirect: "manual" }), {
             DB: db,
             ATTACHMENTS: { delete: deleteAttachmentObjects },
             ARCHIVES: { get: vi.fn().mockResolvedValue(null) },

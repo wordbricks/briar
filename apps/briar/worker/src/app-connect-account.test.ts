@@ -5,27 +5,18 @@ import {
   MobilePushEndpoint,
   MobilePushLocale,
 } from "@briar/contracts/gen/briar/app/v1/account_pb";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
-import {
-  createIsolatedTestDatabase,
-  executeD1Sql,
-} from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1";
 
 describe("AccountService", () => {
   const now = "2026-08-31T00:00:00.000Z";
   const ownerToken = "account-push-owner-token";
   const memberToken = "account-push-member-token";
-  let miniflare: Miniflare;
-  let db: D1Database;
+  const db = env.DB;
 
   beforeAll(async () => {
-    const database = await createIsolatedTestDatabase({
-      suite: "app-connect-account",
-    });
-    miniflare = database.miniflare;
-    db = database.db;
     await executeD1Sql(db, `
       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values
@@ -55,16 +46,12 @@ describe("AccountService", () => {
     `);
   }, 60_000);
 
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
-
   const client = createClient(
     AccountService,
     createConnectTransport({
       baseUrl: "https://briar.example",
       fetch: async (input, init) =>
-        worker.fetch(new Request(input, init), {
+        worker.fetch(new Request(input, { ...init, redirect: "manual" }), {
           DB: db,
           ATTACHMENTS: {},
           ARCHIVES: {},

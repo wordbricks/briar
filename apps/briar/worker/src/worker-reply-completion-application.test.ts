@@ -8,7 +8,8 @@ import {
   WorkClaimIdentitySchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { createHash } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { HuntEventInput } from "./db";
 import {
   claimNextIssueAgentReply,
@@ -46,10 +47,6 @@ import {
   completeIssueReplyInputFromProto,
   type PreparedReplyAttachmentUploadsInput,
 } from "./worker-reply-completion-mappers";
-import {
-  createIsolatedTestDatabase,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
 import { workerClaimRuntimeFixture } from "./test-helpers/worker-runtime";
 
 const organizationId = "a9000000-0000-4000-8000-000000000001";
@@ -92,20 +89,10 @@ const event = (sequence: number): HuntEventInput => ({
 });
 
 describe("reply completion application", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+  const db = cloudflareEnv.DB;
+  const bucket = cloudflareEnv.ATTACHMENTS;
   let agentId: string;
   let sequence = 0;
-  const objects = new Map<string, ArrayBuffer>();
-  const bucket = {
-    put: vi.fn(async (key: string, value: ArrayBuffer) => {
-      objects.set(key, value.slice(0));
-      return {};
-    }),
-    delete: vi.fn(async (key: string | string[]) => {
-      for (const item of Array.isArray(key) ? key : [key]) objects.delete(item);
-    }),
-  } as unknown as R2Bucket;
   const env = () => ({
     DB: db,
     ATTACHMENTS: bucket,
@@ -118,10 +105,6 @@ describe("reply completion application", () => {
   };
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "worker-reply-completion-application",
-    });
-    db = database.db;
     await db.batch([
       db.prepare(
         `insert into "user" (
@@ -201,8 +184,6 @@ describe("reply completion application", () => {
       workerId,
     ).run();
   }, 60_000);
-
-  afterAll(async () => database.dispose());
 
   const seedClaim = async (attempt: 1 | 2 | 3 = 1) => {
     sequence += 1;

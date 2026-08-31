@@ -11,7 +11,6 @@ import {
   ProjectGitHubService,
 } from "@briar/contracts/gen/briar/app/v1/github_pb";
 import {
-  afterAll,
   afterEach,
   beforeAll,
   describe,
@@ -19,6 +18,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { env as cloudflareEnv } from "cloudflare:workers";
 import { sha256 } from "./crypto-digest";
 import {
   connectGithubInstallation,
@@ -26,10 +26,6 @@ import {
 } from "./db";
 import { githubSha256Hex } from "./github";
 import worker from "./index";
-import {
-  createIsolatedTestDatabase,
-  type IsolatedTestDatabase,
-} from "./test-helpers/d1";
 
 const installOrganizationId = "11111111-1111-4111-8111-111111111111";
 const projectOrganizationId = "22222222-2222-4222-8222-222222222222";
@@ -66,8 +62,7 @@ const workflow = JSON.stringify({
 });
 
 describe("GitHub Connect services", () => {
-  let database: IsolatedTestDatabase;
-  let db: D1Database;
+  const db = cloudflareEnv.DB;
 
   const env = () => ({
     DB: db,
@@ -86,11 +81,6 @@ describe("GitHub Connect services", () => {
   } as never);
 
   beforeAll(async () => {
-    database = await createIsolatedTestDatabase({
-      suite: "app-connect-github",
-    });
-    db = database.db;
-
     await db.batch([
       ...[
         [ownerId, "Owner", "github-owner@example.com"],
@@ -231,15 +221,16 @@ describe("GitHub Connect services", () => {
     });
   }, 60_000);
 
-  afterAll(async () => database.dispose());
-
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
   const transport = () => createConnectTransport({
     baseUrl: "https://briar.example",
-    fetch: async (input, init) => worker.fetch(new Request(input, init), env()),
+    fetch: async (input, init) => worker.fetch(
+      new Request(input, { ...init, redirect: "manual" }),
+      env(),
+    ),
   });
 
   const integrationClient = () => createClient(
