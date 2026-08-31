@@ -26,7 +26,6 @@ export const commands = {
 	clearSessionToken: () => __TAURI_INVOKE<null>("clear_session_token"),
 	setAppBadgeCount: (count: number) => __TAURI_INVOKE<null>("set_app_badge_count", { count }),
 	validateRepositoryPath: (path: string) => __TAURI_INVOKE<string>("validate_repository_path", { path }),
-	cloneGithubSshRepository: (repositoryUrl: string) => __TAURI_INVOKE<ClonedProjectRepository>("clone_github_ssh_repository", { repositoryUrl }),
 	createProjectWorkspace: (name: string) => __TAURI_INVOKE<CreatedProjectWorkspace>("create_project_workspace", { name }),
 	inspectLovableRepositoryCompatibility: (repositoryPath: string) => __TAURI_INVOKE<LovableRepositoryCompatibility>("inspect_lovable_repository_compatibility", { repositoryPath }),
 	inspectRepositoryReadiness: (repositoryPath: string, workflow: WorkflowConfig_Deserialize) => __TAURI_INVOKE<RepositoryReadiness>("inspect_repository_readiness", { repositoryPath, workflow }),
@@ -371,11 +370,6 @@ export type BrowserAutomationProvider = "ego-browser" | "agent-browser" | "aside
 
 export type BrowserAutomationSettings = {
 	provider: BrowserAutomationProvider,
-};
-
-export type ClonedProjectRepository = {
-	repositoryPath: string,
-	repositoryName: string,
 };
 
 export type ConnectedLocalProject = ConnectedLocalProject_Serialize | ConnectedLocalProject_Deserialize;
@@ -738,6 +732,7 @@ export type RepositoryReadiness = {
 	remoteReachable: boolean,
 	pushAccess: boolean,
 	requiresGithub: boolean,
+	githubRepositoryId: number | null,
 	githubRepository: string | null,
 	ghInstalled: boolean,
 	ghVersion: string | null,

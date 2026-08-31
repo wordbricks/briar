@@ -159,27 +159,3 @@ export async function updateProjectSettings(
     .run();
   return await getProjectSettings(db, projectId);
 }
-
-export async function bindProjectGithubRepositoryIdentity(
-  db: D1Database,
-  projectId: string,
-  input: { repositoryId: number; repository: string },
-) {
-  const updatedAt = new Date().toISOString();
-  const result = await db
-    .prepare(
-      `update briar_project_settings
-       set github_repository_id = ?, github_repository = ?, updated_at = ?
-       where project_id = ? and github_repository is not null
-         and (github_repository_id is null or github_repository_id = ?)`,
-    )
-    .bind(
-      input.repositoryId,
-      input.repository,
-      updatedAt,
-      projectId,
-      input.repositoryId,
-    )
-    .run();
-  return (result.meta.changes ?? 0) > 0;
-}

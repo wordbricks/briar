@@ -476,6 +476,7 @@ pub(super) struct RepositoryReadiness {
     pub(super) remote_reachable: bool,
     pub(super) push_access: bool,
     pub(super) requires_github: bool,
+    pub(super) github_repository_id: Option<u64>,
     pub(super) github_repository: Option<String>,
     pub(super) gh_installed: bool,
     pub(super) gh_version: Option<String>,

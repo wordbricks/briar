@@ -80,7 +80,6 @@ pub(super) fn builder() -> Builder<tauri::Wry> {
             clear_session_token,
             set_app_badge_count,
             validate_repository_path,
-            clone_github_ssh_repository,
             create_project_workspace,
             inspect_lovable_repository_compatibility,
             inspect_repository_readiness,

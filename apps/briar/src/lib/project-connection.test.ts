@@ -4,9 +4,11 @@ import {
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
 import {
+  prepareConfiguredProjectRepository,
   preflightThenCreateProject,
   resolveProjectConnectionWorkflow,
 } from "./project-connection";
+import type { ProjectGithubCredential } from "./api";
 
 const configuredWorkflow: AutoHuntWorkflow = {
   version: 2,
@@ -108,5 +110,68 @@ describe("project creation preflight", () => {
     )).rejects.toThrow("cancelled");
 
     expect(create).not.toHaveBeenCalled();
+  });
+});
+
+describe("configured project repository preparation", () => {
+  const credential: ProjectGithubCredential = {
+    project: { id: "project-1", organizationId: "organization-1" },
+    repository: {
+      id: 123456789,
+      fullName: "wordbricks/briar",
+      cloneUrl: "https://github.com/wordbricks/briar.git",
+    },
+    username: "x-access-token",
+    password: "installation-token",
+    expiresAt: "2026-08-31T12:00:00.000Z",
+  };
+  const prepared = {
+    repositoryPath: "/managed/project-1/repository",
+    repositoryId: credential.repository.id,
+    repository: credential.repository.fullName,
+    reused: false,
+    completedSteps: ["clone"],
+  };
+
+  it("prepares a selected repository with its immutable identity", async () => {
+    const createCredential = vi.fn(async () => credential);
+    const prepareRepository = vi.fn(async () => prepared);
+
+    await expect(prepareConfiguredProjectRepository(
+      {
+        githubRepository: credential.repository.fullName,
+        githubRepositoryId: credential.repository.id,
+      },
+      createCredential,
+      prepareRepository,
+    )).resolves.toEqual({ credential, prepared });
+
+    expect(createCredential).toHaveBeenCalledOnce();
+    expect(prepareRepository).toHaveBeenCalledWith(credential);
+  });
+
+  it("rejects an incomplete repository identity before requesting credentials", async () => {
+    const createCredential = vi.fn(async () => credential);
+    const prepareRepository = vi.fn(async () => prepared);
+
+    await expect(prepareConfiguredProjectRepository(
+      { githubRepository: null, githubRepositoryId: null },
+      createCredential,
+      prepareRepository,
+    )).rejects.toThrow("프로젝트 저장소를 먼저 선택");
+
+    expect(createCredential).not.toHaveBeenCalled();
+    expect(prepareRepository).not.toHaveBeenCalled();
+  });
+
+  it("compares the prepared clone with the server credential", async () => {
+    await expect(prepareConfiguredProjectRepository(
+      {
+        githubRepository: credential.repository.fullName,
+        githubRepositoryId: credential.repository.id,
+      },
+      async () => credential,
+      async () => ({ ...prepared, repositoryId: 987654321 }),
+    )).rejects.toThrow("프로젝트의 GitHub 저장소와 일치하지 않습니다");
   });
 });

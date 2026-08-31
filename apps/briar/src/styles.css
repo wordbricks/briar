@@ -2594,7 +2594,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-onboarding-dialog-toolbar .project-onboarding-dialog-close { width:34px; padding:0; }
 .project-onboarding-dialog-body { min-height:0; padding:34px 40px 40px; overflow-y:auto; overscroll-behavior:contain; }
 .project-start-choice > .eyebrow { margin-bottom:8px; }
-.project-start-choice-grid { margin-top:8px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.project-start-choice-grid { margin-top:8px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .onboarding-icon.lovable { color:var(--status-destructive-foreground); background:var(--status-destructive-surface); }
 .lovable-video-frame { width:100%; aspect-ratio:389/270; overflow:hidden; border:1px solid #dedde4; border-radius:16px; background:#18171c; box-shadow:0 10px 28px rgba(35,31,47,.12); }
 .lovable-video-frame video { width:100%; height:100%; display:block; object-fit:contain; }

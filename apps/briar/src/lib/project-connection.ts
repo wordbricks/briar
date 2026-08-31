@@ -4,8 +4,8 @@ import {
   isRepositoryWorkflowPending,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
-import { commands } from "../generated/tauri";
-import type { OrganizationRole } from "../types";
+import { commands, type PreparedProjectRepository } from "../generated/tauri";
+import type { OrganizationRole, ProjectSettings } from "../types";
 import type { ProjectGithubCredential } from "./api";
 import { hasOrganizationCapability } from "./organization-role";
 
@@ -20,6 +20,38 @@ export type LocalAutoHuntConfig = {
   workflow: AutoHuntWorkflow;
 };
 
+export async function prepareConfiguredProjectRepository(
+  settings: Pick<ProjectSettings, "githubRepository" | "githubRepositoryId">,
+  createCredential: () => Promise<ProjectGithubCredential>,
+  prepareRepository: (
+    credential: ProjectGithubCredential,
+  ) => Promise<PreparedProjectRepository>,
+) {
+  if (!settings.githubRepository || settings.githubRepositoryId === null) {
+    throw new Error(
+      "조직의 GitHub App에서 프로젝트 저장소를 먼저 선택해 주세요.",
+    );
+  }
+
+  const credential = await createCredential();
+  if (
+    credential.repository.id !== settings.githubRepositoryId ||
+    credential.repository.fullName.toLowerCase() !==
+      settings.githubRepository.toLowerCase()
+  ) {
+    throw new Error("GitHub 자격 증명이 프로젝트 저장소와 일치하지 않습니다.");
+  }
+  const prepared = await prepareRepository(credential);
+  if (
+    prepared.repositoryId !== credential.repository.id ||
+    prepared.repository.toLowerCase() !==
+      credential.repository.fullName.toLowerCase()
+  ) {
+    throw new Error("준비한 저장소가 프로젝트의 GitHub 저장소와 일치하지 않습니다.");
+  }
+
+  return { credential, prepared };
+}
 export async function preflightThenCreateProject<T>(
   preflight: () => Promise<T>,
   create?: () => Promise<unknown>,
@@ -93,13 +125,6 @@ export async function createProjectWorkspace(name: string) {
     throw new Error("새 프로젝트 폴더 만들기는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
   return commands.createProjectWorkspace(name);
-}
-
-export async function cloneGithubSshRepository(repositoryUrl: string) {
-  if (!isTauri()) {
-    throw new Error("GitHub 저장소 가져오기는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
-  }
-  return commands.cloneGithubSshRepository(repositoryUrl);
 }
 
 export async function prepareProjectRepository(

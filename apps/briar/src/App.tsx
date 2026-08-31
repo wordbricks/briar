@@ -4784,7 +4784,6 @@ export function App({
               requirements: health?.requirements ?? [],
             };
           }}
-          onCloneRepository={briar.cloneProjectRepository}
           onConnect={briar.connectProject}
           onCreate={briar.addProject}
           onFinish={() => {
@@ -4797,9 +4796,11 @@ export function App({
           }}
           onInspectLovableRepository={briar.inspectLovableProject}
           onPreflight={briar.preflightProjectConnection}
+          onPrepareGithubRepository={briar.prepareGithubProjectRepository}
           onReviseWorkflow={briar.reviseWorkflow}
           onRepositorySelect={briar.selectProjectRepository}
           onRepositoryInspect={briar.inspectProjectRepository}
+          onResolveGithubRepository={briar.resolveGithubProjectRepository}
         />
       ) : null}
       <WorkerDispatchDialog

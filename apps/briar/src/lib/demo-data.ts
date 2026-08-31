@@ -365,6 +365,7 @@ export const demoRepositoryReadiness: RepositoryReadiness = {
   remoteReachable: true,
   pushAccess: true,
   requiresGithub: true,
+  githubRepositoryId: null,
   githubRepository: "wordbricks/briar",
   ghInstalled: true,
   ghVersion: "gh version 2.94.0",

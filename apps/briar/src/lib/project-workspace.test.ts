@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  githubSshRepositoryName,
+  githubRepositoryFromUrl,
   repositoryProjectName,
 } from "./project-workspace";
 
@@ -16,15 +16,28 @@ describe("repositoryProjectName", () => {
   });
 });
 
-describe("githubSshRepositoryName", () => {
-  it("extracts repository names from GitHub SSH clone URLs", () => {
-    expect(githubSshRepositoryName("git@github.com:wordbricks/briar.git")).toBe("briar");
-    expect(githubSshRepositoryName("ssh://git@github.com/wordbricks/my-app.git")).toBe("my-app");
+describe("githubRepositoryFromUrl", () => {
+  it("accepts GitHub HTTPS and SSH clone URLs", () => {
+    expect(githubRepositoryFromUrl(
+      "https://github.com/wordbricks/briar.git",
+    )).toEqual({ fullName: "wordbricks/briar", name: "briar" });
+    expect(githubRepositoryFromUrl(
+      "git@github.com:wordbricks/briar.git",
+    )).toEqual({ fullName: "wordbricks/briar", name: "briar" });
+    expect(githubRepositoryFromUrl(
+      "ssh://git@github.com/wordbricks/my-app.git",
+    )).toEqual({ fullName: "wordbricks/my-app", name: "my-app" });
   });
 
-  it("rejects non-GitHub and unsafe repository paths", () => {
-    expect(githubSshRepositoryName("https://github.com/wordbricks/briar.git")).toBeNull();
-    expect(githubSshRepositoryName("git@gitlab.com:wordbricks/briar.git")).toBeNull();
-    expect(githubSshRepositoryName("git@github.com:wordbricks/../briar.git")).toBeNull();
+  it("rejects non-GitHub URLs and unsafe or nested paths", () => {
+    expect(githubRepositoryFromUrl(
+      "https://gitlab.com/wordbricks/briar.git",
+    )).toBeNull();
+    expect(githubRepositoryFromUrl(
+      "https://github.com/wordbricks/briar/issues",
+    )).toBeNull();
+    expect(githubRepositoryFromUrl(
+      "git@github.com:wordbricks/../briar.git",
+    )).toBeNull();
   });
 });

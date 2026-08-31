@@ -18,10 +18,7 @@ import {
 import { HttpError } from "./http-response";
 import { hasOrganizationCapability } from "./organization-access";
 import { getProject } from "./project-command-repository";
-import {
-  bindProjectGithubRepositoryIdentity,
-  getProjectSettings,
-} from "./project-settings-repository";
+import { getProjectSettings } from "./project-settings-repository";
 import { decodeRequestSync } from "./request-schema";
 import {
   defaulted,
@@ -140,7 +137,7 @@ export async function projectGithubIdentity(
     getProjectSettings(db, project.id),
     getGithubConnectionForOrganization(db, project.organization_id),
   ]);
-  if (!settings?.github_repository) {
+  if (!settings?.github_repository || settings.github_repository_id === null) {
     throw new HttpError(409, "Connect a GitHub repository to this project");
   }
   if (!connection) {
@@ -151,12 +148,8 @@ export async function projectGithubIdentity(
     connection.installation_id,
   );
   const repository = repositories.find((candidate) =>
-    settings.github_repository_id
-      ? candidate.repository_id === settings.github_repository_id &&
-        candidate.full_name.toLowerCase() ===
-          settings.github_repository!.toLowerCase()
-      : candidate.full_name.toLowerCase() ===
-        settings.github_repository!.toLowerCase()
+    candidate.repository_id === settings.github_repository_id &&
+    candidate.full_name.toLowerCase() === settings.github_repository!.toLowerCase()
   );
   if (!repository) {
     throw new HttpError(
@@ -164,19 +157,6 @@ export async function projectGithubIdentity(
       "The project repository is not included in the GitHub App installation",
       "GITHUB_REPOSITORY_IDENTITY_MISMATCH",
     );
-  }
-  if (!settings.github_repository_id) {
-    const bound = await bindProjectGithubRepositoryIdentity(db, project.id, {
-      repositoryId: repository.repository_id,
-      repository: repository.full_name,
-    });
-    if (!bound) {
-      throw new HttpError(
-        409,
-        "The project repository changed while GitHub access was being prepared",
-        "GITHUB_REPOSITORY_IDENTITY_CHANGED",
-      );
-    }
   }
   return {
     installationId: connection.installation_id,
