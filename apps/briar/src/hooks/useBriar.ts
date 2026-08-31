@@ -33,6 +33,7 @@ import {
   isApiConfigured,
   loadDashboard,
   loadDashboardDelta,
+  loadGithubIntegration,
   loadIssueAttachment,
   loadIssueMessages,
   loadRunEvents,
@@ -73,7 +74,6 @@ import {
 import { deleteAndroidPushRegistration } from "../lib/inbox-notifications";
 import { isRepositoryConnectedForImport } from "../lib/linear-import";
 import {
-  cloneGithubSshRepository,
   configureLocalExecutionWorker,
   connectLocalProject,
   createProjectWorkspace,
@@ -95,6 +95,7 @@ import {
   updateLocalProjectWorkflow,
   type AutoHuntHealth,
   type LocalAutoHuntConfig,
+  type PreparedProjectRepository,
   type RepositoryReadiness,
   type VelenInspection,
 } from "../lib/project-connection";
@@ -1728,11 +1729,42 @@ export function useBriar(options: UseBriarOptions = {}) {
     return await createProjectWorkspace(name);
   }, []);
 
-  const cloneProjectRepository = useCallback(async (repositoryUrl: string) => {
+  const prepareGithubProjectRepository = useCallback(async (
+    projectId: string,
+    githubRepository: string,
+  ): Promise<PreparedProjectRepository> => {
+    if (!token) throw new Error("로그인이 필요합니다.");
     setLoading(true);
     setError(null);
     try {
-      return await cloneGithubSshRepository(repositoryUrl);
+      const projectDashboard = await loadDashboard(token, projectId);
+      const saved = await updateProjectSettings(token, projectId, {
+        ...projectDashboard.settings,
+        githubRepository,
+      });
+      const { credential, prepared } =
+        await prepareConfiguredProjectRepository(
+          saved.settings,
+          () => createProjectGithubCredential(token, projectId),
+          (projectCredential) =>
+            prepareProjectRepository(projectId, projectCredential),
+        );
+      const connectedSettings = {
+        ...saved.settings,
+        githubRepositoryId: credential.repository.id,
+        githubRepository: credential.repository.fullName,
+      };
+      setDashboard((current) =>
+        current?.project.id === projectId
+          ? { ...current, settings: connectedSettings }
+          : { ...projectDashboard, settings: connectedSettings }
+      );
+      setProjectConnection((current) =>
+        current?.project.id === projectId
+          ? { ...current, workflow: connectedSettings.workflow }
+          : current
+      );
+      return prepared;
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : String(caught);
       setError(message);
@@ -1740,7 +1772,32 @@ export function useBriar(options: UseBriarOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token]);
+
+  const resolveGithubProjectRepository = useCallback(async (
+    githubRepository: string,
+  ) => {
+    if (!token) throw new Error("로그인이 필요합니다.");
+    if (!activeOrganizationId) {
+      throw new Error("GitHub App을 연결할 조직을 먼저 선택해 주세요.");
+    }
+    const integration = await loadGithubIntegration(
+      token,
+      activeOrganizationId,
+    );
+    if (!integration.connected) {
+      throw new Error("조직 설정에서 GitHub App을 먼저 연결해 주세요.");
+    }
+    const repository = integration.repositories.find((candidate) =>
+      candidate.fullName.toLowerCase() === githubRepository.toLowerCase()
+    );
+    if (!repository) {
+      throw new Error(
+        "입력한 저장소가 조직 GitHub App의 저장소 접근 범위에 없습니다.",
+      );
+    }
+    return repository.fullName;
+  }, [activeOrganizationId, token]);
 
   const inspectLovableProject = useCallback(
     async (repositoryPath: string) =>
@@ -3957,7 +4014,6 @@ export function useBriar(options: UseBriarOptions = {}) {
     changeProjectIssueKeyPrefix,
     changeProjectScheduleTab,
     checkOrganizationHandle,
-    cloneProjectRepository,
     connectProject,
     connectedProjectIds,
     activeProjectConnectionState: localProjectConnectionState(
@@ -4043,6 +4099,8 @@ export function useBriar(options: UseBriarOptions = {}) {
     inspectProjectRepository: inspectRepositoryReadiness,
     inspectLovableProject,
     preflightProjectConnection,
+    prepareGithubProjectRepository,
+    resolveGithubProjectRepository,
     startWorkingOnProject,
     repairHealth,
     retryRun: (runId: string) => recoverRun(runId, "retry"),

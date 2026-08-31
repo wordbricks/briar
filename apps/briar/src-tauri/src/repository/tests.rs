@@ -273,29 +273,6 @@ fn project_folder_names_stay_filesystem_safe() {
 }
 
 #[test]
-fn github_ssh_urls_produce_safe_repository_names() {
-    assert_eq!(
-        github_ssh_repository_name("git@github.com:wordbricks/briar.git").as_deref(),
-        Ok("briar")
-    );
-    assert_eq!(
-        github_ssh_repository_name("ssh://git@github.com/wordbricks/my-app.git").as_deref(),
-        Ok("my-app")
-    );
-    assert!(github_ssh_repository_name("https://github.com/wordbricks/briar.git").is_err());
-    assert!(github_ssh_repository_name("git@github.com:wordbricks/../briar.git").is_err());
-}
-
-#[test]
-fn git_clone_errors_explain_common_ssh_problems() {
-    assert!(
-        friendly_git_clone_error("git@github.com: Permission denied (publickey).")
-            .contains("SSH 키")
-    );
-    assert!(friendly_git_clone_error("ERROR: Repository not found.").contains("권한"));
-}
-
-#[test]
 fn new_projects_get_an_initialized_git_repository() {
     let Ok(git) = which::which("git") else {
         return;
