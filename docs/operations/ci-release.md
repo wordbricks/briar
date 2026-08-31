@@ -55,7 +55,7 @@ the presence of a same-version runtime alone is insufficient because Xcode can
 reject prerelease or otherwise incompatible runtime builds.
 `bun run mobile:ci` then:
 
-- checks generated Companion OpenAPI/Swift artifacts and exercises the canonical Worker route and client decoders;
+- checks the canonical Buf descriptor and generated TypeScript/Swift Connect artifacts, and exercises representative generated client-to-Worker service boundaries;
 - builds and runs the independent SwiftUI App, Unit Test, and UI Test targets;
 - analyzes and builds the SwiftUI Production configuration without signing; and
 - builds the retained Tauri Android debug APK.
