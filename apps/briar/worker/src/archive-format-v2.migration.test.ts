@@ -139,6 +139,13 @@ describe("archive format v2 migration", () => {
       "logs/v1/archive-rejected.jsonl.gz",
       1,
     )).rejects.toThrow();
+    await expect(db.prepare(
+      `update briar_log_archives
+       set related_object_keys_json = '[" leading-space"]'
+       where id = ?`,
+    ).bind("1".repeat(64)).run()).rejects.toThrow(
+      /invalid archive related object key/iu,
+    );
     expect((await db.prepare(`pragma foreign_key_check`).all()).results)
       .toEqual([]);
   });

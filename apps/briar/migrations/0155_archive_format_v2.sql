@@ -184,3 +184,29 @@ begin
 end;
 
 pragma foreign_keys = on;
+
+-- Related object keys are cleanup identities. The v2 cutover above retires
+-- every pre-contract archive, so only future writes need to be guarded.
+create trigger briar_archive_related_object_keys_insert_guard
+before insert on briar_log_archives
+when exists (
+  select 1 from json_each(new.related_object_keys_json) related
+  where related.type <> 'text'
+    or related.value <> trim(related.value)
+    or length(related.value) not between 1 and 1024
+)
+begin
+  select raise(abort, 'invalid archive related object key');
+end;
+
+create trigger briar_archive_related_object_keys_update_guard
+before update of related_object_keys_json on briar_log_archives
+when exists (
+  select 1 from json_each(new.related_object_keys_json) related
+  where related.type <> 'text'
+    or related.value <> trim(related.value)
+    or length(related.value) not between 1 and 1024
+)
+begin
+  select raise(abort, 'invalid archive related object key');
+end;

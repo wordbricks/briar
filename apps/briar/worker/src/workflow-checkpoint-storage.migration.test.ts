@@ -1,6 +1,5 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { recordHuntEvent } from "./db";
 import {
   applyD1Migrations,
   executeD1Sql,
@@ -34,7 +33,7 @@ describe("workflow checkpoint storage migration", () => {
     }]);
 
     await applyD1Migrations(db, {
-      through: "0159_canonical_archive_related_object_keys.sql",
+      through: "0158_canonical_channel_message_blocks.sql",
     });
     await executeD1Sql(db, `
       insert into "user" (
@@ -84,33 +83,16 @@ describe("workflow checkpoint storage migration", () => {
       now,
       now,
     ).run();
-    const runId = await recordHuntEvent(db, "checkpoint-project", {
-      source: "issue",
-      sourceKey: "checkpoint-migration",
-      title: "Checkpoint migration",
-      stage: "queued",
-      status: "backlog",
-      workflowStage: null,
-      eventKey: "checkpoint-migration:backlog",
-      occurredAt: now,
-      actor: "migration-test",
-      repository: "Checkpoint Project",
-      detail: null,
-      priority: null,
-      branch: null,
-      commitSha: null,
-      tracker: null,
-      issueDescription: null,
-      resultSummary: null,
-      structuredResult: null,
-      pullRequestUrls: [],
-      targetSha: null,
-      sourceCreatedAt: now,
-      qaStatus: null,
-      stagingQaDetail: null,
-      productionQaDetail: null,
-      context: null,
-    });
+    const runId = "checkpoint-migration-run";
+    await db.prepare(
+      `insert into briar_hunt_runs (
+         id, project_id, source, source_key, title, stage, status,
+         workflow_snapshot_json, repository, context_json,
+         started_at, last_event_at, created_at, updated_at
+       ) values (?, 'checkpoint-project', 'issue', 'checkpoint-migration',
+         'Checkpoint migration', 'queued', 'backlog', ?,
+         'Checkpoint Project', '{}', ?, ?, ?, ?)`,
+    ).bind(runId, workflow, now, now, now, now).run();
 
     const legacyProjectCheckpoint = JSON.stringify([{
       ...JSON.parse(projectCheckpoint)[0],
