@@ -6,6 +6,7 @@ import {
   normalizeAutoHuntWorkflow,
   repositoryWorkflowBootstrap,
 } from "../../src/lib/auto-hunt-contract";
+import { encodeStructuredAgentResultJson } from "../../src/lib/agent-result";
 import type { HuntEventInput } from "./db";
 import {
   getDashboardSyncCursor,
@@ -4771,12 +4772,21 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
              commit_sha = 'aabbcc1', target_sha = 'ddeeff2',
              pull_request_urls = '["https://github.example/pr/1"]',
              result_summary = 'Original result',
-             structured_result_json = '{"summary":"Original result"}',
+             structured_result_json = ?,
              staging_qa_status = 'passed', production_qa_status = 'passed',
              completed_at = ?, last_event_at = ?, updated_at = ?
          where id = ?`,
       )
-      .bind(atMinute(77), atMinute(77), atMinute(77), runId)
+      .bind(
+        encodeStructuredAgentResultJson({
+          ...completedStructuredResult,
+          summary: "Original result",
+        }),
+        atMinute(77),
+        atMinute(77),
+        atMinute(77),
+        runId,
+      )
       .run();
     await db
       .prepare(

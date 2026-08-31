@@ -1,13 +1,10 @@
-import * as Option from "effect/Option";
 import {
   autoHuntWorkflowStageCatalog,
   normalizeAutoHuntWorkflow,
 } from "../../src/lib/auto-hunt-contract";
-import {
-  decodeStructuredAgentResultOption,
-  type StructuredAgentResult,
-} from "../../src/lib/agent-result";
+import type { StructuredAgentResult } from "../../src/lib/agent-result";
 import { inboxSessionMessageVersion } from "../../src/lib/inbox-session-version";
+import { parseStructuredResult } from "./agent-result-json";
 import type {
   ChannelConversationNotificationRow,
   HuntRunRow,
@@ -208,16 +205,7 @@ function workflowStageLabel(run: InboxFeedRun) {
 }
 
 function structuredResult(run: InboxFeedRun) {
-  if (!run.structured_result_json) return null;
-  try {
-    return Option.getOrNull(
-      decodeStructuredAgentResultOption(
-        JSON.parse(run.structured_result_json),
-      ),
-    );
-  } catch {
-    return null;
-  }
+  return parseStructuredResult(run.structured_result_json);
 }
 
 /**

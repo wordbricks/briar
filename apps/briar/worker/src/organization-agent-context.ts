@@ -1,9 +1,8 @@
-import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
-import { decodeStructuredAgentResultOption } from "../../src/lib/agent-result";
 import { IsoDateTimeWithOffset } from "../../src/lib/date-time-schema";
 import type { OrganizationAgentContextLookupRequest } from "../../src/lib/organization-agent-context-contract";
+import { parseStructuredResult } from "./agent-result-json";
 import {
   type ArchiveBucket,
   type ArchiveMetadataRow,
@@ -296,9 +295,7 @@ type ContextIssueRow = {
 };
 
 const contextIssueJson = (row: ContextIssueRow) => {
-  const structuredResult = Option.getOrNull(
-    decodeStructuredAgentResultOption(parseJson(row.structured_result_json)),
-  );
+  const structuredResult = parseStructuredResult(row.structured_result_json);
   return {
     id: row.id,
     projectId: row.project_id,

@@ -1,4 +1,5 @@
 import * as Equivalence from "effect/Equivalence";
+import { encodeStructuredAgentResultJson } from "../../src/lib/agent-result";
 import {
   isTerminalTrackerState,
   additionalWorkflowCheckpoints,
@@ -443,7 +444,7 @@ export async function recordHuntEvent(
         normalizedInput.issueDescription,
         normalizedInput.resultSummary,
         normalizedInput.structuredResult
-          ? stableJson(normalizedInput.structuredResult)
+          ? encodeStructuredAgentResultJson(normalizedInput.structuredResult)
           : null,
         stableJson(mergedPullRequestUrls),
         normalizedInput.targetSha,
@@ -591,7 +592,7 @@ export async function recordHuntEvent(
         normalizedInput.resultSummary,
         normalizedInput.occurredAt,
         normalizedInput.structuredResult
-          ? stableJson(normalizedInput.structuredResult)
+          ? encodeStructuredAgentResultJson(normalizedInput.structuredResult)
           : null,
         stableJson(mergedPullRequestUrls),
         normalizedInput.occurredAt,

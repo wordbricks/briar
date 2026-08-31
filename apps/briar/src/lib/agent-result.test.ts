@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import {
   decodeStructuredAgentResult,
-  decodeStructuredAgentResultOption,
+  decodeStructuredAgentResultJson,
+  encodeStructuredAgentResultJson,
   StructuredAgentResult,
 } from "./agent-result";
 
@@ -66,14 +66,16 @@ describe("structured agent result", () => {
     ).toThrow(/excess property/u);
   });
 
-  it("offers an Option decoder for invalid persisted results", () => {
-    expect(
-      Option.isNone(
-        decodeStructuredAgentResultOption({
-          ...routineCompletion,
-          outcome: "unknown",
-        }),
-      ),
-    ).toBe(true);
+  it("round-trips canonical stored JSON and rejects corrupt rows", () => {
+    const encoded = encodeStructuredAgentResultJson(routineCompletion);
+    expect(decodeStructuredAgentResultJson(encoded)).toEqual(
+      routineCompletion,
+    );
+    expect(() => decodeStructuredAgentResultJson("{not-json"))
+      .toThrow();
+    expect(() => decodeStructuredAgentResultJson(JSON.stringify({
+      ...routineCompletion,
+      outcome: "unknown",
+    }))).toThrow();
   });
 });

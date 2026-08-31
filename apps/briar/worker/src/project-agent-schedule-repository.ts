@@ -1,4 +1,7 @@
-import type { StructuredAgentResult } from "../../src/lib/agent-result";
+import {
+  encodeStructuredAgentResultJson,
+  type StructuredAgentResult,
+} from "../../src/lib/agent-result";
 import {
   nextProjectAgentScheduleRunAt,
   parseProjectAgentScheduleDays,
@@ -657,7 +660,7 @@ export async function completeProjectAgentScheduleRun(
       input.status,
       input.observedAt,
       input.resultSummary,
-      stableJson(input.structuredResult),
+      encodeStructuredAgentResultJson(input.structuredResult),
       input.error,
       input.observedAt,
       runId,
