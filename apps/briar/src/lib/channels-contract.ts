@@ -1126,9 +1126,7 @@ export const channelIssueProposalPayloadSchema = Schema.Struct({
       Schema.Trim.check(Schema.isMaxLength(100_000)),
     ),
     priority: Schema.NullOr(between(1, 4)),
-      // Read compatibility for proposals persisted by pre-approval-boundary
-      // Workers. Acceptance always normalizes either value to backlog.
-    status: Schema.Literals(["backlog", "queued"]),
+    status: Schema.Literal("backlog"),
   })),
   executeAfterCreate: defaulted(Schema.Boolean, false),
 });

@@ -32,6 +32,7 @@ import {
   createIsolatedTestDatabase,
   executeD1Sql,
 } from "./test-helpers/d1";
+import { archiveFormatVersion } from "./archive-contract";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 let runId = "";
@@ -595,7 +596,7 @@ describe("D1 to R2 log archives", () => {
            related_object_keys_json
          ) values (
            ?, ?, null, 'expiry-bucket-separation', 'run_evidence', ?,
-           1, 'complete', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, 0, null, ?
+           ${archiveFormatVersion}, 'complete', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, 0, null, ?
          )`,
       )
       .bind(
@@ -680,7 +681,7 @@ describe("D1 to R2 log archives", () => {
            related_object_keys_json
          ) values (
            ?, ?, null, 'live-destination-metadata', 'run_evidence', ?,
-           1, 'complete', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, 0, null, ?
+           ${archiveFormatVersion}, 'complete', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, 0, null, ?
          )`,
       )
       .bind(
@@ -740,11 +741,42 @@ describe("D1 to R2 log archives", () => {
     ).toBe(1);
   });
 
+  it("cleans unreferenced cutover objects while their project is still live", async () => {
+    const archiveObjectKey = "logs/v1/cutover/live-project.jsonl.gz";
+    const relatedObjectKey = "run-evidence/cutover/live-project.png";
+    await enqueueArchiveCleanup(
+      db,
+      projectId,
+      null,
+      { archives: [archiveObjectKey], attachments: [relatedObjectKey] },
+      observedAt,
+    );
+    const archiveDeletes: Array<string | string[]> = [];
+    const attachmentDeletes: Array<string | string[]> = [];
+
+    await expect(processArchiveCleanupQueue(
+      db,
+      deleteOnlyBucket((keys) => {
+        archiveDeletes.push(keys);
+      }),
+      deleteOnlyBucket((keys) => {
+        attachmentDeletes.push(keys);
+      }),
+      observedAt,
+      10,
+    )).resolves.toEqual({ deleted: 2, failed: 0 });
+    expect(archiveDeletes).toEqual([archiveObjectKey]);
+    expect(attachmentDeletes).toEqual([relatedObjectKey]);
+    expect(await db.prepare(
+      `select count(*) as count from briar_projects where id = ?`,
+    ).bind(projectId).first<number>("count")).toBe(1);
+  });
+
   it("plans cleanup for historical project archives that cascade with the current run", async () => {
     const historicalProjectId = "22222222-2222-4222-8222-222222222222";
     const historicalArchiveId = "c".repeat(64);
     const historicalObjectKey =
-      `logs/v1/projects/${historicalProjectId}/runs/${runId}/execution_audit/` +
+      `logs/v${archiveFormatVersion}/projects/${historicalProjectId}/runs/${runId}/execution_audit/` +
       `${historicalArchiveId}.jsonl.gz`;
     await executeD1Sql(
       db,
@@ -766,7 +798,7 @@ describe("D1 to R2 log archives", () => {
        ) values (
          '${historicalArchiveId}', '${historicalProjectId}', '${runId}',
          '${runId}', 'execution_audit', '${historicalObjectKey}',
-         1, 'complete', 1, 1,
+         ${archiveFormatVersion}, 'complete', 1, 1,
          'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
          'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
          '${oldTime}', '${oldTime}', '${oldTime}', '${oldTime}', '${oldTime}',
@@ -856,7 +888,7 @@ describe("D1 to R2 log archives", () => {
                related_object_keys_json
              ) values (
                ?, ?, null, 'cleanup-reference-race', 'run_evidence', ?,
-               1, 'complete', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, 0, null, ?
+               ${archiveFormatVersion}, 'complete', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, 0, null, ?
              )`,
           )
           .bind(

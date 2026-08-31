@@ -491,14 +491,19 @@ const messagesCandidate = async (
   const result = await db
     .prepare(
       `select message.id, message.run_id, message.parent_message_id,
-              message.author_user_id, message.author_agent_provider,
-              author.name as author_name, author.image as author_image,
-              message.body,
+              message.author_user_id, message.author_agent_id,
+              message.author_agent_name, message.author_agent_provider,
+              coalesce(author.name, message.author_agent_name) as author_name,
+              author.image as author_image,
+              agent.avatar as author_agent_image, message.body,
               (select count(*) from briar_issue_messages reply
                where reply.parent_message_id = message.id) as reply_count,
               message.created_at, message.updated_at
        from briar_issue_messages message
        left join "user" author on author.id = message.author_user_id
+       left join briar_project_agents agent
+         on agent.id = message.author_agent_id
+        and agent.project_id = message.project_id
        where message.id in (
          with recursive thread_messages(id) as (
            select ?
@@ -1433,20 +1438,6 @@ export async function processArchiveCleanupQueue(
        from briar_archive_cleanup_queue queue
        where queue.dead_lettered_at is null
          and (queue.next_attempt_at is null or queue.next_attempt_at <= ?)
-         and (
-           (
-             queue.run_id is not null
-             and not exists (
-               select 1 from briar_hunt_runs run where run.id = queue.run_id
-             )
-           ) or (
-             queue.run_id is null
-             and not exists (
-               select 1 from briar_projects project
-               where project.id = queue.project_id
-             )
-           )
-         )
        order by coalesce(queue.next_attempt_at, queue.queued_at),
                 queue.queued_at, queue.bucket, queue.object_key
        limit ?`,
@@ -1464,16 +1455,6 @@ export async function processArchiveCleanupQueue(
   let deleted = 0;
   let failed = 0;
   for (const item of result.results ?? []) {
-    const stillOwned = item.run_id
-      ? await db
-          .prepare(`select 1 as present from briar_hunt_runs where id = ?`)
-          .bind(item.run_id)
-          .first<{ present: number }>()
-      : await db
-          .prepare(`select 1 as present from briar_projects where id = ?`)
-          .bind(item.project_id)
-          .first<{ present: number }>();
-    if (stillOwned) continue;
     const referenced = item.bucket === "archives"
       ? await db
           .prepare(
@@ -1539,21 +1520,6 @@ export async function processArchiveCleanupQueue(
            where bucket = ? and object_key = ?
              and project_id = ? and run_id is ? and queued_at = ?
              and generation = ?
-             and (
-               (
-                 run_id is not null
-                 and not exists (
-                   select 1 from briar_hunt_runs run
-                   where run.id = briar_archive_cleanup_queue.run_id
-                 )
-               ) or (
-                 run_id is null
-                 and not exists (
-                   select 1 from briar_projects project
-                   where project.id = briar_archive_cleanup_queue.project_id
-                 )
-               )
-             )
              and (
                (
                  bucket = 'archives'
