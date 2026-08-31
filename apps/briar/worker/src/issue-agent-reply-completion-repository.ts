@@ -1,5 +1,6 @@
 import { type IssueAttachmentInput } from "./issue-attachment-repository";
 import { type IssueAgentReplyJobRow } from "./issue-agent-reply-repository";
+import { encodeApprovedProjectAgentTaskSession } from "./project-agent-session-materialization";
 import {
   consumeReplyAttachmentStatements,
   replyAttachmentAvailabilityGuard,
@@ -78,6 +79,52 @@ export async function completeIssueAgentReplyOutput(
     : null;
   const consentTaskSessionId = input.output.skillExecutionProposal
     ? crypto.randomUUID()
+    : null;
+  const consentTaskBinding = input.output.skillExecutionProposal
+    ? await db.prepare(
+      `select coalesce(job.agent_id, run.agent_id) as agent_id,
+              job.selected_agent_name_snapshot as agent_name,
+              job.skill_id, job.skill_execution_request_snapshot as request,
+              job.claimed_worker_id as worker_id,
+              trigger.author_user_id as requested_by_user_id,
+              skill.execution_mode, skill.approval_policy
+       from briar_issue_agent_reply_jobs job
+       join briar_hunt_runs run
+         on run.id = job.run_id and run.project_id = job.project_id
+       join briar_project_agents agent
+         on agent.id = coalesce(job.agent_id, run.agent_id)
+        and agent.project_id = job.project_id
+       join briar_agent_skills skill
+         on skill.id = job.skill_id and skill.agent_id = agent.id
+       join briar_issue_messages trigger
+         on trigger.id = job.trigger_message_id
+        and trigger.project_id = job.project_id and trigger.run_id = job.run_id
+       where job.id = ? and job.project_id = ?`,
+    ).bind(jobId, projectId).first<{
+      agent_id: string;
+      agent_name: string;
+      skill_id: string;
+      request: string;
+      worker_id: string | null;
+      requested_by_user_id: string | null;
+      execution_mode: "conversation" | "task";
+      approval_policy: "explicit" | "invoke_is_consent";
+    }>()
+    : null;
+  const consentTaskPayloadJson = consentTaskSessionId &&
+      consentTaskBinding?.execution_mode === "task" &&
+      consentTaskBinding.approval_policy === "invoke_is_consent" &&
+      consentTaskBinding.worker_id && consentTaskBinding.requested_by_user_id
+    ? encodeApprovedProjectAgentTaskSession({
+      sessionId: consentTaskSessionId,
+      agentId: consentTaskBinding.agent_id,
+      agentName: consentTaskBinding.agent_name,
+      skillId: consentTaskBinding.skill_id,
+      request: consentTaskBinding.request,
+      workerId: consentTaskBinding.worker_id,
+      requestedByUserId: consentTaskBinding.requested_by_user_id,
+      acceptedAt: input.completedAt,
+    })
     : null;
   const staleExecutionGuard = `and not exists (
          select 1 from briar_issue_execution_proposals stale_execution
@@ -466,7 +513,8 @@ export async function completeIssueAgentReplyOutput(
               and trigger.run_id = job.run_id
              where job.id = source_reply_job_id
            ),
-           accepted_at = ?, updated_at = ?
+           accepted_at = ?, updated_at = ?,
+           materialized_session_payload_json = ?
        where id = ? and status = 'pending' and execution_mode = 'task'
          and approval_policy = 'invoke_is_consent'
          and exists (
@@ -484,6 +532,7 @@ export async function completeIssueAgentReplyOutput(
       consentTaskSessionId,
       input.completedAt,
       input.completedAt,
+      consentTaskPayloadJson,
       skillExecutionProposalId,
     ));
   }

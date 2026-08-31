@@ -6,6 +6,7 @@ import {
 } from "./project-agent-model";
 import {
   decodeStoredProjectAgentSessionPayload,
+  decodeStoredProjectAgentSessionSummary,
   encodeStoredProjectAgentSessionPayload,
   encodeStoredProjectAgentSessionSummary,
   type StoredProjectAgentSessionPayload,
@@ -16,6 +17,16 @@ const projectAgentSessionChangePageSize = 500;
 
 const preview = (value: string | null, maximumLength: number) =>
   value === null ? null : value.slice(0, maximumLength);
+
+const validatedSessionRow = (row: ProjectAgentSessionRow) => {
+  decodeStoredProjectAgentSessionPayload(row.payload_json);
+  return row;
+};
+
+const validatedSummaryRow = (row: ProjectAgentSessionSummaryRow) => {
+  decodeStoredProjectAgentSessionSummary(row.summary_json);
+  return row;
+};
 
 const projectAgentSessionSummaryJson = (row: ProjectAgentSessionRow) => {
   const payload = decodeStoredProjectAgentSessionPayload(row.payload_json);
@@ -111,7 +122,7 @@ export async function listProjectAgentSessionSummaries(
       rowLimit,
     )
     .all<ProjectAgentSessionSummaryRow>();
-  return result.results;
+  return result.results.map(validatedSummaryRow);
 }
 
 export async function getProjectAgentSessionSyncCursor(
@@ -200,7 +211,7 @@ export async function listProjectAgentSessions(
     )
     .bind(projectId)
     .all<ProjectAgentSessionRow>();
-  return result.results;
+  return result.results.map(validatedSessionRow);
 }
 
 export async function getProjectAgentSession(
@@ -208,7 +219,7 @@ export async function getProjectAgentSession(
   projectId: string,
   sessionId: string,
 ) {
-  return db
+  const row = await db
     .prepare(
       `select project_id, id, agent_id, requested_by_user_id, status,
               session_type, payload_json,
@@ -218,6 +229,7 @@ export async function getProjectAgentSession(
     )
     .bind(projectId, sessionId)
     .first<ProjectAgentSessionRow>();
+  return row ? validatedSessionRow(row) : null;
 }
 
 export async function projectAgentSessionIsApprovalOwned(

@@ -188,7 +188,7 @@ export const StoredProjectAgentSessionPayload = strictSchema(Schema.Struct({
 export type StoredProjectAgentSessionPayload =
   typeof StoredProjectAgentSessionPayload.Type;
 
-const storedProjectAgentSessionPayloadMaxBytes = 1_048_576;
+export const storedProjectAgentSessionPayloadMaxBytes = 1_048_576;
 export const storedProjectAgentSessionSummaryMaxBytes = 262_144;
 
 const boundedJsonString = (maximumBytes: number) =>

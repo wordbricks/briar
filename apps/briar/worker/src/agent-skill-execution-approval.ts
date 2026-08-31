@@ -6,6 +6,7 @@ import {
 } from "./agent-skill-execution-proposal-repository";
 import { getArchivedProjectAgentSession } from "./archive";
 import { HttpError } from "./http-response";
+import { encodeApprovedProjectAgentTaskSession } from "./project-agent-session-materialization";
 import { projectAgentSessionJson } from "./project-agent-session-json";
 import { decodeStoredProjectAgentSessionPayload } from "./project-request-contract";
 import {
@@ -305,6 +306,22 @@ export async function approveAgentSkillExecutionProposal(
     );
   }
 
+  const resultSessionId = proposal.execution_mode === "conversation"
+    ? conversationBinding!.session_id
+    : crypto.randomUUID();
+  const materializedSessionPayloadJson = proposal.execution_mode === "task"
+    ? encodeApprovedProjectAgentTaskSession({
+      sessionId: resultSessionId,
+      agentId: proposal.agent_id,
+      agentName: proposal.agent_name,
+      skillId: proposal.skill_id,
+      request: proposal.request,
+      workerId: worker.id,
+      requestedByUserId: input.userId,
+      acceptedAt,
+    })
+    : null;
+
   let accepted: AgentSkillExecutionProposalRow | null = null;
   try {
     accepted = proposal.execution_mode === "conversation"
@@ -313,7 +330,7 @@ export async function approveAgentSkillExecutionProposal(
         userId: input.userId,
         workerId: worker.id,
         workerLabel: worker.label,
-        resultSessionId: conversationBinding!.session_id,
+        resultSessionId,
         resultReplyJobId: crypto.randomUUID(),
         resultMessageId: crypto.randomUUID(),
         acceptedAt,
@@ -328,7 +345,8 @@ export async function approveAgentSkillExecutionProposal(
         userId: input.userId,
         workerId: worker.id,
         workerLabel: worker.label,
-        resultSessionId: crypto.randomUUID(),
+        resultSessionId,
+        materializedSessionPayloadJson: materializedSessionPayloadJson!,
         acceptedAt,
       });
   } catch (error) {

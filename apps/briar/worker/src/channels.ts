@@ -37,6 +37,7 @@ import {
   hasAvailableChannelReplyWorker,
 } from "./workers";
 import type { WorkerRuntimeMetadata } from "./worker-runtime-mappers";
+import { encodeApprovedProjectAgentTaskSession } from "./project-agent-session-materialization";
 import {
   consumeReplyAttachmentStatements,
   replyAttachmentAvailabilityGuard,
@@ -4265,6 +4266,42 @@ export async function completeChannelReply(
   const consentTaskSessionId = input.skillExecutionProposal
     ? crypto.randomUUID()
     : null;
+  const consentTaskPolicy = input.skillExecutionProposal && job.skill_id
+    ? await db.prepare(
+      `select trigger_message.author_user_id as requested_by_user_id,
+              skill.execution_mode, skill.approval_policy
+       from briar_channel_messages trigger_message
+       join briar_agent_skills skill
+         on skill.id = ? and skill.agent_id = ?
+       where trigger_message.id = ? and trigger_message.channel_id = ?`,
+    ).bind(
+      job.skill_id,
+      job.agent_id,
+      job.trigger_message_id,
+      job.channel_id,
+    ).first<{
+      requested_by_user_id: string | null;
+      execution_mode: "conversation" | "task";
+      approval_policy: "explicit" | "invoke_is_consent";
+    }>()
+    : null;
+  const consentTaskPayloadJson = consentTaskSessionId &&
+      consentTaskPolicy?.execution_mode === "task" &&
+      consentTaskPolicy.approval_policy === "invoke_is_consent" &&
+      consentTaskPolicy.requested_by_user_id && job.claimed_worker_id &&
+      job.selected_agent_name_snapshot && job.skill_id &&
+      job.skill_execution_request_snapshot
+    ? encodeApprovedProjectAgentTaskSession({
+      sessionId: consentTaskSessionId,
+      agentId: job.agent_id,
+      agentName: job.selected_agent_name_snapshot,
+      skillId: job.skill_id,
+      request: job.skill_execution_request_snapshot,
+      workerId: job.claimed_worker_id,
+      requestedByUserId: consentTaskPolicy.requested_by_user_id,
+      acceptedAt: input.completedAt,
+    })
+    : null;
   const statements = [
     db
       .prepare(
@@ -4711,7 +4748,8 @@ export async function completeChannelReply(
                 and trigger_message.channel_id = job.channel_id
                where job.id = source_reply_job_id
              ),
-             accepted_at = ?, updated_at = ?
+             accepted_at = ?, updated_at = ?,
+             materialized_session_payload_json = ?
          where id = ? and status = 'pending' and execution_mode = 'task'
            and approval_policy = 'invoke_is_consent'
            and exists (
@@ -4729,6 +4767,7 @@ export async function completeChannelReply(
         consentTaskSessionId,
         input.completedAt,
         input.completedAt,
+        consentTaskPayloadJson,
         skillExecutionProposalId,
       ),
     );

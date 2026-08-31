@@ -207,6 +207,7 @@ export async function acceptAgentSkillExecutionProposal(
     workerId: string;
     workerLabel: string;
     resultSessionId: string;
+    materializedSessionPayloadJson: string;
     resultReplyJobId?: string | null;
     resultMessageId?: string | null;
     acceptedAt: string;
@@ -218,7 +219,8 @@ export async function acceptAgentSkillExecutionProposal(
        set status = 'accepted', requested_worker_id = ?,
            requested_worker_label = ?, result_session_id = ?,
            result_reply_job_id = ?, result_message_id = ?,
-           accepted_by_user_id = ?, accepted_at = ?, updated_at = ?
+           accepted_by_user_id = ?, accepted_at = ?, updated_at = ?,
+           materialized_session_payload_json = ?
        where id = ? and source_kind = ? and organization_id = ?
          and project_id = ? and channel_id is ? and conversation_run_id is ?
          and status = 'pending'
@@ -233,6 +235,7 @@ export async function acceptAgentSkillExecutionProposal(
       input.userId,
       input.acceptedAt,
       input.acceptedAt,
+      input.materializedSessionPayloadJson,
       input.proposalId,
       input.sourceKind,
       input.organizationId,
