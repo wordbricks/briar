@@ -1,3 +1,5 @@
+import { scheduleDmMemoryActivityRevocations } from "./dm-memory-activity-revocations";
+import { handleDmMemoryClaimRoute } from "./dm-memory-claim-routes";
 import * as SchemaIssue from "effect/SchemaIssue";
 import {
   AutoHuntWorkflowValidationError,
@@ -227,8 +229,11 @@ async function route(
   });
   if (realtimeResponse !== undefined) return realtimeResponse;
 
-  const memoryResponse = await handleDmMemoryRoute({ request, url, auth, db });
-  if (memoryResponse !== undefined) return memoryResponse;
+  const memoryResponse = await handleDmMemoryRoute({ request, url, auth, db, env });
+  if (memoryResponse !== undefined) {
+    if (request.method !== "GET") scheduleDmMemoryActivityRevocations(db, env, context);
+    return memoryResponse;
+  }
 
   const channelMessageResponse = await handleChannelMessageRoute({
     request,
@@ -239,7 +244,10 @@ async function route(
     env,
     context,
   });
-  if (channelMessageResponse !== undefined) return channelMessageResponse;
+  if (channelMessageResponse !== undefined) {
+    if (request.method !== "GET") scheduleDmMemoryActivityRevocations(db, env, context);
+    return channelMessageResponse;
+  }
 
   const organizationChannelResponse = await handleOrganizationChannelRoute({
     request,
@@ -526,6 +534,9 @@ async function route(
   if (channelReplyClaimResponse !== undefined) {
     return channelReplyClaimResponse;
   }
+
+  const memoryClaimResponse = await handleDmMemoryClaimRoute({ request, url, db, env });
+  if (memoryClaimResponse !== undefined) return memoryClaimResponse;
 
   const channelOrganizationContextResponse =
     await handleChannelOrganizationContextRoute({

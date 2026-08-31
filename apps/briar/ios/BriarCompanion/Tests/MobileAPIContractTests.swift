@@ -10,6 +10,10 @@ final class MobileAPIContractTests: XCTestCase {
     private var operations: [String: [String: Any]] = [:]
 
     func testDmMemoryReadsTheSharedFixtureAndKeepsNullableWriteFields() throws {
+        let history: DmMemoryRevisionPage = try decodeResponse("listDmMemoryRevisions")
+        XCTAssertEqual(history.revisions.count, 1)
+        XCTAssertEqual(history.revisions[0].origin, "user_edit")
+        XCTAssertTrue(history.revisions[0].protectedByUser)
         let page: DmMemoryPage = try decodeResponse("listDmMemory")
         XCTAssertEqual(page.documents.count, 1)
         XCTAssertTrue(page.documents[0].protectedByUser)
@@ -831,6 +835,7 @@ final class MobileAPIContractTests: XCTestCase {
             [UUID(uuidString: "66666666-6666-4666-8666-666666666666")!]
         )
         XCTAssertEqual(channelMessages.messages.last?.proposal?.status, .pending)
+        XCTAssertEqual(channelMessages.messages.last?.memoryCitations.first?.version, 1)
         XCTAssertTrue(deletedChannelMessage.deleted)
         XCTAssertEqual(deletedChannelMessage.message?.body, "[deleted]")
         XCTAssertNotNil(deletedChannelMessage.message?.deletedAt)

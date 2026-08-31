@@ -351,6 +351,16 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "description": "Owner-only access to a stored revision. Omit for the current version.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
           }
         ],
         "responses": {
@@ -3386,6 +3396,158 @@
             }
           },
           "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/organizations/{organizationId}/channels/{channelId}/memory/documents/{documentId}/revisions": {
+      "get": {
+        "operationId": "listDmMemoryRevisions",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Owner-authorized revision metadata, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "documentId": {
+                      "type": "string",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                      "format": "uuid"
+                    },
+                    "currentVersion": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "revisions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "memoryClass": {
+                            "type": "string",
+                            "enum": [
+                              "profile",
+                              "log",
+                              "note"
+                            ]
+                          },
+                          "protectedByUser": {
+                            "type": "boolean"
+                          },
+                          "validUntil": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "origin": {
+                            "type": "string",
+                            "enum": [
+                              "user_edit",
+                              "explicit_request",
+                              "extract",
+                              "consolidate"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "version",
+                          "createdAt",
+                          "memoryClass",
+                          "protectedByUser",
+                          "validUntil",
+                          "origin"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextCursor": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "documentId",
+                    "currentVersion",
+                    "revisions",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
             "$ref": "#/components/responses/Error"
           },
           "404": {
@@ -6569,6 +6731,28 @@
               "properties": {
                 "userId": { "type": "string" },
                 "subscribedAt": { "type": "string", "format": "date-time" }
+              }
+            }
+          },
+          "memoryCitations": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "documentId",
+                "version"
+              ],
+              "properties": {
+                "documentId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 1
+                }
               }
             }
           }

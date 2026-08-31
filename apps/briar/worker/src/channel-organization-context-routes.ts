@@ -1,3 +1,4 @@
+import { currentReplyLookupCache, reserveReplyLookup, replyLookupCompletionStatement } from "./channel-reply-lookup-budget";
 import { channelReplyClaimTokenHeader } from "../../src/lib/channels-contract";
 import {
   decodeOrganizationAgentContextAgentsPage,
@@ -133,6 +134,19 @@ export async function handleChannelOrganizationContextRoute(
       workId,
       workerId: input.workerId,
     });
+    const memory = await db.prepare(`select space.memory_revision, space.revocation_epoch
+      from briar_dm_memory_reply_fences fence join briar_dm_memory_spaces space on space.id = fence.space_id
+      where fence.job_id = ? and fence.claim_token_hash = ?`)
+      .bind(workId, job.claim_token_hash).first<{ memory_revision: number; revocation_epoch: number }>();
+    const reservation = await reserveReplyLookup(db, { jobId: workId, claimTokenHash: job.claim_token_hash!,
+      requestId: input.requestId ?? crypto.randomUUID(), kind: "organization", request: input.requests,
+      memoryRevision: memory?.memory_revision ?? null, revocationEpoch: memory?.revocation_epoch ?? null });
+    if (reservation.cachedJson) {
+      await requireActiveOrganizationContextClaim({ db, request, organizationId, workId, workerId: input.workerId });
+      const current = await currentReplyLookupCache(db, reservation);
+      if (!current) throw new HttpError(409, "Lookup context changed", "memory_snapshot_changed");
+      return privateNoStoreJson(decodeOrganizationAgentContextLookupResponse(JSON.parse(current.response_json)));
+    }
     const projectIds = [...new Set(
       input.requests.map((item) => item.projectId),
     )];
@@ -158,6 +172,9 @@ export async function handleChannelOrganizationContextRoute(
     ) {
       throw new OrganizationAgentContextPageTooLargeError();
     }
+    const completed = await replyLookupCompletionStatement(db, reservation, response).all();
+    await requireActiveOrganizationContextClaim({ db, request, organizationId, workId, workerId: input.workerId });
+    if (!completed.results.length) throw new HttpError(409, "Lookup context changed", "memory_snapshot_changed");
     return privateNoStoreJson(response);
   }
 

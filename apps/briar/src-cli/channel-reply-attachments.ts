@@ -30,12 +30,16 @@ export function parseChannelReplyAgentResult(
   if (parsed.contextRequests !== null && parsed.contextRequests !== undefined) {
     throw new Error("A completed channel reply cannot request more context");
   }
+  if (parsed.memoryRequests !== null && parsed.memoryRequests !== undefined) {
+    throw new Error("A completed channel reply cannot request memory");
+  }
   const attachmentPaths = decodeReplyAttachmentPaths(
     parsed.attachments ?? [],
   );
   const {
     attachments: _ignored,
     contextRequests: _contextRequests,
+    memoryRequests: _memoryRequests,
     ...rest
   } = parsed;
   return {

@@ -1,3 +1,5 @@
+import { flushDmMemoryActivityRevocations } from "./dm-memory-activity-revocations";
+import { cleanupAbandonedReplyLookups } from "./channel-reply-lookup-budget";
 import * as Schema from "effect/Schema";
 import { expireDmMemories } from "./dm-memory-access";
 import { chunkDmMemory, dmMemoryEmbeddingPrefix, dmMemoryEmbeddingProfile, dmMemorySplitterProfile, memoryUtf8Slice } from "./dm-memory-chunks";
@@ -251,6 +253,7 @@ export async function processDmMemoryVectorCleanup(db: D1Database, store: DmMemo
 }
 
 export async function reconcileDmMemory(db: D1Database, store: DmMemoryVectorStore | null, observedAt: string, indexingEnabled = true) {
+  await cleanupAbandonedReplyLookups(db, observedAt);
   const expired = await expireDmMemories(db, observedAt);
   if (!store) { await finishMemoryPurges(db, observedAt); return { expired, indexing: null, cleanup: null }; }
   const cleanup = await processDmMemoryVectorCleanup(db, store);
@@ -269,8 +272,10 @@ async function finishMemoryPurges(db: D1Database, now: string) {
 }
 
 export async function runDmMemoryMaintenance(env: Env, observedAt: string) {
-  let store: DmMemoryVectorStore;
+  let store: DmMemoryVectorStore | null = null;
   try { store = dmMemoryVectorStore(env.DM_MEMORY_AI, env.DM_MEMORY_INDEX); }
-  catch { throw new DmMemoryIndexError("memory_index_binding_unavailable", false); }
-  return reconcileDmMemory(env.DB, store, observedAt, String(env.DM_MEMORY_INDEX_ENABLED) === "true");
+  catch { /* Revocation and expiry cleanup must run even without a vector binding. */ }
+  const result = await reconcileDmMemory(env.DB, store, observedAt, String(env.DM_MEMORY_INDEX_ENABLED) === "true");
+  if (env.CHANNEL_ACTIVITY_REALTIME) await flushDmMemoryActivityRevocations(env.DB, env);
+  return result;
 }

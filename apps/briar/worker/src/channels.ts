@@ -1,3 +1,5 @@
+import { dmMemoryCitationsCurrent, dmMemoryCitationStatement, readDmMemoryCitations } from "./dm-memory-citations";
+import { dmMemoryReplyFenceCurrent, requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
 import {
   channelReplyAssignedWorkerUnavailableError,
   channelReplyNoAvailableWorkerError,
@@ -759,6 +761,7 @@ export const channelMessageJson = (
   reactions: ChannelMessageReaction[] = [],
   replyAuthors: ChannelMessage["replyAuthors"] = [],
   subscribers: ChannelThreadSubscriber[] = [],
+  memoryCitations: NonNullable<ChannelMessage["memoryCitations"]> = [],
 ): ChannelMessage => ({
   id: row.id,
   channelId: row.channel_id,
@@ -776,6 +779,7 @@ export const channelMessageJson = (
   lastReplyAt: row.last_reply_at,
   replyAuthors,
   subscribers,
+  memoryCitations: row.deleted_at ? [] : memoryCitations,
   document: !row.deleted_at && row.document_message_id
     ? {
         messageId: row.document_message_id,
@@ -1595,8 +1599,9 @@ async function attachMessageRelations(
     .map((row) => row.id);
   const placeholders = ids.map(() => "?").join(", ");
   const rootPlaceholders = rootIds.map(() => "?").join(", ");
-  const [userMentions, agentMentions, attachments, reactions, replyAuthors, subscribers] =
+  const [citations, userMentions, agentMentions, attachments, reactions, replyAuthors, subscribers] =
     await Promise.all([
+    readDmMemoryCitations(db, ids),
     db
       .prepare(
         `select message_id, user_id from briar_channel_message_mentions
@@ -1757,6 +1762,7 @@ async function attachMessageRelations(
       reactionsByMessage.get(row.id) ?? [],
       replyAuthorsByMessage.get(row.id) ?? [],
       subscribersByRoot.get(row.id) ?? [],
+      citations.get(row.id) ?? [],
     ),
   );
 }
@@ -2541,6 +2547,7 @@ export async function getClaimedChannelReplyAttachment(
     observedAt: string;
   },
 ) {
+  await requireDmMemoryReplyFence(db, input.jobId);
   return db
     .prepare(
       `select attachment.id, attachment.organization_id, attachment.channel_id,
@@ -2560,6 +2567,7 @@ export async function getClaimedChannelReplyAttachment(
              and current_roster.agent_id = job.agent_id
          )
          and ${liveChannelReplyRuntime("job")}
+         and ${dmMemoryReplyFenceCurrent("job")}
          and exists (
            select 1 from briar_execution_workers binding
            where binding.id = job.claimed_worker_id
@@ -2567,6 +2575,10 @@ export async function getClaimedChannelReplyAttachment(
              and binding.state <> 'disabled'
              and (job.project_id is null or binding.project_id = job.project_id)
          )
+         and not exists (select 1 from briar_dm_memory_exclusions excluded
+           join briar_dm_memory_spaces space on space.id = excluded.space_id
+           where space.channel_id = job.channel_id and excluded.source_type = 'message'
+             and excluded.source_id = attachment.message_id)
          and attachment.id = ?`,
     )
     .bind(
@@ -2932,6 +2944,7 @@ export async function checkpointChannelReplySession(
     observedAt: string;
   },
 ) {
+  await requireDmMemoryReplyFence(db, input.jobId);
   const retainedUntil = channelReplySessionRetentionUntil(input.observedAt);
   const [updated] = await db.batch([
     db.prepare(
@@ -2946,6 +2959,7 @@ export async function checkpointChannelReplySession(
              and job.claimed_device_id = ? and job.claimed_worker_id = ?
              and job.claim_token_hash = ? and job.status = 'running'
              and job.lease_expires_at > ?
+             and ${liveChannelReplyRuntime("job")} and ${dmMemoryReplyFenceCurrent("job")}
          )
        returning *`,
     ).bind(
@@ -2973,6 +2987,7 @@ export async function checkpointChannelReplySession(
        where job.id = ? and job.claimed_device_id = ?
          and job.claimed_worker_id = ? and job.claim_token_hash = ?
          and job.status = 'running' and job.lease_expires_at > ?
+             and ${liveChannelReplyRuntime("job")} and ${dmMemoryReplyFenceCurrent("job")}
          and session.updated_at = ? and session.owner_worker_id = ?`,
     ).bind(
       crypto.randomUUID(),
@@ -3174,7 +3189,7 @@ export async function claimNextChannelAgentReply(
            error = coalesce(error, 'Channel reply lease expired repeatedly.'),
            claimed_device_id = null, claimed_worker_id = null,
            claim_token_hash = null, lease_expires_at = null, updated_at = ?
-       where organization_id = ? and status = 'running' and attempts >= ?
+       where organization_id = ? and status = 'running' and attempts >= (? + memory_restart_count)
          and lease_expires_at <= ?`,
     )
     .bind(input.claimedAt, organizationId, MAX_REPLY_ATTEMPTS, input.claimedAt)
@@ -3281,7 +3296,7 @@ export async function claimNextChannelAgentReply(
      join briar_channel_reply_sessions session on session.id = job.session_id
      left join briar_agent_skills current_skill
        on current_skill.id = job.skill_id and current_skill.agent_id = job.agent_id
-     where job.organization_id = ? and job.attempts < ?
+     where job.organization_id = ? and job.attempts < (? + job.memory_restart_count)
        and (job.status = 'queued'
          or (job.status = 'running' and job.lease_expires_at <= ?))
        and not exists (
@@ -3450,7 +3465,7 @@ export async function claimNextChannelAgentReply(
            claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
            attempts = attempts + case when planned_update_resume = 1 then 0 else 1 end,
            planned_update_resume = 0, error = null, updated_at = ?
-       where id = ? and organization_id = ? and attempts < ?
+       where id = ? and organization_id = ? and attempts < (? + memory_restart_count)
          and session_id = ?
          and (status = 'queued'
            or (status = 'running' and lease_expires_at <= ?))
@@ -3712,6 +3727,7 @@ export async function getActiveOrganizationChannelReplyContextClaim(
     observedAt: string;
   },
 ) {
+  await requireDmMemoryReplyFence(db, input.jobId);
   return db.prepare(
     `select job.*
      from briar_channel_agent_reply_jobs job
@@ -3733,6 +3749,7 @@ export async function getActiveOrganizationChannelReplyContextClaim(
            and current_roster.agent_id = job.agent_id
        )
        and ${liveChannelReplyRuntime("job")}
+         and ${dmMemoryReplyFenceCurrent("job")}
        and job.claimed_device_id = ? and job.claimed_worker_id = ?
        and job.claim_token_hash = ? and job.status = 'running'
        and job.lease_expires_at > ?
@@ -3773,6 +3790,7 @@ export async function getClaimedChannelReply(
     observedAt: string;
   },
 ) {
+  await requireDmMemoryReplyFence(db, input.jobId);
   const claimed = await db
     .prepare(
       `select job.* from briar_channel_agent_reply_jobs job
@@ -3786,6 +3804,7 @@ export async function getClaimedChannelReply(
              and current_roster.agent_id = job.agent_id
          )
          and ${liveChannelReplyRuntime("job")}
+         and ${dmMemoryReplyFenceCurrent("job")}
          and exists (
            select 1 from briar_execution_workers binding
            where binding.id = job.claimed_worker_id
@@ -3835,6 +3854,7 @@ export async function renewChannelReplyLease(
              and current_roster.agent_id = briar_channel_agent_reply_jobs.agent_id
          )
          and ${liveChannelReplyRuntime("briar_channel_agent_reply_jobs")}
+           and ${dmMemoryReplyFenceCurrent("briar_channel_agent_reply_jobs")}
          and exists (
            select 1 from briar_execution_workers binding
            where binding.id = briar_channel_agent_reply_jobs.claimed_worker_id
@@ -3924,11 +3944,11 @@ export async function failChannelReply(
   const [failed] = await db.batch([
     db.prepare(
       `update briar_channel_agent_reply_jobs
-       set status = case when attempts >= ? then 'failed' else 'queued' end,
+       set status = case when attempts >= (? + memory_restart_count) then 'failed' else 'queued' end,
            error = ?, claimed_device_id = null, claimed_worker_id = null,
            preferred_device_id = null,
            claim_token_hash = null, lease_expires_at = null,
-           completed_at = case when attempts >= ? then ? else completed_at end,
+           completed_at = case when attempts >= (? + memory_restart_count) then ? else completed_at end,
            updated_at = ?
        where id = ? and claimed_device_id = ? and claimed_worker_id = ?
          and claim_token_hash = ? and status = 'running'
@@ -4024,6 +4044,7 @@ export async function failChannelReply(
 }
 
 export type ChannelReplyCompletionInput = {
+  memoryCitations?: readonly { documentId: string; version: number }[] | null;
   jobId: string;
   deviceId: string;
   workerId: string;
@@ -4303,6 +4324,8 @@ export async function completeChannelReply(
                and current_roster.agent_id = briar_channel_agent_reply_jobs.agent_id
            )
            and ${liveChannelReplyRuntime("briar_channel_agent_reply_jobs")}
+           and ${dmMemoryReplyFenceCurrent("briar_channel_agent_reply_jobs")}
+           and ${dmMemoryCitationsCurrent("briar_channel_agent_reply_jobs")}
            and exists (
              select 1 from briar_execution_workers binding
              where binding.id = briar_channel_agent_reply_jobs.claimed_worker_id
@@ -4360,6 +4383,7 @@ export async function completeChannelReply(
         input.workerId,
         input.claimTokenHash,
         input.completedAt,
+        JSON.stringify(input.memoryCitations ?? []),
         ...delegationGuardBindings,
         ...executionGuardBindings,
         ...skillExecutionGuardBindings,
@@ -4393,6 +4417,10 @@ export async function completeChannelReply(
         input.completedAt,
       ),
   ];
+  if (input.memoryCitations?.length) statements.push(dmMemoryCitationStatement(db, {
+    jobId: input.jobId, claimTokenHash: input.claimTokenHash, messageId: job.reply_message_id,
+    completedAt: input.completedAt, references: input.memoryCitations,
+  }));
   for (const attachment of input.attachments ?? []) {
     statements.push(
       db

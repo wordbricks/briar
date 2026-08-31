@@ -1,3 +1,4 @@
+import { dmMemoryCapability } from "../src/lib/dm-memory-query-contract";
 import { spawn } from "node:child_process";
 import { platform } from "node:os";
 import { join } from "node:path";
@@ -432,6 +433,7 @@ async function workerCommand() {
               protocol: 1,
             },
             organizationAgentContext: organizationAgentContextCapability,
+            dmMemory: dmMemoryCapability,
           },
         }),
       },
@@ -738,6 +740,7 @@ async function workerCommand() {
                   protocol: 1,
                 },
                 organizationAgentContext: organizationAgentContextCapability,
+                dmMemory: dmMemoryCapability,
                 workflowRequirements: requirementHealth.map((item) => ({
                   id: item.id,
                   healthy: item.healthy,
@@ -818,6 +821,7 @@ async function workerCommand() {
                         protocol: 1,
                       },
                       organizationAgentContext: organizationAgentContextCapability,
+                      dmMemory: dmMemoryCapability,
                       workflowRequirements: refreshedHealth.map((item) => ({
                         id: item.id,
                         healthy: item.healthy,

@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 import { briarApiUrl } from "../api-config";
 import {
-  DmMemoryPage, DmMemoryDocumentDetail, DmMemorySpace,
+  DmMemoryPage, DmMemoryDocumentDetail, DmMemorySpace, DmMemoryRevisionPage,
   type DmMemoryCreateInput, type DmMemoryEditInput, type DmMemorySettingsInput,
 } from "../dm-memory-contract";
 import { request } from "./request";
@@ -18,10 +18,15 @@ export async function loadDmMemory(scope: DmMemoryApiScope, spaceId?: string, cu
   const raw = await request(`${base(scope.organizationId, scope.channelId)}?${query}`, scope.token, { signal });
   return Schema.decodeUnknownSync(DmMemoryPage)(raw);
 }
-export async function loadDmMemoryDocument(scope: DmMemoryApiScope, documentId: string, signal?: AbortSignal) {
-  const raw = await request(`${base(scope.organizationId, scope.channelId)}/documents/${encodeURIComponent(documentId)}`,
+export async function loadDmMemoryDocument(scope: DmMemoryApiScope, documentId: string, signal?: AbortSignal, version?: number) {
+  const raw = await request(`${base(scope.organizationId, scope.channelId)}/documents/${encodeURIComponent(documentId)}${version ? `?version=${version}` : ""}`,
     scope.token, { signal });
   return Schema.decodeUnknownSync(Schema.Struct({ document: DmMemoryDocumentDetail }))(raw).document;
+}
+export async function loadDmMemoryRevisions(scope: DmMemoryApiScope, documentId: string, cursor?: number, signal?: AbortSignal) {
+  const raw = await request(`${base(scope.organizationId, scope.channelId)}/documents/${encodeURIComponent(documentId)}/revisions${cursor ? `?cursor=${cursor}` : ""}`,
+    scope.token, { signal });
+  return Schema.decodeUnknownSync(DmMemoryRevisionPage)(raw);
 }
 export async function saveDmMemoryDocument(
   scope: DmMemoryApiScope, input: DmMemoryCreateInput | DmMemoryEditInput, documentId?: string,
@@ -53,5 +58,6 @@ export async function exportDmMemory(scope: DmMemoryApiScope, spaceId: string) {
 export const dmMemoryApi = {
   load: loadDmMemory, get: loadDmMemoryDocument, save: saveDmMemoryDocument,
   settings: setDmMemorySettings, remove: removeDmMemoryDocument, export: exportDmMemory,
+  history: loadDmMemoryRevisions,
 };
 export type DmMemoryClient = typeof dmMemoryApi;
