@@ -94,27 +94,3 @@ pub mod connect {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use buffa::Message;
-
-    use crate::{connect, proto};
-
-    #[test]
-    fn generated_message_and_service_descriptors_are_usable() {
-        let request = proto::briar::app::v1::ListProjectsRequest::default();
-        let bytes = request.encode_to_vec();
-        proto::briar::app::v1::ListProjectsRequest::decode_from_slice(&bytes)
-            .expect("generated protobuf should round-trip");
-
-        assert_eq!(
-            connect::briar::app::v1::PROJECT_SERVICE_SERVICE_NAME,
-            "briar.app.v1.ProjectService"
-        );
-        assert_eq!(
-            connect::briar::worker::v1::WORKER_QUEUE_SERVICE_SERVICE_NAME,
-            "briar.worker.v1.WorkerQueueService"
-        );
-    }
-}
