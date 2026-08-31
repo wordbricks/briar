@@ -215,6 +215,7 @@ export async function acceptProjectIssueActionProposal(
   const action = decodeIssueCreateProposalAction({
     type: proposal.action_type,
     ...rawPayload,
+    executeAfterCreate: proposal.execute_after_create === 1,
   });
   const reservation = await reserveIssueCreateProposalApproval(input.db, {
     projectId: project.id,
