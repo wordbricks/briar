@@ -17,6 +17,13 @@ message ValidationErrorDetail {
   repeated FieldViolation violations = 1;
 }
 
+// Stable application code for a typed Connect error. The canonical Connect
+// Code still owns transport retry semantics; this detail identifies the
+// product-specific failure without parsing a human-readable message.
+message ApplicationErrorDetail {
+  string code = 1;
+}
+
 message CursorExpiredDetail {
   string resource = 1;
   optional uint64 requested_cursor = 2;

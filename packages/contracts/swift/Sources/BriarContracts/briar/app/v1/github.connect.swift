@@ -48,8 +48,7 @@ public final class BriarAPI_GitHubIntegrationServiceClient: BriarAPI_GitHubInteg
 }
 
 /// ProjectGitHubService owns typed project-scoped GitHub App operations used by
-/// the app and CLI. The arbitrary GraphQL escape hatch intentionally remains an
-/// ordinary HTTP endpoint because google.protobuf.Struct would add no contract.
+/// the app and CLI.
 public protocol BriarAPI_ProjectGitHubServiceClientInterface: Sendable {
 
     @available(iOS 13, *)

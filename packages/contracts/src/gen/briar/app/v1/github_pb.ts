@@ -808,8 +808,7 @@ export const GitHubIntegrationService: GenService<{
 
 /**
  * ProjectGitHubService owns typed project-scoped GitHub App operations used by
- * the app and CLI. The arbitrary GraphQL escape hatch intentionally remains an
- * ordinary HTTP endpoint because google.protobuf.Struct would add no contract.
+ * the app and CLI.
  *
  * @generated from service briar.app.v1.ProjectGitHubService
  */

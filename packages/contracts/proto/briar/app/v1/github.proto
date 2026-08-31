@@ -15,8 +15,7 @@ service GitHubIntegrationService {
 }
 
 // ProjectGitHubService owns typed project-scoped GitHub App operations used by
-// the app and CLI. The arbitrary GraphQL escape hatch intentionally remains an
-// ordinary HTTP endpoint because google.protobuf.Struct would add no contract.
+// the app and CLI.
 service ProjectGitHubService {
   rpc CreateProjectGitHubCredential(CreateProjectGitHubCredentialRequest) returns (CreateProjectGitHubCredentialResponse);
   rpc GetProjectGitHubRepository(GetProjectGitHubRepositoryRequest) returns (GetProjectGitHubRepositoryResponse);

@@ -9,8 +9,30 @@ import "briar/app/v1/project.proto";
 import "briar/types/v1/provider.proto";
 import "briar/types/v1/worker.proto";
 
-// Machine-authenticated unary setup operations. The EC2 enrollment bootstrap
-// and the interactive setup WebSocket intentionally remain ordinary HTTP.
+// The unauthenticated EC2 bootstrap proves the instance identity in its request.
+// Keeping it separate from machine-authenticated setup prevents the service's
+// authentication policy from being ambiguous.
+service ManagedComputerEnrollmentService {
+  rpc EnrollManagedComputer(EnrollManagedComputerRequest) returns (EnrollManagedComputerResponse);
+}
+
+message EnrollManagedComputerRequest {
+  string managed_computer_id = 1;
+  string nonce = 2;
+  string identity_document = 3;
+  string identity_signature = 4;
+  string briar_version = 5;
+}
+
+message EnrollManagedComputerResponse {
+  string managed_computer_id = 1;
+  string credential = 2;
+  string device_id = 3;
+  string organization_id = 4;
+}
+
+// Machine-authenticated unary setup operations. The interactive setup
+// WebSocket intentionally remains outside Connect.
 service ManagedComputerSetupService {
   rpc GetManagedComputerSetupContext(GetManagedComputerSetupContextRequest) returns (GetManagedComputerSetupContextResponse);
   rpc BindManagedComputerSetup(BindManagedComputerSetupRequest) returns (BindManagedComputerSetupResponse);

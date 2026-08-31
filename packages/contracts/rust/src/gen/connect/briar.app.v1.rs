@@ -23456,8 +23456,7 @@ pub const PROJECT_GIT_HUB_SERVICE_CREATE_GIT_HUB_COMMIT_STATUS_SPEC: ::connectrp
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// ProjectGitHubService owns typed project-scoped GitHub App operations used by
-/// the app and CLI. The arbitrary GraphQL escape hatch intentionally remains an
-/// ordinary HTTP endpoint because google.protobuf.Struct would add no contract.
+/// the app and CLI.
 ///
 /// # Implementing handlers
 ///

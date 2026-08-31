@@ -22,7 +22,76 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/worker/v1/managed_computer_setup.proto.
  */
 export const file_briar_worker_v1_managed_computer_setup: GenFile = /*@__PURE__*/
-  fileDesc("Cixicmlhci93b3JrZXIvdjEvbWFuYWdlZF9jb21wdXRlcl9zZXR1cC5wcm90bxIPYnJpYXIud29ya2VyLnYxIlkKJUdldE1hbmFnZWRDb21wdXRlclNldHVwQ29udGV4dFJlcXVlc3QSGwoTbWFuYWdlZF9jb21wdXRlcl9pZBgBIAEoCRITCgtzZXR1cF90b2tlbhgCIAEoCSI3ChtNYW5hZ2VkQ29tcHV0ZXJTZXR1cFByb2plY3QSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCSK5AgomR2V0TWFuYWdlZENvbXB1dGVyU2V0dXBDb250ZXh0UmVzcG9uc2USOgoHc2Vzc2lvbhgBIAEoCzIpLmJyaWFyLmFwcC52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cFNlc3Npb24SPQoHcHJvamVjdBgCIAEoCzIsLmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cFByb2plY3QSLwoIc2V0dGluZ3MYAyABKAsyHS5icmlhci5hcHAudjEuUHJvamVjdFNldHRpbmdzEkkKFXJlcG9zaXRvcnlfY3JlZGVudGlhbBgEIAEoCzIlLmJyaWFyLmFwcC52MS5Qcm9qZWN0R2l0SHViQ3JlZGVudGlhbEgAiAEBQhgKFl9yZXBvc2l0b3J5X2NyZWRlbnRpYWwikAEKH0JpbmRNYW5hZ2VkQ29tcHV0ZXJTZXR1cFJlcXVlc3QSGwoTbWFuYWdlZF9jb21wdXRlcl9pZBgBIAEoCRITCgtzZXR1cF90b2tlbhgCIAEoCRI7CgdydW50aW1lGAMgASgLMiouYnJpYXIudHlwZXMudjEuV29ya2VyUnVudGltZUFkdmVydGlzZW1lbnQiwQEKIEJpbmRNYW5hZ2VkQ29tcHV0ZXJTZXR1cFJlc3BvbnNlEhsKE21hbmFnZWRfY29tcHV0ZXJfaWQYASABKAkSFwoPb3JnYW5pemF0aW9uX2lkGAIgASgJEhIKCnByb2plY3RfaWQYAyABKAkSEQoJZGV2aWNlX2lkGAQgASgJEi0KBndvcmtlchgFIAEoCzIdLmJyaWFyLmFwcC52MS5EYXNoYm9hcmRXb3JrZXISEQoJZHVwbGljYXRlGAYgASgIIocDChtNYW5hZ2VkQ29tcHV0ZXJTZXR1cFRvQWdlbnQSOwoFc3RhcnQYCiABKAsyKi5icmlhci53b3JrZXIudjEuTWFuYWdlZENvbXB1dGVyU2V0dXBTdGFydEgAEj0KBnN1Ym1pdBgLIAEoCzIrLmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cFN1Ym1pdEgAEj0KBmNhbmNlbBgMIAEoCzIrLmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cENhbmNlbEgAElAKEGNvbnRyb2xsZXJfcmVhZHkYDSABKAsyNC5icmlhci53b3JrZXIudjEuTWFuYWdlZENvbXB1dGVyU2V0dXBDb250cm9sbGVyUmVhZHlIABJQChBjb250cm9sbGVyX2VuZGVkGA4gASgLMjQuYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwQ29udHJvbGxlckVuZGVkSABCCQoHcGF5bG9hZCJhChlNYW5hZ2VkQ29tcHV0ZXJTZXR1cFN0YXJ0EhMKC3NldHVwX3Rva2VuGAEgASgJEi8KCHByb3ZpZGVyGAIgASgOMh0uYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlciJBChpNYW5hZ2VkQ29tcHV0ZXJTZXR1cFN1Ym1pdBIUCgxjaGFsbGVuZ2VfaWQYASABKAkSDQoFdmFsdWUYAiABKAkiHAoaTWFuYWdlZENvbXB1dGVyU2V0dXBDYW5jZWwiOQojTWFuYWdlZENvbXB1dGVyU2V0dXBDb250cm9sbGVyUmVhZHkSEgoKc2Vzc2lvbl9pZBgBIAEoCSI5CiNNYW5hZ2VkQ29tcHV0ZXJTZXR1cENvbnRyb2xsZXJFbmRlZBISCgpzZXNzaW9uX2lkGAEgASgJIq8CCiBNYW5hZ2VkQ29tcHV0ZXJTZXR1cFRvQ29udHJvbGxlchI7CgVzdGF0ZRgUIAEoCzIqLmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cFN0YXRlSAASQwoJY2hhbGxlbmdlGBUgASgLMi4uYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwQ2hhbGxlbmdlSAASQQoIY29tcGxldGUYFiABKAsyLS5icmlhci53b3JrZXIudjEuTWFuYWdlZENvbXB1dGVyU2V0dXBDb21wbGV0ZUgAEjsKBWVycm9yGBcgASgLMiouYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwRXJyb3JIAEIJCgdwYXlsb2FkItsBChlNYW5hZ2VkQ29tcHV0ZXJTZXR1cFN0YXRlEjkKBXBoYXNlGAEgASgOMiouYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwUGhhc2USQAoGc3RhdHVzGAIgASgOMjAuYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwU3RhdGVTdGF0dXMSNAoIcHJvdmlkZXIYAyABKA4yHS5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVySACIAQFCCwoJX3Byb3ZpZGVyIsICCh1NYW5hZ2VkQ29tcHV0ZXJTZXR1cENoYWxsZW5nZRIUCgxjaGFsbGVuZ2VfaWQYASABKAkSRgoHc2VydmljZRgCIAEoDjI1LmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cENoYWxsZW5nZVNlcnZpY2USQAoEa2luZBgDIAEoDjIyLmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cENoYWxsZW5nZUtpbmQSGAoQdmVyaWZpY2F0aW9uX3VyaRgEIAEoCRIWCgl1c2VyX2NvZGUYBSABKAlIAIgBARI0Cghwcm92aWRlchgGIAEoDjIdLmJyaWFyLnR5cGVzLnYxLkFnZW50UHJvdmlkZXJIAYgBAUIMCgpfdXNlcl9jb2RlQgsKCV9wcm92aWRlciJ2ChxNYW5hZ2VkQ29tcHV0ZXJTZXR1cENvbXBsZXRlEhIKCnByb2plY3RfaWQYASABKAkSLwoIcHJvdmlkZXIYAiABKA4yHS5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVyEhEKCXdvcmtlcl9pZBgDIAEoCSJNChlNYW5hZ2VkQ29tcHV0ZXJTZXR1cEVycm9yEgwKBGNvZGUYASABKAkSDwoHbWVzc2FnZRgCIAEoCRIRCglyZXRyeWFibGUYAyABKAgq8wEKGU1hbmFnZWRDb21wdXRlclNldHVwUGhhc2USLAooTUFOQUdFRF9DT01QVVRFUl9TRVRVUF9QSEFTRV9VTlNQRUNJRklFRBAAEicKI01BTkFHRURfQ09NUFVURVJfU0VUVVBfUEhBU0VfR0lUSFVCEAESKQolTUFOQUdFRF9DT01QVVRFUl9TRVRVUF9QSEFTRV9QUk9WSURFUhACEisKJ01BTkFHRURfQ09NUFVURVJfU0VUVVBfUEhBU0VfUkVQT1NJVE9SWRADEicKI01BTkFHRURfQ09NUFVURVJfU0VUVVBfUEhBU0VfV09SS0VSEAQquQEKH01hbmFnZWRDb21wdXRlclNldHVwU3RhdGVTdGF0dXMSMwovTUFOQUdFRF9DT01QVVRFUl9TRVRVUF9TVEFURV9TVEFUVVNfVU5TUEVDSUZJRUQQABIvCitNQU5BR0VEX0NPTVBVVEVSX1NFVFVQX1NUQVRFX1NUQVRVU19XT1JLSU5HEAESMAosTUFOQUdFRF9DT01QVVRFUl9TRVRVUF9TVEFURV9TVEFUVVNfQ09NUExFVEUQAirMAQokTWFuYWdlZENvbXB1dGVyU2V0dXBDaGFsbGVuZ2VTZXJ2aWNlEjgKNE1BTkFHRURfQ09NUFVURVJfU0VUVVBfQ0hBTExFTkdFX1NFUlZJQ0VfVU5TUEVDSUZJRUQQABIzCi9NQU5BR0VEX0NPTVBVVEVSX1NFVFVQX0NIQUxMRU5HRV9TRVJWSUNFX0dJVEhVQhABEjUKMU1BTkFHRURfQ09NUFVURVJfU0VUVVBfQ0hBTExFTkdFX1NFUlZJQ0VfUFJPVklERVIQAiqCAgohTWFuYWdlZENvbXB1dGVyU2V0dXBDaGFsbGVuZ2VLaW5kEjUKMU1BTkFHRURfQ09NUFVURVJfU0VUVVBfQ0hBTExFTkdFX0tJTkRfVU5TUEVDSUZJRUQQABI1CjFNQU5BR0VEX0NPTVBVVEVSX1NFVFVQX0NIQUxMRU5HRV9LSU5EX0RFVklDRV9DT0RFEAESPAo4TUFOQUdFRF9DT01QVVRFUl9TRVRVUF9DSEFMTEVOR0VfS0lORF9BVVRIT1JJWkFUSU9OX0NPREUQAhIxCi1NQU5BR0VEX0NPTVBVVEVSX1NFVFVQX0NIQUxMRU5HRV9LSU5EX0FQSV9LRVkQAzKyAgobTWFuYWdlZENvbXB1dGVyU2V0dXBTZXJ2aWNlEpEBCh5HZXRNYW5hZ2VkQ29tcHV0ZXJTZXR1cENvbnRleHQSNi5icmlhci53b3JrZXIudjEuR2V0TWFuYWdlZENvbXB1dGVyU2V0dXBDb250ZXh0UmVxdWVzdBo3LmJyaWFyLndvcmtlci52MS5HZXRNYW5hZ2VkQ29tcHV0ZXJTZXR1cENvbnRleHRSZXNwb25zZRJ/ChhCaW5kTWFuYWdlZENvbXB1dGVyU2V0dXASMC5icmlhci53b3JrZXIudjEuQmluZE1hbmFnZWRDb21wdXRlclNldHVwUmVxdWVzdBoxLmJyaWFyLndvcmtlci52MS5CaW5kTWFuYWdlZENvbXB1dGVyU2V0dXBSZXNwb25zZWIGcHJvdG8z", [file_briar_app_v1_dashboard, file_briar_app_v1_fleet, file_briar_app_v1_github, file_briar_app_v1_project, file_briar_types_v1_provider, file_briar_types_v1_worker]);
+  fileDesc("Cixicmlhci93b3JrZXIvdjEvbWFuYWdlZF9jb21wdXRlcl9zZXR1cC5wcm90bxIPYnJpYXIud29ya2VyLnYxIpgBChxFbnJvbGxNYW5hZ2VkQ29tcHV0ZXJSZXF1ZXN0EhsKE21hbmFnZWRfY29tcHV0ZXJfaWQYASABKAkSDQoFbm9uY2UYAiABKAkSGQoRaWRlbnRpdHlfZG9jdW1lbnQYAyABKAkSGgoSaWRlbnRpdHlfc2lnbmF0dXJlGAQgASgJEhUKDWJyaWFyX3ZlcnNpb24YBSABKAkifAodRW5yb2xsTWFuYWdlZENvbXB1dGVyUmVzcG9uc2USGwoTbWFuYWdlZF9jb21wdXRlcl9pZBgBIAEoCRISCgpjcmVkZW50aWFsGAIgASgJEhEKCWRldmljZV9pZBgDIAEoCRIXCg9vcmdhbml6YXRpb25faWQYBCABKAkiWQolR2V0TWFuYWdlZENvbXB1dGVyU2V0dXBDb250ZXh0UmVxdWVzdBIbChNtYW5hZ2VkX2NvbXB1dGVyX2lkGAEgASgJEhMKC3NldHVwX3Rva2VuGAIgASgJIjcKG01hbmFnZWRDb21wdXRlclNldHVwUHJvamVjdBIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJIrkCCiZHZXRNYW5hZ2VkQ29tcHV0ZXJTZXR1cENvbnRleHRSZXNwb25zZRI6CgdzZXNzaW9uGAEgASgLMikuYnJpYXIuYXBwLnYxLk1hbmFnZWRDb21wdXRlclNldHVwU2Vzc2lvbhI9Cgdwcm9qZWN0GAIgASgLMiwuYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwUHJvamVjdBIvCghzZXR0aW5ncxgDIAEoCzIdLmJyaWFyLmFwcC52MS5Qcm9qZWN0U2V0dGluZ3MSSQoVcmVwb3NpdG9yeV9jcmVkZW50aWFsGAQgASgLMiUuYnJpYXIuYXBwLnYxLlByb2plY3RHaXRIdWJDcmVkZW50aWFsSACIAQFCGAoWX3JlcG9zaXRvcnlfY3JlZGVudGlhbCKQAQofQmluZE1hbmFnZWRDb21wdXRlclNldHVwUmVxdWVzdBIbChNtYW5hZ2VkX2NvbXB1dGVyX2lkGAEgASgJEhMKC3NldHVwX3Rva2VuGAIgASgJEjsKB3J1bnRpbWUYAyABKAsyKi5icmlhci50eXBlcy52MS5Xb3JrZXJSdW50aW1lQWR2ZXJ0aXNlbWVudCLBAQogQmluZE1hbmFnZWRDb21wdXRlclNldHVwUmVzcG9uc2USGwoTbWFuYWdlZF9jb21wdXRlcl9pZBgBIAEoCRIXCg9vcmdhbml6YXRpb25faWQYAiABKAkSEgoKcHJvamVjdF9pZBgDIAEoCRIRCglkZXZpY2VfaWQYBCABKAkSLQoGd29ya2VyGAUgASgLMh0uYnJpYXIuYXBwLnYxLkRhc2hib2FyZFdvcmtlchIRCglkdXBsaWNhdGUYBiABKAgihwMKG01hbmFnZWRDb21wdXRlclNldHVwVG9BZ2VudBI7CgVzdGFydBgKIAEoCzIqLmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cFN0YXJ0SAASPQoGc3VibWl0GAsgASgLMisuYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwU3VibWl0SAASPQoGY2FuY2VsGAwgASgLMisuYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwQ2FuY2VsSAASUAoQY29udHJvbGxlcl9yZWFkeRgNIAEoCzI0LmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cENvbnRyb2xsZXJSZWFkeUgAElAKEGNvbnRyb2xsZXJfZW5kZWQYDiABKAsyNC5icmlhci53b3JrZXIudjEuTWFuYWdlZENvbXB1dGVyU2V0dXBDb250cm9sbGVyRW5kZWRIAEIJCgdwYXlsb2FkImEKGU1hbmFnZWRDb21wdXRlclNldHVwU3RhcnQSEwoLc2V0dXBfdG9rZW4YASABKAkSLwoIcHJvdmlkZXIYAiABKA4yHS5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVyIkEKGk1hbmFnZWRDb21wdXRlclNldHVwU3VibWl0EhQKDGNoYWxsZW5nZV9pZBgBIAEoCRINCgV2YWx1ZRgCIAEoCSIcChpNYW5hZ2VkQ29tcHV0ZXJTZXR1cENhbmNlbCI5CiNNYW5hZ2VkQ29tcHV0ZXJTZXR1cENvbnRyb2xsZXJSZWFkeRISCgpzZXNzaW9uX2lkGAEgASgJIjkKI01hbmFnZWRDb21wdXRlclNldHVwQ29udHJvbGxlckVuZGVkEhIKCnNlc3Npb25faWQYASABKAkirwIKIE1hbmFnZWRDb21wdXRlclNldHVwVG9Db250cm9sbGVyEjsKBXN0YXRlGBQgASgLMiouYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwU3RhdGVIABJDCgljaGFsbGVuZ2UYFSABKAsyLi5icmlhci53b3JrZXIudjEuTWFuYWdlZENvbXB1dGVyU2V0dXBDaGFsbGVuZ2VIABJBCghjb21wbGV0ZRgWIAEoCzItLmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cENvbXBsZXRlSAASOwoFZXJyb3IYFyABKAsyKi5icmlhci53b3JrZXIudjEuTWFuYWdlZENvbXB1dGVyU2V0dXBFcnJvckgAQgkKB3BheWxvYWQi2wEKGU1hbmFnZWRDb21wdXRlclNldHVwU3RhdGUSOQoFcGhhc2UYASABKA4yKi5icmlhci53b3JrZXIudjEuTWFuYWdlZENvbXB1dGVyU2V0dXBQaGFzZRJACgZzdGF0dXMYAiABKA4yMC5icmlhci53b3JrZXIudjEuTWFuYWdlZENvbXB1dGVyU2V0dXBTdGF0ZVN0YXR1cxI0Cghwcm92aWRlchgDIAEoDjIdLmJyaWFyLnR5cGVzLnYxLkFnZW50UHJvdmlkZXJIAIgBAUILCglfcHJvdmlkZXIiwgIKHU1hbmFnZWRDb21wdXRlclNldHVwQ2hhbGxlbmdlEhQKDGNoYWxsZW5nZV9pZBgBIAEoCRJGCgdzZXJ2aWNlGAIgASgOMjUuYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwQ2hhbGxlbmdlU2VydmljZRJACgRraW5kGAMgASgOMjIuYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwQ2hhbGxlbmdlS2luZBIYChB2ZXJpZmljYXRpb25fdXJpGAQgASgJEhYKCXVzZXJfY29kZRgFIAEoCUgAiAEBEjQKCHByb3ZpZGVyGAYgASgOMh0uYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlckgBiAEBQgwKCl91c2VyX2NvZGVCCwoJX3Byb3ZpZGVyInYKHE1hbmFnZWRDb21wdXRlclNldHVwQ29tcGxldGUSEgoKcHJvamVjdF9pZBgBIAEoCRIvCghwcm92aWRlchgCIAEoDjIdLmJyaWFyLnR5cGVzLnYxLkFnZW50UHJvdmlkZXISEQoJd29ya2VyX2lkGAMgASgJIk0KGU1hbmFnZWRDb21wdXRlclNldHVwRXJyb3ISDAoEY29kZRgBIAEoCRIPCgdtZXNzYWdlGAIgASgJEhEKCXJldHJ5YWJsZRgDIAEoCCrzAQoZTWFuYWdlZENvbXB1dGVyU2V0dXBQaGFzZRIsCihNQU5BR0VEX0NPTVBVVEVSX1NFVFVQX1BIQVNFX1VOU1BFQ0lGSUVEEAASJwojTUFOQUdFRF9DT01QVVRFUl9TRVRVUF9QSEFTRV9HSVRIVUIQARIpCiVNQU5BR0VEX0NPTVBVVEVSX1NFVFVQX1BIQVNFX1BST1ZJREVSEAISKwonTUFOQUdFRF9DT01QVVRFUl9TRVRVUF9QSEFTRV9SRVBPU0lUT1JZEAMSJwojTUFOQUdFRF9DT01QVVRFUl9TRVRVUF9QSEFTRV9XT1JLRVIQBCq5AQofTWFuYWdlZENvbXB1dGVyU2V0dXBTdGF0ZVN0YXR1cxIzCi9NQU5BR0VEX0NPTVBVVEVSX1NFVFVQX1NUQVRFX1NUQVRVU19VTlNQRUNJRklFRBAAEi8KK01BTkFHRURfQ09NUFVURVJfU0VUVVBfU1RBVEVfU1RBVFVTX1dPUktJTkcQARIwCixNQU5BR0VEX0NPTVBVVEVSX1NFVFVQX1NUQVRFX1NUQVRVU19DT01QTEVURRACKswBCiRNYW5hZ2VkQ29tcHV0ZXJTZXR1cENoYWxsZW5nZVNlcnZpY2USOAo0TUFOQUdFRF9DT01QVVRFUl9TRVRVUF9DSEFMTEVOR0VfU0VSVklDRV9VTlNQRUNJRklFRBAAEjMKL01BTkFHRURfQ09NUFVURVJfU0VUVVBfQ0hBTExFTkdFX1NFUlZJQ0VfR0lUSFVCEAESNQoxTUFOQUdFRF9DT01QVVRFUl9TRVRVUF9DSEFMTEVOR0VfU0VSVklDRV9QUk9WSURFUhACKoICCiFNYW5hZ2VkQ29tcHV0ZXJTZXR1cENoYWxsZW5nZUtpbmQSNQoxTUFOQUdFRF9DT01QVVRFUl9TRVRVUF9DSEFMTEVOR0VfS0lORF9VTlNQRUNJRklFRBAAEjUKMU1BTkFHRURfQ09NUFVURVJfU0VUVVBfQ0hBTExFTkdFX0tJTkRfREVWSUNFX0NPREUQARI8CjhNQU5BR0VEX0NPTVBVVEVSX1NFVFVQX0NIQUxMRU5HRV9LSU5EX0FVVEhPUklaQVRJT05fQ09ERRACEjEKLU1BTkFHRURfQ09NUFVURVJfU0VUVVBfQ0hBTExFTkdFX0tJTkRfQVBJX0tFWRADMpoBCiBNYW5hZ2VkQ29tcHV0ZXJFbnJvbGxtZW50U2VydmljZRJ2ChVFbnJvbGxNYW5hZ2VkQ29tcHV0ZXISLS5icmlhci53b3JrZXIudjEuRW5yb2xsTWFuYWdlZENvbXB1dGVyUmVxdWVzdBouLmJyaWFyLndvcmtlci52MS5FbnJvbGxNYW5hZ2VkQ29tcHV0ZXJSZXNwb25zZTKyAgobTWFuYWdlZENvbXB1dGVyU2V0dXBTZXJ2aWNlEpEBCh5HZXRNYW5hZ2VkQ29tcHV0ZXJTZXR1cENvbnRleHQSNi5icmlhci53b3JrZXIudjEuR2V0TWFuYWdlZENvbXB1dGVyU2V0dXBDb250ZXh0UmVxdWVzdBo3LmJyaWFyLndvcmtlci52MS5HZXRNYW5hZ2VkQ29tcHV0ZXJTZXR1cENvbnRleHRSZXNwb25zZRJ/ChhCaW5kTWFuYWdlZENvbXB1dGVyU2V0dXASMC5icmlhci53b3JrZXIudjEuQmluZE1hbmFnZWRDb21wdXRlclNldHVwUmVxdWVzdBoxLmJyaWFyLndvcmtlci52MS5CaW5kTWFuYWdlZENvbXB1dGVyU2V0dXBSZXNwb25zZWIGcHJvdG8z", [file_briar_app_v1_dashboard, file_briar_app_v1_fleet, file_briar_app_v1_github, file_briar_app_v1_project, file_briar_types_v1_provider, file_briar_types_v1_worker]);
+
+/**
+ * @generated from message briar.worker.v1.EnrollManagedComputerRequest
+ */
+export type EnrollManagedComputerRequest = Message<"briar.worker.v1.EnrollManagedComputerRequest"> & {
+  /**
+   * @generated from field: string managed_computer_id = 1;
+   */
+  managedComputerId: string;
+
+  /**
+   * @generated from field: string nonce = 2;
+   */
+  nonce: string;
+
+  /**
+   * @generated from field: string identity_document = 3;
+   */
+  identityDocument: string;
+
+  /**
+   * @generated from field: string identity_signature = 4;
+   */
+  identitySignature: string;
+
+  /**
+   * @generated from field: string briar_version = 5;
+   */
+  briarVersion: string;
+};
+
+/**
+ * Describes the message briar.worker.v1.EnrollManagedComputerRequest.
+ * Use `create(EnrollManagedComputerRequestSchema)` to create a new message.
+ */
+export const EnrollManagedComputerRequestSchema: GenMessage<EnrollManagedComputerRequest> = /*@__PURE__*/
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 0);
+
+/**
+ * @generated from message briar.worker.v1.EnrollManagedComputerResponse
+ */
+export type EnrollManagedComputerResponse = Message<"briar.worker.v1.EnrollManagedComputerResponse"> & {
+  /**
+   * @generated from field: string managed_computer_id = 1;
+   */
+  managedComputerId: string;
+
+  /**
+   * @generated from field: string credential = 2;
+   */
+  credential: string;
+
+  /**
+   * @generated from field: string device_id = 3;
+   */
+  deviceId: string;
+
+  /**
+   * @generated from field: string organization_id = 4;
+   */
+  organizationId: string;
+};
+
+/**
+ * Describes the message briar.worker.v1.EnrollManagedComputerResponse.
+ * Use `create(EnrollManagedComputerResponseSchema)` to create a new message.
+ */
+export const EnrollManagedComputerResponseSchema: GenMessage<EnrollManagedComputerResponse> = /*@__PURE__*/
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 1);
 
 /**
  * @generated from message briar.worker.v1.GetManagedComputerSetupContextRequest
@@ -44,7 +113,7 @@ export type GetManagedComputerSetupContextRequest = Message<"briar.worker.v1.Get
  * Use `create(GetManagedComputerSetupContextRequestSchema)` to create a new message.
  */
 export const GetManagedComputerSetupContextRequestSchema: GenMessage<GetManagedComputerSetupContextRequest> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 0);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 2);
 
 /**
  * @generated from message briar.worker.v1.ManagedComputerSetupProject
@@ -66,7 +135,7 @@ export type ManagedComputerSetupProject = Message<"briar.worker.v1.ManagedComput
  * Use `create(ManagedComputerSetupProjectSchema)` to create a new message.
  */
 export const ManagedComputerSetupProjectSchema: GenMessage<ManagedComputerSetupProject> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 1);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 3);
 
 /**
  * @generated from message briar.worker.v1.GetManagedComputerSetupContextResponse
@@ -98,7 +167,7 @@ export type GetManagedComputerSetupContextResponse = Message<"briar.worker.v1.Ge
  * Use `create(GetManagedComputerSetupContextResponseSchema)` to create a new message.
  */
 export const GetManagedComputerSetupContextResponseSchema: GenMessage<GetManagedComputerSetupContextResponse> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 2);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 4);
 
 /**
  * @generated from message briar.worker.v1.BindManagedComputerSetupRequest
@@ -125,7 +194,7 @@ export type BindManagedComputerSetupRequest = Message<"briar.worker.v1.BindManag
  * Use `create(BindManagedComputerSetupRequestSchema)` to create a new message.
  */
 export const BindManagedComputerSetupRequestSchema: GenMessage<BindManagedComputerSetupRequest> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 3);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 5);
 
 /**
  * @generated from message briar.worker.v1.BindManagedComputerSetupResponse
@@ -167,7 +236,7 @@ export type BindManagedComputerSetupResponse = Message<"briar.worker.v1.BindMana
  * Use `create(BindManagedComputerSetupResponseSchema)` to create a new message.
  */
 export const BindManagedComputerSetupResponseSchema: GenMessage<BindManagedComputerSetupResponse> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 4);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 6);
 
 /**
  * Browser/controller frames accepted by the managed-computer setup agent.
@@ -219,7 +288,7 @@ export type ManagedComputerSetupToAgent = Message<"briar.worker.v1.ManagedComput
  * Use `create(ManagedComputerSetupToAgentSchema)` to create a new message.
  */
 export const ManagedComputerSetupToAgentSchema: GenMessage<ManagedComputerSetupToAgent> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 5);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 7);
 
 /**
  * @generated from message briar.worker.v1.ManagedComputerSetupStart
@@ -241,7 +310,7 @@ export type ManagedComputerSetupStart = Message<"briar.worker.v1.ManagedComputer
  * Use `create(ManagedComputerSetupStartSchema)` to create a new message.
  */
 export const ManagedComputerSetupStartSchema: GenMessage<ManagedComputerSetupStart> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 6);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 8);
 
 /**
  * @generated from message briar.worker.v1.ManagedComputerSetupSubmit
@@ -263,7 +332,7 @@ export type ManagedComputerSetupSubmit = Message<"briar.worker.v1.ManagedCompute
  * Use `create(ManagedComputerSetupSubmitSchema)` to create a new message.
  */
 export const ManagedComputerSetupSubmitSchema: GenMessage<ManagedComputerSetupSubmit> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 7);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 9);
 
 /**
  * @generated from message briar.worker.v1.ManagedComputerSetupCancel
@@ -276,7 +345,7 @@ export type ManagedComputerSetupCancel = Message<"briar.worker.v1.ManagedCompute
  * Use `create(ManagedComputerSetupCancelSchema)` to create a new message.
  */
 export const ManagedComputerSetupCancelSchema: GenMessage<ManagedComputerSetupCancel> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 8);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 10);
 
 /**
  * @generated from message briar.worker.v1.ManagedComputerSetupControllerReady
@@ -293,7 +362,7 @@ export type ManagedComputerSetupControllerReady = Message<"briar.worker.v1.Manag
  * Use `create(ManagedComputerSetupControllerReadySchema)` to create a new message.
  */
 export const ManagedComputerSetupControllerReadySchema: GenMessage<ManagedComputerSetupControllerReady> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 9);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 11);
 
 /**
  * @generated from message briar.worker.v1.ManagedComputerSetupControllerEnded
@@ -310,7 +379,7 @@ export type ManagedComputerSetupControllerEnded = Message<"briar.worker.v1.Manag
  * Use `create(ManagedComputerSetupControllerEndedSchema)` to create a new message.
  */
 export const ManagedComputerSetupControllerEndedSchema: GenMessage<ManagedComputerSetupControllerEnded> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 10);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 12);
 
 /**
  * Setup-agent frames accepted by the browser/controller.
@@ -353,7 +422,7 @@ export type ManagedComputerSetupToController = Message<"briar.worker.v1.ManagedC
  * Use `create(ManagedComputerSetupToControllerSchema)` to create a new message.
  */
 export const ManagedComputerSetupToControllerSchema: GenMessage<ManagedComputerSetupToController> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 11);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 13);
 
 /**
  * @generated from message briar.worker.v1.ManagedComputerSetupState
@@ -380,7 +449,7 @@ export type ManagedComputerSetupState = Message<"briar.worker.v1.ManagedComputer
  * Use `create(ManagedComputerSetupStateSchema)` to create a new message.
  */
 export const ManagedComputerSetupStateSchema: GenMessage<ManagedComputerSetupState> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 12);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 14);
 
 /**
  * @generated from message briar.worker.v1.ManagedComputerSetupChallenge
@@ -422,7 +491,7 @@ export type ManagedComputerSetupChallenge = Message<"briar.worker.v1.ManagedComp
  * Use `create(ManagedComputerSetupChallengeSchema)` to create a new message.
  */
 export const ManagedComputerSetupChallengeSchema: GenMessage<ManagedComputerSetupChallenge> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 13);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 15);
 
 /**
  * @generated from message briar.worker.v1.ManagedComputerSetupComplete
@@ -449,7 +518,7 @@ export type ManagedComputerSetupComplete = Message<"briar.worker.v1.ManagedCompu
  * Use `create(ManagedComputerSetupCompleteSchema)` to create a new message.
  */
 export const ManagedComputerSetupCompleteSchema: GenMessage<ManagedComputerSetupComplete> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 14);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 16);
 
 /**
  * @generated from message briar.worker.v1.ManagedComputerSetupError
@@ -476,7 +545,7 @@ export type ManagedComputerSetupError = Message<"briar.worker.v1.ManagedComputer
  * Use `create(ManagedComputerSetupErrorSchema)` to create a new message.
  */
 export const ManagedComputerSetupErrorSchema: GenMessage<ManagedComputerSetupError> = /*@__PURE__*/
-  messageDesc(file_briar_worker_v1_managed_computer_setup, 15);
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 17);
 
 /**
  * @generated from enum briar.worker.v1.ManagedComputerSetupPhase
@@ -598,8 +667,27 @@ export const ManagedComputerSetupChallengeKindSchema: GenEnum<ManagedComputerSet
   enumDesc(file_briar_worker_v1_managed_computer_setup, 3);
 
 /**
- * Machine-authenticated unary setup operations. The EC2 enrollment bootstrap
- * and the interactive setup WebSocket intentionally remain ordinary HTTP.
+ * The unauthenticated EC2 bootstrap proves the instance identity in its request.
+ * Keeping it separate from machine-authenticated setup prevents the service's
+ * authentication policy from being ambiguous.
+ *
+ * @generated from service briar.worker.v1.ManagedComputerEnrollmentService
+ */
+export const ManagedComputerEnrollmentService: GenService<{
+  /**
+   * @generated from rpc briar.worker.v1.ManagedComputerEnrollmentService.EnrollManagedComputer
+   */
+  enrollManagedComputer: {
+    methodKind: "unary";
+    input: typeof EnrollManagedComputerRequestSchema;
+    output: typeof EnrollManagedComputerResponseSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_briar_worker_v1_managed_computer_setup, 0);
+
+/**
+ * Machine-authenticated unary setup operations. The interactive setup
+ * WebSocket intentionally remains outside Connect.
  *
  * @generated from service briar.worker.v1.ManagedComputerSetupService
  */
@@ -621,5 +709,5 @@ export const ManagedComputerSetupService: GenService<{
     output: typeof BindManagedComputerSetupResponseSchema;
   },
 }> = /*@__PURE__*/
-  serviceDesc(file_briar_worker_v1_managed_computer_setup, 0);
+  serviceDesc(file_briar_worker_v1_managed_computer_setup, 1);
 
