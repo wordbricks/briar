@@ -25,7 +25,9 @@ export function configuredManagedComputerCredentialPath() {
   return path;
 }
 
-function decodeManagedComputerCredential(value: unknown): ManagedComputerCredential {
+export function decodeManagedComputerCredential(
+  value: unknown,
+): ManagedComputerCredential {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Managed computer credential file is invalid");
   }

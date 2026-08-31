@@ -1,30 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   decodeInstanceIdentityDocument,
-  decodeManagedComputerEnrollment,
 } from "./managed-computer-request-contract";
 
-describe("managed computer request contract", () => {
-  it("rejects malformed EC2 identity and enrollment nonce inputs", () => {
-    expect(() => decodeManagedComputerEnrollment({
-      nonce: "not-a-valid-nonce",
-      identityDocument: JSON.stringify({
-        accountId: "attacker",
-        architecture: "x86_64",
-        availabilityZone: "us-east-1a",
-        imageId: "ami-not-valid",
-        instanceId: "local-machine",
-        instanceType: "m7i.large",
-        pendingTime: "2026-08-22T00:00:00Z",
-        privateIp: "10.0.0.1",
-        region: "us-east-1",
-        version: "2017-09-30",
-      }),
-      identitySignature: "short",
-      briarVersion: "1.2.146",
-    })).toThrow();
-  });
-
+describe("EC2 identity document contract", () => {
   it("accepts nullable AWS product fields in EC2 identity documents", () => {
     const identityDocument = {
       accountId: "123456789012",

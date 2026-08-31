@@ -62,6 +62,7 @@ import {
   managedComputerWorkerUpdateStatusCommand,
   managedComputerWorkerSupervisor,
 } from "./managed-computer-commands";
+import { managedComputerEnrollCommand } from "./managed-computer-enrollment";
 import {
   githubCommitStatusCommand,
   githubCredentialCommand,
@@ -518,6 +519,12 @@ const workerCommandTree = Command.make(
 const managedComputerCommand = Command.make("managed-computer").pipe(
   Command.withDescription("Set up and inspect this Briar managed computer"),
   Command.withSubcommands([
+    leaf(
+      "enroll",
+      {},
+      managedComputerEnrollCommand,
+      "Enroll this managed computer from its instance identity proof",
+    ).pipe(Command.unlisted),
     leaf(
       "setup",
       {

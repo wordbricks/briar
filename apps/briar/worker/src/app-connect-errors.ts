@@ -4,6 +4,7 @@ import {
   type Interceptor,
 } from "@connectrpc/connect";
 import {
+  ApplicationErrorDetailSchema,
   ValidationErrorDetailSchema,
 } from "@briar/contracts/gen/briar/types/v1/error_pb";
 import * as SchemaIssue from "effect/SchemaIssue";
@@ -129,7 +130,12 @@ export const toConnectError = (error: unknown): ConnectError => {
       error.message,
       connectCodeFromHttpStatus(error.status),
       undefined,
-      undefined,
+      error.code
+        ? [{
+            desc: ApplicationErrorDetailSchema,
+            value: { code: error.code },
+          }]
+        : undefined,
       error,
     );
   }

@@ -1,9 +1,5 @@
-import { HttpError, json } from "./http-response";
-import {
-  decodeManagedComputerEnrollment,
-} from "./managed-computer-request-contract";
+import { HttpError } from "./http-response";
 import { managedComputerById } from "./managed-computer-repository";
-import { enrollManagedComputer } from "./managed-computer-service";
 import {
   connectManagedComputerRemoteAgent,
   connectManagedComputerRemoteClient,
@@ -14,7 +10,6 @@ import {
   connectManagedComputerSetupClient,
   managedComputerSetupAgentToken,
 } from "./managed-computer-setup-relay-service";
-import { readJson } from "./request-readers";
 import { requireWorkerCredential } from "./worker-route-auth";
 
 export type ManagedComputerRouteInput = {
@@ -24,27 +19,13 @@ export type ManagedComputerRouteInput = {
 };
 
 /**
- * Serve machine bootstrap and WebSocket upgrade routes that intentionally stay
- * outside Connect. Authenticated unary setup and fleet control live in their
- * generated Connect services.
+ * Serve WebSocket upgrades that intentionally stay outside Connect. Enrollment,
+ * authenticated setup, and fleet control live in generated Connect services.
  */
 export async function handleManagedComputerRoute(
   { request, db, env }: ManagedComputerRouteInput,
 ): Promise<Response | undefined> {
   const { pathname } = new URL(request.url);
-
-  const managedComputerEnrollmentMatch = pathname.match(
-    /^\/managed-computers\/([0-9a-f-]+)\/enroll$/u,
-  );
-  if (managedComputerEnrollmentMatch && request.method === "POST") {
-    const input = decodeManagedComputerEnrollment(await readJson(request));
-    const result = await enrollManagedComputer(db, env, {
-      managedComputerId: managedComputerEnrollmentMatch[1],
-      ...input,
-      observedAt: new Date().toISOString(),
-    });
-    return json(result);
-  }
 
   const managedComputerSetupAgentMatch = pathname.match(
     /^\/managed-computers\/([0-9a-f-]+)\/setup-agent$/u,

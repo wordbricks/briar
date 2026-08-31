@@ -16,6 +16,7 @@ import {
   ProposalStatus,
 } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
+  ApplicationErrorDetailSchema,
   ValidationErrorDetailSchema,
 } from "@briar/contracts/gen/briar/types/v1/error_pb";
 import { describe, expect, it } from "vitest";
@@ -153,12 +154,16 @@ describe("Issue Connect boundary", () => {
             message: "Title is required",
           }],
         },
+      }, {
+        desc: ApplicationErrorDetailSchema,
+        value: { code: "ISSUE_INVALID" },
       }],
     ));
 
     expect(error).toMatchObject({
       status: 400,
       message: "invalid issue",
+      code: "ISSUE_INVALID",
       issues: [{
         path: ["title"],
         rule: "min_length",

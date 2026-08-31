@@ -296,15 +296,11 @@ if (
 }
 
 const enrollment = await text(join(image, "briar-managed-enroll"));
-for (const required of [
-  "const retryableStatus = response.status === 408",
-  "response.status === 409 || response.status === 425",
-  "response.status === 429 || response.status >= 500",
-  "process.exit(retryableStatus ? 75 : 2)",
-]) {
-  if (!enrollment.includes(required)) {
-    fail(`managed enrollment retry policy omits ${required}`);
-  }
+if (!enrollment.includes("/opt/briar/bin/briar managed-computer enroll")) {
+  fail("managed enrollment does not use the generated Briar Connect client");
+}
+if (enrollment.includes("bun --eval") || enrollment.includes("fetch(")) {
+  fail("managed enrollment still embeds a handwritten HTTP client");
 }
 const enrollmentService = await text(
   join(image, "briar-managed-enroll.service"),

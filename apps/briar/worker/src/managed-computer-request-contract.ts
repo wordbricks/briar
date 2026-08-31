@@ -1,4 +1,7 @@
 import * as Schema from "effect/Schema";
+import {
+  ManagedComputerEnrollmentProof,
+} from "../../src/lib/managed-computer-enrollment-contract";
 import { strictSchema, trimmedText, UuidString } from "./schema-codecs";
 import { decodeRequestSync } from "./request-schema";
 
@@ -49,20 +52,6 @@ export const InstanceIdentityDocument = strictSchema(Schema.Struct({
   version: trimmedText(1, 20),
 }));
 
-export const ManagedComputerEnrollment = strictSchema(Schema.Struct({
-  nonce: Schema.String.check(
-    Schema.isPattern(/^[A-Za-z0-9_-]{43}$/u),
-  ),
-  identityDocument: Schema.String.check(
-    Schema.isMinLength(2),
-    Schema.isMaxLength(16_384),
-  ),
-  identitySignature: Schema.String.check(
-    Schema.isPattern(/^[A-Za-z0-9+/=\r\n]{64,8192}$/u),
-  ),
-  briarVersion: trimmedText(1, 64),
-}));
-
 export const decodeManagedComputerPromotionValidation = decodeRequestSync(
   ManagedComputerPromotionValidation,
 );
@@ -78,8 +67,8 @@ export const decodeManagedComputerSetupSession = decodeRequestSync(
 export const decodeManagedComputerRemoteSessionRequest = decodeRequestSync(
   ManagedComputerRemoteSessionRequest,
 );
-export const decodeManagedComputerEnrollment = decodeRequestSync(
-  ManagedComputerEnrollment,
+export const decodeManagedComputerEnrollmentProof = decodeRequestSync(
+  ManagedComputerEnrollmentProof,
 );
 export const decodeInstanceIdentityDocument = decodeRequestSync(
   InstanceIdentityDocument,

@@ -9,6 +9,7 @@ import {
 } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import {
+  ApplicationErrorDetailSchema,
   ValidationErrorDetailSchema,
 } from "@briar/contracts/gen/briar/types/v1/error_pb";
 import { briarApiUrl } from "../api-config";
@@ -42,6 +43,9 @@ const statusForConnectCode = (code: Code): number => {
 };
 
 export const apiErrorFromConnect = (error: ConnectError): ApiError => {
+  const applicationCode = error
+    .findDetails(ApplicationErrorDetailSchema)
+    .at(0)?.code;
   const validationIssues = error
     .findDetails(ValidationErrorDetailSchema)
     .flatMap((detail) => detail.violations)
@@ -53,7 +57,7 @@ export const apiErrorFromConnect = (error: ConnectError): ApiError => {
   return new ApiError(
     statusForConnectCode(error.code),
     error.rawMessage || error.message,
-    undefined,
+    applicationCode || undefined,
     validationIssues.length > 0 ? validationIssues : undefined,
   );
 };

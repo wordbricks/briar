@@ -23,6 +23,9 @@ import {
 } from "./app-connect-project";
 import { registerWorkerExecutionService } from "./worker-connect-execution";
 import { registerWorkerControlService } from "./worker-connect-control";
+import {
+  registerManagedComputerEnrollmentService,
+} from "./worker-connect-managed-computer-enrollment";
 import { registerManagedComputerSetupService } from "./worker-connect-managed-computer-setup";
 import { registerOrganizationAgentContextService } from "./worker-connect-organization-context";
 import { registerWorkerQueueService } from "./worker-connect-queue";
@@ -126,6 +129,10 @@ export async function handleAppConnectRequest(
   registerWorkerControlService(router, {
     request: input.request,
     db: input.env.DB,
+  });
+  registerManagedComputerEnrollmentService(router, {
+    db: input.env.DB,
+    env: input.env,
   });
   registerManagedComputerSetupService(router, {
     request: input.request,
