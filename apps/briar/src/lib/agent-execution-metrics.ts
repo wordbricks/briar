@@ -558,35 +558,7 @@ export function codexExecutionUsageObservationsFromPayload(
     ];
   }
 
-  // Compatibility with App Server versions that attached turn usage directly
-  // to turn/completed rather than publishing thread/tokenUsage/updated.
-  const turn = asRecord(params?.turn);
-  const directUsage =
-    asRecord(turn?.usage) ??
-    asRecord(params?.usage) ??
-    (message.type === "turn.completed" ? asRecord(message.usage) : null);
-  const tokenUsage = directUsage
-    ? normalizedTokenUsage("codex", directUsage)
-    : null;
-  const directTurnId = nonEmptyString(turn?.id) ?? identity.turnId;
-  return tokenUsage
-    ? [
-        {
-          kind: "delta",
-          provider: "codex",
-          model: null,
-          canonicalModel: null,
-          modelProvider: null,
-          modelSource: "unknown",
-          tokenUsage,
-          source: "codex.turnUsage",
-          scopeId: directTurnId ?? identity.sessionId,
-          sessionId: identity.sessionId,
-          turnId: directTurnId,
-          dedupeKey: dedupeKey("codex", "turn", directTurnId, "usage"),
-        },
-      ]
-    : [];
+  return [];
 }
 
 const grokTokenUsage = (

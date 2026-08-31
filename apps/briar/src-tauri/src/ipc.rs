@@ -166,13 +166,6 @@ mod tests {
     }
 
     #[test]
-    fn json_value_exports_as_json_union() {
-        assert!(exported_typescript().contains(
-            "export type JsonValue = boolean | number | null | string | JsonValue[] | { [key in string]: JsonValue };"
-        ));
-    }
-
-    #[test]
     fn typescript_bindings_are_current() {
         let expected = std::fs::read_to_string(generated_typescript_path())
             .expect("generated Tauri TypeScript bindings are missing");

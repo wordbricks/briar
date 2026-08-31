@@ -2074,9 +2074,6 @@ fn approval_decision(method: &str, approved: bool) -> Option<Value> {
         "item/commandExecution/requestApproval" | "item/fileChange/requestApproval" => {
             Some(json!({ "decision": if approved { "accept" } else { "decline" } }))
         }
-        "execCommandApproval" | "applyPatchApproval" => {
-            Some(json!({ "decision": if approved { "approved" } else { "denied" } }))
-        }
         _ => None,
     }
 }
@@ -3308,11 +3305,6 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
             "method": "item/commandExecution/requestApproval",
             "params": { "command": "git status" }
         });
-        let legacy = json!({
-            "id": 10,
-            "method": "applyPatchApproval",
-            "params": { "reason": "update a file" }
-        });
         let unknown = json!({
             "id": 11,
             "method": "item/tool/requestUserInput",
@@ -3326,10 +3318,6 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
         assert_eq!(
             approval_decision(approved["method"].as_str().unwrap(), false).unwrap()["decision"],
             "decline"
-        );
-        assert_eq!(
-            approval_decision(legacy["method"].as_str().unwrap(), true).unwrap()["decision"],
-            "approved"
         );
         assert!(approval_decision(unknown["method"].as_str().unwrap(), true).is_none());
     }

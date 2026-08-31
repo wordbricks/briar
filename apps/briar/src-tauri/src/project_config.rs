@@ -761,7 +761,7 @@ pub(super) fn approval_request_message(
                 .map(str::to_string)
         })
         .unwrap_or_else(|| {
-            if method.contains("fileChange") || method == "applyPatchApproval" {
+            if method.contains("fileChange") {
                 "프로젝트 파일 변경".to_string()
             } else {
                 "프로젝트 명령 실행".to_string()
