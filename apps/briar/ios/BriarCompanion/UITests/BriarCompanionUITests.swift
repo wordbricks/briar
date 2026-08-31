@@ -37,11 +37,6 @@ final class BriarCompanionUITests: XCTestCase {
         ]
         XCTAssertTrue(alternateProject.waitForExistence(timeout: 5))
         alternateProject.tap()
-        // The team menu now contains a project submenu. Opening it alone does
-        // not select the team; choose its leaf before asserting the new scope.
-        let alternateTeam = app.buttons["Briar Mobile"]
-        XCTAssertTrue(alternateTeam.waitForExistence(timeout: 5))
-        alternateTeam.tap()
         let selectedTeam = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label CONTAINS %@", "Briar Mobile"),
             object: app.buttons["project-menu"]
