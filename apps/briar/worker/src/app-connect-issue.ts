@@ -1,3 +1,5 @@
+import { create } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   Code,
   ConnectError,
@@ -8,6 +10,10 @@ import {
   IssueService,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import {
+  PreparedUploadSchema,
+  UploadReferenceSchema,
+} from "@briar/contracts/gen/briar/types/v1/upload_pb";
 import {
   appAcceptIssueActionProposalResponse,
   appAcceptIssueExecutionProposalResponse,
@@ -91,6 +97,11 @@ import {
   requiredAppAgentProviderFromProto,
   updateIssueApplicationRequest,
 } from "./app-mutation-request-mappers";
+import {
+  prepareCreateIssueAttachmentsApplication,
+  prepareIssueMessageAttachmentsApplication,
+  prepareUpdateIssueAttachmentsApplication,
+} from "./issue-attachment-upload-application";
 
 export type AppConnectIssueRouteInput = {
   readonly request: Request;
@@ -109,6 +120,12 @@ export type AppConnectIssueServices = {
   readonly completeResultReview: typeof completeProjectIssueResultReview;
   readonly createIssue: typeof createProjectIssue;
   readonly createMessage: typeof createProjectIssueMessage;
+  readonly prepareCreateAttachments:
+    typeof prepareCreateIssueAttachmentsApplication;
+  readonly prepareMessageAttachments:
+    typeof prepareIssueMessageAttachmentsApplication;
+  readonly prepareUpdateAttachments:
+    typeof prepareUpdateIssueAttachmentsApplication;
   readonly deleteMessage: typeof deleteProjectIssueMessage;
   readonly deleteIssue: typeof deleteProjectIssue;
   readonly dispatchRun: typeof dispatchProjectIssueRun;
@@ -139,6 +156,9 @@ export const appConnectIssueServices: AppConnectIssueServices = {
   completeResultReview: completeProjectIssueResultReview,
   createIssue: createProjectIssue,
   createMessage: createProjectIssueMessage,
+  prepareCreateAttachments: prepareCreateIssueAttachmentsApplication,
+  prepareMessageAttachments: prepareIssueMessageAttachmentsApplication,
+  prepareUpdateAttachments: prepareUpdateIssueAttachmentsApplication,
   deleteMessage: deleteProjectIssueMessage,
   deleteIssue: deleteProjectIssue,
   dispatchRun: dispatchProjectIssueRun,
@@ -164,6 +184,25 @@ export const appConnectIssueServices: AppConnectIssueServices = {
 const decodeUuid = decodeRequestSync(UuidString);
 
 const canonicalUuid = (value: string) => decodeUuid(value).toLowerCase();
+
+const preparedIssueAttachmentsResponse = (
+  input: AppConnectIssueRouteInput,
+  result: Awaited<ReturnType<typeof prepareCreateIssueAttachmentsApplication>>,
+) => create(IssueService.method.prepareCreateIssueAttachments.output, {
+  replayed: result.replayed,
+  uploads: result.uploads.map((upload) =>
+    create(PreparedUploadSchema, {
+      clientId: upload.clientId,
+      reference: create(UploadReferenceSchema, { uploadId: upload.uploadId }),
+      uploadUrl: new URL(
+        `/uploads/${encodeURIComponent(upload.uploadId)}`,
+        input.request.url,
+      ).toString(),
+      uploadCapability: upload.uploadCapability,
+      expiresAt: timestampFromDate(new Date(upload.expiresAt)),
+    })
+  ),
+});
 
 const optionalProviderBody = (provider: AgentProvider) => {
   const value = appAgentProviderFromProto(provider);
@@ -191,6 +230,21 @@ export const createAppIssueService = (
   input: AppConnectIssueRouteInput,
   services: AppConnectIssueServices = appConnectIssueServices,
 ): ServiceImpl<typeof IssueService> => ({
+  prepareCreateIssueAttachments: async (request, context) => {
+    context.responseHeader.set("Cache-Control", "private, no-store");
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.prepareCreateAttachments({
+      db: input.db,
+      signingSecret: input.env.BETTER_AUTH_SECRET,
+      projectId: canonicalUuid(request.projectId),
+      userId: session.user.id,
+      preparationRequestId: canonicalUuid(request.preparationRequestId),
+      mutationId: canonicalUuid(request.clientIssueId),
+      attachments: request.attachments,
+    });
+    return preparedIssueAttachmentsResponse(input, result);
+  },
+
   createIssue: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
@@ -205,6 +259,22 @@ export const createAppIssueService = (
       })
     );
     return appCreateIssueResponse(result);
+  },
+
+  prepareUpdateIssueAttachments: async (request, context) => {
+    context.responseHeader.set("Cache-Control", "private, no-store");
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.prepareUpdateAttachments({
+      db: input.db,
+      signingSecret: input.env.BETTER_AUTH_SECRET,
+      projectId: canonicalUuid(request.projectId),
+      runId: canonicalUuid(request.runId),
+      userId: session.user.id,
+      preparationRequestId: canonicalUuid(request.preparationRequestId),
+      mutationId: canonicalUuid(request.requestId),
+      attachments: request.attachments,
+    });
+    return preparedIssueAttachmentsResponse(input, result);
   },
 
   updateIssue: async (request) => {
@@ -554,6 +624,22 @@ export const createAppIssueService = (
       const snapshot = await services.listMessages(applicationInput);
       return appResetIssueMessagesResponse(snapshot);
     }
+  },
+
+  prepareIssueMessageAttachments: async (request, context) => {
+    context.responseHeader.set("Cache-Control", "private, no-store");
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.prepareMessageAttachments({
+      db: input.db,
+      signingSecret: input.env.BETTER_AUTH_SECRET,
+      projectId: canonicalUuid(request.projectId),
+      runId: canonicalUuid(request.runId),
+      userId: session.user.id,
+      preparationRequestId: canonicalUuid(request.preparationRequestId),
+      mutationId: canonicalUuid(request.clientMessageId),
+      attachments: request.attachments,
+    });
+    return preparedIssueAttachmentsResponse(input, result);
   },
 
   createIssueMessage: async (request) => {

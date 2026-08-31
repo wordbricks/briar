@@ -1,6 +1,13 @@
 import { sha256 } from "./crypto-digest";
 
-export type UploadPurpose = "issue_reply" | "channel_reply" | "run_evidence" | "channel_message";
+export type UploadPurpose =
+  | "issue_reply"
+  | "channel_reply"
+  | "run_evidence"
+  | "channel_message"
+  | "issue_create"
+  | "issue_update"
+  | "issue_message";
 
 export type UploadScope = {
   purpose: UploadPurpose;
@@ -335,7 +342,13 @@ export function consumeUploadStatements(
   db: D1Database,
   input: UploadScope & {
     uploadIds: readonly string[];
-    consumerKind: "reply_completion" | "run_evidence" | "channel_message";
+    consumerKind:
+      | "reply_completion"
+      | "run_evidence"
+      | "channel_message"
+      | "issue_create"
+      | "issue_update"
+      | "issue_message";
     consumerId: string;
     consumedAt: string;
   },
