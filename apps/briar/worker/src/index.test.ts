@@ -994,7 +994,7 @@ describe("Worker HTTP contract", () => {
     expect(prepare).not.toHaveBeenCalled();
   });
 
-  it("acknowledges /create immediately on the command and legacy event URLs", async () => {
+  it("acknowledges /create immediately on the command URL", async () => {
     const signingSecret = "test-slack-signing-secret";
     const pendingInstallation = new Promise<never>(() => {});
     const first = vi.fn(() => pendingInstallation);
@@ -1010,7 +1010,7 @@ describe("Worker HTTP contract", () => {
       passThroughOnException: vi.fn(),
     } as unknown as ExecutionContext;
 
-    const request = (pathname: string) => {
+    const request = () => {
       const body = new URLSearchParams({
         team_id: "T123",
         channel_id: "C123",
@@ -1027,7 +1027,7 @@ describe("Worker HTTP contract", () => {
           .update(`v0:${timestamp}:${body}`)
           .digest("hex")
       }`;
-      return new Request(`https://briar-api.example${pathname}`, {
+      return new Request("https://briar-api.example/slack/commands", {
         method: "POST",
         headers: {
           "content-type": "application/x-www-form-urlencoded",
@@ -1038,13 +1038,11 @@ describe("Worker HTTP contract", () => {
       });
     };
 
-    for (const pathname of ["/slack/commands", "/slack/events"]) {
-      const response = await worker.fetch(request(pathname), env, ctx);
-      expect(response.status).toBe(200);
-      expect(await response.text()).toBe("");
-    }
-    expect(waitUntil).toHaveBeenCalledTimes(2);
-    expect(first).toHaveBeenCalledTimes(2);
+    const response = await worker.fetch(request(), env, ctx);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("");
+    expect(waitUntil).toHaveBeenCalledOnce();
+    expect(first).toHaveBeenCalledOnce();
   });
 
   it("acknowledges the Briar create-issue global shortcut immediately", async () => {
