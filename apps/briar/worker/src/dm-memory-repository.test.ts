@@ -6,7 +6,7 @@ import { addChannelMember, createChannel, removeChannelMember } from "./channels
 import { createOrganizationAgent } from "./organization-agents";
 import apiWorker from "./index";
 import {
-  deleteDmMemory, exportDmMemoryEntries, getDmMemory, listDmMemories, saveDmMemory, updateDmMemorySettings,
+  deleteDmMemory, exportDmMemoryEntries, getDmMemory, listDmMemories, listDmMemoryRevisions, saveDmMemory, updateDmMemorySettings,
   type DmMemoryOwner,
 } from "./dm-memory-repository";
 import { dmMemoryZipResponse } from "./dm-memory-export";
@@ -60,6 +60,22 @@ describe("DM memory authoritative storage", () => {
   const count = async (table: string, spaceId: string) => (await db.prepare(
     `select count(*) as total from ${table} where space_id = ?`,
   ).bind(spaceId).first<{ total: number }>())?.total;
+
+  it("M28 exposes owner revision history without restoring deleted bodies", async () => {
+    const owner = await dm();
+    const saved = await saveDmMemory(db, owner, memory({ body: "Earlier synthetic preference" }));
+    await saveDmMemory(db, owner, { ...memory({ body: "Current synthetic preference" }), expectedVersion: 1 }, saved.documentId!);
+    const page = await listDmMemoryRevisions(db, owner, saved.documentId!);
+    expect(page.revisions.map((revision) => revision.version)).toEqual([2, 1]);
+    expect(page.revisions[0]!.protectedByUser).toBe(true);
+    expect((await getDmMemory(db, owner, saved.documentId!, 1)).body).toBe("Earlier synthetic preference");
+    expect((await getDmMemory(db, owner, saved.documentId!)).body).toBe("Current synthetic preference");
+    await expect(listDmMemoryRevisions(db, { ...owner, userId: otherUserId }, saved.documentId!))
+      .rejects.toMatchObject({ code: "memory_not_found" });
+    await deleteDmMemory(db, owner, saved.documentId!);
+    await expect(getDmMemory(db, owner, saved.documentId!, 1)).rejects.toMatchObject({ code: "memory_not_found" });
+    await expect(listDmMemoryRevisions(db, owner, saved.documentId!)).rejects.toMatchObject({ code: "memory_not_found" });
+  });
 
   it("M01 saves the document, evidence and index job atomically and replays a request", async () => {
     const owner = await dm();

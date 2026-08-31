@@ -901,6 +901,7 @@ const mobileChannelProposalSchema = Schema.Union([
 ]);
 
 export const mobileChannelMessageSchema = mutableStruct({
+  memoryCitations: optional(mutableArray(mutableStruct({ documentId: uuidString, version: positiveInteger }))),
   id: uuidString,
   channelId: uuidString,
   parentMessageId: nullable(uuidString),

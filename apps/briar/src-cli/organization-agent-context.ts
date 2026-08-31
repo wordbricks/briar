@@ -664,7 +664,7 @@ export async function hydrateOrganizationAgentContext(input: {
         Authorization: `Bearer ${input.workerToken}`,
         [channelReplyClaimTokenHeader]: input.claimToken,
       },
-      body: JSON.stringify({ workerId: input.workerId, requests }),
+      body: JSON.stringify({ workerId: input.workerId, requestId: crypto.randomUUID(), requests }),
     },
   );
   if (!response.ok) {

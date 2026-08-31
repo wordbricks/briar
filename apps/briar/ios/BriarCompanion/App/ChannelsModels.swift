@@ -378,12 +378,19 @@ struct ChannelMessageBlock: Codable, Hashable, Sendable {
     }
 }
 
+struct ChannelMemoryCitation: Codable, Hashable, Identifiable, Sendable {
+    let documentId: UUID
+    let version: Int
+    var id: String { "\(documentId.uuidString):\(version)" }
+}
+
 struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     let id: UUID
     let channelId: UUID
     let parentMessageId: UUID?
     let body: String
     let blocks: [ChannelMessageBlock]?
+    let memoryCitations: [ChannelMemoryCitation]
     let author: Author
     let mentionedUserIds: [String]
     let mentionedAgentIds: [UUID]
@@ -411,6 +418,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         case parentMessageId
         case body
         case blocks
+        case memoryCitations
         case author
         case mentionedUserIds
         case mentionedAgentIds
@@ -434,6 +442,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         parentMessageId: UUID?,
         body: String,
         blocks: [ChannelMessageBlock]? = nil,
+        memoryCitations: [ChannelMemoryCitation] = [],
         author: Author,
         mentionedUserIds: [String] = [],
         mentionedAgentIds: [UUID] = [],
@@ -455,6 +464,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         self.parentMessageId = parentMessageId
         self.body = body
         self.blocks = blocks
+        self.memoryCitations = memoryCitations
         self.author = author
         self.mentionedUserIds = mentionedUserIds
         self.mentionedAgentIds = mentionedAgentIds
@@ -479,6 +489,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         parentMessageId = try container.decodeIfPresent(UUID.self, forKey: .parentMessageId)
         body = try container.decode(String.self, forKey: .body)
         blocks = try container.decodeIfPresent([ChannelMessageBlock].self, forKey: .blocks)
+        memoryCitations = try container.decodeIfPresent([ChannelMemoryCitation].self, forKey: .memoryCitations) ?? []
         author = try container.decode(Author.self, forKey: .author)
         mentionedUserIds = try container.decodeIfPresent([String].self, forKey: .mentionedUserIds) ?? []
         mentionedAgentIds = try container.decodeIfPresent([UUID].self, forKey: .mentionedAgentIds) ?? []

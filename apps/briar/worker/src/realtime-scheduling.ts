@@ -260,7 +260,7 @@ type ChannelActivityReplyIdentity = Pick<
 
 export async function channelActivityCredential(
   env: Env,
-  job: ChannelActivityReplyIdentity,
+  job: ChannelActivityReplyIdentity & { claim_token_hash?: string | null },
   input: { workerId: string; deviceId: string },
 ) {
   return activityCredential(
@@ -270,6 +270,7 @@ export async function channelActivityCredential(
       organizationId: job.organization_id,
       channelId: job.channel_id,
       replyJobId: job.id,
+      ...(job.claim_token_hash ? { claimTokenHash: job.claim_token_hash } : {}),
       agentId: job.agent_id,
       triggerMessageId: job.trigger_message_id,
       parentMessageId: job.parent_message_id,

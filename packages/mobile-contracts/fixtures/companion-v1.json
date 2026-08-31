@@ -317,8 +317,14 @@
               "name": "wordbricks/briar"
             },
             "agents": [],
-            "schedule": { "enabled": true, "entries": [] },
-            "workflow": { "version": 2, "stages": [] },
+            "schedule": {
+              "enabled": true,
+              "entries": []
+            },
+            "workflow": {
+              "version": 2,
+              "stages": []
+            },
             "createdAt": "2026-08-02T00:00:00.000Z",
             "updatedAt": "2026-08-11T13:00:00.000Z"
           }
@@ -1257,7 +1263,9 @@
         "body": "@Developer please review",
         "parentMessageId": null,
         "mentionedUserIds": [],
-        "mentionedAgentIds": ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
+        "mentionedAgentIds": [
+          "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        ],
         "agentConversationId": null
       },
       "response": {
@@ -1287,16 +1295,18 @@
           "attempts": 0,
           "error": null
         },
-        "agentReplies": [{
-          "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-          "triggerMessageId": "99999999-9999-4999-8999-999999999999",
-          "parentMessageId": "99999999-9999-4999-8999-999999999999",
-          "agentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-          "agentName": "Developer",
-          "status": "queued",
-          "attempts": 0,
-          "error": null
-        }]
+        "agentReplies": [
+          {
+            "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "triggerMessageId": "99999999-9999-4999-8999-999999999999",
+            "parentMessageId": "99999999-9999-4999-8999-999999999999",
+            "agentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "agentName": "Developer",
+            "status": "queued",
+            "attempts": 0,
+            "error": null
+          }
+        ]
       }
     },
     "getIssueAgentReply": {
@@ -1745,7 +1755,13 @@
               "resultRunId": null
             },
             "createdAt": "2026-08-06T00:04:00.000Z",
-            "reactions": []
+            "reactions": [],
+            "memoryCitations": [
+              {
+                "documentId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+                "version": 1
+              }
+            ]
           }
         ],
         "nextCursor": null
@@ -2070,6 +2086,26 @@
             }
           ]
         }
+      }
+    },
+    "listDmMemoryRevisions": {
+      "method": "GET",
+      "path": "/organizations/{organizationId}/channels/{channelId}/memory/documents/{documentId}/revisions",
+      "status": 200,
+      "response": {
+        "documentId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        "currentVersion": 1,
+        "revisions": [
+          {
+            "version": 1,
+            "createdAt": "2026-09-01T00:00:00.000Z",
+            "memoryClass": "profile",
+            "protectedByUser": true,
+            "validUntil": null,
+            "origin": "user_edit"
+          }
+        ],
+        "nextCursor": null
       }
     }
   }

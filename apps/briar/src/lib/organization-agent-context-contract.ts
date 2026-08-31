@@ -176,6 +176,7 @@ export type OrganizationAgentContextLookupRequest =
   typeof OrganizationAgentContextLookupRequest.Type;
 
 export const OrganizationAgentContextLookupInput = strict(Schema.Struct({
+  requestId: Schema.optional(Schema.String.check(Schema.isUUID())),
   workerId: Schema.Trim.check(Schema.isLengthBetween(1, 64)),
   requests: mutableArrayBetween(OrganizationAgentContextLookupRequest, 1, 12),
 }));

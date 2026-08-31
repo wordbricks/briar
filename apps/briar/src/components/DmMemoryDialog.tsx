@@ -6,18 +6,22 @@ import {
 } from "../lib/api/dm-memory";
 import {
   dmMemoryClasses, dmMemoryDocumentMaxBytes, type DmMemoryClass,
-  type DmMemoryDocumentDetail, type DmMemoryPage,
+  type DmMemoryDocumentDetail, type DmMemoryPage, type DmMemoryRevisionPage,
 } from "../lib/dm-memory-contract";
+import type { DmMemoryReference } from "../lib/dm-memory-query-contract";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 
-export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi }: {
-  scope: DmMemoryApiScope; onClose: () => void; client?: DmMemoryClient;
+export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialReference }: {
+  scope: DmMemoryApiScope; onClose: () => void; client?: DmMemoryClient; initialReference?: DmMemoryReference;
 }) {
   const { t } = useI18n();
   const [page, setPage] = useState<DmMemoryPage | null>(null);
   const [selected, setSelected] = useState<DmMemoryDocumentDetail | null>(null);
   const [editing, setEditing] = useState(false);
+  const [history, setHistory] = useState<DmMemoryRevisionPage | null>(null);
+  const [historyPreview, setHistoryPreview] = useState<DmMemoryDocumentDetail | null>(null);
+  const [observedNow, setObservedNow] = useState(Date.now());
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [memoryClass, setMemoryClass] = useState<DmMemoryClass>("profile");
@@ -32,17 +36,43 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi }: {
   const selectedSpace = page?.spaces.find((space) => space.id === page.selectedSpaceId);
   const writable = page?.eligible && (!selectedSpace || selectedSpace.status === "active");
 
+  const historicalSelected = selected && page?.documents.find((item) => item.id === selected.id)?.version !== selected.version;
+  const canEdit = writable && !historicalSelected;
+
   useEffect(() => {
     const controller = new AbortController();
     const current = ++generation.current;
     setBusy(true);
-    void client.load(scope, undefined, undefined, controller.signal).then((result) => {
-      if (generation.current === current) setPage(result);
+    void client.load(scope, undefined, undefined, controller.signal).then(async (result) => {
+      if (generation.current !== current) return;
+      setPage(result);
+      if (initialReference) {
+        const document = await client.get(scope, initialReference.documentId, controller.signal, initialReference.version);
+        if (generation.current === current) beginEdit(document);
+      }
     }).catch((caught: unknown) => {
       if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : String(caught));
     }).finally(() => { if (generation.current === current) setBusy(false); });
     return () => { generation.current++; controller.abort(); };
-  }, [scope.token, scope.organizationId, scope.channelId, client]);
+  }, [scope.token, scope.organizationId, scope.channelId, client, initialReference?.documentId, initialReference?.version]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const current = generation.current;
+    const timer = setInterval(() => {
+      setObservedNow(Date.now());
+      if (busy || editing || !page) return;
+      void client.load(scope, page.selectedSpaceId ?? undefined, undefined, controller.signal).then(async (first) => {
+        let fresh = first;
+        while (fresh.nextCursor && fresh.documents.length < page.documents.length) {
+          const next = await client.load(scope, page.selectedSpaceId ?? undefined, fresh.nextCursor, controller.signal);
+          fresh = { ...next, documents: [...fresh.documents, ...next.documents] };
+        }
+        if (generation.current === current && !controller.signal.aborted) setPage(fresh);
+      }).catch(() => { /* Explicit refresh retains actionable API errors. */ });
+    }, 5000);
+    return () => { clearInterval(timer); controller.abort(); };
+  }, [busy, editing, page, selectedSpace?.memoryRevision, scope.token, scope.organizationId, scope.channelId, client]);
 
   async function perform(action: () => Promise<void>) {
     if (busy) return;
@@ -59,6 +89,7 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi }: {
     if (current === generation.current) setPage(result);
   }
   function beginEdit(document: DmMemoryDocumentDetail | null) {
+    setHistory(null); setHistoryPreview(null);
     setSelected(document); setTitle(document?.title ?? ""); setBody(document?.body ?? "");
     setMemoryClass(document?.memoryClass ?? "profile"); setSourceLanguage(document?.sourceLanguage ?? "und");
     setObservedAt(document?.observedAt ?? ""); setValidUntil(document?.validUntil ?? "");
@@ -70,6 +101,7 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi }: {
     <DialogContent closeLabel={t("common.close")} className="max-h-[90dvh] max-w-2xl overflow-y-auto">
       <DialogTitle className="flex items-center gap-2"><Brain size={18} />{t("memory.title")}</DialogTitle>
       <DialogDescription>{t("memory.scope")}</DialogDescription>
+      <p className="text-sm text-muted-foreground">{t("memory.forgetHelp")}</p>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {notice && <p role="status" className="text-sm">{notice}</p>}
       {!page && busy && <p role="status">{t("memory.loading")}</p>}
@@ -125,6 +157,7 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi }: {
               })}>
                 <span className="block break-words font-medium">{item.title}</span>
                 <span className="text-xs text-muted-foreground">{item.memoryClass} · v{item.version} · {item.indexState === "ready" ? t("memory.indexReady") : item.indexState === "failed" ? t("memory.indexFailed") : t("memory.indexPending")}</span>
+                {item.validUntil && <span className="block text-xs text-muted-foreground">{Date.parse(item.validUntil) <= observedNow ? t("memory.expired") : t("memory.expiry")} · {item.validUntil}</span>}
                 {item.protectedByUser && <span className="ml-2 text-xs">{t("memory.protected")}</span>}
                 {(item.conflicted || item.status !== "active") && <span className="block text-xs">{t("memory.needsReview")}</span>}
               </button>
@@ -147,23 +180,44 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi }: {
             setEditing(false); await refresh(); setNotice(t("common.saved"));
           });
         }}>
-          <label className="grid gap-1 text-sm">{t("memory.documentTitle")}<input required maxLength={200} disabled={!writable || busy} className={inputClass} value={title} onChange={(event) => { changeDraft(); setTitle(event.target.value); }} /></label>
-          <label className="grid gap-1 text-sm">{t("memory.body")}<textarea required rows={6} disabled={!writable || busy} className={inputClass} value={body} onChange={(event) => { changeDraft(); setBody(event.target.value); }} /></label>
+          {historicalSelected && <p role="status">{t("memory.historical")}</p>}
+          <label className="grid gap-1 text-sm">{t("memory.documentTitle")}<input required maxLength={200} disabled={!canEdit || busy} className={inputClass} value={title} onChange={(event) => { changeDraft(); setTitle(event.target.value); }} /></label>
+          <label className="grid gap-1 text-sm">{t("memory.body")}<textarea required rows={6} disabled={!canEdit || busy} className={inputClass} value={body} onChange={(event) => { changeDraft(); setBody(event.target.value); }} /></label>
           <span className="text-xs text-muted-foreground">{new TextEncoder().encode(body).length} / {dmMemoryDocumentMaxBytes} bytes</span>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="grid gap-1 text-sm">{t("memory.class")}<select disabled={!writable || busy} className={inputClass} value={memoryClass} onChange={(event) => { changeDraft(); setMemoryClass(event.target.value as DmMemoryClass); }}>
+            <label className="grid gap-1 text-sm">{t("memory.class")}<select disabled={!canEdit || busy} className={inputClass} value={memoryClass} onChange={(event) => { changeDraft(); setMemoryClass(event.target.value as DmMemoryClass); }}>
               {dmMemoryClasses.map((value) => <option key={value}>{value}</option>)}
             </select></label>
-            <label className="grid gap-1 text-sm">{t("memory.language")}<input disabled={!writable || busy} className={inputClass} value={sourceLanguage} onChange={(event) => { changeDraft(); setSourceLanguage(event.target.value); }} /></label>
-            <label className="grid gap-1 text-sm">{t("memory.observed")}<input disabled={!writable || busy} className={inputClass} placeholder="2026-09-01T09:00:00+09:00" value={observedAt} onChange={(event) => { changeDraft(); setObservedAt(event.target.value); }} /></label>
-            <label className="grid gap-1 text-sm">{t("memory.expiry")}<input disabled={!writable || busy} className={inputClass} placeholder={t("memory.optionalDate")} value={validUntil} onChange={(event) => { changeDraft(); setValidUntil(event.target.value); }} /></label>
+            <label className="grid gap-1 text-sm">{t("memory.language")}<input disabled={!canEdit || busy} className={inputClass} value={sourceLanguage} onChange={(event) => { changeDraft(); setSourceLanguage(event.target.value); }} /></label>
+            <label className="grid gap-1 text-sm">{t("memory.observed")}<input disabled={!canEdit || busy} className={inputClass} placeholder="2026-09-01T09:00:00+09:00" value={observedAt} onChange={(event) => { changeDraft(); setObservedAt(event.target.value); }} /></label>
+            <label className="grid gap-1 text-sm">{t("memory.expiry")}<input disabled={!canEdit || busy} className={inputClass} placeholder={t("memory.optionalDate")} value={validUntil} onChange={(event) => { changeDraft(); setValidUntil(event.target.value); }} /></label>
           </div>
           {selected && <div className="break-all text-xs text-muted-foreground">
             <p>{t("memory.updated")} {selected.updatedAt}</p>
+            <Button type="button" variant="outline" disabled={busy} onClick={() => void perform(async () => {
+              setHistory(await client.history(scope, selected.id));
+            })}>{t("memory.history")}</Button>
+            {historicalSelected && <Button type="button" variant="outline" disabled={busy} onClick={() => void perform(async () => {
+              beginEdit(await client.get(scope, selected.id));
+            })}>{t("memory.currentVersion")}</Button>}
+            {history && <div className="mt-2 grid gap-2">
+              {history.revisions.map((revision) => <button type="button" className="text-left underline" disabled={busy} key={revision.version}
+                onClick={() => void perform(async () => { setHistoryPreview(await client.get(scope, selected.id, undefined, revision.version)); })}>
+                v{revision.version} · {revision.createdAt} · {revision.origin}
+              </button>)}
+              {history.nextCursor && <Button type="button" variant="outline" disabled={busy} onClick={() => void perform(async () => {
+                const next = await client.history(scope, selected.id, history.nextCursor ?? undefined);
+                setHistory({ ...next, revisions: [...history.revisions, ...next.revisions] });
+              })}>{t("memory.more")}</Button>}
+              {historyPreview && <section aria-label={t("memory.history")} className="rounded border border-border p-3">
+                <p>{t("memory.historical")} · v{historyPreview.version}</p>
+                <pre className="whitespace-pre-wrap break-words">{historyPreview.body}</pre>
+              </section>}
+            </div>}
             <p>{t("memory.sources")}: {selected.sources.map((source) => `${source.type}:${source.id}@${source.version}`).join(", ")}</p>
           </div>}
           <div className="flex gap-2">
-            {writable && <Button type="submit" disabled={busy || new TextEncoder().encode(body).length > dmMemoryDocumentMaxBytes}>{busy ? t("common.saving") : t("common.save")}</Button>}
+            {canEdit && <Button type="submit" disabled={busy || new TextEncoder().encode(body).length > dmMemoryDocumentMaxBytes}>{busy ? t("common.saving") : t("common.save")}</Button>}
             <Button type="button" variant="outline" disabled={busy} onClick={() => setEditing(false)}>{t("common.close")}</Button>
           </div>
         </form>}

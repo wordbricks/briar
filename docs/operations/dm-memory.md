@@ -95,3 +95,42 @@ and connect the execution Worker protocol. Before enabling learning, also verify
 the independent proposal/verifier path, configured model budget, and human-labeled
 learning evaluation. Passing D1 tests or a four-sentence embedding probe does not
 satisfy those quality gates.
+
+## Reply execution and management
+
+Workers advertise `dmMemory: { protocol: 1 }`. The server binds each eligible DM
+claim to its own memory space and revocation epoch, including claims made by old
+Workers. Old Workers receive no memory payload and cannot resume a provider
+conversation that previously held memories. Supported Workers fetch the bounded
+brief, check permissions before each provider turn and activity publication, and
+check once more before completing. The completion transaction repeats the fence.
+
+A revocation clears retained provider IDs, removes lookup payloads and requeues
+active replies. Memory restarts keep activity attempt numbers increasing without
+consuming the ordinary failure budget. Activity credentials also bind the claim
+hash, so a credential from a prior execution cannot publish after reclamation.
+A body-free outbox also clears the revoked activity frame. Owner mutations flush
+it promptly and the minute schedule retries failed publications. Its attempt
+number cannot erase a newer reply's activity.
+Lookup request IDs survive transport retries; a new ID consumes a new lookup turn
+from the three-turn limit shared with organization context. Memory changes
+invalidate cached payloads without resetting that budget.
+
+`DM_MEMORY_MINIMUM_SCORE` is empty until a reviewed evaluation determines it.
+Missing or invalid Vectorize bindings return unavailable retrieval. They do not
+activate a fallback. Brief availability does not prove that semantic search is
+ready, and the feature remains disabled by default.
+
+Temporary memory files live outside the checkout with directory mode 0700 and
+file mode 0600. Completion/failure removes them. On a subsequent invocation,
+cleanup removes directories left by dead processes or past the 24-hour retention
+bound; a stopped machine cannot perform immediate erasure. The minute maintenance
+pass removes lookup payloads and discovered-reference sets for abandoned claims.
+No provider-side erasure is asserted.
+
+Owner management supports paged revision metadata and exact-version reads.
+Desktop/Android and iOS show history without overwriting the current edit, refresh
+index/expiry status, and open cited versions through the owner-authenticated API.
+Forgetting purges all revision bodies and citation links; original chat messages
+remain visible to the user but excluded message IDs are withheld from future
+Agent snapshots and attachment reads.

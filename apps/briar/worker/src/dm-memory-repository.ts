@@ -7,6 +7,7 @@ import type {
   DmMemorySettingsInput,
   DmMemorySource,
   DmMemorySpace,
+  DmMemoryRevisionPage,
 } from "../../src/lib/dm-memory-contract";
 import { dmMemoryPageSize } from "../../src/lib/dm-memory-contract";
 import { sha256 } from "./crypto-digest";
@@ -124,22 +125,45 @@ export async function listDmMemories(
 }
 
 export async function getDmMemory(
-  db: D1Database, owner: DmMemoryOwner, documentId: string,
+  db: D1Database, owner: DmMemoryOwner, documentId: string, version?: number,
 ): Promise<DmMemoryDocumentDetail> {
   const row = await db.prepare(`${documentSelect}
     where ${ownerWhere} and doc.id = ? and doc.status <> 'deleted'`)
     .bind(...ownerBindings(owner), documentId).first<DocumentRow>();
   if (!row) throw new HttpError(404, "Memory not found", "memory_not_found");
+  const selectedVersion = version ?? row.current_version;
+  const revision = await db.prepare(`select body, memory_class, evidence_type, protected_by_user,
+    source_language, observed_at, valid_until, created_at as updated_at
+    from briar_dm_memory_revisions where document_id = ? and version = ?`)
+    .bind(documentId, selectedVersion).first<Pick<DocumentRow, "body" | "memory_class" | "evidence_type" |
+      "protected_by_user" | "source_language" | "observed_at" | "valid_until" | "updated_at">>();
+  if (!revision) throw new HttpError(404, "Memory revision not found", "memory_not_found");
   const sources = await db.prepare(`select source_type as type, source_id as id, source_version as version
     from briar_dm_memory_sources where document_id = ? and document_version = ?
-    order by source_type, source_id`).bind(row.id, row.current_version).all<DmMemorySource>();
+    order by source_type, source_id`).bind(row.id, selectedVersion).all<DmMemorySource>();
   // A concurrent delete or permission loss must not return the already-read body.
   const current = await db.prepare(`select 1 from briar_dm_memory_documents doc
     join briar_dm_memory_spaces space on space.id = doc.space_id
     where ${ownerWhere} and doc.id = ? and doc.current_version = ? and doc.status <> 'deleted'`)
     .bind(...ownerBindings(owner), documentId, row.current_version).first();
   if (!current) throw new HttpError(409, "Memory changed; reload it", "version_conflict");
-  return { ...documentJson(row), body: row.body, sources: sources.results };
+  return { ...documentJson({ ...row, ...revision, current_version: selectedVersion }),
+    body: revision.body, sources: sources.results };
+}
+
+export async function listDmMemoryRevisions(db: D1Database, owner: DmMemoryOwner, documentId: string, beforeVersion?: number): Promise<DmMemoryRevisionPage> {
+  const document = await getDmMemory(db, owner, documentId);
+  const rows = await db.prepare(`select version, created_at as createdAt, memory_class as memoryClass,
+    protected_by_user as protectedByUser, valid_until as validUntil, origin
+    from briar_dm_memory_revisions where document_id = ? and version < ? order by version desc limit 21`)
+    .bind(documentId, beforeVersion ?? document.version + 1)
+    .all<Omit<DmMemoryRevisionPage["revisions"][number], "protectedByUser"> & { protectedByUser: number }>();
+  // Reauthorize after reading history, including a concurrent forget or account removal.
+  await getDmMemory(db, owner, documentId);
+  const page = rows.results.slice(0, 20);
+  return { documentId, currentVersion: document.version,
+    revisions: page.map((revision) => ({ ...revision, protectedByUser: revision.protectedByUser === 1 })),
+    nextCursor: rows.results.length > 20 ? page.at(-1)!.version : null };
 }
 
 const commitGate = `exists (select 1 from briar_dm_memory_commits where id = ? and applied = 0)`;

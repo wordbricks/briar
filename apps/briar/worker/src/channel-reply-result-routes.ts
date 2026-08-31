@@ -1,3 +1,4 @@
+import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
 import type { AgentProvider } from "../../src/lib/agent-provider";
 import { channelReplyClaimTokenHeader } from "../../src/lib/channels-contract";
 import { hydrateAgentSkills } from "./agent-skills";
@@ -113,6 +114,21 @@ export async function handleChannelReplyResultRoute(
     if (!verified) {
       throw new HttpError(401, "Invalid or expired activity token");
     }
+    await requireDmMemoryReplyFence(db, verified.replyJobId);
+    const active = await db.prepare(`select 1 from briar_channel_agent_reply_jobs job
+      where job.id = ? and job.organization_id = ? and job.channel_id = ? and job.agent_id = ?
+        and job.attempts = ? and job.claimed_worker_id = ? and job.claimed_device_id = ?
+        and job.status = 'running' and job.lease_expires_at > ?
+        and (job.claim_token_hash = ? or (? is null and not exists (
+          select 1 from briar_dm_memory_reply_fences fence where fence.job_id = job.id)))`)
+      .bind(verified.replyJobId, verified.organizationId, verified.channelId, verified.agentId,
+        verified.attempt, verified.workerId, verified.deviceId, new Date().toISOString(),
+        verified.claimTokenHash ?? null, verified.claimTokenHash ?? null).first();
+    if (!active) throw new HttpError(409, "Reply activity claim is no longer active");
+    if (verified.claimTokenHash && !await getClaimedChannelReply(db, {
+      jobId: verified.replyJobId, workerId: verified.workerId, deviceId: verified.deviceId,
+      claimTokenHash: verified.claimTokenHash, observedAt: new Date().toISOString(),
+    })) throw new HttpError(409, "Reply runtime changed", "memory_scope_revoked");
     const input = decodeChannelAgentActivityPublishInput(
       await readJson(request),
     );
@@ -429,6 +445,7 @@ export async function handleChannelReplyResultRoute(
         workerId: input.workerId,
         claimTokenHash,
         body: result.body,
+        memoryCitations: result.memoryCitations,
         document,
         issueProposal,
         issueBatchProposal,

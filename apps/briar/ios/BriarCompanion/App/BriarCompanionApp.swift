@@ -329,7 +329,7 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
                 return try JSONDecoder.mobileContract.decode(Response.self, from: data)
             }
             guard method == "GET" else { throw MobileAPIError.invalidRequest }
-            let document: [String: Any] = [
+            var document: [String: Any] = [
                 "id": documentID, "memorySpaceId": spaceID, "kind": "observation",
                 "title": "Synthetic memory", "version": memoryVersion, "status": "active",
                 "conflicted": false, "memoryClass": "profile", "evidenceType": "explicit_user",
@@ -339,8 +339,17 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
                 "body": "합성 데이터: 설명은 결론부터 제시한다.",
                 "sources": [["type": "user_edit_event", "id": "fixture-edit", "version": 1]]
             ]
+            if let requested = URLComponents(string: path)?.queryItems?.first(where: { $0.name == "version" })?.value,
+               let version = Int(requested) { document["version"] = version }
             let payload: [String: Any]
-            if path.contains("/documents/") { payload = ["document": document] }
+            if path.contains("/revisions") {
+                payload = ["documentId": documentID, "currentVersion": memoryVersion, "nextCursor": NSNull(),
+                    "revisions": (1...memoryVersion).reversed().map { version -> [String: Any] in
+                        ["version": version, "createdAt": "2026-09-01T00:00:00.000Z", "memoryClass": "profile",
+                         "protectedByUser": true, "validUntil": NSNull(), "origin": "user_edit"]
+                    }]
+            }
+            else if path.contains("/documents/") { payload = ["document": document] }
             else {
                 payload = [
                     "eligible": true, "capabilities": ["recall": false, "automaticLearning": false],
@@ -388,7 +397,7 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             "/channels/12121212-1212-4212-8212-121212121212?limit=20"
         ) && method == "GET" {
             payload = ##"""
-            {"channel":{"id":"12121212-1212-4212-8212-121212121212","organizationId":"22222222-2222-4222-8222-222222222222","kind":"dm","slug":"dm-honey","name":"Honey","topic":null,"visibility":"private","defaultProjectId":null,"archivedAt":null,"memberCount":1,"agentCount":1,"createdAt":"2026-08-22T07:40:00Z","updatedAt":"2026-08-22T09:24:00Z","lastMessageAt":"2026-08-22T09:24:00Z","lastMessagePreview":"iOS DM 화면 시안을 준비했습니다.","lastReadAt":"2026-08-22T09:00:00Z","hasUnread":true,"dmParticipants":[{"type":"user","id":"fixture-user","name":"Briar User","image":null},{"type":"agent","id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Honey","image":null}]},"members":[],"agents":[{"agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Honey","avatar":null,"provider":"codex","model":"gpt-5.4","projectId":null,"responsibility":"Review mobile product work.","createdAt":"2026-08-22T07:40:00Z"}],"messages":[{"id":"16161616-1616-4616-8616-161616161616","channelId":"12121212-1212-4212-8212-121212121212","parentMessageId":null,"body":"iOS DM 화면을 검토해 주세요.","author":{"type":"user","id":"fixture-user","name":"Briar User","image":null,"provider":null},"mentionedUserIds":[],"mentionedAgentIds":[],"replyCount":1,"lastReplyAt":"2026-08-22T09:24:00Z","document":null,"proposal":null,"createdAt":"2026-08-22T09:23:00Z"},{"id":"17171717-1717-4717-8717-171717171717","channelId":"12121212-1212-4212-8212-121212121212","parentMessageId":"16161616-1616-4616-8616-161616161616","body":"검토를 마쳤습니다.","author":{"type":"agent","id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Honey","image":null,"provider":"codex"},"mentionedUserIds":[],"mentionedAgentIds":[],"replyCount":0,"lastReplyAt":null,"document":null,"proposal":null,"createdAt":"2026-08-22T09:24:00Z"}],"nextCursor":null}
+            {"channel":{"id":"12121212-1212-4212-8212-121212121212","organizationId":"22222222-2222-4222-8222-222222222222","kind":"dm","slug":"dm-honey","name":"Honey","topic":null,"visibility":"private","defaultProjectId":null,"archivedAt":null,"memberCount":1,"agentCount":1,"createdAt":"2026-08-22T07:40:00Z","updatedAt":"2026-08-22T09:24:00Z","lastMessageAt":"2026-08-22T09:24:00Z","lastMessagePreview":"iOS DM 화면 시안을 준비했습니다.","lastReadAt":"2026-08-22T09:00:00Z","hasUnread":true,"dmParticipants":[{"type":"user","id":"fixture-user","name":"Briar User","image":null},{"type":"agent","id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Honey","image":null}]},"members":[],"agents":[{"agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Honey","avatar":null,"provider":"codex","model":"gpt-5.4","projectId":null,"responsibility":"Review mobile product work.","createdAt":"2026-08-22T07:40:00Z"}],"messages":[{"id":"16161616-1616-4616-8616-161616161616","channelId":"12121212-1212-4212-8212-121212121212","parentMessageId":null,"body":"iOS DM 화면을 검토해 주세요.","author":{"type":"user","id":"fixture-user","name":"Briar User","image":null,"provider":null},"mentionedUserIds":[],"mentionedAgentIds":[],"replyCount":1,"lastReplyAt":"2026-08-22T09:24:00Z","document":null,"proposal":null,"createdAt":"2026-08-22T09:23:00Z"},{"id":"17171717-1717-4717-8717-171717171717","channelId":"12121212-1212-4212-8212-121212121212","parentMessageId":"16161616-1616-4616-8616-161616161616","body":"검토를 마쳤습니다.","memoryCitations":[{"documentId":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","version":1}],"author":{"type":"agent","id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Honey","image":null,"provider":"codex"},"mentionedUserIds":[],"mentionedAgentIds":[],"replyCount":0,"lastReplyAt":null,"document":null,"proposal":null,"createdAt":"2026-08-22T09:24:00Z"}],"nextCursor":null}
             """##
         } else if hasChannelHistory && path.contains(
             "/channels/cccccccc-cccc-4ccc-8ccc-cccccccccccc/messages?limit=20&cursor="

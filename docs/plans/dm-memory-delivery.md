@@ -7,8 +7,8 @@ automatic learning or end-to-end recall is complete.
 | PR | Scope | State |
 | --- | --- | --- |
 | 1 | Versioned storage, ownership, CRUD/export, desktop/Android/iOS management | [#1497](https://github.com/wordbricks/briar/pull/1497), merged |
-| 2 | Chunking, durable indexing, Vectorize search, briefs, purge lifecycle | In progress on `codex/dm-memory-retrieval` |
-| 3 | Worker capability, DM lookup loop, provider session fencing, citations | Pending |
+| 2 | Chunking, durable indexing, Vectorize search, briefs, purge lifecycle | [#1499](https://github.com/wordbricks/briar/pull/1499), merged |
+| 3 | Worker capability, DM lookup loop, provider session fencing, citations | In progress on `codex/dm-memory-execution` |
 | 4 | Durable learning claims, proposals, independent verification, consolidation, evaluations | Pending |
 
 Keep automatic learning disabled until its runtime, budgets and evaluation pass.
@@ -78,8 +78,33 @@ remote migrations, deployments, or private conversation imports were performed.
   5,498.54 KiB bundle and 1,323.35 KiB gzip. This is not deployed Cloudflare latency.
 - Pre-commit focused validation: 93 tests across chunking, provider failure
   classification, real D1 storage/retrieval and scheduled routing; Worker
-  TypeScript and type-aware lint passed. Full signoffs are still pending.
+  TypeScript and type-aware lint passed. All four required signoffs passed for
+  `9785ee1f2da9b9f2a33a8317435e9e85db597b4d`; merge commit
+  `229cd4ee37b9a8eb3e7f38399b98bb75d4ec2dc3` was verified on `origin/main`.
 
 The remaining execution/UI pass must cover owner revision history, visible expiry
 and indexing updates, citations, and the distinction between forgetting a memory
 and deleting its conversation source, on desktop/Android and native iOS.
+
+## Execution PR preparation
+
+- Real D1 and owner-management integration: 55 tests passed across execution,
+  storage, retrieval, React history and shared mobile contracts. Existing channel
+  and delegation regressions plus the actual CLI loop: 53 tests passed.
+- The CLI loop uses synthetic HTTP responses and an injected provider. It checks
+  a fresh conversation's reconstructed lookup context, pre-invocation and
+  pre-publication revocation, and abort-before-activity behavior. This does not
+  establish real model recall quality or the PR 4 learning pipeline.
+- Native iPhone simulator: shared-contract tests and DM citation → version read
+  → save → history → forget passed. The test exposed a blank SwiftUI sheet from
+  separately captured route state; the citation route now carries its store and
+  reference as one value.
+- Aside: actual React components with synthetic API responses verified exact
+  cited-version reads, read-only old bodies, current-draft preservation, expiry
+  and pending index labels at desktop and 390px widths. Screenshots are local
+  evidence, not authenticated production or Android device validation.
+- Native evidence is under `/tmp/briar-dm-memory-pr3-ios-evidence/`; browser
+  evidence is under the Aside session's `artifacts/dm-memory-pr3-*` paths.
+  Temporary Vite fixtures and owned browser tabs were removed after capture.
+- Recall remains off pending the measured bilingual evaluation. No production
+  vector index, migration or deployment was performed.

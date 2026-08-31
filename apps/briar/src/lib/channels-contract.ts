@@ -7,6 +7,7 @@ import {
   type ModelEffort as ModelEffortType,
 } from "./agent-provider-contract";
 import { agentProviders, type AgentProvider } from "./agent-provider";
+import type { DmMemoryReference } from "./dm-memory-query-contract";
 import { IsoDateTimeWithOffset } from "./date-time-schema";
 import {
   agentDescriptionMaxLength,
@@ -815,6 +816,8 @@ export type ChannelMessage = {
   proposal: ChannelMessageProposal | null;
   executionProposal: ChannelExecutionProposal | null;
   skillExecutionProposal?: ChannelSkillExecutionProposal | null;
+  /** Owner-authorized, immutable versions used in this answer. */
+  memoryCitations?: DmMemoryReference[];
   /** Client-only state while a newly sent message awaits its server response. */
   optimistic?: boolean;
   createdAt: string;
@@ -1096,7 +1099,12 @@ const channelReplyDelegationSchema = strict(Schema.Struct({
   request: channelMessageBodySchema,
 }));
 
+export const channelMemoryCitationSchema = strict(Schema.Struct({
+  documentId: Uuid, version: Schema.Int.check(Schema.isGreaterThan(0)),
+}));
+
 export const channelReplyCompletionSchema = strict(Schema.Struct({
+  memoryCitations: Schema.optional(Schema.NullOr(Schema.Array(channelMemoryCitationSchema).check(Schema.isMaxLength(10)))),
   body: channelMessageBodySchema,
   document: nullableDefault(channelReplyDocumentSchema),
   issueProposal: nullableDefault(channelReplyIssueProposalSchema),

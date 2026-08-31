@@ -9,6 +9,7 @@ import {
 import { ModelEffort } from "../src/lib/agent-provider-contract";
 import { agentProviders } from "../src/lib/agent-provider";
 import { autoHuntSources } from "../src/lib/auto-hunt-contract";
+import { dmMemoryDescriptorSchema } from "../src/lib/dm-memory-query-contract";
 import { IsoDateTimeWithOffset } from "../src/lib/date-time-schema";
 import { OrganizationAgentContextDescriptor } from "../src/lib/organization-agent-context-contract";
 import {
@@ -628,6 +629,7 @@ const ClaimedChannelReplyInput = Schema.Struct({
   claimedAt: IsoDateTimeWithOffset,
   leaseExpiresAt: IsoDateTimeWithOffset,
   activity: defaulted(Schema.NullOr(ChannelActivityCredential), null),
+  memory: defaulted(Schema.NullOr(dmMemoryDescriptorSchema), null),
   organizationContext: Schema.optional(
     Schema.NullOr(OrganizationAgentContextDescriptor),
   ),

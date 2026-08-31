@@ -17,6 +17,7 @@ const Nonce = ShortText(100);
 
 export const ChannelActivityPublishTokenPayload = Schema.Struct({
   purpose: Schema.Literal("publish"),
+  claimTokenHash: Schema.optional(Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/u))),
   organizationId: ActivityUuid,
   channelId: ActivityUuid,
   replyJobId: ActivityUuid,

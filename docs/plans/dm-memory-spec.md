@@ -708,7 +708,7 @@ descriptor를 내려준다. scope 식별값은 정보이며 서버가 실제 권
     "memoryRevision": 18,
     "revocationEpoch": 2,
     "searchEnabled": true,
-    "briefState": "ready"
+    "briefState": "available"
   }
 }
 ```
@@ -742,6 +742,12 @@ v1은 모든 provider에 새 네이티브 도구를 강제하지 않는다. 기�
 - v1의 `memoryRequests`는 한 조회 턴에 정확히 1개다. `operation`은 `search`
   또는 `get`이며 각각 8절의 입력 계약을 사용한다.
 - `memoryRequests`는 본문·제안·위임·`contextRequests`와 함께 반환할 수 없다.
+- 최종 답변의 `memoryCitations`는 실제 사용한 `{ documentId, version }`만 최대
+  10개 담는다. 사용하지 않았으면 `null`이다. 서버는 현재 claim에서 발견한 최신
+  유효 문서인지 답변 게시 transaction 안에서 검사한다. 추측한 ID, 다른 DM,
+  구버전, 만료된 문서는 답변과 함께 거절한다. 사용자에게는 사용 당시 버전을
+  여는 출처 링크를 표시하고, 본문 사본은 답변 metadata에 넣지 않는다.
+- 조회 턴에서는 `memoryCitations`도 `null`이어야 한다.
 - 최종 답변은 `memoryRequests: null`이다. 기존 결과에는 필드가 없어도
   호환 디코더가 null로 처리하되, 새 Worker의 출력 스키마에는 필드를 명시한다.
 - 논리적 이름 `memory_search`를 네이티브 도구로 제공하는 어댑터를 나중에
