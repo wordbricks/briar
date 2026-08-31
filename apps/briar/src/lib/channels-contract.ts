@@ -334,11 +334,6 @@ const channelAgentSkillInputSourceSchema = strict(Schema.Struct({
   body: Schema.optional(
     Schema.Trim.check(Schema.isMaxLength(agentSkillBodyMaxLength)),
   ),
-  // Accepted while older desktop builds still submit the former combined
-  // field. It is normalized into description/body and never persisted.
-  instructions: Schema.optional(
-    Schema.Trim.check(Schema.isMaxLength(agentSkillBodyMaxLength)),
-  ),
   provider: AgentProviderSchema,
   model: nullableDefault(
     Schema.Trim.check(Schema.isLengthBetween(1, 100)),
@@ -347,9 +342,6 @@ const channelAgentSkillInputSourceSchema = strict(Schema.Struct({
   kind: defaulted(ChannelAgentSkillKindSchema, "custom"),
   executionMode: defaulted(AgentSkillExecutionModeSchema, "task"),
   approvalPolicy: defaulted(AgentSkillApprovalPolicySchema, "explicit"),
-  // Accepted only so clients from before Skill selection was explicit can
-  // roll forward without a hard API failure. It has no runtime meaning.
-  isDefault: Schema.optional(Schema.Boolean),
   position: defaulted(between(0, 999), 0),
 }));
 
@@ -375,11 +367,9 @@ export const channelAgentSkillInputSchema =
         decode: ({
           body,
           description,
-          instructions: legacyInstructions,
-          isDefault: _legacyDefault,
           ...skill
         }) => {
-          const normalizedBody = body || legacyInstructions || "";
+          const normalizedBody = body || "";
           return {
             ...skill,
             description: description ||
@@ -388,11 +378,7 @@ export const channelAgentSkillInputSchema =
             body: normalizedBody,
           };
         },
-        encode: (skill) => ({
-          ...skill,
-          instructions: undefined,
-          isDefault: undefined,
-        }),
+        encode: (skill) => skill,
       }),
     ),
   );

@@ -80,10 +80,10 @@ describe("Agent input limits", () => {
     })).toBe(false);
   });
 
-  it("normalizes the legacy combined Skill field into description and body", () => {
+  it("derives a missing Skill description and defaults execution policy", () => {
     expect(decode(channelAgentSkillInputSchema, {
       name: "Release",
-      instructions: "Publish and verify the release.",
+      body: "Publish and verify the release.",
       provider: "codex",
       model: null,
       effort: null,
