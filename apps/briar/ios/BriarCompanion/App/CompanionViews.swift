@@ -686,6 +686,7 @@ struct TaskListView: View {
                 members: snapshot?.members ?? [],
                 providers: snapshot?.organizationProviders ?? [],
                 capabilities: AgentProviderCapabilityCatalog(workers: snapshot?.workers ?? []),
+                defaultAssigneeUserId: currentUserID,
                 refresh: refresh
             )
         }

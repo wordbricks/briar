@@ -38,8 +38,9 @@ async function requireIssueAssigneeMembership(
   db: D1Database,
   projectId: string,
   assigneeUserId: string | null | undefined,
+  sessionUserId?: string,
 ) {
-  if (!assigneeUserId) return;
+  if (!assigneeUserId || assigneeUserId === sessionUserId) return;
   const members = await listProjectMembers(db, projectId);
   if (!members.some((member) => member.user_id === assigneeUserId)) {
     throw new HttpError(
@@ -78,10 +79,15 @@ export async function handleIssueCoreRoute(input: {
     }
     const { input, attachments, attachmentReferences } =
       await readIssueRequest(request);
+    const assigneeUserId =
+      input.assigneeUserId === undefined
+        ? session.user.id
+        : input.assigneeUserId;
     await requireIssueAssigneeMembership(
       db,
       project.id,
-      input.assigneeUserId,
+      assigneeUserId,
+      session.user.id,
     );
     const issueId = crypto.randomUUID();
     const sourceKey = `briar-issue:${issueId}`;
@@ -93,7 +99,10 @@ export async function handleIssueCoreRoute(input: {
       db,
       attachmentsBucket,
       project,
-      issue: input,
+      issue: {
+        ...input,
+        assigneeUserId,
+      },
       attachments,
       attachmentReferences,
       sourceKey,
@@ -109,7 +118,7 @@ export async function handleIssueCoreRoute(input: {
         sourceKey,
         stage: "queued",
         status: input.status,
-        assigneeUserId: input.assigneeUserId ?? null,
+        assigneeUserId: assigneeUserId ?? null,
         createdByUserId: session.user.id,
         difficulty: input.difficulty,
         attachments: created.attachments.map(issueAttachmentJson),
