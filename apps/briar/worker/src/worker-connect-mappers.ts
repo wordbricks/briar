@@ -36,7 +36,6 @@ import {
   MergeBatchSchema,
   MergeBatchValidationResultSchema,
   MergeBatchValidationResultsSchema,
-  OrganizationAgentContextDescriptorSchema,
   PendingMergeGroupHeadSchema,
   QueuedAttachmentSchema,
   QueuedIssueMessageSchema,
@@ -545,14 +544,11 @@ const channelReply = (
       claimedAt: requiredTimestamp(value.claimedAt, "claimedAt"),
       leaseExpiresAt: requiredTimestamp(value.leaseExpiresAt, "leaseExpiresAt"),
       activity: activity(value.activity),
-      organizationContext: value.organizationContext
-        ? create(OrganizationAgentContextDescriptorSchema, {
-            schemaVersion: value.organizationContext.schemaVersion,
-            snapshotAt: requiredTimestamp(
-              value.organizationContext.snapshotAt,
-              "organizationContext.snapshotAt",
-            ),
-          })
+      organizationContextSnapshotAt: value.organizationContext
+        ? requiredTimestamp(
+            value.organizationContext.snapshotAt,
+            "organizationContext.snapshotAt",
+          )
         : undefined,
       delegation: value.delegation
         ? create(ClaimedChannelDelegationSchema, value.delegation)

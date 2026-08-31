@@ -989,11 +989,6 @@ message ChannelReplyScope {
   }
 }
 
-message OrganizationAgentContextDescriptor {
-  uint32 schema_version = 1;
-  google.protobuf.Timestamp snapshot_at = 2;
-}
-
 message ClaimedChannelDelegation {
   string delegated_by_reply_id = 1;
   string delegated_by_agent_id = 2;
@@ -1052,7 +1047,7 @@ message ClaimedChannelReply {
   google.protobuf.Timestamp claimed_at = 16;
   google.protobuf.Timestamp lease_expires_at = 17;
   optional ChannelActivityCredential activity = 18;
-  optional OrganizationAgentContextDescriptor organization_context = 19;
+  optional google.protobuf.Timestamp organization_context_snapshot_at = 19;
   optional ClaimedChannelDelegation delegation = 20;
   repeated ChannelDelegationTarget delegation_targets = 21;
   optional ChannelReplySession session = 22;

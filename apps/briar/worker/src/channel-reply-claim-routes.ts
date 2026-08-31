@@ -1,4 +1,3 @@
-import { decodeOrganizationAgentContextDescriptor } from "../../src/lib/organization-agent-context-contract";
 import { channelReplyContextMessageJson } from "../../src/lib/channels-contract";
 import { agentReplyDisplayParentMessageId } from "../../src/lib/issue-reply-decision";
 import {
@@ -381,10 +380,7 @@ export async function claimNextChannelReplyWork(
           claimReason: job.session_claim_reason,
         },
         organizationContext: agent.project_id === null
-          ? decodeOrganizationAgentContextDescriptor({
-              schemaVersion: 1,
-              snapshotAt: job.claimed_at,
-            })
+          ? { snapshotAt: job.claimed_at }
           : null,
         delegation,
         delegationTargets,

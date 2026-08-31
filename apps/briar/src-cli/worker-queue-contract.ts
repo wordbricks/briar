@@ -501,12 +501,11 @@ const channelReplyFromProto = (
       ? skillExecutionTarget(value.skillExecutionTarget)
       : null,
     activity: activity(value.activity),
-    organizationContext: value.organizationContext
+    organizationContext: value.organizationContextSnapshotAt
       ? {
-          schemaVersion: value.organizationContext.schemaVersion as 1,
           snapshotAt: isoTimestamp(
-            value.organizationContext.snapshotAt,
-            "organizationContext.snapshotAt",
+            value.organizationContextSnapshotAt,
+            "organizationContextSnapshotAt",
           ),
         }
       : null,
