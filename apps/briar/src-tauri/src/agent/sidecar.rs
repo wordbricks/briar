@@ -1041,6 +1041,8 @@ mod tests {
             &runner,
             r#"import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
 import { ParentToRunnerSchema } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
+import { AgentEventDirection } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import { normalizedMessageCompleted } from "../src-agent/normalized-agent-event";
 import {
   decodeSidecarRunRequest,
   encodeSidecarRunnerOutput,
@@ -1066,14 +1068,13 @@ for await (const message of sizeDelimitedDecodeStream(
       sidecarSessionStarted("session-1"),
     ));
     process.stdout.write(encodeSidecarRunnerOutput(sidecarProviderEvent({
-      direction: "server",
+      direction: AgentEventDirection.SERVER,
       raw: { type: "assistant" },
-      event: {
-        type: "messageCompleted",
+      event: normalizedMessageCompleted({
         id: "message-1",
         phase: "commentary",
         text: "working",
-      },
+      }),
     })));
     process.stdout.write(encodeSidecarRunnerOutput(sidecarApprovalRequest({
       id: "approval-1",
