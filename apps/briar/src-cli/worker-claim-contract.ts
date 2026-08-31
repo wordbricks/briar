@@ -591,6 +591,7 @@ const ChannelReplySession = strict(Schema.Struct({
   retainedUntil: IsoDateTimeWithOffset,
   claimReason: Schema.Literals([
     "session_created",
+    "designated_worker_claimed",
     "worker_reused",
     "worker_reused_runtime_changed",
     "worker_failover_lease_expired",
