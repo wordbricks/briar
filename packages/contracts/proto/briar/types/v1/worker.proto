@@ -54,7 +54,8 @@ message WorkerCapabilities {
   repeated AgentProviderCapability provider_capabilities = 1;
   optional RemoteUpdateCapability remote_updates = 2;
   bool worktrees = 3;
-  optional uint32 organization_agent_context_protocol = 4;
+  reserved 4;
+  reserved "organization_agent_context_protocol";
   repeated WorkflowRequirementHealth workflow_requirements = 5;
 }
 

@@ -44,7 +44,6 @@ import {
   dispatchHuntRun,
   executionWorkerBindingForProject,
   executionWorkerProviders,
-  executionWorkerSupportsOrganizationAgentContext,
   failExecutionWorkerUpdateHandoff,
   getProjectExecutionWorkerPolicy,
   handoffExecutionWorkerClaim,
@@ -1688,25 +1687,6 @@ describe("detached execution workers", () => {
         capabilities_json: "not-json",
       }),
     ).toEqual([]);
-    expect(
-      executionWorkerSupportsOrganizationAgentContext({
-        capabilities_json: JSON.stringify({
-          organizationAgentContext: { protocol: 1 },
-        }),
-      }),
-    ).toBe(true);
-    for (const capabilities_json of [
-      "not-json",
-      "{}",
-      JSON.stringify({ organizationAgentContext: { protocol: true } }),
-      JSON.stringify({ organizationAgentContext: { protocol: 2 } }),
-      JSON.stringify({ organizationAgentContext: [1] }),
-    ]) {
-      expect(
-        executionWorkerSupportsOrganizationAgentContext({ capabilities_json }),
-      ).toBe(false);
-    }
-
     const newest = await register("providers-newest", 5);
     const older = await register("providers-older", 2);
     const legacy = await register("providers-legacy", 1);
@@ -1822,22 +1802,6 @@ describe("detached execution workers", () => {
     await expect(
       hasAvailableChannelReplyWorker(db, projectReply),
     ).resolves.toBe(true);
-    await expect(
-      hasAvailableChannelReplyWorker(db, {
-        ...projectReply,
-        projectId: null,
-      }),
-    ).resolves.toBe(false);
-
-    await recordWorkerHeartbeat(db, projectId, {
-      workerId: worker.worker.id,
-      readinessState: "ready",
-      capabilities: {
-        providerHealth: { codex: { healthy: true } },
-        organizationAgentContext: { protocol: 1 },
-      },
-      observedAt: atMinute(2),
-    });
     await expect(
       hasAvailableChannelReplyWorker(db, {
         ...projectReply,

@@ -4,7 +4,6 @@ import { platform } from "node:os";
 import { join } from "node:path";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { autoHuntRequirementKinds } from "../src/lib/auto-hunt-contract";
-import { organizationAgentContextCapability } from "../src/lib/organization-agent-context-contract";
 import { runProjectAgentTaskCompletionFlow } from "./agent-runner";
 import {
   inspectWorkflowRequirements,
@@ -107,7 +106,6 @@ const workerRuntime = (input: {
     supported: supportsRemoteWorkerUpdates(platform()),
     protocol: 1,
   },
-  organizationAgentContextProtocol: organizationAgentContextCapability.protocol,
 });
 
 async function workerRegisterCommand() {

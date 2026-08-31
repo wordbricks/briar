@@ -1312,7 +1312,6 @@ describe("organization channels", () => {
     ).bind(
       JSON.stringify({
         providerHealth: { claude: { healthy: true } },
-        organizationAgentContext: { protocol: 1 },
       }),
       claimRequestedAt,
       otherWorkerId,
@@ -1321,7 +1320,6 @@ describe("organization channels", () => {
       deviceId,
       workerId: otherWorkerId,
       providers: ["grok"],
-      supportsOrganizationAgentContext: true,
       claimTokenHash,
       claimedAt: at(9),
       leaseExpiresAt: at(19),
@@ -1490,7 +1488,6 @@ describe("organization channels", () => {
         deviceId,
         workerId: otherWorkerId,
         providers: ["claude"],
-        supportsOrganizationAgentContext: true,
         claimTokenHash: "0".repeat(64),
         claimedAt: at(9),
         leaseExpiresAt: at(19),
@@ -1500,34 +1497,6 @@ describe("organization channels", () => {
       `update briar_execution_workers set state = 'online' where id = ?`,
     ).bind(otherWorkerId).run();
 
-    await expect(
-      claimNextChannelAgentReply(db, organizationId, {
-        deviceId,
-        workerId: otherWorkerId,
-        providers: ["claude"],
-        supportsOrganizationAgentContext: true,
-        claimTokenHash: "0".repeat(64),
-        claimedAt: at(10),
-        leaseExpiresAt: at(20),
-      }),
-    ).resolves.toBeNull();
-    await db.prepare(
-      `update briar_execution_workers set capabilities_json = ? where id = ?`,
-    ).bind(
-      JSON.stringify({ organizationAgentContext: { protocol: true } }),
-      otherWorkerId,
-    ).run();
-    await expect(
-      claimNextChannelAgentReply(db, organizationId, {
-        deviceId,
-        workerId: otherWorkerId,
-        providers: ["claude"],
-        supportsOrganizationAgentContext: true,
-        claimTokenHash: "0".repeat(64),
-        claimedAt: at(10),
-        leaseExpiresAt: at(20),
-      }),
-    ).resolves.toBeNull();
     const claimRequestedAt = new Date().toISOString();
     await db.prepare(
       `update briar_execution_workers
@@ -1535,22 +1504,10 @@ describe("organization channels", () => {
     ).bind(
       JSON.stringify({
         providerHealth: { claude: { healthy: true } },
-        organizationAgentContext: { protocol: 1 },
       }),
       claimRequestedAt,
       otherWorkerId,
     ).run();
-    await expect(
-      claimNextChannelAgentReply(db, organizationId, {
-        deviceId,
-        workerId: otherWorkerId,
-        providers: ["claude"],
-        supportsOrganizationAgentContext: false,
-        claimTokenHash: "0".repeat(64),
-        claimedAt: at(10),
-        leaseExpiresAt: at(20),
-      }),
-    ).resolves.toBeNull();
     // A normal execution may occupy the Worker while a reply still claims
     // the same provider; replies must not consume the regular slot.
     await db.prepare(
@@ -1626,27 +1583,6 @@ describe("organization channels", () => {
         observedAt: claimPayload!.claimedAt!,
         ...overrides,
       });
-    // Claim-time capability gating is repeated for every context request.
-    await db.prepare(
-      `update briar_execution_workers set capabilities_json = ? where id = ?`,
-    ).bind(
-      JSON.stringify({ organizationAgentContext: { protocol: true } }),
-      otherWorkerId,
-    ).run();
-    await expect(contextClaim()).resolves.toBeNull();
-    await db.prepare(
-      `update briar_execution_workers set capabilities_json = ? where id = ?`,
-    ).bind(
-      JSON.stringify({ organizationAgentContext: { protocol: 2 } }),
-      otherWorkerId,
-    ).run();
-    await expect(contextClaim()).resolves.toBeNull();
-    await db.prepare(
-      `update briar_execution_workers set capabilities_json = ? where id = ?`,
-    ).bind(
-      JSON.stringify({ organizationAgentContext: { protocol: 1 } }),
-      otherWorkerId,
-    ).run();
     await expect(contextClaim()).resolves.toMatchObject({ id: claimed!.id });
     await expect(contextClaim({
       organizationId: otherOrganizationId,
@@ -1919,7 +1855,6 @@ describe("organization channels", () => {
     ).bind(
       JSON.stringify({
         providerHealth: { claude: { healthy: true } },
-        organizationAgentContext: { protocol: 1 },
       }),
       at(72),
       otherWorkerId,
@@ -1928,7 +1863,6 @@ describe("organization channels", () => {
       deviceId,
       workerId: otherWorkerId,
       providers: ["claude"],
-      supportsOrganizationAgentContext: true,
       claimTokenHash: "7".repeat(64),
       claimedAt: at(72),
       leaseExpiresAt: at(82),
@@ -2057,7 +1991,6 @@ describe("organization channels", () => {
         deviceId,
         workerId: otherWorkerId,
         providers: ["claude"],
-        supportsOrganizationAgentContext: false,
         claimTokenHash: "2".repeat(64),
         claimedAt: at(14),
         leaseExpiresAt: at(24),
@@ -2069,7 +2002,6 @@ describe("organization channels", () => {
       deviceId,
       workerId: boundWorkerId,
       providers: ["claude"],
-      supportsOrganizationAgentContext: false,
       claimTokenHash: "2".repeat(64),
       claimedAt: at(15),
       leaseExpiresAt: at(25),
@@ -2404,7 +2336,6 @@ describe("organization channels", () => {
       providers: ["claude"],
       workerAgentProvider: "claude",
       workerCapabilitiesJson: capabilities,
-      supportsOrganizationAgentContext: false,
       claimTokenHash: overrides.claimTokenHash ?? "1".repeat(64),
       claimedAt: observedAt,
       leaseExpiresAt,
@@ -2678,7 +2609,6 @@ describe("organization channels", () => {
       providers: ["claude"],
       workerAgentProvider: "claude",
       workerCapabilitiesJson: capabilities,
-      supportsOrganizationAgentContext: false,
       claimTokenHash,
       claimedAt,
       leaseExpiresAt: new Date(Date.parse(claimedAt) + 15 * 60_000).toISOString(),
@@ -3128,7 +3058,6 @@ describe("organization channels", () => {
         deviceId,
         workerId: otherWorkerId,
         providers: ["grok"],
-        supportsOrganizationAgentContext: true,
         claimTokenHash: "3".repeat(64),
         claimedAt: at(19),
         leaseExpiresAt: at(29),
@@ -3145,7 +3074,6 @@ describe("organization channels", () => {
     const observedAt = new Date().toISOString();
     const capabilities = JSON.stringify({
       providerHealth: { claude: { healthy: true } },
-      organizationAgentContext: { protocol: 1 },
     });
     await createChannel(db, {
       id: channelId,
@@ -3255,7 +3183,6 @@ describe("organization channels", () => {
       providers: ["claude"],
       workerAgentProvider: "claude",
       workerCapabilitiesJson: capabilities,
-      supportsOrganizationAgentContext: true,
       claimTokenHash: "5".repeat(64),
       claimedAt: observedAt,
       leaseExpiresAt: new Date(Date.parse(observedAt) + 60_000).toISOString(),
@@ -3501,7 +3428,6 @@ describe("organization channels", () => {
     const claimedAt = new Date().toISOString();
     const workerCapabilitiesJson = JSON.stringify({
       providerHealth: { claude: { healthy: true } },
-      organizationAgentContext: { protocol: 1 },
     });
     await db.batch([
       db.prepare(
@@ -3825,7 +3751,6 @@ describe("organization channels", () => {
       ).bind(
         JSON.stringify({
           providerHealth: { claude: { healthy: true } },
-          organizationAgentContext: { protocol: 1 },
         }),
         observedAt,
         observedAt,

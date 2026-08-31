@@ -25,7 +25,6 @@ import {
 } from "./realtime-scheduling";
 import {
   executionWorkerProviders,
-  executionWorkerSupportsOrganizationAgentContext,
   leaseExpiryFrom,
   workerStateAt,
 } from "./workers";
@@ -92,8 +91,6 @@ export async function claimNextChannelReplyWork(
     providers,
     workerAgentProvider: binding.agent_provider,
     workerCapabilitiesJson: binding.capabilities_json,
-    supportsOrganizationAgentContext:
-      executionWorkerSupportsOrganizationAgentContext(binding),
     claimTokenHash,
     claimedAt: observedAt,
     leaseExpiresAt: leaseExpiryFrom(observedAt),

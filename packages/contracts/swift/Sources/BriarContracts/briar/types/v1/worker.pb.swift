@@ -236,15 +236,6 @@ public nonisolated struct BriarTypes_WorkerCapabilities: Sendable {
 
   public var worktrees: Bool = false
 
-  public var organizationAgentContextProtocol: UInt32 {
-    get {_organizationAgentContextProtocol ?? 0}
-    set {_organizationAgentContextProtocol = newValue}
-  }
-  /// Returns true if `organizationAgentContextProtocol` has been explicitly set.
-  public var hasOrganizationAgentContextProtocol: Bool {self._organizationAgentContextProtocol != nil}
-  /// Clears the value of `organizationAgentContextProtocol`. Subsequent reads from it will return its default value.
-  public mutating func clearOrganizationAgentContextProtocol() {self._organizationAgentContextProtocol = nil}
-
   public var workflowRequirements: [BriarTypes_WorkflowRequirementHealth] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -252,7 +243,6 @@ public nonisolated struct BriarTypes_WorkerCapabilities: Sendable {
   public init() {}
 
   fileprivate var _remoteUpdates: BriarTypes_RemoteUpdateCapability? = nil
-  fileprivate var _organizationAgentContextProtocol: UInt32? = nil
 }
 
 public nonisolated struct BriarTypes_WorkerRuntimeAdvertisement: Sendable {
@@ -594,7 +584,7 @@ nonisolated extension BriarTypes_WorkflowRequirementHealth: SwiftProtobuf.Messag
 
 nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WorkerCapabilities"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}provider_capabilities\0\u{3}remote_updates\0\u{1}worktrees\0\u{3}organization_agent_context_protocol\0\u{3}workflow_requirements\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}provider_capabilities\0\u{3}remote_updates\0\u{1}worktrees\0\u{4}\u{2}workflow_requirements\0\u{b}organization_agent_context_protocol\0\u{c}\u{4}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -605,7 +595,6 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
       case 1: try { try decoder.decodeRepeatedMessageField(value: &self.providerCapabilities) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._remoteUpdates) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self.worktrees) }()
-      case 4: try { try decoder.decodeSingularUInt32Field(value: &self._organizationAgentContextProtocol) }()
       case 5: try { try decoder.decodeRepeatedMessageField(value: &self.workflowRequirements) }()
       default: break
       }
@@ -626,9 +615,6 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
     if self.worktrees != false {
       try visitor.visitSingularBoolField(value: self.worktrees, fieldNumber: 3)
     }
-    try { if let v = self._organizationAgentContextProtocol {
-      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 4)
-    } }()
     if !self.workflowRequirements.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.workflowRequirements, fieldNumber: 5)
     }
@@ -639,7 +625,6 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
     if lhs.providerCapabilities != rhs.providerCapabilities {return false}
     if lhs._remoteUpdates != rhs._remoteUpdates {return false}
     if lhs.worktrees != rhs.worktrees {return false}
-    if lhs._organizationAgentContextProtocol != rhs._organizationAgentContextProtocol {return false}
     if lhs.workflowRequirements != rhs.workflowRequirements {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

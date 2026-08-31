@@ -27,9 +27,6 @@ import {
   agentProviders,
   type AgentProvider,
 } from "../../src/lib/agent-provider";
-import {
-  organizationAgentContextCapability,
-} from "../../src/lib/organization-agent-context-contract";
 import { isChannelApprovedIssue } from "./db";
 import {
   executionWorkerHandoffExists,
@@ -833,32 +830,9 @@ export function projectExecutionWorkerCapabilityCatalog(
 }
 
 /**
- * Organization Agent jobs expose claim-scoped organization data. Only Workers
- * that explicitly advertise this exact protocol version may receive them.
- */
-export function executionWorkerSupportsOrganizationAgentContext(
-  worker: Pick<ExecutionWorkerRow, "capabilities_json">,
-) {
-  try {
-    const capabilities = JSON.parse(worker.capabilities_json) as {
-      organizationAgentContext?: unknown;
-    };
-    const context = capabilities.organizationAgentContext;
-    return Boolean(
-      context && typeof context === "object" && !Array.isArray(context) &&
-        (context as { protocol?: unknown }).protocol ===
-          organizationAgentContextCapability.protocol,
-    );
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Channel mentions are interactive, so only a Worker that can claim the reply
  * immediately counts as available. Project Agents require an exact project
- * binding; Organization Agents additionally require the organization-context
- * protocol advertised by the claiming binding.
+ * binding; Organization Agents may use any live binding in the organization.
  */
 export type ChannelReplyWorkerAvailability =
   | "available"
@@ -946,9 +920,7 @@ export async function channelReplyWorkerAvailability(
       worker.worker_last_heartbeat_at,
       input.observedAt,
       worker.worker_state,
-    ) === "online" &&
-    (input.projectId !== null ||
-      executionWorkerSupportsOrganizationAgentContext(worker))
+    ) === "online"
   );
   if (liveWorkers.some((worker) =>
     worker.accepting_work === 1 &&

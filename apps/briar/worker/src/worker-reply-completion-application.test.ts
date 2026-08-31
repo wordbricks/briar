@@ -307,7 +307,6 @@ describe("reply completion application", () => {
       workerCapabilitiesJson: JSON.stringify({
         providerHealth: { codex: { healthy: true } },
       }),
-      supportsOrganizationAgentContext: false,
       claimTokenHash: await sha256(claimToken),
       claimedAt: at(100 + sequence),
       leaseExpiresAt: at(1_000 + sequence),

@@ -7997,14 +7997,6 @@ pub struct WorkerCapabilities {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub worktrees: bool,
-    /// Field 4: `organization_agent_context_protocol`
-    #[serde(
-        rename = "organizationAgentContextProtocol",
-        alias = "organization_agent_context_protocol",
-        with = "::buffa::json_helpers::opt_uint32",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub organization_agent_context_protocol: ::core::option::Option<u32>,
     /// Field 5: `workflow_requirements`
     #[serde(
         rename = "workflowRequirements",
@@ -8023,10 +8015,6 @@ impl ::core::fmt::Debug for WorkerCapabilities {
             .field("provider_capabilities", &self.provider_capabilities)
             .field("remote_updates", &self.remote_updates)
             .field("worktrees", &self.worktrees)
-            .field(
-                "organization_agent_context_protocol",
-                &self.organization_agent_context_protocol,
-            )
             .field("workflow_requirements", &self.workflow_requirements)
             .finish()
     }
@@ -8037,15 +8025,6 @@ impl WorkerCapabilities {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkerCapabilities";
-}
-impl WorkerCapabilities {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::organization_agent_context_protocol`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_organization_agent_context_protocol(mut self, value: u32) -> Self {
-        self.organization_agent_context_protocol = Some(value);
-        self
-    }
 }
 ::buffa::impl_default_instance!(WorkerCapabilities);
 impl ::buffa::MessageName for WorkerCapabilities {
@@ -8086,9 +8065,6 @@ impl ::buffa::Message for WorkerCapabilities {
         if self.worktrees {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
-        if let Some(v) = self.organization_agent_context_protocol {
-            size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
-        }
         for v in &self.workflow_requirements {
             let __slot = __cache.reserve();
             let inner_size = v.compute_size(__cache);
@@ -8125,9 +8101,6 @@ impl ::buffa::Message for WorkerCapabilities {
         }
         if self.worktrees {
             ::buffa::types::put_bool_field(3u32, self.worktrees, buf);
-        }
-        if let Some(v) = self.organization_agent_context_protocol {
-            ::buffa::types::put_uint32_field(4u32, v, buf);
         }
         for v in &self.workflow_requirements {
             ::buffa::types::put_len_delimited_header(
@@ -8180,15 +8153,6 @@ impl ::buffa::Message for WorkerCapabilities {
                 )?;
                 self.worktrees = ::buffa::types::decode_bool(buf)?;
             }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.organization_agent_context_protocol = ::core::option::Option::Some(
-                    ::buffa::types::decode_uint32(buf)?,
-                );
-            }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -8212,7 +8176,6 @@ impl ::buffa::Message for WorkerCapabilities {
         self.provider_capabilities.clear();
         self.remote_updates = ::buffa::MessageField::none();
         self.worktrees = false;
-        self.organization_agent_context_protocol = ::core::option::Option::None;
         self.workflow_requirements.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -21588,8 +21551,6 @@ pub mod __buffa {
             >,
             /// Field 3: `worktrees`
             pub worktrees: bool,
-            /// Field 4: `organization_agent_context_protocol`
-            pub organization_agent_context_protocol: ::core::option::Option<u32>,
             /// Field 5: `workflow_requirements`
             pub workflow_requirements: ::buffa::RepeatedView<
                 'a,
@@ -21660,15 +21621,6 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.worktrees = ::buffa::types::decode_bool(&mut cur)?;
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.organization_agent_context_protocol = Some(
-                            ::buffa::types::decode_uint32(&mut cur)?,
-                        );
                     }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -21754,8 +21706,6 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     worktrees: self.worktrees,
-                    organization_agent_context_protocol: self
-                        .organization_agent_context_protocol,
                     workflow_requirements: self
                         .workflow_requirements
                         .iter()
@@ -21794,9 +21744,6 @@ pub mod __buffa {
                 if self.worktrees {
                     size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
                 }
-                if let Some(v) = self.organization_agent_context_protocol {
-                    size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
-                }
                 for v in &self.workflow_requirements {
                     let __slot = __cache.reserve();
                     let inner_size = v.compute_size(__cache);
@@ -21834,9 +21781,6 @@ pub mod __buffa {
                 }
                 if self.worktrees {
                     ::buffa::types::put_bool_field(3u32, self.worktrees, buf);
-                }
-                if let Some(v) = self.organization_agent_context_protocol {
-                    ::buffa::types::put_uint32_field(4u32, v, buf);
                 }
                 for v in &self.workflow_requirements {
                     ::buffa::types::put_len_delimited_header(
@@ -21884,15 +21828,6 @@ pub mod __buffa {
                 }
                 if self.worktrees {
                     __map.serialize_entry("worktrees", &self.worktrees)?;
-                }
-                if let ::core::option::Option::Some(__v) = self
-                    .organization_agent_context_protocol
-                {
-                    __map
-                        .serialize_entry(
-                            "organizationAgentContextProtocol",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
                 }
                 if !self.workflow_requirements.is_empty() {
                     __map
@@ -22019,13 +21954,6 @@ pub mod __buffa {
             #[must_use]
             pub fn worktrees(&self) -> bool {
                 self.0.reborrow().worktrees
-            }
-            /// Field 4: `organization_agent_context_protocol`
-            #[must_use]
-            pub fn organization_agent_context_protocol(
-                &self,
-            ) -> ::core::option::Option<u32> {
-                self.0.reborrow().organization_agent_context_protocol
             }
             /// Field 5: `workflow_requirements`
             #[must_use]

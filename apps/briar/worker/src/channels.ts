@@ -3074,7 +3074,6 @@ export async function claimNextChannelAgentReply(
     providers: AgentProvider[];
     workerAgentProvider?: AgentProvider;
     workerCapabilitiesJson?: string;
-    supportsOrganizationAgentContext: boolean;
     claimTokenHash: string;
     claimedAt: string;
     leaseExpiresAt: string;
@@ -3297,7 +3296,6 @@ export async function claimNextChannelAgentReply(
        )
        and ${liveChannelReplyRuntime("job")}
        and ${liveSkillSnapshot("job")}
-       and (job.project_id is not null or ? = 1)
        and ((job.agent_provider = 'codex' and ? = 1)
          or (job.agent_provider = 'claude' and ? = 1)
          or (job.agent_provider = 'cursor' and ? = 1)
@@ -3323,24 +3321,6 @@ export async function claimNextChannelAgentReply(
                  and allowed.worker_id = binding.id
              )
            )
-           and (
-             job.project_id is not null
-             or (
-               json_valid(binding.capabilities_json)
-               and json_type(
-                 binding.capabilities_json,
-                 '$.organizationAgentContext'
-               ) = 'object'
-               and json_type(
-                 binding.capabilities_json,
-                 '$.organizationAgentContext.protocol'
-               ) = 'integer'
-               and json_extract(
-                 binding.capabilities_json,
-                 '$.organizationAgentContext.protocol'
-               ) = 1
-             )
-           )
        )
      order by job.created_at, job.id`,
   ).bind(
@@ -3348,7 +3328,6 @@ export async function claimNextChannelAgentReply(
     MAX_REPLY_ATTEMPTS,
     input.claimedAt,
     input.claimedAt,
-    input.supportsOrganizationAgentContext ? 1 : 0,
     input.providers.includes("codex") ? 1 : 0,
     input.providers.includes("claude") ? 1 : 0,
     input.providers.includes("cursor") ? 1 : 0,
@@ -3698,7 +3677,7 @@ export async function snapshotChannelReplyExecutionTargets(
 
 /**
  * Revalidates the complete authority chain for one Organization Agent context
- * page. A valid token alone is insufficient: the claim, Worker binding,
+ * request. A valid token alone is insufficient: the claim, Worker binding,
  * device, organization scope, Agent scope, and live lease must still agree.
  */
 export async function getActiveOrganizationChannelReplyContextClaim(
@@ -3737,19 +3716,6 @@ export async function getActiveOrganizationChannelReplyContextClaim(
        and job.claim_token_hash = ? and job.status = 'running'
        and job.lease_expires_at > ?
        and binding.state <> 'disabled'
-       and json_valid(binding.capabilities_json)
-       and json_type(
-         binding.capabilities_json,
-         '$.organizationAgentContext'
-       ) = 'object'
-       and json_type(
-         binding.capabilities_json,
-         '$.organizationAgentContext.protocol'
-       ) = 'integer'
-       and json_extract(
-         binding.capabilities_json,
-         '$.organizationAgentContext.protocol'
-       ) = 1
        and device.organization_id = job.organization_id
        and device.state <> 'disabled'
        and binding_project.organization_id = job.organization_id`,

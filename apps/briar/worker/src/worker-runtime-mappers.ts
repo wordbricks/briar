@@ -177,13 +177,6 @@ export const workerRuntimeMetadataFromProto = (
           },
         }
       : {}),
-    ...(capabilities?.organizationAgentContextProtocol !== undefined
-      ? {
-          organizationAgentContext: {
-            protocol: capabilities.organizationAgentContextProtocol,
-          },
-        }
-      : {}),
   };
   return {
     agentProvider,

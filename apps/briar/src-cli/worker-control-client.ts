@@ -53,7 +53,6 @@ export type WorkerRuntimeInput = {
     readonly supported: boolean;
     readonly protocol?: number;
   };
-  readonly organizationAgentContextProtocol?: number;
   readonly workflowRequirements?: ReadonlyArray<{
     readonly id: string;
     readonly healthy: boolean;
@@ -103,7 +102,6 @@ export const workerRuntimeToProto = (input: WorkerRuntimeInput) =>
       }),
       remoteUpdates: input.remoteUpdates,
       worktrees: input.worktrees,
-      organizationAgentContextProtocol: input.organizationAgentContextProtocol,
       workflowRequirements: input.workflowRequirements?.map((requirement) => ({
         id: requirement.id,
         healthy: requirement.healthy,

@@ -2,8 +2,6 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { IsoDateTimeWithOffset } from "./date-time-schema";
 
-export const organizationAgentContextCapability = { protocol: 1 } as const;
-
 const strictSchemaOptions = {
   errors: "all",
   onExcessProperty: "error",

@@ -161,7 +161,6 @@ describe("Organization Agent channel delegation", () => {
         JSON.stringify({
           providers: ["claude"],
           providerHealth: { claude: { healthy: true } },
-          organizationAgentContext: { protocol: 1 },
         }),
         now,
         now,
