@@ -105,7 +105,7 @@ export function WorkerDispatchDialog({
     () =>
       policyWorkers.filter(
         (worker) =>
-          (worker.providers ?? []).includes(provider) &&
+          worker.providers.includes(provider) &&
           worker.acceptingWork &&
           worker.readiness !== "disabled",
       ),

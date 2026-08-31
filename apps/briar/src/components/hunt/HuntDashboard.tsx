@@ -501,7 +501,7 @@ function HuntDashboardContent({
     if (dashboard?.organizationProviders?.length) {
       return sortAgentProviders(dashboard.organizationProviders);
     }
-    return sortAgentProviders([...new Set((dashboard?.workers ?? []).flatMap(worker => worker.providers ?? []))]);
+    return sortAgentProviders([...new Set((dashboard?.workers ?? []).flatMap(worker => worker.providers))]);
   }, [dashboard?.organizationProviders, dashboard?.workers]);
   useEffect(() => {
     setSelectedRunMessageId(null);

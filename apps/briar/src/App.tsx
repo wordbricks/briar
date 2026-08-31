@@ -3386,7 +3386,7 @@ export function App({
             : [
                 ...new Set(
                   (briar.dashboard?.workers ?? []).flatMap(
-                    (worker) => worker.providers ?? [],
+                    (worker) => worker.providers,
                   ),
                 ),
               ]

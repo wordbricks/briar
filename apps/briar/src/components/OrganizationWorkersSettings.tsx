@@ -695,7 +695,7 @@ export function OrganizationWorkersSettings({
                                 />
                                 <WorkerProviderIcons
                                   providers={
-                                    binding.providers ?? [binding.agentProvider]
+                                    binding.providers
                                   }
                                   size={14}
                                 />

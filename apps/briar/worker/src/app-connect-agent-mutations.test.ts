@@ -6,6 +6,7 @@ import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
+import { emptyAgentProviderCapabilityCatalog } from "../../src/lib/agent-provider-contract";
 
 describe("AgentService mutations", () => {
   const organizationId = "11111111-1111-4111-8111-111111111111";
@@ -159,6 +160,7 @@ describe("AgentService mutations", () => {
     const capabilities = JSON.stringify({
       providerHealth: { codex: { healthy: true } },
       providerCapabilities: {
+        ...emptyAgentProviderCapabilityCatalog(),
         codex: {
           models: [],
           defaultEfforts: [{ id: "medium", label: "Medium", isDefault: true }],

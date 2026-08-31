@@ -532,7 +532,7 @@ export type ExecutionWorker = {
   label: string;
   icon?: WorkerIcon | null;
   agentProvider: AgentProvider;
-  providers?: AgentProvider[];
+  providers: AgentProvider[];
   versions: Record<string, string>;
   state: "online" | "stale" | "disabled";
   readiness:
@@ -590,7 +590,7 @@ export type OrganizationExecutionWorker = {
     projectId: string;
     projectName: string;
     agentProvider: AgentProvider;
-    providers?: AgentProvider[];
+    providers: AgentProvider[];
     state: "online" | "stale" | "disabled";
     acceptingWork: boolean;
     readiness:

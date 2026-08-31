@@ -34,7 +34,7 @@ export function projectWorkerProviders(
     isProjectWorkerCatalogEligible,
   );
   return agentProviders.filter((provider) =>
-    eligibleWorkers.some((worker) => worker.providers?.includes(provider))
+    eligibleWorkers.some((worker) => worker.providers.includes(provider))
   );
 }
 
@@ -45,7 +45,7 @@ export function projectWorkerCapabilityCatalog(
   const advertisements = projectPolicyWorkers(workers, policy)
     .filter(isProjectWorkerCatalogEligible)
     .map((worker) => ({
-      providers: worker.providers ?? [],
+      providers: worker.providers,
       providerCapabilities: worker.capabilities.providerCapabilities,
     }));
   return mergeAgentProviderCapabilityAdvertisements(advertisements);
@@ -57,7 +57,7 @@ export function executionWorkerSupportsSelection(
   model: string | null,
   effort: string | null,
 ) {
-  if (!worker.providers?.includes(provider)) return false;
+  if (!worker.providers.includes(provider)) return false;
   if (!model && !effort) return true;
   const parsed = decodeAgentProviderCapabilityCatalogOption(
     worker.capabilities.providerCapabilities,

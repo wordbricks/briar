@@ -47,7 +47,7 @@ type Props<T extends AgentSkillExecutionProposal> = {
 const workerSupportsProvider = (
   worker: ExecutionWorker,
   provider: AgentSkillExecutionProposal["provider"],
-) => (worker.providers ?? [worker.agentProvider]).includes(provider);
+) => worker.providers.includes(provider);
 
 const policyAllowsWorker = (
   worker: ExecutionWorker,

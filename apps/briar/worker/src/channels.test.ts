@@ -16,6 +16,7 @@ import { createMethodUrl } from "@connectrpc/connect/protocol";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { channelReplyAttachmentPath } from "../../src/lib/channel-reply-attachment-path";
+import { emptyAgentProviderCapabilityCatalog } from "../../src/lib/agent-provider-contract";
 import {
   channelReplyNoAvailableWorkerError,
   channelReplyProviderUsageExhaustedError,
@@ -2236,6 +2237,7 @@ describe("organization channels", () => {
     const capabilities = JSON.stringify({
       providerHealth: { claude: { healthy: true } },
       providerCapabilities: {
+        ...emptyAgentProviderCapabilityCatalog(),
         claude: {
           models: [{
             id: "claude-sonnet-local",
@@ -2489,6 +2491,7 @@ describe("organization channels", () => {
     const capabilities = JSON.stringify({
       providerHealth: { claude: { healthy: true } },
       providerCapabilities: {
+        ...emptyAgentProviderCapabilityCatalog(),
         claude: {
           models: [],
           defaultEfforts: [],
@@ -4098,6 +4101,7 @@ describe("organization channels", () => {
     const capabilities = JSON.stringify({
       providerHealth: { claude: { healthy: true } },
       providerCapabilities: {
+        ...emptyAgentProviderCapabilityCatalog(),
         claude: {
           models: [],
           defaultEfforts: [],
@@ -4233,6 +4237,7 @@ describe("organization channels", () => {
             },
           },
           providerCapabilities: {
+            ...emptyAgentProviderCapabilityCatalog(),
             grok: {
               models: [{
                 id: "grok-4.6",
