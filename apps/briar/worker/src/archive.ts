@@ -29,6 +29,10 @@ import {
   type ArchiveKind,
   type ExecutionAuditArchiveRow,
 } from "./archive-contract";
+import {
+  attachmentObjectIsReferencedSql,
+  attachmentObjectReferenceBindings,
+} from "./attachment-object-ownership";
 
 export const defaultArchiveRowLimit = 500;
 export const maxArchiveUncompressedBytes = 16 * 1024 * 1024;
@@ -1526,36 +1530,9 @@ export async function processArchiveCleanupQueue(
       : await db
           .prepare(
             `select 1 as present
-             where exists (
-               select 1 from briar_issue_attachments
-               where object_key = ?
-             )
-             or exists (
-               select 1 from briar_run_evidence_images
-               where object_key = ?
-             )
-             or exists (
-               select 1 from briar_project_agents
-               where avatar_spritesheet_object_key = ?
-             )
-             or exists (
-               select 1 from briar_channel_message_attachments
-               where object_key = ?
-             )
-             or exists (
-               select 1
-               from briar_log_archives archive,
-                    json_each(archive.related_object_keys_json) related
-               where related.type = 'text' and related.value = ?
-             )`,
+             where ${attachmentObjectIsReferencedSql("?")}`,
           )
-          .bind(
-            item.object_key,
-            item.object_key,
-            item.object_key,
-            item.object_key,
-            item.object_key,
-          )
+          .bind(...attachmentObjectReferenceBindings(item.object_key))
           .first<{ present: number }>();
     if (referenced) {
       // Ownership moved after this cleanup item was queued. The destination
@@ -1579,29 +1556,9 @@ export async function processArchiveCleanupQueue(
                ) or (
                  bucket = 'attachments'
                  and (
-                   exists (
-                     select 1 from briar_issue_attachments attachment
-                     where attachment.object_key = briar_archive_cleanup_queue.object_key
-                   )
-                   or exists (
-                     select 1 from briar_run_evidence_images image
-                     where image.object_key = briar_archive_cleanup_queue.object_key
-                   )
-                   or exists (
-                     select 1 from briar_project_agents agent
-                     where agent.avatar_spritesheet_object_key = briar_archive_cleanup_queue.object_key
-                   )
-                   or exists (
-                     select 1 from briar_channel_message_attachments attachment
-                     where attachment.object_key = briar_archive_cleanup_queue.object_key
-                   )
-                   or exists (
-                     select 1
-                     from briar_log_archives archive,
-                          json_each(archive.related_object_keys_json) related
-                     where related.type = 'text'
-                       and related.value = briar_archive_cleanup_queue.object_key
-                   )
+                   ${attachmentObjectIsReferencedSql(
+                     "briar_archive_cleanup_queue.object_key",
+                   )}
                  )
                )
              )`,
@@ -1651,28 +1608,10 @@ export async function processArchiveCleanupQueue(
                  )
                ) or (
                  bucket = 'attachments'
-                 and not exists (
-                   select 1 from briar_issue_attachments attachment
-                   where attachment.object_key = briar_archive_cleanup_queue.object_key
-                 )
-                 and not exists (
-                   select 1 from briar_run_evidence_images image
-                   where image.object_key = briar_archive_cleanup_queue.object_key
-                 )
-                 and not exists (
-                   select 1 from briar_project_agents agent
-                   where agent.avatar_spritesheet_object_key = briar_archive_cleanup_queue.object_key
-                 )
-                 and not exists (
-                   select 1 from briar_channel_message_attachments attachment
-                   where attachment.object_key = briar_archive_cleanup_queue.object_key
-                 )
-                 and not exists (
-                   select 1
-                   from briar_log_archives archive,
-                        json_each(archive.related_object_keys_json) related
-                   where related.type = 'text'
-                     and related.value = briar_archive_cleanup_queue.object_key
+                 and not (
+                   ${attachmentObjectIsReferencedSql(
+                     "briar_archive_cleanup_queue.object_key",
+                   )}
                  )
                )
              )`,

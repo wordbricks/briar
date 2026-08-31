@@ -1,4 +1,9 @@
 import { sha256 } from "./crypto-digest";
+import {
+  attachmentObjectIsReferencedSql,
+  attachmentObjectReferenceBindings,
+  type AttachmentObjectKeySql,
+} from "./attachment-object-ownership";
 
 export type UploadPurpose =
   | "issue_reply"
@@ -505,6 +510,19 @@ const cleanupRetryAt = (observedAt: string, attempts: number) => {
   return new Date(Date.parse(observedAt) + base).toISOString();
 };
 
+const uploadObjectIsLiveSql = (objectKeySql: AttachmentObjectKeySql) => `(
+  ${attachmentObjectIsReferencedSql(objectKeySql)}
+  or exists (
+    select 1 from briar_uploads upload
+    where upload.object_key = ${objectKeySql} and upload.consumed_at is null
+  )
+)`;
+
+const uploadObjectLiveBindings = (objectKey: string) => [
+  ...attachmentObjectReferenceBindings(objectKey),
+  objectKey,
+] as const;
+
 export async function processUploadCleanupQueue(
   db: D1Database,
   bucket: Pick<R2Bucket, "delete">,
@@ -523,35 +541,69 @@ export async function processUploadCleanupQueue(
   let deleted = 0;
   let failed = 0;
   for (const item of due.results) {
-    try {
-      await bucket.delete(item.object_key);
-      const removed = await db
+    const live = await db
+      .prepare(`select 1 as present where ${uploadObjectIsLiveSql("?")}`)
+      .bind(...uploadObjectLiveBindings(item.object_key))
+      .first<{ present: number }>();
+    if (live) {
+      await db
         .prepare(
           `delete from briar_upload_cleanup_queue
-         where object_key = ? and generation = ?
-         returning object_key`,
+           where object_key = ? and batch_request_id = ? and queued_at = ?
+             and generation = ?
+             and ${uploadObjectIsLiveSql(
+               "briar_upload_cleanup_queue.object_key",
+             )}`,
         )
-        .bind(item.object_key, item.generation)
-        .first<{ object_key: string }>();
-      if (removed) deleted += 1;
+        .bind(
+          item.object_key,
+          item.batch_request_id,
+          item.queued_at,
+          item.generation,
+        )
+        .run();
+      continue;
+    }
+    try {
+      await bucket.delete(item.object_key);
+      const completion = await db
+        .prepare(
+          `delete from briar_upload_cleanup_queue
+           where object_key = ? and batch_request_id = ? and queued_at = ?
+             and generation = ?
+             and not ${uploadObjectIsLiveSql(
+               "briar_upload_cleanup_queue.object_key",
+             )}`,
+        )
+        .bind(
+          item.object_key,
+          item.batch_request_id,
+          item.queued_at,
+          item.generation,
+        )
+        .run();
+      if ((completion.meta.changes ?? 0) > 0) deleted += 1;
     } catch (error) {
       const nextAttempts = item.attempts + 1;
-      await db
+      const failure = await db
         .prepare(
           `update briar_upload_cleanup_queue
          set attempts = ?, generation = generation + 1,
              next_attempt_at = ?, last_error = ?
-         where object_key = ? and generation = ?`,
+         where object_key = ? and batch_request_id = ? and queued_at = ?
+           and generation = ?`,
         )
         .bind(
           nextAttempts,
           cleanupRetryAt(observedAt, nextAttempts),
           (error instanceof Error ? error.message : String(error)).slice(0, 2_000),
           item.object_key,
+          item.batch_request_id,
+          item.queued_at,
           item.generation,
         )
         .run();
-      failed += 1;
+      if ((failure.meta.changes ?? 0) > 0) failed += 1;
     }
   }
   return { processed: due.results.length, deleted, failed };

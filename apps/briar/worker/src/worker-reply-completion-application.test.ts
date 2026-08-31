@@ -892,4 +892,39 @@ describe("reply completion application", () => {
        where object_key = ?`,
     ).bind(objectKey).first()).resolves.toBeNull();
   });
+
+  it("keeps a cleanup request replaced while R2 deletion is in flight", async () => {
+    const objectKey = "reply-attachments/orphaned/replaced";
+    const originalBatchRequestId = crypto.randomUUID();
+    const replacementBatchRequestId = crypto.randomUUID();
+    await enqueueUploadObjectCleanup(db, {
+      objectKey,
+      batchRequestId: originalBatchRequestId,
+      observedAt: at(610),
+    });
+    const deleteObject = vi.fn(async () => {
+      await db.prepare(
+        `delete from briar_upload_cleanup_queue where object_key = ?`,
+      ).bind(objectKey).run();
+      await enqueueUploadObjectCleanup(db, {
+        objectKey,
+        batchRequestId: replacementBatchRequestId,
+        observedAt: at(611),
+      });
+    });
+
+    await expect(processUploadCleanupQueue(
+      db,
+      { delete: deleteObject },
+      at(610),
+    )).resolves.toEqual({ processed: 1, deleted: 0, failed: 0 });
+    await expect(db.prepare(
+      `select batch_request_id, queued_at, generation
+       from briar_upload_cleanup_queue where object_key = ?`,
+    ).bind(objectKey).first()).resolves.toEqual({
+      batch_request_id: replacementBatchRequestId,
+      queued_at: at(611),
+      generation: 1,
+    });
+  });
 });

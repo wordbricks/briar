@@ -21,7 +21,10 @@ import {
   createIssueFromServerFilesApplication,
   type ServerIssueCreateApplicationServices,
 } from "./server-issue-create-application";
-import { processUploadCleanupQueue } from "./upload-repository";
+import {
+  enqueueUploadObjectCleanup,
+  processUploadCleanupQueue,
+} from "./upload-repository";
 import {
   createIsolatedTestDatabase,
   type IsolatedTestDatabase,
@@ -183,6 +186,53 @@ describe("issue create and update attachment mutations", () => {
       consumer_kind: "issue_create",
       consumer_id: clientIssueId,
     });
+  });
+
+  it("never deletes an object that aggregate metadata still owns", async () => {
+    const clientIssueId = crypto.randomUUID();
+    const uploadId = await prepareAndUpload({
+      purpose: "create",
+      mutationId: clientIssueId,
+      filename: "still-owned.png",
+    });
+    await createProjectIssue({
+      db,
+      projectId,
+      userId: ownerId,
+      clientIssueId,
+      request: decodeIssueInput({
+        title: "Still owned",
+        description: `![owned](briar-attachment://${uploadId})`,
+        status: "backlog",
+        checkpoints: [],
+        fullAuto: false,
+      }),
+      attachmentIds: [uploadId],
+    });
+    const attachment = await db.prepare(
+      `select object_key from briar_issue_attachments where id = ?`,
+    ).bind(uploadId).first<{ object_key: string }>();
+    if (!attachment) throw new Error("Expected a live attachment fixture");
+    const observedAt = new Date().toISOString();
+    await enqueueUploadObjectCleanup(db, {
+      objectKey: attachment.object_key,
+      batchRequestId: `stale:${crypto.randomUUID()}`,
+      observedAt,
+    });
+    const deleteObject = vi.fn(async () => {});
+
+    await expect(processUploadCleanupQueue(
+      db,
+      { delete: deleteObject },
+      observedAt,
+    )).resolves.toEqual({ processed: 1, deleted: 0, failed: 0 });
+    expect(deleteObject).not.toHaveBeenCalled();
+    await expect(db.prepare(
+      `select object_key from briar_upload_cleanup_queue where object_key = ?`,
+    ).bind(attachment.object_key).first()).resolves.toBeNull();
+    await expect(db.prepare(
+      `select object_key from briar_issue_attachments where id = ?`,
+    ).bind(uploadId).first()).resolves.toEqual(attachment);
   });
 
   it("updates an exact attachment snapshot and durably queues removed bytes", async () => {
