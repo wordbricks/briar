@@ -81,7 +81,7 @@ struct CompanionShellView: View {
                     providers: snapshot?.organizationProviders ?? [],
                     workers: snapshot?.workers ?? [],
                     onIssueOpen: { projectID, runID, sourceIsCurrent in
-                        await navigation.openIssueWhenAvailable(
+                        _ = await navigation.openIssueWhenAvailable(
                             projectID: projectID,
                             runID: runID,
                             ensureAvailable: { targetProjectID, targetRunID in
@@ -111,7 +111,7 @@ struct CompanionShellView: View {
                             refresh: refresh,
                             onTasksOpen: { navigation.selectedTab = .tasks },
                             onIssueOpen: { projectID, runID, sourceIsCurrent in
-                                await navigation.openIssueWhenAvailable(
+                                _ = await navigation.openIssueWhenAvailable(
                                     projectID: projectID,
                                     runID: runID,
                                     ensureAvailable: {
@@ -197,7 +197,7 @@ struct CompanionShellView: View {
                     providers: snapshot?.organizationProviders ?? [],
                     workers: snapshot?.workers ?? [],
                     onIssueOpen: { projectID, runID, sourceIsCurrent in
-                        await navigation.openIssueWhenAvailable(
+                        _ = await navigation.openIssueWhenAvailable(
                             projectID: projectID,
                             runID: runID,
                             ensureAvailable: { targetProjectID, targetRunID in
@@ -450,17 +450,26 @@ struct CompanionShellView: View {
                         },
                         id: \.id
                     ) { candidate in
-                        Menu("\(candidate.name) · \(candidate.organizationName)") {
-                            let childProjects = planningProjects.filter {
-                                $0.teamId == candidate.id && $0.status != .cancelled
-                            }
-                            if childProjects.isEmpty {
-                                Button(candidate.name) {
-                                    navigation.cancelPendingIssue()
-                                    selectProject(candidate.id)
-                                    selectPlanningProject(nil)
+                        let childProjects = planningProjects.filter {
+                            $0.teamId == candidate.id && $0.status != .cancelled
+                        }
+                        if childProjects.isEmpty {
+                            Button {
+                                navigation.cancelPendingIssue()
+                                selectProject(candidate.id)
+                                selectPlanningProject(nil)
+                            } label: {
+                                if candidate.id == project.id && selectedPlanningProjectID == nil {
+                                    Label(candidate.name, systemImage: "checkmark")
+                                } else {
+                                    Text(candidate.name)
                                 }
-                            } else {
+                            }
+                            .accessibilityIdentifier(
+                                "project-option-\(candidate.id.uuidString.lowercased())"
+                            )
+                        } else {
+                            Menu("\(candidate.name) · \(candidate.organizationName)") {
                                 ForEach(childProjects) { child in
                                     Button {
                                         navigation.cancelPendingIssue()
@@ -475,10 +484,10 @@ struct CompanionShellView: View {
                                     }
                                 }
                             }
+                            .accessibilityIdentifier(
+                                "project-option-\(candidate.id.uuidString.lowercased())"
+                            )
                         }
-                        .accessibilityIdentifier(
-                            "project-option-\(candidate.id.uuidString.lowercased())"
-                        )
                     }
                 } label: {
                     if dynamicTypeSize.isAccessibilitySize {
