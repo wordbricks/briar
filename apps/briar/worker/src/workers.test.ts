@@ -44,6 +44,7 @@ import {
   dispatchHuntRun,
   executionWorkerBindingForProject,
   executionWorkerProviders,
+  executionWorkerSupportsSelection,
   failExecutionWorkerUpdateHandoff,
   getProjectExecutionWorkerPolicy,
   handoffExecutionWorkerClaim,
@@ -1786,6 +1787,39 @@ describe("detached execution workers", () => {
 
     expect(providers).toEqual(fullProjectionProviders);
     expect(providers).toEqual(["grok", "opencode", "codex"]);
+  });
+
+  it("fails closed when a Worker omits or malforms its capability catalog", () => {
+    const worker = (providerCapabilities?: unknown) => ({
+      agent_provider: "codex" as const,
+      capabilities_json: JSON.stringify({
+        providerHealth: { codex: { healthy: true } },
+        ...(providerCapabilities === undefined ? {} : { providerCapabilities }),
+      }),
+    });
+
+    expect(
+      executionWorkerSupportsSelection(worker(), "codex", null, null),
+    ).toBe(false);
+    expect(
+      executionWorkerSupportsSelection(
+        worker({ codex: { models: [] } }),
+        "codex",
+        null,
+        null,
+      ),
+    ).toBe(false);
+    expect(
+      executionWorkerSupportsSelection(
+        {
+          agent_provider: "codex",
+          capabilities_json: JSON.stringify(workerCapabilitiesFixture()),
+        },
+        "codex",
+        null,
+        null,
+      ),
+    ).toBe(true);
   });
 
   it("allows a busy compatible Worker to run a channel Agent reply", async () => {

@@ -1344,9 +1344,10 @@ describe("organization channels", () => {
       `update briar_execution_workers
        set capabilities_json = ?, last_heartbeat_at = ? where id = ?`,
     ).bind(
-      JSON.stringify({
-        providerHealth: { claude: { healthy: true } },
-      }),
+      workerClaimRuntimeFixture({
+        agentProvider: "claude",
+        providers: ["claude"],
+      }).workerCapabilitiesJson,
       claimRequestedAt,
       otherWorkerId,
     ).run();
@@ -1558,9 +1559,10 @@ describe("organization channels", () => {
       `update briar_execution_workers
        set capabilities_json = ?, last_heartbeat_at = ? where id = ?`,
     ).bind(
-      JSON.stringify({
-        providerHealth: { claude: { healthy: true } },
-      }),
+      workerClaimRuntimeFixture({
+        agentProvider: "claude",
+        providers: ["claude"],
+      }).workerCapabilitiesJson,
       claimRequestedAt,
       otherWorkerId,
     ).run();
@@ -3208,7 +3210,7 @@ describe("organization channels", () => {
              capabilities_json = ?, last_heartbeat_at = ?, updated_at = ?
          where id = ?`,
       ).bind(
-        JSON.stringify({ providerHealth: { claude: { healthy: true } } }),
+        capabilities,
         observedAt,
         observedAt,
         otherWorkerId,
@@ -3505,8 +3507,9 @@ describe("organization channels", () => {
     expect(repeated.channel.id).toBe(createdBody.channel.id);
 
     const claimedAt = new Date().toISOString();
-    const workerCapabilitiesJson = JSON.stringify({
-      providerHealth: { claude: { healthy: true } },
+    const { workerCapabilitiesJson } = workerClaimRuntimeFixture({
+      agentProvider: "claude",
+      providers: ["claude"],
     });
     await db.batch([
       db.prepare(
@@ -3830,9 +3833,10 @@ describe("organization channels", () => {
              capabilities_json = ?, last_heartbeat_at = ?, updated_at = ?
          where id = ?`,
       ).bind(
-        JSON.stringify({
-          providerHealth: { claude: { healthy: true } },
-        }),
+        workerClaimRuntimeFixture({
+          agentProvider: "claude",
+          providers: ["claude"],
+        }).workerCapabilitiesJson,
         observedAt,
         observedAt,
         otherWorkerId,

@@ -754,9 +754,6 @@ function executionWorkerAdvertisesSelection(
   model: string | null,
   effort: string | null,
 ) {
-  // Provider defaults remain compatible with older workers. Any explicit
-  // model/effort must be confirmed by the reporting worker.
-  if (!model && !effort) return true;
   try {
     const capabilities = JSON.parse(worker.capabilities_json) as {
       providerCapabilities?: unknown;
