@@ -1,24 +1,15 @@
 import {
-  CreateIssueMessageResponseSchema,
-} from "@briar/contracts/gen/briar/app/v1/issue_pb";
-import {
-  agentReplyDisplayParentMessageId,
   issueReplyAgentIds,
 } from "../../src/lib/issue-reply-decision";
 import { maxIssueAttachmentCount } from "../../src/lib/issue-attachments";
 import {
-  canonicalizeIssueAttachmentReferences,
+  issueAttachmentReferences,
   isIssueAttachmentReference,
 } from "../../src/lib/issue-markdown";
-import { prepareStoredAttachments, uploadStoredAttachments } from "./attachment-storage";
 import type { BriarAuth } from "./auth";
 import { getDashboardSyncCursor, listDashboardChanges } from "./dashboard-change-repository";
 import {
-  createIssueAttachments,
-  createIssueMessage,
-  deleteIssueAttachments,
   deleteIssueMessage,
-  enqueueIssueAgentReply,
   getHuntRunForProject,
   getIssueAgentReplyJob,
   getIssueAttachment,
@@ -33,18 +24,15 @@ import {
   listIssueReworkProposals,
   listIssueThreadMessages,
   updateIssueMessage,
-  type IssueAgentReplyJobRow,
   type IssueMessageRow,
 } from "./db";
 import {
   HttpError,
   json,
-  privateNoStoreProtobufResponse,
 } from "./http-response";
-import { appCreateIssueMessageResponse } from "./app-connect-issue-mappers";
+import { sha256 } from "./crypto-digest";
 import { hasOrganizationCapability } from "./organization-access";
 import {
-  deleteUnreferencedUploadedIssueObjects,
   issueAttachmentResponse,
   removeOrphanedIssueAttachments,
 } from "./issue-attachment-service";
@@ -60,8 +48,15 @@ import {
   decodeIssueMessageEditInput,
   decodeIssueMessageInput,
 } from "./issue-request-contract";
-import { readIssueMessageRequest } from "./request-readers";
-import { requireSession } from "./session-auth";
+import {
+  commitIssueMessageMutation,
+  findIssueMessageMutationReceipt,
+  issueMessageAggregateExists,
+  type IssueMessageReplyPlan,
+} from "./issue-message-mutation-repository";
+import { resolveIssueAttachmentUploads } from "./issue-attachment-upload-repository";
+import { getOrganizationRole } from "./organization-repository";
+import { issueProcessingAgentSkillRow } from "./agent-skills";
 
 type RequireRunExecutionProject = (
   db: D1Database,
@@ -85,11 +80,13 @@ const workerBearerToken = (request: Request) => {
 
 type IssueConversationApplicationInput = {
   db: D1Database;
-  archivesBucket: R2Bucket;
   projectId: string;
   runId: string;
   userId: string;
 };
+
+type ArchivedIssueConversationApplicationInput =
+  IssueConversationApplicationInput & { archivesBucket: R2Bucket };
 
 async function requireIssueConversationProject(
   input: IssueConversationApplicationInput,
@@ -109,7 +106,7 @@ async function requireIssueConversation(
 }
 
 export async function listProjectIssueMessages(
-  input: IssueConversationApplicationInput,
+  input: ArchivedIssueConversationApplicationInput,
 ) {
   const { project, run } = await requireIssueConversation(input);
   const cursor = await getDashboardSyncCursor(input.db, project.id);
@@ -125,7 +122,7 @@ export async function listProjectIssueMessages(
 }
 
 export async function syncProjectIssueMessages(
-  input: IssueConversationApplicationInput & { cursor: number },
+  input: ArchivedIssueConversationApplicationInput & { cursor: number },
 ) {
   if (!Number.isSafeInteger(input.cursor) || input.cursor < 0) {
     throw new HttpError(400, "A non-negative conversation cursor is required");
@@ -163,10 +160,8 @@ export async function syncProjectIssueMessages(
 
 export async function createProjectIssueMessage(
   input: IssueConversationApplicationInput & {
-    attachmentsBucket: R2Bucket;
-    request: unknown;
-    attachments: File[];
-    attachmentReferences: string[];
+    request: ReturnType<typeof decodeIssueMessageInput>;
+    attachmentIds: readonly string[];
   },
 ) {
   const project = await requireIssueConversationProject(input);
@@ -175,31 +170,27 @@ export async function createProjectIssueMessage(
   }
   const run = await getHuntRunForProject(input.db, project.id, input.runId);
   if (!run) throw new HttpError(404, "Run not found");
-  if (
-    input.attachmentReferences.length > maxIssueAttachmentCount ||
-    !input.attachmentReferences.every(isIssueAttachmentReference)
-  ) {
-    throw new HttpError(400, "Attachment references are invalid");
+  const request = decodeIssueMessageInput(input.request);
+  if (!request.clientMessageId) {
+    throw new HttpError(400, "Client message ID is required");
   }
-  const rawRequest = decodeIssueMessageInput(input.request);
-  const storedAttachments = prepareStoredAttachments(
-    input.attachments,
-    () => {
-      const id = crypto.randomUUID();
-      return {
-        id,
-        object_key: `issue-attachments/${project.id}/${input.runId}/${id}`,
-      };
-    },
-  );
-  const request = {
-    ...rawRequest,
-    body: canonicalizeIssueAttachmentReferences(
-      rawRequest.body,
-      input.attachmentReferences,
-      storedAttachments.map((attachment) => attachment.id),
-    ) ?? rawRequest.body,
-  };
+  const messageId = request.clientMessageId.toLowerCase();
+  if (
+    input.attachmentIds.length > maxIssueAttachmentCount ||
+    new Set(input.attachmentIds).size !== input.attachmentIds.length ||
+    !input.attachmentIds.every(isIssueAttachmentReference)
+  ) {
+    throw new HttpError(400, "Attachment IDs are invalid");
+  }
+  const parentMessageId = request.parentMessageId?.toLowerCase() ?? null;
+  const mentionedUserIds = [...new Set(
+    (request.mentionedUserIds ?? []).map((userId) => userId.trim()),
+  )].sort();
+  const explicitMentionedAgentIds = [...new Set(
+    (request.mentionedAgentIds ?? []).map((agentId) =>
+      agentId.trim().toLowerCase()
+    ),
+  )].sort();
   const agentProvider = request.agentConversationId
     ? request.agentConversationId.startsWith(`briar:claude:${project.id}:`)
       ? "claude"
@@ -215,7 +206,73 @@ export async function createProjectIssueMessage(
       "Agent conversation does not belong to this project",
     );
   }
-  const explicitMentionedAgentIds = [...new Set(request.mentionedAgentIds ?? [])];
+  if (agentProvider && explicitMentionedAgentIds.length > 0) {
+    throw new HttpError(400, "Agent-authored messages cannot invoke Agents");
+  }
+  const requestHash = await sha256(JSON.stringify({
+    organizationId: project.organization_id,
+    projectId: project.id,
+    runId: input.runId,
+    userId: input.userId,
+    messageId,
+    body: request.body,
+    parentMessageId,
+    mentionedUserIds,
+    mentionedAgentIds: explicitMentionedAgentIds,
+    agentConversationId: request.agentConversationId ?? null,
+    attachmentUploadIds: input.attachmentIds,
+  }));
+  const conflict = () => new HttpError(
+    409,
+    "Issue message ID was already used with a different request",
+  );
+  const completed = (
+    receipt: NonNullable<Awaited<ReturnType<
+      typeof findIssueMessageMutationReceipt
+    >>>,
+  ) => {
+    if (
+      receipt.organization_id !== project.organization_id ||
+      receipt.project_id !== project.id ||
+      receipt.run_id !== input.runId ||
+      receipt.user_id !== input.userId ||
+      receipt.request_hash !== requestHash
+    ) {
+      throw conflict();
+    }
+    return JSON.parse(receipt.response_json) as {
+      message: ReturnType<typeof issueMessageJson>;
+      agentReply: ReturnType<typeof issueAgentReplyJson> | null;
+      agentReplies: Array<ReturnType<typeof issueAgentReplyJson>>;
+    };
+  };
+  const existingReceipt = await findIssueMessageMutationReceipt(
+    input.db,
+    messageId,
+  );
+  if (existingReceipt) return completed(existingReceipt);
+  if (await issueMessageAggregateExists(input.db, messageId)) {
+    throw conflict();
+  }
+
+  const parent = parentMessageId
+    ? await getIssueMessage(input.db, project.id, input.runId, parentMessageId)
+    : null;
+  if (parentMessageId && !parent) {
+    throw new HttpError(404, "Thread message not found");
+  }
+  for (const mentionedUserId of mentionedUserIds) {
+    if (
+      !mentionedUserId ||
+      !(await getOrganizationRole(
+        input.db,
+        project.organization_id,
+        mentionedUserId,
+      ))
+    ) {
+      throw new HttpError(400, "Mentioned member is not in this organization");
+    }
+  }
   const explicitlyMentionedAgents = new Map<
     string,
     NonNullable<Awaited<ReturnType<typeof getProjectAgent>>>
@@ -229,71 +286,15 @@ export async function createProjectIssueMessage(
       explicitlyMentionedAgents.set(agent.id, agent);
     }
   }
-  const createdAt = new Date().toISOString();
-  const uploadedKeys: string[] = [];
-  let message: IssueMessageRow | null = null;
-  try {
-    await uploadStoredAttachments(
-      input.attachmentsBucket,
-      storedAttachments,
-      uploadedKeys,
-      (attachment) => ({
-        attachmentId: attachment.id,
-        projectId: project.id,
-      }),
-    );
-    await createIssueAttachments(
-      input.db,
-      project.id,
-      input.runId,
-      storedAttachments.map(({ file: _file, ...attachment }) => attachment),
-    );
-    message = await createIssueMessage(input.db, {
-      id: request.clientMessageId ?? crypto.randomUUID(),
-      projectId: project.id,
-      runId: input.runId,
-      parentMessageId: request.parentMessageId ?? null,
-      authorUserId: agentProvider ? null : input.userId,
-      authorAgentProvider: agentProvider,
-      body: request.body,
-      mentionedUserIds: agentProvider ? [] : request.mentionedUserIds,
-      createdAt,
-    });
-    if (!message) {
-      throw new HttpError(
-        404,
-        request.parentMessageId ? "Thread message not found" : "Run not found",
-      );
-    }
-  } catch (error) {
-    await deleteIssueAttachments(
-      input.db,
-      project.id,
-      input.runId,
-      storedAttachments.map((attachment) => attachment.id),
-    ).catch(() => undefined);
-    await deleteUnreferencedUploadedIssueObjects(
-      input.db,
-      input.attachmentsBucket,
-      uploadedKeys,
-    ).catch(() => undefined);
-    throw error;
-  }
-  if (!message) {
-    throw new HttpError(
-      404,
-      request.parentMessageId ? "Thread message not found" : "Run not found",
-    );
-  }
-  const threadMessages = message.parent_message_id
+  const threadMessages = parentMessageId
     ? await listIssueThreadMessages(
         input.db,
         project.id,
         input.runId,
-        message.parent_message_id,
+        parentMessageId,
       )
     : [];
-  const targetAgentIds = agentProvider
+  const targetAgentIds = (agentProvider
     ? []
     : issueReplyAgentIds(
         threadMessages.map((threadMessage) => ({
@@ -307,55 +308,178 @@ export async function createProjectIssueMessage(
         })),
         {
           mentionedAgentIds: explicitMentionedAgentIds,
-          parentMessageId: message.parent_message_id ?? null,
+          parentMessageId,
         },
-      );
+      )).sort();
   const targetAgents = new Map(explicitlyMentionedAgents);
   for (const agentId of targetAgentIds) {
     if (targetAgents.has(agentId)) continue;
     const agent = await getProjectAgent(input.db, project.id, agentId);
     if (agent) targetAgents.set(agent.id, agent);
   }
-  const agentReplies: IssueAgentReplyJobRow[] = [];
-  if (targetAgents.size > 0) {
-    for (const agent of targetAgents.values()) {
-      const agentReply = await enqueueIssueAgentReply(input.db, {
-        id: crypto.randomUUID(),
-        projectId: project.id,
-        runId: input.runId,
-        triggerMessageId: message.id,
-        parentMessageId: agentReplyDisplayParentMessageId("issue", {
-          id: message.id,
-          parentMessageId: message.parent_message_id,
-        }),
-        replyMessageId: crypto.randomUUID(),
-        agentId: agent.id,
-        skillId: null,
-        requiresPreferredWorker: run.worker_id !== null,
-        createdAt,
-      });
-      if (agentReply) agentReplies.push(agentReply);
-    }
+
+  const bodyAttachmentIds = [...issueAttachmentReferences(request.body)];
+  if (bodyAttachmentIds.length > maxIssueAttachmentCount) {
+    throw new HttpError(400, "Issue message has too many attachment references");
   }
-  return {
-    message: issueMessageJson(
-      message,
-      storedAttachments.map(({ file: _file, ...attachment }) => ({
-        ...attachment,
-        project_id: project.id,
-        run_id: input.runId,
-        created_at: createdAt,
-      })),
-    ),
-    agentReply: agentReplies.length === 1
-      ? issueAgentReplyJson(agentReplies[0])
-      : null,
-    agentReplies: agentReplies.map(issueAgentReplyJson),
+  const existingAttachments = (await listIssueAttachments(
+    input.db,
+    project.id,
+    input.runId,
+  )).filter((attachment) => bodyAttachmentIds.includes(attachment.id));
+  const existingAttachmentIds = new Set(
+    existingAttachments.map((attachment) => attachment.id),
+  );
+  const uploadIdSet = new Set(input.attachmentIds);
+  const existingReferencedAttachmentIds = bodyAttachmentIds.filter((id) =>
+    !uploadIdSet.has(id)
+  );
+  if (
+    bodyAttachmentIds.some((id) =>
+      !uploadIdSet.has(id) && !existingAttachmentIds.has(id)
+    )
+  ) {
+    throw new HttpError(
+      400,
+      "Issue message references an attachment outside this run",
+    );
+  }
+
+  const createdAt = new Date().toISOString();
+  const uploads = await resolveIssueAttachmentUploads(input.db, {
+    purpose: "issue_message",
+    organizationId: project.organization_id,
+    projectId: project.id,
+    userId: input.userId,
+    mutationId: messageId,
+    runId: input.runId,
+    uploadIds: input.attachmentIds,
+    observedAt: createdAt,
+  });
+  if (!uploads) {
+    throw new HttpError(
+      409,
+      "Issue message attachments are unavailable, expired, or already consumed",
+    );
+  }
+  const uploadedAttachments = uploads.map((upload) => ({
+    id: upload.upload_id,
+    run_id: input.runId,
+    project_id: project.id,
+    object_key: upload.object_key,
+    filename: upload.filename,
+    content_type: upload.content_type,
+    byte_size: upload.byte_size,
+    created_at: createdAt,
+  }));
+  const responseAttachments = [
+    ...existingAttachments,
+    ...uploadedAttachments,
+  ].sort((left, right) =>
+    left.created_at.localeCompare(right.created_at) ||
+    left.id.localeCompare(right.id)
+  );
+  const author = await input.db
+    .prepare(
+      `select id, name, image from "user" where id = ?`,
+    )
+    .bind(input.userId)
+    .first<{ id: string; name: string; image: string | null }>();
+  if (!author) throw new HttpError(403, "Authenticated user no longer exists");
+  const replies: IssueMessageReplyPlan[] = [...targetAgents.values()].map(
+    (agent) => ({
+      id: crypto.randomUUID(),
+      replyMessageId: crypto.randomUUID(),
+      agentId: agent.id,
+      agentName: agent.name,
+      agentResponsibility: agent.responsibility,
+      preferredWorkerId: run.worker_id,
+      preferredProvider: issueProcessingAgentSkillRow(agent.skills ?? [])
+        ?.provider ?? agent.provider,
+      requiresPreferredWorker: run.worker_id !== null,
+    }),
+  );
+  const message: IssueMessageRow = {
+    id: messageId,
+    run_id: input.runId,
+    parent_message_id: parentMessageId,
+    author_user_id: agentProvider ? null : input.userId,
+    author_agent_id: null,
+    author_agent_name: null,
+    author_agent_provider: agentProvider,
+    author_name: agentProvider ? null : author.name,
+    author_image: agentProvider ? null : author.image,
+    author_agent_image: null,
+    body: request.body,
+    reply_count: 0,
+    created_at: createdAt,
+    updated_at: createdAt,
   };
+  const agentReplies: Array<ReturnType<typeof issueAgentReplyJson>> = replies
+    .map((reply) => ({
+      id: reply.id,
+      triggerMessageId: messageId,
+      parentMessageId: parentMessageId ?? messageId,
+      agentId: reply.agentId,
+      agentName: reply.agentName,
+      status: "queued" as const,
+      attempts: 0,
+      workerId: null,
+      provider: null,
+      error: null,
+      updatedAt: createdAt,
+    }));
+  const result = {
+    message: issueMessageJson(message, responseAttachments),
+    agentReply: agentReplies.length === 1 ? agentReplies[0]! : null,
+    agentReplies,
+  };
+  try {
+    await commitIssueMessageMutation(input.db, {
+      organizationId: project.organization_id,
+      projectId: project.id,
+      runId: input.runId,
+      userId: input.userId,
+      messageId,
+      parentMessageId,
+      authorAgentProvider: agentProvider,
+      body: request.body,
+      mentionedUserIds,
+      targetAgentIds: [...targetAgents.keys()],
+      attachments: uploadedAttachments,
+      uploadIds: input.attachmentIds,
+      existingAttachmentIds: existingReferencedAttachmentIds,
+      replies,
+      requestHash,
+      responseJson: JSON.stringify(result),
+      committedAt: createdAt,
+    });
+  } catch (error) {
+    const concurrentReceipt = await findIssueMessageMutationReceipt(
+      input.db,
+      messageId,
+    );
+    if (concurrentReceipt) return completed(concurrentReceipt);
+    if (await issueMessageAggregateExists(input.db, messageId)) {
+      throw conflict();
+    }
+    if (
+      input.attachmentIds.length > 0 ||
+      existingReferencedAttachmentIds.length > 0
+    ) {
+      throw new HttpError(
+        409,
+        "Issue message attachments changed while the message was being created",
+      );
+    }
+    throw error;
+  }
+  return result;
 }
 
 export async function updateProjectIssueMessage(
   input: IssueConversationApplicationInput & {
+    archivesBucket: R2Bucket;
     attachmentsBucket: R2Bucket;
     messageId: string;
     request: unknown;
@@ -429,6 +553,7 @@ export async function updateProjectIssueMessage(
 
 export async function deleteProjectIssueMessage(
   input: IssueConversationApplicationInput & {
+    archivesBucket: R2Bucket;
     attachmentsBucket: R2Bucket;
     messageId: string;
   },
@@ -465,7 +590,9 @@ export async function deleteProjectIssueMessage(
 }
 
 export async function getProjectIssueAgentReply(
-  input: IssueConversationApplicationInput & { triggerMessageId: string },
+  input: ArchivedIssueConversationApplicationInput & {
+    triggerMessageId: string;
+  },
 ) {
   const project = await requireIssueConversationProject(input);
   const replyJobs = (await listIssueAgentReplyJobs(
@@ -566,7 +693,6 @@ export async function handleIssueConversationRoute(input: {
     auth,
     db,
     attachmentsBucket,
-    archivesBucket,
     requireRunExecutionProject,
     requireProjectAccess,
   } = input;
@@ -603,41 +729,6 @@ export async function handleIssueConversationRoute(input: {
     const object = await attachmentsBucket.get(attachment.object_key);
     if (!object) throw new HttpError(404, "Attachment not found");
     return issueAttachmentResponse(attachment, object, object.body);
-  }
-
-  const issueMessagesMatch = url.pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/messages$/u,
-  );
-  if (
-    issueMessagesMatch && request.method === "POST" &&
-    request.headers.get("content-type")?.toLowerCase().startsWith(
-      "multipart/form-data",
-    )
-  ) {
-    const session = await requireSession(auth, request);
-    const messageRequest = await readIssueMessageRequest(request, {
-      projectId: issueMessagesMatch[1],
-      runId: issueMessagesMatch[2],
-    });
-    if (messageRequest.attachments.length === 0) {
-      throw new HttpError(400, "Issue message upload requires an attachment");
-    }
-    const result = await createProjectIssueMessage({
-      db,
-      archivesBucket,
-      attachmentsBucket,
-      projectId: issueMessagesMatch[1],
-      runId: issueMessagesMatch[2],
-      userId: session.user.id,
-      request: messageRequest.input,
-      attachments: messageRequest.attachments,
-      attachmentReferences: messageRequest.attachmentReferences,
-    });
-    return privateNoStoreProtobufResponse(
-      CreateIssueMessageResponseSchema,
-      appCreateIssueMessageResponse(result),
-      201,
-    );
   }
 
   return undefined;
