@@ -34,6 +34,7 @@ const createResponse = decodeIssueCreateMutationReceiptResponse({
   assigneeUserId: null,
   createdByUserId: "receipt-owner",
   difficulty: "normal",
+  parentRunId: null,
   attachments: [attachment],
 });
 
