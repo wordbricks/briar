@@ -48,7 +48,6 @@ import {
   isUnauthenticatedConnectError,
 } from "./app-connect-client";
 import { createAuthenticatedConnectClient } from "./connect-client";
-import { HttpRequestError } from "./http-request-error";
 import {
   configWithRemoteProjectSettings,
   type FetchRemoteProjectSettings,
@@ -406,7 +405,7 @@ type ProjectDoctorWorkflowSync = {
 const unavailableWorkflowSync = (
   error: unknown,
 ): ProjectDoctorWorkflowSync => {
-  if (error instanceof HttpRequestError && error.status === 401) {
+  if (isUnauthenticatedConnectError(error)) {
     return {
       status: "session_unavailable",
       source: "server",

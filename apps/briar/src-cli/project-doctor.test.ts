@@ -1,7 +1,7 @@
+import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it, vi } from "vitest";
 import { repositoryWorkflowBootstrap } from "../src/lib/auto-hunt-contract";
 import { decodeConfig, type Config } from "./config-contract";
-import { HttpRequestError } from "./http-request-error";
 import {
   projectDoctor,
   type ProjectDoctorDependencies,
@@ -153,7 +153,7 @@ describe("project doctor repository workflow sync", () => {
     const config = localConfig();
     const expired = dependencies(config, {
       fetchProjectSettings: async () => {
-        throw new HttpRequestError("Unauthorized", 401, null);
+        throw new ConnectError("Unauthorized", Code.Unauthenticated);
       },
     });
     await expect(projectDoctor(expired.values)).rejects.toThrow(
@@ -167,7 +167,7 @@ describe("project doctor repository workflow sync", () => {
 
     const unavailable = dependencies(config, {
       fetchProjectSettings: async () => {
-        throw new HttpRequestError("Unavailable", 503, null);
+        throw new ConnectError("Unavailable", Code.Unavailable);
       },
     });
     await expect(projectDoctor(unavailable.values)).rejects.toThrow(
