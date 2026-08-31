@@ -1,12 +1,21 @@
-import type { DescMethod } from "@bufbuild/protobuf";
-import { createConnectRouter } from "@connectrpc/connect";
+import { env } from "cloudflare:workers";
 import {
-  createFetchHandler,
-  createMethodUrl,
-} from "@connectrpc/connect/protocol";
+  createExecutionContext,
+  waitOnExecutionContext,
+} from "cloudflare:test";
 import {
-  IssueService,
-} from "@briar/contracts/gen/briar/app/v1/issue_pb";
+  Code,
+  createClient,
+  createRouterTransport,
+} from "@connectrpc/connect";
+import {
+  IssueDifficulty,
+  RunStatus,
+} from "@briar/contracts/gen/briar/app/v1/common_pb";
+import { IssueService } from "@briar/contracts/gen/briar/app/v1/issue_pb";
+import {
+  WorkflowCheckpoint_Position,
+} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import { describe, expect, it, vi } from "vitest";
 import type { BriarAuth } from "./auth";
 import { connectErrorInterceptor } from "./app-connect-errors";
@@ -16,7 +25,6 @@ import {
   type AppConnectIssueServices,
   registerAppIssueService,
 } from "./app-connect-issue";
-import { requireConnectHandler } from "./test-helpers/connect";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const runId = "22222222-2222-4222-8222-222222222222";
@@ -26,20 +34,6 @@ const replyId = "55555555-5555-4555-8555-555555555555";
 const agentId = "66666666-6666-4666-8666-666666666666";
 const attachmentId = "77777777-7777-4777-8777-777777777777";
 const userId = "88888888-8888-4888-8888-888888888888";
-
-const issueConnectRequest = (method: DescMethod, body: unknown) =>
-  new Request(
-    createMethodUrl("https://api.example.test", method),
-    {
-      method: "POST",
-      headers: {
-        authorization: "Bearer session-token",
-        "connect-protocol-version": "1",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-    },
-  );
 
 const authenticatedSession = {
   session: {
@@ -60,41 +54,40 @@ const authenticatedSession = {
   },
 };
 
-const invokeIssueRpc = async (
-  method: DescMethod,
-  body: unknown,
+const createIssueClient = (
   overrides: Partial<AppConnectIssueServices>,
 ) => {
-  const request = issueConnectRequest(method, body);
-  const router = createConnectRouter({
-    connect: true,
-    grpc: false,
-    grpcWeb: false,
-    interceptors: [connectErrorInterceptor],
-  });
-  registerAppIssueService(
-    router,
+  const context = createExecutionContext();
+  const services: AppConnectIssueServices = {
+    ...appConnectIssueServices,
+    requireSession: vi.fn().mockResolvedValue(authenticatedSession),
+    ...overrides,
+  };
+  const transport = createRouterTransport(
+    (router) =>
+      registerAppIssueService(router, {
+        request: new Request("https://api.example.test"),
+        auth: {} as BriarAuth,
+        db: env.DB,
+        env,
+        context,
+      }, services),
     {
-      request,
-      auth: {} as BriarAuth,
-      db: {} as D1Database,
-      env: {
-        ATTACHMENTS: {},
-        ARCHIVES: {},
-      } as Env,
-    },
-    {
-      ...appConnectIssueServices,
-      requireSession: vi.fn().mockResolvedValue(authenticatedSession),
-      ...overrides,
+      router: {
+        grpc: false,
+        grpcWeb: false,
+        interceptors: [connectErrorInterceptor],
+      },
     },
   );
-  const handler = requireConnectHandler(router.handlers, method);
-  return createFetchHandler(handler)(request);
+  return {
+    client: createClient(IssueService, transport),
+    flushBackgroundTasks: () => waitOnExecutionContext(context),
+  };
 };
 
 describe("app Issue Connect adapter", () => {
-  it("calls the create application service directly with lossless workflow input", async () => {
+  it("maps generated workflow and upload input without a parallel wire type", async () => {
     const createIssue = vi.fn<AppConnectIssueServices["createIssue"]>();
     createIssue.mockResolvedValueOnce({
       runId,
@@ -103,42 +96,47 @@ describe("app Issue Connect adapter", () => {
       stage: "queued",
       assigneeUserId: null,
       createdByUserId: userId,
-      difficulty: null,
+      difficulty: "normal",
       attachments: [],
     });
+    const { client, flushBackgroundTasks } = createIssueClient({ createIssue });
 
-    const response = await invokeIssueRpc(IssueService.method.createIssue, {
+    const result = await client.createIssue({
       projectId,
       title: "Preserve wire input",
-      status: "RUN_STATUS_BACKLOG",
+      status: RunStatus.BACKLOG,
       checkpoints: [{
         key: "review",
         stage: "implement",
-        position: "POSITION_AFTER",
+        position: WorkflowCheckpoint_Position.AFTER,
       }],
       clientIssueId: runId,
       attachments: [{ uploadId: attachmentId.toUpperCase() }],
-    }, { createIssue });
+    });
+    await flushBackgroundTasks();
 
-    expect(response.status).toBe(200);
-    expect(createIssue).toHaveBeenCalledOnce();
-    expect(createIssue.mock.calls[0][0]).toMatchObject({
+    expect(createIssue).toHaveBeenCalledWith(expect.objectContaining({
       projectId,
       userId,
       clientIssueId: runId,
       attachmentIds: [attachmentId],
-      request: {
+      request: expect.objectContaining({
         status: "backlog",
         checkpoints: [{
           key: "review",
           stage: "implement",
           position: "after",
         }],
-      },
+      }),
+    }));
+    expect(result).toMatchObject({
+      runId,
+      status: RunStatus.BACKLOG,
+      difficulty: IssueDifficulty.NORMAL,
     });
   });
 
-  it("preserves assignee and attachment patch presence", async () => {
+  it("preserves oneof and message-presence semantics for issue patches", async () => {
     const updateIssue = vi.fn<AppConnectIssueServices["updateIssue"]>();
     updateIssue.mockResolvedValue({
       runId,
@@ -155,39 +153,39 @@ describe("app Issue Connect adapter", () => {
         url: `https://api.example.test/attachments/${attachmentId}`,
       }],
     });
+    const { client, flushBackgroundTasks } = createIssueClient({ updateIssue });
 
-    const cleared = await invokeIssueRpc(IssueService.method.updateIssue, {
+    const cleared = await client.updateIssue({
       projectId,
       runId,
       requestId: messageId,
       title: "Updated issue",
-      clearAssignee: {},
+      assigneeUpdate: { case: "clearAssignee", value: {} },
       keptAttachmentIds: { values: [] },
-    }, { updateIssue });
-    expect(cleared.status).toBe(200);
-    expect(updateIssue.mock.calls[0][0]).toMatchObject({
+    });
+    await flushBackgroundTasks();
+
+    expect(updateIssue.mock.calls[0]?.[0]).toMatchObject({
       requestId: messageId,
       request: { assigneeUserId: null },
       attachmentIds: [],
       keptAttachmentIds: [],
     });
-    expect(await cleared.json()).toMatchObject({
-      attachments: [{ id: attachmentId, byteSize: "12" }],
-    });
+    expect(cleared.attachments[0]?.byteSize).toBe(12n);
 
-    const unchanged = await invokeIssueRpc(IssueService.method.updateIssue, {
+    await client.updateIssue({
       projectId,
       runId,
       requestId: proposalId,
       title: "Updated issue",
-    }, { updateIssue });
-    expect(unchanged.status).toBe(200);
-    const applicationInput = updateIssue.mock.calls[1][0];
-    expect(applicationInput.request).not.toHaveProperty("assigneeUserId");
-    expect(applicationInput.keptAttachmentIds).toBeUndefined();
+    });
+    await flushBackgroundTasks();
+    const unchanged = updateIssue.mock.calls[1]?.[0];
+    expect(unchanged?.request).not.toHaveProperty("assigneeUserId");
+    expect(unchanged?.keptAttachmentIds).toBeUndefined();
   });
 
-  it("turns an expired delta into an authoritative reset snapshot", async () => {
+  it("turns an expired delta into an authoritative typed reset snapshot", async () => {
     const syncMessages = vi.fn<AppConnectIssueServices["syncMessages"]>();
     syncMessages.mockRejectedValueOnce(new HttpError(
       410,
@@ -242,18 +240,14 @@ describe("app Issue Connect adapter", () => {
     listMessages.mockResolvedValueOnce(
       snapshot as Awaited<ReturnType<AppConnectIssueServices["listMessages"]>>,
     );
+    const { client } = createIssueClient({ syncMessages, listMessages });
 
-    const response = await invokeIssueRpc(
-      IssueService.method.syncIssueMessages,
-      {
-        projectId,
-        runId,
-        cursor: "41",
-      },
-      { syncMessages, listMessages },
-    );
+    const result = await client.syncIssueMessages({
+      projectId,
+      runId,
+      cursor: 41n,
+    });
 
-    expect(response.status).toBe(200);
     expect(syncMessages).toHaveBeenCalledWith(expect.objectContaining({
       projectId,
       runId,
@@ -261,24 +255,21 @@ describe("app Issue Connect adapter", () => {
       cursor: 41,
     }));
     expect(listMessages).toHaveBeenCalledOnce();
-    expect(await response.json()).toMatchObject({
-      cursor: "42",
+    expect(result).toMatchObject({
+      cursor: 42n,
       changed: true,
       reset: true,
       messages: [{
         id: messageId,
-        updateProposal: {
-          id: proposalId,
-          changedFields: [
-            "ISSUE_CHANGED_FIELD_TITLE",
-            "ISSUE_CHANGED_FIELD_DESCRIPTION",
-          ],
+        proposedAction: {
+          case: "updateProposal",
+          value: { id: proposalId },
         },
       }],
     });
   });
 
-  it("encodes the accepted action oneof and rejects an invalid trusted proposal", async () => {
+  it("encodes the trusted action union and fails closed on a wrong proposal kind", async () => {
     const acceptActionProposal = vi.fn<
       AppConnectIssueServices["acceptActionProposal"]
     >();
@@ -290,7 +281,7 @@ describe("app Issue Connect adapter", () => {
           title: "Generated follow-up",
           description: null,
           priority: null,
-          status: "queued",
+          status: "backlog",
         },
         executeAfterCreate: true,
         status: "accepted",
@@ -301,31 +292,24 @@ describe("app Issue Connect adapter", () => {
       outcome: "accepted",
       resultRunId: runId,
     } as never);
-
-    const accepted = await invokeIssueRpc(
-      IssueService.method.acceptIssueActionProposal,
-      {
-        projectId,
-        runId,
-        proposalId,
-      },
-      { acceptActionProposal },
-    );
-
-    expect(accepted.status).toBe(200);
-    const acceptedBody = await accepted.json();
-    expect(acceptedBody).toMatchObject({
-      create: {
-        id: proposalId,
-        issue: { title: "Generated follow-up", status: "RUN_STATUS_QUEUED" },
-        executeAfterCreate: true,
-        status: "PROPOSAL_STATUS_ACCEPTED",
-        resultRunId: runId,
-      },
-      outcome: "APPROVAL_OUTCOME_ACCEPTED",
-      resultRunId: runId,
+    const { client, flushBackgroundTasks } = createIssueClient({
+      acceptActionProposal,
     });
-    expect(acceptedBody).not.toHaveProperty("update");
+
+    const accepted = await client.acceptIssueActionProposal({
+      projectId,
+      runId,
+      proposalId,
+    });
+    await flushBackgroundTasks();
+
+    expect(accepted.proposal).toMatchObject({
+      case: "create",
+      value: {
+        id: proposalId,
+        issue: { title: "Generated follow-up", status: RunStatus.BACKLOG },
+      },
+    });
 
     acceptActionProposal.mockResolvedValueOnce({
       proposal: {
@@ -340,17 +324,12 @@ describe("app Issue Connect adapter", () => {
       outcome: "accepted",
       resultRunId: runId,
     } as never);
-    const invalid = await invokeIssueRpc(
-      IssueService.method.acceptIssueActionProposal,
-      {
-        projectId,
-        runId,
-        proposalId,
-      },
-      { acceptActionProposal },
-    );
 
-    expect(invalid.status).toBe(500);
-    expect(await invalid.json()).toMatchObject({ code: "internal" });
+    await expect(client.acceptIssueActionProposal({
+      projectId,
+      runId,
+      proposalId,
+    })).rejects.toMatchObject({ code: Code.Internal });
+    await flushBackgroundTasks();
   });
 });

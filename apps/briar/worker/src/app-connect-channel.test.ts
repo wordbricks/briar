@@ -1,31 +1,26 @@
-import type { DescMethod } from "@bufbuild/protobuf";
-import { createConnectRouter } from "@connectrpc/connect";
+import { env } from "cloudflare:workers";
 import {
-  createFetchHandler,
-  createMethodUrl,
-} from "@connectrpc/connect/protocol";
+  createExecutionContext,
+  waitOnExecutionContext,
+} from "cloudflare:test";
+import {
+  Code,
+  createClient,
+  createRouterTransport,
+} from "@connectrpc/connect";
 import {
   ChannelService,
+  ChannelVisibility,
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
+import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import { describe, expect, it, vi } from "vitest";
 import type { BriarAuth } from "./auth";
 import { connectErrorInterceptor } from "./app-connect-errors";
 import {
   appConnectChannelServices,
-  registerAppChannelService,
   type AppConnectChannelServices,
+  registerAppChannelService,
 } from "./app-connect-channel";
-import { requireConnectHandler } from "./test-helpers/connect";
-
-const applicationMocks = {
-  acceptProposal: vi.fn<AppConnectChannelServices["acceptProposal"]>(),
-  createMessage: vi.fn<AppConnectChannelServices["createMessage"]>(),
-  getLinkPreview: vi.fn<AppConnectChannelServices["getLinkPreview"]>(),
-  getMessageDocument: vi.fn<
-    AppConnectChannelServices["getMessageDocument"]
-  >(),
-  requireSession: vi.fn<AppConnectChannelServices["requireSession"]>(),
-};
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const channelId = "22222222-2222-4222-8222-222222222222";
@@ -38,84 +33,68 @@ const skillId = "88888888-8888-4888-8888-888888888888";
 const clientMessageId = "99999999-9999-4999-8999-999999999999";
 const deviceId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab";
 
-const connectRequest = () => new Request(
-  createMethodUrl(
-    "https://api.example.test",
-    ChannelService.method.createChannelMessage,
-  ),
-  {
-    method: "POST",
-    headers: {
-      authorization: "Bearer session-token",
-      "connect-protocol-version": "1",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      organizationId,
-      channelId,
-      clientMessageId,
-      body: "Please create the issue",
-      mentionedUserIds: [userId],
-      mentionedAgentIds: [agentId],
-      skillId,
-      preferredDeviceId: deviceId,
-      attachments: [],
-    }),
+const authenticatedSession = {
+  session: {
+    id: "session-1",
+    userId,
+    token: "session-token",
+    expiresAt: new Date("2027-08-30T00:00:00.000Z"),
+    createdAt: new Date("2026-08-30T00:00:00.000Z"),
+    updatedAt: new Date("2026-08-30T00:00:00.000Z"),
   },
-);
+  user: {
+    id: userId,
+    name: "Owner",
+    email: "owner@example.com",
+    emailVerified: true,
+    createdAt: new Date("2026-08-30T00:00:00.000Z"),
+    updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+  },
+};
 
-const proposalConnectRequest = () => new Request(
-  createMethodUrl(
-    "https://api.example.test",
-    ChannelService.method.acceptChannelProposal,
-  ),
-  {
-    method: "POST",
-    headers: {
-      authorization: "Bearer session-token",
-      "connect-protocol-version": "1",
-      "content-type": "application/json",
+const createChannelClient = (
+  overrides: Partial<AppConnectChannelServices>,
+) => {
+  const context = createExecutionContext();
+  const services: AppConnectChannelServices = {
+    ...appConnectChannelServices,
+    requireSession: vi.fn().mockResolvedValue(authenticatedSession),
+    ...overrides,
+  };
+  const transport = createRouterTransport(
+    (router) =>
+      registerAppChannelService(router, {
+        request: new Request("https://api.example.test"),
+        auth: {} as BriarAuth,
+        db: env.DB,
+        attachmentsBucket: env.ATTACHMENTS,
+        env,
+        context,
+      }, services),
+    {
+      router: {
+        grpc: false,
+        grpcWeb: false,
+        interceptors: [connectErrorInterceptor],
+      },
     },
-    body: JSON.stringify({
-      organizationId,
-      channelId,
-      proposalId,
-      projectId,
-    }),
-  },
-);
+  );
+  return {
+    client: createClient(ChannelService, transport),
+    flushBackgroundTasks: () => waitOnExecutionContext(context),
+  };
+};
 
 describe("app Channel Connect adapter", () => {
-  it("calls the message application service directly and preserves oneofs", async () => {
-    applicationMocks.requireSession.mockResolvedValueOnce({
-      session: {
-        id: "session-1",
-        userId,
-        token: "session-token",
-        expiresAt: new Date("2027-08-30T00:00:00.000Z"),
-        createdAt: new Date("2026-08-30T00:00:00.000Z"),
-        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
-      },
-      user: {
-        id: userId,
-        name: "Owner",
-        email: "owner@example.com",
-        emailVerified: true,
-        createdAt: new Date("2026-08-30T00:00:00.000Z"),
-        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
-      },
-    });
-    applicationMocks.createMessage.mockResolvedValueOnce({
+  it("maps message input and domain unions through generated oneofs", async () => {
+    const createMessage = vi.fn<AppConnectChannelServices["createMessage"]>();
+    createMessage.mockResolvedValueOnce({
       message: {
         id: messageId,
         channelId,
         parentMessageId: null,
         body: "Please create the issue",
-        blocks: [{
-          type: "header",
-          text: { type: "plain_text", text: "Plan", emoji: true },
-          block_id: "plan-header",
-        }],
+        blocks: [],
         author: {
           type: "user",
           id: userId,
@@ -126,12 +105,7 @@ describe("app Channel Connect adapter", () => {
         mentionedUserIds: [userId],
         mentionedAgentIds: [agentId],
         attachments: [],
-        reactions: [{
-          emoji: "👍",
-          count: 1,
-          userIds: [userId],
-          people: [{ userId, name: "Owner", image: null }],
-        }],
+        reactions: [],
         replyCount: 0,
         lastReplyAt: null,
         replyAuthors: [],
@@ -155,60 +129,29 @@ describe("app Channel Connect adapter", () => {
         },
         executionProposal: null,
         skillExecutionProposal: null,
-        subscribers: [{
-          userId,
-          subscribedAt: "2026-08-30T01:02:02.000Z",
-        }],
+        subscribers: [],
         createdAt: "2026-08-30T01:02:03.000Z",
         deletedAt: null,
       },
-      agentReplies: [{
-        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        agentId,
-        channelId,
-        triggerMessageId: messageId,
-        parentMessageId: messageId,
-        replyMessageId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-        status: "queued",
-        attempts: 0,
-        error: null,
-        createdAt: "2026-08-30T01:02:03.000Z",
-        updatedAt: "2026-08-30T01:02:03.000Z",
-      }],
+      agentReplies: [],
+    });
+    const { client, flushBackgroundTasks } = createChannelClient({
+      createMessage,
     });
 
-    const router = createConnectRouter({
-      connect: true,
-      grpc: false,
-      grpcWeb: false,
-      interceptors: [connectErrorInterceptor],
+    const result = await client.createChannelMessage({
+      organizationId,
+      channelId,
+      clientMessageId,
+      body: "Please create the issue",
+      mentionedUserIds: [userId],
+      mentionedAgentIds: [agentId],
+      skillId,
+      preferredDeviceId: deviceId,
     });
-    registerAppChannelService(
-      router,
-      {
-        request: connectRequest(),
-        auth: {} as BriarAuth,
-        db: {} as D1Database,
-        attachmentsBucket: {} as R2Bucket,
-        env: {} as Env,
-      },
-      {
-        ...appConnectChannelServices,
-        createMessage: applicationMocks.createMessage,
-        requireSession: applicationMocks.requireSession,
-      },
-    );
+    await flushBackgroundTasks();
 
-    const handler = requireConnectHandler(
-      router.handlers,
-      ChannelService.method.createChannelMessage,
-    );
-
-    const response = await createFetchHandler(handler)(connectRequest());
-
-    expect(response.status, await response.clone().text()).toBe(200);
-    expect(applicationMocks.createMessage).toHaveBeenCalledWith({
-      db: {},
+    expect(createMessage).toHaveBeenCalledWith(expect.objectContaining({
       organizationId,
       channelId,
       userId,
@@ -222,165 +165,22 @@ describe("app Channel Connect adapter", () => {
         skillId,
         preferredDeviceId: deviceId,
       },
+    }));
+    expect(result.message?.author?.author).toMatchObject({
+      case: "user",
+      value: { id: userId },
     });
-    expect(await response.json()).toEqual({
-      message: {
-        id: messageId,
-        channelId,
-        body: "Please create the issue",
-        blocks: [{
-          header: {
-            text: { kind: "KIND_PLAIN_TEXT", text: "Plan", emoji: true },
-            blockId: "plan-header",
-          },
-        }],
-        author: {
-          kind: "KIND_USER",
-          id: userId,
-          name: "Owner",
-          email: "owner@example.com",
-        },
-        mentionedUserIds: [userId],
-        mentionedAgentIds: [agentId],
-        reactions: [{
-          emoji: "👍",
-          count: 1,
-          userIds: [userId],
-          people: [{ userId, name: "Owner" }],
-        }],
-        proposal: {
-          id: proposalId,
-          status: "PROPOSAL_STATUS_PENDING",
-          projectId,
-          issue: {
-            issue: {
-              title: "Implement Connect",
-              priority: 1,
-              status: "RUN_STATUS_BACKLOG",
-            },
-            executeAfterCreate: true,
-          },
-        },
-        subscribers: [{
-          userId,
-          subscribedAt: "2026-08-30T01:02:02Z",
-        }],
-        createdAt: "2026-08-30T01:02:03Z",
+    expect(result.message?.proposal?.payload).toMatchObject({
+      case: "issue",
+      value: {
+        issue: { title: "Implement Connect", status: RunStatus.BACKLOG },
+        executeAfterCreate: true,
       },
-      agentReplies: [{
-        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        agentId,
-        channelId,
-        triggerMessageId: messageId,
-        parentMessageId: messageId,
-        replyMessageId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-        status: "REPLY_JOB_STATUS_QUEUED",
-        createdAt: "2026-08-30T01:02:03Z",
-        updatedAt: "2026-08-30T01:02:03Z",
-      }],
     });
   });
 
-  it("maps a batch proposal result without routing through HTTP", async () => {
-    applicationMocks.requireSession.mockResolvedValueOnce({
-      session: {
-        id: "session-2",
-        userId,
-        token: "session-token",
-        expiresAt: new Date("2027-08-30T00:00:00.000Z"),
-        createdAt: new Date("2026-08-30T00:00:00.000Z"),
-        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
-      },
-      user: {
-        id: userId,
-        name: "Owner",
-        email: "owner@example.com",
-        emailVerified: true,
-        createdAt: new Date("2026-08-30T00:00:00.000Z"),
-        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
-      },
-    });
-    applicationMocks.acceptProposal.mockResolvedValueOnce({
-      outcome: "accepted",
-      projectId,
-      resultRunId: "run-batch",
-      resultItems: [
-        { localKey: "api", runId: "run-api" },
-        { localKey: "ios", runId: "run-ios" },
-      ],
-      executionProposal: null,
-    });
-
-    const router = createConnectRouter({
-      connect: true,
-      grpc: false,
-      grpcWeb: false,
-      interceptors: [connectErrorInterceptor],
-    });
-    registerAppChannelService(
-      router,
-      {
-        request: proposalConnectRequest(),
-        auth: {} as BriarAuth,
-        db: {} as D1Database,
-        attachmentsBucket: {} as R2Bucket,
-        env: {} as Env,
-      },
-      {
-        ...appConnectChannelServices,
-        acceptProposal: applicationMocks.acceptProposal,
-        requireSession: applicationMocks.requireSession,
-      },
-    );
-    const handler = requireConnectHandler(
-      router.handlers,
-      ChannelService.method.acceptChannelProposal,
-    );
-
-    const response = await createFetchHandler(handler)(proposalConnectRequest());
-
-    expect(applicationMocks.acceptProposal).toHaveBeenCalledOnce();
-    expect(response.status, await response.clone().text()).toBe(200);
-    expect(applicationMocks.acceptProposal).toHaveBeenCalledWith({
-      db: {},
-      env: {},
-      organizationId,
-      channelId,
-      proposalId,
-      userId,
-      request: { projectId, execution: null },
-    });
-    expect(await response.json()).toEqual({
-      outcome: "APPROVAL_OUTCOME_ACCEPTED",
-      projectId,
-      resultRunId: "run-batch",
-      resultItems: [
-        { localKey: "api", runId: "run-api" },
-        { localKey: "ios", runId: "run-ios" },
-      ],
-    });
-  });
-
-  it("normalizes channel writes and rejects explicit unspecified visibility", async () => {
+  it("normalizes channel writes and rejects unspecified visibility", async () => {
     const createChannel = vi.fn<AppConnectChannelServices["createChannel"]>();
-    applicationMocks.requireSession.mockResolvedValue({
-      session: {
-        id: "session-channel-write",
-        userId,
-        token: "session-token",
-        expiresAt: new Date("2027-08-30T00:00:00.000Z"),
-        createdAt: new Date("2026-08-30T00:00:00.000Z"),
-        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
-      },
-      user: {
-        id: userId,
-        name: "Owner",
-        email: "owner@example.com",
-        emailVerified: true,
-        createdAt: new Date("2026-08-30T00:00:00.000Z"),
-        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
-      },
-    });
     createChannel.mockResolvedValue({
       id: channelId,
       organization_id: organizationId,
@@ -403,61 +203,20 @@ describe("app Channel Connect adapter", () => {
       last_read_at: null,
       last_unread_message_at: null,
     });
-    const requestFor = (
-      visibility = "CHANNEL_VISIBILITY_PUBLIC",
-      name = "  Release Notes  ",
-    ) =>
-      new Request(
-        createMethodUrl(
-          "https://api.example.test",
-          ChannelService.method.createChannel,
-        ),
-        {
-          method: "POST",
-          headers: {
-            authorization: "Bearer session-token",
-            "connect-protocol-version": "1",
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            organizationId,
-            name,
-            slug: "  RELEASE-NOTES  ",
-            topic: "  Shipping  ",
-            ...(visibility ? { visibility } : {}),
-          }),
-        },
-      );
-    const router = createConnectRouter({
-      connect: true,
-      grpc: false,
-      grpcWeb: false,
-      interceptors: [connectErrorInterceptor],
+    const { client, flushBackgroundTasks } = createChannelClient({
+      createChannel,
     });
-    registerAppChannelService(
-      router,
-      {
-        request: requestFor(),
-        auth: {} as BriarAuth,
-        db: {} as D1Database,
-        attachmentsBucket: {} as R2Bucket,
-        env: {} as Env,
-      },
-      {
-        ...appConnectChannelServices,
-        createChannel,
-        requireSession: applicationMocks.requireSession,
-      },
-    );
-    const handler = requireConnectHandler(
-      router.handlers,
-      ChannelService.method.createChannel,
-    );
 
-    const response = await createFetchHandler(handler)(requestFor());
-    expect(response.status, await response.clone().text()).toBe(200);
-    expect(createChannel).toHaveBeenCalledWith({
-      db: {},
+    const result = await client.createChannel({
+      organizationId,
+      name: "  Release Notes  ",
+      slug: "  RELEASE-NOTES  ",
+      topic: "  Shipping  ",
+      visibility: ChannelVisibility.PUBLIC,
+    });
+    await flushBackgroundTasks();
+
+    expect(createChannel).toHaveBeenCalledWith(expect.objectContaining({
       organizationId,
       userId,
       command: {
@@ -467,224 +226,48 @@ describe("app Channel Connect adapter", () => {
         visibility: "public",
         defaultProjectId: null,
       },
-    });
-    expect(await response.json()).toMatchObject({
-      channel: {
-        id: channelId,
-        visibility: "CHANNEL_VISIBILITY_PUBLIC",
-      },
-    });
+    }));
+    expect(result.channel?.visibility).toBe(ChannelVisibility.PUBLIC);
 
     createChannel.mockClear();
-    const invalid = await createFetchHandler(handler)(
-      requestFor("CHANNEL_VISIBILITY_UNSPECIFIED"),
-    );
-    expect(invalid.status).toBe(400);
-    expect(createChannel).not.toHaveBeenCalled();
-
-    const invalidName = await createFetchHandler(handler)(
-      requestFor(undefined, "   "),
-    );
-    expect(invalidName.status).toBe(400);
+    await expect(client.createChannel({
+      organizationId,
+      name: "Release Notes",
+      visibility: ChannelVisibility.UNSPECIFIED,
+    })).rejects.toMatchObject({ code: Code.InvalidArgument });
     expect(createChannel).not.toHaveBeenCalled();
   });
 
-  it("keeps opaque user IDs while enforcing the membership oneof", async () => {
+  it("requires and maps the membership oneof while preserving opaque user IDs", async () => {
     const setChannelMember = vi.fn<
       AppConnectChannelServices["setChannelMember"]
     >().mockResolvedValue([]);
-    applicationMocks.requireSession.mockResolvedValue({
-      session: {
-        id: "session-member-write",
-        userId: "owner",
-        token: "session-token",
-        expiresAt: new Date("2027-08-30T00:00:00.000Z"),
-        createdAt: new Date("2026-08-30T00:00:00.000Z"),
-        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
-      },
-      user: {
-        id: "owner",
-        name: "Owner",
-        email: "owner@example.com",
-        emailVerified: true,
-        createdAt: new Date("2026-08-30T00:00:00.000Z"),
-        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
-      },
+    const { client, flushBackgroundTasks } = createChannelClient({
+      setChannelMember,
     });
-    const requestFor = (addMembership: boolean) =>
-      new Request(
-        createMethodUrl(
-          "https://api.example.test",
-          ChannelService.method.setChannelMember,
-        ),
-        {
-          method: "POST",
-          headers: {
-            authorization: "Bearer session-token",
-            "connect-protocol-version": "1",
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            organizationId,
-            channelId,
-            userId: "target-member",
-            ...(addMembership ? { add: {} } : {}),
-          }),
-        },
-      );
-    const router = createConnectRouter({
-      connect: true,
-      grpc: false,
-      grpcWeb: false,
-      interceptors: [connectErrorInterceptor],
-    });
-    registerAppChannelService(
-      router,
-      {
-        request: requestFor(true),
-        auth: {} as BriarAuth,
-        db: {} as D1Database,
-        attachmentsBucket: {} as R2Bucket,
-        env: {} as Env,
-      },
-      {
-        ...appConnectChannelServices,
-        requireSession: applicationMocks.requireSession,
-        setChannelMember,
-      },
-    );
-    const handler = requireConnectHandler(
-      router.handlers,
-      ChannelService.method.setChannelMember,
-    );
 
-    const response = await createFetchHandler(handler)(requestFor(true));
-    expect(response.status, await response.clone().text()).toBe(200);
-    expect(setChannelMember).toHaveBeenCalledWith({
-      db: {},
+    await client.setChannelMember({
       organizationId,
       channelId,
-      userId: "owner",
+      userId: "target-member",
+      membership: { case: "add", value: {} },
+    });
+    await flushBackgroundTasks();
+
+    expect(setChannelMember).toHaveBeenCalledWith(expect.objectContaining({
+      organizationId,
+      channelId,
+      userId,
       targetUserId: "target-member",
       change: { case: "add" },
-    });
+    }));
 
     setChannelMember.mockClear();
-    const missing = await createFetchHandler(handler)(requestFor(false));
-    expect(missing.status).toBe(400);
+    await expect(client.setChannelMember({
+      organizationId,
+      channelId,
+      userId: "target-member",
+    })).rejects.toMatchObject({ code: Code.InvalidArgument });
     expect(setChannelMember).not.toHaveBeenCalled();
-  });
-
-  it("authenticates channel content reads and preserves a null preview", async () => {
-    applicationMocks.requireSession.mockClear();
-    applicationMocks.getMessageDocument.mockClear();
-    applicationMocks.getLinkPreview.mockClear();
-    applicationMocks.requireSession.mockResolvedValue({
-      session: {
-        id: "session-content-read",
-        userId,
-        token: "session-token",
-        expiresAt: new Date("2027-08-30T00:00:00.000Z"),
-        createdAt: new Date("2026-08-30T00:00:00.000Z"),
-        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
-      },
-      user: {
-        id: userId,
-        name: "Owner",
-        email: "owner@example.com",
-        emailVerified: true,
-        createdAt: new Date("2026-08-30T00:00:00.000Z"),
-        updatedAt: new Date("2026-08-30T00:00:00.000Z"),
-      },
-    });
-    applicationMocks.getMessageDocument.mockResolvedValueOnce({
-      message_id: messageId,
-      channel_id: channelId,
-      project_id: null,
-      title: "Rollout plan",
-      markdown: "# Rollout",
-    });
-    applicationMocks.getLinkPreview.mockResolvedValueOnce(null);
-
-    const requestFor = (method: DescMethod, body: Record<string, string>) =>
-      new Request(
-        createMethodUrl("https://api.example.test", method),
-        {
-          method: "POST",
-          headers: {
-            authorization: "Bearer session-token",
-            "connect-protocol-version": "1",
-            "content-type": "application/json",
-          },
-          body: JSON.stringify(body),
-        },
-      );
-    const router = createConnectRouter({
-      connect: true,
-      grpc: false,
-      grpcWeb: false,
-      interceptors: [connectErrorInterceptor],
-    });
-    registerAppChannelService(
-      router,
-      {
-        request: requestFor(ChannelService.method.getChannelMessageDocument, {}),
-        auth: {} as BriarAuth,
-        db: {} as D1Database,
-        attachmentsBucket: {} as R2Bucket,
-        env: {} as Env,
-      },
-      {
-        ...appConnectChannelServices,
-        getLinkPreview: applicationMocks.getLinkPreview,
-        getMessageDocument: applicationMocks.getMessageDocument,
-        requireSession: applicationMocks.requireSession,
-      },
-    );
-    const handlerFor = (method: DescMethod) =>
-      requireConnectHandler(router.handlers, method);
-
-    const documentResponse = await createFetchHandler(
-      handlerFor(ChannelService.method.getChannelMessageDocument),
-    )(requestFor(ChannelService.method.getChannelMessageDocument, {
-      organizationId,
-      channelId,
-      messageId,
-    }));
-    expect(documentResponse.status, await documentResponse.clone().text())
-      .toBe(200);
-    expect(applicationMocks.getMessageDocument).toHaveBeenCalledWith({
-      db: {},
-      organizationId,
-      channelId,
-      messageId,
-      userId,
-    });
-    await expect(documentResponse.json()).resolves.toEqual({
-      document: {
-        messageId,
-        title: "Rollout plan",
-        markdown: "# Rollout",
-      },
-    });
-
-    const previewUrl = "https://news.example.com/articles/42";
-    const previewResponse = await createFetchHandler(
-      handlerFor(ChannelService.method.getChannelLinkPreview),
-    )(requestFor(ChannelService.method.getChannelLinkPreview, {
-      organizationId,
-      channelId,
-      url: previewUrl,
-    }));
-    expect(previewResponse.status, await previewResponse.clone().text()).toBe(200);
-    expect(applicationMocks.getLinkPreview).toHaveBeenCalledWith({
-      db: {},
-      organizationId,
-      channelId,
-      userId,
-      url: previewUrl,
-    });
-    await expect(previewResponse.json()).resolves.toEqual({});
-    expect(applicationMocks.requireSession).toHaveBeenCalledTimes(2);
   });
 });

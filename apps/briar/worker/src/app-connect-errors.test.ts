@@ -1,3 +1,4 @@
+import { env } from "cloudflare:workers";
 import { Code, createClient, ConnectError } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { ProjectService } from "@briar/contracts/gen/briar/app/v1/project_pb";
@@ -24,14 +25,14 @@ describe("App Connect errors", () => {
     const transport = createConnectTransport({
       baseUrl: "https://api.example.test",
       fetch: async (input, init) => {
+        // Connect-Web uses redirect:error, which workerd deliberately does not
+        // implement. This in-memory fetch cannot redirect, so manual preserves
+        // the intended fail-closed behavior while using the real HTTP codec.
+        const request = new Request(input, { ...init, redirect: "manual" });
         const response = await handleAppConnectRequest({
-          request: new Request(input, init),
+          request,
           auth: {} as BriarAuth,
-          env: {
-            DB: {} as D1Database,
-            ARCHIVES: {} as R2Bucket,
-            ATTACHMENTS: {} as R2Bucket,
-          } as Env,
+          env,
           requireRunExecutionProject: vi.fn(),
         }, services);
         return response ?? new Response(null, { status: 404 });
