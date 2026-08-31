@@ -160,30 +160,28 @@ export async function flushOrganizationInboxRealtimeOutbox(
       }));
     })
     : undefined;
-  if (env.CHANNEL_REALTIME) {
-    const pending = await services.listRealtimeOutbox(db);
-    for (const row of pending) {
-      try {
-        await services.publishRealtime(
-          env,
-          row.organization_id,
-          row.version,
-        );
-        await services.acknowledgeRealtime(
-          db,
-          row.organization_id,
-          row.version,
-        );
-      } catch (error) {
-        // Keep the transactional outbox row for the next mutation, scheduled
-        // sweep, or client fallback refresh.
-        console.error(JSON.stringify({
-          message: "Inbox realtime publish failed",
-          organizationId: row.organization_id,
-          version: row.version,
-          error: error instanceof Error ? error.message : String(error),
-        }));
-      }
+  const pending = await services.listRealtimeOutbox(db);
+  for (const row of pending) {
+    try {
+      await services.publishRealtime(
+        env,
+        row.organization_id,
+        row.version,
+      );
+      await services.acknowledgeRealtime(
+        db,
+        row.organization_id,
+        row.version,
+      );
+    } catch (error) {
+      // Keep the transactional outbox row for the next mutation, scheduled
+      // sweep, or client fallback refresh.
+      console.error(JSON.stringify({
+        message: "Inbox realtime publish failed",
+        organizationId: row.organization_id,
+        version: row.version,
+        error: error instanceof Error ? error.message : String(error),
+      }));
     }
   }
   await pushFlush;
@@ -194,7 +192,6 @@ export function scheduleInboxRealtimeFlush(
   db: D1Database,
   context?: ExecutionContext,
 ) {
-  if (!env.CHANNEL_REALTIME && !mobilePushProvidersConfigured(env)) return;
   const flush = flushOrganizationInboxRealtimeOutbox(env, db).catch((error) => {
     console.error(JSON.stringify({
       message: "Inbox realtime outbox flush failed",
@@ -211,7 +208,6 @@ export function scheduleChannelRealtimePublish(
   organizationId: string,
   context?: ExecutionContext,
 ) {
-  if (!env.CHANNEL_REALTIME) return;
   const publish = getChannelSyncCursor(db, organizationId)
     .then((cursor) => publishChannelRealtime(env, organizationId, cursor))
     .catch((error) => {
@@ -399,7 +395,6 @@ export function scheduleProjectRealtimePublish(
   projectId: string,
   context?: ExecutionContext,
 ) {
-  if (!env.CHANNEL_REALTIME) return;
   const publish = Promise.all([
     db.prepare(
       `select organization_id from briar_projects where id = ?`,
@@ -431,7 +426,6 @@ export function scheduleProjectAgentSessionRealtimePublish(
   projectId: string,
   context?: ExecutionContext,
 ) {
-  if (!env.CHANNEL_REALTIME) return;
   const publish = Promise.all([
     db.prepare(
       `select organization_id from briar_projects where id = ?`,

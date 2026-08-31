@@ -584,26 +584,6 @@ export function consumeCodexAppServerMessage(
 
   if (message.id !== undefined && message.id !== null) {
     if (message.error) {
-      // Config and capability discovery are observational. Older App Server
-      // builds may not implement these RPCs, and discovery must never prevent
-      // the actual thread from running.
-      if (
-        message.id === CONFIG_REQUEST_ID ||
-        message.id === MODEL_LIST_REQUEST_ID
-      ) {
-        state.phase = "readingApps";
-        return {
-          outgoing: [codexAppsInstalledRequest()],
-          completed: false,
-        };
-      }
-      if (message.id === APPS_INSTALLED_REQUEST_ID) {
-        state.phase = "startingThread";
-        return {
-          outgoing: [codexThreadRequest(request, state.isolation)],
-          completed: false,
-        };
-      }
       throw new Error(
         message.error.message?.trim() ||
           "Codex App Server returned an RPC error.",

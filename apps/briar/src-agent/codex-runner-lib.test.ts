@@ -508,29 +508,6 @@ describe("Codex App Server runner", () => {
     expect(apps.outgoing[0]).toMatchObject({ method: "thread/start", id: 4 });
   });
 
-  it("keeps running when model-discovery RPCs are unavailable", () => {
-    const state = createCodexAppServerState();
-    const defaultRequest = { ...request, model: undefined };
-    consumeCodexAppServerMessage(state, defaultRequest, {
-      id: 1,
-      result: {},
-    });
-
-    const fallback = consumeCodexAppServerMessage(state, defaultRequest, {
-      id: 2,
-      error: { code: -32601, message: "Method not found" },
-    });
-
-    expect(fallback.outgoing).toEqual([codexAppsInstalledRequest()]);
-    const appsFallback = consumeCodexAppServerMessage(state, defaultRequest, {
-      id: 6,
-      error: { code: -32601, message: "Method not found" },
-    });
-    expect(appsFallback.outgoing).toEqual([
-      codexThreadRequest(defaultRequest),
-    ]);
-  });
-
   it("maps current App Server approval decisions", () => {
     const approval = {
       id: 4,

@@ -58,7 +58,6 @@ import {
 } from "./project-agent-channel-application";
 import { decodeChannelMessageQuery } from "./query-contract";
 import {
-  scheduleInboxRealtimeFlush,
   scheduleProjectRealtimePublish,
 } from "./realtime-scheduling";
 import { UuidString } from "./schema-codecs";
@@ -284,11 +283,6 @@ const scheduleRunMutation = (input: WorkerConnectExecutionInput, projectId: stri
     projectId,
     input.context,
   );
-  // scheduleProjectRealtimePublish includes the inbox flush when project
-  // realtime is enabled. Preserve the legacy fallback for push-only setups.
-  if (!input.env.CHANNEL_REALTIME) {
-    scheduleInboxRealtimeFlush(input.env, input.db, input.context);
-  }
 };
 
 const runControlActor = async (
