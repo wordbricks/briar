@@ -3066,7 +3066,7 @@ describe("organization channels", () => {
     ).toBeNull();
   });
 
-  it("falls back immediately when the preferred device lacks organization Agent context support", async () => {
+  it("keeps an organization reply on an available preferred device", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000111";
     const agentId = "aa000000-0000-4000-8000-000000000111";
     const triggerId = "f0000000-0000-4000-8000-000000000111";
@@ -3188,24 +3188,8 @@ describe("organization channels", () => {
       claimedAt: observedAt,
       leaseExpiresAt: new Date(Date.parse(observedAt) + 60_000).toISOString(),
     });
-    expect(claimed).toMatchObject({
-      id: job.id,
-      preferred_device_id: deviceId,
-      claimed_device_id: fallbackDeviceId,
-    });
-    await completeChannelReply(db, claimed!, {
-      jobId: claimed!.id,
-      deviceId: fallbackDeviceId,
-      workerId: fallbackWorkerId,
-      claimTokenHash: "5".repeat(64),
-      body: "Organization fallback completed.",
-      document: null,
-      issueProposal: null,
-      executionProposal: null,
-      agentName: "Organization Fallback",
-      agentProvider: "claude",
-      completedAt: observedAt,
-    });
+    expect(job.preferred_device_id).toBe(deviceId);
+    expect(claimed).toBeNull();
   });
 
   it("gives every mentioned Agent its own reply job", async () => {
