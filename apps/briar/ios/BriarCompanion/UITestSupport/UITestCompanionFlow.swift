@@ -80,6 +80,7 @@ struct UITestCompanionFlow: View {
         )
         _channels = StateObject(wrappedValue: ChannelsStore(
             api: channelsAPI,
+            preparedUploadClient: channelsAPI,
             servicesFactory: channelsAPI
         ))
     }
@@ -278,9 +279,17 @@ struct UITestCompanionFlow: View {
 }
 
 private final class UITestAPIClient: MobileHTTPClientProtocol,
+    PreparedUploadClientProtocol,
     AuthenticatedMobileServicesFactory,
     @unchecked Sendable
 {
+    func putPreparedUpload(
+        _: URL,
+        capability _: String,
+        contentType _: String,
+        data _: Data
+    ) async throws {}
+
     private let scenario: Scenario
     private let services: AuthenticatedMobileServices
 

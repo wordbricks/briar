@@ -16,14 +16,6 @@ enum MobileAPIContract {
             "/projects/\(projectID.uuidString.lowercased())/issues"
         }
 
-        /// Multipart is intentionally kept as HTTP because Connect requests do not carry file bytes.
-        static func channelMessageUpload(
-            organizationID: UUID,
-            channelID: UUID
-        ) -> String {
-            "/organizations/\(organizationID.uuidString.lowercased())/channels/\(channelID.uuidString.lowercased())/messages"
-        }
-
         /// Multipart issue messages remain HTTP because Connect requests do not carry file bytes.
         static func runMessages(projectID: UUID, runID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/messages"
@@ -243,6 +235,15 @@ extension MobileAPIError {
     }
 }
 
+protocol PreparedUploadClientProtocol: Sendable {
+    func putPreparedUpload(
+        _ url: URL,
+        capability: String,
+        contentType: String,
+        data: Data
+    ) async throws
+}
+
 protocol MobileHTTPClientProtocol: Sendable {
     func send<Response: Decodable & Sendable>(
         _ path: String,
@@ -334,7 +335,7 @@ extension MobileHTTPClientProtocol {
     }
 }
 
-struct MobileHTTPClient: MobileHTTPClientProtocol, Sendable {
+struct MobileHTTPClient: MobileHTTPClientProtocol, PreparedUploadClientProtocol, Sendable {
     let baseURL: URL
     let session: URLSession
 
@@ -416,6 +417,27 @@ struct MobileHTTPClient: MobileHTTPClientProtocol, Sendable {
         }
     }
 
+    func putPreparedUpload(
+        _ url: URL,
+        capability: String,
+        contentType: String,
+        data: Data
+    ) async throws {
+        guard sameOrigin(url, baseURL), !capability.isEmpty else {
+            throw MobileAPIError.invalidRequest
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("Bearer \(capability)", forHTTPHeaderField: "Authorization")
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        request.httpBody = data
+        let (responseData, response) = try await session.data(for: request)
+        try validate(response: response, data: responseData)
+        guard (response as? HTTPURLResponse)?.statusCode == 204 else {
+            throw MobileAPIError.invalidResponse
+        }
+    }
+
     func download(_ path: String, token: String, to destination: URL) async throws -> URL {
         guard let url = endpointURL(path) else { throw MobileAPIError.invalidRequest }
         var request = URLRequest(url: url)
@@ -447,6 +469,15 @@ struct MobileHTTPClient: MobileHTTPClientProtocol, Sendable {
         components.path = basePath + "/" + parts[0].trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         components.percentEncodedQuery = parts.count == 2 ? String(parts[1]) : nil
         return components.url
+    }
+
+    private func sameOrigin(_ lhs: URL, _ rhs: URL) -> Bool {
+        guard let left = URLComponents(url: lhs, resolvingAgainstBaseURL: false),
+              let right = URLComponents(url: rhs, resolvingAgainstBaseURL: false)
+        else { return false }
+        return left.scheme?.lowercased() == right.scheme?.lowercased()
+            && left.host?.lowercased() == right.host?.lowercased()
+            && left.port == right.port
     }
 
     private func validate(response: URLResponse, data: Data) throws {

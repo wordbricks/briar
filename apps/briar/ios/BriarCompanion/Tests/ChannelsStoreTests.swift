@@ -125,6 +125,7 @@ final class ChannelsStoreTests: XCTestCase {
         let channelService = scenario.service()
         let store = ChannelsStore(
             api: api,
+            preparedUploadClient: api,
             channelService: channelService,
             dashboardService: BriarAPI_DashboardServiceClientMock(),
             managesRealtime: false,
@@ -146,12 +147,13 @@ final class ChannelsStoreTests: XCTestCase {
         store.applicationDidEnterBackground()
     }
 
-    func testMessageSendUsesConnectWithoutBytesAndMultipartWithBytes() async throws {
+    func testMessageSendPreparesRawUploadAndFinalizesWithGeneratedClient() async throws {
         let channel = summary()
         let api = ChannelHTTPRecorder(channel: channel)
         let scenario = ChannelConnectScenario(channel: channel, initialMessages: [])
         let store = ChannelsStore(
             api: api,
+            preparedUploadClient: api,
             channelService: scenario.service(),
             dashboardService: BriarAPI_DashboardServiceClientMock(),
             managesRealtime: false,
@@ -166,34 +168,26 @@ final class ChannelsStoreTests: XCTestCase {
         await store.send(
             channelID: channelID,
             parentMessageID: nil,
-            body: "reuse attachment",
-            mentions: [],
-            attachmentReferences: ["existing-ref"]
-        )
-        let connectCalls = scenario.connectMessageCalls
-        let uploadCountAfterConnect = await api.multipartUploadCount()
-        XCTAssertEqual(connectCalls.count, 1)
-        XCTAssertEqual(connectCalls.first?.attachmentReferences, ["existing-ref"])
-        XCTAssertEqual(uploadCountAfterConnect, 0)
-
-        await store.send(
-            channelID: channelID,
-            parentMessageID: nil,
             body: "upload image",
             mentions: [],
             attachments: [PendingIssueAttachment(
                 filename: "pixel.png",
                 contentType: "image/png",
                 data: Data([0x89, 0x50, 0x4e, 0x47])
-            )],
-            attachmentReferences: ["existing-upload-ref"]
+            )]
         )
+        let prepareCalls = scenario.prepareMessageCalls
         let finalConnectCalls = scenario.connectMessageCalls
-        let finalUploadCount = await api.multipartUploadCount()
-        let uploadReferences = await api.multipartAttachmentReferences()
+        let rawUploads = await api.preparedUploads()
+        XCTAssertEqual(prepareCalls.count, 1)
+        XCTAssertEqual(prepareCalls.first?.attachments.map(\.clientID), ["new-upload-ref"])
+        XCTAssertEqual(prepareCalls.first?.attachments.first?.sha256.count, 32)
+        XCTAssertEqual(rawUploads.count, 1)
+        XCTAssertEqual(rawUploads.first?.capability, "channel-upload-capability")
         XCTAssertEqual(finalConnectCalls.count, 1)
-        XCTAssertEqual(finalUploadCount, 1)
-        XCTAssertEqual(uploadReferences, [["new-upload-ref"]])
+        XCTAssertEqual(finalConnectCalls.first?.attachmentIDs, [scenario.uploadID])
+        XCTAssertTrue(finalConnectCalls.first?.body.contains(scenario.uploadID) == true)
+        XCTAssertFalse(finalConnectCalls.first?.body.contains("new-upload-ref") == true)
         store.applicationDidEnterBackground()
     }
 
@@ -262,48 +256,34 @@ final class ChannelsStoreTests: XCTestCase {
     }
 }
 
-private actor ChannelHTTPRecorder: MobileHTTPClientProtocol {
+private actor ChannelHTTPRecorder: MobileHTTPClientProtocol, PreparedUploadClientProtocol {
     private let channel: ChannelSummary
-    private var uploadCount = 0
-    private var uploadReferences: [[String]] = []
+    struct PreparedUploadCall: Sendable {
+        let url: URL
+        let capability: String
+        let contentType: String
+        let data: Data
+    }
+    private var rawUploads: [PreparedUploadCall] = []
 
     init(channel: ChannelSummary) {
         self.channel = channel
     }
 
-    func multipartUploadCount() -> Int { uploadCount }
-    func multipartAttachmentReferences() -> [[String]] { uploadReferences }
+    func preparedUploads() -> [PreparedUploadCall] { rawUploads }
 
-    func upload<
-        UploadRequest: SwiftProtobuf.Message & Sendable,
-        Response: SwiftProtobuf.Message & Sendable
-    >(
-        _ path: String,
-        request: UploadRequest,
-        files: [MultipartFile],
-        token: String,
-        as responseType: Response.Type
-    ) async throws -> Response {
-        guard let request = request as? BriarAPI_CreateChannelMessageRequest else {
-            throw MobileAPIError.invalidRequest
-        }
-        uploadCount += 1
-        uploadReferences.append(request.attachmentReferences)
-        var author = BriarAPI_ChannelMessageAuthor()
-        author.kind = .user
-        author.name = "Briar User"
-        var message = BriarAPI_ChannelMessage()
-        message.id = request.clientMessageID
-        message.channelID = channel.id.uuidString.lowercased()
-        message.body = request.body
-        message.author = author
-        message.createdAt = Google_Protobuf_Timestamp(
-            date: Date(timeIntervalSince1970: 1_775_260_800)
-        )
-        var response = BriarAPI_CreateChannelMessageResponse()
-        response.message = message
-        guard let typed = response as? Response else { throw MobileAPIError.invalidResponse }
-        return typed
+    func putPreparedUpload(
+        _ url: URL,
+        capability: String,
+        contentType: String,
+        data: Data
+    ) async throws {
+        rawUploads.append(.init(
+            url: url,
+            capability: capability,
+            contentType: contentType,
+            data: data
+        ))
     }
 
     func send<Response: Decodable & Sendable>(
@@ -319,13 +299,17 @@ private actor ChannelHTTPRecorder: MobileHTTPClientProtocol {
 
 private final class ChannelConnectScenario: @unchecked Sendable {
     struct ConnectMessageCall: Sendable {
-        let attachmentReferences: [String]
+        let body: String
+        let attachmentIDs: [String]
     }
+
+    let uploadID = "77777777-7777-4777-8777-777777777777"
 
     private let lock = NSLock()
     private let channel: ChannelSummary
     private let initialMessages: [ChannelMessage]
     private var queuedSyncResponses: [ChannelDeltaResponse]
+    private var recordedPrepareCalls: [BriarAPI_PrepareChannelMessageAttachmentsRequest] = []
     private var recordedConnectCalls: [ConnectMessageCall] = []
 
     init(
@@ -344,6 +328,12 @@ private final class ChannelConnectScenario: @unchecked Sendable {
         return recordedConnectCalls
     }
 
+    var prepareMessageCalls: [BriarAPI_PrepareChannelMessageAttachmentsRequest] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedPrepareCalls
+    }
+
     func service() -> BriarAPI_ChannelServiceClientMock {
         let service = BriarAPI_ChannelServiceClientMock()
         service.mockAsyncListChannels = { [self] request in
@@ -357,6 +347,9 @@ private final class ChannelConnectScenario: @unchecked Sendable {
         }
         service.mockAsyncMarkChannelRead = { [self] request in
             .init(result: .success(markChannelRead(request)))
+        }
+        service.mockAsyncPrepareChannelMessageAttachments = { [self] request in
+            .init(result: .success(prepareMessageAttachments(request)))
         }
         service.mockAsyncCreateChannelMessage = { [self] request in
             .init(result: .success(createMessage(request)))
@@ -409,7 +402,8 @@ private final class ChannelConnectScenario: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         recordedConnectCalls.append(.init(
-            attachmentReferences: request.attachmentReferences
+            body: request.body,
+            attachmentIDs: request.attachments.map(\.uploadID)
         ))
         let message = ChannelMessage(
             id: UUID(uuidString: request.clientMessageID)!,
@@ -429,6 +423,27 @@ private final class ChannelConnectScenario: @unchecked Sendable {
         )
         var response = BriarAPI_CreateChannelMessageResponse()
         response.message = wireMessage(message)
+        return response
+    }
+
+    private func prepareMessageAttachments(
+        _ request: BriarAPI_PrepareChannelMessageAttachmentsRequest
+    ) -> BriarAPI_PrepareChannelMessageAttachmentsResponse {
+        lock.lock()
+        defer { lock.unlock() }
+        recordedPrepareCalls.append(request)
+        var reference = BriarTypes_UploadReference()
+        reference.uploadID = uploadID
+        var prepared = BriarTypes_PreparedUpload()
+        prepared.clientID = request.attachments.first?.clientID ?? ""
+        prepared.reference = reference
+        prepared.uploadURL = "https://api.example/uploads/\(uploadID)"
+        prepared.uploadCapability = "channel-upload-capability"
+        prepared.expiresAt = Google_Protobuf_Timestamp(
+            date: Date(timeIntervalSince1970: 1_775_260_900)
+        )
+        var response = BriarAPI_PrepareChannelMessageAttachmentsResponse()
+        response.uploads = [prepared]
         return response
     }
 

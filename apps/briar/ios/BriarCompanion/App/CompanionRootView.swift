@@ -30,6 +30,7 @@ struct CompanionRootView: View {
     init(api: MobileHTTPClient) {
         self.init(
             api: api,
+            preparedUploadClient: api,
             servicesFactory: api,
             realtimeClient: api,
             session: SessionStore(),
@@ -40,6 +41,7 @@ struct CompanionRootView: View {
     @MainActor
     init(
         api: any MobileHTTPClientProtocol,
+        preparedUploadClient: any PreparedUploadClientProtocol,
         servicesFactory: any AuthenticatedMobileServicesFactory,
         realtimeClient: (any MobileRealtimeClientProtocol)?,
         session: SessionStore,
@@ -57,6 +59,7 @@ struct CompanionRootView: View {
         _channels = StateObject(
             wrappedValue: ChannelsStore(
                 api: api,
+                preparedUploadClient: preparedUploadClient,
                 servicesFactory: servicesFactory,
                 realtime: realtimeClient,
                 managesRealtime: false

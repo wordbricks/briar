@@ -164,6 +164,7 @@ final class ChannelsStore: ObservableObject {
     @Published private(set) var errorMessage: String?
 
     private let api: any MobileHTTPClientProtocol
+    private let preparedUploadClient: any PreparedUploadClientProtocol
     private let servicesForToken: @Sendable (String) -> Services
     private var channelService: (any BriarAPI_ChannelServiceClientInterface)?
     private var dashboardService: (any BriarAPI_DashboardServiceClientInterface)?
@@ -205,6 +206,7 @@ final class ChannelsStore: ObservableObject {
 
     init(
         api: any MobileHTTPClientProtocol,
+        preparedUploadClient: any PreparedUploadClientProtocol,
         servicesFactory: any AuthenticatedMobileServicesFactory,
         realtime: (any MobileRealtimeClientProtocol)? = nil,
         managesRealtime: Bool = true,
@@ -215,6 +217,7 @@ final class ChannelsStore: ObservableObject {
         }
     ) {
         self.api = api
+        self.preparedUploadClient = preparedUploadClient
         servicesForToken = { token in
             let services = servicesFactory.authenticatedServices(token: token)
             return Services(channel: services.channel, dashboard: services.dashboard)
@@ -228,6 +231,7 @@ final class ChannelsStore: ObservableObject {
 
     init(
         api: any MobileHTTPClientProtocol,
+        preparedUploadClient: any PreparedUploadClientProtocol,
         channelService: any BriarAPI_ChannelServiceClientInterface,
         dashboardService: any BriarAPI_DashboardServiceClientInterface,
         realtime: (any MobileRealtimeClientProtocol)? = nil,
@@ -239,6 +243,7 @@ final class ChannelsStore: ObservableObject {
         }
     ) {
         self.api = api
+        self.preparedUploadClient = preparedUploadClient
         servicesForToken = { _ in
             Services(channel: channelService, dashboard: dashboardService)
         }
@@ -885,13 +890,11 @@ final class ChannelsStore: ObservableObject {
         body: String,
         currentUserID: String? = nil,
         mentions: [ChannelMentionTarget],
-        attachments: [PendingIssueAttachment] = [],
-        attachmentReferences existingAttachmentReferences: [String] = []
+        attachments: [PendingIssueAttachment] = []
     ) async {
-        guard let organizationID, let token else { return }
+        guard let organizationID, token != nil else { return }
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty || !attachments.isEmpty || !existingAttachmentReferences.isEmpty
-        else { return }
+        guard !trimmed.isEmpty || !attachments.isEmpty else { return }
         if let message = PendingIssueAttachment.validationMessage(for: attachments) {
             errorMessage = message
             return
@@ -946,10 +949,7 @@ final class ChannelsStore: ObservableObject {
         sending = true
         defer { sending = false }
         do {
-            let path = MobileAPIContract.Endpoint.channelMessageUpload(
-                organizationID: organizationID,
-                channelID: channelID
-            )
+            guard let channelService else { throw MobileAPIError.invalidRequest }
             let mentionedUserIds = mentions.compactMap {
                 $0.kind == .user ? $0.recipientId : nil
             }
@@ -966,24 +966,42 @@ final class ChannelsStore: ObservableObject {
             }
             request.mentionedUserIds = mentionedUserIds
             request.mentionedAgentIds = mentionedAgentIds.map(coreUUIDString)
-            request.attachmentReferences = payload?.references ?? existingAttachmentReferences
-            let wireResponse: BriarAPI_CreateChannelMessageResponse
-            if attachments.isEmpty {
-                guard let channelService else { throw MobileAPIError.invalidRequest }
-                wireResponse = try await channelService.createChannelMessage(
-                    request: request,
+            if !attachments.isEmpty {
+                guard let payload else { throw MobileAPIError.invalidRequest }
+                var prepareRequest = BriarAPI_PrepareChannelMessageAttachmentsRequest()
+                prepareRequest.requestID = coreUUIDString(UUID())
+                prepareRequest.organizationID = coreUUIDString(organizationID)
+                prepareRequest.channelID = coreUUIDString(channelID)
+                prepareRequest.clientMessageID = coreUUIDString(clientMessageID)
+                prepareRequest.attachments = try PreparedUploadPipeline.metadata(
+                    attachments: attachments,
+                    clientIDs: payload.references
+                )
+                let prepared = try await channelService.prepareChannelMessageAttachments(
+                    request: prepareRequest,
                     headers: [:]
                 ).briarValue()
-            } else {
-                guard let payload else { throw MobileAPIError.invalidRequest }
-                wireResponse = try await api.upload(
-                    path,
-                    request: request,
-                    files: payload.files,
-                    token: token,
-                    as: BriarAPI_CreateChannelMessageResponse.self
+                let uploadIDs = try await PreparedUploadPipeline.upload(
+                    attachments: attachments,
+                    clientIDs: payload.references,
+                    preparedUploads: prepared.uploads,
+                    using: preparedUploadClient
                 )
+                request.body = try PreparedUploadPipeline.replacingAttachmentReferences(
+                    in: request.body,
+                    clientIDs: payload.references,
+                    uploadIDs: uploadIDs
+                )
+                request.attachments = uploadIDs.map { uploadID in
+                    var reference = BriarTypes_UploadReference()
+                    reference.uploadID = uploadID
+                    return reference
+                }
             }
+            let wireResponse = try await channelService.createChannelMessage(
+                request: request,
+                headers: [:]
+            ).briarValue()
             guard wireResponse.hasMessage else { throw MobileAPIError.invalidResponse }
             let createdMessage = try ChannelMessage(connectMessage: wireResponse.message)
             let createdAgentReplies = try wireResponse.agentReplies.map(

@@ -25,6 +25,7 @@
 		1CF1FA2E61AA8F33505D8F67 /* AppSystemServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = B941ED81ECF5145E9F9BE24C /* AppSystemServices.swift */; };
 		1D25F8B15FC04A11B87EE369 /* MobileAPIContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE453FFA6A7F97CAF774A8E8 /* MobileAPIContractTests.swift */; };
 		1E07F7E0014B2B554804B10F /* BriarContractsMocks.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 255A359627FF6AC89CD8CA47 /* BriarContractsMocks.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		1EE470159F3607D1C6928744 /* upload.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 941275D22C27FF9A4E054E5F /* upload.pb.swift */; };
 		20226CB8737A1310EED15FD1 /* linear_import.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3E9A25E9BACE25A3927A59A /* linear_import.pb.swift */; };
 		21392A67550745FD88613F7E /* AttachmentPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAFDF35566633FE61184320D /* AttachmentPipeline.swift */; };
 		21472B7EAA530A354A88ACE0 /* AgentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61217A3C52F459A88E333CD1 /* AgentModels.swift */; };
@@ -339,6 +340,7 @@
 		9178761C6C06EBFE0C17E556 /* issue.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = issue.pb.swift; sourceTree = "<group>"; };
 		93507BBBF5330CE5F4CD80D1 /* channel.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = channel.pb.swift; sourceTree = "<group>"; };
 		93B2CEACE7CBCA7F825B9DE7 /* realtime_control.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = realtime_control.connect.swift; sourceTree = "<group>"; };
+		941275D22C27FF9A4E054E5F /* upload.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = upload.pb.swift; sourceTree = "<group>"; };
 		951BB81B83C74CEDE2ECEC15 /* ChannelsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelsViews.swift; sourceTree = "<group>"; };
 		9A110B2A438D4543375A7231 /* IssueWriteViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueWriteViews.swift; sourceTree = "<group>"; };
 		9C9EE6E17DC9F346B0A712DD /* IssueWriteModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueWriteModels.swift; sourceTree = "<group>"; };
@@ -633,6 +635,7 @@
 				A231FC159634EA821A13C4D3 /* agent_execution.pb.swift */,
 				D388D7198B7FA49827CD3F52 /* error.pb.swift */,
 				279214785628E863F8B7FB7A /* provider.pb.swift */,
+				941275D22C27FF9A4E054E5F /* upload.pb.swift */,
 				CA71D4C0DF552FFD0C500981 /* worker.pb.swift */,
 				B45C14D269D10CC5D8ED9FB1 /* workflow.pb.swift */,
 			);
@@ -1073,6 +1076,7 @@
 				E88C5500AE05DEE13EDC5E9C /* realtime_control.pb.swift in Sources */,
 				D8437E9934E3CFC8462F1A41 /* reporting.connect.swift in Sources */,
 				59C69F8E830D30BB93FE8E98 /* reporting.pb.swift in Sources */,
+				1EE470159F3607D1C6928744 /* upload.pb.swift in Sources */,
 				F36F0EAAFF971E537480FBCA /* worker.pb.swift in Sources */,
 				0D9BC5551C8A3678D076B904 /* workflow.pb.swift in Sources */,
 			);

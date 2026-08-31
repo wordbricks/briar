@@ -1,8 +1,84 @@
+import BriarContracts
+import CryptoKit
 import Foundation
 import PhotosUI
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
+
+enum PreparedUploadPipeline {
+    static func metadata(
+        attachments: [PendingIssueAttachment],
+        clientIDs: [String]
+    ) throws -> [BriarTypes_UploadFileMetadata] {
+        guard attachments.count == clientIDs.count,
+              Set(clientIDs).count == clientIDs.count,
+              clientIDs.allSatisfy({ !$0.isEmpty })
+        else { throw MobileAPIError.invalidRequest }
+        return zip(attachments, clientIDs).map { attachment, clientID in
+            var metadata = BriarTypes_UploadFileMetadata()
+            metadata.clientID = clientID
+            metadata.filename = attachment.filename
+            metadata.contentType = attachment.contentType
+            metadata.byteSize = UInt64(attachment.data.count)
+            metadata.sha256 = Data(SHA256.hash(data: attachment.data))
+            return metadata
+        }
+    }
+
+    static func upload(
+        attachments: [PendingIssueAttachment],
+        clientIDs: [String],
+        preparedUploads: [BriarTypes_PreparedUpload],
+        using client: any PreparedUploadClientProtocol
+    ) async throws -> [String] {
+        guard attachments.count == clientIDs.count,
+              preparedUploads.count == attachments.count
+        else { throw MobileAPIError.invalidResponse }
+        guard Set(preparedUploads.map(\.clientID)).count == preparedUploads.count else {
+            throw MobileAPIError.invalidResponse
+        }
+        let preparedByClientID = Dictionary(
+            uniqueKeysWithValues: preparedUploads.map { ($0.clientID, $0) }
+        )
+        guard preparedByClientID.count == clientIDs.count else {
+            throw MobileAPIError.invalidResponse
+        }
+        var uploadIDs: [String] = []
+        for (attachment, clientID) in zip(attachments, clientIDs) {
+            guard let prepared = preparedByClientID[clientID],
+                  prepared.hasReference,
+                  !prepared.reference.uploadID.isEmpty,
+                  !prepared.uploadCapability.isEmpty,
+                  let uploadURL = URL(string: prepared.uploadURL)
+            else { throw MobileAPIError.invalidResponse }
+            try await client.putPreparedUpload(
+                uploadURL,
+                capability: prepared.uploadCapability,
+                contentType: attachment.contentType,
+                data: attachment.data
+            )
+            uploadIDs.append(prepared.reference.uploadID)
+        }
+        return uploadIDs
+    }
+
+    static func replacingAttachmentReferences(
+        in body: String,
+        clientIDs: [String],
+        uploadIDs: [String]
+    ) throws -> String {
+        guard clientIDs.count == uploadIDs.count else {
+            throw MobileAPIError.invalidResponse
+        }
+        return zip(clientIDs, uploadIDs).reduce(body) { result, pair in
+            result.replacingOccurrences(
+                of: "briar-attachment://\(pair.0)",
+                with: "briar-attachment://\(pair.1)"
+            )
+        }
+    }
+}
 
 enum PhotoAttachmentImportPolicy: Sendable {
     case imagesOnly
