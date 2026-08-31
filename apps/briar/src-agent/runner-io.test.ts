@@ -9,6 +9,7 @@ import {
   RunnerToParentSchema,
   SandboxMode,
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
+import { AgentEventDirection } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import { PassThrough } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { createRunnerIo } from "./runner-io";
@@ -191,7 +192,7 @@ describe("runner protobuf I/O", () => {
     io.emit.result({ sessionId: "session-1", message: "done" });
 
     expect(() => io.emit.event({
-      direction: "server",
+      direction: AgentEventDirection.SERVER,
       raw: { jsonrpc: "2.0" },
     })).toThrow("after terminal output");
     expect(terminate).toHaveBeenCalledOnce();

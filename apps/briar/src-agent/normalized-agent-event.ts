@@ -1,10 +1,10 @@
-export type AgentActivityKind =
-  | "command"
-  | "fileChange"
-  | "webSearch"
-  | "tool";
-
-export type AgentActivityStatus = "completed" | "failed" | "cancelled";
+import { create } from "@bufbuild/protobuf";
+import {
+  NormalizedAgentEventSchema,
+  type AgentActivityKind,
+  type AgentActivityStatus,
+  type NormalizedAgentEvent,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 
 export const maxNormalizedActivityTextBytes = 16_000;
 export const maxNormalizedActivityTitleBytes = 1_024;
@@ -59,45 +59,68 @@ function utf8Suffix(value: string, byteLimit: number): string {
   return output.reverse().join("");
 }
 
-export type NormalizedAgentEvent =
-  | {
-      type: "messageStarted";
-      id: string;
-      phase: string | null;
-      text: string;
-    }
-  | {
-      type: "messageDelta";
-      id: string;
-      delta: string;
-    }
-  | {
-      type: "messageCompleted";
-      id: string;
-      phase: string | null;
-      text: string;
-    }
-  | {
-      type: "activityStarted";
-      id: string;
-      kind: AgentActivityKind;
-      title: string;
-      text: string;
-    }
-  | {
-      type: "activityDelta";
-      id: string;
-      delta: string;
-    }
-  | {
-      type: "activityCompleted";
-      id: string;
-      kind: AgentActivityKind;
-      title: string;
-      text: string;
-      status: AgentActivityStatus;
-    }
-  | {
-      type: "turnCompleted";
-      status: string;
-    };
+export const normalizedMessageStarted = (input: {
+  id: string;
+  phase?: string | null;
+  text: string;
+}): NormalizedAgentEvent =>
+  create(NormalizedAgentEventSchema, {
+    event: {
+      case: "messageStarted",
+      value: { ...input, phase: input.phase ?? undefined },
+    },
+  });
+
+export const normalizedMessageDelta = (input: {
+  id: string;
+  delta: string;
+}): NormalizedAgentEvent =>
+  create(NormalizedAgentEventSchema, {
+    event: { case: "messageDelta", value: input },
+  });
+
+export const normalizedMessageCompleted = (input: {
+  id: string;
+  phase?: string | null;
+  text: string;
+}): NormalizedAgentEvent =>
+  create(NormalizedAgentEventSchema, {
+    event: {
+      case: "messageCompleted",
+      value: { ...input, phase: input.phase ?? undefined },
+    },
+  });
+
+export const normalizedActivityStarted = (input: {
+  id: string;
+  kind: AgentActivityKind;
+  title: string;
+  text: string;
+}): NormalizedAgentEvent =>
+  create(NormalizedAgentEventSchema, {
+    event: { case: "activityStarted", value: input },
+  });
+
+export const normalizedActivityDelta = (input: {
+  id: string;
+  delta: string;
+}): NormalizedAgentEvent =>
+  create(NormalizedAgentEventSchema, {
+    event: { case: "activityDelta", value: input },
+  });
+
+export const normalizedActivityCompleted = (input: {
+  id: string;
+  kind: AgentActivityKind;
+  title: string;
+  text: string;
+  status: AgentActivityStatus;
+}): NormalizedAgentEvent =>
+  create(NormalizedAgentEventSchema, {
+    event: { case: "activityCompleted", value: input },
+  });
+
+export const normalizedTurnCompleted = (status: string): NormalizedAgentEvent =>
+  create(NormalizedAgentEventSchema, {
+    event: { case: "turnCompleted", value: { status } },
+  });

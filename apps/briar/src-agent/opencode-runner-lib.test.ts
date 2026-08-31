@@ -1,4 +1,17 @@
 import { describe, expect, it } from "vitest";
+import {
+  AgentActivityKind,
+  AgentActivityStatus,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import {
+  normalizedActivityCompleted,
+  normalizedActivityDelta,
+  normalizedActivityStarted,
+  normalizedMessageCompleted,
+  normalizedMessageDelta,
+  normalizedMessageStarted,
+  normalizedTurnCompleted,
+} from "./normalized-agent-event";
 
 import {
   buildOpenCodeParts,
@@ -278,7 +291,11 @@ describe("OpenCode runner helpers", () => {
         state,
       ),
     ).toEqual([
-      { type: "messageStarted", id: "msg_1", phase: "commentary", text: "Hi" },
+      normalizedMessageStarted({
+        id: "msg_1",
+        phase: "commentary",
+        text: "Hi",
+      }),
     ]);
     expect(
       normalizeOpenCodeEvent(
@@ -289,7 +306,7 @@ describe("OpenCode runner helpers", () => {
         "ses_1",
         state,
       ),
-    ).toEqual([{ type: "messageDelta", id: "msg_1", delta: " there" }]);
+    ).toEqual([normalizedMessageDelta({ id: "msg_1", delta: " there" })]);
   });
 
   it("normalizes OpenCode tool output and terminal outcomes", () => {
@@ -320,13 +337,12 @@ describe("OpenCode runner helpers", () => {
       status: "pending",
       input: { command: "bun test" },
       raw: "",
-    }))).toEqual([{
-      type: "activityStarted",
+    }))).toEqual([normalizedActivityStarted({
       id: "call-ok",
-      kind: "command",
+      kind: AgentActivityKind.COMMAND,
       title: "bun test",
       text: "",
-    }]);
+    })]);
     expect(normalizeOpenCodeEvent(
       {
         type: "message.part.delta",
@@ -340,11 +356,10 @@ describe("OpenCode runner helpers", () => {
       },
       "ses_1",
       state,
-    )).toEqual([{
-      type: "activityDelta",
+    )).toEqual([normalizedActivityDelta({
       id: "call-ok",
       delta: "PASS first suite\n",
-    }]);
+    })]);
     expect(updated(toolPart("call-ok", {
       status: "completed",
       input: { command: "bun test" },
@@ -352,14 +367,13 @@ describe("OpenCode runner helpers", () => {
       title: "Run tests",
       metadata: {},
       time: { start: 1, end: 2 },
-    }))).toEqual([{
-      type: "activityCompleted",
+    }))).toEqual([normalizedActivityCompleted({
       id: "call-ok",
-      kind: "command",
+      kind: AgentActivityKind.COMMAND,
       title: "Run tests",
       text: "PASS first suite\nPASS second suite\n",
-      status: "completed",
-    }]);
+      status: AgentActivityStatus.COMPLETED,
+    })]);
 
     expect(updated(toolPart("call-failed", {
       status: "running",
@@ -367,27 +381,25 @@ describe("OpenCode runner helpers", () => {
       title: "Run failing tests",
       metadata: {},
       time: { start: 3 },
-    }))).toEqual([{
-      type: "activityStarted",
+    }))).toEqual([normalizedActivityStarted({
       id: "call-failed",
-      kind: "command",
+      kind: AgentActivityKind.COMMAND,
       title: "Run failing tests",
       text: "",
-    }]);
+    })]);
     expect(updated(toolPart("call-failed", {
       status: "error",
       input: { command: "bun test" },
       error: "1 test failed",
       metadata: {},
       time: { start: 3, end: 4 },
-    }))).toEqual([{
-      type: "activityCompleted",
+    }))).toEqual([normalizedActivityCompleted({
       id: "call-failed",
-      kind: "command",
+      kind: AgentActivityKind.COMMAND,
       title: "Run failing tests",
       text: "1 test failed",
-      status: "failed",
-    }]);
+      status: AgentActivityStatus.FAILED,
+    })]);
   });
 
   it("skips empty starts and completes durable text under the message id", () => {
@@ -439,12 +451,11 @@ describe("OpenCode runner helpers", () => {
         state,
       ),
     ).toEqual([
-      {
-        type: "messageStarted",
+      normalizedMessageStarted({
         id: "msg_1",
         phase: "commentary",
         text: "저장소 구조를 확인합니다.",
-      },
+      }),
     ]);
 
     expect(
@@ -463,11 +474,10 @@ describe("OpenCode runner helpers", () => {
         state,
       ),
     ).toEqual([
-      {
-        type: "messageDelta",
+      normalizedMessageDelta({
         id: "msg_1",
         delta: " 다음 단계로 진행합니다.",
-      },
+      }),
     ]);
 
     // Completing the assistant message must emit full text under the same id so
@@ -489,12 +499,11 @@ describe("OpenCode runner helpers", () => {
         state,
       ),
     ).toEqual([
-      {
-        type: "messageCompleted",
+      normalizedMessageCompleted({
         id: "msg_1",
         phase: "commentary",
         text: "저장소 구조를 확인합니다. 다음 단계로 진행합니다.",
-      },
+      }),
     ]);
   });
 
@@ -533,12 +542,11 @@ describe("OpenCode runner helpers", () => {
         state,
       ),
     ).toEqual([
-      {
-        type: "messageStarted",
+      normalizedMessageStarted({
         id: "msg_1",
         phase: "commentary",
         text: "먼저 분석합니다.",
-      },
+      }),
     ]);
   });
 
@@ -574,13 +582,12 @@ describe("OpenCode runner helpers", () => {
         state,
       ),
     ).toEqual([
-      {
-        type: "messageCompleted",
+      normalizedMessageCompleted({
         id: "msg_1",
         phase: "commentary",
         text: "부분 응답",
-      },
-      { type: "turnCompleted", status: "completed" },
+      }),
+      normalizedTurnCompleted("completed"),
     ]);
 
     expect(
@@ -590,12 +597,11 @@ describe("OpenCode runner helpers", () => {
         phase: "final",
       }),
     ).toEqual([
-      {
-        type: "messageCompleted",
+      normalizedMessageCompleted({
         id: "msg_1",
         phase: "final",
         text: "최종 전체 응답",
-      },
+      }),
     ]);
   });
 });

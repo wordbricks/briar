@@ -1,5 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  AgentActivityKind,
+  AgentActivityStatus,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import {
+  normalizedActivityCompleted,
+  normalizedActivityDelta,
+  normalizedActivityStarted,
+  normalizedMessageCompleted,
+} from "../src-agent/normalized-agent-event";
+import { sidecarProviderEvent } from "../src-agent/sidecar-protocol";
+import {
   ChannelActivityPublisher,
   safeChannelActivityHeadline,
 } from "./channel-activity-publisher";
@@ -22,14 +33,14 @@ describe("ChannelActivityPublisher", () => {
       minIntervalMs: 1,
     });
 
-    publisher.observePayload({
-      event: {
-        type: "messageCompleted",
+    publisher.observePayload(sidecarProviderEvent({
+      raw: {},
+      event: normalizedMessageCompleted({
         id: "commentary-1",
         phase: "commentary",
         text: "저장소 구조를 확인하고 있습니다.",
-      },
-    });
+      }),
+    }));
     await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
     expect(send.mock.calls[0]?.[1]).toMatchObject({
       activity: {
@@ -39,26 +50,26 @@ describe("ChannelActivityPublisher", () => {
       },
     });
 
-    publisher.observePayload({
-      event: {
-        type: "activityStarted",
+    publisher.observePayload(sidecarProviderEvent({
+      raw: {},
+      event: normalizedActivityStarted({
         id: "command-1",
-        kind: "command",
+        kind: AgentActivityKind.COMMAND,
         title: "Running tests",
         text: "",
-      },
-    });
+      }),
+    }));
     await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2));
-    publisher.observePayload({
-      event: {
-        type: "activityCompleted",
+    publisher.observePayload(sidecarProviderEvent({
+      raw: {},
+      event: normalizedActivityCompleted({
         id: "command-1",
-        kind: "command",
+        kind: AgentActivityKind.COMMAND,
         title: "Running tests",
         text: "",
-        status: "completed",
-      },
-    });
+        status: AgentActivityStatus.COMPLETED,
+      }),
+    }));
     await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(3));
     expect(send.mock.calls[2]?.[1]).toMatchObject({
       activity: { id: "commentary-1", kind: "message" },
@@ -74,20 +85,22 @@ describe("ChannelActivityPublisher", () => {
       minIntervalMs: 1,
     });
 
-    publisher.observePayload({
-      type: "event",
-      event: {
-        type: "activityStarted",
+    publisher.observePayload(sidecarProviderEvent({
+      raw: {},
+      event: normalizedActivityStarted({
         id: "command-1",
-        kind: "command",
+        kind: AgentActivityKind.COMMAND,
         title: "Running tests",
         text: "private output",
-      },
-    });
-    publisher.observePayload({
-      type: "event",
-      event: { type: "activityDelta", id: "command-1", delta: "secret stdout" },
-    });
+      }),
+    }));
+    publisher.observePayload(sidecarProviderEvent({
+      raw: {},
+      event: normalizedActivityDelta({
+        id: "command-1",
+        delta: "secret stdout",
+      }),
+    }));
     await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
     expect(send).toHaveBeenCalledWith(credential, {
       sequence: 1,
@@ -122,14 +135,14 @@ describe("ChannelActivityPublisher", () => {
       minIntervalMs: 1,
     });
 
-    publisher.observePayload({
-      event: {
-        type: "messageCompleted",
+    publisher.observePayload(sidecarProviderEvent({
+      raw: {},
+      event: normalizedMessageCompleted({
         id: "commentary-json",
         phase: "commentary",
         text: '{"body":"Approve 동시성 처리와 staging 배포 흐름을 코드 기준으로 확인하겠습니다.","attachments":[],"document":null,"issueProposal"',
-      },
-    });
+      }),
+    }));
     await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
     expect(send.mock.calls[0]?.[1]).toMatchObject({
       activity: {
@@ -139,16 +152,6 @@ describe("ChannelActivityPublisher", () => {
           "Approve 동시성 처리와 staging 배포 흐름을 코드 기준으로 확인하겠습니다.",
       },
     });
-    publisher.stop();
-  });
-
-  it("ignores malformed activity payloads without throwing", () => {
-    const send = vi.fn(async () => undefined);
-    const publisher = new ChannelActivityPublisher({ credential, send });
-    expect(() => publisher.observePayload({
-      event: { type: "activityStarted", id: "bad", kind: "tool" },
-    })).not.toThrow();
-    expect(send).not.toHaveBeenCalled();
     publisher.stop();
   });
 
@@ -167,25 +170,25 @@ describe("ChannelActivityPublisher", () => {
       send,
       minIntervalMs: 1,
     });
-    publisher.observePayload({
-      event: {
-        type: "activityStarted",
+    publisher.observePayload(sidecarProviderEvent({
+      raw: {},
+      event: normalizedActivityStarted({
         id: "one",
-        kind: "tool",
+        kind: AgentActivityKind.TOOL,
         title: "First tool",
         text: "",
-      },
-    });
+      }),
+    }));
     await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
-    publisher.observePayload({
-      event: {
-        type: "activityStarted",
+    publisher.observePayload(sidecarProviderEvent({
+      raw: {},
+      event: normalizedActivityStarted({
         id: "two",
-        kind: "webSearch",
+        kind: AgentActivityKind.WEB_SEARCH,
         title: "Latest search",
         text: "",
-      },
-    });
+      }),
+    }));
     expect(send).toHaveBeenCalledTimes(1);
     resolveFirst?.();
     await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2));

@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
+import { AgentEventDirection } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import * as Result from "effect/Result";
 import {
   codexAppServerArgs,
@@ -40,7 +41,7 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
 
 function send(child: ChildProcessWithoutNullStreams, message: CodexRpcMessage) {
   child.stdin.write(`${JSON.stringify(message)}\n`);
-  emit.event({ direction: "client", raw: message });
+  emit.event({ direction: AgentEventDirection.CLIENT, raw: message });
 }
 
 function childExit(
@@ -110,7 +111,7 @@ async function runCodexAttempt(
 
       const normalized = normalizeCodexAppServerMessage(message);
       emit.event({
-        direction: "server",
+        direction: AgentEventDirection.SERVER,
         raw: message,
         ...(normalized ? { event: normalized } : {}),
       });

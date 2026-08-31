@@ -34,18 +34,14 @@ import {
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import {
   AgentEventDirection,
-  AgentActivityKind as ProtoAgentActivityKind,
-  AgentActivityStatus as ProtoAgentActivityStatus,
-  NormalizedAgentEventSchema,
-  type NormalizedAgentEvent as ProtoNormalizedAgentEvent,
+  type NormalizedAgentEvent,
 } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import { timingSafeEqual } from "node:crypto";
-import type { NormalizedAgentEvent } from "./normalized-agent-event";
 
 export type SidecarProviderEventInput = {
   raw: unknown;
   event?: NormalizedAgentEvent;
-  direction?: "client" | "server";
+  direction?: AgentEventDirection;
 };
 
 export type SidecarApprovalInput = Pick<
@@ -71,51 +67,6 @@ export type SidecarBlockedInput = {
   serverNames?: string[];
   nextRetryAt?: string | null;
   statusCode?: number;
-};
-
-const activityKindToProto = {
-  command: ProtoAgentActivityKind.COMMAND,
-  fileChange: ProtoAgentActivityKind.FILE_CHANGE,
-  webSearch: ProtoAgentActivityKind.WEB_SEARCH,
-  tool: ProtoAgentActivityKind.TOOL,
-} as const;
-
-const activityKindFromProto = (
-  value: ProtoAgentActivityKind,
-): Extract<NormalizedAgentEvent, { type: "activityStarted" }>["kind"] => {
-  switch (value) {
-    case ProtoAgentActivityKind.COMMAND:
-      return "command";
-    case ProtoAgentActivityKind.FILE_CHANGE:
-      return "fileChange";
-    case ProtoAgentActivityKind.WEB_SEARCH:
-      return "webSearch";
-    case ProtoAgentActivityKind.TOOL:
-      return "tool";
-    default:
-      throw new Error(`Unsupported agent activity kind: ${value}`);
-  }
-};
-
-const activityStatusToProto = {
-  completed: ProtoAgentActivityStatus.COMPLETED,
-  failed: ProtoAgentActivityStatus.FAILED,
-  cancelled: ProtoAgentActivityStatus.CANCELLED,
-} as const;
-
-const activityStatusFromProto = (
-  value: ProtoAgentActivityStatus,
-): Extract<NormalizedAgentEvent, { type: "activityCompleted" }>["status"] => {
-  switch (value) {
-    case ProtoAgentActivityStatus.COMPLETED:
-      return "completed";
-    case ProtoAgentActivityStatus.FAILED:
-      return "failed";
-    case ProtoAgentActivityStatus.CANCELLED:
-      return "cancelled";
-    default:
-      throw new Error(`Unsupported agent activity status: ${value}`);
-  }
 };
 
 const blockReasonToProto = {
@@ -144,122 +95,6 @@ export const sidecarProviderRaw = (
   message.payload.case === "event" && message.payload.value.raw
     ? rawFromProto(message.payload.value.raw)
     : undefined;
-
-function normalizedEventToProto(
-  event: NormalizedAgentEvent,
-): ProtoNormalizedAgentEvent {
-  switch (event.type) {
-    case "messageStarted":
-      return create(NormalizedAgentEventSchema, {
-        event: {
-          case: "messageStarted",
-          value: {
-            id: event.id,
-            phase: event.phase ?? undefined,
-            text: event.text,
-          },
-        },
-      });
-    case "messageDelta":
-      return create(NormalizedAgentEventSchema, {
-        event: { case: "messageDelta", value: event },
-      });
-    case "messageCompleted":
-      return create(NormalizedAgentEventSchema, {
-        event: {
-          case: "messageCompleted",
-          value: {
-            id: event.id,
-            phase: event.phase ?? undefined,
-            text: event.text,
-          },
-        },
-      });
-    case "activityStarted":
-      return create(NormalizedAgentEventSchema, {
-        event: {
-          case: "activityStarted",
-          value: {
-            id: event.id,
-            kind: activityKindToProto[event.kind],
-            title: event.title,
-            text: event.text,
-          },
-        },
-      });
-    case "activityDelta":
-      return create(NormalizedAgentEventSchema, {
-        event: { case: "activityDelta", value: event },
-      });
-    case "activityCompleted":
-      return create(NormalizedAgentEventSchema, {
-        event: {
-          case: "activityCompleted",
-          value: {
-            id: event.id,
-            kind: activityKindToProto[event.kind],
-            title: event.title,
-            text: event.text,
-            status: activityStatusToProto[event.status],
-          },
-        },
-      });
-    case "turnCompleted":
-      return create(NormalizedAgentEventSchema, {
-        event: { case: "turnCompleted", value: event },
-      });
-  }
-}
-
-export function sidecarNormalizedEvent(
-  event: ProtoNormalizedAgentEvent,
-): NormalizedAgentEvent | undefined {
-  switch (event.event.case) {
-    case "conversationStarted":
-      // Session starts have their own sidecar envelope and are synthesized by
-      // the parent with the project-scoped conversation ID.
-      return undefined;
-    case "messageStarted":
-      return {
-        type: "messageStarted",
-        id: event.event.value.id,
-        phase: event.event.value.phase ?? null,
-        text: event.event.value.text,
-      };
-    case "messageDelta":
-      return { type: "messageDelta", ...event.event.value };
-    case "messageCompleted":
-      return {
-        type: "messageCompleted",
-        id: event.event.value.id,
-        phase: event.event.value.phase ?? null,
-        text: event.event.value.text,
-      };
-    case "activityStarted":
-      return {
-        type: "activityStarted",
-        id: event.event.value.id,
-        kind: activityKindFromProto(event.event.value.kind),
-        title: event.event.value.title,
-        text: event.event.value.text,
-      };
-    case "activityDelta":
-      return { type: "activityDelta", ...event.event.value };
-    case "activityCompleted":
-      return {
-        type: "activityCompleted",
-        id: event.event.value.id,
-        kind: activityKindFromProto(event.event.value.kind),
-        title: event.event.value.title,
-        text: event.event.value.text,
-        status: activityStatusFromProto(event.event.value.status),
-      };
-    case "turnCompleted":
-      return { type: "turnCompleted", status: event.event.value.status };
-    case undefined:
-      return undefined;
-  }
-}
 
 function assertProtocolFingerprint(actual: Uint8Array) {
   if (
@@ -322,13 +157,8 @@ export const sidecarProviderEvent = (
       case: "event",
       value: create(ProviderEventSchema, {
         raw: rawToProto(input.raw),
-        normalized: input.event
-          ? normalizedEventToProto(input.event)
-          : undefined,
-        direction:
-          input.direction === "client"
-            ? AgentEventDirection.CLIENT
-            : AgentEventDirection.SERVER,
+        normalized: input.event,
+        direction: input.direction ?? AgentEventDirection.SERVER,
       }),
     },
   });

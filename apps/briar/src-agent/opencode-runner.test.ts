@@ -129,7 +129,7 @@ describe("OpenCode runner terminal output", () => {
       "Done",
     );
     const terminal = outputs.find(
-      (output) => output.event.type === "turnCompleted",
+      (output) => output.event.event.case === "turnCompleted",
     );
 
     expect(terminal).toBeDefined();

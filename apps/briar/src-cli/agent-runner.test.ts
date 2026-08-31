@@ -5,6 +5,10 @@ import {
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import { describe, expect, it } from "vitest";
 import {
+  normalizedMessageCompleted,
+  normalizedMessageDelta,
+} from "../src-agent/normalized-agent-event";
+import {
   sidecarProviderEvent,
   sidecarRunBlocked,
 } from "../src-agent/sidecar-protocol";
@@ -1358,7 +1362,7 @@ describe("detached Agent runner", () => {
     expect(
       shouldPersistDetachedTranscriptPayload(sidecarProviderEvent({
         raw: {},
-        event: { type: "messageDelta", id: "message-1", delta: "hello" },
+        event: normalizedMessageDelta({ id: "message-1", delta: "hello" }),
       })),
     ).toBe(true);
     expect(
@@ -1398,19 +1402,18 @@ describe("detached Agent runner", () => {
     ).toBeNull();
     const delta = sidecarProviderEvent({
       raw: {},
-      event: { type: "messageDelta", id: "message-1", delta: "x" },
+      event: normalizedMessageDelta({ id: "message-1", delta: "x" }),
     });
     expect(sequencer.nextForPayload(delta)).toBe(1);
 
     expect(
       sequencer.nextForPayload(sidecarProviderEvent({
         raw: {},
-        event: {
-          type: "messageCompleted",
+        event: normalizedMessageCompleted({
           id: "message-1",
           phase: null,
           text: "done",
-        },
+        }),
       })),
     ).toBe(2);
     expect(sequencer.next()).toBe(3);

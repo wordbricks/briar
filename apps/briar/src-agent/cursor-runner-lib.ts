@@ -13,7 +13,7 @@ import {
   shouldDenyGrokPermission,
   type GrokEventState,
 } from "./grok-runner-lib";
-import type { NormalizedAgentEvent } from "./normalized-agent-event";
+import type { NormalizedAgentEvent } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import type { RunnerRequest } from "./runner-request";
 
 export type CursorEventState = GrokEventState;

@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  AgentActivityKind,
+  AgentActivityStatus,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import {
+  normalizedActivityCompleted,
+  normalizedActivityDelta,
+  normalizedActivityStarted,
+  normalizedMessageDelta,
+  normalizedMessageStarted,
+  normalizedTurnCompleted,
+} from "./normalized-agent-event";
+import {
   codexAppServerArgs,
   codexAppsInstalledRequest,
   codexApprovalRequest,
@@ -154,24 +166,23 @@ describe("Codex App Server runner", () => {
           },
         },
       }),
-    ).toEqual({
-      type: "messageStarted",
+    ).toEqual(normalizedMessageStarted({
       id: "message-1",
       phase: "commentary",
       text: "Working",
-    });
+    }));
     expect(
       normalizeCodexAppServerMessage({
         method: "item/agentMessage/delta",
         params: { itemId: "message-1", delta: " more" },
       }),
-    ).toEqual({ type: "messageDelta", id: "message-1", delta: " more" });
+    ).toEqual(normalizedMessageDelta({ id: "message-1", delta: " more" }));
     expect(
       normalizeCodexAppServerMessage({
         method: "turn/completed",
         params: { turn: { status: "completed" } },
       }),
-    ).toEqual({ type: "turnCompleted", status: "completed" });
+    ).toEqual(normalizedTurnCompleted("completed"));
     expect(
       normalizeCodexAppServerMessage({
         method: "mcpServer/startupStatus/updated",
@@ -183,14 +194,13 @@ describe("Codex App Server runner", () => {
           failureReason: "reauthenticationRequired",
         },
       }),
-    ).toEqual({
-      type: "activityCompleted",
+    ).toEqual(normalizedActivityCompleted({
       id: "mcp-startup:figma",
-      kind: "tool",
+      kind: AgentActivityKind.TOOL,
       title: "figma MCP unavailable",
       text: "AuthRequired",
-      status: "failed",
-    });
+      status: AgentActivityStatus.FAILED,
+    }));
   });
 
   it("normalizes command activity output and terminal outcomes", () => {
@@ -208,23 +218,21 @@ describe("Codex App Server runner", () => {
           },
         },
       }),
-    ).toEqual({
-      type: "activityStarted",
+    ).toEqual(normalizedActivityStarted({
       id: "command-1",
-      kind: "command",
+      kind: AgentActivityKind.COMMAND,
       title: "bun test",
       text: "",
-    });
+    }));
     expect(
       normalizeCodexAppServerMessage({
         method: "item/commandExecution/outputDelta",
         params: { itemId: "command-1", delta: "PASS first suite\n" },
       }),
-    ).toEqual({
-      type: "activityDelta",
+    ).toEqual(normalizedActivityDelta({
       id: "command-1",
       delta: "PASS first suite\n",
-    });
+    }));
     expect(
       normalizeCodexAppServerMessage({
         method: "item/completed",
@@ -239,14 +247,13 @@ describe("Codex App Server runner", () => {
           },
         },
       }),
-    ).toEqual({
-      type: "activityCompleted",
+    ).toEqual(normalizedActivityCompleted({
       id: "command-1",
-      kind: "command",
+      kind: AgentActivityKind.COMMAND,
       title: "bun test",
       text: "PASS first suite\nPASS second suite\n",
-      status: "completed",
-    });
+      status: AgentActivityStatus.COMPLETED,
+    }));
 
     expect(
       normalizeCodexAppServerMessage({
@@ -261,12 +268,14 @@ describe("Codex App Server runner", () => {
             exitCode: 1,
           },
         },
-      }),
+      })?.event,
     ).toMatchObject({
-      type: "activityCompleted",
-      id: "command-failed",
-      text: "1 test failed",
-      status: "failed",
+      case: "activityCompleted",
+      value: {
+        id: "command-failed",
+        text: "1 test failed",
+        status: AgentActivityStatus.FAILED,
+      },
     });
     expect(
       normalizeCodexAppServerMessage({
@@ -281,11 +290,13 @@ describe("Codex App Server runner", () => {
             exitCode: null,
           },
         },
-      }),
+      })?.event,
     ).toMatchObject({
-      type: "activityCompleted",
-      id: "command-declined",
-      status: "cancelled",
+      case: "activityCompleted",
+      value: {
+        id: "command-declined",
+        status: AgentActivityStatus.CANCELLED,
+      },
     });
   });
 

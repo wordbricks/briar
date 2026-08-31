@@ -1,18 +1,21 @@
 import type { JsonRpcMessage } from "./json-rpc-message";
 import {
-  normalizedActivityText,
-  normalizedActivityTitle,
-  type AgentActivityKind,
-  type AgentActivityStatus,
-  type NormalizedAgentEvent,
-} from "./normalized-agent-event";
-import type { RunnerRequest } from "./runner-request";
-
-export type {
   AgentActivityKind,
   AgentActivityStatus,
-  NormalizedAgentEvent,
+  type NormalizedAgentEvent,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import {
+  normalizedActivityCompleted,
+  normalizedActivityDelta,
+  normalizedActivityStarted,
+  normalizedActivityText,
+  normalizedActivityTitle,
+  normalizedMessageCompleted,
+  normalizedMessageDelta,
+  normalizedMessageStarted,
+  normalizedTurnCompleted,
 } from "./normalized-agent-event";
+import type { RunnerRequest } from "./runner-request";
 
 export type CodexRpcMessage = JsonRpcMessage;
 
@@ -333,44 +336,44 @@ export function normalizeCodexAppServerMessage(
       (params.failureReason === "reauthenticationRequired"
         ? "Authentication is required."
         : "The MCP connection failed during startup.");
-    return {
-      type: "activityCompleted",
+    return normalizedActivityCompleted({
       id: `mcp-startup:${name}`,
-      kind: "tool",
+      kind: AgentActivityKind.TOOL,
       title: normalizedActivityTitle(`${name} MCP unavailable`),
       text: normalizedActivityText(detail),
-      status: "failed",
-    };
+      status: AgentActivityStatus.FAILED,
+    });
   }
 
   if (method === "item/started" || method === "item/completed") {
     const item = asRecord(params.item);
     if (item?.type === "agentMessage" && typeof item.id === "string") {
-      return {
-        type: method === "item/started" ? "messageStarted" : "messageCompleted",
+      const input = {
         id: item.id,
         phase: typeof item.phase === "string" ? item.phase : null,
         text: typeof item.text === "string" ? item.text : "",
       };
+      return method === "item/started"
+        ? normalizedMessageStarted(input)
+        : normalizedMessageCompleted(input);
     }
     if (!item) return undefined;
     const activity = codexActivity(item);
     if (!activity) return undefined;
     if (method === "item/started") {
-      return { type: "activityStarted", ...activity };
+      return normalizedActivityStarted(activity);
     }
-    return {
-      type: "activityCompleted",
+    return normalizedActivityCompleted({
       ...activity,
       status: codexActivityStatus(item),
-    };
+    });
   }
 
   if (method === "item/agentMessage/delta") {
     const id = typeof params.itemId === "string" ? params.itemId : undefined;
     const delta = typeof params.delta === "string" ? params.delta : undefined;
     return id && delta !== undefined
-      ? { type: "messageDelta", id, delta }
+      ? normalizedMessageDelta({ id, delta })
       : undefined;
   }
 
@@ -383,14 +386,14 @@ export function normalizeCodexAppServerMessage(
     const id = typeof params.itemId === "string" ? params.itemId : undefined;
     const delta = firstText(params.delta, params.output, params.message);
     return id && delta !== undefined
-      ? { type: "activityDelta", id, delta: normalizedActivityText(delta) }
+      ? normalizedActivityDelta({ id, delta: normalizedActivityText(delta) })
       : undefined;
   }
 
   if (method === "turn/completed") {
     const turn = asRecord(params.turn);
     return typeof turn?.status === "string"
-      ? { type: "turnCompleted", status: turn.status }
+      ? normalizedTurnCompleted(turn.status)
       : undefined;
   }
   return undefined;
@@ -416,9 +419,9 @@ function codexActivity(item: Record<string, unknown> | null): {
 }
 
 function codexActivityKind(type: string): AgentActivityKind | null {
-  if (type === "commandExecution") return "command";
-  if (type === "fileChange") return "fileChange";
-  if (type === "webSearch") return "webSearch";
+  if (type === "commandExecution") return AgentActivityKind.COMMAND;
+  if (type === "fileChange") return AgentActivityKind.FILE_CHANGE;
+  if (type === "webSearch") return AgentActivityKind.WEB_SEARCH;
   if (
     type === "mcpToolCall" ||
     type === "dynamicToolCall" ||
@@ -426,7 +429,7 @@ function codexActivityKind(type: string): AgentActivityKind | null {
     type === "collabAgentToolCall" ||
     type === "imageView"
   ) {
-    return "tool";
+    return AgentActivityKind.TOOL;
   }
   return null;
 }
@@ -495,7 +498,7 @@ function codexActivityStatus(
     status === "aborted" ||
     status === "interrupted"
   ) {
-    return "cancelled";
+    return AgentActivityStatus.CANCELLED;
   }
   if (
     status === "failed" ||
@@ -504,9 +507,9 @@ function codexActivityStatus(
     item.error != null ||
     (typeof item.exitCode === "number" && item.exitCode !== 0)
   ) {
-    return "failed";
+    return AgentActivityStatus.FAILED;
   }
-  return "completed";
+  return AgentActivityStatus.COMPLETED;
 }
 
 export function codexApprovalRequest(message: CodexRpcMessage): {
@@ -824,7 +827,7 @@ function captureCodexMcpItem(
   ) {
     state.mcpFailures.set(serverName, { ...existing, required: true });
   }
-  if (codexActivityStatus(item) !== "failed") return;
+  if (codexActivityStatus(item) !== AgentActivityStatus.FAILED) return;
   const detail = codexActivityText(item).trim() || "MCP tool call failed.";
   state.mcpFailures.set(serverName, {
     serverName,

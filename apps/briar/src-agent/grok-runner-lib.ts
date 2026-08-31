@@ -8,21 +8,25 @@ import {
   win32,
 } from "node:path";
 import {
+  AgentActivityKind,
+  AgentActivityStatus,
+  type NormalizedAgentEvent,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import {
+  normalizedActivityCompleted,
+  normalizedActivityDelta,
+  normalizedActivityStarted,
   normalizedActivityText,
   normalizedActivityTitle,
-  type AgentActivityKind,
-  type NormalizedAgentEvent,
+  normalizedMessageCompleted,
+  normalizedMessageDelta,
+  normalizedMessageStarted,
+  normalizedTurnCompleted,
 } from "./normalized-agent-event";
 import { readAgentImage } from "./runner-attachments";
 import { extractSingleJsonObject } from "../src/lib/single-json-object";
 import type { AcpJsonRpcMessage } from "./acp-json-rpc";
 import type { RunnerRequest } from "./runner-request";
-
-export type {
-  AgentActivityKind,
-  AgentActivityStatus,
-  NormalizedAgentEvent,
-} from "./normalized-agent-event";
 
 /**
  * Grok CLI ACP client helpers.
@@ -461,12 +465,11 @@ function completeActiveGrokMessage(
   if (!state.activeMessageId) return;
   const text = state.activeAssistantText;
   state.lastAssistantText = text;
-  const event: NormalizedAgentEvent = {
-    type: "messageCompleted",
+  const event = normalizedMessageCompleted({
     id: state.activeMessageId,
     phase,
     text,
-  };
+  });
   state.activeMessageId = null;
   state.activeAssistantText = "";
   return event;
@@ -512,23 +515,21 @@ export function normalizeGrokSessionUpdate(
       state.activeAssistantText = text;
       return {
         raw: params,
-        events: [{
-          type: "messageStarted",
+        events: [normalizedMessageStarted({
           id: state.activeMessageId,
           phase: "commentary",
           text,
-        }],
+        })],
       };
     }
 
     state.activeAssistantText += text;
     return {
       raw: params,
-      events: [{
-        type: "messageDelta",
+      events: [normalizedMessageDelta({
         id: state.activeMessageId,
         delta: text,
-      }],
+      })],
     };
   }
 
@@ -559,7 +560,8 @@ function normalizeGrokActivity(
   const title = normalizedActivityTitle(
     (typeof update.title === "string" && update.title) ||
       existing?.title ||
-      (kind === "command" && typeof rawInput?.command === "string"
+      (kind === AgentActivityKind.COMMAND &&
+          typeof rawInput?.command === "string"
         ? rawInput.command
         : "Use tool"),
   );
@@ -577,23 +579,21 @@ function normalizeGrokActivity(
 
   if (!activity.started) {
     activity.started = true;
-    events.push({
-      type: "activityStarted",
+    events.push(normalizedActivityStarted({
       id,
       kind,
       title,
       text: output,
-    });
+    }));
   } else if (
     output &&
     output !== existing?.text &&
     output.startsWith(existing?.text ?? "")
   ) {
-    events.push({
-      type: "activityDelta",
+    events.push(normalizedActivityDelta({
       id,
       delta: output.slice(existing?.text.length ?? 0),
-    });
+    }));
   }
 
   const status = typeof update.status === "string"
@@ -610,14 +610,17 @@ function normalizeGrokActivity(
     (status === "completed" || status === "failed" || cancelled)
   ) {
     activity.completed = true;
-    events.push({
-      type: "activityCompleted",
+    events.push(normalizedActivityCompleted({
       id,
       kind,
       title,
       text: output,
-      status: cancelled ? "cancelled" : status === "failed" ? "failed" : "completed",
-    });
+      status: cancelled
+        ? AgentActivityStatus.CANCELLED
+        : status === "failed"
+          ? AgentActivityStatus.FAILED
+          : AgentActivityStatus.COMPLETED,
+    }));
   }
   state.activities.set(id, activity);
   return events;
@@ -627,18 +630,20 @@ function grokActivityKind(
   kind: string | null,
   fallback: AgentActivityKind | undefined,
 ): AgentActivityKind {
-  if (!kind) return fallback ?? "tool";
+  if (!kind) return fallback ?? AgentActivityKind.TOOL;
   const normalized = kind.toLowerCase();
-  if (normalized === "execute") return "command";
+  if (normalized === "execute") return AgentActivityKind.COMMAND;
   if (
     normalized === "edit" ||
     normalized === "delete" ||
     normalized === "move"
   ) {
-    return "fileChange";
+    return AgentActivityKind.FILE_CHANGE;
   }
-  if (normalized === "fetch" || normalized === "search") return "webSearch";
-  return "tool";
+  if (normalized === "fetch" || normalized === "search") {
+    return AgentActivityKind.WEB_SEARCH;
+  }
+  return AgentActivityKind.TOOL;
 }
 
 function grokActivityOutput(update: Record<string, unknown>): string | null {
@@ -680,12 +685,11 @@ export function finalizeGrokMessage(
   const events: NormalizedAgentEvent[] = [];
   const completed = completeActiveGrokMessage(state, "final");
   if (completed) events.push(completed);
-  events.push({
-    type: "turnCompleted",
-    status: grokStopReasonSucceeded(stopReason)
+  events.push(normalizedTurnCompleted(
+    grokStopReasonSucceeded(stopReason)
       ? "completed"
       : stopReason || "failed",
-  });
+  ));
   return events;
 }
 

@@ -14,22 +14,22 @@ import {
   sidecarProviderEvent,
   sidecarSessionStarted,
 } from "../src-agent/sidecar-protocol";
+import { normalizedActivityCompleted } from "../src-agent/normalized-agent-event";
 import { transcriptEventFromSidecar } from "./worker-transcript-client";
 
 describe("Worker transcript protobuf projection", () => {
   it("bounds untrusted raw output while retaining the typed normalized event", () => {
     const mapped = transcriptEventFromSidecar(
       sidecarProviderEvent({
-        direction: "client",
+        direction: AgentEventDirection.CLIENT,
         raw: { output: "원격 명령 출력".repeat(20_000) },
-        event: {
-          type: "activityCompleted",
+        event: normalizedActivityCompleted({
           id: "activity-1",
-          kind: "command",
+          kind: AgentActivityKind.COMMAND,
           title: "아주 긴 명령 ".repeat(4_000),
           text: "아주 긴 실행 결과 ".repeat(20_000),
-          status: "completed",
-        },
+          status: AgentActivityStatus.COMPLETED,
+        }),
       }),
       42,
     );

@@ -27,6 +27,7 @@ import {
   type OpenCodeBlockedRetry,
   type OpenCodeEventState,
 } from "./opencode-runner-lib";
+import { normalizedTurnCompleted } from "./normalized-agent-event";
 import { createRunnerIo } from "./runner-io";
 import type { RunnerRequest } from "./runner-request";
 import { waitForOpenCodeServerUrl } from "./opencode-server-startup";
@@ -287,7 +288,7 @@ export function openCodeFinalTurnOutputs(
     })),
     {
       raw: response,
-      event: { type: "turnCompleted" as const, status: "completed" },
+      event: normalizedTurnCompleted("completed"),
     },
   ];
 }

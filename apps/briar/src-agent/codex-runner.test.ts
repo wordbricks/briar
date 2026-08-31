@@ -9,6 +9,7 @@ import {
   SandboxMode,
   type RunnerToParent,
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
+import { AgentActivityStatus } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -16,7 +17,6 @@ import { spawn } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import {
   encodeSidecarRunRequest,
-  sidecarNormalizedEvent,
   sidecarProviderRaw,
 } from "./sidecar-protocol";
 
@@ -43,10 +43,9 @@ describe("Codex runner MCP isolation", () => {
       const normalized = payload.payload.case === "event"
         ? payload.payload.value.normalized
         : undefined;
-      const event = normalized ? sidecarNormalizedEvent(normalized) : undefined;
-      return event?.type === "activityCompleted" &&
-        event.title === "codex_apps MCP unavailable" &&
-        event.status === "failed";
+      return normalized?.event.case === "activityCompleted" &&
+        normalized.event.value.title === "codex_apps MCP unavailable" &&
+        normalized.event.value.status === AgentActivityStatus.FAILED;
     })).toBe(true);
     expect(
       result.payloads.filter(

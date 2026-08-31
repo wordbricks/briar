@@ -7,19 +7,22 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk";
 import { parse, resolve } from "node:path";
 import {
+  AgentActivityKind,
+  AgentActivityStatus,
+  type NormalizedAgentEvent,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import {
+  normalizedActivityCompleted,
+  normalizedActivityStarted,
   normalizedActivityText,
   normalizedActivityTitle,
-  type AgentActivityKind,
-  type NormalizedAgentEvent,
+  normalizedMessageCompleted,
+  normalizedMessageDelta,
+  normalizedMessageStarted,
+  normalizedTurnCompleted,
 } from "./normalized-agent-event";
 import { readAgentImage } from "./runner-attachments";
 import type { RunnerRequest } from "./runner-request";
-
-export type {
-  AgentActivityKind,
-  AgentActivityStatus,
-  NormalizedAgentEvent,
-} from "./normalized-agent-event";
 
 export type ClaudeEventState = {
   activeMessageId: string | null;
@@ -221,12 +224,11 @@ export function normalizeClaudeMessage(
     if (event.type === "content_block_start") {
       const block = record(event.content_block);
       if (block?.type === "text") {
-        return [{
-          type: "messageStarted",
+        return [normalizedMessageStarted({
           id,
           phase: "commentary",
           text: typeof block.text === "string" ? block.text : "",
-        }];
+        })];
       }
       if (block?.type === "tool_use") {
         const started = startClaudeActivity(block, state);
@@ -242,7 +244,7 @@ export function normalizeClaudeMessage(
         delta?.type === "text_delta" &&
         typeof delta.text === "string"
       ) {
-        return [{ type: "messageDelta", id, delta: delta.text }];
+        return [normalizedMessageDelta({ id, delta: delta.text })];
       }
     }
     return [];
@@ -255,12 +257,11 @@ export function normalizeClaudeMessage(
     if (text) {
       state.activeMessageId = null;
       state.lastAssistantMessageId = id;
-      events.push({
-        type: "messageCompleted",
+      events.push(normalizedMessageCompleted({
         id,
         phase: "commentary",
         text,
-      });
+      }));
     }
     if (Array.isArray(message.message.content)) {
       for (const block of message.message.content) {
@@ -302,29 +303,27 @@ export function normalizeClaudeMessage(
       started: true,
       completed: true,
     });
-    return [{
-      type: "activityCompleted",
+    return [normalizedActivityCompleted({
       id: message.tool_use_id,
       kind,
       title,
       text,
-      status: "cancelled",
-    }];
+      status: AgentActivityStatus.CANCELLED,
+    })];
   }
 
   if (message.type === "result") {
     if (message.subtype === "success") {
-      return [{
-        type: "messageCompleted",
+      return [normalizedMessageCompleted({
         id: state.lastAssistantMessageId ?? message.uuid,
         phase: "final",
         text:
           message.structured_output === undefined
             ? message.result
             : JSON.stringify(message.structured_output),
-      }];
+      })];
     }
-    return [{ type: "turnCompleted", status: "failed" }];
+    return [normalizedTurnCompleted("failed")];
   }
 
   if (
@@ -332,7 +331,7 @@ export function normalizeClaudeMessage(
     message.subtype === "session_state_changed" &&
     message.state === "idle"
   ) {
-    return [{ type: "turnCompleted", status: "completed" }];
+    return [normalizedTurnCompleted("completed")];
   }
   return [];
 }
@@ -340,7 +339,7 @@ export function normalizeClaudeMessage(
 function startClaudeActivity(
   block: Record<string, unknown> | null,
   state: ClaudeEventState,
-): Extract<NormalizedAgentEvent, { type: "activityStarted" }> | null {
+): NormalizedAgentEvent | null {
   if (
     block?.type !== "tool_use" ||
     typeof block.id !== "string" ||
@@ -363,30 +362,31 @@ function startClaudeActivity(
     completed: false,
   };
   state.activities.set(block.id, activity);
-  return {
-    type: "activityStarted",
+  return normalizedActivityStarted({
     id: block.id,
     kind,
     title,
     text: activity.text,
-  };
+  });
 }
 
 function completeClaudeActivity(
   block: Record<string, unknown> | null,
   state: ClaudeEventState,
-): Extract<NormalizedAgentEvent, { type: "activityCompleted" }> | null {
+): NormalizedAgentEvent | null {
   if (block?.type !== "tool_result" || typeof block.tool_use_id !== "string") {
     return null;
   }
   const existing = state.activities.get(block.tool_use_id);
   if (existing?.completed) return null;
-  const kind = existing?.kind ?? "tool";
+  const kind = existing?.kind ?? AgentActivityKind.TOOL;
   const title = normalizedActivityTitle(
     existing?.title ?? `Tool ${block.tool_use_id}`,
   );
   const text = normalizedActivityText(claudeToolResultText(block.content));
-  const status = block.is_error === true ? "failed" : "completed";
+  const status = block.is_error === true
+    ? AgentActivityStatus.FAILED
+    : AgentActivityStatus.COMPLETED;
   state.activities.set(block.tool_use_id, {
     kind,
     title,
@@ -394,31 +394,32 @@ function completeClaudeActivity(
     started: true,
     completed: true,
   });
-  return {
-    type: "activityCompleted",
+  return normalizedActivityCompleted({
     id: block.tool_use_id,
     kind,
     title,
     text,
     status,
-  };
+  });
 }
 
 function claudeActivityKind(name: string): AgentActivityKind {
   const normalized = name.toLowerCase();
-  if (normalized === "bash" || normalized === "shell") return "command";
+  if (normalized === "bash" || normalized === "shell") {
+    return AgentActivityKind.COMMAND;
+  }
   if (
     normalized === "edit" ||
     normalized === "write" ||
     normalized === "notebookedit" ||
     normalized === "applypatch"
   ) {
-    return "fileChange";
+    return AgentActivityKind.FILE_CHANGE;
   }
   if (normalized === "webfetch" || normalized === "websearch") {
-    return "webSearch";
+    return AgentActivityKind.WEB_SEARCH;
   }
-  return "tool";
+  return AgentActivityKind.TOOL;
 }
 
 function claudeActivityTitle(

@@ -1,6 +1,8 @@
 import type { RunnerToParent } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
-import type { NormalizedAgentEvent } from "../src-agent/normalized-agent-event";
-import { sidecarNormalizedEvent } from "../src-agent/sidecar-protocol";
+import {
+  AgentActivityKind,
+  type NormalizedAgentEvent,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import { naturalLanguageFromAgentMessage } from "../src/lib/auto-hunt-agent";
 import {
   CHANNEL_AGENT_ACTIVITY_HEADLINE_MAX_LENGTH,
@@ -59,48 +61,29 @@ export function safeChannelActivityHeadline(
     .replace(/[\uD800-\uDBFF]$/u, "");
 }
 
-function normalizedEventFromPayload(payload: unknown): NormalizedAgentEvent | null {
-  if (
-    payload && typeof payload === "object" && "$typeName" in payload &&
-    payload.$typeName === "briar.sidecar.v1.RunnerToParent"
-  ) {
-    const output = payload as RunnerToParent;
-    const normalized = output.payload.case === "event"
-      ? output.payload.value.normalized
-      : undefined;
-    return normalized ? sidecarNormalizedEvent(normalized) ?? null : null;
+function normalizedEventFromPayload(
+  payload: RunnerToParent,
+): NormalizedAgentEvent | null {
+  return payload.payload.case === "event"
+    ? payload.payload.value.normalized ?? null
+    : null;
+}
+
+function channelActivityKind(
+  kind: AgentActivityKind,
+): ChannelAgentActivityDescriptor["kind"] | null {
+  switch (kind) {
+    case AgentActivityKind.COMMAND:
+      return "command";
+    case AgentActivityKind.FILE_CHANGE:
+      return "fileChange";
+    case AgentActivityKind.WEB_SEARCH:
+      return "webSearch";
+    case AgentActivityKind.TOOL:
+      return "tool";
+    default:
+      return null;
   }
-  if (
-    payload === null || typeof payload !== "object" || !("event" in payload)
-  ) return null;
-  const event = payload.event;
-  if (event === null || typeof event !== "object" || !("type" in event)) {
-    return null;
-  }
-  const type = event.type;
-  if (type === "messageStarted" || type === "messageCompleted") {
-    const id = "id" in event ? event.id : undefined;
-    const phase = "phase" in event ? event.phase : undefined;
-    const text = "text" in event ? event.text : undefined;
-    if (
-      typeof id !== "string" || phase !== "commentary" ||
-      typeof text !== "string" || !text.trim()
-    ) return null;
-  } else if (type === "activityStarted") {
-    const id = "id" in event ? event.id : undefined;
-    const kind = "kind" in event ? event.kind : undefined;
-    const title = "title" in event ? event.title : undefined;
-    if (
-      typeof id !== "string" || typeof title !== "string" ||
-      (kind !== "command" && kind !== "fileChange" &&
-        kind !== "webSearch" && kind !== "tool")
-    ) return null;
-  } else if (type === "activityCompleted") {
-    if (!("id" in event) || typeof event.id !== "string") return null;
-  } else if (type !== "turnCompleted") {
-    return null;
-  }
-  return event as NormalizedAgentEvent;
 }
 
 /**
@@ -138,31 +121,43 @@ export class ChannelActivityPublisher {
     }
   }
 
-  observePayload(payload: unknown) {
+  observePayload(payload: RunnerToParent) {
     if (this.stopped) return;
     const event = normalizedEventFromPayload(payload);
     if (!event) return;
-    if (event.type === "messageStarted" || event.type === "messageCompleted") {
+    const normalized = event.event;
+    if (
+      normalized.case === "messageStarted" ||
+      normalized.case === "messageCompleted"
+    ) {
+      if (
+        normalized.value.phase !== "commentary" ||
+        !normalized.value.text.trim()
+      ) return;
       this.commentary = {
-        id: event.id,
+        id: normalized.value.id,
         kind: "message",
         headline: safeChannelActivityHeadline(
           "message",
-          naturalLanguageFromAgentMessage(event.text),
+          naturalLanguageFromAgentMessage(normalized.value.text),
         ),
       };
-    } else if (event.type === "activityStarted") {
-      this.active.delete(event.id);
-      this.active.set(event.id, {
-        id: event.id,
-        kind: event.kind,
-        headline: safeChannelActivityHeadline(event.kind, event.title),
+    } else if (normalized.case === "activityStarted") {
+      const kind = channelActivityKind(normalized.value.kind);
+      if (!kind) return;
+      this.active.delete(normalized.value.id);
+      this.active.set(normalized.value.id, {
+        id: normalized.value.id,
+        kind,
+        headline: safeChannelActivityHeadline(kind, normalized.value.title),
       });
-    } else if (event.type === "activityCompleted") {
-      this.active.delete(event.id);
-    } else {
+    } else if (normalized.case === "activityCompleted") {
+      this.active.delete(normalized.value.id);
+    } else if (normalized.case === "turnCompleted") {
       this.active.clear();
       this.commentary = null;
+    } else {
+      return;
     }
     this.queue(this.latest());
   }

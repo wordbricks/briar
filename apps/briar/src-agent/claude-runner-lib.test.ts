@@ -4,6 +4,16 @@ import { tmpdir } from "node:os";
 import { join, parse, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
+  AgentActivityKind,
+  AgentActivityStatus,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import {
+  normalizedActivityCompleted,
+  normalizedActivityStarted,
+  normalizedMessageCompleted,
+  normalizedMessageDelta,
+} from "./normalized-agent-event";
+import {
   approvalResult,
   claudePrompt,
   claudeOptions,
@@ -158,17 +168,19 @@ describe("Claude runner", () => {
     } as unknown as SDKMessage;
 
     expect(normalizeClaudeMessage(started, state)).toEqual([]);
-    expect(normalizeClaudeMessage(delta, state)).toEqual([{
-      type: "messageDelta",
+    expect(normalizeClaudeMessage(delta, state)).toEqual([
+      normalizedMessageDelta({
       id: "message-1",
       delta: "hello",
-    }]);
-    expect(normalizeClaudeMessage(result, state)).toEqual([{
-      type: "messageCompleted",
+      }),
+    ]);
+    expect(normalizeClaudeMessage(result, state)).toEqual([
+      normalizedMessageCompleted({
       id: "result-1",
       phase: "final",
       text: "hello",
-    }]);
+      }),
+    ]);
   });
 
   it("normalizes Claude tool success, failure, and permission cancellation", () => {
@@ -209,33 +221,34 @@ describe("Claude runner", () => {
       },
     }) as unknown as SDKMessage;
 
-    expect(normalizeClaudeMessage(toolStart("tool-ok", "bun test"), state)).toEqual([{
-      type: "activityStarted",
+    expect(normalizeClaudeMessage(toolStart("tool-ok", "bun test"), state)).toEqual([
+      normalizedActivityStarted({
       id: "tool-ok",
-      kind: "command",
+      kind: AgentActivityKind.COMMAND,
       title: "bun test",
       text: "",
-    }]);
-    expect(normalizeClaudeMessage(toolResult("tool-ok", "38 tests passed"), state)).toEqual([{
-      type: "activityCompleted",
+      }),
+    ]);
+    expect(normalizeClaudeMessage(toolResult("tool-ok", "38 tests passed"), state)).toEqual([
+      normalizedActivityCompleted({
       id: "tool-ok",
-      kind: "command",
+      kind: AgentActivityKind.COMMAND,
       title: "bun test",
       text: "38 tests passed",
-      status: "completed",
-    }]);
+      status: AgentActivityStatus.COMPLETED,
+      }),
+    ]);
 
     normalizeClaudeMessage(toolStart("tool-failed", "bun test"), state);
     expect(
       normalizeClaudeMessage(toolResult("tool-failed", "1 test failed", true), state),
-    ).toEqual([{
-      type: "activityCompleted",
+    ).toEqual([normalizedActivityCompleted({
       id: "tool-failed",
-      kind: "command",
+      kind: AgentActivityKind.COMMAND,
       title: "bun test",
       text: "1 test failed",
-      status: "failed",
-    }]);
+      status: AgentActivityStatus.FAILED,
+    })]);
 
     normalizeClaudeMessage(toolStart("tool-denied", "git push"), state);
     expect(normalizeClaudeMessage({
@@ -247,14 +260,13 @@ describe("Claude runner", () => {
       message: "Permission denied",
       uuid: "permission-tool-denied",
       session_id: "session-1",
-    } as unknown as SDKMessage, state)).toEqual([{
-      type: "activityCompleted",
+    } as unknown as SDKMessage, state)).toEqual([normalizedActivityCompleted({
       id: "tool-denied",
-      kind: "command",
+      kind: AgentActivityKind.COMMAND,
       title: "git push",
       text: "The user declined this command.",
-      status: "cancelled",
-    }]);
+      status: AgentActivityStatus.CANCELLED,
+    })]);
   });
 
   it("keeps assistant text and parallel tool starts from the same frame", () => {
@@ -286,26 +298,23 @@ describe("Claude runner", () => {
     } as unknown as SDKMessage, state);
 
     expect(events).toEqual([
-      {
-        type: "messageCompleted",
+      normalizedMessageCompleted({
         id: "message-1",
         phase: "commentary",
         text: "Checking both files.",
-      },
-      {
-        type: "activityStarted",
+      }),
+      normalizedActivityStarted({
         id: "read-1",
-        kind: "tool",
+        kind: AgentActivityKind.TOOL,
         title: "Read",
         text: "",
-      },
-      {
-        type: "activityStarted",
+      }),
+      normalizedActivityStarted({
         id: "read-2",
-        kind: "tool",
+        kind: AgentActivityKind.TOOL,
         title: "Read",
         text: "",
-      },
+      }),
     ]);
   });
 

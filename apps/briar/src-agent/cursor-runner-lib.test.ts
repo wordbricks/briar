@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  normalizedMessageCompleted,
+  normalizedMessageStarted,
+  normalizedTurnCompleted,
+} from "./normalized-agent-event";
+import {
   buildCursorPromptParts,
   createCursorEventState,
   cursorPermissionDecisionResult,
@@ -68,20 +73,18 @@ describe("Cursor runner helpers", () => {
         sessionUpdate: "agent_message_chunk",
         content: { type: "text", text: "Done" },
       },
-    }, state).events).toEqual([{
-      type: "messageStarted",
+    }, state).events).toEqual([normalizedMessageStarted({
       id: "cursor-session:assistant:1",
       phase: "commentary",
       text: "Done",
-    }]);
+    })]);
     expect(finalizeCursorMessage(state, "end_turn")).toEqual([
-      {
-        type: "messageCompleted",
+      normalizedMessageCompleted({
         id: "cursor-session:assistant:1",
         phase: "final",
         text: "Done",
-      },
-      { type: "turnCompleted", status: "completed" },
+      }),
+      normalizedTurnCompleted("completed"),
     ]);
   });
 });
