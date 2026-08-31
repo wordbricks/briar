@@ -6,11 +6,16 @@ pragma foreign_keys = on;
 create table briar_upload_batches (
   request_id text primary key not null,
   purpose text not null check (
-    purpose in ('issue_reply', 'channel_reply', 'run_evidence')
+    purpose in (
+      'issue_reply', 'channel_reply', 'run_evidence', 'channel_message',
+      'issue_create', 'issue_update', 'issue_message'
+    )
   ),
   organization_id text not null
     references briar_organizations (id) on delete cascade,
   project_id text references briar_projects (id) on delete cascade,
+  channel_id text references briar_channels (id) on delete cascade,
+  user_id text references "user" (id) on delete cascade,
   work_id text,
   run_id text,
   worker_id text,
@@ -36,7 +41,8 @@ create index briar_upload_batches_expiry_idx
   on briar_upload_batches (expires_at, request_id);
 create index briar_upload_batches_scope_idx
   on briar_upload_batches (
-    purpose, organization_id, project_id, work_id, run_id, claim_token_hash
+    purpose, organization_id, project_id, channel_id, user_id, work_id,
+    run_id, claim_token_hash
   );
 
 create table briar_uploads (

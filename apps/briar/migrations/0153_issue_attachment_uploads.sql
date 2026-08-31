@@ -1,116 +1,15 @@
 -- IssueService owns three attachment workflows. Opaque bytes still use the
 -- shared short-lived upload capability, while purpose, actor, target, mutation
 -- identity, and consumption remain fixed by the owning RPC.
-pragma foreign_keys = off;
-pragma legacy_alter_table = on;
+-- Migration 0150 already owns the final shared upload shape. This migration
+-- adds only Issue-owned receipts and extends the shared authorization guards.
+pragma foreign_keys = on;
 
 drop trigger if exists briar_upload_batch_insert_guard;
 drop trigger if exists briar_upload_batch_immutable;
 drop trigger if exists briar_upload_metadata_immutable;
 drop trigger if exists briar_upload_state_guard;
 drop trigger if exists briar_upload_delete_cleanup;
-drop index if exists briar_upload_batches_expiry_idx;
-drop index if exists briar_upload_batches_scope_idx;
-drop index if exists briar_uploads_batch_idx;
-drop index if exists briar_uploads_consumer_idx;
-
-alter table briar_uploads rename to briar_uploads_legacy;
-alter table briar_upload_batches rename to briar_upload_batches_legacy;
-
-create table briar_upload_batches (
-  request_id text primary key not null,
-  purpose text not null check (
-    purpose in (
-      'issue_reply', 'channel_reply', 'run_evidence', 'channel_message',
-      'issue_create', 'issue_update', 'issue_message'
-    )
-  ),
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  project_id text references briar_projects (id) on delete cascade,
-  channel_id text references briar_channels (id) on delete cascade,
-  user_id text references "user" (id) on delete cascade,
-  work_id text,
-  run_id text,
-  worker_id text,
-  device_id text,
-  claim_token_hash text check (
-    claim_token_hash is null or (
-      length(claim_token_hash) = 64
-      and claim_token_hash not glob '*[^0-9a-f]*'
-    )
-  ),
-  metadata_hash text not null check (
-    length(metadata_hash) = 64
-    and metadata_hash not glob '*[^0-9a-f]*'
-  ),
-  file_count integer not null check (file_count between 1 and 5),
-  creation_nonce text not null unique check (length(creation_nonce) = 36),
-  expires_at text not null,
-  created_at text not null,
-  check (expires_at > created_at)
-);
-
-insert into briar_upload_batches (
-  request_id, purpose, organization_id, project_id, channel_id, user_id,
-  work_id, run_id, worker_id, device_id, claim_token_hash, metadata_hash,
-  file_count, creation_nonce, expires_at, created_at
-)
-select request_id, purpose, organization_id, project_id, channel_id, user_id,
-       work_id, run_id, worker_id, device_id, claim_token_hash, metadata_hash,
-       file_count, creation_nonce, expires_at, created_at
-from briar_upload_batches_legacy;
-
-create index briar_upload_batches_expiry_idx
-  on briar_upload_batches (expires_at, request_id);
-create index briar_upload_batches_scope_idx
-  on briar_upload_batches (
-    purpose, organization_id, project_id, channel_id, user_id, work_id,
-    run_id, claim_token_hash
-  );
-
-create table briar_uploads (
-  upload_id text primary key not null,
-  batch_request_id text not null
-    references briar_upload_batches (request_id) on delete cascade,
-  client_id text not null check (
-    client_id = trim(client_id) and length(client_id) between 1 and 128
-  ),
-  position integer not null check (position between 0 and 4),
-  filename text not null check (length(trim(filename)) between 1 and 255),
-  content_type text not null check (
-    content_type = trim(content_type)
-    and length(content_type) between 1 and 255
-  ),
-  byte_size integer not null check (byte_size between 1 and 20971520),
-  sha256 blob not null check (typeof(sha256) = 'blob' and length(sha256) = 32),
-  object_key text not null unique check (
-    object_key = trim(object_key) and length(object_key) between 1 and 500
-  ),
-  uploaded_at text,
-  consumed_at text,
-  consumer_kind text,
-  consumer_id text,
-  check (
-    (consumed_at is null and consumer_kind is null and consumer_id is null)
-    or (
-      uploaded_at is not null and consumed_at is not null
-      and consumer_kind is not null and consumer_id is not null
-    )
-  ),
-  unique (batch_request_id, client_id),
-  unique (batch_request_id, position)
-);
-
-insert into briar_uploads select * from briar_uploads_legacy;
-
-drop table briar_uploads_legacy;
-drop table briar_upload_batches_legacy;
-
-create index briar_uploads_batch_idx
-  on briar_uploads (batch_request_id, position, upload_id);
-create index briar_uploads_consumer_idx
-  on briar_uploads (consumer_kind, consumer_id, upload_id);
 
 create table briar_issue_create_mutation_receipts (
   client_issue_id text primary key not null
@@ -905,6 +804,3 @@ begin
     strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
   ) on conflict (object_key) do nothing;
 end;
-
-pragma legacy_alter_table = off;
-pragma foreign_keys = on;
