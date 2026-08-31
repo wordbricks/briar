@@ -7,6 +7,8 @@ import {
   IssueActivityScopeSchema,
 } from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
 import { AgentActivityKind } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import { evictDurableObject } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import * as Option from "effect/Option";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -15,32 +17,11 @@ import {
   type AgentReplyActivityFrame,
 } from "../../src/lib/channel-agent-activity";
 import {
-  ChannelActivityHub,
   publishChannelActivity,
   publishIssueActivity,
   subscribeToChannelActivity,
   subscribeToIssueActivity,
 } from "./channel-activity-realtime";
-
-class FakeSocket {
-  sent: Uint8Array[] = [];
-  close = vi.fn();
-
-  constructor(
-    private readonly attachment: {
-      userId: string;
-      authorizationExpiresAt: number;
-    },
-  ) {}
-
-  deserializeAttachment() {
-    return this.attachment;
-  }
-
-  send(value: Uint8Array) {
-    this.sent.push(value.slice());
-  }
-}
 
 const activity = create(AgentActivitySchema, {
   id: "command-1",
@@ -93,108 +74,156 @@ const publishRequest = (value: AgentReplyActivityFrame) =>
     body: encodeAgentReplyActivityFrameBinary(value),
   });
 
-const decodeFrame = (value: Uint8Array) => Option.getOrThrow(
-  decodeAgentReplyActivityFrameBinaryOption(value),
-);
+const decodeFrame = async (value: unknown) => {
+  let bytes: Uint8Array;
+  if (value instanceof ArrayBuffer) {
+    bytes = new Uint8Array(value);
+  } else if (ArrayBuffer.isView(value)) {
+    bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  } else if (value instanceof Blob) {
+    bytes = new Uint8Array(await value.arrayBuffer());
+  } else {
+    throw new TypeError("Expected a binary WebSocket message");
+  }
+  return Option.getOrThrow(decodeAgentReplyActivityFrameBinaryOption(bytes));
+};
+
+function openWebSocket(response: Response) {
+  const socket = response.webSocket;
+  if (!socket) throw new TypeError("Expected WebSocket upgrade response");
+  const queuedMessages: unknown[] = [];
+  const waitingMessages: Array<(value: unknown) => void> = [];
+  const queuedCloses: Array<{ code: number; reason: string }> = [];
+  const waitingCloses: Array<
+    (value: { code: number; reason: string }) => void
+  > = [];
+  socket.addEventListener("message", (event) => {
+    const resolve = waitingMessages.shift();
+    if (resolve) resolve(event.data);
+    else queuedMessages.push(event.data);
+  });
+  socket.addEventListener("close", (event) => {
+    const value = { code: event.code, reason: event.reason };
+    const resolve = waitingCloses.shift();
+    if (resolve) resolve(value);
+    else queuedCloses.push(value);
+  });
+  socket.accept();
+  return {
+    socket,
+    nextMessage: () => {
+      const value = queuedMessages.shift();
+      return value === undefined
+        ? new Promise<unknown>((resolve) => waitingMessages.push(resolve))
+        : Promise.resolve(value);
+    },
+    nextClose: () => {
+      const value = queuedCloses.shift();
+      return value === undefined
+        ? new Promise<{ code: number; reason: string }>((resolve) =>
+          waitingCloses.push(resolve)
+        )
+        : Promise.resolve(value);
+    },
+  };
+}
+
+async function subscribe(
+  stub: DurableObjectStub,
+  authorizationExpiresAt = Date.now() + 60_000,
+) {
+  const query = new URLSearchParams({
+    userId: "user-a",
+    authorizationExpiresAt: String(authorizationExpiresAt),
+  });
+  return openWebSocket(await stub.fetch(
+    `https://activity.test/subscribe?${query}`,
+    { headers: { Upgrade: "websocket" } },
+  ));
+}
 
 describe("ChannelActivityHub", () => {
   it("fans out the latest sequence and rejects stale updates", async () => {
-    const socket = new FakeSocket({
-      userId: "user-a",
-      authorizationExpiresAt: Date.now() + 60_000,
-    });
-    const hub = new ChannelActivityHub(
-      { getWebSockets: () => [socket] } as unknown as DurableObjectState,
-      {} as Env,
-    );
+    const stub = env.CHANNEL_ACTIVITY_REALTIME.getByName(crypto.randomUUID());
+    const realtime = await subscribe(stub);
     for (const sequence of [2, 1]) {
-      const response = await hub.fetch(publishRequest(frame(sequence)));
+      const response = await stub.fetch(publishRequest(frame(sequence)));
       expect(response.status).toBe(204);
     }
-    expect(socket.sent).toHaveLength(1);
-    expect(decodeFrame(socket.sent[0])).toMatchObject({ sequence: 2n });
+    expect(await decodeFrame(await realtime.nextMessage()))
+      .toMatchObject({ sequence: 2n });
+
+    const otherReply = create(AgentReplyActivityFrameSchema, {
+      ...frame(3),
+      replyJobId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    });
+    await stub.fetch(publishRequest(otherReply));
+    expect(await decodeFrame(await realtime.nextMessage()))
+      .toMatchObject({ replyJobId: otherReply.replyJobId, sequence: 3n });
+    realtime.socket.close(1000, "done");
   });
 
   it("rejects a protobuf frame without a scope oneof", async () => {
-    const socket = new FakeSocket({
-      userId: "user-a",
-      authorizationExpiresAt: Date.now() + 60_000,
-    });
-    const hub = new ChannelActivityHub(
-      { getWebSockets: () => [socket] } as unknown as DurableObjectState,
-      {} as Env,
-    );
+    const stub = env.CHANNEL_ACTIVITY_REALTIME.getByName(crypto.randomUUID());
     const invalid = create(AgentReplyActivityFrameSchema, {
       ...frame(1),
       scope: { case: undefined },
     });
 
-    const response = await hub.fetch(publishRequest(invalid));
+    const response = await stub.fetch(publishRequest(invalid));
 
     expect(response.status).toBe(400);
-    expect(socket.sent).toEqual([]);
   });
 
   it("closes expired subscribers before sending private activity", async () => {
-    const socket = new FakeSocket({
-      userId: "user-a",
-      authorizationExpiresAt: Date.now() - 1,
+    const stub = env.CHANNEL_ACTIVITY_REALTIME.getByName(crypto.randomUUID());
+    const authorizationExpiresAt = Date.now() + 200;
+    const realtime = await subscribe(stub, authorizationExpiresAt);
+    await evictDurableObject(stub);
+    await new Promise((resolve) => {
+      setTimeout(resolve, authorizationExpiresAt - Date.now() + 1);
     });
-    const hub = new ChannelActivityHub(
-      { getWebSockets: () => [socket] } as unknown as DurableObjectState,
-      {} as Env,
-    );
-    await hub.fetch(publishRequest(frame(1)));
-    expect(socket.sent).toEqual([]);
-    expect(socket.close).toHaveBeenCalledWith(
-      4003,
-      "Agent activity authorization expired",
-    );
+
+    await stub.fetch(publishRequest(frame(1)));
+
+    await expect(realtime.nextClose()).resolves.toEqual({
+      code: 4003,
+      reason: "Agent activity authorization expired",
+    });
   });
 
   it("keeps a completion tombstone from being overwritten by a late publish", async () => {
-    const socket = new FakeSocket({
-      userId: "user-a",
-      authorizationExpiresAt: Date.now() + 60_000,
-    });
-    const hub = new ChannelActivityHub(
-      { getWebSockets: () => [socket] } as unknown as DurableObjectState,
-      {} as Env,
-    );
+    const stub = env.CHANNEL_ACTIVITY_REALTIME.getByName(crypto.randomUUID());
     const cleared = create(AgentReplyActivityFrameSchema, {
       ...frame(Number.MAX_SAFE_INTEGER),
       activity: undefined,
     });
     for (const update of [cleared, frame(3)]) {
-      await hub.fetch(publishRequest(update));
+      await stub.fetch(publishRequest(update));
     }
-    expect(socket.sent).toHaveLength(1);
-    const tombstone = decodeFrame(socket.sent[0]);
+    const realtime = await subscribe(stub);
+    const tombstone = await decodeFrame(await realtime.nextMessage());
     expect(tombstone).toMatchObject({
       sequence: BigInt(Number.MAX_SAFE_INTEGER),
     });
     expect(tombstone.activity).toBeUndefined();
+    realtime.socket.close(1000, "done");
   });
 
   it("fans out issue-scoped commentary frames through the same ephemeral hub", async () => {
-    const socket = new FakeSocket({
-      userId: "user-a",
-      authorizationExpiresAt: Date.now() + 60_000,
-    });
-    const hub = new ChannelActivityHub(
-      { getWebSockets: () => [socket] } as unknown as DurableObjectState,
-      {} as Env,
-    );
+    const stub = env.CHANNEL_ACTIVITY_REALTIME.getByName(crypto.randomUUID());
+    const realtime = await subscribe(stub);
     const issue = issueFrame();
-    const response = await hub.fetch(publishRequest(issue));
+    const response = await stub.fetch(publishRequest(issue));
     expect(response.status).toBe(204);
-    expect(decodeFrame(socket.sent[0])).toMatchObject({
+    expect(await decodeFrame(await realtime.nextMessage())).toMatchObject({
       scope: {
         case: "issue",
         value: { projectId: "11111111-1111-4111-8111-111111111111" },
       },
       activity: { kind: AgentActivityKind.MESSAGE },
     });
+    realtime.socket.close(1000, "done");
   });
 });
 

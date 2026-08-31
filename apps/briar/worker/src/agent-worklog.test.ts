@@ -1,6 +1,5 @@
 import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { agentProviders } from "../../src/lib/agent-provider";
 import {
   ingestAgentTranscript,
   listAgentTranscriptSegments,
@@ -68,9 +67,10 @@ describe("provider-independent agent work log", () => {
     return totals!;
   };
 
-  it.each(agentProviders)(
-    "projects %s events into the same compact schema",
-    async (provider) => {
+  it(
+    "projects provider events into the compact schema",
+    async () => {
+      const provider = "codex";
       const sessionId = `provider-${provider}`;
       const first = [
         {

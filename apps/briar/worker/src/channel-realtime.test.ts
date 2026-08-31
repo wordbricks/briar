@@ -1,37 +1,15 @@
 import {
   ChannelsChangedSchema,
+  InboxChangedSchema,
   type OrganizationNotification,
   OrganizationNotificationSchema,
   ProjectAgentSessionsChangedSchema,
   ProjectChangedSchema,
 } from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
-import { describe, expect, it, vi } from "vitest";
-import { ChannelRealtimeHub } from "./channel-realtime";
-
-class FakeSocket {
-  sent: Uint8Array[] = [];
-  attachment: { cursors: Record<string, number> } | null;
-  close = vi.fn();
-
-  constructor(cursor: number) {
-    this.attachment = { cursors: { channels: cursor } };
-  }
-
-  deserializeAttachment() {
-    return this.attachment;
-  }
-
-  serializeAttachment(
-    attachment: { cursors: Record<string, number> },
-  ) {
-    this.attachment = attachment;
-  }
-
-  send(value: Uint8Array) {
-    this.sent.push(value.slice());
-  }
-}
+import { evictDurableObject } from "cloudflare:test";
+import { env } from "cloudflare:workers";
+import { describe, expect, it } from "vitest";
 
 const notifyRequest = (notification: OrganizationNotification) =>
   new Request("https://realtime.test/notify", {
@@ -40,16 +18,63 @@ const notifyRequest = (notification: OrganizationNotification) =>
     body: toBinary(OrganizationNotificationSchema, notification),
   });
 
-const decodeFrame = (value: Uint8Array) =>
-  fromBinary(OrganizationNotificationSchema, value);
+const decodeFrame = async (value: unknown) => {
+  let bytes: Uint8Array;
+  if (value instanceof ArrayBuffer) {
+    bytes = new Uint8Array(value);
+  } else if (ArrayBuffer.isView(value)) {
+    bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  } else if (value instanceof Blob) {
+    bytes = new Uint8Array(await value.arrayBuffer());
+  } else {
+    throw new TypeError("Expected a binary WebSocket message");
+  }
+  return fromBinary(OrganizationNotificationSchema, bytes);
+};
+
+function openWebSocket(response: Response) {
+  const socket = response.webSocket;
+  if (!socket) throw new TypeError("Expected WebSocket upgrade response");
+  const queued: unknown[] = [];
+  const waiting: Array<(value: unknown) => void> = [];
+  socket.addEventListener("message", (event) => {
+    const resolve = waiting.shift();
+    if (resolve) resolve(event.data);
+    else queued.push(event.data);
+  });
+  socket.accept();
+  return {
+    socket,
+    nextMessage: () => {
+      const value = queued.shift();
+      return value === undefined
+        ? new Promise<unknown>((resolve) => waiting.push(resolve))
+        : Promise.resolve(value);
+    },
+  };
+}
+
+async function subscribe(cursor: number) {
+  const stub = env.CHANNEL_REALTIME.getByName(crypto.randomUUID());
+  const realtime = openWebSocket(await stub.fetch(
+    `https://realtime.test/subscribe?cursor=${cursor}&inboxVersion=0`,
+    { headers: { Upgrade: "websocket" } },
+  ));
+  const initial = [];
+  for (let index = 0; index < 3; index += 1) {
+    initial.push(await decodeFrame(await realtime.nextMessage()));
+  }
+  expect(initial.map((item) => item.notification.case)).toEqual([
+    "ready",
+    "channelsChanged",
+    "inboxChanged",
+  ]);
+  return { stub, ...realtime };
+}
 
 describe("ChannelRealtimeHub", () => {
   it("fans out only newer protobuf cursor frames", async () => {
-    const socket = new FakeSocket(9);
-    const hub = new ChannelRealtimeHub(
-      { getWebSockets: () => [socket] } as unknown as DurableObjectState,
-      {} as Env,
-    );
+    const realtime = await subscribe(9);
     const channelsChanged = (cursor: bigint) =>
       create(OrganizationNotificationSchema, {
         notification: {
@@ -58,59 +83,80 @@ describe("ChannelRealtimeHub", () => {
         },
       });
 
-    const published = await hub.fetch(notifyRequest(channelsChanged(12n)));
+    const published = await realtime.stub.fetch(
+      notifyRequest(channelsChanged(12n)),
+    );
     expect(published.status).toBe(204);
-    expect(decodeFrame(socket.sent[0]).notification).toMatchObject({
-      case: "channelsChanged",
-      value: { cursor: 12n },
-    });
-    expect(socket.attachment).toEqual({ cursors: { channels: 12 } });
+    expect((await decodeFrame(await realtime.nextMessage())).notification)
+      .toMatchObject({
+        case: "channelsChanged",
+        value: { cursor: 12n },
+      });
 
-    await hub.fetch(notifyRequest(channelsChanged(11n)));
-    expect(socket.sent).toHaveLength(1);
+    await evictDurableObject(realtime.stub);
+    await realtime.stub.fetch(notifyRequest(channelsChanged(11n)));
+    await realtime.stub.fetch(notifyRequest(create(
+      OrganizationNotificationSchema,
+      {
+        notification: {
+          case: "inboxChanged",
+          value: create(InboxChangedSchema, { version: 1n }),
+        },
+      },
+    )));
+    expect((await decodeFrame(await realtime.nextMessage())).notification.case)
+      .toBe("inboxChanged");
+    realtime.socket.close(1000, "done");
   });
 
   it("tracks protobuf oneof revisions independently", async () => {
-    const socket = new FakeSocket(42);
-    const hub = new ChannelRealtimeHub(
-      { getWebSockets: () => [socket] } as unknown as DurableObjectState,
-      {} as Env,
-    );
+    const realtime = await subscribe(42);
     const projectId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    const projectChanged = (cursor: bigint) =>
+      create(OrganizationNotificationSchema, {
+        notification: {
+          case: "projectChanged",
+          value: create(ProjectChangedSchema, { projectId, cursor }),
+        },
+      });
+    const sessionsChanged = (version: bigint) =>
+      create(OrganizationNotificationSchema, {
+        notification: {
+          case: "projectAgentSessionsChanged",
+          value: create(ProjectAgentSessionsChangedSchema, {
+            projectId,
+            version,
+          }),
+        },
+      });
 
-    await hub.fetch(notifyRequest(create(OrganizationNotificationSchema, {
-      notification: {
-        case: "projectChanged",
-        value: create(ProjectChangedSchema, { projectId, cursor: 3n }),
-      },
-    })));
-    await hub.fetch(notifyRequest(create(OrganizationNotificationSchema, {
-      notification: {
-        case: "projectAgentSessionsChanged",
-        value: create(ProjectAgentSessionsChangedSchema, {
-          projectId,
-          version: 8n,
-        }),
-      },
-    })));
+    await realtime.stub.fetch(notifyRequest(projectChanged(3n)));
+    await realtime.stub.fetch(notifyRequest(sessionsChanged(8n)));
 
-    expect(socket.sent.map(decodeFrame).map((frame) => frame.notification.case))
-      .toEqual(["projectChanged", "projectAgentSessionsChanged"]);
-    expect(socket.attachment).toEqual({
-      cursors: {
-        channels: 42,
-        [`project:${projectId}`]: 3,
-        [`project-session:${projectId}`]: 8,
+    expect((await decodeFrame(await realtime.nextMessage())).notification.case)
+      .toBe("projectChanged");
+    expect((await decodeFrame(await realtime.nextMessage())).notification.case)
+      .toBe("projectAgentSessionsChanged");
+
+    await realtime.stub.fetch(notifyRequest(projectChanged(2n)));
+    await realtime.stub.fetch(notifyRequest(sessionsChanged(7n)));
+    await realtime.stub.fetch(notifyRequest(create(
+      OrganizationNotificationSchema,
+      {
+        notification: {
+          case: "channelsChanged",
+          value: create(ChannelsChangedSchema, { cursor: 43n }),
+        },
       },
-    });
+    )));
+    expect((await decodeFrame(await realtime.nextMessage())).notification)
+      .toMatchObject({ case: "channelsChanged", value: { cursor: 43n } });
+    realtime.socket.close(1000, "done");
   });
 
   it("rejects a frame without a notification oneof", async () => {
-    const hub = new ChannelRealtimeHub(
-      {} as DurableObjectState,
-      {} as Env,
-    );
-    const response = await hub.fetch(notifyRequest(
+    const stub = env.CHANNEL_REALTIME.getByName(crypto.randomUUID());
+    const response = await stub.fetch(notifyRequest(
       create(OrganizationNotificationSchema),
     ));
     expect(response.status).toBe(400);

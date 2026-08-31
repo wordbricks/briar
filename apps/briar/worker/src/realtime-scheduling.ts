@@ -129,7 +129,6 @@ function scheduleActivityClear<Frame>(
     failureContext: Record<string, string>;
   },
 ) {
-  if (!env.CHANNEL_ACTIVITY_REALTIME) return;
   const frame = adapter.makeFrame({
     sequence: Number.MAX_SAFE_INTEGER,
     activity: null,
@@ -372,7 +371,6 @@ export function scheduleChannelActivityDisconnect(
   channelId: string,
   context?: ExecutionContext,
 ) {
-  if (!env.CHANNEL_ACTIVITY_REALTIME) return;
   const disconnect = disconnectChannelActivitySubscribers(
     env,
     organizationId,
