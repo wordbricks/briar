@@ -31,8 +31,10 @@ const prerequisiteIds: PrerequisiteId[] = ["git", ...agentProviders];
 
 export function DeveloperToolsSetup({
   onContinue,
+  requireAgent = false,
 }: {
   onContinue: () => void;
+  requireAgent?: boolean;
 }) {
   const { t } = useI18n();
   const [prerequisites, setPrerequisites] =
@@ -104,6 +106,11 @@ export function DeveloperToolsSetup({
   const gitReady =
     prerequisites?.git.installed === true &&
     prerequisites.git.authenticated === true;
+  const agentReady = agentProviders.some(
+    (provider) =>
+      prerequisites?.[provider].installed === true &&
+      prerequisites[provider].authenticated === true,
+  );
   const busy = checking || installing !== null || terminalPathSaving;
 
   return (
@@ -223,7 +230,9 @@ export function DeveloperToolsSetup({
         {t(
           allReady
             ? "initialOnboarding.allToolsReady"
-            : "onboarding.developerToolsLater",
+            : requireAgent && !agentReady
+              ? "onboarding.developerAgentRequired"
+              : "onboarding.developerToolsLater",
         )}
       </p>
 
@@ -238,7 +247,7 @@ export function DeveloperToolsSetup({
 
       <button
         className="onboarding-primary-action developer-tools-continue"
-        disabled={busy || !gitReady}
+        disabled={busy || !gitReady || (requireAgent && !agentReady)}
         onClick={onContinue}
         type="button"
       >

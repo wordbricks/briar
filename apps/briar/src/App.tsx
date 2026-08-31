@@ -117,8 +117,13 @@ import {
   markInitialOnboardingComplete,
 } from "./lib/initial-onboarding";
 import {
+  beginOrganizationInvitation,
+  clearOrganizationInvitationProgress,
   leaveOrganizationInvitationRoute,
+  loadOrganizationInvitationProgress,
   loadOrganizationInvitationToken,
+  organizationInvitationProgressFrom,
+  storeOrganizationInvitationProgress,
 } from "./lib/organization-invitation";
 import { syncAppBadgeCount } from "./lib/app-badge";
 import {
@@ -286,8 +291,11 @@ export function App({
   const [invitationToken, setInvitationToken] = useState(
     loadOrganizationInvitationToken,
   );
+  const [invitationProgress, setInvitationProgress] = useState(
+    loadOrganizationInvitationProgress,
+  );
   const [acceptingInvitation, setAcceptingInvitation] = useState(false);
-  const invitationAcceptanceAttemptRef = useRef<string | null>(null);
+  const invitationDeveloperSetupRequestRef = useRef<string | null>(null);
   const plannedUpdateRecoveryRef = useRef<Promise<void> | null>(null);
   const scheduleSessionOptions = useMemo<UseBriarOptions>(() => ({
     adoptRemoteAgentSession: autoHunt.adoptRemoteSession,
@@ -2091,9 +2099,13 @@ export function App({
             organization.id === settingsTarget.organizationId,
         )
       : null;
+  const hasCurrentUserInvitationProgress = Boolean(
+    briar.user && invitationProgress?.userId === briar.user.id,
+  );
   const shouldShowInitialOnboarding =
     !briar.remoteMode &&
-    !hasCompletedOnboarding;
+    !hasCompletedOnboarding &&
+    !hasCurrentUserInvitationProgress;
   const shouldShowFirstOrganizationSetup =
     resolveShouldShowFirstOrganizationSetup({
     hasUser: briar.user !== null,
@@ -2108,8 +2120,14 @@ export function App({
       !briar.isCreatingProject &&
       !briar.projectConnection &&
       !invitationToken &&
+      !hasCurrentUserInvitationProgress &&
       (pendingFirstRunTutorialUserId === briar.user.id ||
         hasPendingFirstRunTutorial(briar.user.id)),
+  );
+  const shouldShowInvitationCollaboratorTutorial = Boolean(
+    !briar.remoteMode &&
+      hasCurrentUserInvitationProgress &&
+      invitationProgress?.nextStep === "collaborator",
   );
   const sendIssueMessage = (
     runId: string,
@@ -2349,11 +2367,19 @@ export function App({
   }, [briar.activeProjectId]);
 
   const acceptCurrentInvitation = useCallback(async () => {
-    if (!invitationToken) return;
+    if (!invitationToken || !briar.user) return;
     setAcceptingInvitation(true);
     try {
-      await briar.acceptInvitation(invitationToken);
-      leaveOrganizationInvitationRoute();
+      const result = await briar.acceptInvitation(invitationToken);
+      const progress = organizationInvitationProgressFrom(
+        result.invitation,
+        briar.user.id,
+      );
+      storeOrganizationInvitationProgress(progress);
+      setInvitationProgress(progress);
+      markInitialOnboardingComplete();
+      setHasCompletedOnboarding(true);
+      leaveOrganizationInvitationRoute({ preserveProgress: true });
       setInvitationToken(null);
       setRequestedRunId(null);
       setRequestedSessionId(null);
@@ -2363,19 +2389,48 @@ export function App({
     } finally {
       setAcceptingInvitation(false);
     }
-  }, [briar.acceptInvitation, invitationToken, resetNavigation]);
+  }, [briar.acceptInvitation, briar.user, invitationToken, resetNavigation]);
 
   useEffect(() => {
-    if (!invitationToken || !briar.user || acceptingInvitation) return;
-    const attemptKey = `${invitationToken}:${briar.user.id}`;
-    if (invitationAcceptanceAttemptRef.current === attemptKey) return;
-    invitationAcceptanceAttemptRef.current = attemptKey;
-    void acceptCurrentInvitation();
+    if (
+      !briar.user ||
+      !invitationProgress ||
+      invitationProgress.userId === briar.user.id
+    ) {
+      return;
+    }
+    clearOrganizationInvitationProgress();
+    invitationDeveloperSetupRequestRef.current = null;
+    setInvitationProgress(null);
+  }, [briar.user, invitationProgress]);
+
+  useEffect(() => {
+    if (
+      briar.remoteMode ||
+      !briar.user ||
+      invitationProgress?.userId !== briar.user.id ||
+      invitationProgress?.nextStep !== "developer" ||
+      briar.isCreatingProject ||
+      briar.projectConnection ||
+      !briar.projects.some(
+        (project) => project.id === invitationProgress.initialProjectId,
+      )
+    ) {
+      return;
+    }
+    const requestKey = `${briar.user.id}:${invitationProgress.initialProjectId}`;
+    if (invitationDeveloperSetupRequestRef.current === requestKey) return;
+    invitationDeveloperSetupRequestRef.current = requestKey;
+    setDeveloperToolsProjectSetupRequested(true);
+    void briar.reconnectProject(invitationProgress.initialProjectId);
   }, [
-    acceptCurrentInvitation,
-    acceptingInvitation,
+    briar.isCreatingProject,
+    briar.projectConnection,
+    briar.projects,
+    briar.reconnectProject,
+    briar.remoteMode,
     briar.user,
-    invitationToken,
+    invitationProgress,
   ]);
 
   useEffect(() => {
@@ -3617,21 +3672,6 @@ export function App({
 
   if (briar.restoringSession) {
     content = <SessionLoadingScreen />;
-  } else if (shouldShowInitialOnboarding) {
-    content = (
-      <InitialOnboarding
-        authenticated={Boolean(briar.user)}
-        error={briar.error}
-        loading={briar.loading}
-        loginCode={briar.loginCode}
-        onCancelLogin={briar.cancelLogin}
-        onComplete={() => {
-          markInitialOnboardingComplete();
-          setHasCompletedOnboarding(true);
-        }}
-        onLogin={(method) => void briar.login({ method, locale })}
-      />
-    );
   } else if (invitationToken) {
     content = (
       <InvitationOnboarding
@@ -3652,6 +3692,21 @@ export function App({
         }}
         token={invitationToken}
         user={briar.user}
+      />
+    );
+  } else if (shouldShowInitialOnboarding) {
+    content = (
+      <InitialOnboarding
+        authenticated={Boolean(briar.user)}
+        error={briar.error}
+        loading={briar.loading}
+        loginCode={briar.loginCode}
+        onCancelLogin={briar.cancelLogin}
+        onComplete={() => {
+          markInitialOnboardingComplete();
+          setHasCompletedOnboarding(true);
+        }}
+        onLogin={(method) => void briar.login({ method, locale })}
       />
     );
   } else if (!briar.user) {
@@ -3675,6 +3730,10 @@ export function App({
           markFirstRunTutorialPending(briar.user!.id);
           setPendingFirstRunTutorialUserId(briar.user!.id);
           resetNavigation("lobby");
+        }}
+        onJoin={(token) => {
+          beginOrganizationInvitation(token);
+          setInvitationToken(token);
         }}
         onLogout={() => void briar.logout()}
         user={briar.user}
@@ -4767,6 +4826,11 @@ export function App({
           includeDeveloperTools={developerToolsProjectSetupRequested}
           loading={briar.loading}
           onCancel={() => {
+            if (invitationProgress?.nextStep === "developer") {
+              clearOrganizationInvitationProgress();
+              setInvitationProgress(null);
+              invitationDeveloperSetupRequestRef.current = null;
+            }
             setDeveloperToolsProjectSetupRequested(false);
             briar.cancelProjectCreation();
             restoreRepositorySetupTrigger();
@@ -4785,6 +4849,11 @@ export function App({
           onConnect={briar.connectProject}
           onCreate={briar.addProject}
           onFinish={() => {
+            if (invitationProgress?.nextStep === "developer") {
+              clearOrganizationInvitationProgress();
+              setInvitationProgress(null);
+              invitationDeveloperSetupRequestRef.current = null;
+            }
             repositorySetupTriggerRef.current = null;
             setDeveloperToolsProjectSetupRequested(false);
             briar.finishProjectCreation();
@@ -4799,6 +4868,14 @@ export function App({
           onRepositorySelect={briar.selectProjectRepository}
           onRepositoryInspect={briar.inspectProjectRepository}
           onResolveGithubRepository={briar.resolveGithubProjectRepository}
+          requireDeveloperAgent={
+            invitationProgress?.nextStep === "developer"
+          }
+          startWithDeveloperTools={Boolean(
+            invitationProgress?.nextStep === "developer" &&
+              invitationProgress.initialProjectId ===
+                briar.projectConnection?.project.id,
+          )}
         />
       ) : null}
       <WorkerDispatchDialog
@@ -4817,7 +4894,18 @@ export function App({
         workers={briar.dashboard?.workers ?? []}
       />
       <FirstRunTutorial
+        initialPhase={
+          shouldShowInvitationCollaboratorTutorial
+            ? "collaborator-demo"
+            : "purpose"
+        }
         onCollaboratorComplete={() => {
+          if (shouldShowInvitationCollaboratorTutorial) {
+            clearOrganizationInvitationProgress();
+            setInvitationProgress(null);
+            resetNavigation("lobby");
+            return;
+          }
           if (!briar.user) return;
           clearFirstRunTutorialPending(briar.user.id);
           setPendingFirstRunTutorialUserId(null);
@@ -4830,7 +4918,10 @@ export function App({
           setDeveloperToolsProjectSetupRequested(true);
           briar.startProjectCreation();
         }}
-        open={shouldShowFirstRunTutorial}
+        open={
+          shouldShowFirstRunTutorial ||
+          shouldShowInvitationCollaboratorTutorial
+        }
       />
       {isLaunchIntroVisible ? (
         <LaunchIntro

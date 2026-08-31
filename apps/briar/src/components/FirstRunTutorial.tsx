@@ -23,20 +23,22 @@ import { useI18n } from "../i18n";
 type TutorialPhase = "purpose" | "collaborator-demo";
 
 export function FirstRunTutorial({
+  initialPhase = "purpose",
   onCollaboratorComplete,
   onDeveloperSelect,
   open,
 }: {
+  initialPhase?: TutorialPhase;
   onCollaboratorComplete: () => void;
   onDeveloperSelect: () => void;
   open: boolean;
 }) {
   const { t } = useI18n();
-  const [phase, setPhase] = useState<TutorialPhase>("purpose");
+  const [phase, setPhase] = useState<TutorialPhase>(initialPhase);
 
   useEffect(() => {
-    if (open) setPhase("purpose");
-  }, [open]);
+    if (open) setPhase(initialPhase);
+  }, [initialPhase, open]);
 
   return (
     <Dialog open={open}>
