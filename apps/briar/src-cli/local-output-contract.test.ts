@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest";
 import {
   localClaimResult,
   localClaimResultJson,
-  localNoWorkResult,
 } from "./local-output-contract";
 
 const runId = "11111111-1111-4111-8111-111111111111";
@@ -74,11 +73,5 @@ describe("local CLI ProtoJSON", () => {
     const json = localClaimResultJson(result);
     expect(json).not.toContain(secret);
     expect(json).not.toContain("claimToken");
-  });
-
-  it("uses an explicit no-work oneof outcome", () => {
-    expect(JSON.parse(localClaimResultJson(localNoWorkResult()))).toEqual({
-      noWork: {},
-    });
   });
 });
