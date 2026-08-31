@@ -1,14 +1,21 @@
-import { inboxSessionMessageVersion } from "../../src/lib/inbox-session-version";
-
 import {
   type ProjectAgentSessionChangeRow,
   type ProjectAgentSessionChangesPage,
   type ProjectAgentSessionRow,
   type ProjectAgentSessionSummaryRow,
 } from "./project-agent-model";
-import { decodeStoredProjectAgentSessionPayload } from "./project-request-contract";
+import {
+  decodeStoredProjectAgentSessionPayload,
+  encodeStoredProjectAgentSessionPayload,
+  encodeStoredProjectAgentSessionSummary,
+  type StoredProjectAgentSessionPayload,
+  type StoredProjectAgentSessionSummary,
+} from "./project-request-contract";
 
 const projectAgentSessionChangePageSize = 500;
+
+const preview = (value: string | null, maximumLength: number) =>
+  value === null ? null : value.slice(0, maximumLength);
 
 const projectAgentSessionSummaryJson = (row: ProjectAgentSessionRow) => {
   const payload = decodeStoredProjectAgentSessionPayload(row.payload_json);
@@ -20,7 +27,7 @@ const projectAgentSessionSummaryJson = (row: ProjectAgentSessionRow) => {
     outcome: issue.outcome,
     summary: null,
   }));
-  return JSON.stringify({
+  return encodeStoredProjectAgentSessionSummary({
     dispatchGroupId: payload.dispatchGroupId,
     agentId: payload.agentId,
     agentName: payload.agentName ?? null,
@@ -31,36 +38,28 @@ const projectAgentSessionSummaryJson = (row: ProjectAgentSessionRow) => {
     scheduleRunId: payload.scheduleRunId ?? null,
     parentSessionId: payload.parentSessionId ?? null,
     requestedByUserId: row.requested_by_user_id,
-    request: payload.request?.slice(0, 500) ?? null,
+    request: preview(payload.request, 500),
     status: payload.status,
     issues,
     startedAt: payload.startedAt,
     completedAt: payload.completedAt,
-    inboxVersion: inboxSessionMessageVersion(
-      payload.status,
-      payload.completedAt ?? payload.startedAt,
-    ),
+    summary: preview(payload.summary, 2_000),
+    error: preview(payload.error, 2_000),
     requestedWorkerId: payload.requestedWorkerId ?? null,
     workerId: payload.workerId ?? null,
     updatedAt: payload.updatedAt,
-  });
+  } satisfies StoredProjectAgentSessionSummary);
 };
 
 const upsertProjectAgentSessionSummaryStatement = (
   db: D1Database,
   row: ProjectAgentSessionRow,
   archived: boolean,
-  requesterFromHotSession = false,
-) => {
-  const requesterExpression = requesterFromHotSession
-    ? `(select session.requested_by_user_id
-        from briar_project_agent_sessions session
-        where session.project_id = ? and session.id = ?)`
-    : "?";
-  return db.prepare(
+) =>
+  db.prepare(
     `insert into briar_project_agent_session_summaries (
        project_id, session_id, summary_json, updated_at, archived
-     ) values (?, ?, json_set(?, '$.requestedByUserId', ${requesterExpression}), ?, ?)
+     ) values (?, ?, ?, ?, ?)
      on conflict (project_id, session_id) do update set
        summary_json = excluded.summary_json,
        updated_at = excluded.updated_at,
@@ -71,13 +70,9 @@ const upsertProjectAgentSessionSummaryStatement = (
     row.project_id,
     row.id,
     projectAgentSessionSummaryJson(row),
-    ...(requesterFromHotSession
-      ? [row.project_id, row.id]
-      : [row.requested_by_user_id]),
     row.updated_at,
     archived ? 1 : 0,
   );
-};
 
 export async function upsertProjectAgentSessionSummary(
   db: D1Database,
@@ -244,9 +239,34 @@ export async function projectAgentSessionIsApprovalOwned(
 
 export async function upsertProjectAgentSession(
   db: D1Database,
-  input: ProjectAgentSessionRow,
+  input: {
+    projectId: string;
+    id: string;
+    requestedByUserId: string | null;
+    payload: StoredProjectAgentSessionPayload;
+  },
   observedAt: string,
 ) {
+  const existing = await getProjectAgentSession(db, input.projectId, input.id);
+  const requestedByUserId = existing
+    ? existing.requested_by_user_id
+    : input.requestedByUserId;
+  const payload = {
+    ...input.payload,
+    requestedByUserId,
+  } satisfies StoredProjectAgentSessionPayload;
+  const row: ProjectAgentSessionRow = {
+    project_id: input.projectId,
+    id: input.id,
+    agent_id: payload.agentId,
+    requested_by_user_id: requestedByUserId,
+    status: payload.status,
+    session_type: payload.sessionType,
+    payload_json: encodeStoredProjectAgentSessionPayload(payload),
+    started_at: payload.startedAt,
+    completed_at: payload.completedAt,
+    updated_at: payload.updatedAt,
+  };
   await db.batch([
     db.prepare(
       `insert into briar_project_agent_session_context_membership (
@@ -265,7 +285,7 @@ export async function upsertProjectAgentSession(
            and archive.archive_kind = 'project_agent_sessions'
            and archive.status in ('verified', 'complete')
        )`,
-    ).bind(input.project_id, input.id, observedAt),
+    ).bind(row.project_id, row.id, observedAt),
     db.prepare(
       `insert into briar_project_agent_sessions (
          project_id, id, agent_id, status, session_type, payload_json,
@@ -282,18 +302,18 @@ export async function upsertProjectAgentSession(
        where excluded.updated_at > briar_project_agent_sessions.updated_at`,
     )
     .bind(
-      input.project_id,
-      input.id,
-      input.agent_id,
-      input.status,
-      input.session_type,
-      input.payload_json,
-      input.started_at,
-      input.completed_at,
-      input.updated_at,
-      input.requested_by_user_id,
+      row.project_id,
+      row.id,
+      row.agent_id,
+      row.status,
+      row.session_type,
+      row.payload_json,
+      row.started_at,
+      row.completed_at,
+      row.updated_at,
+      row.requested_by_user_id,
     ),
-    upsertProjectAgentSessionSummaryStatement(db, input, false, true),
+    upsertProjectAgentSessionSummaryStatement(db, row, false),
   ]);
   return db
     .prepare(
@@ -303,6 +323,6 @@ export async function upsertProjectAgentSession(
        from briar_project_agent_sessions
        where project_id = ? and id = ?`,
     )
-    .bind(input.project_id, input.id)
+    .bind(row.project_id, row.id)
     .first<ProjectAgentSessionRow>();
 }

@@ -13,6 +13,7 @@ import {
 } from "./db";
 import { hydrateAgentSkills } from "./agent-skills";
 import type { OrganizationAgentRow } from "./organization-agents";
+import { decodeStoredProjectAgentSessionPayload } from "./project-request-contract";
 
 export const organizationAgentContextDefaultPageSize = 25;
 export const organizationAgentContextMaxPageSize = 50;
@@ -197,13 +198,6 @@ const parseJson = (value: string | null) => {
   }
 };
 
-const parseJsonObject = (value: string | null) => {
-  const parsed = parseJson(value);
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-    ? parsed as Record<string, unknown>
-    : null;
-};
-
 const projectAgentContextJson = (
   agent: OrganizationAgentRow & {
     skills: NonNullable<OrganizationAgentRow["skills"]>;
@@ -354,37 +348,9 @@ type ContextIssuePullRequestRow = {
   url: string;
 };
 
-const sessionPayloadKeys = [
-  "dispatchGroupId",
-  "agentId",
-  "agentName",
-  "skillId",
-  "sessionType",
-  "trigger",
-  "scheduleId",
-  "scheduleRunId",
-  "parentSessionId",
-  "request",
-  "followUps",
-  "status",
-  "issues",
-  "startedAt",
-  "completedAt",
-  "conversationId",
-  "summary",
-  "error",
-  "requestedWorkerId",
-  "workerId",
-  "events",
-  "updatedAt",
-] as const;
-
 const sessionContextJson = (row: ProjectAgentSessionRow) => {
-  const raw = parseJsonObject(row.payload_json) ?? {};
-  const payload: Record<string, unknown> = {};
-  for (const key of sessionPayloadKeys) {
-    if (Object.prototype.hasOwnProperty.call(raw, key)) payload[key] = raw[key];
-  }
+  const payload = { ...decodeStoredProjectAgentSessionPayload(row.payload_json) };
+  delete payload.requestedByUserId;
   return {
     id: row.id,
     projectId: row.project_id,
@@ -1039,7 +1005,7 @@ type ContextSessionSummaryRow = {
   agent_id: string | null;
   status: string | null;
   session_type: string | null;
-  summary: string | null;
+  payload_json: string | null;
   started_at: string | null;
   completed_at: string | null;
   updated_at: string;
@@ -1060,7 +1026,7 @@ async function organizationAgentContextSessionSummaries(
   }) as SessionCursor | null;
   const candidateSql = `
     select session.id, session.agent_id, session.status, session.session_type,
-           json_extract(session.payload_json, '$.summary') as summary,
+           session.payload_json,
            session.started_at, session.completed_at, session.updated_at,
            0 as archived
     from briar_project_agent_sessions session
@@ -1070,7 +1036,7 @@ async function organizationAgentContextSessionSummaries(
     where session.project_id = ? and membership.visible_at <= ?
     union all
     select archive.scope_id as id, null as agent_id, null as status,
-           null as session_type, null as summary,
+           null as session_type, null as payload_json,
            archive.period_start as started_at,
            archive.period_end as completed_at,
            coalesce(archive.completed_at, archive.verified_at,
@@ -1119,7 +1085,9 @@ async function organizationAgentContextSessionSummaries(
     agentId: row.agent_id,
     status: row.status,
     sessionType: row.session_type,
-    summary: row.summary,
+    summary: row.payload_json === null
+      ? null
+      : decodeStoredProjectAgentSessionPayload(row.payload_json).summary,
     archived: row.archived === 1,
     startedAt: row.started_at,
     completedAt: row.completed_at,

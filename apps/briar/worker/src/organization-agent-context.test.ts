@@ -12,9 +12,11 @@ import {
   organizationAgentContextManifest,
   OrganizationAgentContextCursorError,
   organizationAgentContextMaxEncodedPageBytes,
-  OrganizationAgentContextPageTooLargeError,
 } from "./organization-agent-context";
-import { decodeProjectAgentSessionInput } from "./project-request-contract";
+import {
+  decodeProjectAgentSessionInput,
+  encodeStoredProjectAgentSessionPayload,
+} from "./project-request-contract";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const otherOrganizationId = "10000000-0000-4000-8000-000000000002";
@@ -117,7 +119,7 @@ const insertSession = async (input: {
     input.id,
     agentId,
     input.status,
-    JSON.stringify(payload),
+    encodeStoredProjectAgentSessionPayload(payload),
     input.startedAt,
     input.status === "completed" ? input.startedAt : null,
     input.startedAt,
@@ -601,7 +603,7 @@ describe("Organization Agent context lookup", () => {
     })).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
   });
 
-  it("fits summary pages to the byte budget and rejects one oversized item", async () => {
+  it("fits large summary pages to the byte budget", async () => {
     for (let index = 0; index < 32; index += 1) {
       await insertSession({
         id: `large-session-${index.toString().padStart(2, "0")}`,
@@ -632,35 +634,5 @@ describe("Organization Agent context lookup", () => {
     ).toBeLessThanOrEqual(organizationAgentContextMaxEncodedPageBytes);
     expect(page).toMatchObject({ total: 36, complete: false });
     expect(page.nextCursor).not.toBeNull();
-
-    await insertSession({
-      id: "oversized-session",
-      projectId: secondProjectId,
-      status: "running",
-      summary: "Before corruption",
-      startedAt: currentDataAt,
-    });
-    await db.prepare(
-      `update briar_project_agent_sessions
-       set payload_json = json_set(payload_json, '$.summary', ?)
-       where project_id = ? and id = 'oversized-session'`,
-    ).bind(
-      "x".repeat(organizationAgentContextMaxEncodedPageBytes),
-      secondProjectId,
-    ).run();
-    await expect(
-      lookupOrganizationAgentContext(db, archives, {
-        organizationId,
-        workId,
-        snapshotAt,
-        requests: [{
-          resource: "agent-sessions",
-          projectId: secondProjectId,
-          detail: "summary",
-          limit: 25,
-          cursor: null,
-        }],
-      }),
-    ).rejects.toBeInstanceOf(OrganizationAgentContextPageTooLargeError);
   });
 });

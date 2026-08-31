@@ -113,6 +113,7 @@ import {
   decodeProjectAgentScheduleInput,
   decodeProjectAgentSessionInput,
   decodeStoredProjectAgentSessionPayload,
+  decodeStoredProjectAgentSessionSummary,
   decodeProjectAgentTaskInput,
 } from "./project-request-contract";
 import { decodeRequestSync } from "./request-schema";
@@ -950,59 +951,18 @@ const rowToProjectAgentSession = (
 const summaryToProjectAgentSession = (
   row: Awaited<ReturnType<typeof listProjectAgentSessionSummaries>>[number],
 ) => {
-  type StoredSessionSummary = {
-    dispatchGroupId?: unknown;
-    agentId?: unknown;
-    agentName?: unknown;
-    skillId?: unknown;
-    sessionType?: unknown;
-    trigger?: unknown;
-    scheduleId?: unknown;
-    scheduleRunId?: unknown;
-    parentSessionId?: unknown;
-    request?: unknown;
-    status?: unknown;
-    issues?: unknown;
-    startedAt?: unknown;
-    completedAt?: unknown;
-    requestedWorkerId?: unknown;
-    workerId?: unknown;
-    updatedAt?: unknown;
-    requestedByUserId?: unknown;
-  };
-  const stored = JSON.parse(row.summary_json) as StoredSessionSummary;
-  // Apply the public summary defaults while passing only canonical session
-  // input fields through strict decode.
+  const { requestedByUserId, ...stored } =
+    decodeStoredProjectAgentSessionSummary(row.summary_json);
   const payload = decodeProjectAgentSessionInput({
-    dispatchGroupId: stored.dispatchGroupId,
-    agentId: stored.agentId ?? null,
-    agentName: stored.agentName ?? null,
-    skillId: stored.skillId ?? null,
-    sessionType: stored.sessionType,
-    trigger: stored.trigger ?? null,
-    scheduleId: stored.scheduleId ?? null,
-    scheduleRunId: stored.scheduleRunId ?? null,
-    parentSessionId: stored.parentSessionId ?? null,
-    request: stored.request ?? null,
+    ...stored,
     followUps: [],
-    status: stored.status,
-    issues: stored.issues,
-    startedAt: stored.startedAt,
-    completedAt: stored.completedAt ?? null,
     conversationId: null,
-    summary: null,
-    error: null,
-    requestedWorkerId: stored.requestedWorkerId ?? null,
-    workerId: stored.workerId ?? null,
     events: [],
-    updatedAt: stored.updatedAt,
   });
   return toProjectAgentSession({
     id: row.session_id,
     projectId: row.project_id,
-    requestedByUserId: typeof stored.requestedByUserId === "string"
-      ? stored.requestedByUserId
-      : null,
+    requestedByUserId,
     payload,
     archived: row.archived === 1,
   });
@@ -1699,16 +1659,10 @@ export const createAppAgentService = (
     const row = await upsertProjectAgentSession(
       db,
       {
-        project_id: project.id,
+        projectId: project.id,
         id: sessionId,
-        agent_id: payload.agentId,
-        requested_by_user_id: requestedByUserId,
-        status: payload.status,
-        session_type: payload.sessionType,
-        payload_json: JSON.stringify(payload),
-        started_at: payload.startedAt,
-        completed_at: payload.completedAt,
-        updated_at: payload.updatedAt,
+        requestedByUserId,
+        payload,
       },
       observedAt,
     );
@@ -1884,16 +1838,10 @@ export const createAppAgentService = (
     const createdSession = await upsertProjectAgentSession(
       db,
       {
-        project_id: project.id,
+        projectId: project.id,
         id: taskId,
-        agent_id: agent.id,
-        requested_by_user_id: session.user.id,
-        status: "running",
-        session_type: "task",
-        payload_json: JSON.stringify(payload),
-        started_at: observedAt,
-        completed_at: null,
-        updated_at: observedAt,
+        requestedByUserId: session.user.id,
+        payload,
       },
       observedAt,
     );

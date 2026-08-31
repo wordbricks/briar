@@ -29,6 +29,7 @@ import {
   mutableArray,
   NonNegativeSafeInteger,
   strictSchema,
+  strictSchemaOptions,
   trimmedText,
   UuidString,
 } from "./schema-codecs";
@@ -179,15 +180,120 @@ export const ProjectAgentSessionInput = strictSchema(Schema.Struct({
  */
 export const StoredProjectAgentSessionPayload = strictSchema(Schema.Struct({
   ...ProjectAgentSessionInput.fields,
-  requestedByUserId: Schema.optional(Schema.NullOr(Schema.String)),
+  requestedByUserId: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isMaxLength(128))),
+  ),
 }));
 
-const StoredProjectAgentSessionPayloadJson = Schema.fromJsonString(
+export type StoredProjectAgentSessionPayload =
+  typeof StoredProjectAgentSessionPayload.Type;
+
+const storedProjectAgentSessionPayloadMaxBytes = 1_048_576;
+export const storedProjectAgentSessionSummaryMaxBytes = 262_144;
+
+const boundedJsonString = (maximumBytes: number) =>
+  Schema.String.check(
+    Schema.makeFilter((value) =>
+      new TextEncoder().encode(value).byteLength <= maximumBytes ||
+      `JSON must contain at most ${maximumBytes} bytes`
+    ),
+  );
+
+const storedJson = <S extends Schema.Constraint>(
+  schema: S,
+  maximumBytes: number,
+) =>
+  boundedJsonString(maximumBytes).pipe(
+    Schema.decodeTo(schema, SchemaTransformation.fromJsonString()),
+  );
+
+const StoredProjectAgentSessionPayloadJson = storedJson(
   StoredProjectAgentSessionPayload,
+  storedProjectAgentSessionPayloadMaxBytes,
 );
 
 export const decodeStoredProjectAgentSessionPayload =
-  Schema.decodeUnknownSync(StoredProjectAgentSessionPayloadJson);
+  Schema.decodeUnknownSync(
+    StoredProjectAgentSessionPayloadJson,
+    strictSchemaOptions,
+  );
+
+export const encodeStoredProjectAgentSessionPayload = Schema.encodeSync(
+  StoredProjectAgentSessionPayloadJson,
+  strictSchemaOptions,
+);
+
+const StoredProjectAgentSessionSummaryIssue = strictSchema(Schema.Struct({
+  runId: Schema.String.check(Schema.isLengthBetween(1, 128)),
+  runNumber: NonNegativeSafeInteger,
+  sourceKey: Schema.String.check(Schema.isLengthBetween(1, 500)),
+  title: Schema.String.check(Schema.isLengthBetween(1, 500)),
+  outcome: Schema.Literals([
+    "pending",
+    "completed",
+    "blocked",
+    "failed",
+    "skipped",
+  ]),
+  summary: Schema.Null,
+}));
+
+export const StoredProjectAgentSessionSummary = strictSchema(Schema.Struct({
+  dispatchGroupId: Schema.String.check(Schema.isLengthBetween(1, 128)),
+  agentId: Schema.NullOr(UuidString),
+  agentName: Schema.NullOr(trimmedText(1, 200)),
+  skillId: Schema.NullOr(UuidString),
+  sessionType: Schema.Literals(["task", "dispatch"]),
+  trigger: Schema.NullOr(Schema.Literals(["manual", "scheduled"])),
+  scheduleId: Schema.NullOr(Schema.String.check(Schema.isMaxLength(128))),
+  scheduleRunId: Schema.NullOr(
+    Schema.String.check(Schema.isMaxLength(128)),
+  ),
+  parentSessionId: Schema.NullOr(
+    Schema.String.check(Schema.isMaxLength(128)),
+  ),
+  requestedByUserId: Schema.NullOr(
+    Schema.String.check(Schema.isMaxLength(128)),
+  ),
+  request: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
+  status: Schema.Literals([
+    "running",
+    "completed",
+    "failed",
+    "skipped",
+    "interrupted",
+  ]),
+  issues: mutableArray(StoredProjectAgentSessionSummaryIssue).check(
+    Schema.isMaxLength(100),
+  ),
+  startedAt: IsoDateTimeWithOffset,
+  completedAt: Schema.NullOr(IsoDateTimeWithOffset),
+  summary: Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_000))),
+  error: Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_000))),
+  requestedWorkerId: Schema.NullOr(
+    Schema.String.check(Schema.isMaxLength(128)),
+  ),
+  workerId: Schema.NullOr(Schema.String.check(Schema.isMaxLength(128))),
+  updatedAt: IsoDateTimeWithOffset,
+}));
+
+export type StoredProjectAgentSessionSummary =
+  typeof StoredProjectAgentSessionSummary.Type;
+
+const StoredProjectAgentSessionSummaryJson = storedJson(
+  StoredProjectAgentSessionSummary,
+  storedProjectAgentSessionSummaryMaxBytes,
+);
+
+export const decodeStoredProjectAgentSessionSummary = Schema.decodeUnknownSync(
+  StoredProjectAgentSessionSummaryJson,
+  strictSchemaOptions,
+);
+
+export const encodeStoredProjectAgentSessionSummary = Schema.encodeSync(
+  StoredProjectAgentSessionSummaryJson,
+  strictSchemaOptions,
+);
 
 export const ProjectAgentTaskInput = strictSchema(Schema.Struct({
   agentId: UuidString,

@@ -12,6 +12,7 @@ import type {
   AgentTranscriptSegmentRow,
   AgentWorkLogEntryRow,
 } from "./agent-worklog";
+import { decodeStoredProjectAgentSessionPayload } from "./project-request-contract";
 import {
   PositiveSafeInteger,
   strictSchemaOptions,
@@ -273,9 +274,16 @@ export const decodeArchivedRunEvidenceImage:
     decodeArchiveSync(ArchivedRunEvidenceImage);
 export const decodeArchivedIssueMessage: (input: unknown) => IssueMessageRow =
   decodeArchiveSync(ArchivedIssueMessage);
-export const decodeArchivedProjectAgentSession:
-  (input: unknown) => ProjectAgentSessionRow =
-    decodeArchiveSync(ArchivedProjectAgentSession);
+const decodeArchivedProjectAgentSessionRow = decodeArchiveSync(
+  ArchivedProjectAgentSession,
+);
+export const decodeArchivedProjectAgentSession = (
+  input: unknown,
+): ProjectAgentSessionRow => {
+  const row = decodeArchivedProjectAgentSessionRow(input);
+  decodeStoredProjectAgentSessionPayload(row.payload_json);
+  return row;
+};
 export const decodeArchivedTranscriptSession:
   (input: unknown) => TranscriptSessionRow =
     decodeArchiveSync(ArchivedTranscriptSession);

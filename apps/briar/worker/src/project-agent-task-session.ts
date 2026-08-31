@@ -2,9 +2,11 @@ import {
   getProjectAgentSession,
   upsertProjectAgentSession,
 } from "./project-agent-session-repository";
-import type { ProjectAgentSessionRow } from "./project-agent-model";
 import { projectAgentSessionJson } from "./project-agent-session-json";
-import { decodeStoredProjectAgentSessionPayload } from "./project-request-contract";
+import {
+  decodeStoredProjectAgentSessionPayload,
+  type StoredProjectAgentSessionPayload,
+} from "./project-request-contract";
 
 export const projectAgentTaskSessionEvent = (
   type: "started" | "completed" | "failed",
@@ -38,7 +40,7 @@ export async function syncProjectAgentTaskSession(
   if (!current) return null;
   const payload = decodeStoredProjectAgentSessionPayload(current.payload_json);
   const terminal = job.status === "completed" || job.status === "failed";
-  const nextPayload = {
+  const nextPayload: StoredProjectAgentSessionPayload = {
     ...payload,
     status: job.status === "queued" || job.status === "running"
       ? "running"
@@ -59,16 +61,10 @@ export async function syncProjectAgentTaskSession(
     ],
   };
   const updated = await upsertProjectAgentSession(db, {
-    project_id: current.project_id,
+    projectId: current.project_id,
     id: current.id,
-    agent_id: current.agent_id,
-    requested_by_user_id: current.requested_by_user_id,
-    status: nextPayload.status as ProjectAgentSessionRow["status"],
-    session_type: current.session_type,
-    payload_json: JSON.stringify(nextPayload),
-    started_at: current.started_at,
-    completed_at: nextPayload.completedAt as string | null,
-    updated_at: job.updated_at,
+    requestedByUserId: current.requested_by_user_id,
+    payload: nextPayload,
   }, job.updated_at);
   return updated ? projectAgentSessionJson(updated) : null;
 }

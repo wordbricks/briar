@@ -116,6 +116,7 @@ import { registerExecutionWorker } from "./workers";
 import apiWorker from "./index";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { encryptSlackToken } from "./slack";
+import type { StoredProjectAgentSessionPayload } from "./project-request-contract";
 import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
 import { workerRuntimeMetadataFixture } from "./test-helpers/worker-runtime";
 
@@ -253,7 +254,7 @@ const projectAgentSessionPayload = (input: {
     type: "completed";
     occurredAt: string;
   }>;
-}) => ({
+}): StoredProjectAgentSessionPayload => ({
   dispatchGroupId: input.id,
   agentId: null,
   sessionType: "task",
@@ -262,6 +263,7 @@ const projectAgentSessionPayload = (input: {
   scheduleRunId: null,
   parentSessionId: null,
   request: "Review the repository",
+  followUps: [],
   status: input.status,
   issues: [],
   startedAt: input.startedAt,
@@ -1335,48 +1337,28 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
   it("synchronizes the newest project agent session snapshot", async () => {
     const sessionId = "77777777-7777-4777-8777-777777777777";
-    const payload = {
-      dispatchGroupId: sessionId,
-      agentId: null,
-      sessionType: "task",
-      trigger: "manual",
-      scheduleId: null,
-      scheduleRunId: null,
-      parentSessionId: null,
-      request: "Review the repository",
+    const payload = projectAgentSessionPayload({
+      id: sessionId,
       status: "running",
-      issues: [],
       startedAt: atMinute(2),
       completedAt: null,
-      conversationId: null,
-      summary: null,
-      error: null,
-      events: [],
-      updatedAt: atMinute(2),
-    };
+    });
     await upsertProjectAgentSession(db, {
-      project_id: projectId,
+      projectId,
       id: sessionId,
-      agent_id: null,
-      requested_by_user_id: "owner",
-      status: "running",
-      session_type: "task",
-      payload_json: JSON.stringify(payload),
-      started_at: atMinute(2),
-      completed_at: null,
-      updated_at: atMinute(2),
+      requestedByUserId: "owner",
+      payload,
     }, atMinute(2));
     await upsertProjectAgentSession(db, {
-      project_id: projectId,
+      projectId,
       id: sessionId,
-      agent_id: null,
-      requested_by_user_id: "owner",
-      status: "failed",
-      session_type: "task",
-      payload_json: JSON.stringify({ ...payload, status: "failed" }),
-      started_at: atMinute(2),
-      completed_at: atMinute(1),
-      updated_at: atMinute(1),
+      requestedByUserId: "owner",
+      payload: {
+        ...payload,
+        status: "failed",
+        completedAt: atMinute(1),
+        updatedAt: atMinute(1),
+      },
     }, atMinute(3));
 
     const sessions = await listProjectAgentSessions(db, projectId);
@@ -1389,85 +1371,29 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ]);
   });
 
-  it("uses the canonical terminal session Inbox version", async () => {
-    const sessionId = "55555555-5555-4555-8555-555555555555";
-    const completedAt = atMinute(4);
-    await upsertProjectAgentSession(db, {
-      project_id: projectId,
-      id: sessionId,
-      agent_id: null,
-      requested_by_user_id: "owner",
-      status: "completed",
-      session_type: "task",
-      payload_json: JSON.stringify(projectAgentSessionPayload({
-        id: sessionId,
-        status: "completed",
-        startedAt: atMinute(2),
-        completedAt,
-        events: [{
-          id: "terminal-completed-event",
-          type: "completed",
-          occurredAt: completedAt,
-        }],
-      })),
-      started_at: atMinute(2),
-      completed_at: completedAt,
-      updated_at: completedAt,
-    }, completedAt);
-
-    const summaries = await listProjectAgentSessionSummaries(
-      db,
-      projectId,
-      [sessionId],
-      "owner",
-    );
-    expect(JSON.parse(summaries[0]!.summary_json)).toMatchObject({
-      status: "completed",
-      inboxVersion: `session:v1:completed:${completedAt}`,
-      requestedByUserId: "owner",
-    });
-    await expect(
-      listProjectAgentSessionSummaries(
-        db,
-        projectId,
-        [sessionId],
-        "another-member",
-      ),
-    ).resolves.toEqual([]);
-  });
-
   it("preserves the trusted Agent Session requester across later updates", async () => {
     const sessionId = "44444444-4444-4444-8444-444444444444";
     const row = {
-      project_id: projectId,
+      projectId,
       id: sessionId,
-      agent_id: null,
-      requested_by_user_id: "owner",
-      status: "running" as const,
-      session_type: "task" as const,
-      payload_json: JSON.stringify(projectAgentSessionPayload({
+      requestedByUserId: "owner",
+      payload: projectAgentSessionPayload({
         id: sessionId,
         status: "running",
         startedAt: atMinute(5),
         completedAt: null,
-      })),
-      started_at: atMinute(5),
-      completed_at: null,
-      updated_at: atMinute(5),
+      }),
     };
     await upsertProjectAgentSession(db, row, atMinute(5));
     await upsertProjectAgentSession(db, {
       ...row,
-      requested_by_user_id: null,
-      status: "completed",
-      payload_json: JSON.stringify(projectAgentSessionPayload({
+      requestedByUserId: null,
+      payload: projectAgentSessionPayload({
         id: sessionId,
         status: "completed",
         startedAt: atMinute(5),
         completedAt: atMinute(6),
-      })),
-      completed_at: atMinute(6),
-      updated_at: atMinute(6),
+      }),
     }, atMinute(6));
 
     const stored = (await listProjectAgentSessions(db, projectId)).find(
