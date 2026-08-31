@@ -3,7 +3,6 @@ import {
   agentExecutionCostObservationsFromPayload,
   agentExecutionCostRecordsFromObservations,
   agentExecutionMetrics,
-  agentExecutionTokenUsageFromPayload,
   agentExecutionTokenUsageFromObservations,
   agentExecutionUsageObservationsFromPayload,
   agentExecutionUsageRecordsFromObservations,
@@ -97,14 +96,16 @@ describe("agent execution metrics", () => {
 
   it("normalizes Codex turn usage without double-counting cached input", () => {
     expect(
-      agentExecutionTokenUsageFromPayload("codex", {
-        type: "turn.completed",
-        usage: {
-          input_tokens: 1_000,
-          cached_input_tokens: 800,
-          output_tokens: 250,
-        },
-      }),
+      agentExecutionTokenUsageFromObservations(
+        agentExecutionUsageObservationsFromPayload("codex", {
+          type: "turn.completed",
+          usage: {
+            input_tokens: 1_000,
+            cached_input_tokens: 800,
+            output_tokens: 250,
+          },
+        }),
+      ),
     ).toEqual({
       inputTokens: 1_000,
       outputTokens: 250,
@@ -117,18 +118,20 @@ describe("agent execution metrics", () => {
 
   it("normalizes Claude result usage including cache activity", () => {
     expect(
-      agentExecutionTokenUsageFromPayload("claude", {
-        type: "event",
-        raw: {
-          type: "result",
-          usage: {
-            input_tokens: 100,
-            output_tokens: 50,
-            cache_read_input_tokens: 25,
-            cache_creation_input_tokens: 10,
+      agentExecutionTokenUsageFromObservations(
+        agentExecutionUsageObservationsFromPayload("claude", {
+          type: "event",
+          raw: {
+            type: "result",
+            usage: {
+              input_tokens: 100,
+              output_tokens: 50,
+              cache_read_input_tokens: 25,
+              cache_creation_input_tokens: 10,
+            },
           },
-        },
-      }),
+        }),
+      ),
     ).toMatchObject({
       inputTokens: 100,
       outputTokens: 50,
@@ -259,7 +262,11 @@ describe("agent execution metrics", () => {
         tokenUsage: expect.objectContaining({ totalTokens: 55 }),
       }),
     ]);
-    expect(agentExecutionTokenUsageFromPayload("claude", payload)).toEqual({
+    expect(
+      agentExecutionTokenUsageFromObservations(
+        agentExecutionUsageObservationsFromPayload("claude", payload),
+      ),
+    ).toEqual({
       inputTokens: 130,
       outputTokens: 70,
       cacheReadTokens: 30,

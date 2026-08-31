@@ -1966,19 +1966,6 @@ export function agentExecutionTokenUsageFromObservations(
   return aggregateTokenUsage(observations);
 }
 
-/**
- * Compatibility wrapper for the pre-ledger execution metrics path. New usage
- * ingestion should retain every observation so per-model totals are not lost.
- */
-export function agentExecutionTokenUsageFromPayload(
-  provider: AgentExecutionUsageProvider,
-  payload: unknown,
-): AgentExecutionTokenUsage | null {
-  return aggregateTokenUsage(
-    agentExecutionUsageObservationsFromPayload(provider, payload),
-  );
-}
-
 export const agentExecutionMetrics = (
   durationMs: number,
   usage: AgentExecutionTokenUsage | null,
