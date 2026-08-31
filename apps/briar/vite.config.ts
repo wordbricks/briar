@@ -43,7 +43,6 @@ export default defineConfig({
       "src-cli/**/*.{test,spec}.ts",
       // These tests require Node-only filesystem or VM APIs.
       "worker/src/html-artifact-preview-shell.test.ts",
-      "worker/src/wrangler-config.test.ts",
     ],
     exclude: [...configDefaults.exclude, "**/.claude/worktrees/**"],
     maxWorkers: Number(process.env.VITEST_MAX_WORKERS ?? 4),

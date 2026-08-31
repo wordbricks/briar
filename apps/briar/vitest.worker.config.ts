@@ -16,7 +16,6 @@ export default defineConfig(async () => ({
       ...configDefaults.exclude,
       ...migrationTestGlobs,
       "worker/src/html-artifact-preview-shell.test.ts",
-      "worker/src/wrangler-config.test.ts",
     ],
     // Setup runs outside per-file storage isolation, so every isolated test
     // database starts from the same fully migrated schema.
