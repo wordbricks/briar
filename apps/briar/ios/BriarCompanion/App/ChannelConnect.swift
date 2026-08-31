@@ -15,16 +15,6 @@ extension ChannelDeltaResponse {
     }
 }
 
-extension CreateChannelMessageResponse {
-    init(connectMessage message: BriarAPI_CreateChannelMessageResponse) throws {
-        guard message.hasMessage else { throw MobileAPIError.invalidResponse }
-        self.init(
-            message: try ChannelMessage(connectMessage: message.message),
-            agentReplies: try message.agentReplies.map { try ChannelAgentReply(connectMessage: $0) }
-        )
-    }
-}
-
 extension AcceptChannelProposalResponse {
     init(connectMessage message: BriarAPI_AcceptChannelProposalResponse) throws {
         outcome = try AcceptChannelProposalResponse.Outcome(connectValue: message.outcome)
@@ -331,8 +321,7 @@ extension ChannelMessage.Proposal.Payload.Issue {
         let status: IssueStatus
         switch message.status {
         case .backlog: status = .backlog
-        case .queued: status = .queued
-        case .unspecified, .running, .paused, .blocked, .failed, .completed, .cancelled,
+        case .unspecified, .queued, .running, .paused, .blocked, .failed, .completed, .cancelled,
              .UNRECOGNIZED:
             throw MobileAPIError.invalidResponse
         }

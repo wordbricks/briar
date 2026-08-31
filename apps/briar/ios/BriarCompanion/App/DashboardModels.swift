@@ -769,20 +769,12 @@ struct AcceptIssueExecutionProposalResponse: Sendable {
     }
 }
 
-struct AcceptIssueReworkProposalResponse: Equatable, Sendable {
-    let proposal: IssueProposedAction
-    let outcome: String
-    let attempt: Int
-    let revision: Int
-    let workflowStage: String
-}
-
 struct AcceptIssueActionProposalResponse: Equatable, Sendable {
     let proposal: IssueProposedAction
     let outcome: String
     let resultRunId: UUID?
     /// Present when an accepted create proposal requested a separate execution
-    /// approval. Optional keeps decoding compatible with older responses.
+    /// approval.
     let executionProposal: IssueExecutionProposal?
 }
 

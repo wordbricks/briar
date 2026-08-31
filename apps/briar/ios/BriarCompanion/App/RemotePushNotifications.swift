@@ -213,8 +213,8 @@ final class InboxPushAppDelegate: NSObject, UIApplicationDelegate,
 
 @MainActor
 final class RemotePushRegistrationService: ObservableObject {
-    private let api: any MobileHTTPClientProtocol
-    private let accountService: (any BriarAPI_AccountServiceClientInterface)?
+    private let accountServiceForToken:
+        @Sendable (String) -> any BriarAPI_AccountServiceClientInterface
     private var syncTask: Task<Void, Never>?
     private var sessionToken: String?
     private var preferences = InboxNotificationPreferences()
@@ -222,11 +222,15 @@ final class RemotePushRegistrationService: ObservableObject {
     private var lastPayload: Data?
 
     init(
-        api: any MobileHTTPClientProtocol,
-        accountService: (any BriarAPI_AccountServiceClientInterface)? = nil
+        servicesFactory: any AuthenticatedMobileServicesFactory
     ) {
-        self.api = api
-        self.accountService = accountService
+        accountServiceForToken = { token in
+            servicesFactory.authenticatedServices(token: token).account
+        }
+    }
+
+    init(accountService: any BriarAPI_AccountServiceClientInterface) {
+        accountServiceForToken = { _ in accountService }
     }
 
     func configure(
@@ -261,7 +265,7 @@ final class RemotePushRegistrationService: ObservableObject {
             return
         }
         do {
-            let account = try account(for: sessionToken)
+            let account = accountServiceForToken(sessionToken)
             var request = BriarAPI_UnregisterMobilePushDeviceRequest()
             request.endpoint = endpoint
             request.token = deviceToken
@@ -279,9 +283,9 @@ final class RemotePushRegistrationService: ObservableObject {
         syncTask?.cancel()
         guard let sessionToken,
               let deviceToken = RemotePushNotificationBridge.token,
-              let endpoint = Self.apnsEndpoint,
-              let account = try? account(for: sessionToken)
+              let endpoint = Self.apnsEndpoint
         else { return }
+        let account = accountServiceForToken(sessionToken)
         var pushPreferences = BriarAPI_MobilePushPreferences()
         pushPreferences.playSound = preferences.playSound
         pushPreferences.urgent = preferences.urgent
@@ -309,15 +313,6 @@ final class RemotePushRegistrationService: ObservableObject {
                 // A later token, preference, locale, or foreground change retries registration.
             }
         }
-    }
-
-    private func account(
-        for token: String
-    ) throws -> any BriarAPI_AccountServiceClientInterface {
-        if let accountService {
-            return accountService
-        }
-        return try authenticatedMobileServices(for: api, token: token).account
     }
 
     private static var apnsEndpoint: BriarAPI_MobilePushEndpoint? {

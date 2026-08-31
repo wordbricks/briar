@@ -21,13 +21,17 @@ struct CompanionRootView: View {
     @State private var projectSelectionComplete = false
 
     private let api: any MobileHTTPClientProtocol
+    private let servicesFactory: any AuthenticatedMobileServicesFactory
+    private let realtimeClient: (any MobileRealtimeClientProtocol)?
     private let authorization: DeviceAuthorizationService
     private let presenter: any WebAuthenticationPresenting
 
     @MainActor
-    init(api: any MobileHTTPClientProtocol) {
+    init(api: MobileHTTPClient) {
         self.init(
             api: api,
+            servicesFactory: api,
+            realtimeClient: api,
             session: SessionStore(),
             presenter: ASWebAuthenticationPresenter()
         )
@@ -36,25 +40,39 @@ struct CompanionRootView: View {
     @MainActor
     init(
         api: any MobileHTTPClientProtocol,
+        servicesFactory: any AuthenticatedMobileServicesFactory,
+        realtimeClient: (any MobileRealtimeClientProtocol)?,
         session: SessionStore,
         presenter: any WebAuthenticationPresenting
     ) {
         self.api = api
+        self.servicesFactory = servicesFactory
+        self.realtimeClient = realtimeClient
         _session = StateObject(wrappedValue: session)
-        _companion = StateObject(wrappedValue: CompanionStore(api: api))
-        _dashboard = StateObject(wrappedValue: DashboardStore(api: api))
+        _companion = StateObject(wrappedValue: CompanionStore(servicesFactory: servicesFactory))
+        _dashboard = StateObject(wrappedValue: DashboardStore(servicesFactory: servicesFactory))
         _realtime = StateObject(
-            wrappedValue: OrganizationRealtimeStore(api: api)
+            wrappedValue: OrganizationRealtimeStore(realtime: realtimeClient)
         )
         _channels = StateObject(
-            wrappedValue: ChannelsStore(api: api, managesRealtime: false)
+            wrappedValue: ChannelsStore(
+                api: api,
+                servicesFactory: servicesFactory,
+                realtime: realtimeClient,
+                managesRealtime: false
+            )
         )
-        _agents = StateObject(wrappedValue: AgentsStore(api: api))
+        _agents = StateObject(wrappedValue: AgentsStore(servicesFactory: servicesFactory))
         _inbox = StateObject(
-            wrappedValue: InboxStore(api: api, pollInterval: .seconds(60))
+            wrappedValue: InboxStore(
+                servicesFactory: servicesFactory,
+                pollInterval: .seconds(60)
+            )
         )
         _notifications = StateObject(wrappedValue: LocalNotificationService())
-        _remotePush = StateObject(wrappedValue: RemotePushRegistrationService(api: api))
+        _remotePush = StateObject(
+            wrappedValue: RemotePushRegistrationService(servicesFactory: servicesFactory)
+        )
         authorization = DeviceAuthorizationService(api: api)
         self.presenter = presenter
     }
@@ -320,7 +338,8 @@ struct CompanionRootView: View {
         token: String,
         project: Project
     ) -> some View {
-        CompanionShellView(
+        let services = servicesFactory.authenticatedServices(token: token)
+        return CompanionShellView(
             navigation: navigation,
             agents: agents,
             inbox: inbox,
@@ -333,6 +352,8 @@ struct CompanionRootView: View {
             errorMessage: dashboard.errorMessage,
             token: token,
             api: api,
+            services: services,
+            realtimeClient: realtimeClient,
             user: companion.user,
             refresh: { await dashboard.refresh(forceSnapshot: true) },
             ensureIssueAvailable: { projectID, runID in

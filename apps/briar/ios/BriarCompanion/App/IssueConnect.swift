@@ -73,21 +73,6 @@ func issueUpdateRequest(
     return request
 }
 
-extension CreateIssueResponse {
-    init(connectMessage message: BriarAPI_CreateIssueResponse) throws {
-        self.init(
-            runId: try issueUUID(message.runID),
-            sourceKey: message.sourceKey,
-            stage: message.stage,
-            status: try issueRunStatus(message.status),
-            attachments: try message.attachments.map { try .init(connectMessage: $0) },
-            assigneeUserId: message.hasAssigneeUserID ? message.assigneeUserID : nil,
-            createdByUserId: message.createdByUserID,
-            difficulty: message.hasDifficulty ? try issueDifficulty(message.difficulty) : nil
-        )
-    }
-}
-
 extension ResultReview {
     init(connectMessage message: BriarAPI_ResultReview) throws {
         guard message.hasCompletedAt else { throw MobileAPIError.invalidResponse }
@@ -124,17 +109,6 @@ extension IssueMessagesDeltaResponse {
             agentReplies: message.changed || message.reset
                 ? try message.agentReplies.map { try .init(connectMessage: $0) }
                 : nil
-        )
-    }
-}
-
-extension CreateIssueMessageResponse {
-    init(connectMessage message: BriarAPI_CreateIssueMessageResponse) throws {
-        guard message.hasMessage else { throw MobileAPIError.invalidResponse }
-        self.init(
-            message: try .init(connectMessage: message.message),
-            agentReply: message.hasAgentReply ? try .init(connectMessage: message.agentReply) : nil,
-            agentReplies: try message.agentReplies.map { try .init(connectMessage: $0) }
         )
     }
 }
@@ -323,19 +297,6 @@ extension EvidenceImage {
             contentType: message.contentType,
             byteSize: try issueSafeInt(message.byteSize),
             url: message.url
-        )
-    }
-}
-
-extension AcceptIssueReworkProposalResponse {
-    init(connectMessage message: BriarAPI_AcceptIssueReworkProposalResponse) throws {
-        guard message.hasProposal else { throw MobileAPIError.invalidResponse }
-        self.init(
-            proposal: try .init(connectMessage: message.proposal),
-            outcome: try issueApprovalOutcome(message.outcome),
-            attempt: try issueSafeInt(message.attempt),
-            revision: try issueSafeInt(message.revision),
-            workflowStage: message.workflowStage
         )
     }
 }

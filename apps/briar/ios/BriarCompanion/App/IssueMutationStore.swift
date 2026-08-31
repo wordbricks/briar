@@ -13,7 +13,7 @@ final class IssueMutationStore: ObservableObject {
     @Published private(set) var errorMessage: String?
 
     private let api: any MobileHTTPClientProtocol
-    private let issueService: (any BriarAPI_IssueServiceClientInterface)?
+    private let issueService: any BriarAPI_IssueServiceClientInterface
     private let projectID: UUID
     private let token: String
     private let requestID: @Sendable () -> UUID
@@ -22,7 +22,7 @@ final class IssueMutationStore: ObservableObject {
 
     init(
         api: any MobileHTTPClientProtocol,
-        issueService: (any BriarAPI_IssueServiceClientInterface)? = nil,
+        issueService: any BriarAPI_IssueServiceClientInterface,
         projectID: UUID,
         token: String,
         requestID: @escaping @Sendable () -> UUID = UUID.init,
@@ -31,8 +31,7 @@ final class IssueMutationStore: ObservableObject {
         }
     ) {
         self.api = api
-        self.issueService = issueService ?? (api as? any AuthenticatedMobileServicesFactory)?
-            .authenticatedServices(token: token).issue
+        self.issueService = issueService
         self.projectID = projectID
         self.token = token
         self.requestID = requestID
@@ -44,7 +43,7 @@ final class IssueMutationStore: ObservableObject {
     func createIssue(
         draft: IssueDraft,
         attachments: [PendingIssueAttachment]
-    ) async throws -> CreateIssueResponse {
+    ) async throws {
         try await perform("create") {
             let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
             if let titleError = IssueTitleLimits.validationError(for: title) {
@@ -62,17 +61,17 @@ final class IssueMutationStore: ObservableObject {
                 ? draft.preferredEffort
                 : nil
             if attachments.isEmpty {
-                let response = try await issueClient().createIssue(
+                _ = try await issueService.createIssue(
                     request: issueCreateRequest(
                         projectID: projectID,
                         draft: normalizedDraft,
                         attachmentReferences: []
                     ),
                     headers: [:]
-                )
-                return try CreateIssueResponse(connectMessage: response.briarValue())
+                ).briarValue()
+                return
             }
-            let wireResponse = try await api.upload(
+            let _: BriarAPI_CreateIssueResponse = try await api.upload(
                 MobileAPIContract.Endpoint.issues(projectID: projectID),
                 request: issueCreateRequest(
                     projectID: projectID,
@@ -90,7 +89,6 @@ final class IssueMutationStore: ObservableObject {
                 token: token,
                 as: BriarAPI_CreateIssueResponse.self
             )
-            return try CreateIssueResponse(connectMessage: wireResponse)
         }
     }
 
@@ -104,8 +102,8 @@ final class IssueMutationStore: ObservableObject {
             var normalizedDraft = draft
             normalizedDraft.title = title
             normalizedDraft.description = description
-            let response = try await issueClient().updateIssue(
-                request: issueUpdateRequest(
+            let response = await issueService.updateIssue(
+                request: try issueUpdateRequest(
                     projectID: projectID,
                     runID: runID,
                     draft: normalizedDraft,
@@ -131,7 +129,7 @@ final class IssueMutationStore: ObservableObject {
             request.projectID = coreUUIDString(projectID)
             request.runID = coreUUIDString(runID)
             request.subscribed = subscribed
-            let response = try await issueClient().setIssueSubscription(
+            let response = await issueService.setIssueSubscription(
                 request: request,
                 headers: [:]
             )
@@ -148,7 +146,7 @@ final class IssueMutationStore: ObservableObject {
             var request = BriarAPI_DeleteIssueRequest()
             request.projectID = coreUUIDString(projectID)
             request.runID = coreUUIDString(runID)
-            let response = try await issueClient().deleteIssue(request: request, headers: [:])
+            let response = await issueService.deleteIssue(request: request, headers: [:])
             guard try response.briarValue().deleted else {
                 throw MobileAPIError.invalidResponse
             }
@@ -161,7 +159,7 @@ final class IssueMutationStore: ObservableObject {
             request.projectID = coreUUIDString(projectID)
             request.runID = coreUUIDString(runID)
             request.targetProjectID = coreUUIDString(targetProjectID)
-            let response = try await issueClient().transferIssue(
+            let response = await issueService.transferIssue(
                 request: request,
                 headers: [:]
             )
@@ -193,7 +191,7 @@ final class IssueMutationStore: ObservableObject {
             }
             if let model = preferences.model { request.model = model }
             if let effort = preferences.effort { request.effort = effort.rawValue }
-            let response = try await issueClient().updateIssuePreferences(
+            let response = await issueService.updateIssuePreferences(
                 request: request,
                 headers: [:]
             )
@@ -211,7 +209,7 @@ final class IssueMutationStore: ObservableObject {
             request.runID = coreUUIDString(runID)
             request.prerequisiteRunID = coreUUIDString(prerequisiteID)
             request.enabled = enabled
-            _ = try await issueClient().setIssueDependency(
+            _ = try await issueService.setIssueDependency(
                 request: request,
                 headers: [:]
             ).briarValue()
@@ -227,7 +225,7 @@ final class IssueMutationStore: ObservableObject {
             request.requestID = coreUUIDString(idempotencyID(for: idempotencyKey))
             request.status = issueRunStatusMessage(status)
             if let workflowStage { request.workflowStage = workflowStage }
-            _ = try await issueClient().moveRun(
+            _ = try await issueService.moveRun(
                 request: request,
                 headers: [:]
             ).briarValue()
@@ -260,7 +258,7 @@ final class IssueMutationStore: ObservableObject {
                 request.projectID = coreUUIDString(projectID)
                 request.runID = coreUUIDString(runID)
                 request.dispatch = dispatch
-                let response = try await issueClient().reassignRun(
+                let response = try await issueService.reassignRun(
                     request: request,
                     headers: [:]
                 ).briarValue()
@@ -271,7 +269,7 @@ final class IssueMutationStore: ObservableObject {
                 request.projectID = coreUUIDString(projectID)
                 request.runID = coreUUIDString(runID)
                 request.dispatch = dispatch
-                let response = try await issueClient().dispatchRun(
+                let response = try await issueService.dispatchRun(
                     request: request,
                     headers: [:]
                 ).briarValue()
@@ -293,7 +291,7 @@ final class IssueMutationStore: ObservableObject {
                 request.runID = coreUUIDString(runID)
                 request.requestID = coreUUIDString(idempotencyID(for: idempotencyKey))
                 if let reason { request.reason = reason }
-                _ = try await issueClient().retryRun(
+                _ = try await issueService.retryRun(
                     request: request,
                     headers: [:]
                 ).briarValue()
@@ -303,7 +301,7 @@ final class IssueMutationStore: ObservableObject {
                 request.runID = coreUUIDString(runID)
                 request.requestID = coreUUIDString(idempotencyID(for: idempotencyKey))
                 if let reason { request.reason = reason }
-                _ = try await issueClient().cancelRun(
+                _ = try await issueService.cancelRun(
                     request: request,
                     headers: [:]
                 ).briarValue()
@@ -327,7 +325,7 @@ final class IssueMutationStore: ObservableObject {
             request.checkpointKey = checkpoint.key
             request.attempt = attempt
             request.revision = revision
-            _ = try await issueClient().resumeRun(
+            _ = try await issueService.resumeRun(
                 request: request,
                 headers: [:]
             ).briarValue()
@@ -340,7 +338,7 @@ final class IssueMutationStore: ObservableObject {
             var request = BriarAPI_CompleteResultReviewRequest()
             request.projectID = coreUUIDString(projectID)
             request.runID = coreUUIDString(runID)
-            let response = try await issueClient().completeResultReview(
+            let response = try await issueService.completeResultReview(
                 request: request,
                 headers: [:]
             ).briarValue()
@@ -359,15 +357,14 @@ final class IssueMutationStore: ObservableObject {
                 request.projectID = coreUUIDString(projectID)
                 request.runID = coreUUIDString(runID)
                 request.proposalID = coreUUIDString(proposal.id)
-                let wireResponse = try await issueClient().acceptIssueReworkProposal(
+                let wireResponse = await issueService.acceptIssueReworkProposal(
                     request: request,
                     headers: [:]
                 )
-                let response = try AcceptIssueReworkProposalResponse(
-                    connectMessage: wireResponse.briarValue()
-                )
+                let response = try wireResponse.briarValue()
+                guard response.hasProposal else { throw MobileAPIError.invalidResponse }
                 return AcceptIssueProposalResult(
-                    proposal: response.proposal,
+                    proposal: try IssueProposedAction(connectMessage: response.proposal),
                     executionProposal: nil,
                     requiresAuthoritativeReload: false
                 )
@@ -376,7 +373,7 @@ final class IssueMutationStore: ObservableObject {
             request.projectID = coreUUIDString(projectID)
             request.runID = coreUUIDString(runID)
             request.proposalID = coreUUIDString(proposal.id)
-            let wireResponse = try await issueClient().acceptIssueActionProposal(
+            let wireResponse = await issueService.acceptIssueActionProposal(
                 request: request,
                 headers: [:]
             )
@@ -416,7 +413,7 @@ final class IssueMutationStore: ObservableObject {
             message.conversationRunID = coreUUIDString(conversationRunID)
             message.proposalID = coreUUIDString(proposalID)
             message.approval = issueExecutionApprovalMessage(request)
-            let response = try await issueClient().acceptIssueExecutionProposal(
+            let response = await issueService.acceptIssueExecutionProposal(
                 request: message,
                 headers: [:]
             )
@@ -437,7 +434,7 @@ final class IssueMutationStore: ObservableObject {
             message.conversationRunID = coreUUIDString(conversationRunID)
             message.proposalID = coreUUIDString(proposalID)
             if let workerID = request.workerId { message.workerID = workerID }
-            let response = try await issueClient().acceptIssueSkillExecutionProposal(
+            let response = await issueService.acceptIssueSkillExecutionProposal(
                 request: message,
                 headers: [:]
             )
@@ -481,7 +478,7 @@ final class IssueMutationStore: ObservableObject {
                 return id
             }
             let resolvedClientMessageID = clientMessageID ?? UUID()
-            let response: CreateIssueMessageResponse
+            let wireResponse: BriarAPI_CreateIssueMessageResponse
             if attachments.isEmpty {
                 var request = BriarAPI_CreateIssueMessageRequest()
                 request.projectID = coreUUIDString(projectID)
@@ -494,13 +491,10 @@ final class IssueMutationStore: ObservableObject {
                 request.mentionedUserIds = uniqueMentionedUserIds
                 request.mentionedAgentIds = mentionedAgentUUIDs.map(coreUUIDString)
                 request.attachmentReferences = attachmentReferences ?? []
-                let wireResponse = try await issueClient().createIssueMessage(
+                wireResponse = try await issueService.createIssueMessage(
                     request: request,
                     headers: [:]
-                )
-                response = try CreateIssueMessageResponse(
-                    connectMessage: wireResponse.briarValue()
-                )
+                ).briarValue()
             } else {
                 let payload = try AttachmentMessagePayload(
                     body: trimmed,
@@ -519,7 +513,7 @@ final class IssueMutationStore: ObservableObject {
                 request.mentionedUserIds = uniqueMentionedUserIds
                 request.mentionedAgentIds = mentionedAgentUUIDs.map(coreUUIDString)
                 request.attachmentReferences = payload.references
-                let wireResponse = try await api.upload(
+                wireResponse = try await api.upload(
                     MobileAPIContract.Endpoint.runMessages(
                         projectID: projectID,
                         runID: runID
@@ -529,13 +523,20 @@ final class IssueMutationStore: ObservableObject {
                     token: token,
                     as: BriarAPI_CreateIssueMessageResponse.self
                 )
-                response = try CreateIssueMessageResponse(connectMessage: wireResponse)
             }
-            onCreated?(response.message)
-            let initialReplies = response.agentReplies.isEmpty
-                ? response.agentReply.map { [$0] } ?? []
-                : response.agentReplies
-            guard !initialReplies.isEmpty else { return [response.message] }
+            guard wireResponse.hasMessage else { throw MobileAPIError.invalidResponse }
+            let createdMessage = try IssueMessage(connectMessage: wireResponse.message)
+            let createdAgentReply = wireResponse.hasAgentReply
+                ? try IssueAgentReplyJob(connectMessage: wireResponse.agentReply)
+                : nil
+            let createdAgentReplies = try wireResponse.agentReplies.map(
+                IssueAgentReplyJob.init(connectMessage:)
+            )
+            onCreated?(createdMessage)
+            let initialReplies = createdAgentReplies.isEmpty
+                ? createdAgentReply.map { [$0] } ?? []
+                : createdAgentReplies
+            guard !initialReplies.isEmpty else { return [createdMessage] }
             for initialReply in initialReplies {
                 onAgentReplyChanged?(initialReply)
             }
@@ -549,8 +550,8 @@ final class IssueMutationStore: ObservableObject {
                     var request = BriarAPI_GetIssueAgentReplyRequest()
                     request.projectID = coreUUIDString(projectID)
                     request.runID = coreUUIDString(runID)
-                    request.triggerMessageID = coreUUIDString(response.message.id)
-                    let wireResponse = try await issueClient().getIssueAgentReply(
+                    request.triggerMessageID = coreUUIDString(createdMessage.id)
+                    let wireResponse = await issueService.getIssueAgentReply(
                         request: request,
                         headers: [:]
                     )
@@ -589,8 +590,8 @@ final class IssueMutationStore: ObservableObject {
                     let completedMessages = polledMessages.isEmpty
                         ? polledMessage.map { [$0] } ?? []
                         : polledMessages
-                    return [response.message] + completedMessages.filter {
-                        $0.id != response.message.id
+                    return [createdMessage] + completedMessages.filter {
+                        $0.id != createdMessage.id
                     }
                 }
             }
@@ -622,8 +623,4 @@ final class IssueMutationStore: ObservableObject {
         return created
     }
 
-    private func issueClient() throws -> any BriarAPI_IssueServiceClientInterface {
-        guard let issueService else { throw MobileAPIError.invalidRequest }
-        return issueService
-    }
 }

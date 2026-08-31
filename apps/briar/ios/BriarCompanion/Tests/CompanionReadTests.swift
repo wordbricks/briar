@@ -270,7 +270,9 @@ final class CompanionReadTests: XCTestCase {
             api: RunDetailHTTPStub(),
             projectID: projectID,
             runID: runID,
-            token: "token"
+            token: "token",
+            dashboardService: BriarAPI_DashboardServiceClientMock(),
+            issueService: BriarAPI_IssueServiceClientMock()
         )
         store.updateAgentReply(IssueAgentReplyJob(
             id: replyID,
@@ -410,7 +412,9 @@ final class CompanionReadTests: XCTestCase {
             api: RunDetailHTTPStub(),
             projectID: execution.projectId,
             runID: execution.runId,
-            token: "token"
+            token: "token",
+            dashboardService: BriarAPI_DashboardServiceClientMock(),
+            issueService: BriarAPI_IssueServiceClientMock()
         )
         store.appendMessages([issueMessage(
             proposedAction: pendingCreate,
@@ -437,7 +441,9 @@ final class CompanionReadTests: XCTestCase {
             api: RunDetailHTTPStub(),
             projectID: pending.projectId,
             runID: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
-            token: "token"
+            token: "token",
+            dashboardService: BriarAPI_DashboardServiceClientMock(),
+            issueService: BriarAPI_IssueServiceClientMock()
         )
         store.appendMessages([issueMessage(skillExecutionProposal: pending)])
         let context = try XCTUnwrap(
@@ -458,7 +464,9 @@ final class CompanionReadTests: XCTestCase {
             api: RunDetailHTTPStub(),
             projectID: pending.projectId,
             runID: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
-            token: "token"
+            token: "token",
+            dashboardService: BriarAPI_DashboardServiceClientMock(),
+            issueService: BriarAPI_IssueServiceClientMock()
         )
         store.appendMessages([issueMessage(skillExecutionProposal: pending)])
         let context = try XCTUnwrap(
@@ -478,7 +486,9 @@ final class CompanionReadTests: XCTestCase {
             api: RunDetailHTTPStub(),
             projectID: pending.projectId,
             runID: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
-            token: "token"
+            token: "token",
+            dashboardService: BriarAPI_DashboardServiceClientMock(),
+            issueService: BriarAPI_IssueServiceClientMock()
         )
         store.appendMessages([issueMessage(skillExecutionProposal: pending)])
         let context = try XCTUnwrap(
@@ -503,7 +513,9 @@ final class CompanionReadTests: XCTestCase {
             api: RunDetailHTTPStub(),
             projectID: pending.projectId,
             runID: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
-            token: "token"
+            token: "token",
+            dashboardService: BriarAPI_DashboardServiceClientMock(),
+            issueService: BriarAPI_IssueServiceClientMock()
         )
         store.appendMessages([issueMessage(skillExecutionProposal: pending)])
         store.updateSkillExecutionProposal(accepted)
@@ -528,7 +540,9 @@ final class CompanionReadTests: XCTestCase {
             api: RunDetailHTTPStub(),
             projectID: executionProposal().projectId,
             runID: parent.runId,
-            token: "token"
+            token: "token",
+            dashboardService: BriarAPI_DashboardServiceClientMock(),
+            issueService: BriarAPI_IssueServiceClientMock()
         )
         store.appendMessages([parent])
         store.appendOptimisticMessage(pending)

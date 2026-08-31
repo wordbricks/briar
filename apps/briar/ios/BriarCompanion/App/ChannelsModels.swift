@@ -454,8 +454,7 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
             let issue: Issue?
             /// Present only for an atomic multi-issue backlog proposal.
             let batch: Batch?
-            /// Compatibility for Agent payloads that place the follow-up intent
-            /// next to the issue. It never contains execution preferences.
+            /// Whether approval should be followed by a separate execution proposal.
             let executeAfterCreate: Bool?
 
             init(
@@ -503,8 +502,6 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
 
                 enum IssueStatus: String, Codable, Hashable, Sendable {
                     case backlog
-                    /// Read compatibility only. Approval always creates backlog.
-                    case queued
                 }
             }
         }
@@ -758,24 +755,13 @@ struct ChannelDeltaResponse: Equatable, Sendable {
     var agentReplies: [ChannelAgentReply]? = nil
 }
 
-struct CreateChannelMessageResponse: Sendable {
-    let message: ChannelMessage
-    let agentReplies: [ChannelAgentReply]
-
-    init(message: ChannelMessage, agentReplies: [ChannelAgentReply] = []) {
-        self.message = message
-        self.agentReplies = agentReplies
-    }
-
-}
-
 struct AcceptChannelProposalResponse: Equatable, Sendable {
     let outcome: Outcome
     let projectId: UUID
     let resultRunId: UUID
     let resultItems: [ChannelMessage.Proposal.ResultItem]?
-    /// Combined approval returns the materialized execution record. Older
-    /// servers and create-only responses may omit this field.
+    /// Combined approval returns the materialized execution record; create-only
+    /// responses omit it.
     let executionProposal: IssueExecutionProposal?
     let dispatch: DispatchRunResponse?
 

@@ -98,7 +98,6 @@ final class InboxStoreSyncTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let store = InboxStore(
             defaults: defaults,
-            api: InboxHTTPStub(),
             inboxService: inbox,
             pollInterval: .seconds(3_600)
         )
@@ -126,7 +125,6 @@ final class InboxStoreSyncTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let store = InboxStore(
             defaults: defaults,
-            api: InboxHTTPStub(),
             inboxService: inbox
         )
         let project = makeProject()
@@ -222,8 +220,6 @@ final class InboxStoreSyncTests: XCTestCase {
         XCTFail("Timed out waiting for \(method) request \(count)")
     }
 }
-
-private struct InboxHTTPStub: MobileHTTPClientProtocol {}
 
 private final class InboxFeedMockScenario: @unchecked Sendable {
     private let lock = NSLock()

@@ -7,6 +7,8 @@ struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
     let project: Project
     let token: String
     let api: any MobileHTTPClientProtocol
+    let services: AuthenticatedMobileServices
+    let realtimeClient: (any MobileRealtimeClientProtocol)?
     let snapshot: DashboardSnapshot?
     let issueConversationView: IssueConversationViewTracker?
     let refreshDashboard: () async -> Void
@@ -114,6 +116,8 @@ struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
                         project: project,
                         token: token,
                         api: api,
+                        services: services,
+                        realtimeClient: realtimeClient,
                         snapshot: snapshot,
                         issueConversationView: issueConversationView,
                         refreshDashboard: refreshDashboard,
@@ -602,6 +606,8 @@ struct SessionDetailView: View {
     let project: Project
     let token: String
     let api: any MobileHTTPClientProtocol
+    let services: AuthenticatedMobileServices
+    let realtimeClient: (any MobileRealtimeClientProtocol)?
     let snapshot: DashboardSnapshot?
     let issueConversationView: IssueConversationViewTracker?
     let refreshDashboard: () async -> Void
@@ -616,6 +622,8 @@ struct SessionDetailView: View {
         project: Project,
         token: String,
         api: any MobileHTTPClientProtocol,
+        services: AuthenticatedMobileServices,
+        realtimeClient: (any MobileRealtimeClientProtocol)? = nil,
         snapshot: DashboardSnapshot?,
         issueConversationView: IssueConversationViewTracker? = nil,
         refreshDashboard: @escaping () async -> Void,
@@ -629,6 +637,8 @@ struct SessionDetailView: View {
         self.project = project
         self.token = token
         self.api = api
+        self.services = services
+        self.realtimeClient = realtimeClient
         self.snapshot = snapshot
         self.issueConversationView = issueConversationView
         self.refreshDashboard = refreshDashboard
@@ -707,6 +717,8 @@ struct SessionDetailView: View {
                                     issueKeyPrefix: project.effectiveIssueKeyPrefix,
                                     token: token,
                                     api: api,
+                                    services: services,
+                                    realtimeClient: realtimeClient,
                                     allRuns: snapshot?.runs ?? [],
                                     projectAgents: projectAgents,
                                     workers: snapshot?.workers ?? [],

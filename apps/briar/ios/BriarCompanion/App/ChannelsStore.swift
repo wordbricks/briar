@@ -17,8 +17,8 @@ final class OrganizationRealtimeStore: ObservableObject {
     private var isForeground = true
     private var task: Task<Void, Never>?
 
-    init(api: any MobileHTTPClientProtocol) {
-        realtime = api as? any MobileRealtimeClientProtocol
+    init(realtime: (any MobileRealtimeClientProtocol)?) {
+        self.realtime = realtime
     }
 
     func select(organizationID: UUID?, token: String?) {
@@ -94,6 +94,11 @@ final class OrganizationRealtimeStore: ObservableObject {
 
 @MainActor
 final class ChannelsStore: ObservableObject {
+    private struct Services: Sendable {
+        let channel: any BriarAPI_ChannelServiceClientInterface
+        let dashboard: any BriarAPI_DashboardServiceClientInterface
+    }
+
     static let messagePageSize = 20
     static let cachedConversationLimit = 5
     static let cachedThreadLimit = 5
@@ -159,8 +164,9 @@ final class ChannelsStore: ObservableObject {
     @Published private(set) var errorMessage: String?
 
     private let api: any MobileHTTPClientProtocol
-    private let injectedChannelService: (any BriarAPI_ChannelServiceClientInterface)?
+    private let servicesForToken: @Sendable (String) -> Services
     private var channelService: (any BriarAPI_ChannelServiceClientInterface)?
+    private var dashboardService: (any BriarAPI_DashboardServiceClientInterface)?
     private let realtime: (any MobileRealtimeClientProtocol)?
     private let managesRealtime: Bool
     private let attachmentReference: @Sendable () -> String
@@ -199,7 +205,7 @@ final class ChannelsStore: ObservableObject {
 
     init(
         api: any MobileHTTPClientProtocol,
-        channelService: (any BriarAPI_ChannelServiceClientInterface)? = nil,
+        servicesFactory: any AuthenticatedMobileServicesFactory,
         realtime: (any MobileRealtimeClientProtocol)? = nil,
         managesRealtime: Bool = true,
         pollInterval: Duration = .seconds(60),
@@ -209,9 +215,34 @@ final class ChannelsStore: ObservableObject {
         }
     ) {
         self.api = api
-        injectedChannelService = channelService
-        self.channelService = channelService
-        self.realtime = realtime ?? (api as? any MobileRealtimeClientProtocol)
+        servicesForToken = { token in
+            let services = servicesFactory.authenticatedServices(token: token)
+            return Services(channel: services.channel, dashboard: services.dashboard)
+        }
+        self.realtime = realtime
+        self.managesRealtime = managesRealtime
+        self.pollInterval = pollInterval
+        self.maxDeltaPagesPerRefresh = min(max(maxDeltaPagesPerRefresh, 1), 20)
+        self.attachmentReference = attachmentReference
+    }
+
+    init(
+        api: any MobileHTTPClientProtocol,
+        channelService: any BriarAPI_ChannelServiceClientInterface,
+        dashboardService: any BriarAPI_DashboardServiceClientInterface,
+        realtime: (any MobileRealtimeClientProtocol)? = nil,
+        managesRealtime: Bool = true,
+        pollInterval: Duration = .seconds(60),
+        maxDeltaPagesPerRefresh: Int = 20,
+        attachmentReference: @escaping @Sendable () -> String = {
+            UUID().uuidString.lowercased()
+        }
+    ) {
+        self.api = api
+        servicesForToken = { _ in
+            Services(channel: channelService, dashboard: dashboardService)
+        }
+        self.realtime = realtime
         self.managesRealtime = managesRealtime
         self.pollInterval = pollInterval
         self.maxDeltaPagesPerRefresh = min(max(maxDeltaPagesPerRefresh, 1), 20)
@@ -234,10 +265,9 @@ final class ChannelsStore: ObservableObject {
         activityExpiryTask = nil
         self.organizationID = organizationID
         self.token = token
-        channelService = injectedChannelService ?? token.flatMap { token in
-            (api as? any AuthenticatedMobileServicesFactory)?
-                .authenticatedServices(token: token).channel
-        }
+        let services = token.map(servicesForToken)
+        channelService = services?.channel
+        dashboardService = services?.dashboard
         syncCursor = nil
         proposalRevisions = [:]
         latestProposals = [:]
@@ -503,7 +533,7 @@ final class ChannelsStore: ObservableObject {
     func loadEarlierMessages(channelID: UUID) async {
         guard
             let organizationID,
-            let token,
+            token != nil,
             let cursor = nextMessageCursor,
             focusedChannelID == channelID,
             focusedThreadParentID == nil,
@@ -582,7 +612,7 @@ final class ChannelsStore: ObservableObject {
         }
         guard
             let organizationID,
-            let token,
+            token != nil,
             focusedChannelID == channelID,
             focusedThreadParentID == nil
         else { return nil }
@@ -657,7 +687,7 @@ final class ChannelsStore: ObservableObject {
     }
 
     func openThread(channelID: UUID, parentMessageID: UUID) async {
-        guard let organizationID, let token else { return }
+        guard let organizationID, token != nil else { return }
         cacheFocusedThread()
         if focusedChannelID != channelID || focusedThreadParentID != parentMessageID {
             invalidateProposalAcceptancePresentation()
@@ -937,35 +967,36 @@ final class ChannelsStore: ObservableObject {
             request.mentionedUserIds = mentionedUserIds
             request.mentionedAgentIds = mentionedAgentIds.map(coreUUIDString)
             request.attachmentReferences = payload?.references ?? existingAttachmentReferences
-            let response: CreateChannelMessageResponse
+            let wireResponse: BriarAPI_CreateChannelMessageResponse
             if attachments.isEmpty {
                 guard let channelService else { throw MobileAPIError.invalidRequest }
-                let wireResponse = await channelService.createChannelMessage(
+                wireResponse = try await channelService.createChannelMessage(
                     request: request,
                     headers: [:]
-                )
-                response = try CreateChannelMessageResponse(
-                    connectMessage: wireResponse.briarValue()
-                )
+                ).briarValue()
             } else {
                 guard let payload else { throw MobileAPIError.invalidRequest }
-                let wireResponse = try await api.upload(
+                wireResponse = try await api.upload(
                     path,
                     request: request,
                     files: payload.files,
                     token: token,
                     as: BriarAPI_CreateChannelMessageResponse.self
                 )
-                response = try CreateChannelMessageResponse(connectMessage: wireResponse)
             }
+            guard wireResponse.hasMessage else { throw MobileAPIError.invalidResponse }
+            let createdMessage = try ChannelMessage(connectMessage: wireResponse.message)
+            let createdAgentReplies = try wireResponse.agentReplies.map(
+                ChannelAgentReply.init(connectMessage:)
+            )
             if parentMessageID == nil {
-                messages = Self.mergeMessages(messages, updates: [response.message], removing: [])
+                messages = Self.mergeMessages(messages, updates: [createdMessage], removing: [])
                 cacheFocusedConversation()
             } else {
-                thread = Self.mergeMessages(thread, updates: [response.message], removing: [])
+                thread = Self.mergeMessages(thread, updates: [createdMessage], removing: [])
                 cacheFocusedThread()
             }
-            mergeAgentReplies(response.agentReplies)
+            mergeAgentReplies(createdAgentReplies)
             optimisticMessageIDs.remove(clientMessageID)
             errorMessage = nil
         } catch {
@@ -1151,7 +1182,7 @@ final class ChannelsStore: ObservableObject {
         projectID: UUID,
         execution: AcceptIssueExecutionProposalRequest? = nil
     ) async -> AcceptChannelProposalResponse? {
-        guard let organizationID, let token else { return nil }
+        guard let organizationID, token != nil else { return nil }
         guard focusedChannelID == channelID else { return nil }
         // Approval is a state-changing operation. Keep one request in flight so
         // repeated taps (including on another card) cannot race each other.
@@ -1182,7 +1213,9 @@ final class ChannelsStore: ObservableObject {
         }
         do {
             if let execution {
-                let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+                guard let dashboard = dashboardService else {
+                    throw MobileAPIError.invalidRequest
+                }
                 var dashboardRequest = BriarAPI_GetDashboardRequest()
                 dashboardRequest.projectID = coreUUIDString(projectID)
                 let preflight = try DashboardSnapshot(
@@ -1351,7 +1384,7 @@ final class ChannelsStore: ObservableObject {
     }
 
     func declineProposal(channelID: UUID, proposalID: UUID) async -> Bool {
-        guard let organizationID, let token else { return false }
+        guard let organizationID, token != nil else { return false }
         guard focusedChannelID == channelID else { return false }
         guard acceptingProposalID == nil,
               decliningProposalID == nil,
@@ -1419,7 +1452,7 @@ final class ChannelsStore: ObservableObject {
         proposalID: UUID,
         request: AcceptIssueExecutionProposalRequest
     ) async -> AcceptChannelExecutionProposalResponse? {
-        guard let organizationID, let token else { return nil }
+        guard let organizationID, token != nil else { return nil }
         guard focusedChannelID == channelID else { return nil }
         guard channels.first(where: { $0.id == channelID })?.archivedAt == nil else {
             return nil
@@ -1450,7 +1483,9 @@ final class ChannelsStore: ObservableObject {
         }
 
         do {
-            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            guard let dashboard = dashboardService else {
+                throw MobileAPIError.invalidRequest
+            }
             var dashboardRequest = BriarAPI_GetDashboardRequest()
             dashboardRequest.projectID = coreUUIDString(expectedProposal.projectId)
             let preflight = try DashboardSnapshot(
@@ -1570,7 +1605,7 @@ final class ChannelsStore: ObservableObject {
         channelID: UUID,
         proposalID: UUID
     ) async -> ExecutionApprovalContext? {
-        guard let token else { return nil }
+        guard token != nil else { return nil }
         guard focusedChannelID == channelID else { return nil }
         guard channels.first(where: { $0.id == channelID })?.archivedAt == nil else {
             return nil
@@ -1600,7 +1635,9 @@ final class ChannelsStore: ObservableObject {
         }
 
         do {
-            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            guard let dashboard = dashboardService else {
+                throw MobileAPIError.invalidRequest
+            }
             var dashboardRequest = BriarAPI_GetDashboardRequest()
             dashboardRequest.projectID = coreUUIDString(proposal.projectId)
             let snapshot = try DashboardSnapshot(
@@ -1642,7 +1679,7 @@ final class ChannelsStore: ObservableObject {
         proposalID: UUID,
         projectID: UUID
     ) async -> ExecutionApprovalContext? {
-        guard let token else { return nil }
+        guard token != nil else { return nil }
         guard focusedChannelID == channelID else { return nil }
         guard channels.first(where: { $0.id == channelID })?.archivedAt == nil else {
             return nil
@@ -1673,7 +1710,9 @@ final class ChannelsStore: ObservableObject {
         }
 
         do {
-            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            guard let dashboard = dashboardService else {
+                throw MobileAPIError.invalidRequest
+            }
             var dashboardRequest = BriarAPI_GetDashboardRequest()
             dashboardRequest.projectID = coreUUIDString(projectID)
             let snapshot = try DashboardSnapshot(
@@ -1715,7 +1754,7 @@ final class ChannelsStore: ObservableObject {
         proposalID: UUID,
         request: AcceptAgentSkillExecutionProposalRequest
     ) async -> AcceptAgentSkillExecutionProposalResponse? {
-        guard let organizationID, let token else { return nil }
+        guard let organizationID, token != nil else { return nil }
         guard focusedChannelID == channelID else { return nil }
         guard channels.first(where: { $0.id == channelID })?.archivedAt == nil else {
             return nil
@@ -1757,7 +1796,9 @@ final class ChannelsStore: ObservableObject {
         }
 
         do {
-            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            guard let dashboard = dashboardService else {
+                throw MobileAPIError.invalidRequest
+            }
             var dashboardRequest = BriarAPI_GetDashboardRequest()
             dashboardRequest.projectID = coreUUIDString(expectedProposal.projectId)
             let preflight = try DashboardSnapshot(
@@ -1849,7 +1890,7 @@ final class ChannelsStore: ObservableObject {
         channelID: UUID,
         proposalID: UUID
     ) async -> SkillExecutionApprovalContext? {
-        guard let token else { return nil }
+        guard token != nil else { return nil }
         guard focusedChannelID == channelID else { return nil }
         guard channels.first(where: { $0.id == channelID })?.archivedAt == nil else {
             return nil
@@ -1882,7 +1923,9 @@ final class ChannelsStore: ObservableObject {
         }
 
         do {
-            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            guard let dashboard = dashboardService else {
+                throw MobileAPIError.invalidRequest
+            }
             var dashboardRequest = BriarAPI_GetDashboardRequest()
             dashboardRequest.projectID = coreUUIDString(proposal.projectId)
             let snapshot = try DashboardSnapshot(

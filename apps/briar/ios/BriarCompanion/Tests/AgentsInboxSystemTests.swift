@@ -110,10 +110,7 @@ final class AgentsInboxSystemTests: XCTestCase {
             recorder.record(request)
             return .init(result: .success(.init()))
         }
-        let service = RemotePushRegistrationService(
-            api: PushHTTPStub(),
-            accountService: account
-        )
+        let service = RemotePushRegistrationService(accountService: account)
         RemotePushNotificationBridge.updateToken("apns-device-token")
         var preferences = InboxNotificationPreferences()
         preferences.playSound = false
@@ -236,7 +233,6 @@ final class AgentsInboxSystemTests: XCTestCase {
         )
         let services = AgentTestServices(projectID: projectID)
         let store = AgentsStore(
-            api: AgentHTTPStub(),
             agentService: services.agent,
             issueService: services.issue
         )
@@ -265,7 +261,6 @@ final class AgentsInboxSystemTests: XCTestCase {
         let otherProjectID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
         let services = AgentTestServices(projectID: projectID)
         let store = AgentsStore(
-            api: AgentHTTPStub(),
             agentService: services.agent,
             issueService: services.issue
         )
@@ -398,7 +393,6 @@ final class AgentsInboxSystemTests: XCTestCase {
             suspendFirstSessionList: true
         )
         let store = AgentsStore(
-            api: AgentHTTPStub(),
             agentService: services.agent,
             issueService: services.issue,
             pollInterval: .seconds(3_600)
@@ -468,7 +462,6 @@ final class AgentsInboxSystemTests: XCTestCase {
         )
         let services = AgentTestServices(projectID: projectID, suspendDirectTasks: true)
         let store = AgentsStore(
-            api: AgentHTTPStub(),
             agentService: services.agent,
             issueService: services.issue
         )
@@ -616,7 +609,6 @@ final class AgentsInboxSystemTests: XCTestCase {
         let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
         let services = AgentTestServices(projectID: projectID)
         let store = AgentsStore(
-            api: AgentHTTPStub(),
             agentService: services.agent,
             issueService: services.issue
         )
@@ -1425,8 +1417,6 @@ final class AgentsInboxSystemTests: XCTestCase {
     }
 }
 
-private struct PushHTTPStub: MobileHTTPClientProtocol {}
-
 private final class MobilePushRequestRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var registrations: [BriarAPI_RegisterMobilePushDeviceRequest] = []
@@ -1448,8 +1438,6 @@ private final class MobilePushRequestRecorder: @unchecked Sendable {
         lock.withLock { unregistrations.append(request) }
     }
 }
-
-private struct AgentHTTPStub: MobileHTTPClientProtocol {}
 
 private final class AgentTestServices: @unchecked Sendable {
     let scenario: AgentExecutionScenario

@@ -102,16 +102,6 @@ extension MobileHTTPClient: AuthenticatedMobileServicesFactory {
     }
 }
 
-func authenticatedMobileServices(
-    for api: any MobileHTTPClientProtocol,
-    token: String
-) throws -> AuthenticatedMobileServices {
-    guard let factory = api as? any AuthenticatedMobileServicesFactory else {
-        throw MobileAPIError.invalidRequest
-    }
-    return factory.authenticatedServices(token: token)
-}
-
 private final class BearerTokenInterceptor: UnaryInterceptor, @unchecked Sendable {
     private let token: String
 

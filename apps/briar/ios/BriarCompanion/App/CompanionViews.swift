@@ -34,6 +34,8 @@ struct CompanionShellView: View {
     let errorMessage: String?
     let token: String
     let api: any MobileHTTPClientProtocol
+    let services: AuthenticatedMobileServices
+    let realtimeClient: (any MobileRealtimeClientProtocol)?
     let user: CurrentUser?
     let refresh: () async -> Void
     let ensureIssueAvailable: (UUID, UUID) async -> Bool
@@ -129,6 +131,8 @@ struct CompanionShellView: View {
                             project: project,
                             token: token,
                             api: api,
+                            services: services,
+                            realtimeClient: realtimeClient,
                             snapshot: snapshot,
                             issueConversationView: issueConversationView,
                             refreshDashboard: refresh,
@@ -149,6 +153,8 @@ struct CompanionShellView: View {
                     errorMessage: errorMessage,
                     token: token,
                     api: api,
+                    services: services,
+                    realtimeClient: realtimeClient,
                     currentUserID: user?.id,
                     issueConversationView: issueConversationView,
                     refresh: refresh,
@@ -213,6 +219,8 @@ struct CompanionShellView: View {
                                 project: project,
                                 token: token,
                                 api: api,
+                                services: services,
+                                realtimeClient: realtimeClient,
                                 snapshot: snapshot,
                                 issueConversationView: issueConversationView,
                                 refreshDashboard: refresh,
@@ -329,6 +337,8 @@ struct CompanionShellView: View {
                 issueKeyPrefix: project.effectiveIssueKeyPrefix,
                 token: token,
                 api: api,
+                services: services,
+                realtimeClient: realtimeClient,
                 projects: projects,
                 allRuns: snapshot?.runs ?? [],
                 projectAgents: agents.agents.filter { $0.projectId == project.id },
@@ -506,6 +516,8 @@ struct TaskListView: View {
     let errorMessage: String?
     let token: String
     let api: any MobileHTTPClientProtocol
+    let services: AuthenticatedMobileServices
+    let realtimeClient: (any MobileRealtimeClientProtocol)?
     let currentUserID: String?
     let issueConversationView: IssueConversationViewTracker?
     let refresh: () async -> Void
@@ -522,6 +534,8 @@ struct TaskListView: View {
         errorMessage: String?,
         token: String,
         api: any MobileHTTPClientProtocol,
+        services: AuthenticatedMobileServices,
+        realtimeClient: (any MobileRealtimeClientProtocol)? = nil,
         currentUserID: String? = nil,
         issueConversationView: IssueConversationViewTracker? = nil,
         refresh: @escaping () async -> Void,
@@ -536,6 +550,8 @@ struct TaskListView: View {
         self.errorMessage = errorMessage
         self.token = token
         self.api = api
+        self.services = services
+        self.realtimeClient = realtimeClient
         self.currentUserID = currentUserID
         self.issueConversationView = issueConversationView
         self.refresh = refresh
@@ -544,6 +560,7 @@ struct TaskListView: View {
         self.onSkillSessionOpen = onSkillSessionOpen
         _mutations = StateObject(wrappedValue: IssueMutationStore(
             api: api,
+            issueService: services.issue,
             projectID: project.id,
             token: token
         ))
@@ -597,6 +614,8 @@ struct TaskListView: View {
                                     issueKeyPrefix: project.effectiveIssueKeyPrefix,
                                     token: token,
                                     api: api,
+                                    services: services,
+                                    realtimeClient: realtimeClient,
                                     projects: projects,
                                     allRuns: snapshot?.runs ?? [],
                                     projectAgents: projectAgents,
@@ -1186,6 +1205,7 @@ struct RunDetailView: View {
     private let onSkillSessionOpen: SkillSessionOpenHandler
     private let token: String
     private let api: any MobileHTTPClientProtocol
+    private let dashboardService: any BriarAPI_DashboardServiceClientInterface
 
     private var issueMentionCandidates: [ChannelMentionTarget] {
         MessageMentions.issueCandidates(
@@ -1234,6 +1254,8 @@ struct RunDetailView: View {
         issueKeyPrefix: String = "AH",
         token: String,
         api: any MobileHTTPClientProtocol,
+        services: AuthenticatedMobileServices,
+        realtimeClient: (any MobileRealtimeClientProtocol)? = nil,
         projects: [Project] = [],
         allRuns: [DashboardRun] = [],
         projectAgents: [ProjectAgent] = [],
@@ -1265,14 +1287,19 @@ struct RunDetailView: View {
         self.onSkillSessionOpen = onSkillSessionOpen
         self.token = token
         self.api = api
+        dashboardService = services.dashboard
         _detail = StateObject(wrappedValue: RunDetailStore(
             api: api,
             projectID: projectID,
             runID: run.id,
-            token: token
+            token: token,
+            dashboardService: services.dashboard,
+            issueService: services.issue,
+            realtime: realtimeClient
         ))
         _mutations = StateObject(wrappedValue: IssueMutationStore(
             api: api,
+            issueService: services.issue,
             projectID: projectID,
             token: token
         ))
@@ -2590,7 +2617,7 @@ struct RunDetailView: View {
             }
         }
         do {
-            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            let dashboard = dashboardService
             var request = BriarAPI_GetDashboardRequest()
             request.projectID = coreUUIDString(proposal.projectId)
             let snapshot = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(
@@ -2622,7 +2649,7 @@ struct RunDetailView: View {
             return false
         }
         do {
-            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            let dashboard = dashboardService
             var dashboardRequest = BriarAPI_GetDashboardRequest()
             dashboardRequest.projectID = coreUUIDString(proposal.projectId)
             let preflight = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(
@@ -2693,7 +2720,7 @@ struct RunDetailView: View {
         }
 
         do {
-            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            let dashboard = dashboardService
             var request = BriarAPI_GetDashboardRequest()
             request.projectID = coreUUIDString(proposal.projectId)
             let snapshot = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(
@@ -2726,7 +2753,7 @@ struct RunDetailView: View {
         ) else { return false }
 
         do {
-            let dashboard = try authenticatedMobileServices(for: api, token: token).dashboard
+            let dashboard = dashboardService
             var dashboardRequest = BriarAPI_GetDashboardRequest()
             dashboardRequest.projectID = coreUUIDString(proposal.projectId)
             let preflight = try DashboardSnapshot(connectMessage: await dashboard.getDashboard(

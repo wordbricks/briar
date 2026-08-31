@@ -3,6 +3,13 @@ import Foundation
 
 @MainActor
 final class InboxStore: ObservableObject {
+    private enum RemoteSync {
+        case disabled
+        case service(
+            @Sendable (String) -> any BriarAPI_InboxServiceClientInterface
+        )
+    }
+
     @Published private(set) var messages: [InboxMessage] = []
     @Published private(set) var unreadCount = 0
     @Published private(set) var feedReady = false
@@ -29,22 +36,39 @@ final class InboxStore: ObservableObject {
     private var userID: String?
     private var organizationID: UUID?
     private let defaults: UserDefaults
-    private let api: (any MobileHTTPClientProtocol)?
-    private let injectedInboxService: (any BriarAPI_InboxServiceClientInterface)?
+    private let remoteSync: RemoteSync
     private var inboxService: (any BriarAPI_InboxServiceClientInterface)?
     private let pollInterval: Duration
     private let storageKeyPrefix = "briar.inbox.v1"
 
     init(
         defaults: UserDefaults = .standard,
-        api: (any MobileHTTPClientProtocol)? = nil,
-        inboxService: (any BriarAPI_InboxServiceClientInterface)? = nil,
         pollInterval: Duration = .seconds(15)
     ) {
         self.defaults = defaults
-        self.api = api
-        injectedInboxService = inboxService
-        self.inboxService = inboxService
+        remoteSync = .disabled
+        self.pollInterval = pollInterval
+    }
+
+    init(
+        defaults: UserDefaults = .standard,
+        servicesFactory: any AuthenticatedMobileServicesFactory,
+        pollInterval: Duration = .seconds(15)
+    ) {
+        self.defaults = defaults
+        remoteSync = .service { token in
+            servicesFactory.authenticatedServices(token: token).inbox
+        }
+        self.pollInterval = pollInterval
+    }
+
+    init(
+        defaults: UserDefaults = .standard,
+        inboxService: any BriarAPI_InboxServiceClientInterface,
+        pollInterval: Duration = .seconds(15)
+    ) {
+        self.defaults = defaults
+        remoteSync = .service { _ in inboxService }
         self.pollInterval = pollInterval
     }
 
@@ -67,9 +91,11 @@ final class InboxStore: ObservableObject {
             pushTask = nil
             self.token = token
             self.userID = nextUserID
-            inboxService = injectedInboxService ?? token.flatMap { token in
-                (api as? any AuthenticatedMobileServicesFactory)?
-                    .authenticatedServices(token: token).inbox
+            switch remoteSync {
+            case .disabled:
+                inboxService = nil
+            case let .service(serviceForToken):
+                inboxService = token.map(serviceForToken)
             }
             pendingPush = [:]
             inFlightPush = [:]

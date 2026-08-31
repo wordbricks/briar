@@ -75,7 +75,6 @@ final class DashboardSyncTests: XCTestCase {
             .init(result: .success(scenario.nextDelta(request: request)))
         }
         let store = DashboardStore(
-            api: DashboardHTTPStub(),
             dashboardService: dashboard,
             pollInterval: .seconds(3_600)
         )
@@ -216,8 +215,6 @@ final class DashboardSyncTests: XCTestCase {
         return workflow
     }
 }
-
-private struct DashboardHTTPStub: MobileHTTPClientProtocol {}
 
 private final class DashboardMockScenario: @unchecked Sendable {
     private let lock = NSLock()

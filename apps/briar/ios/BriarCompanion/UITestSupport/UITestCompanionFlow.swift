@@ -68,15 +68,19 @@ struct UITestCompanionFlow: View {
         self.offline = offline
         self.locale = locale
         api = UITestAPIClient(delaysMessageSend: delaysMessageSend)
+        let channelsAPI = UITestAPIClient(
+            delaysChannelLoad: delaysChannelLoad,
+            hasChannelHistory: hasChannelHistory,
+            showsBatchProposal: showsBatchProposal
+        )
         UserDefaults.standard.set(locale.rawValue, forKey: "companion-locale")
         _selectedProjectID = State(initialValue: project.id)
-        _agents = StateObject(wrappedValue: AgentsStore(api: UITestAPIClient()))
+        _agents = StateObject(
+            wrappedValue: AgentsStore(servicesFactory: UITestAPIClient())
+        )
         _channels = StateObject(wrappedValue: ChannelsStore(
-            api: UITestAPIClient(
-                delaysChannelLoad: delaysChannelLoad,
-                hasChannelHistory: hasChannelHistory,
-                showsBatchProposal: showsBatchProposal
-            )
+            api: channelsAPI,
+            servicesFactory: channelsAPI
         ))
     }
 
@@ -106,6 +110,8 @@ struct UITestCompanionFlow: View {
                 errorMessage: nil,
                 token: "ui-test-token",
                 api: api,
+                services: api.authenticatedServices(token: "ui-test-token"),
+                realtimeClient: nil,
                 user: CurrentUser(
                     id: "fixture-user",
                     username: "briar_user",

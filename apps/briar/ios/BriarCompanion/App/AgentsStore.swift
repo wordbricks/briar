@@ -17,6 +17,11 @@ enum AgentsStoreError: LocalizedError, Equatable {
 
 @MainActor
 final class AgentsStore: ObservableObject {
+    private struct Services: Sendable {
+        let agent: any BriarAPI_AgentServiceClientInterface
+        let issue: any BriarAPI_IssueServiceClientInterface
+    }
+
     @Published private(set) var agents: [ProjectAgent] = []
     @Published private(set) var sessions: [ProjectAgentSession] = []
     @Published private(set) var isRefreshing = false
@@ -28,9 +33,7 @@ final class AgentsStore: ObservableObject {
         Set(executingAgentCounts.keys)
     }
 
-    private let api: any MobileHTTPClientProtocol
-    private let injectedAgentService: (any BriarAPI_AgentServiceClientInterface)?
-    private let injectedIssueService: (any BriarAPI_IssueServiceClientInterface)?
+    private let servicesForToken: @Sendable (String) -> Services
     private var agentService: (any BriarAPI_AgentServiceClientInterface)?
     private var issueService: (any BriarAPI_IssueServiceClientInterface)?
     private let pollInterval: Duration
@@ -45,16 +48,22 @@ final class AgentsStore: ObservableObject {
     private var pollingTask: Task<Void, Never>?
 
     init(
-        api: any MobileHTTPClientProtocol,
-        agentService: (any BriarAPI_AgentServiceClientInterface)? = nil,
-        issueService: (any BriarAPI_IssueServiceClientInterface)? = nil,
+        servicesFactory: any AuthenticatedMobileServicesFactory,
         pollInterval: Duration = .seconds(15)
     ) {
-        self.api = api
-        injectedAgentService = agentService
-        injectedIssueService = issueService
-        self.agentService = agentService
-        self.issueService = issueService
+        servicesForToken = { token in
+            let services = servicesFactory.authenticatedServices(token: token)
+            return Services(agent: services.agent, issue: services.issue)
+        }
+        self.pollInterval = pollInterval
+    }
+
+    init(
+        agentService: any BriarAPI_AgentServiceClientInterface,
+        issueService: any BriarAPI_IssueServiceClientInterface,
+        pollInterval: Duration = .seconds(15)
+    ) {
+        servicesForToken = { _ in Services(agent: agentService, issue: issueService) }
         self.pollInterval = pollInterval
     }
 
@@ -64,12 +73,9 @@ final class AgentsStore: ObservableObject {
         self.projectID = projectID
         self.token = token
         self.locale = locale
-        let services = token.flatMap { token in
-            (api as? any AuthenticatedMobileServicesFactory)?
-                .authenticatedServices(token: token)
-        }
-        agentService = injectedAgentService ?? services?.agent
-        issueService = injectedIssueService ?? services?.issue
+        let services = token.map(servicesForToken)
+        agentService = services?.agent
+        issueService = services?.issue
         generation += 1
         sessionMutationRevision &+= 1
         pollingTask?.cancel()
@@ -84,7 +90,7 @@ final class AgentsStore: ObservableObject {
     }
 
     func refresh() async {
-        guard let projectID, let token else { return }
+        guard let projectID, token != nil else { return }
         let generation = self.generation
         let expectedSessionMutationRevision = sessionMutationRevision
         isRefreshing = true
@@ -143,7 +149,7 @@ final class AgentsStore: ObservableObject {
         request: String,
         workerID: String
     ) async throws -> ProjectAgentSession {
-        guard let projectID, let token else {
+        guard let projectID, token != nil else {
             throw MobileAPIError.invalidRequest
         }
         guard
@@ -188,7 +194,7 @@ final class AgentsStore: ObservableObject {
         runs: [DashboardRun],
         maxIssues: Int = 3
     ) async throws -> String {
-        guard let projectID, let token else {
+        guard let projectID, token != nil else {
             executionError = AgentsStoreError.notConfigured.localizedDescription
             throw AgentsStoreError.notConfigured
         }
@@ -309,7 +315,7 @@ final class AgentsStore: ObservableObject {
     }
 
     func reconcile(runs: [DashboardRun]) async {
-        guard let projectID, let token else { return }
+        guard let projectID, token != nil else { return }
         let runsByID = Dictionary(uniqueKeysWithValues: runs.map { ($0.id, $0) })
         let now = Date()
         let runningSessions = sessions.filter {

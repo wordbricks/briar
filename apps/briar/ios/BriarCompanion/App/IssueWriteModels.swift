@@ -293,17 +293,6 @@ struct IssueDraft: Codable, Equatable, Sendable {
     }
 }
 
-struct CreateIssueResponse: Sendable {
-    let runId: UUID
-    let sourceKey: String
-    let stage: String
-    let status: DashboardRun.Status
-    let attachments: [IssueAttachment]
-    let assigneeUserId: String?
-    let createdByUserId: String
-    let difficulty: IssueDifficulty?
-}
-
 struct IssueExecutionPreferences: Codable, Equatable, Sendable {
     var provider: AgentProvider?
     var model: String?
@@ -828,23 +817,6 @@ struct IssueAgentReplyJob: Equatable, Sendable {
         self.status = status
         self.attempts = attempts
         self.error = error
-    }
-
-}
-
-struct CreateIssueMessageResponse: Sendable {
-    let message: IssueMessage
-    let agentReply: IssueAgentReplyJob?
-    let agentReplies: [IssueAgentReplyJob]
-
-    init(
-        message: IssueMessage,
-        agentReply: IssueAgentReplyJob?,
-        agentReplies: [IssueAgentReplyJob] = []
-    ) {
-        self.message = message
-        self.agentReply = agentReply
-        self.agentReplies = agentReplies
     }
 
 }
