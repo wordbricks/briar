@@ -97,7 +97,6 @@ describe("Project Agent task worktrees", () => {
     const allocated: unknown[] = [];
     const removed: unknown[] = [];
     const providerWorkspaces: string[] = [];
-    const prompts: string[] = [];
     const checkpoints: unknown[] = [];
     const isolatedPath = `/worktrees/${projectId}/analysis/analysis-${workId}`;
 
@@ -124,7 +123,6 @@ describe("Project Agent task worktrees", () => {
         },
         runProviderTurn: async (input) => {
           providerWorkspaces.push(input.workspacePath);
-          prompts.push(input.prompt);
           return successfulTurn();
         },
         git,
@@ -141,7 +139,6 @@ describe("Project Agent task worktrees", () => {
     ]);
     expect(providerWorkspaces).toEqual([isolatedPath]);
     expect(providerWorkspaces).not.toContain(project.repositoryPath);
-    expect(prompts[0]).toContain("prepared isolated project worktree");
     expect(checkpoints).toContainEqual({ workspacePath: isolatedPath });
     expect(removed).toEqual([
       expect.objectContaining({

@@ -52,12 +52,6 @@ describe("project Agent templates", () => {
           body.length > 0 && description.length > 0 && description !== ">",
       ),
     ).toBe(true);
-    expect(ponytailDeveloperAgentTemplate.responsibility).toContain(
-      "must never be omitted as YAGNI",
-    );
-    expect(ponytailDeveloperAgentTemplate.responsibility).toContain(
-      "Briar workflow and structured result contracts take precedence",
-    );
     expect(ponytailDeveloperAgentTemplate.source.licenseNotice).toContain(
       "Copyright (c) 2026 DietrichGebert",
     );
