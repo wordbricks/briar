@@ -1,6 +1,5 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { recordHuntEvent } from "./db";
 import {
   applyD1Migrations,
   executeD1Sql,
@@ -57,34 +56,18 @@ describe("issue proposal payload migration", () => {
       ) values (
         'proposal-channel', 'proposal-owner', 'owner', '${now}'
       );
+      insert into briar_hunt_runs (
+        id, project_id, source, source_key, title, stage, status,
+        workflow_snapshot_json, repository, context_json,
+        started_at, last_event_at, created_at, updated_at
+      ) values (
+        'proposal-conversation-run', 'proposal-project', 'issue',
+        'proposal-conversation', 'Proposal conversation', 'queued', 'backlog',
+        '{"version":2,"requirements":[],"stages":[{"id":"implementing","label":"Implement","required":true}],"execution":{"checkpoints":[]},"completion":{"requiredStages":["implementing"]}}',
+        'Proposal Project', '{}', '${now}', '${now}', '${now}', '${now}'
+      );
     `);
-    const conversationRunId = await recordHuntEvent(db, "proposal-project", {
-      source: "issue",
-      sourceKey: "proposal-conversation",
-      title: "Proposal conversation",
-      stage: "queued",
-      status: "backlog",
-      workflowStage: null,
-      eventKey: "proposal-conversation:backlog",
-      occurredAt: now,
-      actor: "migration-test",
-      repository: "Proposal Project",
-      detail: null,
-      priority: null,
-      branch: null,
-      commitSha: null,
-      tracker: null,
-      issueDescription: null,
-      resultSummary: null,
-      structuredResult: null,
-      pullRequestUrls: [],
-      targetSha: null,
-      sourceCreatedAt: now,
-      qaStatus: null,
-      stagingQaDetail: null,
-      productionQaDetail: null,
-      context: null,
-    });
+    const conversationRunId = "proposal-conversation-run";
 
     const channelProposal = (id: string, payload: unknown) => db.prepare(
       `insert into briar_channel_action_proposals (
@@ -157,10 +140,7 @@ describe("issue proposal payload migration", () => {
     ).bind(now).run();
 
     await applyD1Migrations(db, {
-      files: [
-        "0156_canonical_channel_issue_proposal_status.sql",
-        "0157_remove_issue_proposal_status.sql",
-      ],
+      files: ["0157_remove_issue_proposal_status.sql"],
     });
 
     expect(await db.prepare(
