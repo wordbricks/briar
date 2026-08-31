@@ -14,9 +14,13 @@ import { checkpointChannelReplySession, completeChannelReply, createChannel, cre
 import { sha256 } from "./crypto-digest";
 import { handleDmMemoryClaimRoute } from "./dm-memory-claim-routes";
 import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
-import { deleteDmMemory, getDmMemory, saveDmMemory } from "./dm-memory-repository";
+import { claimDmLearningJob } from "./dm-memory-learning-claims";
+import { reserveDmLearningModelCall, submitDmLearningProposal, submitDmLearningVerification } from "./dm-memory-learning-model-calls";
+import { scheduleDmLearningJobs } from "./dm-memory-learning-queue";
+import { deleteDmMemory, getDmMemory, saveDmMemory, updateDmMemorySettings } from "./dm-memory-repository";
 import { createOrganizationAgent } from "./organization-agents";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
+import { syntheticDmLearningChange, syntheticDmLearningPolicy } from "./test-helpers/dm-memory-learning";
 
 describe("DM memory in active channel claims", () => {
   let db: D1Database;
@@ -66,14 +70,14 @@ describe("DM memory in active channel claims", () => {
     await db.prepare("update briar_execution_workers set capabilities_json = ? where id = ?")
       .bind(JSON.stringify(capabilities), workerId).run();
   });
-  async function fixture() {
+  async function fixture(messageBody = "한국어 설명을 선호합니다.") {
     const channelId = crypto.randomUUID(), messageId = crypto.randomUUID();
     const now = new Date().toISOString();
     const owner = { organizationId, channelId, userId: ownerId };
     await createChannel(db, { id: channelId, organizationId, kind: "dm", slug: channelId, name: "Synthetic DM",
       visibility: "private", topic: null, defaultProjectId: null, createdByUserId: ownerId, agentIds: [agentId], createdAt: now });
     await createChannelMessage(db, { id: messageId, channelId, parentMessageId: null, authorUserId: ownerId,
-      authorAgentId: null, authorAgentName: null, authorAgentProvider: null, body: "한국어 설명을 선호합니다.",
+      authorAgentId: null, authorAgentName: null, authorAgentProvider: null, body: messageBody,
       mentionedUserIds: [], mentionedAgentIds: [agentId], createdAt: now });
     const saved = await saveDmMemory(db, owner, { requestId: crypto.randomUUID(), title: "설명 언어",
       body: "설명은 한국어로 요청한다.", memoryClass: "profile", sourceLanguage: "ko", observedAt: now,
@@ -114,6 +118,64 @@ describe("DM memory in active channel claims", () => {
       .toMatchObject({ operation: "get", documents: [{ status: "ok", body: "설명은 한국어로 요청한다." }] });
     expect(await lookup(reply, { operation: "get", documents: [{ documentId: crypto.randomUUID(), version: 1 }] }))
       .toMatchObject({ documents: [{ status: "stale_reference" }] });
+  });
+  it("M27 carries an explicit DM request through outbox, verification, storage and a fresh reply brief", async () => {
+    const f = await fixture("앞으로 기술 설명은 결론부터 해 주세요. 기억해 주세요.");
+    const learningCapabilities = { ...capabilities, dmMemory: { protocol: 1, learningRequests: 1 },
+      dmMemoryLearning: { protocol: 1, transport: "openrouter" } };
+    await db.prepare("update briar_execution_workers set capabilities_json = ? where id = ?")
+      .bind(JSON.stringify(learningCapabilities), workerId).run();
+    const reply = await claim(); await brief(reply);
+    const learningEnv = { ...env(), DM_MEMORY_LEARNING_ENABLED: "true",
+      DM_MEMORY_LEARNING_POLICIES: JSON.stringify({ [organizationId]: syntheticDmLearningPolicy }) } as unknown as Env;
+    const complete = workerRequest(`/channel-reply-claims/${reply.workId}/complete`, {
+      organizationId, workerId, claimToken: reply.claimToken, conversationId: null,
+      result: { body: "기억 저장을 검토하고 있습니다.", memorySaveRequest: { documents: [] } },
+    });
+    const completed = await handleChannelReplyResultRoute({ request: complete, url: new URL(complete.url), db,
+      env: learningEnv, attachmentsBucket: learningEnv.ATTACHMENTS });
+    expect(completed?.status).toBe(200);
+    expect(await db.prepare(`select kind, request_source_id, request_targets_json from briar_dm_memory_learning_outbox
+      where reply_job_id = ?`).bind(reply.workId).first()).toEqual({
+      kind: "explicit_request", request_source_id: f.messageId, request_targets_json: "[]",
+    });
+    const now = new Date().toISOString();
+    expect(await scheduleDmLearningJobs(db, organizationId, syntheticDmLearningPolicy, now)).toBe(1);
+    const learning = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId,
+      policy: syntheticDmLearningPolicy, now });
+    expect(learning?.snapshot).toMatchObject({ kind: "explicit_request", requestSource: { id: f.messageId }, documents: [] });
+    if (!learning) throw new Error("Synthetic explicit memory claim was not acquired");
+    const identity = { organizationId, workerId, deviceId, jobId: learning.workId,
+      claimTokenHash: await sha256(learning.claimToken) };
+    const common = { identity, policy: syntheticDmLearningPolicy, inputHash: learning.inputHash, now };
+    const usage = { inputTokens: 100, outputTokens: 50, costMicroUsd: 100 };
+    const proposal = { explicitRequest: true, changes: [syntheticDmLearningChange(learning.snapshot, {
+      title: "응답 형식", content: "사용자는 설명을 결론부터 받기를 원한다.",
+      sourceLanguage: "ko", sourceRefs: [learning.snapshot.requestSource!],
+    })] };
+    const proposalCall = crypto.randomUUID();
+    await reserveDmLearningModelCall(db, { ...common, callId: proposalCall, stage: "proposing" });
+    const proposed = await submitDmLearningProposal(db, { ...common, callId: proposalCall, proposal, usage });
+    if (!("proposalId" in proposed)) throw new Error("Synthetic proposal was not accepted");
+    const verifyCall = crypto.randomUUID();
+    await reserveDmLearningModelCall(db, { ...common, callId: verifyCall, stage: "verifying" });
+    await submitDmLearningVerification(db, { ...common, callId: verifyCall, proposalId: proposed.proposalId,
+      proposalHash: proposed.proposalHash, usage, verification: { approved: true, explicitRequestAuthorized: true,
+        decisions: [{ changeId: "change-1", verdict: "supported" }] } });
+    for (let index = 0; index < 12; index++) {
+      await createChannelMessage(db, { id: crypto.randomUUID(), channelId: reply.channelId, parentMessageId: null,
+        authorUserId: ownerId, authorAgentId: null, authorAgentName: null, authorAgentProvider: null,
+        body: `Synthetic intervening turn ${index}`, mentionedUserIds: [], mentionedAgentIds: [], createdAt: new Date().toISOString() });
+    }
+    const trigger = crypto.randomUUID(), observed = new Date().toISOString();
+    await createChannelMessage(db, { id: trigger, channelId: reply.channelId, parentMessageId: null, authorUserId: ownerId,
+      authorAgentId: null, authorAgentName: null, authorAgentProvider: null, body: "설명 순서를 적용해 주세요.",
+      mentionedUserIds: [], mentionedAgentIds: [agentId], createdAt: observed });
+    await enqueueChannelAgentReplies(db, { organizationId, channelId: reply.channelId, triggerMessageId: trigger,
+      parentMessageId: trigger, agents: [{ id: agentId, projectId: null, provider: "claude" }], createdAt: observed });
+    const fresh = await claim();
+    expect(fresh.session?.conversationId).toBeNull();
+    expect((await brief(fresh)).brief?.profile.some((item) => item.body.includes("결론부터"))).toBe(true);
   });
   it("M12/M17 counts new turns, replays a lost response once and shares its limit with organization lookups", async () => {
     const f = await fixture(), reply = await claim(); await brief(reply);
@@ -182,6 +244,27 @@ describe("DM memory in active channel claims", () => {
       .toEqual(completion.memoryCitations);
     await deleteDmMemory(db, f.owner, f.documentId);
     expect((await getChannelMessage(db, reply.channelId, job.reply_message_id))?.memoryCitations).toEqual([]);
+  });
+  it("atomically leaves a learning outbox only when the DM reply was actually published", async () => {
+    const f = await fixture();
+    const memory = await getDmMemory(db, f.owner, f.documentId);
+    await updateDmMemorySettings(db, f.owner, { requestId: crypto.randomUUID(), memorySpaceId: memory.memorySpaceId,
+      expectedMemoryRevision: 1, useEnabled: true, autoEnabled: true }, { learningAvailable: true });
+    const reply = await claim(), job = (await getChannelAgentReplyJob(db, organizationId, reply.workId))!;
+    const completion = { jobId: reply.workId, deviceId, workerId, claimTokenHash: await sha256(reply.claimToken),
+      body: "Synthetic reply for durable learning", document: null, issueProposal: null, executionProposal: null,
+      agentName: "Synthetic Agent", agentProvider: "claude" as const, completedAt: new Date().toISOString() };
+    expect(await completeChannelReply(db, job, { ...completion, claimTokenHash: "f".repeat(64) })).toBeNull();
+    expect(await db.prepare("select 1 from briar_dm_memory_learning_outbox where reply_job_id = ?").bind(reply.workId).first()).toBeNull();
+    expect(await completeChannelReply(db, job, completion)).not.toBeNull();
+    const outbox = await db.prepare("select kind, source_end, available_at from briar_dm_memory_learning_outbox where reply_job_id = ?")
+      .bind(reply.workId).first<{ kind: string; source_end: number; available_at: string }>();
+    expect(outbox?.kind).toBe("extract");
+    expect(outbox!.source_end).toBeGreaterThan(0);
+    expect(Date.parse(outbox!.available_at) - Date.parse(completion.completedAt)).toBe(15_000);
+    expect(await completeChannelReply(db, job, completion)).toBeNull();
+    expect((await db.prepare("select count(*) as count from briar_dm_memory_learning_outbox where reply_job_id = ?")
+      .bind(reply.workId).first<{ count: number }>())!.count).toBe(1);
   });
   it("M07 retains an activity revocation until its old attempt is actually cleared", async () => {
     const f = await fixture(), reply = await claim();

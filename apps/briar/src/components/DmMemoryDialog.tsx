@@ -125,13 +125,41 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
             onChange={(event) => { const enabled = event.target.checked; void perform(async () => {
               const space = await client.settings(scope, { requestId: crypto.randomUUID(),
                 memorySpaceId: selectedSpace?.id, expectedMemoryRevision: selectedSpace?.memoryRevision ?? 0,
-                useEnabled: enabled, autoEnabled: false });
+                useEnabled: enabled, autoEnabled: enabled && (selectedSpace?.autoEnabled ?? false) });
               await refresh(space.id);
             }); }} />{t("memory.use")}
         </label>}
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <input type="checkbox" disabled checked={selectedSpace?.autoEnabled ?? false} />{t("memory.automaticPending")}
+          <input type="checkbox" disabled={busy || !writable || !selectedSpace?.useEnabled ||
+            (!page.capabilities.automaticLearning && !selectedSpace?.autoEnabled)} checked={selectedSpace?.autoEnabled ?? false}
+            onChange={(event) => { const enabled = event.target.checked; void perform(async () => {
+              const space = await client.settings(scope, { requestId: crypto.randomUUID(), memorySpaceId: selectedSpace?.id,
+                expectedMemoryRevision: selectedSpace?.memoryRevision ?? 0, useEnabled: true, autoEnabled: enabled });
+              await refresh(space.id);
+            }); }} />{t(page.capabilities.automaticLearning ? "memory.automatic" : "memory.automaticPending")}
         </label>
+        <p className="text-xs text-muted-foreground">{t("memory.automaticHelp")}</p>
+        {page.learning && <div className="grid gap-2 rounded-md border border-border p-3 text-xs" aria-label={t("memory.learningStatus")}>
+          {page.learning.configuration && <>
+            <p className="break-words">{t("memory.learningModels")} · {page.learning.configuration.proposer.model}
+              {" / "}{page.learning.configuration.verifier.model}</p>
+            <p className="break-words">OpenRouter · {page.learning.configuration.proposer.provider}
+              {" / "}{page.learning.configuration.verifier.provider}</p>
+            <p>{t("memory.learningCalls")} · {page.learning.callsToday} / {page.learning.configuration.spaceDailyCalls}</p>
+            <p>{t("memory.learningCost")} · ${(page.learning.reservedMicroUsdToday / 1_000_000).toFixed(4)}
+              {" / $"}{(page.learning.configuration.spaceDailyMicroUsd / 1_000_000).toFixed(2)} USD</p>
+          </>}
+          <p>{t("memory.learningPending")} · {page.learning.pendingJobs} / {t("memory.learningFailures")} · {page.learning.failedJobs}</p>
+          <p role="status">{t("memory.learningStatus")} · {page.learning.lastJob
+            ? t(`memory.learningState.${page.learning.lastJob.status === "running" && page.learning.lastJob.stage
+              ? page.learning.lastJob.stage : page.learning.lastJob.status}`)
+            : t("memory.learningNone")}</p>
+          {page.learning.lastJob?.errorCode && <p className="text-destructive">{t(`memory.learningError.${page.learning.lastJob.errorCode}`)}</p>}
+          {page.learning.retryableJob && selectedSpace && <Button size="sm" disabled={busy} onClick={() => void perform(async () => {
+            await client.retryLearning(scope, page.learning!.retryableJob!.id, selectedSpace.revocationEpoch);
+            await refresh(selectedSpace.id);
+          })}>{t("memory.learningRetry")}</Button>}
+        </div>}
         <div className="flex flex-wrap gap-2">
           {writable && <Button disabled={busy} onClick={() => beginEdit(null)}><Plus size={15} />{t("memory.add")}</Button>}
           <Button variant="outline" disabled={busy} onClick={() => void perform(() => refresh())}><RefreshCw size={15} />{t("memory.refresh")}</Button>

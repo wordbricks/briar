@@ -1,5 +1,6 @@
 import { scheduleDmMemoryActivityRevocations } from "./dm-memory-activity-revocations";
 import { handleDmMemoryClaimRoute } from "./dm-memory-claim-routes";
+import { handleDmMemoryLearningRoute } from "./dm-memory-learning-routes";
 import * as SchemaIssue from "effect/SchemaIssue";
 import {
   AutoHuntWorkflowValidationError,
@@ -537,6 +538,9 @@ async function route(
 
   const memoryClaimResponse = await handleDmMemoryClaimRoute({ request, url, db, env });
   if (memoryClaimResponse !== undefined) return memoryClaimResponse;
+
+  const memoryLearningResponse = await handleDmMemoryLearningRoute({ request, url, db, env });
+  if (memoryLearningResponse !== undefined) return memoryLearningResponse;
 
   const channelOrganizationContextResponse =
     await handleChannelOrganizationContextRoute({

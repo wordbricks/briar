@@ -21,6 +21,9 @@ struct BriarCompanionApp: App {
                     ),
                     showsBatchProposal: ProcessInfo.processInfo.arguments.contains(
                         "--ui-testing-batch-proposal"
+                    ),
+                    showsMemoryLearning: ProcessInfo.processInfo.arguments.contains(
+                        "--ui-testing-memory-learning"
                     )
                 )
             } else {
@@ -77,7 +80,8 @@ private struct UITestCompanionFlow: View {
         delaysMessageSend: Bool,
         delaysChannelLoad: Bool,
         hasChannelHistory: Bool,
-        showsBatchProposal: Bool
+        showsBatchProposal: Bool,
+        showsMemoryLearning: Bool
     ) {
         self.offline = offline
         self.locale = locale
@@ -89,7 +93,8 @@ private struct UITestCompanionFlow: View {
             api: UITestAPIClient(
                 delaysChannelLoad: delaysChannelLoad,
                 hasChannelHistory: hasChannelHistory,
-                showsBatchProposal: showsBatchProposal
+                showsBatchProposal: showsBatchProposal,
+                showsMemoryLearning: showsMemoryLearning
             )
         ))
     }
@@ -294,17 +299,20 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
     private let delaysChannelLoad: Bool
     private let hasChannelHistory: Bool
     private let showsBatchProposal: Bool
+    private let showsMemoryLearning: Bool
 
     init(
         delaysMessageSend: Bool = false,
         delaysChannelLoad: Bool = false,
         hasChannelHistory: Bool = false,
-        showsBatchProposal: Bool = false
+        showsBatchProposal: Bool = false,
+        showsMemoryLearning: Bool = false
     ) {
         self.delaysMessageSend = delaysMessageSend
         self.delaysChannelLoad = delaysChannelLoad
         self.hasChannelHistory = hasChannelHistory
         self.showsBatchProposal = showsBatchProposal
+        self.showsMemoryLearning = showsMemoryLearning
     }
 
     func createdIssueStatus() -> DashboardRun.Status? { issueStatus }
@@ -352,14 +360,27 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             else if path.contains("/documents/") { payload = ["document": document] }
             else {
                 payload = [
-                    "eligible": true, "capabilities": ["recall": false, "automaticLearning": false],
+                    "eligible": true, "capabilities": ["recall": false, "automaticLearning": showsMemoryLearning],
                     "selectedSpaceId": spaceID, "nextCursor": NSNull(),
                     "documents": memoryDeleted ? [] : [document],
                     "spaces": [["id": spaceID, "channelId": "12121212-1212-4212-8212-121212121212",
                         "agentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "rosterEpoch": 1,
                         "status": "active", "useEnabled": true, "autoEnabled": false,
                         "memoryRevision": memoryVersion, "revocationEpoch": 0,
-                        "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z"]]
+                        "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z"]],
+                    "learning": showsMemoryLearning ? [
+                        "configuration": [
+                            "proposer": ["model": "synthetic/proposer", "provider": "synthetic"],
+                            "verifier": ["model": "synthetic/verifier", "provider": "synthetic"],
+                            "spaceDailyCalls": 24, "spaceDailyMicroUsd": 5_000_000
+                        ],
+                        "callsToday": 2, "reservedMicroUsdToday": 1200,
+                        "pendingJobs": 0, "failedJobs": 1,
+                        "lastJob": ["id": "77777777-7777-4777-8777-777777777777",
+                            "kind": "explicit_request", "status": "failed", "stage": NSNull(),
+                            "errorCode": "model_unavailable", "updatedAt": "2026-09-01T00:00:00.000Z"],
+                        "retryableJob": ["id": "77777777-7777-4777-8777-777777777777", "callsUsed": 2]
+                    ] : NSNull()
                 ]
             }
             return try JSONDecoder.mobileContract.decode(Response.self,

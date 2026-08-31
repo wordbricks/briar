@@ -53,6 +53,29 @@ struct DmMemoryPage: Decodable, Sendable {
     let selectedSpaceId: String?
     var documents: [DmMemoryDocument]
     var nextCursor: String?
+    let learning: DmMemoryLearningStatus?
+}
+
+struct DmMemoryLearningStatus: Decodable, Sendable {
+    struct Configuration: Decodable, Sendable {
+        struct Model: Decodable, Sendable { let model: String; let provider: String }
+        let proposer: Model
+        let verifier: Model
+        let spaceDailyCalls: Int
+        let spaceDailyMicroUsd: Int
+    }
+    struct Job: Decodable, Sendable {
+        let id: String; let kind: String; let status: String; let stage: String?
+        let errorCode: String?; let updatedAt: String
+    }
+    let configuration: Configuration?
+    let callsToday: Int
+    let reservedMicroUsdToday: Int
+    let pendingJobs: Int
+    let failedJobs: Int
+    let lastJob: Job?
+    let retryableJob: RetryableJob?
+    struct RetryableJob: Decodable, Sendable { let id: String; let callsUsed: Int }
 }
 
 struct DmMemoryRevisionPage: Decodable, Sendable {
@@ -197,7 +220,7 @@ final class DmMemoryStore: ObservableObject, Identifiable {
             return true
         } catch { errorMessage = error.localizedDescription; return false }
     }
-    func setUse(_ enabled: Bool, newSpace: Bool = false) async {
+    func setUse(_ enabled: Bool, newSpace: Bool = false, automatic: Bool? = nil) async {
         struct Input: Encodable, Sendable {
             let requestId: String; let memorySpaceId: String?; let expectedMemoryRevision: Int
             let useEnabled: Bool; let autoEnabled: Bool
@@ -211,7 +234,7 @@ final class DmMemoryStore: ObservableObject, Identifiable {
             let result = try await api.send(path + "/settings", method: "PATCH", token: token,
                 body: Input(requestId: UUID().uuidString.lowercased(), memorySpaceId: newSpace ? nil : space?.id,
                             expectedMemoryRevision: newSpace ? 0 : space?.memoryRevision ?? 0,
-                            useEnabled: enabled, autoEnabled: false), as: Response.self)
+                            useEnabled: enabled, autoEnabled: enabled && !newSpace && (automatic ?? space?.autoEnabled ?? false)), as: Response.self)
             page = try await fetchPage(spaceID: result.space.id)
         } catch { errorMessage = error.localizedDescription }
     }
@@ -223,6 +246,20 @@ final class DmMemoryStore: ObservableObject, Identifiable {
             try requireScope()
             try await api.sendVoid(path + "/documents/" + id, method: "DELETE", token: token, body: nil)
             page = try await fetchPage(spaceID: page?.selectedSpaceId)
+        } catch { errorMessage = error.localizedDescription }
+    }
+    func retryLearning(_ jobID: String) async {
+        struct Input: Encodable, Sendable { let requestId: String; let revocationEpoch: Int }
+        struct Response: Decodable, Sendable { let accepted: Bool; let replayed: Bool }
+        guard !busy, let space else { return }
+        busy = true; errorMessage = nil
+        defer { busy = false }
+        do {
+            try requireScope()
+            _ = try await api.send(path + "/jobs/" + jobID + "/retry", method: "POST", token: token,
+                                   body: Input(requestId: UUID().uuidString.lowercased(),
+                                               revocationEpoch: space.revocationEpoch), as: Response.self)
+            page = try await fetchPage(spaceID: space.id)
         } catch { errorMessage = error.localizedDescription }
     }
     func export() async {
@@ -302,8 +339,18 @@ struct DmMemoryView: View {
                                 set: { enabled in Task { await store.setUse(enabled) } }
                             ))
                         }
-                        Toggle(text("자동 학습 · 아직 사용할 수 없음", "Automatic learning · not available yet"),
-                               isOn: .constant(store.space?.autoEnabled ?? false)).disabled(true)
+                        Toggle(page.capabilities.automaticLearning
+                               ? text("대화에서 자동으로 기억", "Learn memories from this conversation")
+                               : text("자동 학습 · 아직 사용할 수 없음", "Automatic learning · not available yet"),
+                               isOn: Binding(get: { store.space?.autoEnabled ?? false },
+                                             set: { enabled in Task { await store.setUse(true, automatic: enabled) } }))
+                            .disabled(!store.writable || store.space?.useEnabled != true ||
+                                      (!page.capabilities.automaticLearning && store.space?.autoEnabled != true))
+                            .accessibilityIdentifier("dm-memory-automatic")
+                        Text(text("기억 사용을 먼저 켜세요. 자동 학습은 켠 시점 이후의 대화만 처리하며 별도 모델과 예산을 사용합니다. 직접 편집한 기억은 덮어쓰지 않습니다.",
+                                  "Enable memory use first. Automatic learning processes conversations after opt-in with separate models and budgets. It cannot overwrite memories you edited."))
+                            .font(.caption).foregroundStyle(.secondary)
+                        if let learning = page.learning { learningStatus(learning) }
                     }
                     Section(text("저장된 기억", "Saved memories")) {
                         if page.documents.isEmpty { Text(text("저장된 기억이 없습니다.", "No saved memories.")) }
@@ -376,6 +423,57 @@ struct DmMemoryView: View {
             }
             .sheet(item: $draft) { value in DmMemoryEditor(store: store, document: value.document, locale: locale) }
             .onDisappear { store.clearExport() }
+        }
+    }
+
+    @ViewBuilder
+    private func learningStatus(_ learning: DmMemoryLearningStatus) -> some View {
+        if let configuration = learning.configuration {
+            Text("\(text("제안 / 검증 모델", "Proposer / verifier model")) · \(configuration.proposer.model) / \(configuration.verifier.model)")
+                .font(.caption)
+            Text("OpenRouter · \(configuration.proposer.provider) / \(configuration.verifier.provider)").font(.caption)
+            Text("\(text("오늘 호출 / 하루 한도", "Calls today / daily limit")) · \(learning.callsToday) / \(configuration.spaceDailyCalls)")
+                .font(.caption)
+            Text(text("오늘 예약 비용 / 하루 한도", "Reserved cost today / daily limit") + " · " +
+                 String(format: "$%.4f / $%.2f USD", Double(learning.reservedMicroUsdToday) / 1_000_000,
+                        Double(configuration.spaceDailyMicroUsd) / 1_000_000)).font(.caption)
+        }
+        Text("\(text("대기·진행 작업", "Pending or running jobs")) · \(learning.pendingJobs) / \(text("실패 기록", "Failed jobs")) · \(learning.failedJobs)")
+            .font(.caption)
+        if let job = learning.lastJob {
+            let state = job.status == "running" ? job.stage ?? job.status : job.status
+            let labels = ["pending": text("실행 대기", "Waiting to run"), "running": text("처리 중", "Processing"),
+                          "retry_wait": text("재시도 대기", "Waiting to retry"), "failed": text("학습 실패 · 기억은 변경하지 않음", "Learning failed; memories unchanged"),
+                          "cancelled": text("취소됨", "Cancelled"), "succeeded": text("기억 저장 완료", "Memories saved"),
+                          "no_change": text("검토 완료 · 새 기억 없음", "Reviewed; no new memories"),
+                          "proposing": text("기억 변경안 생성 중", "Proposing memory changes"),
+                          "verifying": text("원본 근거 검증 중", "Verifying original evidence"),
+                          "committing": text("검증된 기억 저장 중", "Saving verified memories")]
+            Text(text("학습 상태", "Learning status") + " · " + (labels[state] ?? text("확인 필요", "Needs review"))).font(.caption)
+            if let code = job.errorCode {
+                Text(learningError(code)).font(.caption).foregroundStyle(.red)
+            }
+            if let retryable = learning.retryableJob {
+                Button(text("실패한 학습 다시 시도", "Retry failed learning")) {
+                    Task { await store.retryLearning(retryable.id) }
+                }.disabled(store.busy)
+            }
+        } else { Text(text("아직 학습 작업 없음", "No learning jobs yet")).font(.caption) }
+    }
+
+    private func learningError(_ code: String) -> String {
+        switch code {
+        case "invalid_proposal": return text("변경안 형식이나 근거가 유효하지 않아 저장하지 않았습니다.", "The proposal or evidence was invalid. No changes were saved.")
+        case "verification_rejected": return text("별도 검증이 변경안을 거절했습니다. 저장된 기억은 바뀌지 않았습니다.", "Independent verification rejected the proposal. Saved memories are unchanged.")
+        case "stale": return text("근거나 기억이 바뀌어 최신 입력으로 다시 처리합니다.", "Evidence or memories changed. Processing will use current input.")
+        case "scope_revoked": return text("기억 설정이나 접근 권한이 바뀌어 작업을 중단했습니다.", "Memory settings or access changed. The job stopped.")
+        case "budget_exhausted": return text("설정된 호출·비용 한도를 소진했습니다. 미처리 대화는 남아 있습니다.", "The call or cost limit was reached. Unprocessed conversations remain queued.")
+        case "model_unavailable": return text("학습 모델에 연결하지 못했습니다. 대화와 기존 기억은 유지됩니다.", "The learning model could not be reached. Conversations and existing memories remain.")
+        case "model_timeout": return text("학습 모델 응답 시간이 초과됐습니다.", "The learning model timed out.")
+        case "model_credentials": return text("학습 모델 인증이나 잔액 설정을 확인해야 합니다.", "Check learning model credentials or account balance.")
+        case "model_configuration": return text("설정된 학습 모델·제공자·출력 계약을 사용할 수 없습니다.", "The configured model, provider or output contract is unavailable.")
+        case "input_capacity": return text("입력 한도를 초과해 학습을 중단했습니다. 일부만 저장하지 않았습니다.", "The input exceeded its limit. No partial memories were saved.")
+        default: return text("학습 실패 기록을 확인하세요.", "Check the learning failure record.")
         }
     }
 

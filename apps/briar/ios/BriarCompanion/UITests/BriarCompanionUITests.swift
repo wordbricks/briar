@@ -265,6 +265,24 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-dm-memory-forgotten")
     }
 
+    func testDirectMessageMemoryLearningStatus() {
+        let app = launchInsideCompanion(additionalArguments: ["--ui-testing-memory-learning"])
+        app.tabBars.buttons["DMs"].tap()
+        let conversation = app.buttons["dm-row-12121212-1212-4212-8212-121212121212"]
+        XCTAssertTrue(conversation.waitForExistence(timeout: channelTransitionTimeout))
+        conversation.tap()
+        XCTAssertTrue(app.buttons["dm-memory-open"].waitForExistence(timeout: channelTransitionTimeout))
+        app.buttons["dm-memory-open"].tap()
+        XCTAssertTrue(app.switches["dm-memory-automatic"].waitForExistence(timeout: 5))
+        let failure = app.staticTexts["학습 모델에 연결하지 못했습니다. 대화와 기존 기억은 유지됩니다."]
+        for _ in 0..<3 where !failure.exists { app.swipeUp() }
+        XCTAssertTrue(failure.waitForExistence(timeout: 5))
+        let retry = app.buttons["실패한 학습 다시 시도"]
+        for _ in 0..<2 where !retry.exists { app.swipeUp() }
+        XCTAssertTrue(retry.exists)
+        captureScreenshot(named: "companion-dm-memory-learning")
+    }
+
     func testChannelShowsLoadingSpinnerWhileMessagesLoad() {
         let app = launchInsideCompanion(
             additionalArguments: ["--ui-testing-delayed-channel-load"]

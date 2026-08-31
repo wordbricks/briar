@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 import { IsoDateTimeWithOffset } from "./date-time-schema";
+import { dmLearningFailureCodes } from "./dm-memory-learning-contract";
 
 export const dmMemoryDocumentMaxBytes = 65_536;
 export const dmMemoryPageSize = 50;
@@ -39,6 +40,10 @@ export const dmMemorySettingsInput = strict(Schema.Struct({
 export type DmMemoryCreateInput = typeof dmMemoryCreateInput.Type;
 export type DmMemoryEditInput = typeof dmMemoryEditInput.Type;
 export type DmMemorySettingsInput = typeof dmMemorySettingsInput.Type;
+export const dmMemoryLearningRetryInput = strict(Schema.Struct({
+  requestId: id, revocationEpoch: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+}));
+export type DmMemoryLearningRetryInput = typeof dmMemoryLearningRetryInput.Type;
 
 export const DmMemorySpace = Schema.Struct({
   id, channelId: id, agentId: id, rosterEpoch: Schema.Int,
@@ -77,11 +82,28 @@ export const DmMemoryRevisionPage = Schema.Struct({
   nextCursor: Schema.NullOr(version),
 });
 export type DmMemoryRevisionPage = typeof DmMemoryRevisionPage.Type;
+export const DmMemoryLearningStatus = Schema.Struct({
+  configuration: Schema.NullOr(Schema.Struct({
+    proposer: Schema.Struct({ model: Schema.String, provider: Schema.String }),
+    verifier: Schema.Struct({ model: Schema.String, provider: Schema.String }),
+    spaceDailyCalls: Schema.Int, spaceDailyMicroUsd: Schema.Int,
+  })),
+  callsToday: Schema.Int, reservedMicroUsdToday: Schema.Int, pendingJobs: Schema.Int, failedJobs: Schema.Int,
+  retryableJob: Schema.optional(Schema.NullOr(Schema.Struct({ id, callsUsed: Schema.Int }))),
+  lastJob: Schema.NullOr(Schema.Struct({
+    id, kind: Schema.Literals(["extract", "explicit_request", "consolidate"]),
+    status: Schema.Literals(["pending", "running", "retry_wait", "failed", "cancelled", "succeeded", "no_change"]),
+    stage: Schema.NullOr(Schema.Literals(["proposing", "verifying", "committing"])),
+    errorCode: Schema.NullOr(Schema.Literals(dmLearningFailureCodes)), updatedAt: Schema.String,
+  })),
+});
+export type DmMemoryLearningStatus = typeof DmMemoryLearningStatus.Type;
 export const DmMemoryPage = Schema.Struct({
   eligible: Schema.Boolean,
   capabilities: Schema.Struct({ recall: Schema.Boolean, automaticLearning: Schema.Boolean }),
   spaces: Schema.Array(DmMemorySpace), selectedSpaceId: Schema.NullOr(id),
   documents: Schema.Array(DmMemoryDocument), nextCursor: Schema.NullOr(id),
+  learning: Schema.optional(Schema.NullOr(DmMemoryLearningStatus)),
 });
 export type DmMemoryPage = typeof DmMemoryPage.Type;
 

@@ -1,3 +1,4 @@
+import { dmLearningCapacityTable } from "./dm-memory-capacity";
 import {
   type AutoHuntPersistedRunStatus,
   type DashboardStage,
@@ -282,6 +283,10 @@ export async function claimNextQueuedHuntRun(
                   'enqueueing', 'waiting_tail', 'validating',
                   'publishing', 'draining'
                 ))
+             + (select count(*) from ${await dmLearningCapacityTable(db)} learning
+                where learning.claimed_device_id = ? and learning.status = 'running'
+                  and learning.kind in ('extract', 'explicit_request', 'consolidate')
+                  and learning.lease_expires_at > ?)
              ) < coalesce((
                select device.max_concurrent_sessions
                from briar_execution_worker_devices device
@@ -326,6 +331,8 @@ export async function claimNextQueuedHuntRun(
       allowedProviders?.includes("opencode") ? 1 : 0,
       allowedProviders?.includes("openrouter") ? 1 : 0,
       input.workerDeviceId ?? null,
+      input.workerDeviceId ?? null,
+      input.claimedAt,
       input.workerDeviceId ?? null,
       input.claimedAt,
       input.workerDeviceId ?? null,

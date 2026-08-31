@@ -6,6 +6,8 @@ import { claimNextQueueWork } from "./queue-claim-routes";
 import { readJson } from "./request-readers";
 import { requireWorkerProjectBinding } from "./worker-route-auth";
 import { decodeWorkerClaimInput } from "./worker-request-contract";
+import { claimDmLearningJob } from "./dm-memory-learning-claims";
+import { dmLearningPolicy } from "./dm-memory-learning-policy";
 
 async function workFrom(response: Response) {
   if (!response.ok) {
@@ -81,6 +83,13 @@ export async function handleWorkerClaimRoute(input: {
   for (const claim of claims) {
     const work = await workFrom(await claim());
     if (work !== null) return json({ work });
+  }
+  const learningPolicy = dmLearningPolicy(env, authenticatedWorker.principal.organizationId);
+  if (learningPolicy) {
+    const work = await claimDmLearningJob(db, { organizationId: authenticatedWorker.principal.organizationId,
+      deviceId: authenticatedWorker.principal.deviceId, workerId: claimInput.workerId,
+      projectId: claimInput.projectId, policy: learningPolicy, now: new Date().toISOString() });
+    if (work) return json({ work });
   }
   return json({ work: null, retryAfterMs: 15_000 });
 }

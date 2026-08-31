@@ -54,10 +54,16 @@ export async function exportDmMemory(scope: DmMemoryApiScope, spaceId: string) {
   if (!response.ok) throw new ApiError(response.status, "Memory export failed");
   return response.blob();
 }
+export async function retryDmMemoryLearning(scope: DmMemoryApiScope, jobId: string, revocationEpoch: number) {
+  const raw = await request(`${base(scope.organizationId, scope.channelId)}/jobs/${encodeURIComponent(jobId)}/retry`,
+    scope.token, { method: "POST", body: JSON.stringify({ requestId: crypto.randomUUID(), revocationEpoch }) });
+  return Schema.decodeUnknownSync(Schema.Struct({ accepted: Schema.Boolean, replayed: Schema.Boolean }))(raw);
+}
 
 export const dmMemoryApi = {
   load: loadDmMemory, get: loadDmMemoryDocument, save: saveDmMemoryDocument,
   settings: setDmMemorySettings, remove: removeDmMemoryDocument, export: exportDmMemory,
   history: loadDmMemoryRevisions,
+  retryLearning: retryDmMemoryLearning,
 };
 export type DmMemoryClient = typeof dmMemoryApi;
