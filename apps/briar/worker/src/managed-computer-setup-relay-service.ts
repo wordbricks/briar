@@ -1,3 +1,4 @@
+import { isManagedComputerSetupToken } from "../../src/lib/managed-computer-setup-codec";
 import { sha256Hex } from "./managed-computer-crypto";
 import { managedComputerConfig } from "./managed-computer-model";
 import { managedComputerSetupSessionByTokenHash } from "./managed-computer-repository";
@@ -29,7 +30,7 @@ function requireSetupRelay(env: Env) {
 function protocolToken(
   request: Request,
   prefix: string,
-  pattern: RegExp,
+  isValid: (token: string) => boolean,
 ) {
   const protocols = (request.headers.get("sec-websocket-protocol") ?? "")
     .split(",")
@@ -38,21 +39,21 @@ function protocolToken(
   const candidates = protocols.filter((value) => value.startsWith(prefix));
   if (candidates.length !== 1) return null;
   const token = candidates[0]!.slice(prefix.length);
-  return pattern.test(token) ? { protocol: candidates[0]!, token } : null;
+  return isValid(token) ? { protocol: candidates[0]!, token } : null;
 }
 
 export const managedComputerSetupClientToken = (request: Request) =>
   protocolToken(
     request,
     clientProtocolPrefix,
-    /^briar_setup_[A-Za-z0-9_-]{43}$/u,
+    isManagedComputerSetupToken,
   );
 
 export const managedComputerSetupAgentToken = (request: Request) =>
   protocolToken(
     request,
     agentProtocolPrefix,
-    /^briar_worker_[A-Za-z0-9_-]+$/u,
+    (token) => /^briar_worker_[A-Za-z0-9_-]+$/u.test(token),
   );
 
 function setupHub(env: Env, managedComputerId: string) {

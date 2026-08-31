@@ -52,20 +52,8 @@ export const appConnectAccountServices: AppConnectAccountServices = {
 const mobilePushTokenSchema = Schema.Trim.check(
   Schema.isLengthBetween(32, 4_096),
 );
-const mobilePushLocaleSchema = Schema.Literals(["ko", "en", "zh"]);
-const mobilePushPreferencesSchema = Schema.Struct({
-  playSound: Schema.Boolean,
-  urgent: Schema.Boolean,
-  actionRequired: Schema.Boolean,
-  important: Schema.Boolean,
-  activity: Schema.Boolean,
-});
 
 const decodeMobilePushToken = decodeRequestSync(mobilePushTokenSchema);
-const decodeMobilePushLocale = decodeRequestSync(mobilePushLocaleSchema);
-const decodeMobilePushPreferences = decodeRequestSync(
-  mobilePushPreferencesSchema,
-);
 
 const nullableUsername = (
   update: Parameters<ServiceImpl<typeof AccountService>["updateAccountProfile"]>[0]["usernameUpdate"],
@@ -131,11 +119,11 @@ const mobilePushEndpoint = (endpoint: MobilePushEndpoint) => {
 const mobilePushLocale = (locale: MobilePushLocale) => {
   switch (locale) {
     case MobilePushLocale.KO:
-      return decodeMobilePushLocale("ko");
+      return "ko";
     case MobilePushLocale.EN:
-      return decodeMobilePushLocale("en");
+      return "en";
     case MobilePushLocale.ZH:
-      return decodeMobilePushLocale("zh");
+      return "zh";
     case MobilePushLocale.UNSPECIFIED:
     default:
       throw new ConnectError(
@@ -184,6 +172,12 @@ export const createAppAccountService = (
   registerMobilePushDevice: async (rpcRequest) => {
     const session = await services.requireSession(auth, request);
     const endpoint = mobilePushEndpoint(rpcRequest.endpoint);
+    if (!rpcRequest.preferences) {
+      throw new ConnectError(
+        "mobile push preferences are required",
+        Code.InvalidArgument,
+      );
+    }
     await services.registerMobilePushDevice(
       db,
       session.user.id,
@@ -191,7 +185,7 @@ export const createAppAccountService = (
         ...endpoint,
         token: decodeMobilePushToken(rpcRequest.token),
         locale: mobilePushLocale(rpcRequest.locale),
-        preferences: decodeMobilePushPreferences(rpcRequest.preferences),
+        preferences: rpcRequest.preferences,
       },
       new Date().toISOString(),
     );

@@ -39,122 +39,113 @@ export const managedComputerSetupProviderFromProto = (
   }
 };
 
-const SetupProvider = Schema.Literals([
-  AgentProvider.CODEX,
-  AgentProvider.CLAUDE,
-  AgentProvider.GROK,
-  AgentProvider.OPENCODE,
-]);
-const SetupToken = Schema.String.check(
+export const ManagedComputerSetupToken = Schema.String.check(
   Schema.isPattern(/^briar_setup_[A-Za-z0-9_-]{43}$/u),
 );
 const ChallengeId = Schema.String.check(
   Schema.isPattern(/^[a-z][a-z0-9_-]{0,63}$/u),
 );
 const SessionId = Schema.String.check(Schema.isUUID());
-
-const ToAgentPayload = Schema.Union([
-  Schema.Struct({
-    case: Schema.Literal("start"),
-    value: Schema.Struct({
-      setupToken: SetupToken,
-      provider: SetupProvider,
-    }),
-  }),
-  Schema.Struct({
-    case: Schema.Literal("submit"),
-    value: Schema.Struct({
-      challengeId: ChallengeId,
-      value: Schema.String.check(
-        Schema.isMinLength(1),
-        Schema.isMaxLength(8_192),
-      ),
-    }),
-  }),
-  Schema.Struct({
-    case: Schema.Literal("cancel"),
-    value: Schema.Struct({}),
-  }),
-  Schema.Struct({
-    case: Schema.Literal("controllerReady"),
-    value: Schema.Struct({ sessionId: SessionId }),
-  }),
-  Schema.Struct({
-    case: Schema.Literal("controllerEnded"),
-    value: Schema.Struct({ sessionId: SessionId }),
-  }),
-]);
-
-const ToControllerPayload = Schema.Union([
-  Schema.Struct({
-    case: Schema.Literal("state"),
-    value: Schema.Struct({
-      phase: Schema.Literals([
-        ManagedComputerSetupPhase.GITHUB,
-        ManagedComputerSetupPhase.PROVIDER,
-        ManagedComputerSetupPhase.REPOSITORY,
-        ManagedComputerSetupPhase.WORKER,
-      ]),
-      status: Schema.Literals([
-        ManagedComputerSetupStateStatus.WORKING,
-        ManagedComputerSetupStateStatus.COMPLETE,
-      ]),
-      provider: Schema.optional(SetupProvider),
-    }),
-  }),
-  Schema.Struct({
-    case: Schema.Literal("challenge"),
-    value: Schema.Struct({
-      challengeId: ChallengeId,
-      service: Schema.Literals([
-        ManagedComputerSetupChallengeService.GITHUB,
-        ManagedComputerSetupChallengeService.PROVIDER,
-      ]),
-      kind: Schema.Literals([
-        ManagedComputerSetupChallengeKind.DEVICE_CODE,
-        ManagedComputerSetupChallengeKind.AUTHORIZATION_CODE,
-        ManagedComputerSetupChallengeKind.API_KEY,
-      ]),
-      verificationUri: Schema.String.check(
-        Schema.isPattern(/^https:\/\//u),
-        Schema.isMaxLength(4_096),
-      ),
-      userCode: Schema.optional(
-        Schema.String.check(Schema.isLengthBetween(2, 100)),
-      ),
-      provider: Schema.optional(SetupProvider),
-    }),
-  }),
-  Schema.Struct({
-    case: Schema.Literal("complete"),
-    value: Schema.Struct({
-      projectId: Schema.String.check(Schema.isUUID()),
-      provider: SetupProvider,
-      workerId: Schema.String.check(Schema.isLengthBetween(1, 128)),
-    }),
-  }),
-  Schema.Struct({
-    case: Schema.Literal("error"),
-    value: Schema.Struct({
-      code: Schema.String.check(
-        Schema.isPattern(/^[A-Z][A-Z0-9_]{2,99}$/u),
-      ),
-      message: Schema.String.check(Schema.isLengthBetween(1, 1_000)),
-      retryable: Schema.Boolean,
-    }),
-  }),
-]);
-
-const decodeToAgent = Schema.decodeUnknownOption(
-  Schema.Struct({ payload: ToAgentPayload }),
+const ChallengeValue = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(8_192),
 );
-const decodeToController = Schema.decodeUnknownOption(
-  Schema.Struct({ payload: ToControllerPayload }),
+const VerificationUri = Schema.String.check(
+  Schema.isPattern(/^https:\/\//u),
+  Schema.isMaxLength(4_096),
 );
+const UserCode = Schema.String.check(Schema.isLengthBetween(2, 100));
+const WorkerId = Schema.String.check(Schema.isLengthBetween(1, 128));
+const ErrorCode = Schema.String.check(
+  Schema.isPattern(/^[A-Z][A-Z0-9_]{2,99}$/u),
+);
+const ErrorMessage = Schema.String.check(Schema.isLengthBetween(1, 1_000));
+
+const decodeSetupToken = Schema.decodeUnknownOption(ManagedComputerSetupToken);
+const decodeChallengeId = Schema.decodeUnknownOption(ChallengeId);
+const decodeSessionId = Schema.decodeUnknownOption(SessionId);
+const decodeChallengeValue = Schema.decodeUnknownOption(ChallengeValue);
+const decodeVerificationUri = Schema.decodeUnknownOption(VerificationUri);
+const decodeUserCode = Schema.decodeUnknownOption(UserCode);
+const decodeWorkerId = Schema.decodeUnknownOption(WorkerId);
+const decodeErrorCode = Schema.decodeUnknownOption(ErrorCode);
+const decodeErrorMessage = Schema.decodeUnknownOption(ErrorMessage);
+
+export const isManagedComputerSetupToken = (value: unknown): value is string =>
+  Option.isSome(decodeSetupToken(value));
+
+const isSetupProvider = (provider: AgentProvider) =>
+  managedComputerSetupProviderFromProto(provider) !== null;
+
+const isSetupPhase = (phase: ManagedComputerSetupPhase) => {
+  switch (phase) {
+    case ManagedComputerSetupPhase.GITHUB:
+    case ManagedComputerSetupPhase.PROVIDER:
+    case ManagedComputerSetupPhase.REPOSITORY:
+    case ManagedComputerSetupPhase.WORKER:
+      return true;
+    case ManagedComputerSetupPhase.UNSPECIFIED:
+    default:
+      return false;
+  }
+};
+
+const isSetupStateStatus = (status: ManagedComputerSetupStateStatus) => {
+  switch (status) {
+    case ManagedComputerSetupStateStatus.WORKING:
+    case ManagedComputerSetupStateStatus.COMPLETE:
+      return true;
+    case ManagedComputerSetupStateStatus.UNSPECIFIED:
+    default:
+      return false;
+  }
+};
+
+const isChallengeService = (service: ManagedComputerSetupChallengeService) => {
+  switch (service) {
+    case ManagedComputerSetupChallengeService.GITHUB:
+    case ManagedComputerSetupChallengeService.PROVIDER:
+      return true;
+    case ManagedComputerSetupChallengeService.UNSPECIFIED:
+    default:
+      return false;
+  }
+};
+
+const isChallengeKind = (kind: ManagedComputerSetupChallengeKind) => {
+  switch (kind) {
+    case ManagedComputerSetupChallengeKind.DEVICE_CODE:
+    case ManagedComputerSetupChallengeKind.AUTHORIZATION_CODE:
+    case ManagedComputerSetupChallengeKind.API_KEY:
+      return true;
+    case ManagedComputerSetupChallengeKind.UNSPECIFIED:
+    default:
+      return false;
+  }
+};
 
 export const isManagedComputerSetupToAgent = (
   message: ManagedComputerSetupToAgent,
-) => Option.isSome(decodeToAgent(message));
+): boolean => {
+  const payload = message.payload;
+  switch (payload.case) {
+    case "start":
+      return isManagedComputerSetupToken(payload.value.setupToken) &&
+        isSetupProvider(payload.value.provider);
+    case "submit":
+      return Option.isSome(decodeChallengeId(payload.value.challengeId)) &&
+        Option.isSome(decodeChallengeValue(payload.value.value));
+    case "cancel":
+      return true;
+    case "controllerReady":
+    case "controllerEnded":
+      return Option.isSome(decodeSessionId(payload.value.sessionId));
+    case undefined:
+      return false;
+  }
+  const exhaustive: never = payload;
+  return exhaustive;
+};
 
 export const isManagedComputerSetupControllerCommand = (
   message: ManagedComputerSetupToAgent,
@@ -166,4 +157,33 @@ export const isManagedComputerSetupControllerCommand = (
 
 export const isManagedComputerSetupToController = (
   message: ManagedComputerSetupToController,
-) => Option.isSome(decodeToController(message));
+): boolean => {
+  const payload = message.payload;
+  switch (payload.case) {
+    case "state":
+      return isSetupPhase(payload.value.phase) &&
+        isSetupStateStatus(payload.value.status) &&
+        (payload.value.provider === undefined ||
+          isSetupProvider(payload.value.provider));
+    case "challenge":
+      return Option.isSome(decodeChallengeId(payload.value.challengeId)) &&
+        isChallengeService(payload.value.service) &&
+        isChallengeKind(payload.value.kind) &&
+        Option.isSome(decodeVerificationUri(payload.value.verificationUri)) &&
+        (payload.value.userCode === undefined ||
+          Option.isSome(decodeUserCode(payload.value.userCode))) &&
+        (payload.value.provider === undefined ||
+          isSetupProvider(payload.value.provider));
+    case "complete":
+      return Option.isSome(decodeSessionId(payload.value.projectId)) &&
+        isSetupProvider(payload.value.provider) &&
+        Option.isSome(decodeWorkerId(payload.value.workerId));
+    case "error":
+      return Option.isSome(decodeErrorCode(payload.value.code)) &&
+        Option.isSome(decodeErrorMessage(payload.value.message));
+    case undefined:
+      return false;
+  }
+  const exhaustive: never = payload;
+  return exhaustive;
+};

@@ -8,6 +8,7 @@ import {
 } from "@briar/contracts/gen/briar/worker/v1/managed_computer_setup_pb";
 import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
 
+import { isManagedComputerSetupToken } from "../../src/lib/managed-computer-setup-codec";
 import { appFleetTimestamp } from "./app-connect-fleet-mappers";
 import { appProjectGithubCredentialMessage } from "./app-connect-github-mappers";
 import { appDashboardWorker, appProjectSettings } from "./app-connect-mappers";
@@ -45,10 +46,8 @@ export const managedComputerSetupServices: ManagedComputerSetupServices = {
 };
 
 const decodeUuid = decodeRequestSync(UuidString);
-const setupTokenPattern = /^briar_setup_[A-Za-z0-9_-]{43}$/u;
-
 const setupToken = (value: string) => {
-  if (!setupTokenPattern.test(value)) {
+  if (!isManagedComputerSetupToken(value)) {
     throw new HttpError(400, "Managed computer setup token is invalid");
   }
   return value;
