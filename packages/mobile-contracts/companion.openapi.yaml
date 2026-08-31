@@ -886,9 +886,22 @@
             "bearerAuth": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateIssueRequest" }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Issue created"
+            "description": "Issue created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CreateIssueResponse" }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/Error"
@@ -1005,6 +1018,40 @@
             "description": "Dependency removed"
           }
         }
+      }
+    },
+    "/projects/{projectId}/runs/{runId}/parent/{parentRunId}": {
+      "put": {
+        "operationId": "setIssueParent",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Parent issue set or unchanged" },
+          "201": { "description": "Parent issue set" },
+          "409": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/projects/{projectId}/runs/{runId}/parent": {
+      "delete": {
+        "operationId": "removeIssueParent",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "204": { "description": "Parent issue removed" } }
+      }
+    },
+    "/projects/{projectId}/runs/{runId}/related/{relatedRunId}": {
+      "put": {
+        "operationId": "addRelatedIssue",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Related issue already connected" },
+          "201": { "description": "Related issue connected" },
+          "409": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "delete": {
+        "operationId": "removeRelatedIssue",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "204": { "description": "Related issue removed" } }
       }
     },
     "/projects/{projectId}/runs/{runId}/status": {
@@ -3174,6 +3221,20 @@
             "items": {
               "$ref": "#/components/schemas/IssueAttachment"
             }
+          },
+          "parent": {
+            "anyOf": [
+              { "type": "object", "additionalProperties": true },
+              { "type": "null" }
+            ]
+          },
+          "subIssues": {
+            "type": "array",
+            "items": { "type": "object", "additionalProperties": true }
+          },
+          "relatedIssues": {
+            "type": "array",
+            "items": { "type": "object", "additionalProperties": true }
           },
           "prerequisites": {
             "type": "array",
@@ -5378,6 +5439,39 @@
               }
             }
           }
+        }
+      },
+      "CreateIssueRequest": {
+        "type": "object",
+        "required": ["title", "description", "priority", "assigneeUserId", "status", "fullAuto"],
+        "properties": {
+          "title": { "type": "string" },
+          "description": { "type": ["string", "null"] },
+          "priority": { "type": ["integer", "null"], "minimum": 1, "maximum": 4 },
+          "difficulty": { "type": ["string", "null"], "enum": ["easy", "normal", "hard", null] },
+          "assigneeUserId": { "type": ["string", "null"] },
+          "parentRunId": { "type": ["string", "null"], "format": "uuid" },
+          "status": { "type": "string", "enum": ["backlog", "queued"] },
+          "preferredProvider": { "type": ["string", "null"] },
+          "preferredModel": { "type": ["string", "null"] },
+          "preferredEffort": { "type": ["string", "null"] },
+          "fullAuto": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "CreateIssueResponse": {
+        "type": "object",
+        "required": ["runId", "sourceKey", "stage", "status", "assigneeUserId", "createdByUserId", "difficulty", "parentRunId", "attachments"],
+        "properties": {
+          "runId": { "type": "string", "format": "uuid" },
+          "sourceKey": { "type": "string" },
+          "stage": { "type": "string", "enum": ["queued"] },
+          "status": { "type": "string", "enum": ["backlog", "queued"] },
+          "assigneeUserId": { "type": ["string", "null"] },
+          "createdByUserId": { "type": "string" },
+          "difficulty": { "type": ["string", "null"], "enum": ["easy", "normal", "hard", null] },
+          "parentRunId": { "type": ["string", "null"], "format": "uuid" },
+          "attachments": { "type": "array", "items": { "$ref": "#/components/schemas/IssueAttachment" } }
         }
       },
       "ChannelMessageReaction": {

@@ -168,6 +168,8 @@ export async function handleProjectLinearRoute(
             state: issue.state?.name ?? null,
           },
           sourceCreatedAt: issue.createdAt,
+          parentIssueId: issue.parentId,
+          relations: issue.relations,
         };
       });
       const result = await importLinearHuntRuns(

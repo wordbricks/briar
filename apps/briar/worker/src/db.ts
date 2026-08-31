@@ -165,6 +165,23 @@ export type {
 } from "./issue-dependency-repository";
 
 export {
+  listIssueHierarchy,
+  listIssueHierarchyByRunIds,
+  listIssueRelations,
+  listIssueRelationsByRunIds,
+  setIssueParent,
+  deleteIssueParent,
+  createIssueRelation,
+  deleteIssueRelation,
+} from "./issue-relation-repository";
+export type {
+  IssueHierarchyRow,
+  IssueRelationRow,
+  IssueHierarchyMutationOutcome,
+  IssueRelationMutationOutcome,
+} from "./issue-relation-repository";
+
+export {
   createIssueExecutionProposal,
   listIssueExecutionProposals,
   getIssueExecutionProposal,

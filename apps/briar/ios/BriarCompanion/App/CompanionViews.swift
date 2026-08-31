@@ -580,7 +580,7 @@ struct TaskListView: View {
             guard let selectedPlanningProjectID else { return true }
             return run.projectId == nil || run.projectId == selectedPlanningProjectID
         }
-        TaskOrdering.byMostRecentlyUpdated(
+        return TaskOrdering.byMostRecentlyUpdated(
             scopedRuns.filter(filter.includes)
         )
     }
@@ -1192,6 +1192,15 @@ private struct SkillExecutionApprovalPresentation: Identifiable {
     var id: UUID { proposal.id }
 }
 
+private enum IssueRelationPicker: String, Identifiable {
+    case parent
+    case subIssue
+    case related
+    case dependency
+
+    var id: String { rawValue }
+}
+
 struct RunDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var inbox: InboxStore
@@ -1207,7 +1216,8 @@ struct RunDetailView: View {
     @State private var reassigning = false
     @State private var confirmingDelete = false
     @State private var showingTransfer = false
-    @State private var showingDependencyPicker = false
+    @State private var relationPicker: IssueRelationPicker?
+    @State private var showingCreateSubIssue = false
     @State private var executionApprovalPresentation: IssueExecutionApprovalPresentation?
     @State private var preparingExecutionProposalID: UUID?
     @State private var skillExecutionApprovalPresentation:
@@ -1217,6 +1227,9 @@ struct RunDetailView: View {
     @State private var localStatus: DashboardRun.Status
     @State private var localWorkflowStage: String?
     @State private var dependencyIDs: Set<UUID>
+    @State private var parentID: UUID?
+    @State private var subIssueIDs: Set<UUID>
+    @State private var relatedIssueIDs: Set<UUID>
     @State private var preferences: IssueExecutionPreferences
     @State private var messageText = ""
     @State private var messageMentions: [ChannelMentionTarget] = []
@@ -1340,6 +1353,9 @@ struct RunDetailView: View {
         _localStatus = State(initialValue: run.status)
         _localWorkflowStage = State(initialValue: run.workflowStage)
         _dependencyIDs = State(initialValue: Set((run.prerequisites ?? []).map(\.id)))
+        _parentID = State(initialValue: run.parent?.id)
+        _subIssueIDs = State(initialValue: Set((run.subIssues ?? []).map(\.id)))
+        _relatedIssueIDs = State(initialValue: Set((run.relatedIssues ?? []).map(\.id)))
         _preferences = State(initialValue: IssueExecutionPreferences(
             provider: run.preferredProvider,
             model: run.preferredModel,
@@ -1392,7 +1408,7 @@ struct RunDetailView: View {
             }
             Button(L10n.text("취소", locale: locale), role: .cancel) {}
         } message: {
-            Text(L10n.text("선택한 프로젝트로 이슈와 대화·첨부·활동 기록이 함께 이동합니다. 의존성은 해제됩니다.", locale: locale))
+            Text(L10n.text("선택한 프로젝트로 이슈와 대화·첨부·활동 기록이 함께 이동합니다. 부모·하위·관련·실행 의존성 연결은 해제됩니다.", locale: locale))
         }
         .sheet(isPresented: $showingEdit) {
             EditIssueSheet(
@@ -1412,16 +1428,29 @@ struct RunDetailView: View {
                 refresh: refresh
             )
         }
-        .sheet(isPresented: $showingDependencyPicker) {
-            DependencyPickerSheet(
-                selectedIDs: $dependencyIDs,
-                candidates: dependencyCandidates,
+        .sheet(item: $relationPicker) { picker in
+            IssueRelationPickerSheet(
+                selectedIDs: selectedIDsBinding(for: picker),
+                candidates: relationCandidates(for: picker),
                 issueKeyPrefix: issueKeyPrefix,
-                onAdd: { prerequisiteID in
-                    try await changeDependency(prerequisiteID, enabled: true)
+                title: pickerTitle(picker),
+                sectionTitle: pickerSectionTitle(picker),
+                onAdd: { candidateID in
+                    try await addRelation(candidateID, picker: picker)
                 }
             )
             .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showingCreateSubIssue) {
+            CreateIssueSheet(
+                mutations: mutations,
+                members: members,
+                providers: providers,
+                capabilities: providerCapabilities,
+                defaultAssigneeUserId: currentUserID,
+                parentRunID: run.id,
+                refresh: refresh
+            )
         }
         .sheet(item: $executionApprovalPresentation) { presentation in
             ExecutionProposalApprovalSheet(
@@ -1461,6 +1490,90 @@ struct RunDetailView: View {
     }
 
     private var lifecycleContent: some View {
+        relationshipSynchronizedContent
+            .onDisappear {
+                issueConversationView?.leave(runID: run.id)
+                executionApprovalPresentation = nil
+                preparingExecutionProposalID = nil
+                skillExecutionApprovalPresentation = nil
+                preparingSkillExecutionProposalID = nil
+                detail.close()
+            }
+            .onChange(of: detail.messages) { _, messages in
+                if let proposalID = executionApprovalPresentation?.proposal.id,
+                   !messages.contains(where: {
+                       $0.executionProposal?.id == proposalID &&
+                           $0.executionProposal?.status == .pending
+                   }) {
+                    executionApprovalPresentation = nil
+                }
+                if let proposal = skillExecutionApprovalPresentation?.proposal,
+                   !messages.contains(where: {
+                       guard let current = $0.skillExecutionProposal else { return false }
+                       return current.status == .pending &&
+                           agentSkillExecutionImmutableFieldsMatch(current, proposal)
+                   }) {
+                    skillExecutionApprovalPresentation = nil
+                }
+            }
+            .onChange(of: pendingExecutionTargetSignatures) { previous, current in
+                guard pendingIssueExecutionTargetChanged(
+                    from: previous,
+                    to: current
+                ) else { return }
+                executionApprovalPresentation = nil
+                Task { await detail.load(queueIfLoading: true) }
+            }
+    }
+
+    private var relationshipSynchronizedContent: some View {
+        synchronizedLifecycleContent
+            .onChange(of: run.prerequisites) { _, prerequisites in
+                dependencyIDs = Set((prerequisites ?? []).map(\.id))
+            }
+            .onChange(of: run.parent) { _, parent in
+                parentID = parent?.id
+            }
+            .onChange(of: run.subIssues) { _, subIssues in
+                subIssueIDs = Set((subIssues ?? []).map(\.id))
+            }
+            .onChange(of: run.relatedIssues) { _, relatedIssues in
+                relatedIssueIDs = Set((relatedIssues ?? []).map(\.id))
+            }
+            .onChange(of: run.subscribers) { _, updatedSubscribers in
+                subscribers = updatedSubscribers ?? []
+            }
+    }
+
+    private var synchronizedLifecycleContent: some View {
+        presentedLifecycleContent
+            .task {
+                inbox.markIssueRead(runID: run.id)
+                detail.startActivitySynchronization()
+                await detail.load()
+            }
+            .refreshable { await detail.load() }
+            .onChange(of: inbox.messages) { _, _ in
+                inbox.markIssueRead(runID: run.id)
+            }
+            .onChange(of: selectedTab, initial: true) { _, tab in
+                if tab == .conversation {
+                    issueConversationView?.view(projectID: projectID, runID: run.id) {
+                        await detail.syncConversationChanges()
+                    }
+                } else {
+                    issueConversationView?.leave(runID: run.id)
+                }
+            }
+            .onChange(of: run.status) { _, status in
+                localStatus = status
+                // Keep parity with shared React RunPage: status transitions reselect the default tab.
+                selectedTab = status.prefersResultDetailTab ? .result : .issue
+            }
+            .onChange(of: run.workflowStage) { _, stage in localWorkflowStage = stage }
+    }
+
+    private var presentedLifecycleContent: some View {
         detailContent
             .navigationTitle(run.title)
             .toolbar {
@@ -1500,69 +1613,6 @@ struct RunDetailView: View {
                 isPresented: $linkCopied,
                 message: L10n.text(.linkCopied, locale: locale)
             )
-            .task {
-                inbox.markIssueRead(runID: run.id)
-                detail.startActivitySynchronization()
-                await detail.load()
-            }
-            .refreshable { await detail.load() }
-            .onChange(of: inbox.messages) { _, _ in
-                inbox.markIssueRead(runID: run.id)
-            }
-            .onChange(of: selectedTab, initial: true) { _, tab in
-                if tab == .conversation {
-                    issueConversationView?.view(projectID: projectID, runID: run.id) {
-                        await detail.syncConversationChanges()
-                    }
-                } else {
-                    issueConversationView?.leave(runID: run.id)
-                }
-            }
-            .onChange(of: run.status) { _, status in
-                localStatus = status
-                // Keep parity with shared React RunPage: status transitions reselect the default tab.
-                selectedTab = status.prefersResultDetailTab ? .result : .issue
-            }
-            .onChange(of: run.workflowStage) { _, stage in localWorkflowStage = stage }
-            .onChange(of: run.prerequisites) { _, prerequisites in
-                dependencyIDs = Set((prerequisites ?? []).map(\.id))
-            }
-            .onChange(of: run.subscribers) { _, updatedSubscribers in
-                subscribers = updatedSubscribers ?? []
-            }
-            .onDisappear {
-                issueConversationView?.leave(runID: run.id)
-                executionApprovalPresentation = nil
-                preparingExecutionProposalID = nil
-                skillExecutionApprovalPresentation = nil
-                preparingSkillExecutionProposalID = nil
-                detail.close()
-            }
-            .onChange(of: detail.messages) { _, messages in
-                if let proposalID = executionApprovalPresentation?.proposal.id,
-                   !messages.contains(where: {
-                       $0.executionProposal?.id == proposalID &&
-                           $0.executionProposal?.status == .pending
-                   }) {
-                    executionApprovalPresentation = nil
-                }
-                if let proposal = skillExecutionApprovalPresentation?.proposal,
-                   !messages.contains(where: {
-                       guard let current = $0.skillExecutionProposal else { return false }
-                       return current.status == .pending &&
-                           agentSkillExecutionImmutableFieldsMatch(current, proposal)
-                   }) {
-                    skillExecutionApprovalPresentation = nil
-                }
-            }
-            .onChange(of: pendingExecutionTargetSignatures) { previous, current in
-                guard pendingIssueExecutionTargetChanged(
-                    from: previous,
-                    to: current
-                ) else { return }
-                executionApprovalPresentation = nil
-                Task { await detail.load(queueIfLoading: true) }
-            }
     }
 
     private var detailContent: some View {
@@ -1867,54 +1917,163 @@ struct RunDetailView: View {
 
     @ViewBuilder
     private var dependenciesControl: some View {
-        Section(L10n.text("의존성", locale: locale)) {
+        Section(L10n.text("계층", locale: locale)) {
+            if let parent = selectedParentReference {
+                relationshipRow(
+                    parent,
+                    actionKey: "parent-\(run.id)",
+                    removeLabel: L10n.format("%@ 부모 연결 제거", locale: locale, parent.title),
+                    removeIdentifier: "remove-parent-\(parent.id.uuidString.lowercased())"
+                ) {
+                    try await changeParent(runID: run.id, parentID: nil)
+                }
+            } else {
+                Text(L10n.text("부모 이슈가 없습니다.", locale: locale))
+                    .foregroundStyle(.secondary)
+            }
+            Button {
+                relationPicker = .parent
+            } label: {
+                Label(L10n.text("부모 설정 또는 변경", locale: locale), systemImage: "arrow.up.right")
+            }
+            .accessibilityIdentifier("set-parent-button")
+
+            let completedCount = selectedSubIssueReferences.filter { $0.status == .completed }.count
+            Text(L10n.format(
+                "하위 이슈 · %d/%d 완료",
+                locale: locale,
+                completedCount,
+                selectedSubIssueReferences.count
+            ))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            if selectedSubIssueReferences.isEmpty {
+                Text(L10n.text("하위 이슈가 없습니다.", locale: locale))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(selectedSubIssueReferences) { subIssue in
+                    relationshipRow(
+                        subIssue,
+                        actionKey: "parent-\(subIssue.id)",
+                        removeLabel: L10n.format("%@ 하위 연결 제거", locale: locale, subIssue.title),
+                        removeIdentifier: "remove-sub-issue-\(subIssue.id.uuidString.lowercased())"
+                    ) {
+                        try await changeParent(runID: subIssue.id, parentID: nil)
+                    }
+                }
+            }
+            Button {
+                relationPicker = .subIssue
+            } label: {
+                Label(L10n.text("기존 하위 이슈 연결", locale: locale), systemImage: "link.badge.plus")
+            }
+            .accessibilityIdentifier("link-sub-issue-button")
+            Button {
+                showingCreateSubIssue = true
+            } label: {
+                Label(L10n.text("하위 이슈 생성", locale: locale), systemImage: "plus.circle")
+            }
+            .accessibilityIdentifier("create-sub-issue-button")
+        }
+
+        Section(L10n.text("관련 이슈", locale: locale)) {
+            if selectedRelatedReferences.isEmpty {
+                Text(L10n.text("관련 이슈가 없습니다.", locale: locale))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(selectedRelatedReferences) { related in
+                    relationshipRow(
+                        related,
+                        actionKey: "related-\(run.id)-\(related.id)",
+                        removeLabel: L10n.format("%@ 관련 연결 제거", locale: locale, related.title),
+                        removeIdentifier: "remove-related-issue-\(related.id.uuidString.lowercased())"
+                    ) {
+                        try await changeRelated(related.id, enabled: false)
+                    }
+                }
+            }
+            Button {
+                relationPicker = .related
+            } label: {
+                Label(L10n.text("관련 이슈 추가", locale: locale), systemImage: "link.badge.plus")
+            }
+            .accessibilityIdentifier("add-related-issue-button")
+        }
+
+        Section(L10n.text("실행 의존성", locale: locale)) {
             if selectedDependencyReferences.isEmpty {
                 Text(L10n.text("선행 이슈가 없습니다.", locale: locale))
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(selectedDependencyReferences) { dependency in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(dependency.title)
-                            Text(verbatim: "\(issueKeyPrefix)-\(dependency.runNumber) · \(dependency.status.displayName(locale: locale))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 8)
-                        Button(role: .destructive) {
-                            Task { try? await changeDependency(dependency.id, enabled: false) }
-                        } label: {
-                            if mutations.isActive("dependency-\(run.id)-\(dependency.id)") {
-                                ProgressView()
-                            } else {
-                                Image(systemName: "minus.circle")
-                            }
-                        }
-                        .buttonStyle(.borderless)
-                        .disabled(mutations.isActive("dependency-\(run.id)-\(dependency.id)"))
-                        .accessibilityLabel(
-                            L10n.format("%@ 의존성 제거", locale: locale, dependency.title)
-                        )
-                        .accessibilityIdentifier(
-                            "remove-dependency-\(dependency.id.uuidString.lowercased())"
-                        )
+                    relationshipRow(
+                        dependency,
+                        actionKey: "dependency-\(run.id)-\(dependency.id)",
+                        removeLabel: L10n.format("%@ 의존성 제거", locale: locale, dependency.title),
+                        removeIdentifier: "remove-dependency-\(dependency.id.uuidString.lowercased())"
+                    ) {
+                        try await changeDependency(dependency.id, enabled: false)
                     }
                 }
             }
 
             Button {
-                showingDependencyPicker = true
+                relationPicker = .dependency
             } label: {
                 Label(L10n.text("의존성 추가", locale: locale), systemImage: "plus.circle")
             }
-            .disabled(dependencyCandidates.isEmpty)
             .accessibilityIdentifier("add-dependency-button")
+
+            if (run.dependents ?? []).isEmpty {
+                Text(L10n.text("이 이슈를 기다리는 후속 이슈가 없습니다.", locale: locale))
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(L10n.text("후속 이슈", locale: locale))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ForEach(run.dependents ?? []) { dependent in
+                    relationshipRow(dependent)
+                }
+            }
         }
     }
 
-    private var dependencyCandidates: [DashboardRun] {
-        allRuns
-            .filter { $0.id != run.id && $0.status != .cancelled }
+    private func relationshipRow(
+        _ reference: IssueDependencyReference,
+        actionKey: String? = nil,
+        removeLabel: String? = nil,
+        removeIdentifier: String? = nil,
+        remove: (() async throws -> Void)? = nil
+    ) -> some View {
+        HStack {
+            NavigationLink(value: reference.id) {
+                VStack(alignment: .leading) {
+                    Text(reference.title)
+                    Text(verbatim: "\(issueKeyPrefix)-\(reference.runNumber) · \(reference.status.displayName(locale: locale))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if let actionKey, let removeLabel, let remove {
+                Button(role: .destructive) {
+                    Task { try? await remove() }
+                } label: {
+                    if mutations.isActive(actionKey) {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "minus.circle")
+                    }
+                }
+                .buttonStyle(.borderless)
+                .disabled(mutations.isActive(actionKey))
+                .accessibilityLabel(removeLabel)
+                .accessibilityIdentifier(removeIdentifier ?? "")
+            }
+        }
+    }
+
+    private var sortedRelationCandidates: [DashboardRun] {
+        return allRuns.filter { $0.id != run.id && $0.status != .cancelled }
             .sorted { left, right in
                 switch (left.runNumber, right.runNumber) {
                 case let (leftNumber?, rightNumber?):
@@ -1927,7 +2086,10 @@ struct RunDetailView: View {
             }
     }
 
-    private var selectedDependencyReferences: [IssueDependencyReference] {
+    private func relationReferences(
+        ids: Set<UUID>,
+        existing: [IssueDependencyReference]
+    ) -> [IssueDependencyReference] {
         let loadedReferences = Dictionary(
             uniqueKeysWithValues: allRuns.map { candidate in
                 (
@@ -1941,14 +2103,119 @@ struct RunDetailView: View {
                 )
             }
         )
-        let existingReferences = Dictionary(
-            uniqueKeysWithValues: (run.prerequisites ?? []).map { ($0.id, $0) }
-        )
-        return dependencyIDs.compactMap { dependencyID in
-            loadedReferences[dependencyID] ?? existingReferences[dependencyID]
+        let existingReferences = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
+        return ids.compactMap { relationID in
+            loadedReferences[relationID] ?? existingReferences[relationID]
         }.sorted { left, right in
             if left.runNumber != right.runNumber { return left.runNumber < right.runNumber }
             return left.title.localizedCaseInsensitiveCompare(right.title) == .orderedAscending
+        }
+    }
+
+    private var selectedParentReference: IssueDependencyReference? {
+        guard let parentID else { return nil }
+        return relationReferences(ids: [parentID], existing: run.parent.map { [$0] } ?? []).first
+    }
+
+    private var selectedSubIssueReferences: [IssueDependencyReference] {
+        relationReferences(ids: subIssueIDs, existing: run.subIssues ?? [])
+    }
+
+    private var selectedRelatedReferences: [IssueDependencyReference] {
+        relationReferences(ids: relatedIssueIDs, existing: run.relatedIssues ?? [])
+    }
+
+    private var selectedDependencyReferences: [IssueDependencyReference] {
+        relationReferences(ids: dependencyIDs, existing: run.prerequisites ?? [])
+    }
+
+    private func relationCandidates(for picker: IssueRelationPicker) -> [DashboardRun] {
+        sortedRelationCandidates.filter { candidate in
+            switch picker {
+            case .parent: return candidate.id != parentID
+            case .subIssue: return !subIssueIDs.contains(candidate.id)
+            case .related: return !relatedIssueIDs.contains(candidate.id)
+            case .dependency: return !dependencyIDs.contains(candidate.id)
+            }
+        }
+    }
+
+    private func selectedIDsBinding(for picker: IssueRelationPicker) -> Binding<Set<UUID>> {
+        Binding(
+            get: {
+                switch picker {
+                case .parent: return self.parentID.map { Set([$0]) } ?? []
+                case .subIssue: return self.subIssueIDs
+                case .related: return self.relatedIssueIDs
+                case .dependency: return self.dependencyIDs
+                }
+            },
+            set: { _ in }
+        )
+    }
+
+    private func pickerTitle(_ picker: IssueRelationPicker) -> String {
+        switch picker {
+        case .parent: L10n.text("부모 이슈 선택", locale: locale)
+        case .subIssue: L10n.text("하위 이슈 연결", locale: locale)
+        case .related: L10n.text("관련 이슈 추가", locale: locale)
+        case .dependency: L10n.text("의존성 추가", locale: locale)
+        }
+    }
+
+    private func pickerSectionTitle(_ picker: IssueRelationPicker) -> String {
+        switch picker {
+        case .parent: L10n.text("부모 이슈", locale: locale)
+        case .subIssue: L10n.text("하위 이슈", locale: locale)
+        case .related: L10n.text("관련 이슈", locale: locale)
+        case .dependency: L10n.text("선행 이슈", locale: locale)
+        }
+    }
+
+    private func addRelation(_ candidateID: UUID, picker: IssueRelationPicker) async throws {
+        switch picker {
+        case .parent:
+            try await changeParent(runID: run.id, parentID: candidateID)
+        case .subIssue:
+            try await changeParent(runID: candidateID, parentID: run.id)
+        case .related:
+            try await changeRelated(candidateID, enabled: true)
+        case .dependency:
+            try await changeDependency(candidateID, enabled: true)
+        }
+    }
+
+    private func changeParent(runID: UUID, parentID nextParentID: UUID?) async throws {
+        do {
+            try await mutations.setParent(runID: runID, parentID: nextParentID)
+            if runID == run.id {
+                parentID = nextParentID
+            } else if nextParentID == run.id {
+                subIssueIDs.insert(runID)
+            } else {
+                subIssueIDs.remove(runID)
+            }
+            actionError = nil
+            await refresh()
+        } catch {
+            actionError = error.localizedDescription
+            throw error
+        }
+    }
+
+    private func changeRelated(_ relatedID: UUID, enabled: Bool) async throws {
+        do {
+            try await mutations.setRelated(runID: run.id, relatedID: relatedID, enabled: enabled)
+            if enabled {
+                relatedIssueIDs.insert(relatedID)
+            } else {
+                relatedIssueIDs.remove(relatedID)
+            }
+            actionError = nil
+            await refresh()
+        } catch {
+            actionError = error.localizedDescription
+            throw error
         }
     }
 
@@ -3362,7 +3629,7 @@ private struct PreviewErrorAlertModifier: ViewModifier {
     }
 }
 
-struct DependencyPickerSheet: View {
+struct IssueRelationPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedIDs: Set<UUID>
     @State private var query = ""
@@ -3371,6 +3638,8 @@ struct DependencyPickerSheet: View {
 
     let candidates: [DashboardRun]
     let issueKeyPrefix: String
+    let title: String
+    let sectionTitle: String
     let onAdd: (UUID) async throws -> Void
 
     private var filteredCandidates: [DashboardRun] {
@@ -3407,7 +3676,7 @@ struct DependencyPickerSheet: View {
                             : Text(L10n.text("다른 제목이나 이슈 번호로 검색해 보세요."))
                     )
                 } else {
-                    Section(L10n.text("선행 이슈 선택")) {
+                    Section(sectionTitle) {
                         ForEach(filteredCandidates) { candidate in
                             Button {
                                 Task { @MainActor in await add(candidate) }
@@ -3436,7 +3705,7 @@ struct DependencyPickerSheet: View {
                             }
                             .buttonStyle(.borderless)
                             .disabled(addingID != nil)
-                            .accessibilityLabel(L10n.format("%@ 의존성 추가", candidate.title))
+                            .accessibilityLabel(L10n.format("%@ 연결", candidate.title))
                             .accessibilityIdentifier(
                                 "dependency-option-\(candidate.id.uuidString.lowercased())"
                             )
@@ -3445,7 +3714,7 @@ struct DependencyPickerSheet: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle(L10n.text("의존성 추가"))
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, prompt: L10n.text("이슈 검색"))
             .toolbar {

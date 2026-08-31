@@ -17,6 +17,7 @@ struct CreateIssueSheet: View {
     let providers: [AgentProvider]
     let capabilities: AgentProviderCapabilityCatalog
     let persistence: IssueDraftPersistence
+    let parentRunID: UUID?
     let refresh: () async -> Void
 
     init(
@@ -26,6 +27,7 @@ struct CreateIssueSheet: View {
         capabilities: AgentProviderCapabilityCatalog = AgentProviderCapabilityCatalog(workers: []),
         persistence: IssueDraftPersistence = IssueDraftPersistence(),
         defaultAssigneeUserId: String? = nil,
+        parentRunID: UUID? = nil,
         refresh: @escaping () async -> Void
     ) {
         self.mutations = mutations
@@ -35,6 +37,7 @@ struct CreateIssueSheet: View {
         )
         self.capabilities = capabilities
         self.persistence = persistence
+        self.parentRunID = parentRunID
         self.refresh = refresh
         var loaded = persistence.load()
         if loaded.assigneeUserId == nil, let defaultAssigneeUserId {
@@ -261,7 +264,11 @@ struct CreateIssueSheet: View {
 
     private func submit() async {
         do {
-            _ = try await mutations.createIssue(draft: draft, attachments: attachments)
+            _ = try await mutations.createIssue(
+                draft: draft,
+                attachments: attachments,
+                parentRunId: parentRunID
+            )
             persistence.clear()
             didSubmitSuccessfully = true
             await refresh()

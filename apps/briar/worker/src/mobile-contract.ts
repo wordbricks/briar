@@ -399,6 +399,9 @@ export const mobileDashboardRunSchema = mutableStruct({
   issueDescription: optionalNullable(Schema.String),
   relatedMessage: optionalNullable(mobileRelatedMessageSchema),
   attachments: optional(mutableArray(mobileIssueAttachmentSchema)),
+  parent: optionalNullable(mobileRunDependencySchema),
+  subIssues: optional(mutableArray(mobileRunDependencySchema)),
+  relatedIssues: optional(mutableArray(mobileRunDependencySchema)),
   prerequisites: optional(mutableArray(mobileRunDependencySchema)),
   dependents: optional(mutableArray(mobileRunDependencySchema)),
   executionReadiness: optional(Schema.Literals(["ready", "waiting"])),
@@ -1130,6 +1133,7 @@ const mobileIssueWriteFields = {
     null,
   ),
   assigneeUserId: nullable(Schema.String),
+  parentRunId: optionalNullable(uuidString),
   status: Schema.Literals(["backlog", "queued"]),
   preferredProvider: optionalNullable(mobileProviderSchema),
   preferredModel: optionalNullable(Schema.String),
@@ -1161,6 +1165,7 @@ export const mobileCreateIssueResponseSchema = mutableStruct({
   assigneeUserId: nullable(Schema.String),
   createdByUserId: Schema.String,
   difficulty: nullable(mobileIssueDifficultySchema),
+  parentRunId: nullable(uuidString),
   attachments: mutableArray(mobileIssueAttachmentSchema),
 });
 

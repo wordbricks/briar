@@ -398,6 +398,7 @@ export async function readIssueRequest(request: Request) {
   const priority = form.get("priority");
   const difficulty = form.get("difficulty");
   const assigneeUserId = form.get("assigneeUserId");
+  const parentRunId = form.get("parentRunId");
   const status = form.get("status");
   const preferredProvider = form.get("preferredProvider");
   const preferredModel = form.get("preferredModel");
@@ -429,6 +430,10 @@ export async function readIssueRequest(request: Request) {
       assigneeUserId:
         typeof assigneeUserId === "string"
           ? assigneeUserId.trim() || null
+          : undefined,
+      parentRunId:
+        typeof parentRunId === "string"
+          ? parentRunId.trim() || null
           : undefined,
       status: typeof status === "string" && status ? status : undefined,
       preferredProvider:

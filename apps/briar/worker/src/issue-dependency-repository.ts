@@ -98,9 +98,10 @@ export async function createIssueDependency(
   input: {
     prerequisiteRunId: string;
     dependentRunId: string;
-    createdByUserId: string;
+    createdByUserId: string | null;
     createdAt: string;
   },
+  options: { allowStartedDependent?: boolean } = {},
 ): Promise<IssueDependencyMutationOutcome> {
   const inserted = await db
     .prepare(
@@ -125,7 +126,10 @@ export async function createIssueDependency(
          and exists (
            select 1 from briar_hunt_runs
            where id = ? and project_id = ?
-             and status in ('backlog', 'queued', 'blocked', 'failed')
+             and (
+               ? = 1
+               or status in ('backlog', 'queued', 'blocked', 'failed')
+             )
          )
          and not exists (
            select 1 from reachable where run_id = ?
@@ -145,6 +149,7 @@ export async function createIssueDependency(
       projectId,
       input.dependentRunId,
       projectId,
+      options.allowStartedDependent ? 1 : 0,
       input.prerequisiteRunId,
     )
     .first<{ prerequisite_run_id: string }>();
@@ -189,6 +194,7 @@ export async function createIssueDependency(
     .first<{ present: number }>();
   if (existing) return "already_exists";
   if (
+    !options.allowStartedDependent &&
     !["backlog", "queued", "blocked", "failed"].includes(
       runs.dependent_status ?? "",
     )
