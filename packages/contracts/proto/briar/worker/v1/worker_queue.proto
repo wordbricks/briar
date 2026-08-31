@@ -853,13 +853,15 @@ message DetachedAgentSkill {
 }
 
 message DetachedAgentClaim {
+  reserved 7;
+  reserved "skill";
+
   string id = 1;
   string name = 2;
   briar.types.v1.AgentProvider provider = 3;
   optional string model = 4;
   optional string effort = 5;
   string responsibility = 6;
-  string skill = 7;
   repeated DetachedAgentSkill skills = 8;
 }
 
@@ -1043,7 +1045,7 @@ message ClaimedChannelReply {
   briar.types.v1.AgentProvider provider = 9;
   optional string model = 10;
   optional string effort = 11;
-  optional DetachedAgentClaim agent = 12;
+  DetachedAgentClaim agent = 12;
   optional DetachedAgentSkill active_skill = 13;
   optional DetachedAgentSkillExecutionTarget skill_execution_target = 14;
   string claim_token = 15;

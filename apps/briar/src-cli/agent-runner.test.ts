@@ -43,7 +43,6 @@ const agent = {
   model: "gpt-5",
   effort: "high" as const,
   responsibility: "Ship the assigned issue.",
-  skill: "# Release Agent",
   skills: [
     {
       id: "skill-issue",
@@ -639,7 +638,7 @@ describe("detached Agent runner", () => {
     ).toThrow("delegation targets can only be attached");
   });
 
-  it("uses active skill instructions while retaining legacy skill fallback", () => {
+  it("uses the active skill while retaining the generated skill catalog", () => {
     const activeAgent = { ...agent, activeSkill: agent.skills[1] };
     const launch = detachedProviderRequest({
       agent: activeAgent,
@@ -653,15 +652,6 @@ describe("detached Agent runner", () => {
     );
     expect(launch.request.instructions).toContain("Ship the assigned issue.");
     expect(launch.request.instructions).toContain("Issue handling");
-
-    const legacyContext = detachedAgentContext({
-      ...agent,
-      skills: [],
-      skill: "Follow the legacy release checklist.",
-    });
-    expect(legacyContext).toContain("Legacy skill");
-    expect(legacyContext).toContain("Follow the legacy release checklist.");
-    expect(legacyContext).toContain("No Skill was preselected");
   });
 
   it("uses frontmatter descriptions for Skill discovery and loads bodies on demand", () => {

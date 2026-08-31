@@ -3,8 +3,6 @@ import {
   rm,
 } from "node:fs/promises";
 import { join } from "node:path";
-import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
 import {
   agentExecutionCostRecordsFromObservations,
   agentExecutionMetrics,
@@ -59,10 +57,6 @@ import {
   type Config,
   type ProjectConfig,
 } from "./config-contract";
-import {
-  decodeDetachedAgentEffortOption,
-  decodeDetachedAgentSkillsOption,
-} from "./detached-agent-options";
 import {
   type ClaimedRun,
   type DetachedAgentClaim,
@@ -125,38 +119,21 @@ function detachedReplyAgent(input: {
   effort?: ModelEffort | null;
   agent?: DetachedAgentClaim | null;
   activeSkill?: DetachedAgentSkill | null;
-  snapshot: Record<string, unknown>;
   fallbackName: string;
   scope?: DetachedAgent["scope"];
 }): DetachedAgent {
-  const snapshotAgent = Predicate.isObject(input.snapshot.agent)
-    ? input.snapshot.agent
-    : null;
-  const snapshotSkills = decodeDetachedAgentSkillsOption(snapshotAgent?.skills);
   const baseAgent = input.agent ?? {
-    id: typeof snapshotAgent?.id === "string" && snapshotAgent.id.trim()
-      ? snapshotAgent.id
-      : input.workId,
-    name: typeof snapshotAgent?.name === "string" && snapshotAgent.name.trim()
-      ? snapshotAgent.name
-      : input.fallbackName,
+    id: input.workId,
+    name: input.fallbackName,
     provider: input.provider,
     model: input.model,
-    effort:
-      typeof snapshotAgent?.effort === "string" &&
-        Option.isSome(decodeDetachedAgentEffortOption(snapshotAgent.effort))
-        ? snapshotAgent.effort
-        : null,
-    responsibility: typeof snapshotAgent?.responsibility === "string"
-      ? snapshotAgent.responsibility
-      : "",
-    skill: typeof snapshotAgent?.skill === "string" ? snapshotAgent.skill : "",
-    skills: Option.getOrElse(snapshotSkills, () => []),
+    effort: null,
+    responsibility: "",
+    skills: [],
   };
   return {
     ...baseAgent,
-    // The top-level execution fields are snapshotted by the server and remain
-    // authoritative during rolling upgrades, even when Agent defaults change.
+    // The claim's execution fields are immutable for this worker turn.
     provider: input.provider,
     model: input.model,
     effort: input.effort !== undefined
@@ -329,7 +306,6 @@ async function runClaimedIssueInRuntime(
     model: execution.model,
     effort: execution.effort,
     responsibility: logicalAgent?.responsibility ?? "",
-    skill: logicalAgent?.skill ?? "",
     skills: logicalAgent?.skills ?? [],
     activeSkill: logicalAgent?.activeSkill ?? null,
   };

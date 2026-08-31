@@ -247,7 +247,6 @@ type AppAgent = {
   model: string | null;
   effort: string | null;
   responsibility: string;
-  skill: string;
   skills: AppSkill[];
 };
 
@@ -258,7 +257,6 @@ const agent = (value: AppAgent) => create(DetachedAgentClaimSchema, {
   model: value.model ?? undefined,
   effort: value.effort ?? undefined,
   responsibility: value.responsibility,
-  skill: value.skill,
   skills: value.skills.map(skill),
 });
 
@@ -538,7 +536,7 @@ const channelReply = (
       provider: provider(value.provider),
       model: value.model ?? undefined,
       effort: value.effort ?? undefined,
-      agent: value.agent ? agent(value.agent) : undefined,
+      agent: agent(value.agent),
       activeSkill: value.activeSkill ? skill(value.activeSkill) : undefined,
       skillExecutionTarget: value.skillExecutionTarget
         ? skillTarget(value.skillExecutionTarget)

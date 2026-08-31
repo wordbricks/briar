@@ -370,7 +370,6 @@ async function runClaimedIssueReply(
       effort: issue.effort,
       agent: issue.agent,
       activeSkill: issue.activeSkill,
-      snapshot: issue.snapshot,
       fallbackName: "Project Agent",
       scope: {
         kind: "project",
@@ -605,7 +604,7 @@ async function runClaimedChannelReply(
       sessionId: reply.session.id,
       channelId: reply.channelId,
       threadId: reply.session.threadId,
-      agentId: reply.agent?.id ?? null,
+      agentId: reply.agent.id,
       claimReason: reply.session.claimReason,
       workspaceReused: sessionWorktree?.reused ?? false,
       retainedUntil,
@@ -724,7 +723,6 @@ async function runClaimedChannelReply(
       effort: reply.effort,
       agent: reply.agent,
       activeSkill: reply.activeSkill,
-      snapshot: reply.snapshot,
       fallbackName: "Briar Channel",
       scope: reply.scope,
     });

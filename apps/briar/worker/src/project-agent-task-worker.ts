@@ -155,7 +155,6 @@ export async function claimNextProjectAgentTaskWork(input: {
           model: job.agent_model,
           effort: job.agent_effort,
           responsibility: job.agent_responsibility,
-          skill: job.agent_skill,
           skills: job.agent_skills.map(agentSkillJson),
         },
     };

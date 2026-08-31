@@ -70,7 +70,6 @@ const task: ClaimedProjectAgentTask = {
     model: null,
     effort: null,
     responsibility: "Release the project",
-    skill: "Release the project",
     skills: [],
   },
   activeSkill: null,

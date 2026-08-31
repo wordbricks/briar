@@ -5,7 +5,6 @@ import {
   agentSkillJson,
   hydrateAgentSkills,
 } from "./agent-skills";
-import { legacyAgentSkillInstructions } from "./agent-execution-config";
 import {
   channelExecutionProposalTablesAvailable,
   claimNextChannelAgentReply,
@@ -367,10 +366,6 @@ export async function claimNextChannelReplyWork(
           model: replyModel,
           effort: replyEffort,
           responsibility: agent.responsibility,
-          skill: legacyAgentSkillInstructions(
-            activeSkill,
-            agent.skill_markdown ?? agent.responsibility,
-          ),
           skills: agent.skills.map(agentSkillJson),
         },
         claimToken,
@@ -405,14 +400,9 @@ export async function claimNextChannelReplyWork(
             id: agent.id,
             name: agent.name,
             responsibility: agent.responsibility,
-            skill: legacyAgentSkillInstructions(
-              activeSkill,
-              agent.skill_markdown ?? agent.responsibility,
-            ),
             provider: job.agent_provider,
             model: replyModel,
             effort: replyEffort,
-            skills: agent.skills.map(agentSkillJson),
             projectId: agent.project_id,
           },
           project: project ? { id: project.id, name: project.name } : null,

@@ -29,7 +29,6 @@ const agent = {
   model: null,
   effort: null,
   responsibility: "Handle the work",
-  skill: "Handle the work",
   skills: [],
 };
 
@@ -130,11 +129,9 @@ const channelReply = {
       id: agent.id,
       name: agent.name,
       responsibility: agent.responsibility,
-      skill: agent.skill,
       provider: agent.provider,
       model: agent.model,
       effort: agent.effort,
-      skills: [],
       projectId: "88888888-8888-4888-8888-888888888888",
     },
     project: {

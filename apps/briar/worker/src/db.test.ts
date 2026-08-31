@@ -2309,9 +2309,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         status: "running",
         attempts: 1,
         agent_provider: "codex",
-        agent_skill: skill.body,
         selected_skill_id: skill.id,
-        selected_skill_instructions: skill.body,
       });
 
       await expect(

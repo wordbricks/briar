@@ -16,7 +16,6 @@ const agent: DetachedAgent = {
   model: "gpt-5",
   effort: "high",
   responsibility: "Prepare releases.",
-  skill: "",
   skills: [
     {
       id: "skill-ios",

@@ -13,10 +13,7 @@ import {
   listIssueAttachments,
   listRunEvidence,
 } from "./db";
-import {
-  issueReplyExecutionConfig,
-  legacyAgentSkillInstructions,
-} from "./agent-execution-config";
+import { issueReplyExecutionConfig } from "./agent-execution-config";
 import { HttpError } from "./http-response";
 import { claimConversationJson } from "./issue-conversation-json";
 import { listIssueMessagesWithArchive } from "./issue-conversation-service";
@@ -214,10 +211,6 @@ export async function claimNextIssueReplyWork(input: {
               model: replyExecution.model,
               effort: replyExecution.effort,
               responsibility: agent.responsibility,
-              skill: legacyAgentSkillInstructions(
-                activeSkill,
-                agent.skill_markdown,
-              ),
               skills: agent.skills.map(agentSkillJson),
             }
           : null,
@@ -241,21 +234,6 @@ export async function claimNextIssueReplyWork(input: {
           run: {
             ...dashboardRunJson(run, attachments),
             events: events.map((event) => dashboardEventJson(event)),
-            // Workers from before first-class Agent Skills ignore work.agent,
-            // but retain arbitrary fields inside snapshot.run. Keep the saved
-            // profile here as read-only context during a rolling upgrade.
-            agentProfile: agent
-              ? {
-                  id: agent.id,
-                  name: agent.name,
-                  responsibility: agent.responsibility,
-                  skill: legacyAgentSkillInstructions(
-                    activeSkill,
-                    agent.skill_markdown,
-                  ),
-                  skills: agent.skills.map(agentSkillJson),
-                }
-              : null,
           },
           messages: claimConversationJson(messages, attachments),
           agentTranscript:

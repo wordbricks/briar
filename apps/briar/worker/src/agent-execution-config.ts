@@ -50,10 +50,3 @@ export function issueReplyExecutionConfig(input: {
     effort: source?.effort ?? null,
   };
 }
-
-export function legacyAgentSkillInstructions(
-  activeSkill: { body: string } | null | undefined,
-  fallback: string,
-) {
-  return activeSkill?.body ?? fallback;
-}

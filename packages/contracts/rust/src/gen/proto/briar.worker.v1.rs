@@ -26315,13 +26315,6 @@ pub struct DetachedAgentClaim {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub responsibility: ::buffa::alloc::string::String,
-    /// Field 7: `skill`
-    #[serde(
-        rename = "skill",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub skill: ::buffa::alloc::string::String,
     /// Field 8: `skills`
     #[serde(
         rename = "skills",
@@ -26342,7 +26335,6 @@ impl ::core::fmt::Debug for DetachedAgentClaim {
             .field("model", &self.model)
             .field("effort", &self.effort)
             .field("responsibility", &self.responsibility)
-            .field("skill", &self.skill)
             .field("skills", &self.skills)
             .finish()
     }
@@ -26419,9 +26411,6 @@ impl ::buffa::Message for DetachedAgentClaim {
                 += 1u64
                     + ::buffa::types::string_encoded_len(&self.responsibility) as u64;
         }
-        if !self.skill.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.skill) as u64;
-        }
         for v in &self.skills {
             let __slot = __cache.reserve();
             let inner_size = v.compute_size(__cache);
@@ -26460,9 +26449,6 @@ impl ::buffa::Message for DetachedAgentClaim {
         }
         if !self.responsibility.is_empty() {
             ::buffa::types::put_string_field(6u32, &self.responsibility, buf);
-        }
-        if !self.skill.is_empty() {
-            ::buffa::types::put_string_field(7u32, &self.skill, buf);
         }
         for v in &self.skills {
             ::buffa::types::put_len_delimited_header(
@@ -26535,13 +26521,6 @@ impl ::buffa::Message for DetachedAgentClaim {
                 )?;
                 ::buffa::types::merge_string(&mut self.responsibility, buf)?;
             }
-            7u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.skill, buf)?;
-            }
             8u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -26568,7 +26547,6 @@ impl ::buffa::Message for DetachedAgentClaim {
         self.model = ::core::option::Option::None;
         self.effort = ::core::option::Option::None;
         self.responsibility.clear();
-        self.skill.clear();
         self.skills.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -77758,8 +77736,6 @@ pub mod __buffa {
             pub effort: ::core::option::Option<&'a str>,
             /// Field 6: `responsibility`
             pub responsibility: &'a str,
-            /// Field 7: `skill`
-            pub skill: &'a str,
             /// Field 8: `skills`
             pub skills: ::buffa::RepeatedView<
                 'a,
@@ -77843,13 +77819,6 @@ pub mod __buffa {
                         )?;
                         view.responsibility = ::buffa::types::borrow_str(&mut cur)?;
                     }
-                    7u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.skill = ::buffa::types::borrow_str(&mut cur)?;
-                    }
                     8u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -77905,7 +77874,6 @@ pub mod __buffa {
                     model: self.model.map(|s| s.to_string()),
                     effort: self.effort.map(|s| s.to_string()),
                     responsibility: self.responsibility.to_string(),
-                    skill: self.skill.to_string(),
                     skills: self
                         .skills
                         .iter()
@@ -77949,10 +77917,6 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.responsibility)
                                 as u64;
                 }
-                if !self.skill.is_empty() {
-                    size
-                        += 1u64 + ::buffa::types::string_encoded_len(&self.skill) as u64;
-                }
                 for v in &self.skills {
                     let __slot = __cache.reserve();
                     let inner_size = v.compute_size(__cache);
@@ -77992,9 +77956,6 @@ pub mod __buffa {
                 }
                 if !self.responsibility.is_empty() {
                     ::buffa::types::put_string_field(6u32, &self.responsibility, buf);
-                }
-                if !self.skill.is_empty() {
-                    ::buffa::types::put_string_field(7u32, &self.skill, buf);
                 }
                 for v in &self.skills {
                     ::buffa::types::put_len_delimited_header(
@@ -78044,9 +78005,6 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.responsibility) {
                     __map.serialize_entry("responsibility", self.responsibility)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.skill) {
-                    __map.serialize_entry("skill", self.skill)?;
                 }
                 if !self.skills.is_empty() {
                     __map.serialize_entry("skills", &*self.skills)?;
@@ -78179,11 +78137,6 @@ pub mod __buffa {
             #[must_use]
             pub fn responsibility(&self) -> &'_ str {
                 self.0.reborrow().responsibility
-            }
-            /// Field 7: `skill`
-            #[must_use]
-            pub fn skill(&self) -> &'_ str {
-                self.0.reborrow().skill
             }
             /// Field 8: `skills`
             #[must_use]

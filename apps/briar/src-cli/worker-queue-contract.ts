@@ -262,7 +262,6 @@ const agent = (value: ProtoDetachedAgentClaim) => ({
   model: value.model ?? null,
   effort: value.effort ?? null,
   responsibility: value.responsibility,
-  skill: value.skill,
   skills: value.skills.map(agentSkill),
 });
 
@@ -496,7 +495,7 @@ const channelReplyFromProto = (
     provider: agentProvider(value.provider),
     model: value.model ?? null,
     effort: value.effort ?? null,
-    agent: value.agent ? agent(value.agent) : null,
+    agent: agent(required(value.agent, "channelReply.agent")),
     activeSkill: value.activeSkill ? agentSkill(value.activeSkill) : null,
     skillExecutionTarget: value.skillExecutionTarget
       ? skillExecutionTarget(value.skillExecutionTarget)

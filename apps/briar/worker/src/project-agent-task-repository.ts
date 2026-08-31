@@ -310,10 +310,8 @@ export async function claimNextProjectAgentTask(
       agent_model: approval.model,
       agent_effort: approval.effort,
       agent_responsibility: approval.agent_responsibility,
-      agent_skill: approval.skill_instructions,
       selected_skill_id: approval.skill_id,
       selected_skill_name: approval.skill_name,
-      selected_skill_instructions: approval.skill_instructions,
       agent_skills: [approvedSkill],
     };
   }
@@ -322,10 +320,8 @@ export async function claimNextProjectAgentTask(
       `select job.*, agent.name as agent_name, skill.provider as agent_provider,
               skill.model as agent_model, skill.effort as agent_effort,
               agent.responsibility as agent_responsibility,
-              skill.body as agent_skill,
               skill.id as selected_skill_id,
-              skill.name as selected_skill_name,
-              skill.body as selected_skill_instructions
+              skill.name as selected_skill_name
        from briar_project_agent_task_jobs job
        join briar_project_agents agent on agent.id = job.agent_id
        join briar_agent_skills skill

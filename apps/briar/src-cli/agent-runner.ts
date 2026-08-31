@@ -523,8 +523,6 @@ export type DetachedAgent = {
   model: string | null;
   effort?: DetachedAgentEffort | null;
   responsibility: string;
-  /** Legacy single-skill instructions retained for rolling compatibility. */
-  skill: string;
   skills: DetachedAgentSkill[];
   activeSkill?: DetachedAgentSkill | null;
   scope?: DetachedAgentScope;
@@ -546,21 +544,6 @@ export function detachedAgentSkills(agent: DetachedAgent): DetachedAgentSkill[] 
     !skills.some((skill) => skill.id === agent.activeSkill?.id)
   ) {
     skills.push(agent.activeSkill);
-  }
-  if (skills.length === 0 && agent.skill.trim()) {
-    skills.push({
-      id: "legacy",
-      name: "Legacy skill",
-      description: agent.skill.replace(/\s+/gu, " ").trim().slice(0, 1_000),
-      body: agent.skill,
-      provider: agent.provider,
-      model: agent.model,
-      effort: agent.effort ?? null,
-      kind: "custom",
-      executionMode: "task",
-      approvalPolicy: "explicit",
-      position: 0,
-    });
   }
   return skills.sort((left, right) =>
     left.position - right.position || left.name.localeCompare(right.name)

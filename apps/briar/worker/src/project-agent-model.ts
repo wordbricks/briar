@@ -121,10 +121,8 @@ export type ClaimedProjectAgentTaskRow = ProjectAgentTaskJobRow & {
   agent_model: string | null;
   agent_effort: AgentSkillEffort | null;
   agent_responsibility: string;
-  agent_skill: string;
   selected_skill_id: string;
   selected_skill_name: string;
-  selected_skill_instructions: string;
   agent_skills: AgentSkillRow[];
 };
 

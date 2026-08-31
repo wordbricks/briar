@@ -7,10 +7,7 @@ import {
   getProjectAgent,
   listIssueAttachments,
 } from "./db";
-import {
-  issueClaimExecutionConfig,
-  legacyAgentSkillInstructions,
-} from "./agent-execution-config";
+import { issueClaimExecutionConfig } from "./agent-execution-config";
 import { HttpError } from "./http-response";
 import { issueAttachmentJson } from "./issue-conversation-json";
 import { claimConversationJson } from "./issue-conversation-json";
@@ -199,10 +196,6 @@ export async function claimNextQueueWork(input: {
                   model: execution?.model ?? null,
                   effort: execution?.effort ?? null,
                   responsibility: agent.responsibility,
-                  skill: legacyAgentSkillInstructions(
-                    activeSkill,
-                    agent.skill_markdown,
-                  ),
                   skills: agent.skills.map(agentSkillJson),
                 }
               : null,

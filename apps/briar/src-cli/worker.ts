@@ -44,7 +44,6 @@ export type ClaimedIssue = {
     model: string | null;
     effort: ModelEffort | null;
     responsibility: string;
-    skill: string;
   } | null;
 };
 
