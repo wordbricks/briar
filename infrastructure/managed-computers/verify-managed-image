@@ -70,6 +70,8 @@ pkg-config --exists webkit2gtk-4.1
 pkg-config --exists ayatana-appindicator3-0.1
 test -x /usr/bin/google-chrome-stable
 test -x /opt/briar/bin/briar-open-browser
+test "$(sudo -u briar -H bash -lc 'printf %s "$GH_BROWSER"')" = \
+  "/opt/briar/bin/briar-open-browser"
 grep -Fq -- '--no-first-run' /opt/briar/bin/briar-open-browser
 grep -Fq -- '--no-default-browser-check' /opt/briar/bin/briar-open-browser
 test -r /usr/share/applications/google-chrome.desktop
@@ -217,6 +219,8 @@ for unit in \
   test "$(systemctl show "$unit" --property=User --value)" = "briar"
   test "$(systemctl show "$unit" --property=NoNewPrivileges --value)" = "no"
   test "$(systemctl show "$unit" --property=ProtectSystem --value)" = "no"
+  systemctl show "$unit" --property=Environment --value \
+    | grep -Fq 'GH_BROWSER=/opt/briar/bin/briar-open-browser'
   systemctl show "$unit" --property=ExecStartPre --value \
     | grep -Fq '/opt/briar/bin/verify-managed-admin'
 done
