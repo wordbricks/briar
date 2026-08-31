@@ -93,6 +93,7 @@ import {
   channelMutationOrganization,
   projectMutationProject,
   projectScheduleClaimMutation,
+  scheduleAgentSkillExecutionRealtimeFlush,
   scheduleChannelRealtimePublish,
   scheduleInboxRealtimeFlush,
   scheduleProjectRealtimePublish,
@@ -741,6 +742,10 @@ export default {
         }),
       );
       return json({ message: "Internal server error" }, 500);
+    } finally {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        scheduleAgentSkillExecutionRealtimeFlush(env, env.DB, ctx);
+      }
     }
   },
 } satisfies ExportedHandler<Env>;

@@ -16,6 +16,12 @@ export type {
 } from "./agent-skill-execution-proposal-repository";
 
 export {
+  listAgentSkillExecutionRealtimeOutbox,
+  acknowledgeAgentSkillExecutionRealtimeOutbox,
+} from "./agent-skill-execution-realtime-outbox-repository";
+export type { AgentSkillExecutionRealtimeOutboxRow } from "./agent-skill-execution-realtime-outbox-repository";
+
+export {
   channelApprovalTablesAvailable,
   isChannelApprovedIssue,
 } from "./channel-issue-approval-repository";

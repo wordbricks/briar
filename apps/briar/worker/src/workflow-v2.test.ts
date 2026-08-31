@@ -208,6 +208,10 @@ describe("workflow v2 D1 persistence and transitions", () => {
         // Apply the hierarchy migration only after the deliberately delayed
         // workflow/approval migrations below have reached their real order.
         "0149_workspace_team_project_issue_hierarchy.sql",
+        // 0150 replaces the Agent Skill approval triggers and reconciles their
+        // terminal projections, so it depends on the deliberately excluded
+        // approval schema installed later in this historical fixture.
+        "0150_agent_skill_execution_terminal_reconciliation.sql",
       ],
     });
 
