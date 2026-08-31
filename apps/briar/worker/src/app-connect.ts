@@ -2,6 +2,7 @@ import { createConnectRouter } from "@connectrpc/connect";
 import { createFetchHandler } from "@connectrpc/connect/protocol";
 import type { BriarAuth } from "./auth";
 import { withCorsHeaders } from "./http-response";
+import { connectErrorInterceptor } from "./app-connect-errors";
 import { registerAppAccountService } from "./app-connect-account";
 import { registerAppAgentService } from "./app-connect-agent";
 import { registerAppChannelService } from "./app-connect-channel";
@@ -48,6 +49,7 @@ export async function handleAppConnectRequest(
     grpc: false,
     grpcWeb: false,
     readMaxBytes: appConnectReadMaxBytes,
+    interceptors: [connectErrorInterceptor],
   });
   registerAppProjectService(router, {
     request: input.request,

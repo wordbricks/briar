@@ -1,8 +1,13 @@
-import { Code, ConnectError } from "@connectrpc/connect";
+import {
+  Code,
+  ConnectError,
+  type Interceptor,
+} from "@connectrpc/connect";
 import {
   ValidationErrorDetailSchema,
 } from "@briar/contracts/gen/briar/types/v1/error_pb";
 import * as SchemaIssue from "effect/SchemaIssue";
+import { agentSkillConflictMessage } from "./agent-skills";
 import { HttpError } from "./http-response";
 import { RequestDecodeError } from "./request-schema";
 import { ProjectWorkflowInputError } from "./run-request-contract";
@@ -13,6 +18,8 @@ const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 const connectCodeFromHttpStatus = (status: number): Code => {
   switch (status) {
     case 400:
+    case 411:
+    case 422:
       return Code.InvalidArgument;
     case 401:
       return Code.Unauthenticated;
@@ -21,6 +28,7 @@ const connectCodeFromHttpStatus = (status: number): Code => {
     case 404:
       return Code.NotFound;
     case 409:
+    case 428:
       return Code.FailedPrecondition;
     case 410:
       return Code.OutOfRange;
@@ -84,6 +92,16 @@ export const toConnectError = (error: unknown): ConnectError => {
       error,
     );
   }
+  const skillConflict = agentSkillConflictMessage(error);
+  if (skillConflict) {
+    return new ConnectError(
+      skillConflict,
+      Code.FailedPrecondition,
+      undefined,
+      undefined,
+      error,
+    );
+  }
   if (error instanceof HttpError) {
     return new ConnectError(
       error.message,
@@ -101,6 +119,15 @@ export const toConnectError = (error: unknown): ConnectError => {
     error,
   );
 };
+
+export const connectErrorInterceptor: Interceptor =
+  (next) => async (request) => {
+    try {
+      return await next(request);
+    } catch (error) {
+      throw toConnectError(error);
+    }
+  };
 
 export async function withConnectErrors<A>(operation: () => Promise<A>) {
   try {
