@@ -283,7 +283,7 @@ describe("issue multipart input", () => {
       description: "Please inspect the attachment",
       priority: 2,
       difficulty: null,
-      assigneeUserId: null,
+      assigneeUserId: undefined,
       status: "backlog",
       preferredProvider: null,
       preferredModel: null,

@@ -2,7 +2,9 @@ import {
   ArrowUpRight,
   Building2,
   Check,
+  Cpu,
   FolderKanban,
+  Github,
   LogOut,
   Mail,
   ShieldCheck,
@@ -15,15 +17,34 @@ import { Card } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/loading-state";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
-import { isApiErrorStatus, loadOrganizationInvitation } from "../lib/api";
+import { ApiError, loadOrganizationInvitation } from "../lib/api";
 import type { OrganizationInvitationPreview, SessionUser } from "../types";
 import { GoogleIcon, type LoginMethod } from "./LoginScreen";
 import { Logo } from "./Logo";
+
+type Translate = ReturnType<typeof useI18n>["t"];
+
+function invitationErrorMessage(error: unknown, t: Translate) {
+  if (error instanceof ApiError) {
+    if (error.code === "INVITATION_EMAIL_MISMATCH") {
+      return t("invitation.emailMismatch");
+    }
+    if (error.code === "INVITATION_EXPIRED") {
+      return t("invitation.expired");
+    }
+    if (error.code === "INVITATION_REVOKED") {
+      return t("invitation.revoked");
+    }
+    if (error.status === 404) return t("invitation.invalid");
+  }
+  return error instanceof Error ? error.message : String(error);
+}
 
 export function InvitationOnboarding({
   accepting,
   error: loginError,
   loading: loginLoading,
+  loadInvitation = loadOrganizationInvitation,
   loginCode,
   onAccept,
   onCancelLogin,
@@ -36,6 +57,7 @@ export function InvitationOnboarding({
   accepting: boolean;
   error: string | null;
   loading: boolean;
+  loadInvitation?: typeof loadOrganizationInvitation;
   loginCode: string | null;
   onAccept: () => Promise<void>;
   onCancelLogin: () => void;
@@ -56,12 +78,14 @@ export function InvitationOnboarding({
     let cancelled = false;
     setLoadingInvitation(true);
     setInvitationError(null);
-    void loadOrganizationInvitation(token)
+    void loadInvitation(token)
       .then((result) => {
         if (!cancelled) setInvitation(result.invitation);
       })
-      .catch(() => {
-        if (!cancelled) setInvitationError(t("invitation.invalid"));
+      .catch((caught) => {
+        if (!cancelled) {
+          setInvitationError(invitationErrorMessage(caught, t));
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingInvitation(false);
@@ -69,7 +93,7 @@ export function InvitationOnboarding({
     return () => {
       cancelled = true;
     };
-  }, [t, token]);
+  }, [loadInvitation, t, token]);
 
   const unavailableMessage = invitation
     ? invitation.status === "expired"
@@ -141,12 +165,30 @@ export function InvitationOnboarding({
                     | "organization.role.viewer")}
                 </Typography>
               </div>
-              <div className="flex items-center gap-3">
-                <Check className="text-success" size={18} />
-                <Typography as="span" tone="muted" variant="caption">
-                  {t("invitation.noTools")}
-                </Typography>
-              </div>
+              {invitation.role === "editor" ||
+              invitation.role === "viewer" ? (
+                <div className="flex items-center gap-3">
+                  <Check className="text-success" size={18} />
+                  <Typography as="span" tone="muted" variant="caption">
+                    {t("invitation.noTools")}
+                  </Typography>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3">
+                    <Github className="text-primary" size={18} />
+                    <Typography as="span" tone="muted" variant="caption">
+                      {t("invitation.githubRequired")}
+                    </Typography>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Cpu className="text-primary" size={18} />
+                    <Typography as="span" tone="muted" variant="caption">
+                      {t("invitation.agentRequired")}
+                    </Typography>
+                  </div>
+                </>
+              )}
             </div>
 
             <Typography
@@ -179,18 +221,19 @@ export function InvitationOnboarding({
                 >
                   {t("invitation.signedInAs", { email: user.email })}
                 </Typography>
+                <Typography
+                  className="text-center"
+                  tone="muted"
+                  variant="caption"
+                >
+                  {t("invitation.validationNotice")}
+                </Typography>
                 <Button
                   disabled={accepting}
                   onClick={() => {
                     setAcceptError(null);
                     void onAccept().catch((caught) =>
-                      setAcceptError(
-                        isApiErrorStatus(caught, 409)
-                          ? t("invitation.emailMismatch")
-                          : caught instanceof Error
-                            ? caught.message
-                            : String(caught),
-                      ),
+                      setAcceptError(invitationErrorMessage(caught, t)),
                     );
                   }}
                   type="button"

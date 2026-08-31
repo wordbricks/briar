@@ -60,6 +60,10 @@ command -v node >/dev/null
 command -v cc >/dev/null
 command -v make >/dev/null
 command -v minisign >/dev/null
+/usr/sbin/visudo --check
+test "$(stat --format='%U:%G:%a' /etc/sudoers.d/briar-local-admin)" = \
+  "root:root:440"
+sudo -u briar -H /opt/briar/bin/verify-managed-admin
 command -v pkg-config >/dev/null
 pkg-config --exists openssl
 pkg-config --exists webkit2gtk-4.1
@@ -206,8 +210,16 @@ systemctl show briar-managed-worker.service --property=Environment --value \
   | grep -Fq 'BRIAR_MANAGED_RUNTIME_UPDATER=/opt/briar/bin/briar-managed-runtime-update-request'
 systemctl show briar-remote-session-agent.service --property=Environment --value \
   | grep -Fq 'PATH=/opt/briar/bin:'
-systemctl show briar-remote-session-agent.service --property=ReadWritePaths --value \
-  | grep -Fq '/home/briar'
+for unit in \
+  briar-managed-worker.service \
+  briar-remote-desktop.service \
+  briar-remote-session-agent.service; do
+  test "$(systemctl show "$unit" --property=User --value)" = "briar"
+  test "$(systemctl show "$unit" --property=NoNewPrivileges --value)" = "no"
+  test "$(systemctl show "$unit" --property=ProtectSystem --value)" = "no"
+  systemctl show "$unit" --property=ExecStartPre --value \
+    | grep -Fq '/opt/briar/bin/verify-managed-admin'
+done
 if systemctl cat briar-managed-worker.service | grep -q 'briar_worker_'; then
   echo "Managed worker unit contains credential material" >&2
   exit 1

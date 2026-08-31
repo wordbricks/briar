@@ -706,7 +706,7 @@ function HuntDashboardContent({
         : current
     );
   }, [keyboardKanbanRunIds]);
-  const createIssueDialog = isIssueDialogOpen ? <CreateIssueDialog availableProviders={availableProviders} compactHeader={companionMode} defaultProjectId={createIssueDefaultProjectId ?? dashboard?.project.id} defaultStatus={createIssuePlacement?.status === "backlog" ? "backlog" : "queued"} isSubmitting={isCreatingIssue} onClose={() => {
+  const createIssueDialog = isIssueDialogOpen ? <CreateIssueDialog availableProviders={availableProviders} compactHeader={companionMode} currentUserId={currentUserId} defaultProjectId={createIssueDefaultProjectId ?? dashboard?.project.id} defaultStatus={createIssuePlacement?.status === "backlog" ? "backlog" : "queued"} isSubmitting={isCreatingIssue} onClose={() => {
     setCreateIssuePlacement(null);
     setIsIssueDialogOpen(false);
   }} onCreate={async (projectId, input) => {

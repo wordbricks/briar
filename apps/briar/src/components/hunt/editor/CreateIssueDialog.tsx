@@ -23,6 +23,8 @@ import { SelectedAttachment } from "./SelectedAttachment";
 export function CreateIssueDialog({
   availableProviders = agentProviders,
   compactHeader = false,
+  currentUserId = null,
+  defaultAssigneeUserId,
   defaultProjectId,
   defaultStatus = "queued",
   isSubmitting,
@@ -35,6 +37,8 @@ export function CreateIssueDialog({
 }: {
   availableProviders?: readonly AgentProvider[];
   compactHeader?: boolean;
+  currentUserId?: string | null;
+  defaultAssigneeUserId?: string | null;
   defaultProjectId?: string;
   defaultStatus?: CreateIssueInput["status"];
   isSubmitting: boolean;
@@ -63,7 +67,12 @@ export function CreateIssueDialog({
   const [status, setStatus] = useState<"backlog" | "queued">(initialDraft?.status ?? defaultStatus);
   const [priority, setPriority] = useState(initialDraft?.priority ?? "2");
   const [difficulty, setDifficulty] = useState<IssueDifficulty | null>(initialDraft?.difficulty ?? null);
-  const [assigneeUserId, setAssigneeUserId] = useState(initialDraft?.assigneeUserId ?? "");
+  const defaultAssignee = defaultAssigneeUserId ?? currentUserId ?? "";
+  const [assigneeUserId, setAssigneeUserId] = useState(() =>
+    initialDraft && initialDraft.assigneeUserId !== undefined
+      ? (initialDraft.assigneeUserId ?? "")
+      : defaultAssignee,
+  );
   const [preferredProvider, setPreferredProvider] = useState(initialDraft?.preferredProvider ?? "");
   const [preferredModel, setPreferredModel] = useState(() => initialDraft?.preferredModel ?? (initialDraft?.preferredProvider ? providerModelPreferences[initialDraft.preferredProvider as AgentProvider].defaultModel : null) ?? "");
   const [preferredEffort, setPreferredEffort] = useState(initialDraft?.preferredEffort ?? "high");

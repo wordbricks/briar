@@ -50,6 +50,17 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: DenyParameterStoreReads
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # SSM Agent needs its core policy, but managed computers must not
+              # read account parameters, including values in parameter history.
+              - Sid: DenyParameterStoreReads
+                Effect: Deny
+                Action: ssm:GetParameter*
+                Resource: "*"
       Tags:
         - Key: briar-managed
           Value: "true"

@@ -2576,7 +2576,10 @@ export function useBriar(options: UseBriarOptions = {}) {
             detail,
             priority: input.priority,
             difficulty: input.difficulty,
-            assigneeUserId: input.assigneeUserId ?? null,
+            assigneeUserId:
+              input.assigneeUserId === undefined
+                ? user?.id ?? null
+                : input.assigneeUserId,
             preferredProvider: input.preferredProvider ?? null,
             preferredModel: input.preferredModel ?? null,
             preferredEffort: input.preferredEffort ?? null,
@@ -2642,7 +2645,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         setIsCreatingIssue(false);
       }
     },
-    [activeProjectId, dashboard, projects, refresh, selectProject, token],
+    [activeProjectId, dashboard, projects, refresh, selectProject, token, user],
   );
 
   const readIssueAttachment = useCallback(
