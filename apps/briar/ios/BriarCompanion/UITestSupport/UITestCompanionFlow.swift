@@ -1481,7 +1481,8 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
                 type: .user,
                 name: "Briar User",
                 image: nil,
-                provider: nil
+                provider: nil,
+                id: "fixture-user"
             ),
             attachments: [ChannelMessageAttachment(
                 id: UUID(uuidString: "abababab-abab-4bab-8bab-abababababab")!,
@@ -1714,7 +1715,10 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
                     type: index.isMultiple(of: 2) ? .agent : .user,
                     name: index.isMultiple(of: 2) ? "Briar Agent" : "Briar User",
                     image: nil,
-                    provider: index.isMultiple(of: 2) ? "codex" : nil
+                    provider: index.isMultiple(of: 2) ? "codex" : nil,
+                    id: index.isMultiple(of: 2)
+                        ? "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+                        : "fixture-user"
                 ),
                 replyCount: 0,
                 lastReplyAt: nil,
@@ -1741,7 +1745,8 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
                 type: .user,
                 name: "Briar User",
                 image: nil,
-                provider: nil
+                provider: nil,
+                id: "fixture-user"
             ),
             replyCount: 0,
             lastReplyAt: nil,
