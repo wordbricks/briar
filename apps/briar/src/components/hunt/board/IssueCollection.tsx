@@ -30,15 +30,10 @@ import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
 import type { AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
 import {
-  readKanbanCollapsedColumnIds,
-  toggleKanbanCollapsedColumnId,
-  writeKanbanCollapsedColumnIds,
-} from "@/lib/kanban-column-collapse";
-import {
-  readKanbanHiddenColumnIds,
-  toggleKanbanHiddenColumnId,
-  writeKanbanHiddenColumnIds,
-} from "@/lib/kanban-column-hide";
+  readKanbanColumnIds,
+  toggleKanbanColumnId,
+  writeKanbanColumnIds,
+} from "@/lib/kanban-column-storage";
 import { formatIssueKey } from "@/lib/issue-key";
 import { runMeta } from "@/lib/stages";
 import type {
@@ -249,8 +244,8 @@ export function IssueCollection({
   const boardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setCollapsedColumnIds(readKanbanCollapsedColumnIds(currentUserId, storageScopeId));
-    setHiddenColumnIds(readKanbanHiddenColumnIds(currentUserId, storageScopeId));
+    setCollapsedColumnIds(readKanbanColumnIds("collapse", currentUserId, storageScopeId));
+    setHiddenColumnIds(readKanbanColumnIds("hide", currentUserId, storageScopeId));
   }, [currentUserId, storageScopeId]);
   useEffect(() => () => pointerDragPreviewRef.current?.remove(), []);
 
@@ -476,8 +471,8 @@ export function IssueCollection({
   const toggleCollapsed = useCallback(
     (columnId: string) => {
       setCollapsedColumnIds((current) => {
-        const next = toggleKanbanCollapsedColumnId(current, columnId);
-        writeKanbanCollapsedColumnIds(currentUserId, storageScopeId, next);
+        const next = toggleKanbanColumnId(current, columnId);
+        writeKanbanColumnIds("collapse", currentUserId, storageScopeId, next);
         return next;
       });
     },
@@ -486,8 +481,8 @@ export function IssueCollection({
   const toggleHidden = useCallback(
     (columnId: string) => {
       setHiddenColumnIds((current) => {
-        const next = toggleKanbanHiddenColumnId(current, columnId);
-        writeKanbanHiddenColumnIds(currentUserId, storageScopeId, next);
+        const next = toggleKanbanColumnId(current, columnId);
+        writeKanbanColumnIds("hide", currentUserId, storageScopeId, next);
         return next;
       });
     },
