@@ -72,7 +72,6 @@ run_app_worker() {
   bun run check
   bun run managed-computer:image:check
   bash scripts/qa-managed-computer-health.sh
-  bun run test:d1:prepare
   bun run test
   bash -n \
     scripts/import-apple-signing-assets.sh \

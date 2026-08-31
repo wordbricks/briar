@@ -9,6 +9,7 @@
     "packages": ["apps/*", "packages/*"],
     "catalog": {
       "@bufbuild/protobuf": "2.14.0",
+      "@cloudflare/vitest-plugin": "1.1.1",
       "@cloudflare/workers-types": "5.20260721.1",
       "@connectrpc/connect": "2.1.2",
       "@connectrpc/connect-web": "2.1.2",
@@ -82,10 +83,7 @@
     "d1:migrate:local": "turbo run d1:migrate:local --filter=@briar/app --",
     "d1:migrate:remote": "turbo run d1:migrate:remote --filter=@briar/app",
     "test:d1:migrations": "turbo run test:d1:migrations --filter=@briar/app",
-    "test:d1:cache-recovery": "turbo run test:d1:cache-recovery --filter=@briar/app",
     "test:d1:integration": "turbo run test:d1:integration --filter=@briar/app",
-    "test:d1:prepare": "turbo run test:d1:prepare --filter=@briar/app",
-    "test:d1:clean": "turbo run test:d1:clean --filter=@briar/app",
     "audit:dependencies": "bash scripts/audit-dependencies.sh",
     "audit:rust": "bash scripts/audit-rust-dependencies.sh",
     "secrets:verify-encrypted": "turbo run secrets:verify-encrypted --filter=@briar/app",

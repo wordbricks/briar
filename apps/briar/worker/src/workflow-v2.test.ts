@@ -1,6 +1,6 @@
 import * as Predicate from "effect/Predicate";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
@@ -108,11 +108,6 @@ const v2Workflow: AutoHuntWorkflow = normalizeAutoHuntWorkflow({
 });
 
 describe("workflow v2 D1 persistence and transitions", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-workflow-v2-test" },
-  });
   let db: D1Database;
   let projectId: string;
   let v2RunId: string;
@@ -151,7 +146,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
   };
 
   beforeAll(async () => {
-    db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+    db = env.DB;
     await applyD1Migrations(db, {
       exclude: [
         "0059_workflow_v2_progress.sql",
@@ -201,6 +196,11 @@ describe("workflow v2 D1 persistence and transitions", () => {
         // 0146 recreates an approval trigger that this fixture installs later
         // in historical order with migration 0091.
         "0146_organization_capability_roles.sql",
+        // These current-format cutovers depend on later schema that this
+        // deliberately partial workflow fixture does not construct.
+        "0154_canonical_project_agent_schedule_recurrence.sql",
+        "0155_archive_format_v2.sql",
+        "0156_canonical_channel_issue_proposal_status.sql",
       ],
     });
 
@@ -314,10 +314,6 @@ describe("workflow v2 D1 persistence and transitions", () => {
       event("v2-transitions", "v2-transitions:queued", at(2)),
     );
   }, 30_000);
-
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
 
   it("keeps frozen snapshots byte-for-byte unchanged and initializes normalized rows", async () => {
     const progress = await initializeWorkflowProgress(db, projectId, { runId: v2RunId });

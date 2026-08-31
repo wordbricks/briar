@@ -17,5 +17,13 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "src-agent", "src-cli", "vite.config.ts"]
+  "include": [
+    "src",
+    "src-agent",
+    "src-cli",
+    "vite.config.ts",
+    "vitest.worker.shared.ts",
+    "vitest.worker.config.ts",
+    "vitest.worker-migrations.config.ts"
+  ]
 }

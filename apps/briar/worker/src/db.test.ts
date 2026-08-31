@@ -1,8 +1,7 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   cloneAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
@@ -118,7 +117,7 @@ import { registerExecutionWorker } from "./workers";
 import apiWorker from "./index";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { encryptSlackToken } from "./slack";
-import { executeD1Sql } from "./test-helpers/d1";
+import { d1MigrationSql, executeD1Sql } from "./test-helpers/d1";
 import { workerCapabilitiesFixture } from "./test-helpers/worker-runtime";
 
 const releaseWorkflow = normalizeAutoHuntWorkflow({
@@ -325,11 +324,6 @@ const event = (
 });
 
 describe("Briar Auto Hunt D1 lifecycle", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-test" },
-  });
   let db: D1Database;
 
   const claimResumedRun = async (runId: string, minute: number) => {
@@ -349,7 +343,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   };
 
   beforeAll(async () => {
-    db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+    db = env.DB;
     for (const migration of [
       "migrations/0001_briar.sql",
       "migrations/0002_remove_repository_path.sql",
@@ -366,7 +360,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "migrations/0013_execution_workers.sql",
       "migrations/0014_agent_provider_grok.sql",
     ]) {
-      await executeSql(db, await readFile(resolve(migration), "utf8"));
+      await executeSql(db, d1MigrationSql(resolve(migration)));
     }
     await executeSql(
       db,
@@ -461,104 +455,71 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0015_backlog_status.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0015_backlog_status.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0016_project_agents.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0016_project_agents.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0017_default_auto_hunt_agent.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0017_default_auto_hunt_agent.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0018_project_agent_schedules.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0018_project_agent_schedules.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0019_project_agent_schedule_runs.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0019_project_agent_schedule_runs.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0020_project_agent_calendar_color.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0020_project_agent_calendar_color.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0021_run_evidence.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0021_run_evidence.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0022_remove_workflow_presets.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0022_remove_workflow_presets.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0023_project_agent_skills.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0023_project_agent_skills.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0024_project_agent_avatars.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0024_project_agent_avatars.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0025_project_agent_codex_pets.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0025_project_agent_codex_pets.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0026_flexible_project_agent_schedules.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0026_flexible_project_agent_schedules.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0027_run_revisions.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0027_run_revisions.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0029_structured_agent_results.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0029_structured_agent_results.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0030_run_evidence_images.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0030_run_evidence_images.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0031_organization_logos.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0031_organization_logos.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0032_slack_integration.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0032_slack_integration.sql")),
     );
     await executeSql(
       db,
@@ -568,226 +529,151 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0033_organization_logo_browser_formats.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0033_organization_logo_browser_formats.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0034_execution_worker_credentials.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0034_execution_worker_credentials.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0035_detached_worker_dispatch.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0035_detached_worker_dispatch.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0036_execution_worker_concurrency.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0036_execution_worker_concurrency.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0037_workflow_stop_after_stage.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0037_workflow_stop_after_stage.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0038_project_execution_worker_policies.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0038_project_execution_worker_policies.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0039_project_agent_tokens.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0039_project_agent_tokens.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0040_run_execution_provider.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0040_run_execution_provider.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0041_issue_message_mentions.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0041_issue_message_mentions.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0042_project_agent_sessions.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0042_project_agent_sessions.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0043_execution_worker_icons.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0043_execution_worker_icons.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0044_issue_agent_reply_jobs.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0044_issue_agent_reply_jobs.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0045_issue_execution_preferences.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0045_issue_execution_preferences.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0046_project_icons.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0046_project_icons.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0047_project_icon_browser_formats.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0047_project_icon_browser_formats.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0048_issue_dependencies.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0048_issue_dependencies.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0049_dashboard_delta_sync.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0049_dashboard_delta_sync.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0050_hunt_run_event_count.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0050_hunt_run_event_count.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0051_log_archives.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0051_log_archives.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0051_user_profiles.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0051_user_profiles.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0052_project_agent_session_skipped.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0052_project_agent_session_skipped.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0053_issue_result_reviews.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0053_issue_result_reviews.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0054_run_execution_metrics.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0054_run_execution_metrics.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0057_organization_invitations.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0057_organization_invitations.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0058_workflow_pause_after_stage.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0058_workflow_pause_after_stage.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0059_workflow_v2_progress.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0059_workflow_v2_progress.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0060_workflow_checkpoint_policies.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0060_workflow_checkpoint_policies.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0061_resume_requested_state.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0061_resume_requested_state.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0061_workflow_stage_status_events.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0061_workflow_stage_status_events.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0062_issue_assignees.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0062_issue_assignees.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0063_inbox_read_states.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0063_inbox_read_states.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0063_github_pull_request_sync.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0063_github_pull_request_sync.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0064_github_integration.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0064_github_integration.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0065_issue_rework_proposals.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0065_issue_rework_proposals.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0066_normalize_project_workflows_v2.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0066_normalize_project_workflows_v2.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0067_issue_checkpoints.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0067_issue_checkpoints.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0068_issue_action_proposals.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0068_issue_action_proposals.sql")),
     );
     await executeSql(
       db,
@@ -800,76 +686,55 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0069_project_agent_effort.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0069_project_agent_effort.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0070_project_issue_key_prefix.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0070_project_issue_key_prefix.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0056_ideas.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0056_ideas.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0071_organization_agents.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0071_organization_agents.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0072_organization_ideas.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0072_organization_ideas.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0073_organization_channels.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0073_organization_channels.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0075_channel_message_attachments.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0075_channel_message_attachments.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0076_execution_worker_updates.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0076_execution_worker_updates.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0077_project_agent_task_jobs.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0077_project_agent_task_jobs.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0079_agent_skills.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0079_agent_skills.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0080_agent_skill_jobs.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0080_agent_skill_jobs.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0081_optimize_dashboard_worker_device_sync.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0081_optimize_dashboard_worker_device_sync.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0082_explicit_agent_skill_selection.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0082_explicit_agent_skill_selection.sql")),
     );
     await executeSql(
       db,
@@ -879,32 +744,23 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0083_suppress_heartbeat_dashboard_changes.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0083_suppress_heartbeat_dashboard_changes.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0084_run_usage_ledger.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0084_run_usage_ledger.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0085_run_cost_ledger.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0085_run_cost_ledger.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0097_project_usage_summary.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0097_project_usage_summary.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0088_organization_agent_context.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0088_organization_agent_context.sql")),
     );
     await executeSql(
       db,
@@ -1013,60 +869,39 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0093_project_agent_session_sync.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0093_project_agent_session_sync.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0098_issue_subscriptions.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0098_issue_subscriptions.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0099_project_usage_analytics.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0099_project_usage_analytics.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0102_auto_issue_subscriptions.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0102_auto_issue_subscriptions.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0108_channel_notification_inbox.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0108_channel_notification_inbox.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0113_agent_descriptions.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0113_agent_descriptions.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0113_project_schedule_tab.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0113_project_schedule_tab.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0117_email_otp_auth.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0117_email_otp_auth.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0119_execution_worker_update_handoffs.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0119_execution_worker_update_handoffs.sql")),
     );
     for (const migration of [
       "0121_repository_merge_batches.sql",
@@ -1076,7 +911,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ]) {
       await executeSql(
         db,
-        await readFile(resolve("migrations", migration), "utf8"),
+        d1MigrationSql(resolve("migrations", migration)),
       );
     }
     await executeSql(
@@ -1088,22 +923,19 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0133_channel_reply_sessions.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0133_channel_reply_sessions.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0136_issue_difficulty.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0136_issue_difficulty.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0140_issue_difficulty_optional.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0140_issue_difficulty_optional.sql")),
     );
     await executeSql(
       db,
-      await readFile(resolve("migrations/0138_project_members.sql"), "utf8"),
+      d1MigrationSql(resolve("migrations/0138_project_members.sql")),
     );
     // Keep the compact lifecycle fixture aligned with the current saved-Skill
     // policy columns used by shared Agent Skill helpers.
@@ -1118,10 +950,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0141_agent_designated_workers.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0141_agent_designated_workers.sql")),
     );
     // Supply the channel sync tables referenced by the production role
     // migration's membership foreign keys and triggers.
@@ -1156,17 +985,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0146_organization_capability_roles.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0146_organization_capability_roles.sql")),
     );
     await executeSql(
       db,
-      await readFile(
-        resolve("migrations/0147_project_github_repository_identity.sql"),
-        "utf8",
-      ),
+      d1MigrationSql(resolve("migrations/0147_project_github_repository_identity.sql")),
     );
     await executeSql(
       db,
@@ -1207,10 +1030,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          on briar_issue_agent_reply_jobs (project_id, trigger_message_id, agent_id);`,
     );
   }, 30_000);
-
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
 
   it("compares normalized persisted event fields for idempotent replays", async () => {
     const sourceKey = "event-equivalence";
