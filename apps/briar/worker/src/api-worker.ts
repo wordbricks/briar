@@ -44,13 +44,6 @@ import {
   json,
 } from "./http-response";
 import { handleAppConnectRequest } from "./app-connect";
-import {
-  channelMutationOrganization,
-  projectMutationProject,
-  scheduleChannelRealtimePublish,
-  scheduleInboxRealtimeFlush,
-  scheduleProjectRealtimePublish,
-} from "./realtime-scheduling";
 
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 const bearerToken = (request: Request) => {
@@ -266,7 +259,7 @@ export default {
           requireRunExecutionProject(env.DB, request, runId),
       });
       // Connect uses POST for reads as well as writes. RPC implementations own
-      // mutation scheduling instead of relying on the legacy HTTP verb fallback.
+      // their mutation-specific realtime scheduling.
       if (connectResponse !== undefined) return connectResponse;
       const response = await route(
         request,
@@ -276,30 +269,6 @@ export default {
         env,
         ctx,
       );
-      const organizationId = channelMutationOrganization(
-        url.pathname,
-        request.method,
-        response.status,
-      );
-      if (organizationId) {
-        scheduleChannelRealtimePublish(env, env.DB, organizationId, ctx);
-      }
-      const projectId = projectMutationProject(
-        url.pathname,
-        request.method,
-        response.status,
-      );
-      if (projectId) {
-        scheduleProjectRealtimePublish(env, env.DB, projectId, ctx);
-      }
-      if (
-        !organizationId &&
-        !projectId &&
-        request.method !== "GET" &&
-        request.method !== "HEAD"
-      ) {
-        scheduleInboxRealtimeFlush(env, env.DB, ctx);
-      }
       return response;
     } catch (error) {
       const skillConflictMessage = agentSkillConflictMessage(error);

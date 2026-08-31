@@ -7,7 +7,6 @@ import {
   loadChannelCatalogSnapshot,
   resolveChannelProposalTargetProjectId,
 } from "./channel-proposal-helpers";
-import { projectMutationProject } from "./realtime-scheduling";
 import {
   handleScheduledTask,
   type ScheduledTaskDependencies,

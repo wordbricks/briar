@@ -455,23 +455,3 @@ export function scheduleProjectAgentSessionRealtimePublish(
   if (context) context.waitUntil(publish);
   else void publish;
 }
-
-export function channelMutationOrganization(
-  pathname: string,
-  method: string,
-  status: number,
-) {
-  if (status >= 400 || method === "GET" || method === "HEAD") return null;
-  return pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels(?:\/|$)/u,
-  )?.[1] ?? null;
-}
-
-export function projectMutationProject(
-  pathname: string,
-  method: string,
-  status: number,
-) {
-  if (status >= 400 || method === "GET" || method === "HEAD") return null;
-  return pathname.match(/^\/projects\/([0-9a-f-]+)(?:\/|$)/u)?.[1] ?? null;
-}
