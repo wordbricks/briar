@@ -35,6 +35,10 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 if ! id briar >/dev/null 2>&1; then
   useradd --create-home --shell /bin/bash briar
 fi
+visudo --check --file "$source_dir/briar-local-admin.sudoers"
+install -o root -g root -m 0440 "$source_dir/briar-local-admin.sudoers" \
+  /etc/sudoers.d/briar-local-admin
+visudo --check
 install -d -o root -g root -m 0755 /opt/briar/bin
 install -d -o root -g briar -m 0750 /var/lib/briar
 install -o root -g root -m 0755 \
@@ -43,6 +47,7 @@ install -o root -g root -m 0755 \
   "$source_dir/briar-remote-desktop" \
   "$source_dir/resolve-remote-desktop-packages" \
   "$source_dir/install-remote-desktop" \
+  "$source_dir/verify-managed-admin" \
   "$source_dir/verify-remote-desktop" \
   /opt/briar/bin/
 install -o root -g root -m 0644 \
