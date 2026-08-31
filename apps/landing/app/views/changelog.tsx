@@ -30,6 +30,23 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.174",
+        date: "2026년 8월 31일",
+        title: "조직 생성부터 저장소 연결까지 첫 실행을 한 흐름으로 시작합니다",
+        summary:
+          "조직이 없는 사용자도 새 조직을 만들거나 초대에 참여하고, GitHub 저장소·관리형 컴퓨터·내 이슈로 이어지는 첫 실행 흐름을 더 쉽게 시작하도록 다듬었습니다.",
+        items: [
+          "조직이 없는 로그인 사용자가 새 조직을 만들거나 초대 링크와 Join 코드로 기존 조직에 참여할 수 있습니다.",
+          "초대 토큰을 새로고침과 인증 리다이렉트 뒤에도 안전하게 유지하고, 역할에 따라 필요한 준비 단계와 안내를 분리합니다.",
+          "GitHub CLI 없이 GitHub App으로 원격 저장소를 가져오고, 저장소 ID 복구로 이름 변경이나 재사용 시 잘못된 저장소 연결을 막습니다.",
+          "조직 사이드바의 내 이슈와 일반 Issues가 같은 검색·필터·리스트·칸반 흐름을 사용합니다.",
+          "관리형 컴퓨터 연결에서 프로바이더 인증과 Worker 준비 상태를 더 분명하게 확인하고, 새 컴퓨터는 최신 검증 이미지로 시작합니다.",
+          "iOS와 Android Inbox가 앱이 종료되거나 백그라운드여도 원격 푸시 알림을 전달하고, 중복 알림과 만료된 기기 토큰을 정리합니다.",
+          "DM Agent 응답에 최근 맥락만 전달해 오래된 대화가 작업을 방해하지 않게 합니다.",
+          "Kanban 열 숨김과 접기 설정을 공통 저장소로 통합하면서 기존 사용자별·프로젝트별 설정을 유지합니다.",
+        ],
+      },
+      {
         version: "1.2.173",
         date: "2026년 8월 30일",
         title: "조직의 내 이슈와 저장소 작업을 한곳에서 확인합니다",
@@ -1315,6 +1332,23 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.174",
+        date: "August 31, 2026",
+        title: "Start with an organization, repository, and first run in one flow",
+        summary:
+          "Make it easier to create or join an organization and continue into GitHub repositories, managed computers, and My Issues from one first-run flow.",
+        items: [
+          "Create an organization when you have none, or join an existing one with an invitation link or Join code.",
+          "Keep invitation tokens safe across refreshes and authentication redirects, and split first-run guidance by the member's role.",
+          "Import remote repositories through the GitHub App without the GitHub CLI, and recover repository IDs so renames or reused names do not point to the wrong repository.",
+          "Use the same search, filters, list, and kanban flow for organization-wide My Issues and regular Issues.",
+          "See clearer provider-authentication and Worker-readiness states while setting up managed computers, with new computers starting from the latest verified image.",
+          "Deliver Inbox push notifications on iOS and Android while the app is closed or in the background, while suppressing duplicates and cleaning up expired device tokens.",
+          "Limit direct-message Agent replies to recent context so older conversation history does not distract the task.",
+          "Share one Kanban storage layer for hidden and collapsed columns while preserving existing user and project preferences.",
+        ],
+      },
       {
         version: "1.2.173",
         date: "August 30, 2026",
@@ -2692,7 +2726,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-173">
+          <a href="#v1-2-174">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2714,7 +2748,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.173"
+                      entry.version === "1.2.174"
+                        ? "2026-08-31"
+                        : entry.version === "1.2.173"
                         ? "2026-08-30"
                         : entry.version === "1.2.172"
                         ? "2026-08-29"
