@@ -222,7 +222,7 @@ aws iam attach-user-policy \
    - `MANAGED_COMPUTER_REMOTE_DESKTOP_FLEET_SESSION_LIMIT=<승인된 전체 동시 세션 수>`
    - `MANAGED_COMPUTER_REMOTE_DESKTOP_RATE_LIMIT=10`
 4. Cloudflare secrets:
-   - `MANAGED_COMPUTER_PROMOTION_CODE=<단일 레거시 코드 또는 {"campaign-id":"promotion-code"} JSON>`
+   - `MANAGED_COMPUTER_PROMOTION_CODE={"campaign-id":"promotion-code"}`
    - `MANAGED_COMPUTER_ENROLLMENT_SECRET=<32바이트 이상 무작위 값>`
    - `MANAGED_COMPUTER_AWS_ACCESS_KEY_ID`
    - `MANAGED_COMPUTER_AWS_SECRET_ACCESS_KEY`

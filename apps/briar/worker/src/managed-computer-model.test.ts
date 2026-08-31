@@ -28,15 +28,6 @@ describe("managed computer remote desktop configuration", () => {
 });
 
 describe("managed computer promotion configuration", () => {
-  it("keeps the legacy single-code configuration compatible", () => {
-    const config = managedComputerConfig({
-      MANAGED_COMPUTER_PROMOTION_CODE: "  LEGACY-PROMO  ",
-    } as Env);
-    expect(config.promotionCampaigns).toEqual([
-      { id: "getbriar-pilot", code: "LEGACY-PROMO" },
-    ]);
-  });
-
   it("decodes independent campaign codes from one secret", () => {
     const config = managedComputerConfig({
       MANAGED_COMPUTER_PROMOTION_CODE: JSON.stringify({
