@@ -25,10 +25,14 @@ struct BriarCompanionApp: App {
                     )
                 )
             } else {
-                CompanionRootView(api: MobileHTTPClient(baseURL: Self.apiBaseURL))
+                CompanionRootView(
+                    clientFactory: MobileServiceClientFactory(baseURL: Self.apiBaseURL)
+                )
             }
             #else
-            CompanionRootView(api: MobileHTTPClient(baseURL: Self.apiBaseURL))
+            CompanionRootView(
+                clientFactory: MobileServiceClientFactory(baseURL: Self.apiBaseURL)
+            )
             #endif
         }
         .handlesExternalEvents(matching: Set(arrayLiteral: "*"))

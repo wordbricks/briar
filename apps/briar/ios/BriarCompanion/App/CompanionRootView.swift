@@ -20,19 +20,29 @@ struct CompanionRootView: View {
     @State private var authError: String?
     @State private var projectSelectionComplete = false
 
-    private let api: any MobileHTTPClientProtocol
+    private let downloadClient: any AuthenticatedDownloadClientProtocol
     private let servicesFactory: any AuthenticatedMobileServicesFactory
     private let realtimeClient: (any MobileRealtimeClientProtocol)?
     private let authorization: DeviceAuthorizationService
     private let presenter: any WebAuthenticationPresenting
 
     @MainActor
-    init(api: MobileHTTPClient) {
+    init(clientFactory: MobileServiceClientFactory) {
         self.init(
-            api: api,
-            preparedUploadClient: api,
-            servicesFactory: api,
-            realtimeClient: api,
+            downloadClient: AuthenticatedDownloadClient(
+                baseURL: clientFactory.baseURL,
+                session: clientFactory.session
+            ),
+            deviceAuthorizationClient: DeviceAuthorizationHTTPClient(
+                baseURL: clientFactory.baseURL,
+                session: clientFactory.session
+            ),
+            preparedUploadClient: PreparedUploadHTTPClient(
+                baseURL: clientFactory.baseURL,
+                session: clientFactory.session
+            ),
+            servicesFactory: clientFactory,
+            realtimeClient: clientFactory,
             session: SessionStore(),
             presenter: ASWebAuthenticationPresenter()
         )
@@ -40,14 +50,15 @@ struct CompanionRootView: View {
 
     @MainActor
     init(
-        api: any MobileHTTPClientProtocol,
+        downloadClient: any AuthenticatedDownloadClientProtocol,
+        deviceAuthorizationClient: any DeviceAuthorizationClientProtocol,
         preparedUploadClient: any PreparedUploadClientProtocol,
         servicesFactory: any AuthenticatedMobileServicesFactory,
         realtimeClient: (any MobileRealtimeClientProtocol)?,
         session: SessionStore,
         presenter: any WebAuthenticationPresenting
     ) {
-        self.api = api
+        self.downloadClient = downloadClient
         self.servicesFactory = servicesFactory
         self.realtimeClient = realtimeClient
         _session = StateObject(wrappedValue: session)
@@ -58,7 +69,7 @@ struct CompanionRootView: View {
         )
         _channels = StateObject(
             wrappedValue: ChannelsStore(
-                api: api,
+                api: downloadClient,
                 preparedUploadClient: preparedUploadClient,
                 servicesFactory: servicesFactory,
                 realtime: realtimeClient,
@@ -76,7 +87,7 @@ struct CompanionRootView: View {
         _remotePush = StateObject(
             wrappedValue: RemotePushRegistrationService(servicesFactory: servicesFactory)
         )
-        authorization = DeviceAuthorizationService(api: api)
+        authorization = DeviceAuthorizationService(client: deviceAuthorizationClient)
         self.presenter = presenter
     }
 
@@ -354,7 +365,7 @@ struct CompanionRootView: View {
             snapshot: dashboard.snapshot,
             errorMessage: dashboard.errorMessage,
             token: token,
-            api: api,
+            api: downloadClient,
             services: services,
             realtimeClient: realtimeClient,
             user: companion.user,

@@ -256,7 +256,7 @@ final class ChannelsStoreTests: XCTestCase {
     }
 }
 
-private actor ChannelHTTPRecorder: MobileHTTPClientProtocol, PreparedUploadClientProtocol {
+private actor ChannelHTTPRecorder: AuthenticatedDownloadClientProtocol, PreparedUploadClientProtocol {
     private let channel: ChannelSummary
     struct PreparedUploadCall: Sendable {
         let url: URL
@@ -286,14 +286,8 @@ private actor ChannelHTTPRecorder: MobileHTTPClientProtocol, PreparedUploadClien
         ))
     }
 
-    func send<Response: Decodable & Sendable>(
-        _ path: String,
-        method: String,
-        token: String?,
-        body: (any Encodable & Sendable)?,
-        as responseType: Response.Type
-    ) async throws -> Response {
-        throw MobileAPIError.invalidRequest
+    func download(_: String, token _: String, to _: URL) async throws -> URL {
+        throw MobileAPIError.invalidDownload
     }
 }
 

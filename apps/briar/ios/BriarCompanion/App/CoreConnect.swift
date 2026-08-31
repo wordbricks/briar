@@ -92,7 +92,7 @@ struct AuthenticatedMobileServices: Sendable {
         channel = BriarAPI_ChannelServiceClient(client: protocolClient)
         agent = BriarAPI_AgentServiceClient(client: protocolClient)
         realtime = BriarAPI_RealtimeServiceClient(client: protocolClient)
-        preparedUploadClient = MobileHTTPClient(baseURL: baseURL, session: session)
+        preparedUploadClient = PreparedUploadHTTPClient(baseURL: baseURL, session: session)
     }
 }
 
@@ -100,7 +100,7 @@ protocol AuthenticatedMobileServicesFactory: Sendable {
     func authenticatedServices(token: String) -> AuthenticatedMobileServices
 }
 
-extension MobileHTTPClient: AuthenticatedMobileServicesFactory {
+extension MobileServiceClientFactory: AuthenticatedMobileServicesFactory {
     func authenticatedServices(token: String) -> AuthenticatedMobileServices {
         AuthenticatedMobileServices(baseURL: baseURL, session: session, token: token)
     }

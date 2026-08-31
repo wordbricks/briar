@@ -656,7 +656,11 @@ final class CompanionReadTests: XCTestCase {
     }
 }
 
-private struct RunDetailHTTPStub: MobileHTTPClientProtocol {}
+private struct RunDetailHTTPStub: AuthenticatedDownloadClientProtocol {
+    func download(_: String, token _: String, to _: URL) async throws -> URL {
+        throw MobileAPIError.invalidDownload
+    }
+}
 
 private final class RunDetailTestServices: @unchecked Sendable {
     let scenario: RunDetailConnectScenario

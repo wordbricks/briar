@@ -4,7 +4,6 @@ import Foundation
 
 enum MobileAPIContract {
     static let iOSClientID = "briar-mobile"
-    static let androidClientID = "briar-android"
 
     enum Endpoint {
         static let deviceCode = "/api/auth/device/code"
@@ -12,69 +11,43 @@ enum MobileAPIContract {
     }
 }
 
-struct DeviceCodeRequest: Codable, Equatable, Sendable {
-    let clientID: String
-    let scope: String
-
-    init(clientID: String = MobileAPIContract.iOSClientID) {
-        self.clientID = clientID
-        scope = "openid profile email"
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case clientID = "client_id"
-        case scope
-    }
-}
-
-struct DeviceCodeResponse: Codable, Equatable, Sendable {
+struct DeviceAuthorizationCode: Equatable, Sendable {
     let deviceCode: String
     let userCode: String
     let verificationURI: URL
-    let verificationURIComplete: URL?
-    let expiresIn: Int?
-    let interval: Int?
-
-    enum CodingKeys: String, CodingKey {
-        case deviceCode = "device_code"
-        case userCode = "user_code"
-        case verificationURI = "verification_uri"
-        case verificationURIComplete = "verification_uri_complete"
-        case expiresIn = "expires_in"
-        case interval
-    }
+    let verificationURIComplete: URL
+    let expiresIn: Int
+    let interval: Int
 }
 
-struct DeviceTokenRequest: Codable, Equatable, Sendable {
-    let grantType: String
-    let deviceCode: String
-    let clientID: String
-
-    init(
-        deviceCode: String,
-        clientID: String = MobileAPIContract.iOSClientID
-    ) {
-        grantType = "urn:ietf:params:oauth:grant-type:device_code"
-        self.deviceCode = deviceCode
-        self.clientID = clientID
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case grantType = "grant_type"
-        case deviceCode = "device_code"
-        case clientID = "client_id"
-    }
-}
-
-struct DeviceTokenResponse: Codable, Equatable, Sendable {
+struct DeviceAuthorizationToken: Equatable, Sendable {
     let accessToken: String
-    let tokenType: String?
-    let expiresIn: Int?
+    let tokenType: String
+    let expiresIn: Int
+    let scope: String
+}
 
-    enum CodingKeys: String, CodingKey {
-        case accessToken = "access_token"
-        case tokenType = "token_type"
-        case expiresIn = "expires_in"
+enum DeviceTokenPollResult: Equatable, Sendable {
+    case authorized(DeviceAuthorizationToken)
+    case authorizationPending(String)
+    case slowDown(String)
+    case accessDenied(String)
+    case expiredToken(String)
+}
+
+enum DeviceAuthorizationRequestErrorCode: String, Equatable, Sendable {
+    case invalidRequest = "invalid_request"
+    case invalidClient = "invalid_client"
+    case invalidGrant = "invalid_grant"
+}
+
+struct DeviceAuthorizationRequestError: LocalizedError, Equatable, Sendable {
+    let statusCode: Int
+    let code: DeviceAuthorizationRequestErrorCode
+    let message: String
+
+    var errorDescription: String? {
+        message
     }
 }
 
@@ -233,15 +206,12 @@ protocol PreparedUploadClientProtocol: Sendable {
     ) async throws
 }
 
-protocol MobileHTTPClientProtocol: Sendable {
-    func send<Response: Decodable & Sendable>(
-        _ path: String,
-        method: String,
-        token: String?,
-        body: (any Encodable & Sendable)?,
-        as responseType: Response.Type
-    ) async throws -> Response
+protocol DeviceAuthorizationClientProtocol: Sendable {
+    func requestDeviceCode() async throws -> DeviceAuthorizationCode
+    func pollDeviceToken(deviceCode: String) async throws -> DeviceTokenPollResult
+}
 
+protocol AuthenticatedDownloadClientProtocol: Sendable {
     func download(_ path: String, token: String, to destination: URL) async throws -> URL
 }
 
@@ -284,23 +254,152 @@ enum ChannelRealtimeNotification: Equatable, Sendable {
     }
 }
 
-extension MobileHTTPClientProtocol {
-    func send<Response: Decodable & Sendable>(
-        _ path: String,
-        method: String,
-        token: String?,
-        body: (any Encodable & Sendable)?,
-        as responseType: Response.Type
-    ) async throws -> Response {
-        throw MobileAPIError.invalidRequest
-    }
+struct MobileServiceClientFactory: Sendable {
+    let baseURL: URL
+    let session: URLSession
 
-    func download(_ path: String, token: String, to destination: URL) async throws -> URL {
-        throw MobileAPIError.invalidDownload
+    init(baseURL: URL, session: URLSession = .shared) {
+        self.baseURL = baseURL
+        self.session = session
     }
 }
 
-struct MobileHTTPClient: MobileHTTPClientProtocol, PreparedUploadClientProtocol, Sendable {
+struct DeviceAuthorizationHTTPClient: DeviceAuthorizationClientProtocol, Sendable {
+    typealias DataForRequest = @Sendable (URLRequest) async throws -> (Data, URLResponse)
+
+    private let baseURL: URL
+    private let dataForRequest: DataForRequest
+
+    init(baseURL: URL, session: URLSession = .shared) {
+        self.init(baseURL: baseURL) { request in
+            try await session.data(for: request)
+        }
+    }
+
+    init(baseURL: URL, dataForRequest: @escaping DataForRequest) {
+        self.baseURL = baseURL
+        self.dataForRequest = dataForRequest
+    }
+
+    func requestDeviceCode() async throws -> DeviceAuthorizationCode {
+        let (data, status) = try await post(
+            MobileAPIContract.Endpoint.deviceCode,
+            body: JSONEncoder().encode(DeviceCodeRequestPayload())
+        )
+        if (200 ..< 300).contains(status) {
+            guard
+                let payload = try? JSONDecoder().decode(
+                    DeviceCodeResponsePayload.self,
+                    from: data
+                ),
+                !payload.deviceCode.isEmpty,
+                !payload.userCode.isEmpty,
+                payload.expiresIn > 0,
+                payload.interval > 0,
+                let verificationURI = deviceAuthorizationURL(payload.verificationURI),
+                let verificationURIComplete = deviceAuthorizationURL(
+                    payload.verificationURIComplete
+                )
+            else { throw MobileAPIError.invalidResponse }
+            return DeviceAuthorizationCode(
+                deviceCode: payload.deviceCode,
+                userCode: payload.userCode,
+                verificationURI: verificationURI,
+                verificationURIComplete: verificationURIComplete,
+                expiresIn: payload.expiresIn,
+                interval: payload.interval
+            )
+        }
+
+        guard
+            status == 400,
+            let payload = try? JSONDecoder().decode(
+                DeviceCodeErrorPayload.self,
+                from: data
+            ),
+            !payload.errorDescription.isEmpty
+        else { throw MobileAPIError.invalidResponse }
+        throw DeviceAuthorizationRequestError(
+            statusCode: status,
+            code: payload.error == .invalidClient ? .invalidClient : .invalidRequest,
+            message: payload.errorDescription
+        )
+    }
+
+    func pollDeviceToken(deviceCode: String) async throws -> DeviceTokenPollResult {
+        guard !deviceCode.isEmpty else { throw MobileAPIError.invalidRequest }
+        let (data, status) = try await post(
+            MobileAPIContract.Endpoint.deviceToken,
+            body: JSONEncoder().encode(DeviceTokenRequestPayload(deviceCode: deviceCode))
+        )
+        if (200 ..< 300).contains(status) {
+            guard
+                let payload = try? JSONDecoder().decode(
+                    DeviceTokenResponsePayload.self,
+                    from: data
+                ),
+                !payload.accessToken.isEmpty,
+                !payload.tokenType.isEmpty,
+                payload.expiresIn > 0
+            else { throw MobileAPIError.invalidResponse }
+            return .authorized(DeviceAuthorizationToken(
+                accessToken: payload.accessToken,
+                tokenType: payload.tokenType,
+                expiresIn: payload.expiresIn,
+                scope: payload.scope
+            ))
+        }
+
+        guard
+            status == 400,
+            let payload = try? JSONDecoder().decode(
+                DeviceTokenErrorPayload.self,
+                from: data
+            ),
+            !payload.errorDescription.isEmpty
+        else { throw MobileAPIError.invalidResponse }
+        switch payload.error {
+        case .authorizationPending:
+            return .authorizationPending(payload.errorDescription)
+        case .slowDown:
+            return .slowDown(payload.errorDescription)
+        case .accessDenied:
+            return .accessDenied(payload.errorDescription)
+        case .expiredToken:
+            return .expiredToken(payload.errorDescription)
+        case .invalidRequest:
+            throw DeviceAuthorizationRequestError(
+                statusCode: status,
+                code: .invalidRequest,
+                message: payload.errorDescription
+            )
+        case .invalidGrant:
+            throw DeviceAuthorizationRequestError(
+                statusCode: status,
+                code: .invalidGrant,
+                message: payload.errorDescription
+            )
+        }
+    }
+
+    private func post(_ path: String, body: Data) async throws -> (Data, Int) {
+        guard let url = mobileEndpointURL(baseURL: baseURL, path: path) else {
+            throw MobileAPIError.invalidRequest
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        let (data, response) = try await dataForRequest(request)
+        guard let response = response as? HTTPURLResponse else {
+            throw MobileAPIError.invalidResponse
+        }
+        return (data, response.statusCode)
+    }
+}
+
+struct PreparedUploadHTTPClient: PreparedUploadClientProtocol, Sendable {
     let baseURL: URL
     let session: URLSession
 
@@ -309,48 +408,13 @@ struct MobileHTTPClient: MobileHTTPClientProtocol, PreparedUploadClientProtocol,
         self.session = session
     }
 
-    func send<Response: Decodable & Sendable>(
-        _ path: String,
-        method: String,
-        token: String?,
-        body: (any Encodable & Sendable)?,
-        as responseType: Response.Type = Response.self
-    ) async throws -> Response {
-        let data = try await sendData(path, method: method, token: token, body: body)
-        return try JSONDecoder.mobileContract.decode(responseType, from: data)
-    }
-
-    /// Executes the remaining JSON-only device authorization requests after applying
-    /// Briar's shared URL, encoding, and HTTP error contract.
-    private func sendData(
-        _ path: String,
-        method: String,
-        token: String?,
-        body: (any Encodable & Sendable)?
-    ) async throws -> Data {
-        guard let url = endpointURL(path) else { throw MobileAPIError.invalidRequest }
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if let token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        if let body {
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try JSONEncoder.mobileContract.encode(AnyEncodable(body))
-        }
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response, data: data)
-        return data
-    }
-
     func putPreparedUpload(
         _ url: URL,
         capability: String,
         contentType: String,
         data: Data
     ) async throws {
-        guard sameOrigin(url, baseURL), !capability.isEmpty else {
+        guard mobileSameOrigin(url, baseURL), !capability.isEmpty else {
             throw MobileAPIError.invalidRequest
         }
         var request = URLRequest(url: url)
@@ -358,19 +422,31 @@ struct MobileHTTPClient: MobileHTTPClientProtocol, PreparedUploadClientProtocol,
         request.setValue("Bearer \(capability)", forHTTPHeaderField: "Authorization")
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         request.httpBody = data
-        let (responseData, response) = try await session.data(for: request)
-        try validate(response: response, data: responseData)
-        guard (response as? HTTPURLResponse)?.statusCode == 204 else {
+        let (responseData, urlResponse) = try await session.data(for: request)
+        let response = try validatedHTTPResponse(urlResponse, data: responseData)
+        guard response.statusCode == 204 else {
             throw MobileAPIError.invalidResponse
         }
     }
+}
+
+struct AuthenticatedDownloadClient: AuthenticatedDownloadClientProtocol, Sendable {
+    let baseURL: URL
+    let session: URLSession
+
+    init(baseURL: URL, session: URLSession = .shared) {
+        self.baseURL = baseURL
+        self.session = session
+    }
 
     func download(_ path: String, token: String, to destination: URL) async throws -> URL {
-        guard let url = endpointURL(path) else { throw MobileAPIError.invalidRequest }
+        guard let url = mobileEndpointURL(baseURL: baseURL, path: path) else {
+            throw MobileAPIError.invalidRequest
+        }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         let (temporaryURL, response) = try await session.download(for: request)
-        try validate(response: response, data: Data())
+        _ = try validatedHTTPResponse(response, data: Data())
         let fileManager = FileManager.default
         try fileManager.createDirectory(
             at: destination.deletingLastPathComponent(),
@@ -386,53 +462,97 @@ struct MobileHTTPClient: MobileHTTPClientProtocol, PreparedUploadClientProtocol,
         }
         return destination
     }
+}
 
-    private func endpointURL(_ path: String) -> URL? {
-        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
-            return nil
-        }
-        let parts = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
-        let basePath = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path
-        components.path = basePath + "/" + parts[0].trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        components.percentEncodedQuery = parts.count == 2 ? String(parts[1]) : nil
-        return components.url
-    }
+private struct DeviceCodeRequestPayload: Encodable {
+    let clientID = MobileAPIContract.iOSClientID
+    let scope = "openid profile email"
 
-    private func sameOrigin(_ lhs: URL, _ rhs: URL) -> Bool {
-        guard let left = URLComponents(url: lhs, resolvingAgainstBaseURL: false),
-              let right = URLComponents(url: rhs, resolvingAgainstBaseURL: false)
-        else { return false }
-        return left.scheme?.lowercased() == right.scheme?.lowercased()
-            && left.host?.lowercased() == right.host?.lowercased()
-            && left.port == right.port
-    }
-
-    private func validate(response: URLResponse, data: Data) throws {
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw MobileAPIError.invalidResponse
-        }
-        guard (200..<300).contains(httpResponse.statusCode) else {
-            let error = try? JSONDecoder.mobileContract.decode(APIErrorResponse.self, from: data)
-            throw MobileAPIError.httpStatus(
-                httpResponse.statusCode,
-                error?.error ?? error?.message ?? error?.errorDescription ??
-                    HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode)
-            )
-        }
+    enum CodingKeys: String, CodingKey {
+        case clientID = "client_id"
+        case scope
     }
 }
 
-private struct AnyEncodable: Encodable {
-    private let encodeValue: (Encoder) throws -> Void
+private struct DeviceCodeResponsePayload: Decodable {
+    let deviceCode: String
+    let userCode: String
+    let verificationURI: String
+    let verificationURIComplete: String
+    let expiresIn: Int
+    let interval: Int
 
-    init(_ value: any Encodable) {
-        encodeValue = { encoder in try value.encode(to: encoder) }
+    enum CodingKeys: String, CodingKey {
+        case deviceCode = "device_code"
+        case userCode = "user_code"
+        case verificationURI = "verification_uri"
+        case verificationURIComplete = "verification_uri_complete"
+        case expiresIn = "expires_in"
+        case interval
     }
-
-    func encode(to encoder: Encoder) throws { try encodeValue(encoder) }
 }
 
-private struct APIErrorResponse: Decodable {
+private enum DeviceCodeErrorCode: String, Decodable {
+    case invalidRequest = "invalid_request"
+    case invalidClient = "invalid_client"
+}
+
+private struct DeviceCodeErrorPayload: Decodable {
+    let error: DeviceCodeErrorCode
+    let errorDescription: String
+
+    enum CodingKeys: String, CodingKey {
+        case error
+        case errorDescription = "error_description"
+    }
+}
+
+private struct DeviceTokenRequestPayload: Encodable {
+    let grantType = "urn:ietf:params:oauth:grant-type:device_code"
+    let deviceCode: String
+    let clientID = MobileAPIContract.iOSClientID
+
+    enum CodingKeys: String, CodingKey {
+        case grantType = "grant_type"
+        case deviceCode = "device_code"
+        case clientID = "client_id"
+    }
+}
+
+private struct DeviceTokenResponsePayload: Decodable {
+    let accessToken: String
+    let tokenType: String
+    let expiresIn: Int
+    let scope: String
+
+    enum CodingKeys: String, CodingKey {
+        case accessToken = "access_token"
+        case tokenType = "token_type"
+        case expiresIn = "expires_in"
+        case scope
+    }
+}
+
+private enum DeviceTokenErrorCode: String, Decodable {
+    case authorizationPending = "authorization_pending"
+    case slowDown = "slow_down"
+    case expiredToken = "expired_token"
+    case accessDenied = "access_denied"
+    case invalidRequest = "invalid_request"
+    case invalidGrant = "invalid_grant"
+}
+
+private struct DeviceTokenErrorPayload: Decodable {
+    let error: DeviceTokenErrorCode
+    let errorDescription: String
+
+    enum CodingKeys: String, CodingKey {
+        case error
+        case errorDescription = "error_description"
+    }
+}
+
+private struct GenericHTTPErrorPayload: Decodable {
     let error: String?
     let message: String?
     let errorDescription: String?
@@ -444,20 +564,55 @@ private struct APIErrorResponse: Decodable {
     }
 }
 
-extension JSONDecoder {
-    static var mobileContract: JSONDecoder {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }
+private func deviceAuthorizationURL(_ value: String) -> URL? {
+    guard
+        let components = URLComponents(string: value),
+        let scheme = components.scheme?.lowercased(),
+        scheme == "http" || scheme == "https",
+        components.host != nil
+    else { return nil }
+    return components.url
 }
 
-extension JSONEncoder {
-    static var mobileContract: JSONEncoder {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
+private func mobileEndpointURL(baseURL: URL, path: String) -> URL? {
+    guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
+        return nil
     }
+    let parts = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+    let basePath = components.path.hasSuffix("/")
+        ? String(components.path.dropLast())
+        : components.path
+    components.path = basePath + "/" + parts[0].trimmingCharacters(
+        in: CharacterSet(charactersIn: "/")
+    )
+    components.percentEncodedQuery = parts.count == 2 ? String(parts[1]) : nil
+    return components.url
+}
+
+private func mobileSameOrigin(_ lhs: URL, _ rhs: URL) -> Bool {
+    guard
+        let left = URLComponents(url: lhs, resolvingAgainstBaseURL: false),
+        let right = URLComponents(url: rhs, resolvingAgainstBaseURL: false)
+    else { return false }
+    return left.scheme?.lowercased() == right.scheme?.lowercased()
+        && left.host?.lowercased() == right.host?.lowercased()
+        && left.port == right.port
+}
+
+@discardableResult
+private func validatedHTTPResponse(_ response: URLResponse, data: Data) throws -> HTTPURLResponse {
+    guard let response = response as? HTTPURLResponse else {
+        throw MobileAPIError.invalidResponse
+    }
+    guard (200 ..< 300).contains(response.statusCode) else {
+        let error = try? JSONDecoder().decode(GenericHTTPErrorPayload.self, from: data)
+        throw MobileAPIError.httpStatus(
+            response.statusCode,
+            error?.error ?? error?.message ?? error?.errorDescription ??
+                HTTPURLResponse.localizedString(forStatusCode: response.statusCode)
+        )
+    }
+    return response
 }
 
 extension ISO8601DateFormatter {

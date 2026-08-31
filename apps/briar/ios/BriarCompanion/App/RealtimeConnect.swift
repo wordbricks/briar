@@ -182,7 +182,7 @@ struct RealtimeConnectClient: Sendable {
     }
 }
 
-extension MobileHTTPClient: MobileRealtimeClientProtocol {
+extension MobileServiceClientFactory: MobileRealtimeClientProtocol {
     func realtimeEvents(
         organizationID: UUID,
         token: String

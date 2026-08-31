@@ -163,7 +163,7 @@ final class ChannelsStore: ObservableObject {
     @Published private(set) var preparingSkillExecutionProposalID: UUID?
     @Published private(set) var errorMessage: String?
 
-    private let api: any MobileHTTPClientProtocol
+    private let api: any AuthenticatedDownloadClientProtocol
     private let preparedUploadClient: any PreparedUploadClientProtocol
     private let servicesForToken: @Sendable (String) -> Services
     private var channelService: (any BriarAPI_ChannelServiceClientInterface)?
@@ -205,7 +205,7 @@ final class ChannelsStore: ObservableObject {
     private var activityExpiryTask: Task<Void, Never>?
 
     init(
-        api: any MobileHTTPClientProtocol,
+        api: any AuthenticatedDownloadClientProtocol,
         preparedUploadClient: any PreparedUploadClientProtocol,
         servicesFactory: any AuthenticatedMobileServicesFactory,
         realtime: (any MobileRealtimeClientProtocol)? = nil,
@@ -230,7 +230,7 @@ final class ChannelsStore: ObservableObject {
     }
 
     init(
-        api: any MobileHTTPClientProtocol,
+        api: any AuthenticatedDownloadClientProtocol,
         preparedUploadClient: any PreparedUploadClientProtocol,
         channelService: any BriarAPI_ChannelServiceClientInterface,
         dashboardService: any BriarAPI_DashboardServiceClientInterface,

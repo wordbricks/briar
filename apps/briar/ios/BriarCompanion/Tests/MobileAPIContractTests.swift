@@ -119,4 +119,99 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(mappedIssue.runId.uuidString.lowercased(), issueScope.runID)
     }
 
+    func testDeviceAuthorizationRejectsMalformedSuccessAndUnknownPollingError() async {
+        let malformedSuccess = deviceAuthorizationClient(status: 200, body: #"""
+        {
+            "device_code":"device-code",
+            "user_code":"USER-CODE",
+            "verification_uri":"https://briar.example/device",
+            "verification_uri_complete":"https://briar.example/device?user_code=USER-CODE",
+            "expires_in":600
+        }
+        """#)
+        do {
+            _ = try await malformedSuccess.requestDeviceCode()
+            XCTFail("Malformed 2xx response must not authorize a device")
+        } catch {
+            XCTAssertEqual(error as? MobileAPIError, .invalidResponse)
+        }
+
+        let unknownError = deviceAuthorizationClient(status: 400, body: #"""
+        {
+            "error":"future_polling_state",
+            "error_description":"A future server state"
+        }
+        """#)
+        do {
+            _ = try await unknownError.pollDeviceToken(deviceCode: "device-code")
+            XCTFail("Unknown polling states must fail closed")
+        } catch {
+            XCTAssertEqual(error as? MobileAPIError, .invalidResponse)
+        }
+    }
+
+    func testDeviceAuthorizationDecodesSuccessAndStructuredPollingStates() async throws {
+        let code = try await deviceAuthorizationClient(status: 200, body: #"""
+        {
+            "device_code":"device-code",
+            "user_code":"USER-CODE",
+            "verification_uri":"https://briar.example/device",
+            "verification_uri_complete":"https://briar.example/device?user_code=USER-CODE",
+            "expires_in":600,
+            "interval":5
+        }
+        """#).requestDeviceCode()
+        XCTAssertEqual(code.deviceCode, "device-code")
+        XCTAssertEqual(code.userCode, "USER-CODE")
+        XCTAssertEqual(code.expiresIn, 600)
+        XCTAssertEqual(code.interval, 5)
+
+        let authorized = try await deviceAuthorizationClient(status: 200, body: #"""
+        {
+            "access_token":"access-token",
+            "token_type":"Bearer",
+            "expires_in":3600,
+            "scope":"openid profile email"
+        }
+        """#).pollDeviceToken(deviceCode: code.deviceCode)
+        XCTAssertEqual(authorized, .authorized(DeviceAuthorizationToken(
+            accessToken: "access-token",
+            tokenType: "Bearer",
+            expiresIn: 3_600,
+            scope: "openid profile email"
+        )))
+
+        let slowDown = try await deviceAuthorizationClient(status: 400, body: #"""
+        {
+            "error":"slow_down",
+            "error_description":"Poll less often"
+        }
+        """#).pollDeviceToken(deviceCode: "device-code")
+        XCTAssertEqual(slowDown, .slowDown("Poll less often"))
+
+        let denied = try await deviceAuthorizationClient(status: 400, body: #"""
+        {
+            "error":"access_denied",
+            "error_description":"The user denied access"
+        }
+        """#).pollDeviceToken(deviceCode: "device-code")
+        XCTAssertEqual(denied, .accessDenied("The user denied access"))
+    }
+
+    private func deviceAuthorizationClient(
+        status: Int,
+        body: String
+    ) -> DeviceAuthorizationHTTPClient {
+        DeviceAuthorizationHTTPClient(
+            baseURL: URL(string: "https://briar.example")!
+        ) { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: status,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (Data(body.utf8), response)
+        }
+    }
 }

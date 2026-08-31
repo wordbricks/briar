@@ -278,7 +278,7 @@ struct UITestCompanionFlow: View {
     }
 }
 
-private final class UITestAPIClient: MobileHTTPClientProtocol,
+private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
     PreparedUploadClientProtocol,
     AuthenticatedMobileServicesFactory,
     @unchecked Sendable

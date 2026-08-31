@@ -427,7 +427,7 @@ final class RunDetailStore: ObservableObject {
     @Published private(set) var loading = false
     @Published private(set) var errorMessage: String?
 
-    private let api: any MobileHTTPClientProtocol
+    private let api: any AuthenticatedDownloadClientProtocol
     private let dashboardService: any BriarAPI_DashboardServiceClientInterface
     private let issueService: any BriarAPI_IssueServiceClientInterface
     private let realtime: (any MobileRealtimeClientProtocol)?
@@ -450,7 +450,7 @@ final class RunDetailStore: ObservableObject {
     private static let maxConversationDeltaPagesPerSync = 20
 
     init(
-        api: any MobileHTTPClientProtocol,
+        api: any AuthenticatedDownloadClientProtocol,
         projectID: UUID,
         runID: UUID,
         token: String,

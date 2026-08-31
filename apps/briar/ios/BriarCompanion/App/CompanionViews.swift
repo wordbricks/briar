@@ -33,7 +33,7 @@ struct CompanionShellView: View {
     let snapshot: DashboardSnapshot?
     let errorMessage: String?
     let token: String
-    let api: any MobileHTTPClientProtocol
+    let api: any AuthenticatedDownloadClientProtocol
     let services: AuthenticatedMobileServices
     let realtimeClient: (any MobileRealtimeClientProtocol)?
     let user: CurrentUser?
@@ -515,7 +515,7 @@ struct TaskListView: View {
     let snapshot: DashboardSnapshot?
     let errorMessage: String?
     let token: String
-    let api: any MobileHTTPClientProtocol
+    let api: any AuthenticatedDownloadClientProtocol
     let services: AuthenticatedMobileServices
     let realtimeClient: (any MobileRealtimeClientProtocol)?
     let currentUserID: String?
@@ -533,7 +533,7 @@ struct TaskListView: View {
         snapshot: DashboardSnapshot?,
         errorMessage: String?,
         token: String,
-        api: any MobileHTTPClientProtocol,
+        api: any AuthenticatedDownloadClientProtocol,
         services: AuthenticatedMobileServices,
         realtimeClient: (any MobileRealtimeClientProtocol)? = nil,
         currentUserID: String? = nil,
@@ -1203,7 +1203,7 @@ struct RunDetailView: View {
     private let onSkillSessionMaterialized: SkillSessionMaterializedHandler
     private let onSkillSessionOpen: SkillSessionOpenHandler
     private let token: String
-    private let api: any MobileHTTPClientProtocol
+    private let api: any AuthenticatedDownloadClientProtocol
     private let dashboardService: any BriarAPI_DashboardServiceClientInterface
 
     private var issueMentionCandidates: [ChannelMentionTarget] {
@@ -1252,7 +1252,7 @@ struct RunDetailView: View {
         projectID: UUID,
         issueKeyPrefix: String = "AH",
         token: String,
-        api: any MobileHTTPClientProtocol,
+        api: any AuthenticatedDownloadClientProtocol,
         services: AuthenticatedMobileServices,
         realtimeClient: (any MobileRealtimeClientProtocol)? = nil,
         projects: [Project] = [],

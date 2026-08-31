@@ -6,7 +6,7 @@ struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
     @ObservedObject var navigation: CompanionNavigationModel
     let project: Project
     let token: String
-    let api: any MobileHTTPClientProtocol
+    let api: any AuthenticatedDownloadClientProtocol
     let services: AuthenticatedMobileServices
     let realtimeClient: (any MobileRealtimeClientProtocol)?
     let snapshot: DashboardSnapshot?
@@ -605,7 +605,7 @@ struct SessionDetailView: View {
     let projectAgents: [ProjectAgent]
     let project: Project
     let token: String
-    let api: any MobileHTTPClientProtocol
+    let api: any AuthenticatedDownloadClientProtocol
     let services: AuthenticatedMobileServices
     let realtimeClient: (any MobileRealtimeClientProtocol)?
     let snapshot: DashboardSnapshot?
@@ -621,7 +621,7 @@ struct SessionDetailView: View {
         projectAgents: [ProjectAgent] = [],
         project: Project,
         token: String,
-        api: any MobileHTTPClientProtocol,
+        api: any AuthenticatedDownloadClientProtocol,
         services: AuthenticatedMobileServices,
         realtimeClient: (any MobileRealtimeClientProtocol)? = nil,
         snapshot: DashboardSnapshot?,
