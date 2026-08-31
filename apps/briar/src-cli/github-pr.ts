@@ -1,11 +1,7 @@
-import { createClient } from "@connectrpc/connect";
 import { ProjectGitHubService } from "@briar/contracts/gen/briar/app/v1/github_pb";
 import { githubPullRequestFromProto } from "../src/lib/app-rpc/github-mappers";
 import { requiredMessage } from "../src/lib/app-rpc/mappers";
-import {
-  appConnectCallOptions,
-  appConnectTransport,
-} from "./app-connect-client";
+import { createAuthenticatedConnectClient } from "./connect-client";
 
 type GithubPullRequestTarget = {
   owner: string;
@@ -102,15 +98,18 @@ const connectGithubPullRequestApi = (
   apiUrl: string,
   token: string,
 ): GithubPullRequestApi => {
-  const client = createClient(ProjectGitHubService, appConnectTransport(apiUrl));
-  const options = appConnectCallOptions(token);
+  const client = createAuthenticatedConnectClient(
+    ProjectGitHubService,
+    apiUrl,
+    token,
+  );
   return {
     getPullRequest: async (input) => githubPullRequestFromProto(requiredMessage(
-      (await client.getGitHubPullRequest(input, options)).pullRequest,
+      (await client.getGitHubPullRequest(input)).pullRequest,
       "getGitHubPullRequest.pullRequest",
     )),
     updatePullRequest: async (input) => {
-      await client.updateGitHubPullRequest(input, options);
+      await client.updateGitHubPullRequest(input);
     },
   };
 };

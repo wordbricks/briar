@@ -10,7 +10,6 @@ import {
   toJsonString,
 } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
-import { createClient } from "@connectrpc/connect";
 import {
   CancelRunResponseSchema,
   CreateIssueResponseSchema,
@@ -67,10 +66,7 @@ import {
   workerRunEventStatus,
   workerRunSource,
 } from "./run-event-proto";
-import {
-  appConnectCallOptions,
-  appConnectTransport,
-} from "./app-connect-client";
+import { createAuthenticatedConnectClient } from "./connect-client";
 import { decodeRunStructuredResult } from "./run-structured-result";
 
 async function optionalText(valueFlag: string, fileFlag: string) {
@@ -146,9 +142,10 @@ async function createIssueCommand() {
     priority: priorityValue === undefined ? null : Number(priorityValue),
     status: value("--status") ?? "queued",
   });
-  const result = await createClient(
+  const result = await createAuthenticatedConnectClient(
     IssueService,
-    appConnectTransport(config.apiUrl),
+    config.apiUrl,
+    config.userToken,
   ).createIssue(
     {
       projectId: project.id,
@@ -159,7 +156,6 @@ async function createIssueCommand() {
         ? RunStatus.BACKLOG
         : RunStatus.QUEUED,
     },
-    appConnectCallOptions(config.userToken),
   );
   console.log(toJsonString(CreateIssueResponseSchema, result));
 }
@@ -170,9 +166,10 @@ async function changeIssueDependencyCommand(action: "add" | "remove") {
   const project = await currentProject(config);
   const dependentRunId = decodeUuid(required("--dependent-run"));
   const prerequisiteRunId = decodeUuid(required("--prerequisite-run"));
-  const result = await createClient(
+  const result = await createAuthenticatedConnectClient(
     IssueService,
-    appConnectTransport(config.apiUrl),
+    config.apiUrl,
+    config.userToken,
   ).setIssueDependency(
     {
       projectId: project.id,
@@ -180,7 +177,6 @@ async function changeIssueDependencyCommand(action: "add" | "remove") {
       prerequisiteRunId,
       enabled: action === "add",
     },
-    appConnectCallOptions(config.userToken),
   );
   console.log(toJsonString(SetIssueDependencyResponseSchema, result));
 }

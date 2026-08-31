@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import { toJsonString } from "@bufbuild/protobuf";
-import { createClient } from "@connectrpc/connect";
 import {
   GitHubMergeResultSchema,
   GitHubPullRequestSchema,
@@ -14,10 +13,7 @@ import {
   projectGithubCredentialFromProto,
 } from "../src/lib/app-rpc/github-mappers";
 import { requiredMessage } from "../src/lib/app-rpc/mappers";
-import {
-  appConnectCallOptions,
-  appConnectTransport,
-} from "./app-connect-client";
+import { createAuthenticatedConnectClient } from "./connect-client";
 import {
   args,
   currentProject,
@@ -48,11 +44,11 @@ async function projectGithubContext() {
     apiUrl: config.apiUrl,
     projectId: project.id,
     token,
-    client: createClient(
+    client: createAuthenticatedConnectClient(
       ProjectGitHubService,
-      appConnectTransport(config.apiUrl),
+      config.apiUrl,
+      token,
     ),
-    options: appConnectCallOptions(token),
   };
 }
 
@@ -107,7 +103,7 @@ export async function githubPullRequestCreateCommand() {
     base: value("--base") ?? "main",
     body: (await optionalBody()) ?? "",
     draft: has("--draft"),
-  }, github.options);
+  });
   console.log(toJsonString(
     GitHubPullRequestSchema,
     requiredMessage(response.pullRequest, "createGitHubPullRequest.pullRequest"),
@@ -119,7 +115,7 @@ export async function githubPullRequestViewCommand() {
   const response = await github.client.getGitHubPullRequest({
     projectId: github.projectId,
     pullRequestNumber: positiveUint64(required("--number"), "--number"),
-  }, github.options);
+  });
   console.log(toJsonString(
     GitHubPullRequestSchema,
     requiredMessage(response.pullRequest, "getGitHubPullRequest.pullRequest"),
@@ -147,7 +143,7 @@ export async function githubPullRequestEditCommand() {
     body,
     base,
     state: state === undefined ? undefined : pullRequestState(state),
-  }, github.options);
+  });
   console.log(toJsonString(
     GitHubPullRequestSchema,
     requiredMessage(response.pullRequest, "updateGitHubPullRequest.pullRequest"),
@@ -161,7 +157,7 @@ export async function githubPullRequestMergeCommand() {
     pullRequestNumber: positiveUint64(required("--number"), "--number"),
     mergeMethod: mergeMethod(value("--method") ?? "squash"),
     expectedHeadSha: value("--head-sha"),
-  }, github.options);
+  });
   console.log(toJsonString(
     GitHubMergeResultSchema,
     requiredMessage(response.merge, "mergeGitHubPullRequest.merge"),
@@ -177,7 +173,7 @@ export async function githubCommitStatusCommand() {
     context: required("--context"),
     description: value("--description"),
     targetUrl: value("--target-url"),
-  }, github.options);
+  });
   console.log(JSON.stringify({ ok: true }));
 }
 
@@ -185,7 +181,6 @@ export async function githubRepositoryCommand() {
   const github = await projectGithubContext();
   const response = await github.client.getProjectGitHubRepository(
     { projectId: github.projectId },
-    github.options,
   );
   console.log(toJsonString(
     ProjectGitHubRepositorySchema,
@@ -240,7 +235,6 @@ export async function githubCredentialCommand() {
   const github = await projectGithubContext();
   const response = await github.client.createProjectGitHubCredential(
     { projectId: github.projectId },
-    github.options,
   );
   const credential = projectGithubCredentialFromProto(requiredMessage(
     response.credential,

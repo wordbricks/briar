@@ -1,9 +1,7 @@
 import {
   Code,
   ConnectError,
-  createClient,
 } from "@connectrpc/connect";
-import { createConnectTransport } from "@connectrpc/connect-web";
 import {
   AccountService,
   type GetCurrentUserResponse,
@@ -29,22 +27,17 @@ import {
   mergeQueueQuietWindowToProto,
 } from "../src/lib/app-rpc/merge-queue-mappers";
 import { requiredMessage } from "../src/lib/app-rpc/mappers";
-
-export const appConnectTransport = (apiUrl: string) =>
-  createConnectTransport({ baseUrl: apiUrl.replace(/\/+$/u, "") });
-
-export const appConnectCallOptions = (token: string) => ({
-  headers: { Authorization: `Bearer ${token}` },
-});
+import { createAuthenticatedConnectClient } from "./connect-client";
 
 export async function fetchCurrentUser(
   apiUrl: string,
   token: string,
 ): Promise<NonNullable<GetCurrentUserResponse["user"]>> {
-  const response = await createClient(
+  const response = await createAuthenticatedConnectClient(
     AccountService,
-    appConnectTransport(apiUrl),
-  ).getCurrentUser({}, appConnectCallOptions(token));
+    apiUrl,
+    token,
+  ).getCurrentUser({});
   if (response.user === undefined) throw new Error("Current user is missing");
   return response.user;
 }
@@ -53,10 +46,11 @@ export async function fetchProjects(
   apiUrl: string,
   token: string,
 ): Promise<ListProjectsResponse["projects"]> {
-  return (await createClient(
+  return (await createAuthenticatedConnectClient(
     ProjectService,
-    appConnectTransport(apiUrl),
-  ).listProjects({}, appConnectCallOptions(token))).projects;
+    apiUrl,
+    token,
+  ).listProjects({})).projects;
 }
 
 export async function fetchDashboard(
@@ -64,10 +58,11 @@ export async function fetchDashboard(
   token: string,
   projectId: string,
 ): Promise<GetDashboardResponse> {
-  return createClient(
+  return createAuthenticatedConnectClient(
     DashboardService,
-    appConnectTransport(apiUrl),
-  ).getDashboard({ projectId }, appConnectCallOptions(token));
+    apiUrl,
+    token,
+  ).getDashboard({ projectId });
 }
 
 export async function updateRemoteProjectSettings(
@@ -75,10 +70,11 @@ export async function updateRemoteProjectSettings(
   token: string,
   input: UpdateProjectSettingsRequest,
 ) {
-  return createClient(
+  return createAuthenticatedConnectClient(
     ProjectService,
-    appConnectTransport(apiUrl),
-  ).updateProjectSettings(input, appConnectCallOptions(token));
+    apiUrl,
+    token,
+  ).updateProjectSettings(input);
 }
 
 export async function fetchManagedComputer(
@@ -87,12 +83,12 @@ export async function fetchManagedComputer(
   organizationId: string,
   managedComputerId: string,
 ) {
-  const response = await createClient(
+  const response = await createAuthenticatedConnectClient(
     FleetService,
-    appConnectTransport(apiUrl),
+    apiUrl,
+    token,
   ).getManagedComputer(
     { organizationId, managedComputerId },
-    appConnectCallOptions(token),
   );
   return managedComputerFromProto(
     requiredMessage(response.computer, "managedComputer"),
@@ -107,12 +103,12 @@ export async function createManagedComputerSetupSession(
   projectId: string,
   requestId: string,
 ) {
-  const response = await createClient(
+  const response = await createAuthenticatedConnectClient(
     FleetService,
-    appConnectTransport(apiUrl),
+    apiUrl,
+    token,
   ).createManagedComputerSetupSession(
     { organizationId, managedComputerId, projectId, requestId },
-    appConnectCallOptions(token),
   );
   return managedComputerSetupSessionTicketFromProto(response);
 }
@@ -123,12 +119,12 @@ export async function fetchManagedComputerSetupStatus(
   organizationId: string,
   managedComputerId: string,
 ) {
-  const response = await createClient(
+  const response = await createAuthenticatedConnectClient(
     FleetService,
-    appConnectTransport(apiUrl),
+    apiUrl,
+    token,
   ).getManagedComputerSetupStatus(
     { organizationId, managedComputerId },
-    appConnectCallOptions(token),
   );
   return managedComputerSetupStatusFromProto(response);
 }
@@ -138,10 +134,11 @@ export async function fetchMergeQueueProfile(
   token: string,
   projectId: string,
 ) {
-  const response = await createClient(
+  const response = await createAuthenticatedConnectClient(
     MergeQueueService,
-    appConnectTransport(apiUrl),
-  ).getMergeQueueProfile({ projectId }, appConnectCallOptions(token));
+    apiUrl,
+    token,
+  ).getMergeQueueProfile({ projectId });
   return response.profile
     ? mergeQueueProfileFromProto(response.profile)
     : null;
@@ -158,9 +155,10 @@ export async function updateRemoteMergeQueueProfile(
     maxBatchSize?: number;
   },
 ) {
-  const response = await createClient(
+  const response = await createAuthenticatedConnectClient(
     MergeQueueService,
-    appConnectTransport(apiUrl),
+    apiUrl,
+    token,
   ).updateMergeQueueProfile(
     {
       projectId: input.projectId,
@@ -171,7 +169,6 @@ export async function updateRemoteMergeQueueProfile(
         : mergeQueueQuietWindowToProto(input.quietWindowMs),
       maxBatchSize: input.maxBatchSize,
     },
-    appConnectCallOptions(token),
   );
   return mergeQueueProfileFromProto(requiredMessage(
     response.profile,

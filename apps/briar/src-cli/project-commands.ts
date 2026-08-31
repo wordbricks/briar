@@ -5,7 +5,6 @@ import {
   resolve,
 } from "node:path";
 import { create } from "@bufbuild/protobuf";
-import { createClient } from "@connectrpc/connect";
 import {
   type Project as ProjectMessage,
   ProjectService,
@@ -45,12 +44,11 @@ import {
   currentProject,
 } from "./command-support";
 import {
-  appConnectCallOptions,
-  appConnectTransport,
   fetchProjects,
   isUnauthenticatedConnectError,
   updateRemoteProjectSettings,
 } from "./app-connect-client";
+import { createAuthenticatedConnectClient } from "./connect-client";
 import { HttpRequestError } from "./http-request-error";
 import {
   configWithRemoteProjectSettings,
@@ -139,13 +137,11 @@ async function createProject() {
   if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
   const repositoryPath = await currentRepositoryPath();
   const name = value("--name") ?? basename(repositoryPath);
-  const result = await createClient(
+  const result = await createAuthenticatedConnectClient(
     ProjectService,
-    appConnectTransport(config.apiUrl),
-  ).createProject(
-    { name },
-    appConnectCallOptions(config.userToken),
-  );
+    config.apiUrl,
+    config.userToken,
+  ).createProject({ name });
   const createdProject = requiredMessage(result.project, "createProject.project");
   config.projects = [
     ...config.projects.filter((project) => project.id !== createdProject.id),
