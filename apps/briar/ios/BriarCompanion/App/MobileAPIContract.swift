@@ -108,6 +108,10 @@ enum MobileAPIContract {
             return "\(base)?limit=\(messageLimit)"
         }
 
+        static func dmMemory(organizationID: UUID, channelID: UUID) -> String {
+            "\(channel(organizationID: organizationID, channelID: channelID))/memory"
+        }
+
         static func channelRead(organizationID: UUID, channelID: UUID) -> String {
             "\(channel(organizationID: organizationID, channelID: channelID))/read"
         }

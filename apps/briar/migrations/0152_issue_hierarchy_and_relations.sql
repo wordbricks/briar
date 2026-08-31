@@ -1,6 +1,6 @@
 pragma foreign_keys = on;
 
--- Migration 0149 reserves briar_issue_hierarchy for the canonical issue read
+-- The 0149 migration reserves briar_issue_hierarchy for the canonical issue read
 -- projection, so parent/child edges live in a dedicated link table.
 create table briar_issue_parent_links (
   project_id text not null references briar_projects (id) on delete cascade,

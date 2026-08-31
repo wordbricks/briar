@@ -15,6 +15,7 @@
 		27D6AD1FB92763BB44078C73 /* FoundationStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D59E70E330C5C3C60094A493 /* FoundationStatusView.swift */; };
 		2A28E99DC0C61B5D2BF6B8AC /* IssueWriteModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C9EE6E17DC9F346B0A712DD /* IssueWriteModels.swift */; };
 		2AF90E1B4483EB04BF943C3C /* ChannelsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 951BB81B83C74CEDE2ECEC15 /* ChannelsViews.swift */; };
+		2B87877CD12A67914A351155 /* DmMemory.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A83FBB5F0F68854441186A /* DmMemory.swift */; };
 		2E57FEC834A9552E0E4879A9 /* CompanionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B0BE22C1849DA483E8B7BFF /* CompanionViews.swift */; };
 		3B4D6409E11267AE58A8C0F2 /* ProfileImageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DBAE843F4181E4041EE9A69 /* ProfileImageTests.swift */; };
 		3C2F3D1E9973B1EA2A461D44 /* CompanionRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D2CC4C3D7F505A0B3A0C564 /* CompanionRootView.swift */; };
@@ -119,6 +120,7 @@
 		A25CB67D8121593018F56432 /* CoreAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreAPITests.swift; sourceTree = "<group>"; };
 		A688D7BF6B6F7EB6394D3F7D /* AgentsInboxSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentsInboxSystemTests.swift; sourceTree = "<group>"; };
 		AB6CE869E2BC6D599E7D03D0 /* ChannelGroupingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGroupingTests.swift; sourceTree = "<group>"; };
+		B2A83FBB5F0F68854441186A /* DmMemory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DmMemory.swift; sourceTree = "<group>"; };
 		B39FE63A0EDED2FBB809F740 /* ChannelsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelsStoreTests.swift; sourceTree = "<group>"; };
 		B941ED81ECF5145E9F9BE24C /* AppSystemServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSystemServices.swift; sourceTree = "<group>"; };
 		BBD28955B6995BA7B485085B /* InboxStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxStore.swift; sourceTree = "<group>"; };
@@ -234,6 +236,7 @@
 				D4334565F76CAABE2AFAC90F /* DeepLinks.swift */,
 				C3A2BD65A5BF60B1D39F7690 /* DeviceAuthorization.swift */,
 				54CCA2946DCE0666A5C40619 /* DirectMessagesViews.swift */,
+				B2A83FBB5F0F68854441186A /* DmMemory.swift */,
 				D59E70E330C5C3C60094A493 /* FoundationStatusView.swift */,
 				F10A04D41AB039273FA6B91E /* InboxModels.swift */,
 				BBD28955B6995BA7B485085B /* InboxStore.swift */,
@@ -444,6 +447,7 @@
 				B9D870EFE863E945B4CBE764 /* DeepLinks.swift in Sources */,
 				3DB8D1A6D350998AF802BF7C /* DeviceAuthorization.swift in Sources */,
 				FB2544C570F7F54F2030C0AF /* DirectMessagesViews.swift in Sources */,
+				2B87877CD12A67914A351155 /* DmMemory.swift in Sources */,
 				27D6AD1FB92763BB44078C73 /* FoundationStatusView.swift in Sources */,
 				734B87FE5D6A7DF134A53FA9 /* InboxModels.swift in Sources */,
 				83E461C754E9D88F746961D2 /* InboxStore.swift in Sources */,

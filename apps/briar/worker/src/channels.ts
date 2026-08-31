@@ -3095,10 +3095,16 @@ export async function claimNextChannelAgentReply(
                and snapshot_agent.responsibility =
                  ${job}.selected_agent_responsibility_snapshot
                and snapshot_skill.id = ${job}.selected_skill_id_snapshot
-               and snapshot_skill.name = ${job}.selected_skill_name_snapshot
                and snapshot_skill.body =
                  ${job}.selected_skill_instructions_snapshot
-               and snapshot_skill.kind = ${job}.selected_skill_kind_snapshot
+               and (
+                 ${job}.approved_skill_execution_proposal_id is not null
+                 or (
+                   snapshot_skill.name = ${job}.selected_skill_name_snapshot
+                   and snapshot_skill.kind =
+                     ${job}.selected_skill_kind_snapshot
+                 )
+               )
                and (
                  snapshot_skill.execution_mode = 'conversation'
                  or (

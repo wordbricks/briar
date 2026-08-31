@@ -286,6 +286,8 @@ private struct UITestCompanionFlow: View {
 }
 
 private actor UITestAPIClient: MobileAPIClientProtocol {
+    private var memoryVersion = 1
+    private var memoryDeleted = false
     private var issueStatus: DashboardRun.Status?
     private var dependencyAdded = false
     private let delaysMessageSend: Bool
@@ -315,6 +317,45 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
         body: (any Encodable & Sendable)?,
         as responseType: Response.Type
     ) async throws -> Response {
+        if path.contains("/memory") {
+            let documentID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+            let spaceID = "99999999-9999-4999-8999-999999999999"
+            if method == "PATCH", path.contains("/documents/") {
+                try await Task.sleep(for: .seconds(1))
+                memoryVersion += 1
+                let data = try JSONSerialization.data(withJSONObject: [
+                    "documentId": documentID, "version": memoryVersion, "replayed": false
+                ])
+                return try JSONDecoder.mobileContract.decode(Response.self, from: data)
+            }
+            guard method == "GET" else { throw MobileAPIError.invalidRequest }
+            let document: [String: Any] = [
+                "id": documentID, "memorySpaceId": spaceID, "kind": "observation",
+                "title": "Synthetic memory", "version": memoryVersion, "status": "active",
+                "conflicted": false, "memoryClass": "profile", "evidenceType": "explicit_user",
+                "protectedByUser": true, "sourceLanguage": "ko", "observedAt": NSNull(),
+                "validUntil": NSNull(), "createdAt": "2026-09-01T00:00:00.000Z",
+                "updatedAt": "2026-09-01T00:00:00.000Z", "indexState": "pending",
+                "body": "합성 데이터: 설명은 결론부터 제시한다.",
+                "sources": [["type": "user_edit_event", "id": "fixture-edit", "version": 1]]
+            ]
+            let payload: [String: Any]
+            if path.contains("/documents/") { payload = ["document": document] }
+            else {
+                payload = [
+                    "eligible": true, "capabilities": ["recall": false, "automaticLearning": false],
+                    "selectedSpaceId": spaceID, "nextCursor": NSNull(),
+                    "documents": memoryDeleted ? [] : [document],
+                    "spaces": [["id": spaceID, "channelId": "12121212-1212-4212-8212-121212121212",
+                        "agentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "rosterEpoch": 1,
+                        "status": "active", "useEnabled": true, "autoEnabled": false,
+                        "memoryRevision": memoryVersion, "revocationEpoch": 0,
+                        "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z"]]
+                ]
+            }
+            return try JSONDecoder.mobileContract.decode(Response.self,
+                from: JSONSerialization.data(withJSONObject: payload))
+        }
         let payload: String
         if path.hasSuffix("/channels") && method == "GET" {
             payload = ##"""
@@ -465,7 +506,9 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
         method: String,
         token: String?,
         body: (any Encodable & Sendable)?
-    ) async throws {}
+    ) async throws {
+        if method == "DELETE", path.contains("/memory/documents/") { memoryDeleted = true }
+    }
 
     func download(_ path: String, token: String, to destination: URL) async throws -> URL {
         guard path.hasPrefix("/ui-test/") else { throw MobileAPIError.invalidDownload }

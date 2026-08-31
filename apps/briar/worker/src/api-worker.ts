@@ -14,6 +14,7 @@ import { handleIssueControlRoute } from "./issue-control-routes";
 import { handleIssueReplyWorkerRoute } from "./issue-reply-worker-routes";
 import { handleIssueProposalRoute } from "./issue-proposal-routes";
 import { handleChannelMessageRoute } from "./channel-message-routes";
+import { handleDmMemoryRoute } from "./dm-memory-routes";
 import { handleChannelOrganizationContextRoute } from "./channel-organization-context-routes";
 import { handleChannelProposalRoute } from "./channel-proposal-routes";
 import { handleChannelReplyClaimRoute } from "./channel-reply-claim-routes";
@@ -93,6 +94,7 @@ import {
   channelMutationOrganization,
   projectMutationProject,
   projectScheduleClaimMutation,
+  scheduleAgentSkillExecutionRealtimeFlush,
   scheduleChannelRealtimePublish,
   scheduleInboxRealtimeFlush,
   scheduleProjectRealtimePublish,
@@ -224,6 +226,9 @@ async function route(
     env,
   });
   if (realtimeResponse !== undefined) return realtimeResponse;
+
+  const memoryResponse = await handleDmMemoryRoute({ request, url, auth, db });
+  if (memoryResponse !== undefined) return memoryResponse;
 
   const channelMessageResponse = await handleChannelMessageRoute({
     request,
@@ -741,6 +746,10 @@ export default {
         }),
       );
       return json({ message: "Internal server error" }, 500);
+    } finally {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        scheduleAgentSkillExecutionRealtimeFlush(env, env.DB, ctx);
+      }
     }
   },
 } satisfies ExportedHandler<Env>;
