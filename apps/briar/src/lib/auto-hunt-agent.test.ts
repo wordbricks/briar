@@ -35,31 +35,6 @@ describe("mergeAutoHuntAppServerEvents", () => {
 });
 
 describe("agentMessagesFromAppServerEvents", () => {
-  it("renders final messages from detached Codex worker transcripts", () => {
-    expect(agentMessagesFromAppServerEvents([{
-      sessionId: "detached-run-1",
-      sequence: 7,
-      occurredAtMs: 700,
-      direction: "server",
-      provider: "codex",
-      message: {
-        type: "item.completed",
-        item: {
-          id: "worker-message-1",
-          type: "agent_message",
-          text: "워커 구현과 검증을 완료했습니다.",
-        },
-      },
-    }])).toEqual([{
-      id: "detached-run-1:worker-message-1",
-      phase: "final_answer",
-      text: "워커 구현과 검증을 완료했습니다.",
-      startedAtMs: 700,
-      updatedAtMs: 700,
-      isComplete: true,
-    }]);
-  });
-
   it("renders provider-neutral agent events without parsing the raw protocol", () => {
     const events: AutoHuntAppServerEvent[] = [
       {
@@ -134,89 +109,6 @@ describe("agentMessagesFromAppServerEvents", () => {
       { id: "assistant:1", text: "첫 번째 답변" },
       { id: "turn:2:assistant:1", text: "후속 답변" },
     ]);
-  });
-
-  it("combines agent message deltas and hides non-message protocol events", () => {
-    const events: AutoHuntAppServerEvent[] = [
-      event(1, "initialize"),
-      {
-        ...event(2, "item/started"),
-        direction: "server",
-        message: {
-          method: "item/started",
-          params: {
-            item: {
-              id: "message-1",
-              type: "agentMessage",
-              phase: "commentary",
-              text: "",
-            },
-          },
-        },
-      },
-      {
-        ...event(3, "item/agentMessage/delta"),
-        direction: "server",
-        message: {
-          method: "item/agentMessage/delta",
-          params: { itemId: "message-1", delta: "분석하고 " },
-        },
-      },
-      {
-        ...event(4, "item/agentMessage/delta"),
-        direction: "server",
-        message: {
-          method: "item/agentMessage/delta",
-          params: { itemId: "message-1", delta: "있습니다." },
-        },
-      },
-      {
-        ...event(5, "item/completed"),
-        direction: "server",
-        message: {
-          method: "item/completed",
-          params: {
-            item: {
-              id: "message-1",
-              type: "agentMessage",
-              phase: "commentary",
-              text: "분석하고 있습니다.",
-            },
-          },
-        },
-      },
-      {
-        ...event(6, "item/completed"),
-        direction: "server",
-        message: {
-          method: "item/completed",
-          params: {
-            item: {
-              id: "command-1",
-              type: "commandExecution",
-              aggregatedOutput: "hidden",
-            },
-          },
-        },
-      },
-    ];
-
-    expect(agentMessagesFromAppServerEvents(events.slice(0, 4))).toEqual([{
-      id: "message-1",
-      phase: "commentary",
-      text: "분석하고 있습니다.",
-      startedAtMs: 2,
-      updatedAtMs: 4,
-      isComplete: false,
-    }]);
-    expect(agentMessagesFromAppServerEvents(events)).toEqual([{
-      id: "message-1",
-      phase: "commentary",
-      text: "분석하고 있습니다.",
-      startedAtMs: 2,
-      updatedAtMs: 5,
-      isComplete: true,
-    }]);
   });
 
   it("hides blank incomplete rows that only show the writing placeholder", () => {

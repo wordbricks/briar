@@ -184,11 +184,12 @@ export class ChannelRealtimeHub {
     for (const client of this.state.getWebSockets()) {
       const attachment = client.deserializeAttachment() as
         | OrganizationRealtimeSocketAttachment
-        | { cursor: number }
         | null;
-      const cursors = attachment && "cursors" in attachment
-        ? attachment.cursors
-        : { channels: attachment?.cursor ?? -1 };
+      if (!attachment?.cursors) {
+        client.close(1011, "Realtime socket state is invalid");
+        continue;
+      }
+      const { cursors } = attachment;
       if ((cursors[cursor.key] ?? -1) >= cursor.version) continue;
       try {
         client.send(payload);

@@ -11,7 +11,7 @@ import { ChannelRealtimeHub } from "./channel-realtime";
 
 class FakeSocket {
   sent: Uint8Array[] = [];
-  attachment: { cursors: Record<string, number> } | { cursor: number } | null;
+  attachment: { cursors: Record<string, number> } | null;
   close = vi.fn();
 
   constructor(cursor: number) {
@@ -23,7 +23,7 @@ class FakeSocket {
   }
 
   serializeAttachment(
-    attachment: { cursors: Record<string, number> } | { cursor: number },
+    attachment: { cursors: Record<string, number> },
   ) {
     this.attachment = attachment;
   }
