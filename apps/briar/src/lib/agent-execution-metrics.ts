@@ -14,8 +14,9 @@ import {
   type AgentExecutionUsageProvider,
   AgentExecutionUsageRecord,
   decodeAgentExecutionMetrics,
-  decodeAgentExecutionMetricsOption,
+  decodeAgentExecutionMetricsJson,
   decodeAgentExecutionUsageRecord,
+  encodeAgentExecutionMetricsJson,
   parseObservedAt,
 } from "./agent-execution-metrics/model";
 import {
@@ -46,8 +47,9 @@ export {
   type AgentExecutionUsageProvider,
   AgentExecutionUsageRecord,
   decodeAgentExecutionMetrics,
-  decodeAgentExecutionMetricsOption,
+  decodeAgentExecutionMetricsJson,
   decodeAgentExecutionUsageRecord,
+  encodeAgentExecutionMetricsJson,
   openCodeExecutionCostObservationsFromPayload,
   openCodeExecutionUsageObservationsFromPayload,
 };

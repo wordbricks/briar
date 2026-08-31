@@ -1,11 +1,11 @@
 import { type AutoHuntPersistedRunStatus } from "../../src/lib/auto-hunt-contract";
 import type { AgentExecutionCostRecord } from "../../src/lib/agent-execution-cost";
-import type {
-  AgentExecutionMetrics,
-  AgentExecutionUsageRecord,
+import {
+  encodeAgentExecutionMetricsJson,
+  type AgentExecutionMetrics,
+  type AgentExecutionUsageRecord,
 } from "../../src/lib/agent-execution-metrics";
 
-import { stableJson } from "./hunt-run-codec";
 import { type IssueResultReviewRow } from "./issue-result-review-repository";
 import { type ProjectAgentProvider } from "./project-agent-model";
 
@@ -532,7 +532,7 @@ export async function updateHuntRunExecutionMetrics(
          and (? is null or last_execution_id = ?)`,
     )
     .bind(
-      stableJson(input.metrics),
+      encodeAgentExecutionMetricsJson(input.metrics),
       input.runId,
       projectId,
       input.attempt,

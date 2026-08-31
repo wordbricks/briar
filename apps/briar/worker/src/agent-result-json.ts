@@ -1,9 +1,8 @@
-import * as Option from "effect/Option";
 import {
   decodeStructuredAgentResultJson,
   type StructuredAgentResult,
 } from "../../src/lib/agent-result";
-import { decodeAgentExecutionMetricsOption } from "../../src/lib/agent-execution-metrics";
+import { decodeAgentExecutionMetricsJson } from "../../src/lib/agent-execution-metrics";
 
 export const parseJsonObject = (value: string | null) => {
   if (!value) return null;
@@ -19,6 +18,4 @@ export const parseStructuredResult = (
   value === null ? null : decodeStructuredAgentResultJson(value);
 
 export const parseExecutionMetrics = (value: string | null) =>
-  Option.getOrNull(
-    decodeAgentExecutionMetricsOption(parseJsonObject(value)),
-  );
+  value === null ? null : decodeAgentExecutionMetricsJson(value);

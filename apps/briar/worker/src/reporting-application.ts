@@ -62,14 +62,6 @@ const usageRangeFetchPaddingDays = 1;
 export const organizationUsageQuerySince = (days: 7 | 30 | 90, now: number = Date.now()) =>
   new Date(now - (days + usageRangeFetchPaddingDays) * 24 * 60 * 60_000).toISOString();
 
-const parseUsageExecutionMetrics = (value: string | null) => {
-  try {
-    return parseExecutionMetrics(value);
-  } catch {
-    return null;
-  }
-};
-
 const usageExecutionAttemptReport = (attempt: RunExecutionAttemptRow) => ({
   executionId: attempt.id,
   projectId: attempt.project_id,
@@ -143,7 +135,7 @@ export const organizationUsageRunReport = (
   id: run.id,
   projectId: run.project_id,
   status: run.paused_at ? ("paused" as const) : run.status,
-  executionMetrics: parseUsageExecutionMetrics(run.execution_metrics_json),
+  executionMetrics: parseExecutionMetrics(run.execution_metrics_json),
   claimedBy: run.claimed_by,
   claimedAt: run.claimed_at,
   claimAttempts: run.claim_attempts,

@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-import * as Schema from "effect/Schema";
 import {
-  AgentExecutionMetrics,
-  decodeAgentExecutionMetrics,
+  decodeAgentExecutionMetricsJson,
   decodeAgentExecutionUsageRecord,
+  encodeAgentExecutionMetricsJson,
 } from "./model";
 
 const metrics = {
@@ -37,31 +36,38 @@ const usageRecord = {
 };
 
 describe("agent execution metric schemas", () => {
-  it("accepts the complete nonnegative safe-integer range", () => {
-    expect(decodeAgentExecutionMetrics(metrics)).toEqual(metrics);
+  it("round-trips the complete canonical storage range", () => {
+    const encoded = encodeAgentExecutionMetricsJson(metrics);
+    expect(decodeAgentExecutionMetricsJson(encoded)).toEqual(metrics);
   });
 
-  it("rejects invalid token counts and excess properties", () => {
+  it("rejects corrupt non-null storage JSON", () => {
+    expect(() => decodeAgentExecutionMetricsJson("{not-json"))
+      .toThrow();
     for (const totalTokens of [
       -1,
       1.5,
       Number.MAX_SAFE_INTEGER + 1,
-      Number.NaN,
-      Number.POSITIVE_INFINITY,
     ]) {
       expect(() =>
-        decodeAgentExecutionMetrics({ ...metrics, totalTokens })
+        decodeAgentExecutionMetricsJson(JSON.stringify({
+          ...metrics,
+          totalTokens,
+        }))
       ).toThrow();
     }
+    for (const totalTokens of [Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => encodeAgentExecutionMetricsJson({
+        ...metrics,
+        totalTokens,
+      })).toThrow();
+    }
     expect(() =>
-      decodeAgentExecutionMetrics({ ...metrics, requestTraceId: "trace-1" })
-    ).toThrow();
-    expect(() =>
-      Schema.decodeUnknownSync(AgentExecutionMetrics)({
+      decodeAgentExecutionMetricsJson(JSON.stringify({
         ...metrics,
         requestTraceId: "trace-1",
-      })
-    ).toThrow();
+      }))
+    ).toThrow(/excess property/u);
   });
 
   it("trims bounded identifiers while preserving the observed offset", () => {
