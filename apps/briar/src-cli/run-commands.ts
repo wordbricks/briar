@@ -49,7 +49,6 @@ import {
   required,
   loadConfig,
   saveConfig,
-  request,
   login,
   gitValue,
   currentRepositoryPath,
