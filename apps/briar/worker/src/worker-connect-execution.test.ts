@@ -15,6 +15,7 @@ import {
   RecordRunEvidenceRequestSchema,
   WorkClaimIdentitySchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import { env as cloudflareEnv } from "cloudflare:workers";
 import { describe, expect, it, vi } from "vitest";
 import { HttpError } from "./http-response";
 import {
@@ -29,12 +30,24 @@ const projectId = "11111111-1111-4111-8111-111111111111";
 const otherProjectId = "22222222-2222-4222-8222-222222222222";
 const runId = "33333333-3333-4333-8333-333333333333";
 const context = {} as HandlerContext;
-const db = {} as D1Database;
-const archivesBucket = {} as R2Bucket;
-const env = {} as Env;
+const db = cloudflareEnv.DB;
+const archivesBucket = cloudflareEnv.ARCHIVES;
+const env = cloudflareEnv;
 const authenticatedWorker = {} as NonNullable<
   IssueClaimAuthorization["authenticatedWorker"]
 >;
+
+const realtimeContext = () => {
+  const pending: Promise<unknown>[] = [];
+  return {
+    context: {
+      waitUntil(promise: Promise<unknown>) {
+        pending.push(promise);
+      },
+    } as unknown as ExecutionContext,
+    settle: () => Promise.all(pending),
+  };
+};
 
 describe("WorkerExecutionService execution credential boundary", () => {
   it("selects agent and Worker claim auth without losing the Worker binding", async () => {
@@ -57,11 +70,11 @@ describe("WorkerExecutionService execution credential boundary", () => {
     }, { requireAgentProject, requireWorkerProjectBinding });
 
     expect(authorization).toEqual({ projectId, authenticatedWorker });
-    expect(requireWorkerProjectBinding).toHaveBeenCalledWith(
-      db,
+    expect(requireWorkerProjectBinding).toHaveBeenCalledOnce();
+    expect(requireWorkerProjectBinding.mock.calls[0]?.slice(1)).toEqual([
       request,
       projectId,
-    );
+    ]);
     expect(requireAgentProject).not.toHaveBeenCalled();
 
     const agentRequest = new Request("https://briar.example", {
@@ -74,7 +87,8 @@ describe("WorkerExecutionService execution credential boundary", () => {
     }, { requireAgentProject, requireWorkerProjectBinding })).resolves.toEqual({
       projectId,
     });
-    expect(requireAgentProject).toHaveBeenCalledWith(db, agentRequest);
+    expect(requireAgentProject).toHaveBeenCalledOnce();
+    expect(requireAgentProject.mock.calls[0]?.slice(1)).toEqual([agentRequest]);
   });
 
   it("rejects a specific-run claim outside the credential project", async () => {
@@ -124,9 +138,14 @@ describe("WorkerExecutionService execution credential boundary", () => {
     }), context);
 
     expect(response.issue).toBeUndefined();
-    expect(claimIssue).toHaveBeenCalledWith({
-      db,
-      env,
+    expect(claimIssue).toHaveBeenCalledOnce();
+    const claimInput = claimIssue.mock.calls[0]?.[0];
+    expect({
+      projectId: claimInput?.projectId,
+      runId: claimInput?.runId,
+      claimedBy: claimInput?.claimedBy,
+      authenticatedWorker: claimInput?.authenticatedWorker,
+    }).toEqual({
       projectId,
       runId,
       claimedBy: "auto-hunt",
@@ -202,9 +221,12 @@ describe("WorkerExecutionService execution credential boundary", () => {
     ), context);
 
     expect(authenticate).toHaveBeenCalledWith(runId);
-    expect(listRunEvidence).toHaveBeenCalledWith({
-      db,
-      archivesBucket,
+    expect(listRunEvidence).toHaveBeenCalledOnce();
+    const evidenceInput = listRunEvidence.mock.calls[0]?.[0];
+    expect({
+      projectId: evidenceInput?.projectId,
+      runId: evidenceInput?.runId,
+    }).toEqual({
       projectId,
       runId,
     });
@@ -269,12 +291,14 @@ describe("WorkerExecutionService execution credential boundary", () => {
         created_at: "2026-08-31T01:02:04.000Z",
       }],
     });
+    const scheduled = realtimeContext();
     const service = createWorkerExecutionService({
       request: new Request("https://briar.example/connect", {
         headers: { authorization: "Bearer briar_agent_test" },
       }),
       db,
       env,
+      context: scheduled.context,
       archivesBucket,
       requireRunExecutionProject: vi.fn(),
     }, {
@@ -308,12 +332,19 @@ describe("WorkerExecutionService execution credential boundary", () => {
       reference: { uploadId },
       uploadUrl: `https://briar.example/uploads/${uploadId}`,
     });
-    expect(prepare).toHaveBeenCalledWith(expect.objectContaining({
+    expect(prepare).toHaveBeenCalledOnce();
+    const prepareInput = prepare.mock.calls[0]?.[0];
+    expect({
+      projectId: prepareInput?.projectId,
+      principal: prepareInput?.principal,
+      work: prepareInput?.work,
+      filenames: prepareInput?.images.map((image) => image.filename),
+    }).toEqual({
       projectId,
       principal: { kind: "agent" },
       work: { workId: runId, runId, claimToken },
-      images: [expect.objectContaining({ filename: "result.png" })],
-    }));
+      filenames: ["result.png"],
+    });
 
     const response = await service.recordRunEvidence(create(
       RecordRunEvidenceRequestSchema,
@@ -330,11 +361,18 @@ describe("WorkerExecutionService execution credential boundary", () => {
       },
     ), context);
 
-    expect(record).toHaveBeenCalledWith(expect.objectContaining({
+    await scheduled.settle();
+    expect(record).toHaveBeenCalledOnce();
+    const recordInput = record.mock.calls[0]?.[0];
+    expect({
+      projectId: recordInput?.projectId,
+      imageUploadIds: recordInput?.imageUploadIds,
+      work: recordInput?.work,
+    }).toEqual({
       projectId,
       imageUploadIds: [uploadId],
       work: { workId: runId, runId, claimToken },
-    }));
+    });
     expect(response).toMatchObject({
       runId,
       status: RunEvidence_Status.PASSED,
@@ -353,12 +391,14 @@ describe("WorkerExecutionService execution credential boundary", () => {
     const worker = {
       binding: { id: "worker-42" },
     } as NonNullable<IssueClaimAuthorization["authenticatedWorker"]>;
+    const scheduled = realtimeContext();
     const service = createWorkerExecutionService({
       request: new Request("https://briar.example", {
         headers: { authorization: "Bearer briar_worker_test" },
       }),
       db,
       env,
+      context: scheduled.context,
       archivesBucket,
       requireRunExecutionProject: vi.fn(async () => projectId),
     }, {
@@ -373,8 +413,17 @@ describe("WorkerExecutionService execution credential boundary", () => {
       reason: " Retry the provider turn ",
     }), context);
 
-    expect(recoverRun).toHaveBeenCalledWith({
-      db,
+    await scheduled.settle();
+    expect(recoverRun).toHaveBeenCalledOnce();
+    const recoverInput = recoverRun.mock.calls[0]?.[0];
+    expect({
+      projectId: recoverInput?.projectId,
+      runId: recoverInput?.runId,
+      requestId: recoverInput?.requestId,
+      reason: recoverInput?.reason,
+      action: recoverInput?.action,
+      actor: recoverInput?.actor,
+    }).toEqual({
       projectId,
       runId,
       requestId: "44444444-4444-4444-8444-444444444444",

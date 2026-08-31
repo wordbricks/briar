@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { env as cloudflareEnv } from "cloudflare:workers";
 import * as Option from "effect/Option";
 import { describe, expect, it, vi } from "vitest";
 import worker from "./index";
@@ -105,11 +106,7 @@ const scheduledContext = () => {
   };
 };
 
-const scheduledEnv = {
-  DB: {} as D1Database,
-  ARCHIVES: {} as R2Bucket,
-  ATTACHMENTS: {} as R2Bucket,
-} as unknown as Env;
+const scheduledEnv = cloudflareEnv;
 
 describe("Worker HTTP contract", () => {
   it("skips the organization Inbox snapshot when its ETag is unchanged", async () => {

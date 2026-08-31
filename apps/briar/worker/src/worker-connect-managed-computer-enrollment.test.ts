@@ -26,7 +26,10 @@ const enrollmentClient = (services: ManagedComputerEnrollmentServices) => {
     baseUrl: "https://api.example.test",
     useBinaryFormat: true,
     fetch: async (input, init) => {
-      const request = new Request(input, init);
+      // Connect-ES deliberately requests `redirect: "error"`, while workerd's
+      // Fetch implementation only accepts `follow` or `manual`. The in-memory
+      // handler cannot redirect, so `manual` preserves the intended semantics.
+      const request = new Request(input, { ...init, redirect: "manual" });
       const router = createConnectRouter({
         connect: true,
         grpc: false,
