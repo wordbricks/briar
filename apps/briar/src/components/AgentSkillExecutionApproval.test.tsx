@@ -1,6 +1,5 @@
 /** @vitest-environment jsdom */
 
-import { readFileSync } from "node:fs";
 import { act } from "react";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -81,7 +80,7 @@ describe("AgentSkillExecutionApproval", () => {
   let root: ReturnType<typeof createReactTestRoot>["root"];
 
   beforeEach(() => {
-Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     ({ cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     }));
