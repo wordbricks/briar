@@ -76,7 +76,8 @@ describe("typed pull request evidence identity migration", () => {
 
     expect((await db.prepare(
       `select evidence_id, run_id, attempt, revision,
-              repository_id, pull_request_number
+              repository_id, pull_request_number,
+              pull_request_id, pull_request_node_id
        from briar_run_evidence_pull_requests`,
     ).all()).results).toEqual([{
       evidence_id: "evidence-linked",
@@ -85,6 +86,8 @@ describe("typed pull request evidence identity migration", () => {
       revision: 2,
       repository_id: 9001,
       pull_request_number: 42,
+      pull_request_id: 10042,
+      pull_request_node_id: "PR_node_42",
     }]);
     expect((await db.prepare(
       `select id, metadata_json from briar_run_evidence order by id`,

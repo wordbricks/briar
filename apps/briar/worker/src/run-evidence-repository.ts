@@ -162,7 +162,7 @@ export async function recordRunEvidence(
       );
       if (!identity) {
         throw new HuntTransitionError(
-          "GitHub pull request evidence for the configured repository requires its typed immutable identity; update and use the bundled Briar CLI",
+          "GitHub pull request evidence requires its typed immutable identity; use the bundled Briar CLI",
         );
       }
       verifiedGithubPullRequest = { target, identity };
@@ -194,6 +194,8 @@ export async function recordRunEvidence(
         and link.revision = association.revision
         and link.repository_id = association.repository_id
         and link.pull_request_number = association.pull_request_number
+        and link.pull_request_id = association.pull_request_id
+        and link.pull_request_node_id = association.pull_request_node_id
        where evidence.run_id = ? and evidence.attempt = ?
          and evidence.evidence_key = ?`,
     )
@@ -353,8 +355,9 @@ export async function recordRunEvidence(
       statements.push(db.prepare(
         `insert into briar_run_evidence_pull_requests (
            evidence_id, run_id, attempt, revision,
-           repository_id, pull_request_number
-         ) values (?, ?, ?, ?, ?, ?)
+           repository_id, pull_request_number,
+           pull_request_id, pull_request_node_id
+         ) values (?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(evidence_id) do nothing`,
       ).bind(
         evidenceId,
@@ -363,6 +366,8 @@ export async function recordRunEvidence(
         run.current_revision,
         identity.repositoryId,
         identity.pullRequestNumber,
+        identity.pullRequestId,
+        identity.pullRequestNodeId,
       ));
     }
     return statements;

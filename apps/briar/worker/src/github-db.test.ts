@@ -406,7 +406,7 @@ describe("GitHub pull request D1 integration", () => {
         actor: "incomplete-client",
         observedAt: nextTime(),
       }),
-    ).rejects.toThrow("update and use the bundled Briar CLI");
+    ).rejects.toThrow("typed immutable identity");
 
     await expect(pullRequestRow(scenario, url)).resolves.toBeNull();
     await expect(
