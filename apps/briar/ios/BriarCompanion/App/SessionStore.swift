@@ -2,18 +2,12 @@ import Foundation
 import Security
 import Combine
 
-protocol SessionTokenStoring: Sendable {
-    func read() throws -> String?
-    func write(_ token: String) throws
-    func clear() throws
-}
-
 enum SessionStoreError: Error, Equatable {
     case keychain(OSStatus)
     case emptyToken
 }
 
-struct KeychainSessionTokenStore: SessionTokenStoring, Sendable {
+struct KeychainSessionTokenStore: Sendable {
     let service: String
     let account: String
 
@@ -76,70 +70,13 @@ struct KeychainSessionTokenStore: SessionTokenStoring, Sendable {
     }
 }
 
-struct LegacyTauriSessionMigrator: Sendable {
-    private struct LegacySession: Decodable { let token: String }
-
-    let legacyURL: URL
-    let markerURL: URL
-
-    init(
-        applicationSupportURL: URL? = nil,
-        legacyBundleIdentifier: String = "app.briar.companion"
-    ) {
-        let support = applicationSupportURL ?? FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first ?? FileManager.default.temporaryDirectory
-        legacyURL = support
-            .appending(path: legacyBundleIdentifier, directoryHint: .isDirectory)
-            .appending(path: "session.json")
-        markerURL = support.appending(path: ".native-session-migration-v1")
-    }
-
-    /// Imports only from the current app container. This intentionally cannot
-    /// reach another installed bundle's sandbox.
-    func migrateIfNeeded(into store: any SessionTokenStoring) throws -> Bool {
-        let fileManager = FileManager.default
-        guard !fileManager.fileExists(atPath: markerURL.path) else { return false }
-        guard fileManager.fileExists(atPath: legacyURL.path) else {
-            try markComplete()
-            return false
-        }
-        if try store.read() != nil {
-            try fileManager.removeItem(at: legacyURL)
-            try markComplete()
-            return false
-        }
-        let session = try JSONDecoder().decode(
-            LegacySession.self,
-            from: Data(contentsOf: legacyURL)
-        )
-        try store.write(session.token)
-        try fileManager.removeItem(at: legacyURL)
-        try markComplete()
-        return true
-    }
-
-    private func markComplete() throws {
-        try FileManager.default.createDirectory(
-            at: markerURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try Data().write(to: markerURL, options: .atomic)
-    }
-}
-
 @MainActor
 final class SessionStore: ObservableObject {
     @Published private(set) var token: String?
-    private let secureStore: any SessionTokenStoring
+    private let secureStore: KeychainSessionTokenStore
 
-    init(
-        secureStore: any SessionTokenStoring = KeychainSessionTokenStore(),
-        migrator: LegacyTauriSessionMigrator = LegacyTauriSessionMigrator()
-    ) {
+    init(secureStore: KeychainSessionTokenStore = KeychainSessionTokenStore()) {
         self.secureStore = secureStore
-        _ = try? migrator.migrateIfNeeded(into: secureStore)
         token = try? secureStore.read()
     }
 
