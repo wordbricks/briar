@@ -10,7 +10,7 @@ import { defaultAgentProviderModelCatalog } from "@/lib/project-llm";
 import * as api from "@/lib/api";
 import * as channelRealtime from "@/lib/channel-realtime";
 import * as issueActivityHook from "@/hooks/use-issue-agent-activity";
-import type { ExecutionWorker, HuntRun, IssueMessage, IssueMessageSendResult, ProjectAgent, RunEvidence, UpdateIssueInput } from "@/types";
+import type { ExecutionWorker, HuntRun, IssueMessage, IssueMessageSendResult, PlanningProject, ProjectAgent, RunEvidence, UpdateIssueInput } from "@/types";
 import { HuntDashboard } from "@/components/hunt/HuntDashboard";
 import { IssueAgentActivityPanel } from "@/components/hunt/detail/IssueAgentActivityPanel";
 import { RunPage } from "@/components/hunt/detail/RunPage";
@@ -61,6 +61,34 @@ const issueMentionAgent: ProjectAgent = {
   ...dashboardAgent,
   id: "agent-mention-1",
   name: "Developer"
+};
+const propertiesProject: PlanningProject = {
+  id: "planning-project-1",
+  workspaceId: "workspace-1",
+  workspaceName: "Workspace",
+  teamId: demoDashboard.project.id,
+  teamName: demoDashboard.project.name,
+  name: "GetGPT",
+  description: "",
+  status: "active",
+  leadUserId: null,
+  leadName: null,
+  startDate: null,
+  targetDate: null,
+  icon: null,
+  color: null,
+  sortOrder: 0,
+  isDefault: true,
+  role: "owner",
+  createdAt: "2026-07-29T00:00:00.000Z",
+  updatedAt: "2026-07-29T00:00:00.000Z"
+};
+const secondaryPropertiesProject: PlanningProject = {
+  ...propertiesProject,
+  id: "planning-project-2",
+  name: "Briar mobile",
+  isDefault: false,
+  sortOrder: 1
 };
 const dashboardWorker: ExecutionWorker = {
   id: "worker-1",
@@ -240,6 +268,93 @@ describe("RunPage", () => {
       difficulty: run.difficulty,
       attachments: []
     });
+    await cleanup();
+  });
+  it("lets users edit every mutable issue property from the properties panel", async () => {
+    const currentMember = {
+      ...demoDashboard.members![0]!,
+      userId: "member-1",
+      name: "Jay Nam"
+    };
+    const nextMember = {
+      ...currentMember,
+      userId: "member-2",
+      name: "Min Park"
+    };
+    const onUpdateIssue = vi.fn(async () => undefined);
+    const onMoveIssueProject = vi.fn(async () => undefined);
+    const run = {
+      ...demoDashboard.runs[0],
+      assigneeUserId: currentMember.userId,
+      difficulty: "normal" as const,
+      projectId: propertiesProject.id,
+      projectName: propertiesProject.name,
+      teamId: propertiesProject.teamId
+    };
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <TooltipProvider>
+        <RunPage
+          error={null}
+          isRecovering={false}
+          isSidebarOpen
+          issueProjects={[propertiesProject, secondaryPropertiesProject]}
+          mentionMembers={[currentMember, nextMember]}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onMoveIssueProject={onMoveIssueProject}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          onUpdateIssue={onUpdateIssue}
+          run={run}
+        />
+      </TooltipProvider>,
+    );
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".run-page-properties-toggle")?.click();
+    });
+    expect(container.querySelector(".run-properties")?.textContent)
+      .toContain("GetGPT");
+
+    const assigneeTrigger = container.querySelector<HTMLButtonElement>(".run-assignee-select .select-menu-trigger");
+    await act(async () => assigneeTrigger?.click());
+    const nextAssignee = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(option => option.textContent?.includes(nextMember.name));
+    await act(async () => nextAssignee?.click());
+    expect(onUpdateIssue).toHaveBeenLastCalledWith({
+      title: run.title,
+      description: run.issueDescription,
+      priority: run.priority,
+      difficulty: run.difficulty,
+      assigneeUserId: nextMember.userId,
+      attachments: []
+    });
+
+    const difficultyTrigger = container.querySelector<HTMLButtonElement>(".run-difficulty-select .select-menu-trigger");
+    await act(async () => difficultyTrigger?.click());
+    const hardDifficulty = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(option => option.textContent?.includes("어려움"));
+    await act(async () => hardDifficulty?.click());
+    expect(onUpdateIssue).toHaveBeenLastCalledWith({
+      title: run.title,
+      description: run.issueDescription,
+      priority: run.priority,
+      difficulty: "hard",
+      attachments: []
+    });
+
+    const projectTrigger = container.querySelector<HTMLButtonElement>(".run-project-select .select-menu-trigger");
+    await act(async () => projectTrigger?.click());
+    const nextProject = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(option => option.textContent?.includes(secondaryPropertiesProject.name));
+    await act(async () => nextProject?.click());
+    expect(onMoveIssueProject).toHaveBeenCalledWith(secondaryPropertiesProject.id);
     await cleanup();
   });
   it("opens issue details as a page and returns to the kanban", async () => {
