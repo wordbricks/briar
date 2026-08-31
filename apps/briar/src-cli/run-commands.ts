@@ -12,6 +12,9 @@ import {
 import {
   decodeChannelMessagesInput,
   decodeCreateIssueInput,
+  decodeIssueUpdateChanges,
+  decodeIssueUpdateDashboardRuns,
+  decodeIssueUpdateInput,
   decodeRunEvidenceInput,
   decodeUuid,
   decodeWorkflowStageId,
@@ -21,6 +24,10 @@ import {
   validateRunEventInput,
   validateWorkflowTransitionInput,
 } from "./command-contract";
+import {
+  type Config,
+  type ProjectConfig,
+} from "./config-contract";
 import {
   executionToken,
   values,
@@ -66,6 +73,164 @@ async function createIssueCommand() {
     { method: "POST", body: JSON.stringify(input) },
   );
   console.log(JSON.stringify(result));
+}
+
+export type IssueUpdateCommandInput = {
+  runId: string;
+  title?: string;
+  description?: string;
+  descriptionFile?: string;
+  clearDescription: boolean;
+  priority?: number;
+  clearPriority: boolean;
+  difficulty?: string;
+  clearDifficulty: boolean;
+  assigneeUserId?: string;
+  clearAssignee: boolean;
+};
+
+export type IssueUpdateCommandDependencies = {
+  loadConfig: () => Promise<Config>;
+  currentProject: (config: Config) => Promise<ProjectConfig>;
+  request: <T>(
+    apiUrl: string,
+    path: string,
+    token: string | null,
+    init?: RequestInit,
+  ) => Promise<T>;
+  readFile: (path: string, encoding: "utf8") => Promise<string>;
+  writeLine: (line: string) => void;
+};
+
+const defaultIssueUpdateCommandDependencies: IssueUpdateCommandDependencies = {
+  loadConfig,
+  currentProject,
+  request,
+  readFile,
+  writeLine: (line) => console.log(line),
+};
+
+function assertExclusiveIssueUpdateFlags(
+  selected: boolean,
+  cleared: boolean,
+  selectedFlags: string,
+  clearFlag: string,
+) {
+  if (selected && cleared) {
+    throw new Error(`${selectedFlags} cannot be combined with ${clearFlag}`);
+  }
+}
+
+async function updateIssueCommand(
+  command: IssueUpdateCommandInput,
+  dependencies: IssueUpdateCommandDependencies =
+    defaultIssueUpdateCommandDependencies,
+) {
+  const runId = decodeUuid(command.runId);
+
+  if (command.description !== undefined && command.descriptionFile !== undefined) {
+    throw new Error("Use only one of --description and --description-file");
+  }
+  assertExclusiveIssueUpdateFlags(
+    command.description !== undefined || command.descriptionFile !== undefined,
+    command.clearDescription,
+    "--description or --description-file",
+    "--clear-description",
+  );
+  assertExclusiveIssueUpdateFlags(
+    command.priority !== undefined,
+    command.clearPriority,
+    "--priority",
+    "--clear-priority",
+  );
+  assertExclusiveIssueUpdateFlags(
+    command.difficulty !== undefined,
+    command.clearDifficulty,
+    "--difficulty",
+    "--clear-difficulty",
+  );
+  assertExclusiveIssueUpdateFlags(
+    command.assigneeUserId !== undefined,
+    command.clearAssignee,
+    "--assignee-user-id",
+    "--clear-assignee",
+  );
+
+  const changes = decodeIssueUpdateChanges({
+    ...(command.title === undefined ? undefined : { title: command.title }),
+    ...(command.clearDescription
+      ? { description: null }
+      : command.descriptionFile !== undefined
+        ? {
+            description: await dependencies.readFile(
+              resolve(command.descriptionFile),
+              "utf8",
+            ),
+          }
+        : command.description === undefined
+          ? undefined
+          : { description: command.description }),
+    ...(command.clearPriority
+      ? { priority: null }
+      : command.priority === undefined
+        ? undefined
+        : { priority: command.priority }),
+    ...(command.clearDifficulty
+      ? { difficulty: null }
+      : command.difficulty === undefined
+        ? undefined
+        : { difficulty: command.difficulty }),
+    ...(command.clearAssignee
+      ? { assigneeUserId: null }
+      : command.assigneeUserId === undefined
+        ? undefined
+        : { assigneeUserId: command.assigneeUserId }),
+  });
+
+  const config = await dependencies.loadConfig();
+  if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+  const project = await dependencies.currentProject(config);
+
+  const dashboard = await dependencies.request<{ runs: unknown[] }>(
+    config.apiUrl,
+    `/projects/${encodeURIComponent(project.id)}/dashboard`,
+    config.userToken,
+  );
+  const current = decodeIssueUpdateDashboardRuns(dashboard.runs).find(
+    (run) => run.id === runId,
+  );
+  if (!current) throw new Error(`이슈를 찾지 못했습니다: ${runId}`);
+
+  const input = decodeIssueUpdateInput({
+    title: changes.title ?? current.title,
+    description: changes.description === undefined
+      ? current.issueDescription
+      : changes.description,
+    priority: changes.priority === undefined
+      ? current.priority
+      : changes.priority,
+    difficulty: changes.difficulty === undefined
+      ? current.difficulty
+      : changes.difficulty,
+    assigneeUserId: changes.assigneeUserId === undefined
+      ? current.assigneeUserId
+      : changes.assigneeUserId,
+  });
+  const result = await dependencies.request<{
+    runId: string;
+    title: string;
+    description: string | null;
+    priority: number | null;
+    difficulty: "easy" | "normal" | "hard" | null;
+    assigneeUserId: string | null;
+    attachments: unknown[];
+  }>(
+    config.apiUrl,
+    `/projects/${encodeURIComponent(project.id)}/runs/${encodeURIComponent(runId)}`,
+    config.userToken,
+    { method: "PATCH", body: JSON.stringify(input) },
+  );
+  dependencies.writeLine(JSON.stringify(result));
 }
 
 async function changeIssueDependencyCommand(action: "add" | "remove") {
@@ -532,6 +697,7 @@ async function transitionWorkflowStage(action: "start" | "complete") {
 export {
   optionalText,
   createIssueCommand,
+  updateIssueCommand,
   changeIssueDependencyCommand,
   channelMessagesUsage,
   listChannelMessagesCommand,
