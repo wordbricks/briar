@@ -776,12 +776,10 @@ describe("worker identity", () => {
     const first = issueWorkerSessionDirectory(configDirectory, {
       runId: "run-42",
       executionId: "execution-1",
-      claimAttempts: 1,
     });
     const second = issueWorkerSessionDirectory(configDirectory, {
       runId: "run-42",
       executionId: "execution-2",
-      claimAttempts: 2,
     });
 
     expect(first).toBe(

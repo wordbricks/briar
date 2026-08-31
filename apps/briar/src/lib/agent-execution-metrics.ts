@@ -1961,7 +1961,7 @@ export function agentExecutionCostRecordsFromObservations(
 }
 
 export function agentExecutionTokenUsageFromObservations(
-  observations: AgentExecutionTokenObservation[],
+  observations: AgentExecutionUsageObservation[],
 ): AgentExecutionTokenUsage | null {
   return aggregateTokenUsage(observations);
 }
