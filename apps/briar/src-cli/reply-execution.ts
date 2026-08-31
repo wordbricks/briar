@@ -5,15 +5,16 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+  ChannelAgentReplyProviderOutputSchema,
+  type ParsedChannelReplyAgentResult,
+} from "../src/lib/channel-agent-reply-contract";
 import { IssueAgentReplyProviderOutputSchema } from "../src/lib/agent-reply-contract";
-import { decodeOrganizationAgentContextRequestTurn } from "../src/lib/organization-agent-context-contract";
 import {
   createDetachedTranscriptSequencer,
   detachedChannelReplyPrompt,
-  detachedChannelReplyOutputSchema,
   detachedIssueReplyPrompt,
   detachedProjectAgentPrompt,
-  parseDetachedJsonResult,
   shouldPersistDetachedTranscriptPayload,
   type DetachedAgent,
 } from "./agent-runner";
@@ -53,7 +54,6 @@ import {
 } from "./worktree";
 import {
   collectChannelReplyAttachments,
-  parseChannelReplyAgentResult,
 } from "./channel-reply-attachments";
 import {
   collectIssueReplyAttachments,
@@ -474,7 +474,7 @@ async function runClaimedIssueReply(
     if (!turn.resultText) throw new Error("Agent returned an empty issue reply");
     const parsedResult = parseIssueReplyAgentResult(
       turn.resultText,
-      outputContract.decode,
+      outputContract.decodeJson,
       {
         allowSkillExecutionProposal:
           issue.skillExecutionTarget?.executionMode === "task",
@@ -726,6 +726,10 @@ async function runClaimedChannelReply(
       fallbackName: "Briar Channel",
       scope: reply.scope,
     });
+    const outputContract = providerStructuredOutputContract(
+      agent.provider,
+      ChannelAgentReplyProviderOutputSchema,
+    );
     // A retained channel session resumes the same provider conversation across
     // replies. Keep its Skill catalog at a stable workspace path for that
     // conversation; workspace/session TTL cleanup owns its eventual removal.
@@ -752,8 +756,7 @@ async function runClaimedChannelReply(
     if (conversationId) reportCheckpoint?.({ conversationId });
     let lookupRounds = 0;
     let turnPrompt = prompt;
-    let result: ReturnType<typeof parseChannelReplyAgentResult>["result"] | null =
-      null;
+    let result: ParsedChannelReplyAgentResult["result"] | null = null;
     let attachmentPaths: string[] = [];
     const generatedImages = new ReplyGeneratedImageCollector();
     while (!result) {
@@ -766,7 +769,7 @@ async function runClaimedChannelReply(
         attachments: lookupRounds === 0
           ? downloadedImages.attachments
           : undefined,
-        outputSchema: detachedChannelReplyOutputSchema,
+        outputSchema: outputContract.jsonSchema,
         organizationContextManifestPath:
           organizationContext?.manifestPath ?? null,
         delegationTargets: reply.scope.kind === "organization"
@@ -822,35 +825,11 @@ async function runClaimedChannelReply(
       if (!turn.resultText) {
         throw new Error("Agent returned an empty channel reply");
       }
-      const parsed = parseDetachedJsonResult(turn.resultText);
-      const parsedRecord = parsed && typeof parsed === "object" &&
-          !Array.isArray(parsed)
-        ? parsed as Record<string, unknown>
-        : null;
-      const contextRequests = parsedRecord?.contextRequests;
-      if (contextRequests === null || contextRequests === undefined) {
-        const parsedResult = parseChannelReplyAgentResult(parsed);
-        result = parsedResult.result;
-        attachmentPaths = parsedResult.attachmentPaths;
+      const decodedTurn = outputContract.decodeJson(turn.resultText);
+      if (decodedTurn.case === "reply") {
+        result = decodedTurn.result;
+        attachmentPaths = decodedTurn.attachmentPaths;
         break;
-      }
-      const lookup = decodeOrganizationAgentContextRequestTurn({
-        contextRequests,
-      });
-      if (
-        parsedRecord?.body !== null ||
-        !Array.isArray(parsedRecord.attachments) ||
-        parsedRecord.attachments.length !== 0 ||
-        parsedRecord.document !== null ||
-        parsedRecord.issueProposal !== null ||
-        parsedRecord.issueBatchProposal !== null ||
-        parsedRecord.executionProposal !== null ||
-        parsedRecord.skillExecutionProposal !== null ||
-        parsedRecord.delegation !== null
-      ) {
-        throw new Error(
-          "Organization context lookup cannot include a channel reply or proposal",
-        );
       }
       if (!organizationContext) {
         throw new Error(
@@ -869,7 +848,7 @@ async function runClaimedChannelReply(
         claimToken: reply.claimToken,
         snapshotAt: reply.organizationContext!.snapshotAt,
         workspacePath,
-        requests: lookup.contextRequests,
+        requests: decodedTurn.requests.contextRequests,
         signal,
       });
       if (hydrated.loaded === 0) {

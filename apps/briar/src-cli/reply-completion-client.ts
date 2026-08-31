@@ -9,9 +9,9 @@ import {
   PrepareReplyAttachmentUploadsRequestSchema,
   ReplyCompletionDisposition,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import type { ParsedChannelReplyAgentResult } from "../src/lib/channel-agent-reply-contract";
 import type { IssueAgentReplyResult } from "../src/lib/agent-reply-contract";
 import { uploadPreparedFiles } from "../src/lib/upload-client";
-import type { ParsedChannelReplyAgentResult } from "./channel-reply-attachments";
 import {
   createWorkerQueueClient,
   type WorkerQueueClient,

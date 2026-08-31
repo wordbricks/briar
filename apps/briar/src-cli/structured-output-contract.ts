@@ -29,11 +29,13 @@ export function providerStructuredOutputContract<T, E, RE>(
   schema: Schema.ConstraintCodec<T, E, never, RE>,
 ) {
   const transformed = providerCodecTransformers[provider](schema);
+  const decode = Schema.decodeUnknownSync(
+    transformed.codec,
+    strictSchemaOptions,
+  );
   return {
     jsonSchema: transformed.jsonSchema,
-    decode: Schema.decodeUnknownSync(
-      transformed.codec,
-      strictSchemaOptions,
-    ),
+    decode,
+    decodeJson: (text: string) => decode(JSON.parse(text) as unknown),
   };
 }

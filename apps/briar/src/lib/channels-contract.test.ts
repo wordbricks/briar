@@ -6,9 +6,11 @@ import {
   channelMessageBlocksFallback,
   channelMessageInputSchema,
   channelProposalAcceptInputSchema,
+  channelProposalPayloadSchema,
   channelReplyContextMessageJson,
   channelReplyCompletionSchema,
   channelAgentSkillInputSchema,
+  channelStoredProposalPayloadSchema,
   organizationAgentInputSchema,
   type ChannelMessage,
 } from "./channels-contract";
@@ -395,5 +397,21 @@ describe("channel reply completion contract", () => {
         issueBatchProposal: { projectId, batch },
       })).toBe(false);
     }
+  });
+
+  it("keeps stored payloads exact and derives public execution metadata", () => {
+    const stored = {
+      issue: {
+        title: "Build the API",
+        description: null,
+        priority: 2,
+      },
+    };
+    const projected = { ...stored, executeAfterCreate: true };
+
+    expect(accepts(channelStoredProposalPayloadSchema, stored)).toBe(true);
+    expect(accepts(channelStoredProposalPayloadSchema, projected)).toBe(false);
+    expect(accepts(channelProposalPayloadSchema, stored)).toBe(false);
+    expect(accepts(channelProposalPayloadSchema, projected)).toBe(true);
   });
 });

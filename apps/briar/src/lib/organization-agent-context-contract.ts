@@ -61,8 +61,8 @@ const OrganizationAgentContextSummaryLookup = strict(Schema.Struct({
   resource: Schema.Literals(["agents", "issues", "agent-sessions"]),
   projectId: OrganizationAgentContextId,
   detail: Schema.Literal("summary"),
-  limit: defaulted(integerBetween(1, 50), 25),
-  cursor: defaulted(Schema.NullOr(stringBetween(1, 4_096)), null),
+  limit: integerBetween(1, 50),
+  cursor: Schema.NullOr(stringBetween(1, 4_096)),
 }));
 
 const OrganizationAgentContextDetailLookup = strict(Schema.Struct({
@@ -145,12 +145,14 @@ export const OrganizationAgentContextManifest = strict(Schema.Struct({
 export type OrganizationAgentContextManifest =
   typeof OrganizationAgentContextManifest.Type;
 
+export const OrganizationAgentContextRequests = mutableArrayBetween(
+  OrganizationAgentContextLookupRequest,
+  1,
+  12,
+);
+
 export const OrganizationAgentContextRequestTurn = strict(Schema.Struct({
-  contextRequests: mutableArrayBetween(
-    OrganizationAgentContextLookupRequest,
-    1,
-    12,
-  ),
+  contextRequests: OrganizationAgentContextRequests,
 }));
 export type OrganizationAgentContextRequestTurn =
   typeof OrganizationAgentContextRequestTurn.Type;

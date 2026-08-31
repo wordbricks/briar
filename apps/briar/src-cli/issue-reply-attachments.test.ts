@@ -10,10 +10,10 @@ import {
 import { providerStructuredOutputContract } from "./structured-output-contract";
 
 const temporaryDirectories: string[] = [];
-const decodeIssueReply = providerStructuredOutputContract(
+const decodeIssueReplyJson = providerStructuredOutputContract(
   "codex",
   IssueAgentReplyProviderOutputSchema,
-).decode;
+).decodeJson;
 
 async function temporaryWorkspace() {
   const directory = await mkdtemp(join(tmpdir(), "briar-issue-reply-out-"));
@@ -37,7 +37,7 @@ describe("issue reply agent attachments", () => {
       proposedAction: null,
       executionProposal: null,
       skillExecutionProposal: null,
-    }), decodeIssueReply)).toEqual({
+    }), decodeIssueReplyJson)).toEqual({
       result: {
         body: "Here is the mockup.",
         proposedAction: null,
@@ -57,10 +57,10 @@ describe("issue reply agent attachments", () => {
       skillExecutionProposal: { type: "request_agent_skill_execute" },
     });
 
-    expect(() => parseIssueReplyAgentResult(output, decodeIssueReply)).toThrow(
+    expect(() => parseIssueReplyAgentResult(output, decodeIssueReplyJson)).toThrow(
       "Agent Skill execution target is not authorized",
     );
-    expect(parseIssueReplyAgentResult(output, decodeIssueReply, {
+    expect(parseIssueReplyAgentResult(output, decodeIssueReplyJson, {
       allowSkillExecutionProposal: true,
     }).result.skillExecutionProposal).toEqual({
       type: "request_agent_skill_execute",

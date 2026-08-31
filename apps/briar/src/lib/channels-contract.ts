@@ -105,6 +105,19 @@ const between = (minimum: number, maximum: number) =>
     Schema.isGreaterThanOrEqualTo(minimum),
     Schema.isLessThanOrEqualTo(maximum),
   );
+const boundedTrimmedText = (minimum: number, maximum: number) =>
+  Schema.String.check(
+    Schema.isMinLength(minimum),
+    Schema.isMaxLength(maximum),
+  ).pipe(
+    Schema.decodeTo(
+      Schema.String.check(
+        Schema.isMinLength(minimum),
+        Schema.isMaxLength(maximum),
+      ),
+      SchemaTransformation.trim(),
+    ),
+  );
 
 const Lowercased = Schema.Trim.pipe(
   Schema.decode({
@@ -121,9 +134,7 @@ export const channelNameSchema = Schema.Trim.check(
   Schema.isLengthBetween(1, 100),
 );
 export const channelTopicSchema = Schema.Trim.check(Schema.isMaxLength(500));
-export const channelMessageBodySchema = Schema.Trim.check(
-  Schema.isLengthBetween(1, 10_000),
-);
+export const channelMessageBodySchema = boundedTrimmedText(1, 10_000);
 export const channelWebhookNameSchema = Schema.Trim.check(
   Schema.isLengthBetween(1, 100),
 );
@@ -924,28 +935,37 @@ export type ChannelDelta = {
  * accept, matching the issue conversation rules in migration 0068.
  */
 const channelReplyDocumentSchema = strict(Schema.Struct({
-  title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),
+  title: boundedTrimmedText(1, 300),
   markdown: Schema.String.check(Schema.isLengthBetween(1, 200_000)),
-  projectId: nullableDefault(Uuid),
+  projectId: Schema.NullOr(Uuid),
 }));
 
 const channelReplyIssueInputSchema = strict(Schema.Struct({
-  title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),
+  title: boundedTrimmedText(1, 300),
   description: Schema.NullOr(
-    Schema.Trim.check(Schema.isMaxLength(100_000)),
+    boundedTrimmedText(0, 100_000),
   ),
   priority: Schema.NullOr(between(1, 4)),
 }));
 
 const channelReplyIssueProposalSchema = strict(Schema.Struct({
-  projectId: nullableDefault(Uuid),
-  executeAfterCreate: defaulted(Schema.Boolean, false),
+  projectId: Schema.NullOr(Uuid),
+  executeAfterCreate: Schema.Boolean,
   issue: channelReplyIssueInputSchema,
 }));
 
-const channelIssueBatchLocalKeySchema = Schema.Trim.check(
+const channelIssueBatchLocalKeyPattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
+const channelIssueBatchLocalKeySchema = Schema.String.check(
   Schema.isLengthBetween(1, 64),
-  Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/u),
+  Schema.isPattern(channelIssueBatchLocalKeyPattern),
+).pipe(
+  Schema.decodeTo(
+    Schema.String.check(
+      Schema.isLengthBetween(1, 64),
+      Schema.isPattern(channelIssueBatchLocalKeyPattern),
+    ),
+    SchemaTransformation.trim(),
+  ),
 );
 
 const channelIssueBatchSchema = strict(Schema.Struct({
@@ -953,13 +973,10 @@ const channelIssueBatchSchema = strict(Schema.Struct({
     key: channelIssueBatchLocalKeySchema,
     issue: channelReplyIssueInputSchema,
   }))).check(Schema.isLengthBetween(1, 8)),
-  dependencies: defaultedWith(
-    mutableArray(strict(Schema.Struct({
-      prerequisiteKey: channelIssueBatchLocalKeySchema,
-      dependentKey: channelIssueBatchLocalKeySchema,
-    }))).check(Schema.isMaxLength(28)),
-    () => [],
-  ),
+  dependencies: mutableArray(strict(Schema.Struct({
+    prerequisiteKey: channelIssueBatchLocalKeySchema,
+    dependentKey: channelIssueBatchLocalKeySchema,
+  }))).check(Schema.isMaxLength(28)),
 })).check(
   Schema.makeFilter((batch) => {
     const issues: Array<Schema.FilterIssue> = [];
@@ -1041,7 +1058,7 @@ const channelIssueBatchSchema = strict(Schema.Struct({
 );
 
 const channelReplyIssueBatchProposalSchema = strict(Schema.Struct({
-  projectId: nullableDefault(Uuid),
+  projectId: Schema.NullOr(Uuid),
   batch: channelIssueBatchSchema,
 }));
 
@@ -1060,8 +1077,7 @@ const channelReplyDelegationSchema = strict(Schema.Struct({
   request: channelMessageBodySchema,
 }));
 
-export const channelReplyCompletionSchema = strict(Schema.Struct({
-  body: channelMessageBodySchema,
+export const channelReplyCompletionFields = {
   document: Schema.NullOr(channelReplyDocumentSchema),
   issueProposal: Schema.NullOr(channelReplyIssueProposalSchema),
   issueBatchProposal: Schema.NullOr(channelReplyIssueBatchProposalSchema),
@@ -1069,12 +1085,12 @@ export const channelReplyCompletionSchema = strict(Schema.Struct({
   skillExecutionProposal: Schema.NullOr(
     channelReplySkillExecutionProposalSchema,
   ),
-    /**
-     * Organization Agents can hand one repository-specific question to an
-     * eligible Project Agent. The server remains authoritative for the target
-     * organization, project, channel roster, and recursion boundary.
-     */
   delegation: Schema.NullOr(channelReplyDelegationSchema),
+} as const;
+
+export const channelReplyCompletionSchema = strict(Schema.Struct({
+  body: channelMessageBodySchema,
+  ...channelReplyCompletionFields,
 }).check(
   Schema.makeFilter((reply) => {
     const issues: Array<Schema.FilterIssue> = [];
@@ -1118,24 +1134,34 @@ export const channelReplyCompletionSchema = strict(Schema.Struct({
   }),
 ));
 
-export const channelIssueProposalPayloadSchema = Schema.Struct({
-  issue: strict(Schema.Struct({
-    title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),
-    description: Schema.NullOr(
-      Schema.Trim.check(Schema.isMaxLength(100_000)),
-    ),
-    priority: Schema.NullOr(between(1, 4)),
-  })),
-  executeAfterCreate: defaulted(Schema.Boolean, false),
-});
+export const channelStoredIssueProposalPayloadSchema = strict(Schema.Struct({
+  issue: channelReplyIssueInputSchema,
+}));
+export const channelStoredIssueBatchProposalPayloadSchema = strict(
+  Schema.Struct({ batch: channelIssueBatchSchema }),
+);
+export const channelStoredProposalPayloadSchema = Schema.Union([
+  channelStoredIssueProposalPayloadSchema,
+  channelStoredIssueBatchProposalPayloadSchema,
+]);
+
+export const channelIssueProposalPayloadSchema = strict(Schema.Struct({
+  ...channelStoredIssueProposalPayloadSchema.fields,
+  executeAfterCreate: Schema.Boolean,
+}));
 export const decodeChannelIssueProposalPayloadOption =
   Schema.decodeUnknownOption(channelIssueProposalPayloadSchema);
 
 export const channelIssueBatchProposalPayloadSchema = strict(Schema.Struct({
-  batch: channelIssueBatchSchema,
-  executeAfterCreate: defaulted(Schema.Literal(false), false),
+  ...channelStoredIssueBatchProposalPayloadSchema.fields,
+  executeAfterCreate: Schema.Literal(false),
 }));
 export type ChannelIssueBatchProposalPayload =
   typeof channelIssueBatchProposalPayloadSchema.Type;
 export const decodeChannelIssueBatchProposalPayloadOption =
   Schema.decodeUnknownOption(channelIssueBatchProposalPayloadSchema);
+
+export const channelProposalPayloadSchema = Schema.Union([
+  channelIssueProposalPayloadSchema,
+  channelIssueBatchProposalPayloadSchema,
+]);

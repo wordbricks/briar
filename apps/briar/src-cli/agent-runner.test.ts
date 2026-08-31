@@ -12,12 +12,12 @@ import {
   sidecarProviderEvent,
   sidecarRunBlocked,
 } from "../src-agent/sidecar-protocol";
+import { ChannelAgentReplyProviderOutputSchema } from "../src/lib/channel-agent-reply-contract";
 import {
   createDetachedTranscriptSequencer,
   detachedAgentContext,
   detachedAgentPrompt,
   detachedChannelReplyPrompt,
-  detachedChannelReplyOutputSchema,
   detachedIssueReplyPrompt,
   detachedProjectAgentPrompt,
   detachedProviderRequest,
@@ -32,6 +32,7 @@ import {
   runProjectAgentTaskCompletionFlow,
   shouldPersistDetachedTranscriptPayload,
 } from "./agent-runner";
+import { providerStructuredOutputContract } from "./structured-output-contract";
 
 const agent = {
   id: "agent-1",
@@ -69,6 +70,10 @@ const agent = {
     },
   ],
 };
+const channelOutputSchema = providerStructuredOutputContract(
+  "codex",
+  ChannelAgentReplyProviderOutputSchema,
+).jsonSchema;
 
 describe("detached Agent runner", () => {
   it("directs saved Project Agents to the isolated worktree", () => {
@@ -857,43 +862,14 @@ describe("detached Agent runner", () => {
       prompt: "reply",
       workspacePath: "/worktree",
       fullAccess: false,
-      outputSchema: detachedChannelReplyOutputSchema,
+      outputSchema: channelOutputSchema,
       agentBinary: "/bin/codex",
     }).request;
 
     expect(request.outputSchema?.value).toEqual({
       case: "object",
-      value: detachedChannelReplyOutputSchema,
+      value: channelOutputSchema,
     });
-  });
-
-  it("keeps every structured-output object strict and fully required", () => {
-    const inspect = (schema: unknown) => {
-      if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
-        return;
-      }
-      const record = schema as Record<string, unknown>;
-      if (
-        record.type === "object" && record.properties &&
-        typeof record.properties === "object" &&
-        !Array.isArray(record.properties)
-      ) {
-        const propertyNames = Object.keys(record.properties);
-        expect(record.additionalProperties).toBe(false);
-        expect(new Set(record.required as string[])).toEqual(
-          new Set(propertyNames),
-        );
-      }
-      for (const value of Object.values(record)) {
-        if (Array.isArray(value)) {
-          value.forEach(inspect);
-        } else {
-          inspect(value);
-        }
-      }
-    };
-
-    inspect(detachedChannelReplyOutputSchema);
   });
 
   it("gives issue conversations the full Worker execution profile", () => {

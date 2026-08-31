@@ -1,28 +1,11 @@
 import { access, readFile, stat } from "node:fs/promises";
 import { basename, isAbsolute, resolve } from "node:path";
-import * as Schema from "effect/Schema";
 import {
   agentReplyAttachmentMimeTypeFromName,
   normalizeAgentReplyAttachmentFile,
   validateAgentReplyAttachments,
 } from "../src/lib/agent-reply-attachments";
 import { isPathWithinRoot } from "./worktree";
-
-const maxReplyAttachmentPathLength = 4096;
-
-const ReplyAttachmentPaths = Schema.mutable(
-  Schema.Array(
-    Schema.Trim.check(
-      Schema.isLengthBetween(1, maxReplyAttachmentPathLength),
-    ),
-  ),
-).check(Schema.isMaxLength(5));
-
-const decodeAttachmentPaths = Schema.decodeUnknownSync(ReplyAttachmentPaths);
-
-export function decodeReplyAttachmentPaths(value: unknown): string[] {
-  return decodeAttachmentPaths(value ?? []);
-}
 
 export function validateReplyAttachments(
   attachments: readonly File[],

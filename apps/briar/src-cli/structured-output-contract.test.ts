@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ChannelAgentReplyProviderOutputSchema } from "../src/lib/channel-agent-reply-contract";
 import { IssueAgentReplyProviderOutputSchema } from "../src/lib/agent-reply-contract";
 import { providerStructuredOutputContract } from "./structured-output-contract";
 
@@ -69,10 +70,11 @@ describe("provider structured output contracts", () => {
   });
 
   it("rejects duplicate changes, excess authority, and excess fields", () => {
-    const { decode } = providerStructuredOutputContract(
+    const contract = providerStructuredOutputContract(
       "codex",
       IssueAgentReplyProviderOutputSchema,
     );
+    const { decode } = contract;
 
     expect(() => decode({
       ...updateOutput,
@@ -89,5 +91,84 @@ describe("provider structured output contracts", () => {
       executionProposal: { type: "request_issue_execute" },
     })).toThrow();
     expect(() => decode({ ...updateOutput, untrustedAuthority: true })).toThrow();
+    expect(() => contract.decodeJson(
+      `\`\`\`json\n${JSON.stringify(updateOutput)}\n\`\`\``,
+    )).toThrow();
+  });
+
+  it("derives matching channel reply and context-turn codecs", () => {
+    const replyOutput = {
+      body: "  The project Agent will inspect authentication.  ",
+      attachments: [" auth.html "],
+      document: null,
+      issueProposal: null,
+      issueBatchProposal: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+      delegation: {
+        projectId: "11111111-1111-4111-8111-111111111111",
+        agentId: "22222222-2222-4222-8222-222222222222",
+        request: "  Inspect authentication.  ",
+      },
+      contextRequests: null,
+    } as const;
+    const contextOutput = {
+      body: null,
+      attachments: [],
+      document: null,
+      issueProposal: null,
+      issueBatchProposal: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+      delegation: null,
+      contextRequests: [{
+        resource: "issues",
+        projectId: "project-1",
+        detail: "summary",
+        limit: 25,
+        cursor: null,
+      }],
+    } as const;
+
+    for (const provider of providers) {
+      const contract = providerStructuredOutputContract(
+        provider,
+        ChannelAgentReplyProviderOutputSchema,
+      );
+
+      expect(contract.jsonSchema).toMatchObject({ type: "object" });
+      expect(contract.jsonSchema).not.toHaveProperty("anyOf");
+      expect(JSON.stringify(contract.jsonSchema)).toContain(
+        '"pattern":"^[A-Za-z0-9][A-Za-z0-9._-]*$"',
+      );
+      expectStrictRequiredObjects(contract.jsonSchema);
+      expect(contract.decode(replyOutput)).toEqual({
+        case: "reply",
+        result: {
+          body: "The project Agent will inspect authentication.",
+          document: null,
+          issueProposal: null,
+          issueBatchProposal: null,
+          executionProposal: null,
+          skillExecutionProposal: null,
+          delegation: {
+            projectId: "11111111-1111-4111-8111-111111111111",
+            agentId: "22222222-2222-4222-8222-222222222222",
+            request: "Inspect authentication.",
+          },
+        },
+        attachmentPaths: ["auth.html"],
+      });
+      expect(contract.decode(contextOutput)).toEqual({
+        case: "context",
+        requests: { contextRequests: contextOutput.contextRequests },
+      });
+      expect(() => contract.decode({
+        ...contextOutput,
+        body: "Mixed reply and context lookup",
+      })).toThrow();
+      const { attachments: _attachments, ...missingAttachments } = replyOutput;
+      expect(() => contract.decode(missingAttachments)).toThrow();
+    }
   });
 });

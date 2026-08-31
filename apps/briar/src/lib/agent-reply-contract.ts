@@ -258,7 +258,7 @@ const ProviderIssueProposedAction = Schema.Union([
   })),
 ]);
 
-const ProviderReplyAttachmentPaths = mutableArray(
+export const agentReplyAttachmentPathsProviderSchema = mutableArray(
   providerTrimmedText(1, 4_096),
 ).check(Schema.isMaxLength(5));
 
@@ -274,7 +274,7 @@ const ParsedIssueAgentReply = strict(Schema.Struct({
  */
 export const IssueAgentReplyProviderOutputSchema = strict(Schema.Struct({
   reply: providerTrimmedText(1, 10_000),
-  attachments: ProviderReplyAttachmentPaths,
+  attachments: agentReplyAttachmentPathsProviderSchema,
   proposedAction: Schema.NullOr(ProviderIssueProposedAction),
   executionProposal: Schema.NullOr(IssueExecutionProposal),
   skillExecutionProposal: Schema.NullOr(AgentSkillExecutionProposal),

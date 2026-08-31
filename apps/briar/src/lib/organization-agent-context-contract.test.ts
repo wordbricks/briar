@@ -4,12 +4,14 @@ import {
 } from "./organization-agent-context-contract";
 
 describe("organization Agent context contract", () => {
-  it("validates the model-selected lookup union and applies safe defaults", () => {
+  it("requires the complete model-selected lookup union", () => {
     expect(decodeOrganizationAgentContextRequestTurn({
       contextRequests: [{
         resource: "issues",
         projectId: "project-1",
         detail: "summary",
+        limit: 25,
+        cursor: null,
       }],
     })).toEqual({
       contextRequests: [{
@@ -20,6 +22,13 @@ describe("organization Agent context contract", () => {
         cursor: null,
       }],
     });
+    expect(() => decodeOrganizationAgentContextRequestTurn({
+      contextRequests: [{
+        resource: "issues",
+        projectId: "project-1",
+        detail: "summary",
+      }],
+    })).toThrow();
     expect(() => decodeOrganizationAgentContextRequestTurn({
       contextRequests: [{
         resource: "issues",

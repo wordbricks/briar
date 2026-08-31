@@ -1,6 +1,3 @@
-import {
-  parseDetachedJsonResult,
-} from "./agent-runner";
 import type { ParsedIssueAgentReply } from "../src/lib/agent-reply-contract";
 import {
   collectReplyAttachments,
@@ -8,10 +5,10 @@ import {
 
 export function parseIssueReplyAgentResult(
   text: string,
-  decode: (input: unknown) => ParsedIssueAgentReply,
+  decodeJson: (text: string) => ParsedIssueAgentReply,
   options: { allowSkillExecutionProposal?: boolean } = {},
 ): ParsedIssueAgentReply {
-  const parsed = decode(parseDetachedJsonResult(text));
+  const parsed = decodeJson(text);
   if (
     parsed.result.skillExecutionProposal &&
     !options.allowSkillExecutionProposal

@@ -1,47 +1,4 @@
-import * as Predicate from "effect/Predicate";
-import * as Schema from "effect/Schema";
-import { channelReplyCompletionSchema } from "../src/lib/channels-contract";
-import {
-  collectReplyAttachments,
-  decodeReplyAttachmentPaths,
-} from "./reply-attachments";
-
-const decodeChannelReplyCompletion = Schema.decodeUnknownSync(
-  channelReplyCompletionSchema,
-);
-
-type ChannelReplyCompletion = typeof channelReplyCompletionSchema.Type;
-
-export type ParsedChannelReplyAgentResult = {
-  result: ChannelReplyCompletion;
-  attachmentPaths: string[];
-};
-
-export function parseChannelReplyAgentResult(
-  parsed: unknown,
-): ParsedChannelReplyAgentResult {
-  if (!Predicate.isObject(parsed)) {
-    return {
-      result: decodeChannelReplyCompletion(parsed),
-      attachmentPaths: [],
-    };
-  }
-  if (parsed.contextRequests !== null && parsed.contextRequests !== undefined) {
-    throw new Error("A completed channel reply cannot request more context");
-  }
-  const attachmentPaths = decodeReplyAttachmentPaths(
-    parsed.attachments ?? [],
-  );
-  const {
-    attachments: _ignored,
-    contextRequests: _contextRequests,
-    ...rest
-  } = parsed;
-  return {
-    result: decodeChannelReplyCompletion(rest),
-    attachmentPaths,
-  };
-}
+import { collectReplyAttachments } from "./reply-attachments";
 
 /**
  * Read reply attachments before the disposable workspace is deleted. Paths stay
