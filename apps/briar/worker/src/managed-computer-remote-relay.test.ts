@@ -4,24 +4,26 @@ import {
   ManagedComputerSetupChallengeSchema,
   ManagedComputerSetupChallengeService,
   ManagedComputerSetupCompleteSchema,
-  ManagedComputerSetupControllerReadySchema,
   ManagedComputerSetupStartSchema,
   ManagedComputerSetupSubmitSchema,
   ManagedComputerSetupToAgentSchema,
   ManagedComputerSetupToControllerSchema,
 } from "@briar/contracts/gen/briar/worker/v1/managed_computer_setup_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runInDurableObject } from "cloudflare:test";
+import { env } from "cloudflare:workers";
+import { describe, expect, it } from "vitest";
 import {
-  decodeManagedComputerRemoteRelayControlFrame,
   encodeManagedComputerRemoteAgentControlFrame,
   managedComputerRemoteHeartbeatRequest,
   managedComputerRemoteHeartbeatResponse,
 } from "../../src/lib/managed-computer-remote-protocol";
-import { ManagedComputerRemoteSessionHub } from "./managed-computer-remote-relay";
+import type { ManagedComputerRemoteSessionHub } from "./managed-computer-remote-relay";
+
+type Role = "agent" | "controller" | "setup-agent" | "setup-controller";
 
 type Attachment = {
-  role: "agent" | "controller" | "setup-agent" | "setup-controller";
+  role: Role;
   sessionId: string | null;
   connectionGeneration: number;
   maxExpiresAt: string | null;
@@ -29,30 +31,9 @@ type Attachment = {
   screenBytes: number;
 };
 
-class FakeSocket {
-  readyState = 1;
-  sent: Array<string | ArrayBuffer> = [];
-  close = vi.fn();
+const sessionId = "11111111-1111-4111-8111-111111111111";
 
-  constructor(private state: Attachment) {}
-
-  deserializeAttachment() {
-    return this.state;
-  }
-
-  serializeAttachment(next: Attachment) {
-    this.state = next;
-  }
-
-  send(value: string | ArrayBuffer) {
-    this.sent.push(value);
-  }
-}
-
-const binaryFrame = (bytes: Uint8Array): ArrayBuffer =>
-  new Uint8Array(bytes).buffer;
-
-const setupStartFrame = () => binaryFrame(toBinary(
+const setupStartFrame = () => toBinary(
   ManagedComputerSetupToAgentSchema,
   create(ManagedComputerSetupToAgentSchema, {
     payload: {
@@ -63,9 +44,9 @@ const setupStartFrame = () => binaryFrame(toBinary(
       }),
     },
   }),
-));
+);
 
-const setupSubmitFrame = () => binaryFrame(toBinary(
+const setupSubmitFrame = () => toBinary(
   ManagedComputerSetupToAgentSchema,
   create(ManagedComputerSetupToAgentSchema, {
     payload: {
@@ -76,21 +57,9 @@ const setupSubmitFrame = () => binaryFrame(toBinary(
       }),
     },
   }),
-));
+);
 
-const forgedSetupReadyFrame = () => binaryFrame(toBinary(
-  ManagedComputerSetupToAgentSchema,
-  create(ManagedComputerSetupToAgentSchema, {
-    payload: {
-      case: "controllerReady",
-      value: create(ManagedComputerSetupControllerReadySchema, {
-        sessionId: "11111111-1111-4111-8111-111111111111",
-      }),
-    },
-  }),
-));
-
-const setupChallengeFrame = () => binaryFrame(toBinary(
+const setupChallengeFrame = () => toBinary(
   ManagedComputerSetupToControllerSchema,
   create(ManagedComputerSetupToControllerSchema, {
     payload: {
@@ -105,9 +74,9 @@ const setupChallengeFrame = () => binaryFrame(toBinary(
       }),
     },
   }),
-));
+);
 
-const setupCompleteFrame = () => binaryFrame(toBinary(
+const setupCompleteFrame = () => toBinary(
   ManagedComputerSetupToControllerSchema,
   create(ManagedComputerSetupToControllerSchema, {
     payload: {
@@ -119,523 +88,338 @@ const setupCompleteFrame = () => binaryFrame(toBinary(
       }),
     },
   }),
-));
+);
 
-class FakeWebSocketRequestResponsePair {
-  constructor(
-    readonly request: string,
-    readonly response: string,
-  ) {}
+function responseWebSocket(response: Response) {
+  const socket = response.webSocket;
+  if (!socket) throw new TypeError("Expected WebSocket upgrade response");
+  socket.accept();
+  return socket;
 }
 
-class FakeWebSocketPair {
-  readonly 0: FakeSocket;
-  readonly 1: FakeSocket;
+function waitForMessage(socket: WebSocket) {
+  return new Promise<string | ArrayBuffer>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Timed out waiting for WebSocket message"));
+    }, 5_000);
+    socket.addEventListener("message", (event) => {
+      clearTimeout(timeout);
+      const data: unknown = event.data;
+      if (typeof data === "string" || data instanceof ArrayBuffer) {
+        resolve(data);
+        return;
+      }
+      if (ArrayBuffer.isView(data)) {
+        resolve(new Uint8Array(
+          data.buffer,
+          data.byteOffset,
+          data.byteLength,
+        ).slice().buffer);
+        return;
+      }
+      if (data instanceof Blob) {
+        void data.arrayBuffer().then(resolve, reject);
+        return;
+      }
+      reject(new TypeError(
+        `Unexpected WebSocket message type: ${Object.prototype.toString.call(data)}`,
+      ));
+    }, { once: true });
+    socket.addEventListener("error", () => {
+      clearTimeout(timeout);
+      reject(new Error("WebSocket failed while waiting for message"));
+    }, { once: true });
+  });
+}
 
-  constructor() {
-    const initial = {
-      role: "setup-controller" as const,
-      sessionId: null,
-      connectionGeneration: 0,
-      maxExpiresAt: null,
-      controllerBytes: 0,
-      screenBytes: 0,
-    };
-    this[0] = new FakeSocket(initial);
-    this[1] = new FakeSocket(initial);
+function waitForClose(socket: WebSocket) {
+  return new Promise<{ code: number; reason: string }>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Timed out waiting for WebSocket close"));
+    }, 5_000);
+    socket.addEventListener("close", (event) => {
+      clearTimeout(timeout);
+      resolve({ code: event.code, reason: event.reason });
+    }, { once: true });
+    socket.addEventListener("error", () => {
+      clearTimeout(timeout);
+      reject(new Error("WebSocket failed while waiting for close"));
+    }, { once: true });
+  });
+}
+
+function binaryMessage(message: string | ArrayBuffer) {
+  if (typeof message === "string") {
+    throw new TypeError("Expected binary WebSocket message");
   }
+  return new Uint8Array(message);
 }
 
-class FakeUpgradeResponse {
-  readonly status: number;
-
-  constructor(
-    _body: BodyInit | null,
-    init: ResponseInit & { webSocket?: WebSocket },
-  ) {
-    this.status = init.status ?? 200;
-  }
+async function connectSetupAgent(
+  stub: DurableObjectStub<ManagedComputerRemoteSessionHub>,
+) {
+  return responseWebSocket(await stub.fetch(
+    "https://managed-computer-remote.internal/connect",
+    {
+      headers: {
+        Upgrade: "websocket",
+        "X-Briar-Remote-Role": "setup-agent",
+        "X-Briar-Remote-Protocol": "briar-setup-agent-v1.token",
+      },
+    },
+  ));
 }
 
-beforeEach(() => {
-  vi.stubGlobal(
-    "WebSocketRequestResponsePair",
-    FakeWebSocketRequestResponsePair,
-  );
-});
+async function connectSetupController(
+  stub: DurableObjectStub<ManagedComputerRemoteSessionHub>,
+) {
+  return responseWebSocket(await stub.fetch(
+    "https://managed-computer-remote.internal/connect",
+    {
+      headers: {
+        Upgrade: "websocket",
+        "X-Briar-Remote-Role": "setup-controller",
+        "X-Briar-Setup-Session": sessionId,
+        "X-Briar-Setup-Expires-At": "2099-01-01T00:00:00.000Z",
+        "X-Briar-Remote-Protocol": "briar-setup-controller-v1.token",
+      },
+    },
+  ));
+}
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
+function attachSocket(
+  state: DurableObjectState,
+  role: Role,
+  overrides: Partial<Attachment> = {},
+) {
+  const pair = new WebSocketPair();
+  const [client, server] = Object.values(pair);
+  state.acceptWebSocket(server, [role]);
+  server.serializeAttachment({
+    role,
+    sessionId: null,
+    connectionGeneration: 0,
+    maxExpiresAt: null,
+    controllerBytes: 0,
+    screenBytes: 0,
+    ...overrides,
+  } satisfies Attachment);
+  client.accept();
+  return { client, server };
+}
 
 describe("ManagedComputerRemoteSessionHub", () => {
-  it("answers agent heartbeats without waking the relay", () => {
-    const setWebSocketAutoResponse = vi.fn();
-    new ManagedComputerRemoteSessionHub(
-      {
-        getWebSockets: () => [],
-        setWebSocketAutoResponse,
-      } as unknown as DurableObjectState,
-      {} as Env,
-    );
+  it("runs the authenticated protobuf setup lifecycle over real hibernatable sockets", async () => {
+    const stub = env.MANAGED_COMPUTER_REMOTE.getByName(crypto.randomUUID());
+    const agent = await connectSetupAgent(stub);
 
-    expect(setWebSocketAutoResponse).toHaveBeenCalledWith(
-      expect.objectContaining({
-        request: managedComputerRemoteHeartbeatRequest,
-        response: managedComputerRemoteHeartbeatResponse,
-      }),
-    );
+    const heartbeat = waitForMessage(agent);
+    agent.send(managedComputerRemoteHeartbeatRequest);
+    await expect(heartbeat).resolves.toBe(managedComputerRemoteHeartbeatResponse);
+
+    const ready = waitForMessage(agent);
+    const controller = await connectSetupController(stub);
+    expect(fromBinary(
+      ManagedComputerSetupToAgentSchema,
+      binaryMessage(await ready),
+    ).payload.case).toBe("controllerReady");
+
+    const start = waitForMessage(agent);
+    controller.send(setupStartFrame());
+    expect(fromBinary(
+      ManagedComputerSetupToAgentSchema,
+      binaryMessage(await start),
+    ).payload.case).toBe("start");
+
+    const challenge = waitForMessage(controller);
+    agent.send(setupChallengeFrame());
+    expect(fromBinary(
+      ManagedComputerSetupToControllerSchema,
+      binaryMessage(await challenge),
+    ).payload.case).toBe("challenge");
+
+    const submit = waitForMessage(agent);
+    controller.send(setupSubmitFrame());
+    expect(fromBinary(
+      ManagedComputerSetupToAgentSchema,
+      binaryMessage(await submit),
+    ).payload.case).toBe("submit");
+
+    const complete = waitForMessage(controller);
+    agent.send(setupCompleteFrame());
+    expect(fromBinary(
+      ManagedComputerSetupToControllerSchema,
+      binaryMessage(await complete),
+    ).payload.case).toBe("complete");
+
+    const ended = waitForMessage(agent);
+    controller.close(1000, "done");
+    expect(fromBinary(
+      ManagedComputerSetupToAgentSchema,
+      binaryMessage(await ended),
+    ).payload.case).toBe("controllerEnded");
+    agent.close(1000, "done");
   });
 
-  it("relays only binary RFB frames between one controller and one agent", async () => {
-    const sessionId = "11111111-1111-4111-8111-111111111111";
-    const controller = new FakeSocket({
-      role: "controller",
-      sessionId,
-      connectionGeneration: 1,
-      maxExpiresAt: "2099-01-01T00:00:00.000Z",
-      controllerBytes: 0,
-      screenBytes: 0,
+  it("rejects a valid protobuf message sent by the unauthorized direction", async () => {
+    const stub = env.MANAGED_COMPUTER_REMOTE.getByName(crypto.randomUUID());
+    const agent = await connectSetupAgent(stub);
+    const controller = await connectSetupController(stub);
+    const closed = waitForClose(agent);
+
+    agent.send(setupStartFrame());
+
+    await expect(closed).resolves.toEqual({
+      code: 1008,
+      reason: "Managed setup message is invalid",
     });
-    const agent = new FakeSocket({
-      role: "agent",
-      sessionId: null,
-      connectionGeneration: 0,
-      maxExpiresAt: null,
-      controllerBytes: 0,
-      screenBytes: 0,
-    });
-    const hub = new ManagedComputerRemoteSessionHub(
-      {
-        getWebSockets: (tag?: string) =>
-          tag === "agent"
-            ? [agent]
-            : tag === "controller"
-              ? [controller]
-              : [agent, controller],
-        setWebSocketAutoResponse: vi.fn(),
-      } as unknown as DurableObjectState,
-      {} as Env,
-    );
-    const input = new Uint8Array([1, 2, 3]).buffer;
-    const screen = new Uint8Array([4, 5, 6, 7]).buffer;
-    await hub.webSocketMessage(controller as unknown as WebSocket, input);
-    await hub.webSocketMessage(agent as unknown as WebSocket, screen);
-    expect(agent.sent).toEqual([input]);
-    expect(controller.sent).toEqual([screen]);
-    expect(controller.deserializeAttachment()).toMatchObject({
-      controllerBytes: 3,
-      screenBytes: 4,
-    });
+    controller.close(1000, "done");
   });
 
-  it("keeps RFB binary-only and accepts only typed agent failures", async () => {
-    const staleController = new FakeSocket({
-      role: "controller",
-      sessionId: "11111111-1111-4111-8111-111111111111",
-      connectionGeneration: 1,
-      maxExpiresAt: "2099-01-01T00:00:00.000Z",
-      controllerBytes: 0,
-      screenBytes: 0,
-    });
-    const controller = new FakeSocket({
-      role: "controller",
-      sessionId: "11111111-1111-4111-8111-111111111111",
-      connectionGeneration: 2,
-      maxExpiresAt: "2099-01-01T00:00:00.000Z",
-      controllerBytes: 0,
-      screenBytes: 0,
-    });
-    const agent = new FakeSocket({
-      role: "agent",
-      sessionId: null,
-      connectionGeneration: 0,
-      maxExpiresAt: null,
-      controllerBytes: 0,
-      screenBytes: 0,
-    });
-    const hub = new ManagedComputerRemoteSessionHub(
-      {
-        getWebSockets: (tag?: string) =>
-          tag === "agent"
-            ? [agent]
-            : tag === "controller"
-              ? [staleController, controller]
-              : [agent, staleController, controller],
-        setWebSocketAutoResponse: vi.fn(),
-      } as unknown as DurableObjectState,
-      {} as Env,
-    );
-    await hub.webSocketMessage(controller as unknown as WebSocket, "secret");
-    expect(controller.close).toHaveBeenCalledWith(
-      1008,
-      "Remote desktop input must be binary",
-    );
-    expect(agent.sent).toEqual([]);
+  it("relays only bounded binary RFB frames in both directions", async () => {
+    const stub = env.MANAGED_COMPUTER_REMOTE.getByName(crypto.randomUUID());
+    const result = await runInDurableObject(
+      stub,
+      async (hub: ManagedComputerRemoteSessionHub, state) => {
+        const controller = attachSocket(state, "controller", {
+          sessionId,
+          connectionGeneration: 1,
+          maxExpiresAt: "2099-01-01T00:00:00.000Z",
+        });
+        const agent = attachSocket(state, "agent");
 
-    await hub.webSocketMessage(
-      agent as unknown as WebSocket,
-      encodeManagedComputerRemoteAgentControlFrame({
-        type: "display_error",
-        sessionId: controller.deserializeAttachment().sessionId!,
-        code: "display_closed",
-      }),
-    );
-    expect(controller.close).toHaveBeenCalledWith(
-      1011,
-      "Remote display unavailable",
-    );
-    expect(staleController.close).not.toHaveBeenCalled();
+        const agentInput = waitForMessage(agent.client);
+        await hub.webSocketMessage(
+          controller.server,
+          new Uint8Array([1, 2, 3]).buffer,
+        );
+        const forwardedInput = [...binaryMessage(await agentInput)];
 
-    controller.close.mockClear();
-    await hub.webSocketMessage(
-      agent as unknown as WebSocket,
-      JSON.stringify({
-        type: "display_error",
-        sessionId: controller.deserializeAttachment().sessionId,
-        code: "display_closed",
-        injected: true,
-      }),
-    );
-    expect(agent.close).toHaveBeenCalledWith(
-      1008,
-      "Remote display control is invalid",
-    );
-    expect(controller.close).not.toHaveBeenCalled();
+        const controllerScreen = waitForMessage(controller.client);
+        await hub.webSocketMessage(
+          agent.server,
+          new Uint8Array([4, 5, 6, 7]).buffer,
+        );
+        const forwardedScreen = [...binaryMessage(await controllerScreen)];
+        const transferred = controller.server
+          .deserializeAttachment() as Attachment;
 
-    agent.close.mockClear();
-    await hub.webSocketMessage(
-      agent as unknown as WebSocket,
-      encodeManagedComputerRemoteAgentControlFrame({
-        type: "display_error",
-        sessionId: "22222222-2222-4222-8222-222222222222",
-        code: "display_closed",
-      }),
-    );
-    expect(agent.close).not.toHaveBeenCalled();
-    expect(controller.close).not.toHaveBeenCalled();
-  });
+        const textClose = waitForClose(controller.client);
+        await hub.webSocketMessage(controller.server, "secret");
+        const textRejection = await textClose;
 
-  it("relays a validated binary challenge and completion flow", async () => {
-    const sessionId = "11111111-1111-4111-8111-111111111111";
-    const controller = new FakeSocket({
-      role: "setup-controller",
-      sessionId,
-      connectionGeneration: 0,
-      maxExpiresAt: "2099-01-01T00:00:00.000Z",
-      controllerBytes: 0,
-      screenBytes: 0,
-    });
-    const agent = new FakeSocket({
-      role: "setup-agent",
-      sessionId: null,
-      connectionGeneration: 0,
-      maxExpiresAt: null,
-      controllerBytes: 0,
-      screenBytes: 0,
-    });
-    const hub = new ManagedComputerRemoteSessionHub(
-      {
-        getWebSockets: (tag?: string) =>
-          tag === "setup-agent"
-            ? [agent]
-            : tag === "setup-controller"
-              ? [controller]
-              : [agent, controller],
-        setWebSocketAutoResponse: vi.fn(),
-      } as unknown as DurableObjectState,
-      {} as Env,
-    );
-    const start = setupStartFrame();
-    const challenge = setupChallengeFrame();
-    const submit = setupSubmitFrame();
-    const complete = setupCompleteFrame();
-    await hub.webSocketMessage(controller as unknown as WebSocket, start);
-    await hub.webSocketMessage(agent as unknown as WebSocket, challenge);
-    await hub.webSocketMessage(controller as unknown as WebSocket, submit);
-    await hub.webSocketMessage(agent as unknown as WebSocket, complete);
-
-    expect(agent.sent).toEqual([start, submit]);
-    expect(controller.sent).toEqual([challenge, complete]);
-    expect(agent.sent.map((frame) =>
-      typeof frame === "string"
-        ? null
-        : fromBinary(
-          ManagedComputerSetupToAgentSchema,
-          new Uint8Array(frame),
-        ).payload.case
-    )).toEqual(["start", "submit"]);
-    expect(controller.sent.map((frame) =>
-      typeof frame === "string"
-        ? null
-        : fromBinary(
-          ManagedComputerSetupToControllerSchema,
-          new Uint8Array(frame),
-        ).payload.case
-    )).toEqual(["challenge", "complete"]);
-  });
-
-  it("rejects wrong-direction, malformed, and non-heartbeat text frames", async () => {
-    const controller = new FakeSocket({
-      role: "setup-controller",
-      sessionId: "11111111-1111-4111-8111-111111111111",
-      connectionGeneration: 0,
-      maxExpiresAt: "2099-01-01T00:00:00.000Z",
-      controllerBytes: 0,
-      screenBytes: 0,
-    });
-    const agent = new FakeSocket({
-      role: "setup-agent",
-      sessionId: null,
-      connectionGeneration: 0,
-      maxExpiresAt: null,
-      controllerBytes: 0,
-      screenBytes: 0,
-    });
-    const hub = new ManagedComputerRemoteSessionHub(
-      {
-        getWebSockets: (tag?: string) =>
-          tag === "setup-agent"
-            ? [agent]
-            : tag === "setup-controller"
-              ? [controller]
-              : [agent, controller],
-        setWebSocketAutoResponse: vi.fn(),
-      } as unknown as DurableObjectState,
-      {} as Env,
-    );
-
-    await hub.webSocketMessage(
-      agent as unknown as WebSocket,
-      setupStartFrame(),
-    );
-    expect(agent.close).toHaveBeenCalledWith(
-      1008,
-      "Managed setup message is invalid",
-    );
-    expect(controller.sent).toEqual([]);
-
-    await hub.webSocketMessage(
-      controller as unknown as WebSocket,
-      forgedSetupReadyFrame(),
-    );
-    expect(controller.close).toHaveBeenCalledWith(
-      1008,
-      "Managed setup message is invalid",
-    );
-    expect(agent.sent).toEqual([]);
-
-    await hub.webSocketMessage(controller as unknown as WebSocket, "not-json");
-    expect(controller.close).toHaveBeenCalledWith(
-      1008,
-      "Managed setup control messages must be binary",
-    );
-
-    await hub.webSocketMessage(
-      controller as unknown as WebSocket,
-      new Uint8Array([0xff]).buffer,
-    );
-    expect(controller.close).toHaveBeenCalledWith(
-      1008,
-      "Managed setup message is malformed",
-    );
-  });
-
-  it("emits protobuf controller-ready and controller-ended relay controls", async () => {
-    vi.stubGlobal("WebSocketPair", FakeWebSocketPair);
-    vi.stubGlobal("Response", FakeUpgradeResponse);
-    const sessionId = "11111111-1111-4111-8111-111111111111";
-    const agent = new FakeSocket({
-      role: "setup-agent",
-      sessionId: null,
-      connectionGeneration: 0,
-      maxExpiresAt: null,
-      controllerBytes: 0,
-      screenBytes: 0,
-    });
-    const acceptWebSocket = vi.fn();
-    const hub = new ManagedComputerRemoteSessionHub(
-      {
-        getWebSockets: (tag?: string) => tag === "setup-agent" ? [agent] : [],
-        setWebSocketAutoResponse: vi.fn(),
-        acceptWebSocket,
-      } as unknown as DurableObjectState,
-      {} as Env,
-    );
-
-    const response = await hub.fetch(new Request(
-      "https://managed-computer-remote.internal/connect",
-      {
-        headers: {
-          Upgrade: "websocket",
-          "X-Briar-Remote-Role": "setup-controller",
-          "X-Briar-Setup-Session": sessionId,
-          "X-Briar-Setup-Expires-At": "2099-01-01T00:00:00.000Z",
-          "X-Briar-Remote-Protocol": "briar-setup-v1.token",
-        },
+        const oversized = attachSocket(state, "controller", {
+          sessionId,
+          connectionGeneration: 2,
+          maxExpiresAt: "2099-01-01T00:00:00.000Z",
+        });
+        const oversizedClose = waitForClose(oversized.client);
+        await hub.webSocketMessage(
+          oversized.server,
+          new ArrayBuffer(8 * 1024 * 1024 + 1),
+        );
+        const oversizedRejection = await oversizedClose;
+        agent.client.close(1000, "done");
+        return {
+          forwardedInput,
+          forwardedScreen,
+          textRejection,
+          oversizedRejection,
+          byteCounts: {
+            controller: transferred.controllerBytes,
+            screen: transferred.screenBytes,
+          },
+        };
       },
-    ));
-    expect(response.status).toBe(101);
-    const controller = acceptWebSocket.mock.calls[0]![0] as FakeSocket;
-
-    await hub.webSocketClose(
-      controller as unknown as WebSocket,
-      1000,
-      "done",
-      true,
     );
 
-    expect(agent.sent.map((frame) => {
-      if (typeof frame === "string") return null;
-      const decoded = fromBinary(
-        ManagedComputerSetupToAgentSchema,
-        new Uint8Array(frame),
-      );
-      return decoded.payload.case === "controllerReady" ||
-          decoded.payload.case === "controllerEnded"
-        ? [decoded.payload.case, decoded.payload.value.sessionId]
-        : null;
-    })).toEqual([
-      ["controllerReady", sessionId],
-      ["controllerEnded", sessionId],
-    ]);
-  });
-
-  it("announces only the latest live controller to a reconnecting agent", async () => {
-    vi.stubGlobal("WebSocketPair", FakeWebSocketPair);
-    vi.stubGlobal("Response", FakeUpgradeResponse);
-    const sessionId = "11111111-1111-4111-8111-111111111111";
-    const staleController = new FakeSocket({
-      role: "controller",
-      sessionId,
-      connectionGeneration: 1,
-      maxExpiresAt: "2099-01-01T00:00:00.000Z",
-      controllerBytes: 0,
-      screenBytes: 0,
-    });
-    const liveController = new FakeSocket({
-      role: "controller",
-      sessionId,
-      connectionGeneration: 2,
-      maxExpiresAt: "2099-01-01T00:00:00.000Z",
-      controllerBytes: 0,
-      screenBytes: 0,
-    });
-    const acceptWebSocket = vi.fn();
-    const hub = new ManagedComputerRemoteSessionHub(
-      {
-        getWebSockets: (tag?: string) =>
-          tag === "controller" ? [staleController, liveController] : [],
-        setWebSocketAutoResponse: vi.fn(),
-        acceptWebSocket,
-      } as unknown as DurableObjectState,
-      {} as Env,
-    );
-
-    const response = await hub.fetch(new Request(
-      "https://managed-computer-remote.internal/connect",
-      {
-        headers: {
-          Upgrade: "websocket",
-          "X-Briar-Remote-Role": "agent",
-          "X-Briar-Remote-Protocol": "briar-remote-agent-v1.token",
-        },
+    expect(result).toEqual({
+      forwardedInput: [1, 2, 3],
+      forwardedScreen: [4, 5, 6, 7],
+      textRejection: {
+        code: 1008,
+        reason: "Remote desktop input must be binary",
       },
-    ));
-
-    expect(response.status).toBe(101);
-    const agent = acceptWebSocket.mock.calls[0]![0] as FakeSocket;
-    expect(agent.sent).toHaveLength(1);
-    expect(decodeManagedComputerRemoteRelayControlFrame(agent.sent[0])).toEqual({
-      type: "controller_ready",
-      sessionId,
+      oversizedRejection: {
+        code: 1009,
+        reason: "Remote desktop frame is too large",
+      },
+      byteCounts: { controller: 3, screen: 4 },
     });
   });
 
-  it("keeps the controller alive when an agent socket is replaced", async () => {
-    const controller = new FakeSocket({
-      role: "controller",
-      sessionId: "11111111-1111-4111-8111-111111111111",
-      connectionGeneration: 2,
-      maxExpiresAt: "2099-01-01T00:00:00.000Z",
-      controllerBytes: 0,
-      screenBytes: 0,
-    });
-    const oldAgent = new FakeSocket({
-      role: "agent",
-      sessionId: null,
-      connectionGeneration: 0,
-      maxExpiresAt: null,
-      controllerBytes: 0,
-      screenBytes: 0,
-    });
-    oldAgent.readyState = 3;
-    const replacementAgent = new FakeSocket({
-      role: "agent",
-      sessionId: null,
-      connectionGeneration: 0,
-      maxExpiresAt: null,
-      controllerBytes: 0,
-      screenBytes: 0,
-    });
-    const hub = new ManagedComputerRemoteSessionHub(
-      {
-        getWebSockets: (tag?: string) =>
-          tag === "agent"
-            ? [oldAgent, replacementAgent]
-            : tag === "controller"
-              ? [controller]
-              : [oldAgent, replacementAgent, controller],
-        setWebSocketAutoResponse: vi.fn(),
-      } as unknown as DurableObjectState,
-      {} as Env,
-    );
-    await hub.webSocketClose(
-      oldAgent as unknown as WebSocket,
-      4001,
-      "replaced",
-      true,
-    );
-    expect(controller.close).not.toHaveBeenCalled();
-  });
+  it("accepts only typed agent failures for the latest matching controller", async () => {
+    const stub = env.MANAGED_COMPUTER_REMOTE.getByName(crypto.randomUUID());
+    const result = await runInDurableObject(
+      stub,
+      async (hub: ManagedComputerRemoteSessionHub, state) => {
+        const stale = attachSocket(state, "controller", {
+          sessionId,
+          connectionGeneration: 1,
+          maxExpiresAt: "2099-01-01T00:00:00.000Z",
+        });
+        const current = attachSocket(state, "controller", {
+          sessionId,
+          connectionGeneration: 2,
+          maxExpiresAt: "2099-01-01T00:00:00.000Z",
+        });
+        const agent = attachSocket(state, "agent");
 
-  it("rejects oversized binary frames before forwarding them", async () => {
-    const controller = new FakeSocket({
-      role: "controller",
-      sessionId: "11111111-1111-4111-8111-111111111111",
-      connectionGeneration: 1,
-      maxExpiresAt: "2099-01-01T00:00:00.000Z",
-      controllerBytes: 0,
-      screenBytes: 0,
+        await hub.webSocketMessage(
+          agent.server,
+          encodeManagedComputerRemoteAgentControlFrame({
+            type: "display_error",
+            sessionId: "22222222-2222-4222-8222-222222222222",
+            code: "display_closed",
+          }),
+        );
+        const unmatchedControllerState = current.client.readyState;
+
+        const currentClose = waitForClose(current.client);
+        await hub.webSocketMessage(
+          agent.server,
+          encodeManagedComputerRemoteAgentControlFrame({
+            type: "display_error",
+            sessionId,
+            code: "display_closed",
+          }),
+        );
+        const matchedRejection = await currentClose;
+        const staleControllerState = stale.client.readyState;
+
+        const agentClose = waitForClose(agent.client);
+        await hub.webSocketMessage(
+          agent.server,
+          JSON.stringify({
+            type: "display_error",
+            sessionId,
+            code: "display_closed",
+            injected: true,
+          }),
+        );
+        const forgedRejection = await agentClose;
+        stale.client.close(1000, "done");
+
+        return {
+          unmatchedControllerState,
+          staleControllerState,
+          matchedRejection,
+          forgedRejection,
+        };
+      },
+    );
+
+    expect(result).toEqual({
+      unmatchedControllerState: WebSocket.OPEN,
+      staleControllerState: WebSocket.OPEN,
+      matchedRejection: {
+        code: 1011,
+        reason: "Remote display unavailable",
+      },
+      forgedRejection: {
+        code: 1008,
+        reason: "Remote display control is invalid",
+      },
     });
-    const agent = new FakeSocket({
-      role: "agent",
-      sessionId: null,
-      connectionGeneration: 0,
-      maxExpiresAt: null,
-      controllerBytes: 0,
-      screenBytes: 0,
-    });
-    const hub = new ManagedComputerRemoteSessionHub(
-      {
-        getWebSockets: (tag?: string) =>
-          tag === "agent"
-            ? [agent]
-            : tag === "controller"
-              ? [controller]
-              : [agent, controller],
-        setWebSocketAutoResponse: vi.fn(),
-      } as unknown as DurableObjectState,
-      {} as Env,
-    );
-    await hub.webSocketMessage(
-      controller as unknown as WebSocket,
-      new ArrayBuffer(8 * 1024 * 1024 + 1),
-    );
-    expect(controller.close).toHaveBeenCalledWith(
-      1009,
-      "Remote desktop frame is too large",
-    );
-    expect(agent.sent).toEqual([]);
   });
 });
