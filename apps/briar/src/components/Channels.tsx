@@ -85,7 +85,6 @@ import {
   directMessageParticipants,
 } from "../lib/direct-messages";
 import {
-  channelHasUnread,
   laterTimestamp,
   markChannelCatalogRead,
 } from "../lib/channel-unread";
@@ -322,7 +321,7 @@ export function Channels({
   useEffect(() => {
     if (!activeChannelId) return;
     const channel = channels.find((item) => item.id === activeChannelId);
-    if (!channel || !channelHasUnread(channel)) return;
+    if (!channel?.hasUnread) return;
     const lastReadAt = laterTimestamp(
       channel.lastMessageAt,
       new Date().toISOString(),

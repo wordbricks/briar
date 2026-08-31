@@ -18,8 +18,15 @@ const selectedChannel: ChannelSummary = {
   archivedAt: null,
   memberCount: 0,
   agentCount: 0,
+  kind: "channel",
+  createdByUserId: null,
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
+  lastMessageAt: null,
+  lastMessagePreview: null,
+  lastReadAt: null,
+  hasUnread: false,
+  dmParticipants: [],
 };
 
 const secondChannel: ChannelSummary = {
@@ -66,7 +73,13 @@ const channelSummaryWire = (channel: ChannelSummary) => ({
   createdAt: channel.createdAt,
   updatedAt: channel.updatedAt,
   kind: 1,
-  hasUnread: channel.hasUnread ?? false,
+  hasUnread: channel.hasUnread,
+  directMessageParticipants: channel.dmParticipants.map((participant) => ({
+    kind: participant.type === "user" ? 1 : 2,
+    id: participant.id,
+    name: participant.name,
+    image: participant.image ?? undefined,
+  })),
 });
 
 const channelMessageWire = (message: ChannelMessage) => ({

@@ -76,8 +76,15 @@ const sidebarChannel = (
   archivedAt: null,
   memberCount: 1,
   agentCount: 0,
+  kind: "channel" as const,
+  createdByUserId: null,
   createdAt: "2026-08-01T00:00:00Z",
   updatedAt: "2026-08-01T00:00:00Z",
+  lastMessageAt: null,
+  lastMessagePreview: null,
+  lastReadAt: null,
+  hasUnread: false,
+  dmParticipants: [],
 });
 
 describe("Sidebar", () => {
@@ -126,8 +133,15 @@ describe("Sidebar", () => {
             archivedAt: null,
             memberCount: 1,
             agentCount: 0,
+            kind: "channel",
+            createdByUserId: null,
             createdAt: "2026-08-01T00:00:00Z",
             updatedAt: "2026-08-01T00:00:00Z",
+            lastMessageAt: null,
+            lastMessagePreview: null,
+            lastReadAt: null,
+            hasUnread: false,
+            dmParticipants: [],
           },
         ]}
         onChannelCreate={onChannelCreate}

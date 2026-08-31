@@ -1128,8 +1128,8 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         }
         if let preview = value.lastMessagePreview { message.lastMessagePreview = preview }
         if let lastReadAt = value.lastReadAt { message.lastReadAt = .init(date: lastReadAt) }
-        message.hasUnread_p = value.hasUnread ?? false
-        message.directMessageParticipants = (value.dmParticipants ?? []).map { participant in
+        message.hasUnread_p = value.hasUnread
+        message.directMessageParticipants = value.dmParticipants.map { participant in
             var item = BriarAPI_DirectMessageParticipant()
             item.kind = participant.type == .user ? .user : .agent
             item.id = participant.id
@@ -1329,7 +1329,9 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             agentCount: 3,
             createdAt: Date(timeIntervalSince1970: 1_775_260_800),
             updatedAt: Date(timeIntervalSince1970: 1_775_260_800),
-            kind: .channel
+            kind: .channel,
+            hasUnread: false,
+            dmParticipants: []
         )
     }
 
@@ -1679,7 +1681,10 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             memberCount: 4,
             agentCount: 3,
             createdAt: createdAt,
-            updatedAt: createdAt
+            updatedAt: createdAt,
+            kind: .channel,
+            hasUnread: false,
+            dmParticipants: []
         )
         let messages = (1 ... 20).map { index in
             ChannelMessage(

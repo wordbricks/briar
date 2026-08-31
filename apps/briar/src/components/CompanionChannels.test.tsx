@@ -18,8 +18,15 @@ const selectedChannel: ChannelSummary = {
   archivedAt: null,
   memberCount: 0,
   agentCount: 0,
+  kind: "channel",
+  createdByUserId: null,
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
+  lastMessageAt: null,
+  lastMessagePreview: null,
+  lastReadAt: null,
+  hasUnread: false,
+  dmParticipants: [],
 };
 
 const channelSummaryWire = (channel: ChannelSummary) => ({
@@ -33,6 +40,8 @@ const channelSummaryWire = (channel: ChannelSummary) => ({
   createdAt: channel.createdAt,
   updatedAt: channel.updatedAt,
   kind: 1,
+  hasUnread: channel.hasUnread,
+  directMessageParticipants: [],
 });
 
 const jsonResponse = (body: unknown) => new Response(JSON.stringify(body), {

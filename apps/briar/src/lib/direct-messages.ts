@@ -7,7 +7,7 @@ export function directMessageParticipants(
   channel: ChannelSummary,
   currentUserId: string | null,
 ): DirectMessageParticipant[] {
-  return (channel.dmParticipants ?? []).filter(
+  return channel.dmParticipants.filter(
     (participant) =>
       participant.type !== "user" || participant.id !== currentUserId,
   );

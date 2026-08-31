@@ -43,7 +43,6 @@ import {
   type ChannelSummary,
 } from "../lib/channels-contract";
 import {
-  channelHasUnread,
   laterTimestamp,
   markChannelCatalogRead,
   markChannelSummaryRead,
@@ -335,7 +334,7 @@ export function CompanionChannels({
 
   const markSelectedChannelRead = useCallback(
     (summary: ChannelSummary) => {
-      if (!channelHasUnread(summary)) return summary;
+      if (!summary.hasUnread) return summary;
       const lastReadAt = laterTimestamp(
         summary.lastMessageAt,
         new Date().toISOString(),
@@ -1132,7 +1131,7 @@ export function CompanionChannels({
             {group.channels.map((item) => (
               <li key={item.id}>
                 <button
-                  className={channelHasUnread(item) ? "unread" : undefined}
+                  className={item.hasUnread ? "unread" : undefined}
                   onClick={() => void openChannel(item)}
                   type="button"
                 >

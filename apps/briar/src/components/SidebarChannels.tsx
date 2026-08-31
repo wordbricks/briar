@@ -18,7 +18,6 @@ import {
   organizationSidebarChannels,
   projectSidebarChannels,
 } from "../lib/channel-grouping";
-import { channelHasUnread } from "../lib/channel-unread";
 import type {
   ChannelSummary,
   ChannelVisibility,
@@ -480,7 +479,7 @@ function SidebarChannelButton({
   const { t } = useI18n();
   const { toast } = useToast();
   const isActive = activePage === "channels" && channel.id === activeChannelId;
-  const unread = !isActive && channelHasUnread(channel);
+  const unread = !isActive && channel.hasUnread;
   const canDelete = Boolean(
     onDeleteChannel &&
       currentUserId &&

@@ -630,7 +630,7 @@ export const channelJson = (row: ChannelRow): ChannelSummary => ({
   hasUnread: channelHasUnreadFromRow(row),
   dmParticipants: row.dm_participants_json
     ? JSON.parse(row.dm_participants_json) as DirectMessageParticipant[]
-    : undefined,
+    : [],
 });
 
 export const channelReplyJson = (

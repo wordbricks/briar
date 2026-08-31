@@ -13,8 +13,11 @@ final class ChannelGroupingTests: XCTestCase {
         _ name: String,
         project: UUID?,
         archived: Date? = nil,
-        kind: ChannelSummary.Kind? = nil,
-        lastMessageAt: Date? = nil
+        kind: ChannelSummary.Kind = .channel,
+        lastMessageAt: Date? = nil,
+        lastMessagePreview: String? = nil,
+        hasUnread: Bool = false,
+        dmParticipants: [DirectMessageParticipant] = []
     ) -> ChannelSummary {
         ChannelSummary(
             id: UUID(uuidString: id)!,
@@ -30,7 +33,10 @@ final class ChannelGroupingTests: XCTestCase {
             createdAt: Date(timeIntervalSince1970: 1_700_000_000),
             updatedAt: Date(timeIntervalSince1970: 1_700_000_000),
             kind: kind,
-            lastMessageAt: lastMessageAt
+            lastMessageAt: lastMessageAt,
+            lastMessagePreview: lastMessagePreview,
+            hasUnread: hasUnread,
+            dmParticipants: dmParticipants
         )
     }
 
@@ -157,43 +163,37 @@ final class ChannelGroupingTests: XCTestCase {
         XCTAssertEqual(result.flatMap(\.channels).map(\.name), ["General"])
     }
 
-    func testDirectMessagesDecodeParticipantsAndSortByLatestActivity() throws {
-        let json = """
-        {
-          "id": "aaaaaaaa-0000-4000-8000-000000000001",
-          "organizationId": "99999999-9999-4999-8999-999999999999",
-          "kind": "dm",
-          "slug": "dm-honey",
-          "name": "Briar User, Honey",
-          "topic": null,
-          "visibility": "private",
-          "defaultProjectId": null,
-          "archivedAt": null,
-          "memberCount": 1,
-          "agentCount": 1,
-          "createdAt": "2026-08-01T01:00:00Z",
-          "updatedAt": "2026-08-01T02:00:00Z",
-          "lastMessageAt": "2026-08-01T02:00:00Z",
-          "lastMessagePreview": "작업 결과를 확인해 주세요.",
-          "hasUnread": true,
-          "dmParticipants": [
-            {"type":"user","id":"fixture-user","name":"Briar User","image":null},
-            {"type":"agent","id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Honey","image":null}
-          ]
-        }
-        """
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-
-        let dm = try decoder.decode(ChannelSummary.self, from: Data(json.utf8))
-        var olderDM = channel(
+    func testDirectMessagesPresentParticipantsAndSortByLatestActivity() {
+        let dm = channel(
+            "aaaaaaaa-0000-4000-8000-000000000001",
+            "Briar User, Honey",
+            project: nil,
+            kind: .directMessage,
+            lastMessageAt: Date(timeIntervalSince1970: 1_775_264_400),
+            lastMessagePreview: "작업 결과를 확인해 주세요.",
+            hasUnread: true,
+            dmParticipants: [
+                DirectMessageParticipant(
+                    type: .user,
+                    id: "fixture-user",
+                    name: "Briar User",
+                    image: nil
+                ),
+                DirectMessageParticipant(
+                    type: .agent,
+                    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    name: "Honey",
+                    image: nil
+                ),
+            ]
+        )
+        let olderDM = channel(
             "aaaaaaaa-0000-4000-8000-000000000002",
             "Older",
             project: nil,
             kind: .directMessage,
             lastMessageAt: Date(timeIntervalSince1970: 1_700_000_100)
         )
-        olderDM.dmParticipants = []
 
         XCTAssertTrue(dm.isDirectMessage)
         XCTAssertEqual(dm.directMessageDisplayName(currentUserID: "fixture-user"), "Honey")
@@ -263,32 +263,33 @@ final class ChannelGroupingTests: XCTestCase {
         XCTAssertNil(resolved.responsibility)
     }
 
-    func testGroupDirectMessageListsEveryParticipantExceptTheCurrentUser() throws {
-        let json = """
-        {
-          "id": "aaaaaaaa-0000-4000-8000-000000000003",
-          "organizationId": "99999999-9999-4999-8999-999999999999",
-          "kind": "dm",
-          "slug": "dm-group",
-          "name": "Honey, Growth Marketer",
-          "topic": null,
-          "visibility": "private",
-          "defaultProjectId": null,
-          "archivedAt": null,
-          "memberCount": 1,
-          "agentCount": 2,
-          "createdAt": "2026-08-01T01:00:00Z",
-          "updatedAt": "2026-08-01T02:00:00Z",
-          "dmParticipants": [
-            {"type":"user","id":"fixture-user","name":"Briar User","image":null},
-            {"type":"agent","id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Honey","image":null},
-            {"type":"agent","id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","name":"Growth Marketer","image":null}
-          ]
-        }
-        """
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let dm = try decoder.decode(ChannelSummary.self, from: Data(json.utf8))
+    func testGroupDirectMessageListsEveryParticipantExceptTheCurrentUser() {
+        let dm = channel(
+            "aaaaaaaa-0000-4000-8000-000000000003",
+            "Honey, Growth Marketer",
+            project: nil,
+            kind: .directMessage,
+            dmParticipants: [
+                DirectMessageParticipant(
+                    type: .user,
+                    id: "fixture-user",
+                    name: "Briar User",
+                    image: nil
+                ),
+                DirectMessageParticipant(
+                    type: .agent,
+                    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    name: "Honey",
+                    image: nil
+                ),
+                DirectMessageParticipant(
+                    type: .agent,
+                    id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                    name: "Growth Marketer",
+                    image: nil
+                ),
+            ]
+        )
         let participants = dm.directMessageParticipants(excluding: "fixture-user")
 
         XCTAssertEqual(participants.map(\.name), ["Honey", "Growth Marketer"])

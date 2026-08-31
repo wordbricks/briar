@@ -534,8 +534,7 @@ export const channelProposalAcceptInputSchema = strict(Schema.Struct({
 export type ChannelSummary = {
   id: string;
   organizationId: string;
-  /** Missing only on cached responses from clients predating direct messages. */
-  kind?: ChannelKind;
+  kind: ChannelKind;
   slug: string;
   name: string;
   topic: string | null;
@@ -544,14 +543,14 @@ export type ChannelSummary = {
   archivedAt: string | null;
   memberCount: number;
   agentCount: number;
-  createdByUserId?: string | null;
+  createdByUserId: string | null;
   createdAt: string;
   updatedAt: string;
-  lastMessageAt?: string | null;
-  lastMessagePreview?: string | null;
-  lastReadAt?: string | null;
-  hasUnread?: boolean;
-  dmParticipants?: DirectMessageParticipant[];
+  lastMessageAt: string | null;
+  lastMessagePreview: string | null;
+  lastReadAt: string | null;
+  hasUnread: boolean;
+  dmParticipants: DirectMessageParticipant[];
 };
 
 export type DirectMessageParticipant = {

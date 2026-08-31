@@ -1,7 +1,7 @@
 import BriarContracts
 import Foundation
 
-struct ChannelSummary: Codable, Hashable, Identifiable, Sendable {
+struct ChannelSummary: Hashable, Identifiable, Sendable {
     let id: UUID
     let organizationId: UUID
     let slug: String
@@ -15,21 +15,19 @@ struct ChannelSummary: Codable, Hashable, Identifiable, Sendable {
     let agentCount: Int
     let createdAt: Date
     let updatedAt: Date
-    /// Older channel snapshots predate direct messages, so a missing value is
-    /// treated as a regular channel by the presentation helpers below.
-    var kind: Kind? = nil
+    var kind: Kind
     var lastMessageAt: Date? = nil
     var lastMessagePreview: String? = nil
     var lastReadAt: Date? = nil
-    var hasUnread: Bool? = nil
-    var dmParticipants: [DirectMessageParticipant]? = nil
+    var hasUnread: Bool
+    var dmParticipants: [DirectMessageParticipant]
 
-    enum Kind: String, Codable, Hashable, Sendable {
+    enum Kind: String, Hashable, Sendable {
         case channel
         case directMessage = "dm"
     }
 
-    enum Visibility: String, Codable, Hashable, Sendable {
+    enum Visibility: String, Hashable, Sendable {
         case org = "public"
         case restricted = "private"
     }
@@ -37,7 +35,7 @@ struct ChannelSummary: Codable, Hashable, Identifiable, Sendable {
     var isDirectMessage: Bool { kind == .directMessage }
 
     func directMessageParticipants(excluding currentUserID: String?) -> [DirectMessageParticipant] {
-        (dmParticipants ?? []).filter { participant in
+        dmParticipants.filter { participant in
             participant.type != .user || participant.id != currentUserID
         }
     }
@@ -48,8 +46,8 @@ struct ChannelSummary: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-struct DirectMessageParticipant: Codable, Hashable, Identifiable, Sendable {
-    enum Kind: String, Codable, Hashable, Sendable {
+struct DirectMessageParticipant: Hashable, Identifiable, Sendable {
+    enum Kind: String, Hashable, Sendable {
         case user
         case agent
     }

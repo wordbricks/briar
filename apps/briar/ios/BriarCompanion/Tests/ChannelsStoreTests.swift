@@ -206,7 +206,8 @@ final class ChannelsStoreTests: XCTestCase {
             createdAt: Date(timeIntervalSince1970: 1_775_260_800),
             updatedAt: Date(timeIntervalSince1970: 1_775_260_800),
             kind: .channel,
-            hasUnread: false
+            hasUnread: false,
+            dmParticipants: []
         )
     }
 
@@ -466,7 +467,15 @@ private final class ChannelConnectScenario: @unchecked Sendable {
         message.createdAt = Google_Protobuf_Timestamp(date: value.createdAt)
         message.updatedAt = Google_Protobuf_Timestamp(date: value.updatedAt)
         message.kind = value.kind == .channel ? .channel : .directMessage
-        if let hasUnread = value.hasUnread { message.hasUnread_p = hasUnread }
+        message.hasUnread_p = value.hasUnread
+        message.directMessageParticipants = value.dmParticipants.map { participant in
+            var item = BriarAPI_DirectMessageParticipant()
+            item.kind = participant.type == .user ? .user : .agent
+            item.id = participant.id
+            item.name = participant.name
+            if let image = participant.image { item.image = image }
+            return item
+        }
         return message
     }
 

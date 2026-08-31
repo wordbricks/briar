@@ -198,7 +198,6 @@ import type {
   ChannelVisibility,
 } from "./lib/channels-contract";
 import {
-  channelHasUnread,
   laterTimestamp,
   markChannelCatalogRead,
 } from "./lib/channel-unread";
@@ -515,7 +514,7 @@ export function App({
       const organizationId = briar.activeOrganizationId;
       if (!token || !organizationId) return;
       const channel = organizationChannels.find((item) => item.id === channelId);
-      if (!channel || !channelHasUnread(channel)) return;
+      if (!channel?.hasUnread) return;
       const lastReadAt = laterTimestamp(
         channel.lastMessageAt,
         new Date().toISOString(),
@@ -1820,7 +1819,7 @@ export function App({
     ? []
     : organizationChannels.filter((channel) => channel.kind === "dm");
   const unreadDirectMessageCount = organizationDirectMessages.filter(
-    channelHasUnread,
+    (channel) => channel.hasUnread,
   ).length;
   const visibleOrganizations = projectWindowProjectId
     ? projectWindowProject?.organizationId
@@ -3270,7 +3269,7 @@ export function App({
   for (const channel of isCommandPaletteOpen ? visibleOrganizationChannels : []) {
     const isCurrent =
       channel.id === activeChannelId && activePage === "channels";
-    const unread = channelHasUnread(channel);
+    const unread = channel.hasUnread;
     addPaletteItem({
       active: isCurrent,
       description: channel.topic?.trim() || `#${channel.slug}`,
@@ -3303,8 +3302,8 @@ export function App({
     );
     const isCurrent =
       directMessage.id === activeChannelId && activePage === "dms";
-    const unread = channelHasUnread(directMessage);
-    const participantNames = (directMessage.dmParticipants ?? [])
+    const unread = directMessage.hasUnread;
+    const participantNames = directMessage.dmParticipants
       .map((participant) => participant.name);
     addPaletteItem({
       active: isCurrent,
