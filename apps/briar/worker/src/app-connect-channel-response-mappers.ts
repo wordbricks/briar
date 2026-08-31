@@ -59,11 +59,13 @@ import {
   ChannelIssueProposalPayloadSchema,
   ChannelIssueProposalSchema,
   ChannelKind,
-  ChannelMessageAuthor_Kind,
+  ChannelMessageAgentAuthorSchema,
   ChannelMessageAuthorSchema,
   ChannelMessageReactionPersonSchema,
   ChannelMessageReactionSchema,
   ChannelMessageSchema,
+  ChannelMessageUserAuthorSchema,
+  ChannelMessageWebhookAuthorSchema,
   ChannelProposalSchema,
   ChannelSummarySchema,
   ChannelVisibility,
@@ -300,8 +302,8 @@ export const appChannelSummaryJson = (channel: ChannelSummary) => {
     ),
     lastMessagePreview: channel.lastMessagePreview ?? undefined,
     lastReadAt: optionalTimestamp(channel.lastReadAt, "channel last read"),
-    hasUnread: channel.hasUnread ?? false,
-    directMessageParticipants: (channel.dmParticipants ?? []).map(
+    hasUnread: channel.hasUnread,
+    directMessageParticipants: channel.dmParticipants.map(
       appDirectMessageParticipant,
     ),
     createdByUserId: channel.createdByUserId ?? undefined,
@@ -540,27 +542,39 @@ const appChannelMessageAuthor = (author: ChannelMessageAuthor) => {
   switch (author.type) {
     case "user":
       return create(ChannelMessageAuthorSchema, {
-        kind: ChannelMessageAuthor_Kind.USER,
-        id: author.id,
-        name: author.name,
-        email: author.email,
-        image: author.image ?? undefined,
+        author: {
+          case: "user",
+          value: create(ChannelMessageUserAuthorSchema, {
+            id: author.id,
+            name: author.name,
+            email: author.email,
+            image: author.image ?? undefined,
+          }),
+        },
       });
     case "agent":
       return create(ChannelMessageAuthorSchema, {
-        kind: ChannelMessageAuthor_Kind.AGENT,
-        id: author.id ?? undefined,
-        name: author.name,
-        image: author.image ?? undefined,
-        provider: author.provider === null
-          ? undefined
-          : enumValue(agentProvider, author.provider, "message author provider"),
+        author: {
+          case: "agent",
+          value: create(ChannelMessageAgentAuthorSchema, {
+            id: author.id ?? undefined,
+            name: author.name,
+            image: author.image ?? undefined,
+            provider: author.provider === null
+              ? undefined
+              : enumValue(agentProvider, author.provider, "message author provider"),
+          }),
+        },
       });
     case "webhook":
       return create(ChannelMessageAuthorSchema, {
-        kind: ChannelMessageAuthor_Kind.WEBHOOK,
-        id: author.id ?? undefined,
-        name: author.name,
+        author: {
+          case: "webhook",
+          value: create(ChannelMessageWebhookAuthorSchema, {
+            id: author.id ?? undefined,
+            name: author.name,
+          }),
+        },
       });
     default:
       return internal("Invalid channel message author kind");
@@ -712,7 +726,7 @@ export const appChannelMessage = (message: ChannelMessage) =>
     channelId: message.channelId,
     parentMessageId: message.parentMessageId ?? undefined,
     body: message.body,
-    blocks: (message.blocks ?? []).map(appMessageBlock),
+    blocks: message.blocks.map(appMessageBlock),
     author: appChannelMessageAuthor(message.author),
     mentionedUserIds: message.mentionedUserIds,
     mentionedAgentIds: message.mentionedAgentIds,
@@ -741,7 +755,7 @@ export const appChannelMessage = (message: ChannelMessage) =>
     ),
     replyCount: message.replyCount,
     lastReplyAt: optionalTimestamp(message.lastReplyAt, "channel last reply"),
-    replyAuthors: (message.replyAuthors ?? []).map(appChannelMessageAuthor),
+    replyAuthors: message.replyAuthors.map(appChannelMessageAuthor),
     document: message.document
       ? create(ChannelDocumentSchema, {
           messageId: message.document.messageId,
@@ -756,7 +770,7 @@ export const appChannelMessage = (message: ChannelMessage) =>
     skillExecutionProposal: message.skillExecutionProposal
       ? appAgentSkillExecutionProposal(message.skillExecutionProposal)
       : undefined,
-    subscribers: (message.subscribers ?? []).map(appChannelSubscriber),
+    subscribers: message.subscribers.map(appChannelSubscriber),
     createdAt: requiredTimestamp(message.createdAt, "channel message creation"),
     deletedAt: optionalTimestamp(message.deletedAt, "channel message deletion"),
   });
@@ -893,7 +907,7 @@ const appProjectAgentSession = (session: SkillApprovalSession) => {
   return create(ProjectAgentSessionSchema, {
     id: session.id,
     projectId: session.projectId,
-    dispatchGroupId: payload.dispatchGroupId || undefined,
+    dispatchGroupId: payload.dispatchGroupId,
     agentId: payload.agentId ?? undefined,
     agentName: payload.agentName ?? undefined,
     skillId: payload.skillId ?? undefined,

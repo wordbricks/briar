@@ -26,7 +26,7 @@ const agent: ProjectAgent = {
 
 const taskSession: AutoHuntSession = {
   id: "task-session",
-  dispatchGroupId: "",
+  dispatchGroupId: "task-session",
   projectId: "project-1",
   agentId: agent.id,
   sessionType: "task",
@@ -34,6 +34,7 @@ const taskSession: AutoHuntSession = {
   status: "completed",
   issues: [],
   startedAt: "2026-07-28T01:00:00.000Z",
+  updatedAt: "2026-07-28T01:01:00.000Z",
   completedAt: "2026-07-28T01:01:00.000Z",
   conversationId: "thread-1",
   workspaceRoot: "/repo",

@@ -16,7 +16,6 @@ export type {
 } from "./agent-skill-execution-proposal-repository";
 
 export {
-  channelApprovalTablesAvailable,
   isChannelApprovedIssue,
 } from "./channel-issue-approval-repository";
 

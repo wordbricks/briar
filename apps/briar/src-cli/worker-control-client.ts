@@ -1,4 +1,3 @@
-import { create } from "@bufbuild/protobuf";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import {
   DashboardWorker_State,
@@ -11,10 +10,6 @@ import {
   UnbindProjectExecutionWorkerRequest_Reason,
   type ExecutionWorkerUpdateRequestState,
 } from "@briar/contracts/gen/briar/app/v1/fleet_pb";
-import { AgentProvider as ProtoAgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
-import {
-  WorkerRuntimeAdvertisementSchema,
-} from "@briar/contracts/gen/briar/types/v1/worker_pb";
 import {
   WorkerControlService,
   WorkerReadinessState,
@@ -24,92 +19,13 @@ import {
   type AutoHuntWorkflowRequirement,
 } from "../src/lib/auto-hunt-contract";
 import {
-  agentProviders,
-  type AgentProvider,
-} from "../src/lib/agent-provider";
-import type { AgentProviderCapabilityCatalog } from "../src/lib/agent-provider-contract";
+  workerRuntimeToProto,
+  type WorkerRuntimeInput,
+} from "../src/lib/worker-runtime-proto";
 import { createAuthenticatedConnectClient } from "./connect-client";
-import type { WorkerProviderHealthMap } from "./provider-health";
 import type { WorkerLoopUpdateDirective } from "./worker";
 
-const protoAgentProvider = {
-  codex: ProtoAgentProvider.CODEX,
-  claude: ProtoAgentProvider.CLAUDE,
-  cursor: ProtoAgentProvider.CURSOR,
-  grok: ProtoAgentProvider.GROK,
-  agy: ProtoAgentProvider.AGY,
-  opencode: ProtoAgentProvider.OPENCODE,
-  openrouter: ProtoAgentProvider.OPENROUTER,
-} as const satisfies Record<AgentProvider, ProtoAgentProvider>;
-
-export type WorkerRuntimeInput = {
-  readonly agentProvider: AgentProvider;
-  readonly providers: readonly AgentProvider[];
-  readonly providerHealth: WorkerProviderHealthMap;
-  readonly providerCapabilities: AgentProviderCapabilityCatalog;
-  readonly versions: Readonly<Record<string, string>>;
-  readonly worktrees: boolean;
-  readonly remoteUpdates?: {
-    readonly supported: boolean;
-    readonly protocol?: number;
-  };
-  readonly workflowRequirements?: ReadonlyArray<{
-    readonly id: string;
-    readonly healthy: boolean;
-    readonly detail: string | null;
-  }>;
-};
-
-export const workerRuntimeToProto = (input: WorkerRuntimeInput) =>
-  create(WorkerRuntimeAdvertisementSchema, {
-    agentProvider: protoAgentProvider[input.agentProvider],
-    providers: input.providers.map((provider) => protoAgentProvider[provider]),
-    providerHealth: agentProviders.map((provider) => ({
-      provider: protoAgentProvider[provider],
-      installed: input.providerHealth[provider].installed,
-      authenticated: input.providerHealth[provider].authenticated,
-      healthy: input.providerHealth[provider].healthy,
-      reason: input.providerHealth[provider].reason ?? undefined,
-      usageExhausted: input.providerHealth[provider].usageExhausted ?? false,
-      maxUsedPercent: input.providerHealth[provider].maxUsedPercent ?? undefined,
-    })),
-    capabilities: {
-      providerCapabilities: agentProviders.map((provider) => {
-        const capability = input.providerCapabilities[provider];
-        return {
-          provider: protoAgentProvider[provider],
-          models: capability.models.map((model) => ({
-            id: model.id,
-            label: model.label,
-            isDefault: model.isDefault,
-            defaultEffortId: model.defaultEffortId ?? undefined,
-            efforts: (model.efforts ?? []).map((effort) => ({
-              id: effort.id,
-              label: effort.label,
-              description: effort.description ?? undefined,
-              isDefault: effort.isDefault,
-            })),
-          })),
-          defaultEfforts: (capability.defaultEfforts ?? []).map((effort) => ({
-            id: effort.id,
-            label: effort.label,
-            description: effort.description ?? undefined,
-            isDefault: effort.isDefault,
-          })),
-          allowCustomModels: capability.allowCustomModels,
-          error: capability.error ?? undefined,
-        };
-      }),
-      remoteUpdates: input.remoteUpdates,
-      worktrees: input.worktrees,
-      workflowRequirements: input.workflowRequirements?.map((requirement) => ({
-        id: requirement.id,
-        healthy: requirement.healthy,
-        detail: requirement.detail ?? undefined,
-      })) ?? [],
-    },
-    versions: { ...input.versions },
-  });
+export { workerRuntimeToProto, type WorkerRuntimeInput };
 
 const requiredTimestamp = (
   value: Parameters<typeof timestampDate>[0] | undefined,

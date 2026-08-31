@@ -48,15 +48,19 @@ const virtualMessage = (channelId: string, index: number): ChannelMessage => ({
     image: null,
   },
   body: `메시지 ${index}`,
+  blocks: [],
   mentionedUserIds: [],
   mentionedAgentIds: [],
   attachments: [],
   reactions: [],
   replyCount: 0,
   lastReplyAt: null,
+  replyAuthors: [],
+  subscribers: [],
   document: null,
   proposal: null,
   executionProposal: null,
+  skillExecutionProposal: null,
   createdAt: `2026-08-01T00:${String(index).padStart(2, "0")}:00.000Z`,
 });
 
@@ -82,21 +86,42 @@ const channelSummaryWire = (channel: ChannelSummary) => ({
   })),
 });
 
+const channelMessageAuthorWire = (author: ChannelMessage["author"]) => {
+  switch (author.type) {
+    case "user":
+      return {
+        user: {
+          id: author.id,
+          name: author.name,
+          email: author.email,
+          image: author.image ?? undefined,
+        },
+      };
+    case "agent":
+      return {
+        agent: {
+          id: author.id ?? undefined,
+          name: author.name,
+          image: author.image ?? undefined,
+        },
+      };
+    case "webhook":
+      return {
+        webhook: {
+          id: author.id ?? undefined,
+          name: author.name,
+        },
+      };
+  }
+};
+
 const channelMessageWire = (message: ChannelMessage) => ({
   id: message.id,
   channelId: message.channelId,
   parentMessageId: message.parentMessageId ?? undefined,
   body: message.body,
   blocks: [],
-  author: message.author.type === "user"
-    ? {
-        kind: 1,
-        id: message.author.id,
-        name: message.author.name,
-        email: message.author.email,
-        image: message.author.image ?? undefined,
-      }
-    : { kind: 3, name: message.author.name },
+  author: channelMessageAuthorWire(message.author),
   mentionedUserIds: message.mentionedUserIds,
   mentionedAgentIds: message.mentionedAgentIds,
   attachments: [],
@@ -299,15 +324,19 @@ describe("Channels", () => {
         image: null,
       },
       body: "Inbox에서 연 채널 메시지",
+      blocks: [],
       mentionedUserIds: [],
       mentionedAgentIds: [],
       attachments: [],
       reactions: [],
       replyCount: 0,
       lastReplyAt: null,
+      replyAuthors: [],
+      subscribers: [],
       document: null,
       proposal: null,
       executionProposal: null,
+      skillExecutionProposal: null,
       createdAt: "2026-08-15T00:00:00.000Z",
     };
     vi.stubGlobal("fetch", createChannelFetch((method) =>
@@ -380,15 +409,19 @@ describe("Channels", () => {
         image: null,
       },
       body: "스레드 원본",
+      blocks: [],
       mentionedUserIds: [],
       mentionedAgentIds: [],
       attachments: [],
       reactions: [],
       replyCount: 1,
       lastReplyAt: "2026-08-15T00:01:00.000Z",
+      replyAuthors: [],
+      subscribers: [],
       document: null,
       proposal: null,
       executionProposal: null,
+      skillExecutionProposal: null,
       createdAt: "2026-08-15T00:00:00.000Z",
     };
     const replyMessage: ChannelMessage = {

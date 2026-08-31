@@ -1064,10 +1064,7 @@ export async function registerExecutionWorker(
     credentialTokenHash: string;
     label: string;
     agentProvider: AgentProvider;
-    providers?: AgentProvider[];
-    providerHealth?: ProviderHealthMap;
-    providerCapabilities?: AgentProviderCapabilityCatalog;
-    capabilities?: Record<string, unknown>;
+    capabilities: Record<string, unknown>;
     versions: Record<string, string>;
     maxConcurrentSessions?: number;
     observedAt: string;
@@ -1102,12 +1099,8 @@ export async function registerExecutionWorker(
     throw new WorkerConflictError("Worker project must belong to its organization");
   }
 
-  const versions = JSON.stringify(input.versions ?? {});
-  const capabilities = JSON.stringify(input.capabilities ?? {
-    providers: input.providers ?? [],
-    providerHealth: input.providerHealth ?? {},
-    providerCapabilities: input.providerCapabilities,
-  });
+  const versions = JSON.stringify(input.versions);
+  const capabilities = JSON.stringify(input.capabilities);
   await db
     .prepare(
       `insert into briar_execution_worker_devices (
@@ -1226,10 +1219,7 @@ export async function bindExecutionWorkerProject(
     ownerUserId: string;
     deviceIdentityHash: string;
     agentProvider: AgentProvider;
-    providers?: AgentProvider[];
-    providerHealth?: ProviderHealthMap;
-    providerCapabilities?: AgentProviderCapabilityCatalog;
-    capabilities?: Record<string, unknown>;
+    capabilities: Record<string, unknown>;
     versions: Record<string, string>;
     observedAt: string;
   },
@@ -1286,12 +1276,8 @@ export async function bindExecutionWorkerProject(
       device.label,
       input.deviceIdentityHash,
       input.agentProvider,
-      JSON.stringify(input.versions ?? {}),
-      JSON.stringify(input.capabilities ?? {
-        providers: input.providers ?? [],
-        providerHealth: input.providerHealth ?? {},
-        providerCapabilities: input.providerCapabilities,
-      }),
+      JSON.stringify(input.versions),
+      JSON.stringify(input.capabilities),
       input.observedAt,
       input.observedAt,
       input.observedAt,
@@ -1313,11 +1299,11 @@ export async function recordWorkerHeartbeat(
   input: {
     workerId: string;
     knownBinding?: ExecutionWorkerRow;
-    versions?: Record<string, string>;
+    versions: Record<string, string>;
     acceptingWork?: boolean;
     readinessState?: ExecutionWorkerReadiness;
     readinessDetail?: string | null;
-    capabilities?: Record<string, unknown>;
+    capabilities: Record<string, unknown>;
     observedAt: string;
   },
 ) {
@@ -1338,20 +1324,6 @@ export async function recordWorkerHeartbeat(
   ) {
     throw new WorkerConflictError("Worker is not registered for this project");
   }
-  let nextCapabilities = input.capabilities;
-  if (nextCapabilities && nextCapabilities.providerCapabilities === undefined) {
-    try {
-      const previous = JSON.parse(binding.capabilities_json) as Record<string, unknown>;
-      if (previous.providerCapabilities !== undefined) {
-        nextCapabilities = {
-          ...nextCapabilities,
-          providerCapabilities: previous.providerCapabilities,
-        };
-      }
-    } catch {
-      // A malformed legacy payload has no capability state worth preserving.
-    }
-  }
   const [, workerUpdate] = await db.batch<ExecutionWorkerRow>([
     db
       .prepare(
@@ -1367,7 +1339,7 @@ export async function recordWorkerHeartbeat(
         `update briar_execution_workers
          set last_heartbeat_at = ?,
              updated_at = ?,
-             versions_json = coalesce(?, versions_json),
+             versions_json = ?,
              accepting_work = case when exists (
                select 1 from briar_managed_computers computer
                where computer.briar_device_id = ?
@@ -1384,7 +1356,7 @@ export async function recordWorkerHeartbeat(
                  and computer.state not in ('needs_setup', 'ready')
              ) then 'Managed computer is not accepting new work.'
                when ? is null then readiness_detail else ? end,
-             capabilities_json = coalesce(?, capabilities_json),
+             capabilities_json = ?,
              state = case when state = 'disabled' then 'disabled' else 'online' end
          where id = ? and project_id = ?
          returning *`,
@@ -1392,7 +1364,7 @@ export async function recordWorkerHeartbeat(
       .bind(
         input.observedAt,
         input.observedAt,
-        input.versions ? JSON.stringify(input.versions) : null,
+        JSON.stringify(input.versions),
         binding.device_id,
         input.acceptingWork === undefined ? null : input.acceptingWork ? 1 : 0,
         binding.device_id,
@@ -1400,7 +1372,7 @@ export async function recordWorkerHeartbeat(
         binding.device_id,
         input.readinessDetail === undefined ? null : 1,
         input.readinessDetail ?? null,
-        nextCapabilities ? JSON.stringify(nextCapabilities) : null,
+        JSON.stringify(input.capabilities),
         input.workerId,
         projectId,
       ),
@@ -2715,43 +2687,9 @@ export async function dispatchHuntRun(
     if (existing.id !== input.runId) {
       throw new WorkerConflictError("Dispatch request belongs to another run");
     }
-    const existingProvider = existing.requested_agent_provider ?? input.provider;
+    const existingProvider = existing.requested_agent_provider;
     if (!existingProvider) {
       throw new WorkerConflictError("Committed dispatch has no provider snapshot");
-    }
-    // A pre-atomic dispatcher may have committed the run update and failed
-    // before writing its audit event. An idempotent retry repairs that durable
-    // evidence; 0091 also finalizes a matching conversational approval in the
-    // same audit INSERT transaction.
-    const existingAudit = await db
-      .prepare(
-        `select action from briar_execution_audit_events
-         where project_id = ? and request_id = ?
-         limit 1`,
-      )
-      .bind(projectId, input.requestId)
-      .first<{ action: string }>();
-    if (!existingAudit) {
-      await auditExecutionEvent(db, {
-        organizationId,
-        projectId,
-        runId: existing.id,
-        workerId: existing.requested_worker_id,
-        agentId: existing.agent_id,
-        actorUserId: existing.requested_by_user_id ?? input.requestedByUserId,
-        action: "dispatched",
-        requestId: input.requestId,
-        detail: {
-          legacyActionUnknown: true,
-          recoveredFromRunState: true,
-          previousWorkerId: null,
-          provider: existingProvider,
-          model: existing.requested_agent_model,
-          effort: existing.requested_agent_effort,
-          dispatchMode: existing.dispatch_mode,
-        },
-        occurredAt: existing.dispatched_at,
-      });
     }
     return {
       runId: existing.id,

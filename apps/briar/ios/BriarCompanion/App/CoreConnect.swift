@@ -488,9 +488,7 @@ private extension AgentProviderCapability {
                 )
             },
             defaultEfforts: message.defaultEfforts.map(coreEffortCapability),
-            allowCustomModels: message.hasAllowCustomModels
-                ? message.allowCustomModels
-                : false,
+            allowCustomModels: message.allowCustomModels,
             error: message.hasError ? message.error : nil
         )
     }

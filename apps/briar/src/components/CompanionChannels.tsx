@@ -1225,7 +1225,7 @@ const companionChannelAuthorId = (author: ChannelMessage["author"]) =>
 const companionChannelReplyParticipants = (
   message: ChannelMessage,
 ): ConversationReplyParticipant[] =>
-  [message.author, ...(message.replyAuthors ?? [])]
+  [message.author, ...message.replyAuthors]
     .filter(
       (author, index, authors) =>
         authors.findIndex(

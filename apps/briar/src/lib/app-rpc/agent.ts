@@ -183,8 +183,8 @@ export const organizationAgentFromMessage = (
 });
 
 const sessionTypeFromProto = (
-  value: ProtoProjectAgentSessionType | undefined,
-): NonNullable<AutoHuntSession["sessionType"]> => {
+  value: ProtoProjectAgentSessionType,
+): AutoHuntSession["sessionType"] => {
   switch (value) {
     case ProtoProjectAgentSessionType.TASK:
       return "task";
@@ -275,7 +275,7 @@ export const projectAgentSessionFromMessage = (
 ): AutoHuntSession => ({
   id: session.id,
   projectId: session.projectId,
-  dispatchGroupId: session.dispatchGroupId ?? session.id,
+  dispatchGroupId: session.dispatchGroupId,
   agentId: session.agentId,
   agentName: session.agentName ?? null,
   skillId: session.skillId ?? null,
@@ -333,7 +333,7 @@ const sessionTypeToProto = {
   task: ProtoProjectAgentSessionType.TASK,
   dispatch: ProtoProjectAgentSessionType.DISPATCH,
 } as const satisfies Record<
-  NonNullable<AutoHuntSession["sessionType"]>,
+  AutoHuntSession["sessionType"],
   ProtoProjectAgentSessionType
 >;
 
@@ -1040,7 +1040,7 @@ export async function upsertProjectAgentSession(
       agentId: session.agentId,
       agentName: session.agentName ?? undefined,
       skillId: session.skillId ?? undefined,
-      sessionType: sessionTypeToProto[session.sessionType ?? "dispatch"],
+      sessionType: sessionTypeToProto[session.sessionType],
       trigger: session.trigger === undefined ? undefined : sessionTriggerToProto[session.trigger],
       scheduleId: session.scheduleId,
       scheduleRunId: session.scheduleRunId,
@@ -1075,10 +1075,7 @@ export async function upsertProjectAgentSession(
         type: sessionEventTypeToProto[event.type],
         occurredAt: timestampFromIso(event.occurredAt, "session.event.occurredAt"),
       })),
-      updatedAt: timestampFromIso(
-        session.updatedAt ?? session.completedAt ?? session.startedAt,
-        "session.updatedAt",
-      ),
+      updatedAt: timestampFromIso(session.updatedAt, "session.updatedAt"),
     },
     appCallOptions(token),
   );

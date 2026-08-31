@@ -34,6 +34,7 @@ import {
   transferIssue,
 } from "./db";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
+import { workerCapabilitiesFixture } from "./test-helpers/worker-runtime";
 import { RequestDecodeError } from "./request-schema";
 import {
   dispatchHuntRun,
@@ -239,6 +240,8 @@ describe("channel issue proposal approval route", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "proposals",
       name: "Proposals",
       topic: null,
@@ -305,11 +308,7 @@ describe("channel issue proposal approval route", () => {
       .update(`channel-${suffix}-credential`)
       .digest("hex"),
     agentProvider: "codex",
-    providers: ["codex"],
-    providerHealth: {
-      codex: { installed: true, authenticated: true, healthy: true },
-    },
-    providerCapabilities,
+    capabilities: workerCapabilitiesFixture({ providerCapabilities }),
     versions: { briar: "1.0.0" },
     observedAt,
   });

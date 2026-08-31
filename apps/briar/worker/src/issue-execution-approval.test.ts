@@ -46,6 +46,7 @@ import { HttpError } from "./http-response";
 import { createOrganizationAgent } from "./organization-agents";
 import { RequestDecodeError } from "./request-schema";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
+import { workerCapabilitiesFixture } from "./test-helpers/worker-runtime";
 import { completeIssueReplyApplication } from "./worker-reply-completion-application";
 import { completeIssueReplyInputFromProto } from "./worker-reply-completion-mappers";
 import {
@@ -276,11 +277,7 @@ describe("conversational issue execution approval", () => {
       credentialTokenHash: createHash("sha256")
         .update(executionWorkerCredential).digest("hex"),
       agentProvider: "codex",
-      providers: ["codex"],
-      providerHealth: {
-        codex: { installed: true, authenticated: true, healthy: true },
-      },
-      providerCapabilities,
+      capabilities: workerCapabilitiesFixture({ providerCapabilities }),
       versions: { briar: "1.0.0" },
       observedAt: new Date().toISOString(),
     });
@@ -904,6 +901,8 @@ describe("conversational issue execution approval", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: `execution-${sequence}`,
       name: `Execution ${sequence}`,
       topic: null,
@@ -1152,6 +1151,8 @@ describe("conversational issue execution approval", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: `create-execute-${sequence}`,
       name: "Create and execute",
       topic: null,
@@ -1562,11 +1563,7 @@ describe("conversational issue execution approval", () => {
       credentialTokenHash: createHash("sha256")
         .update(`committed-token-${sequence}`).digest("hex"),
       agentProvider: "codex",
-      providers: ["codex"],
-      providerHealth: {
-        codex: { installed: true, authenticated: true, healthy: true },
-      },
-      providerCapabilities,
+      capabilities: workerCapabilitiesFixture({ providerCapabilities }),
       versions: { briar: "1.0.0" },
       observedAt: new Date().toISOString(),
     });
@@ -1740,11 +1737,7 @@ describe("conversational issue execution approval", () => {
       credentialTokenHash: createHash("sha256")
         .update(`selected-token-${sequence}`).digest("hex"),
       agentProvider: "codex",
-      providers: ["codex"],
-      providerHealth: {
-        codex: { installed: true, authenticated: true, healthy: true },
-      },
-      providerCapabilities,
+      capabilities: workerCapabilitiesFixture({ providerCapabilities }),
       versions: { briar: "1.0.0" },
       observedAt: new Date().toISOString(),
     });

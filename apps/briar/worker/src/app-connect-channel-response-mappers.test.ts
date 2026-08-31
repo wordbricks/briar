@@ -127,6 +127,8 @@ describe("Channel domain to protobuf mapping", () => {
       },
     }));
 
+    expect(mapped.author?.author.case).toBe("agent");
+    expect(mapped.replyAuthors[0]?.author.case).toBe("webhook");
     expect(mapped.blocks.map((block) => block.value.case)).toEqual([
       "header",
       "section",

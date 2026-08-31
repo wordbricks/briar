@@ -236,22 +236,46 @@ extension ChannelMessage {
 
 extension ChannelMessage.Author {
     init(connectMessage message: BriarAPI_ChannelMessageAuthor) throws {
-        let type: Kind
-        switch message.kind {
-        case .user: type = .user
-        case .agent: type = .agent
-        case .webhook: type = .webhook
-        case .unspecified, .UNRECOGNIZED: throw MobileAPIError.invalidResponse
+        guard let author = message.author else {
+            throw MobileAPIError.invalidResponse
         }
-        self.init(
-            type: type,
-            name: message.name,
-            image: message.hasImage ? message.image : nil,
-            provider: message.hasProvider
-                ? try channelProvider(message.provider).rawValue
-                : nil,
-            id: message.hasID ? message.id : nil
-        )
+        switch author {
+        case .user(let user):
+            guard !user.id.isEmpty, !user.name.isEmpty, !user.email.isEmpty else {
+                throw MobileAPIError.invalidResponse
+            }
+            self.init(
+                type: .user,
+                name: user.name,
+                image: user.hasImage ? user.image : nil,
+                provider: nil,
+                id: user.id
+            )
+        case .agent(let agent):
+            guard !agent.name.isEmpty, !agent.hasID || !agent.id.isEmpty else {
+                throw MobileAPIError.invalidResponse
+            }
+            self.init(
+                type: .agent,
+                name: agent.name,
+                image: agent.hasImage ? agent.image : nil,
+                provider: agent.hasProvider
+                    ? try channelProvider(agent.provider).rawValue
+                    : nil,
+                id: agent.hasID ? agent.id : nil
+            )
+        case .webhook(let webhook):
+            guard !webhook.name.isEmpty, !webhook.hasID || !webhook.id.isEmpty else {
+                throw MobileAPIError.invalidResponse
+            }
+            self.init(
+                type: .webhook,
+                name: webhook.name,
+                image: nil,
+                provider: nil,
+                id: webhook.hasID ? webhook.id : nil
+            )
+        }
     }
 }
 

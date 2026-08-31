@@ -112,6 +112,10 @@ const message = (
   executionProposal: null,
   createdAt: "2026-08-01T01:00:00.000Z",
   ...input,
+  blocks: input.blocks ?? [],
+  replyAuthors: input.replyAuthors ?? [],
+  subscribers: input.subscribers ?? [],
+  skillExecutionProposal: input.skillExecutionProposal ?? null,
 });
 
 const agentReply = (

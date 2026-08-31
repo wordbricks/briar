@@ -1221,15 +1221,30 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         _ value: ChannelMessage.Author
     ) -> BriarAPI_ChannelMessageAuthor {
         var message = BriarAPI_ChannelMessageAuthor()
-        message.kind = switch value.type {
-        case .user: .user
-        case .agent: .agent
-        case .webhook: .webhook
+        switch value.type {
+        case .user:
+            guard let id = value.id else {
+                preconditionFailure("User channel authors require an id")
+            }
+            var author = BriarAPI_ChannelMessageUserAuthor()
+            author.id = id
+            author.name = value.name
+            author.email = "ui-test@briar.local"
+            if let image = value.image { author.image = image }
+            message.user = author
+        case .agent:
+            var author = BriarAPI_ChannelMessageAgentAuthor()
+            if let id = value.id { author.id = id }
+            author.name = value.name
+            if let image = value.image { author.image = image }
+            if let provider = value.provider { author.provider = providerMessage(provider) }
+            message.agent = author
+        case .webhook:
+            var author = BriarAPI_ChannelMessageWebhookAuthor()
+            if let id = value.id { author.id = id }
+            author.name = value.name
+            message.webhook = author
         }
-        if let id = value.id { message.id = id }
-        message.name = value.name
-        if let image = value.image { message.image = image }
-        if let provider = value.provider { message.provider = providerMessage(provider) }
         return message
     }
 

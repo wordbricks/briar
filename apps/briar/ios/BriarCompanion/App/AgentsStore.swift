@@ -566,7 +566,7 @@ final class AgentsStore: ObservableObject {
         let replacementRequestedWorkerID: String? = requestedWorkerId ?? session.requestedWorkerId
         let replacementWorkerID: String? = workerId ?? session.workerId
         let replacementEvents: [ProjectAgentSession.Event]? = events ?? session.events
-        let replacementUpdatedAt: Date? = updatedAt ?? session.updatedAt
+        let replacementUpdatedAt = updatedAt ?? session.updatedAt
 
         return ProjectAgentSession(
             id: session.id,

@@ -2,11 +2,13 @@ import { AgentProvider as ProtoAgentProvider } from "@briar/contracts/gen/briar/
 import type { WorkerRuntimeAdvertisement } from "@briar/contracts/gen/briar/types/v1/worker_pb";
 import {
   decodeAgentProviderCapabilityCatalog,
-  emptyAgentProviderCapabilityCatalog,
   type AgentEffortCapability,
   type AgentProviderCapabilityCatalog,
 } from "../../src/lib/agent-provider-contract";
-import type { AgentProvider } from "../../src/lib/agent-provider";
+import {
+  agentProviders,
+  type AgentProvider,
+} from "../../src/lib/agent-provider";
 import type { ProviderHealthMap } from "./workers";
 
 export class WorkerRuntimeValidationError extends Error {
@@ -60,11 +62,16 @@ const effortCapability = (value: {
 });
 
 const providerCapabilities = (
-  runtime: WorkerRuntimeAdvertisement,
+  capabilities: NonNullable<WorkerRuntimeAdvertisement["capabilities"]>,
 ): AgentProviderCapabilityCatalog => {
-  const catalog = emptyAgentProviderCapabilityCatalog();
+  if (capabilities.providerCapabilities.length !== agentProviders.length) {
+    invalid(
+      `Worker provider capabilities must contain exactly ${agentProviders.length} providers`,
+    );
+  }
+  const catalog: Record<string, unknown> = {};
   const seen = new Set<AgentProvider>();
-  for (const value of runtime.capabilities?.providerCapabilities ?? []) {
+  for (const value of capabilities.providerCapabilities) {
     const provider = workerAgentProviderFromProto(value.provider);
     if (seen.has(provider)) {
       invalid(`Provider capability is duplicated: ${provider}`);
@@ -80,16 +87,10 @@ const providerCapabilities = (
         ...(model.defaultEffortId !== undefined
           ? { defaultEffortId: model.defaultEffortId }
           : {}),
-        ...(model.efforts.length > 0
-          ? { efforts: model.efforts.map(effortCapability) }
-          : {}),
+        efforts: model.efforts.map(effortCapability),
       })),
-      ...(value.defaultEfforts.length > 0
-        ? { defaultEfforts: value.defaultEfforts.map(effortCapability) }
-        : {}),
-      ...(value.allowCustomModels !== undefined
-        ? { allowCustomModels: value.allowCustomModels }
-        : {}),
+      defaultEfforts: value.defaultEfforts.map(effortCapability),
+      allowCustomModels: value.allowCustomModels,
       error: value.error ?? null,
     };
   }
@@ -103,6 +104,11 @@ const providerCapabilities = (
 const providerHealth = (
   runtime: WorkerRuntimeAdvertisement,
 ): ProviderHealthMap => {
+  if (runtime.providerHealth.length !== agentProviders.length) {
+    invalid(
+      `Worker provider health must contain exactly ${agentProviders.length} providers`,
+    );
+  }
   const result: ProviderHealthMap = {};
   for (const value of runtime.providerHealth) {
     const provider = workerAgentProviderFromProto(value.provider);
@@ -152,22 +158,23 @@ export const workerRuntimeMetadataFromProto = (
       invalid("Worker version keys and values must contain at most 64 characters");
     }
   }
-  const capabilities = runtime.capabilities;
-  const capabilityCatalog = providerCapabilities(runtime);
+  const capabilities = runtime.capabilities ??
+    invalid("Worker capabilities are required");
+  const capabilityCatalog = providerCapabilities(capabilities);
   const health = providerHealth(runtime);
   const capabilityJson = {
     providers,
     providerHealth: health,
     providerCapabilities: capabilityCatalog,
-    worktrees: capabilities?.worktrees ?? false,
-    workflowRequirements: (capabilities?.workflowRequirements ?? []).map(
+    worktrees: capabilities.worktrees,
+    workflowRequirements: capabilities.workflowRequirements.map(
       (requirement) => ({
         id: requirement.id,
         healthy: requirement.healthy,
         detail: requirement.detail ?? null,
       }),
     ),
-    ...(capabilities?.remoteUpdates
+    ...(capabilities.remoteUpdates
       ? {
           remoteUpdates: {
             supported: capabilities.remoteUpdates.supported,

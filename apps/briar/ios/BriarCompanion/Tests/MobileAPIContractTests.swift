@@ -4,7 +4,7 @@ import XCTest
 @testable import BriarCompanion
 
 final class MobileAPIContractTests: XCTestCase {
-    func testProjectAgentSessionMapsDomainSemanticsAndPutDefaults() throws {
+    func testProjectAgentSessionMapsRequiredDomainSemanticsAndRejectsMalformedMessages() throws {
         let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
         let agentID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
         let startedAt = Date(timeIntervalSince1970: 1_786_310_400)
@@ -31,7 +31,9 @@ final class MobileAPIContractTests: XCTestCase {
         var message = BriarAPI_ProjectAgentSession()
         message.id = "session-17"
         message.projectID = projectID.uuidString.lowercased()
+        message.dispatchGroupID = "dispatch-17"
         message.agentID = agentID.uuidString.lowercased()
+        message.sessionType = .task
         message.trigger = .scheduled
         message.followUps = [followUp]
         message.status = .completed
@@ -40,24 +42,28 @@ final class MobileAPIContractTests: XCTestCase {
         message.completedAt = .init(date: completedAt)
         message.requestedByUserID = "user-17"
         message.events = [event]
+        message.updatedAt = .init(date: completedAt)
 
         let mapped = try ProjectAgentSession(connectMessage: message)
         XCTAssertEqual(mapped.projectId, projectID)
+        XCTAssertEqual(mapped.dispatchGroupId, "dispatch-17")
         XCTAssertEqual(mapped.agentId, agentID)
+        XCTAssertEqual(mapped.sessionType, .task)
         XCTAssertEqual(mapped.trigger, .scheduled)
         XCTAssertEqual(mapped.status, .completed)
         XCTAssertEqual(mapped.issues.first?.outcome, .completed)
         XCTAssertEqual(mapped.events?.first?.type, .completed)
         XCTAssertEqual(mapped.followUps?.first?.message, "Verify TestFlight")
         XCTAssertEqual(mapped.requestedByUserId, "user-17")
+        XCTAssertEqual(mapped.updatedAt, completedAt)
 
         let put = try mapped.putConnectRequest(projectID: projectID)
-        XCTAssertEqual(put.dispatchGroupID, mapped.id)
-        XCTAssertEqual(put.sessionType, .dispatch)
+        XCTAssertEqual(put.dispatchGroupID, "dispatch-17")
+        XCTAssertEqual(put.sessionType, .task)
         XCTAssertEqual(put.updatedAt.date, completedAt)
 
         var invalid = message
-        invalid.status = .UNRECOGNIZED(999)
+        invalid.clearUpdatedAt()
         XCTAssertThrowsError(try ProjectAgentSession(connectMessage: invalid))
     }
 

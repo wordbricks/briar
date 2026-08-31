@@ -764,8 +764,8 @@ export type ChannelMessage = {
   parentMessageId: string | null;
   author: ChannelMessageAuthor;
   body: string;
-  /** Slack-compatible presentation blocks; absent on older API responses. */
-  blocks?: ChannelMessageBlock[] | null;
+  /** Slack-compatible presentation blocks. */
+  blocks: ChannelMessageBlock[];
   mentionedUserIds: string[];
   mentionedAgentIds: string[];
   attachments: ChannelMessageAttachment[];
@@ -773,13 +773,12 @@ export type ChannelMessage = {
   replyCount: number;
   lastReplyAt: string | null;
   /** Up to three unique reply authors, ordered by their most recent reply. */
-  replyAuthors?: ChannelMessageAuthor[];
-  /** Present on thread roots. Older API responses omit the field. */
-  subscribers?: ChannelThreadSubscriber[];
+  replyAuthors: ChannelMessageAuthor[];
+  subscribers: ChannelThreadSubscriber[];
   document: ChannelMessageDocument | null;
   proposal: ChannelMessageProposal | null;
   executionProposal: ChannelExecutionProposal | null;
-  skillExecutionProposal?: ChannelSkillExecutionProposal | null;
+  skillExecutionProposal: ChannelSkillExecutionProposal | null;
   /** Client-only state while a newly sent message awaits its server response. */
   optimistic?: boolean;
   createdAt: string;
@@ -877,7 +876,7 @@ export function channelReplyContextMessageJson(
     document: message.document,
     proposal: message.proposal,
     executionProposal: message.executionProposal,
-    skillExecutionProposal: message.skillExecutionProposal ?? null,
+    skillExecutionProposal: message.skillExecutionProposal,
     createdAt: message.createdAt,
   };
 }

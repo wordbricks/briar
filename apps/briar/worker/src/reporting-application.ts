@@ -231,7 +231,6 @@ const projectUsageSummaryRun = (
   createdByName: run.created_by_name,
   agentId: run.agent_id,
   agentName: run.agent_name,
-  hasUsageLedger: Boolean(run.has_usage_ledger),
   usageRecords: totals.map((total) => ({
     uncachedInputTokens: null,
     cacheReadTokens: null,

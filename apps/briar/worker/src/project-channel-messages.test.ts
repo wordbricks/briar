@@ -92,6 +92,8 @@ describe("Project Agent channel message history", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "agent-history",
       name: "Agent history",
       topic: null,

@@ -264,7 +264,7 @@ final class AgentsInboxSystemTests: XCTestCase {
         let session = ProjectAgentSession(
             id: "approved-session",
             projectId: projectID,
-            dispatchGroupId: nil,
+            dispatchGroupId: "approved-session",
             agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
             agentName: "Project Agent",
             skillId: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
@@ -294,7 +294,7 @@ final class AgentsInboxSystemTests: XCTestCase {
         let otherSession = ProjectAgentSession(
             id: "other-session",
             projectId: otherProjectID,
-            dispatchGroupId: nil,
+            dispatchGroupId: "other-session",
             agentId: nil,
             sessionType: .task,
             trigger: .manual,
@@ -311,7 +311,7 @@ final class AgentsInboxSystemTests: XCTestCase {
             summary: nil,
             error: nil,
             events: nil,
-            updatedAt: nil
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
         store.materialize(otherSession)
         XCTAssertNil(store.session(id: otherSession.id))
@@ -1776,13 +1776,11 @@ private actor AgentExecutionScenario {
         var message = BriarAPI_ProjectAgentSession()
         message.id = session.id
         message.projectID = session.projectId.uuidString.lowercased()
-        if let value = session.dispatchGroupId { message.dispatchGroupID = value }
+        message.dispatchGroupID = session.dispatchGroupId
         if let value = session.agentId { message.agentID = value.uuidString.lowercased() }
         if let value = session.agentName { message.agentName = value }
         if let value = session.skillId { message.skillID = value.uuidString.lowercased() }
-        if let value = session.sessionType {
-            message.sessionType = value == .task ? .task : .dispatch
-        }
+        message.sessionType = session.sessionType == .task ? .task : .dispatch
         if let value = session.trigger {
             message.trigger = value == .manual ? .manual : .scheduled
         }
@@ -1820,7 +1818,7 @@ private actor AgentExecutionScenario {
             event.occurredAt = .init(date: value.occurredAt)
             return event
         }
-        if let value = session.updatedAt { message.updatedAt = .init(date: value) }
+        message.updatedAt = .init(date: session.updatedAt)
         message.archived = session.archived ?? false
         return message
     }

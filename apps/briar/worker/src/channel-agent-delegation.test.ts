@@ -171,6 +171,8 @@ describe("Organization Agent channel delegation", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "delegation",
       name: "Delegation",
       topic: null,

@@ -192,6 +192,7 @@ describe("channel message contract", () => {
         email: "jay@example.com",
         image: "data:image/png;base64,another-avatar",
       }],
+      subscribers: [],
       document: null,
       proposal: null,
       executionProposal: null,

@@ -1,4 +1,3 @@
-import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError, createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import {
@@ -12,9 +11,6 @@ import {
   ManagedComputerSetupService,
 } from "@briar/contracts/gen/briar/worker/v1/managed_computer_setup_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
-import {
-  WorkerRuntimeAdvertisementSchema,
-} from "@briar/contracts/gen/briar/types/v1/worker_pb";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
 import { sha256Hex } from "./managed-computer-crypto";
@@ -22,6 +18,7 @@ import {
   createIsolatedTestDatabase,
   type IsolatedTestDatabase,
 } from "./test-helpers/d1";
+import { workerRuntimeFixture } from "./test-helpers/worker-runtime";
 
 const organizationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const projectId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -173,12 +170,9 @@ describe("managed computer setup", () => {
     return (error as ConnectError).code;
   };
 
-  const runtime = (providers = [AgentProvider.CODEX, AgentProvider.CLAUDE]) =>
-    create(WorkerRuntimeAdvertisementSchema, {
-      agentProvider: AgentProvider.CODEX,
-      providers,
-      versions: { briar: "1.2.154", codex: "0.149.1" },
-    });
+  const runtime = (
+    providers: ReadonlyArray<"codex" | "claude"> = ["codex", "claude"],
+  ) => workerRuntimeFixture({ providers });
 
   it("allows the requester to issue a hashed, idempotent setup ticket", async () => {
     const developerRequestId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -375,7 +369,7 @@ describe("managed computer setup", () => {
       {
         managedComputerId,
         setupToken,
-        runtime: runtime([AgentProvider.CODEX]),
+        runtime: runtime(["codex"]),
       },
       options(machineToken),
     )).resolves.toMatchObject({

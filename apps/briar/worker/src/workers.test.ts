@@ -73,6 +73,10 @@ import {
   pendingExecutionWorkerUpdate,
 } from "./worker-update-repository";
 import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
+import {
+  workerCapabilitiesFixture,
+  workerRuntimeFixture,
+} from "./test-helpers/worker-runtime";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const secondProjectId = "22222222-2222-4222-8222-222222222222";
@@ -97,17 +101,11 @@ const workerControlClient = (env: Env, credential: string) => ({
   options: { headers: { authorization: `Bearer ${credential}` } },
 });
 
-const workerRuntime = (version = "1.2.95") => ({
-  agentProvider: AgentProvider.CODEX,
-  providers: [AgentProvider.CODEX],
-  providerHealth: [],
-  capabilities: {
-    providerCapabilities: [],
-    worktrees: true,
-    workflowRequirements: [],
-  },
-  versions: { briar: version },
-});
+const workerRuntime = (version = "1.2.95") => {
+  const runtime = workerRuntimeFixture();
+  runtime.versions.briar = version;
+  return runtime;
+};
 
 const instrumentD1 = (database: D1Database) => {
   const cost = { rowsRead: 0, rowsWritten: 0 };
@@ -471,15 +469,8 @@ describe("detached execution workers", () => {
       deviceIdentityHash: fingerprint(seed),
       credentialTokenHash,
       agentProvider: "codex",
-      providers: ["codex"],
-      providerHealth: {
-        codex: {
-          installed: true,
-          authenticated: true,
-          healthy: true,
-        },
-      },
-      providerCapabilities: {
+      capabilities: workerCapabilitiesFixture({
+        providerCapabilities: {
         codex: {
           models: [{
             id: "gpt-5.6-sol",
@@ -540,10 +531,20 @@ describe("detached execution workers", () => {
           allowCustomModels: true,
           error: null,
         },
-      },
+        },
+      }),
       versions: { briar: "1.1.1" },
       observedAt: atMinute(minute),
     });
+
+  const currentCapabilities = (registration: {
+    worker: { capabilities_json: string };
+  }) => JSON.parse(registration.worker.capabilities_json) as {
+    providers: string[];
+    providerHealth: Record<string, Record<string, unknown>>;
+    providerCapabilities: AgentProviderCapabilityCatalog;
+    [key: string]: unknown;
+  };
 
   it("detects only persisted Worker readiness transitions", () => {
     const ready = {
@@ -758,7 +759,7 @@ describe("detached execution workers", () => {
       workerId: worker.worker.id,
       versions: { briar: "1.2.69" },
       capabilities: {
-        providers: ["codex"],
+        ...currentCapabilities(worker),
         remoteUpdates: { supported: true, protocol: 1 },
       },
       observedAt: atMinute(2),
@@ -956,7 +957,7 @@ describe("detached execution workers", () => {
       acceptingWork: true,
       readinessState: "ready",
       capabilities: {
-        providers: ["codex"],
+        ...currentCapabilities(worker),
         remoteUpdates: { supported: true, protocol: 1 },
       },
       observedAt: atMinute(5),
@@ -1117,12 +1118,6 @@ describe("detached execution workers", () => {
       ).bind(projectId, requestId).first<number>("count"),
     ).resolves.toBe(1);
 
-    // Idempotent retries repair the split-write gap left by older dispatchers.
-    // The retry endpoint cannot choose the missing historical action.
-    await db.prepare(
-      `delete from briar_execution_audit_events
-       where project_id = ? and action = 'dispatched' and request_id = ?`,
-    ).bind(projectId, requestId).run();
     await expect(
       dispatchHuntRun(db, projectId, projectId, {
         runId,
@@ -1136,26 +1131,6 @@ describe("detached execution workers", () => {
         reassign: true,
       }),
     ).resolves.toMatchObject({ outcome: "already_dispatched" });
-    const repairedAudit = await db.prepare(
-      `select action, detail_json from briar_execution_audit_events
-       where project_id = ? and request_id = ?`,
-    ).bind(projectId, requestId).first<{
-      action: string;
-      detail_json: string;
-    }>();
-    expect(repairedAudit?.action).toBe("dispatched");
-    expect(JSON.parse(repairedAudit!.detail_json)).toMatchObject({
-      legacyActionUnknown: true,
-      recoveredFromRunState: true,
-    });
-    await dispatchHuntRun(db, projectId, projectId, {
-      runId,
-      provider: "codex",
-      workerId: selected.worker.id,
-      requestedByUserId: "member",
-      requestId,
-      occurredAt: atMinute(2),
-    });
     await expect(
       db.prepare(
         `select count(*) as count from briar_execution_audit_events
@@ -1609,6 +1584,10 @@ describe("detached execution workers", () => {
       deviceIdentityHash: fingerprint("a"),
       credentialTokenHash: fingerprint("rotated-token"),
       agentProvider: "claude",
+      capabilities: workerCapabilitiesFixture({
+        agentProvider: "claude",
+        providers: ["claude"],
+      }),
       versions: { briar: "1.2.0" },
       observedAt: atMinute(5),
     });
@@ -1672,6 +1651,7 @@ describe("detached execution workers", () => {
       ownerUserId: "owner",
       deviceIdentityHash: fingerprint("shared"),
       agentProvider: "codex",
+      capabilities: workerCapabilitiesFixture(),
       versions: { briar: "1.1.2" },
       observedAt: atMinute(2),
     });
@@ -1711,6 +1691,7 @@ describe("detached execution workers", () => {
 
     await recordWorkerHeartbeat(db, projectId, {
       workerId: newest.worker.id,
+      versions: { briar: "1.1.1" },
       capabilities: {
         providerHealth: {
           codex: { healthy: false },
@@ -1723,6 +1704,7 @@ describe("detached execution workers", () => {
     });
     await recordWorkerHeartbeat(db, projectId, {
       workerId: older.worker.id,
+      versions: { briar: "1.1.1" },
       capabilities: {
         providerHealth: {
           codex: { healthy: true },
@@ -1734,11 +1716,13 @@ describe("detached execution workers", () => {
     });
     await recordWorkerHeartbeat(db, projectId, {
       workerId: legacy.worker.id,
+      versions: { briar: "1.1.1" },
       capabilities: { providers: ["claude"] },
       observedAt: atMinute(1),
     });
     await recordWorkerHeartbeat(db, projectId, {
       workerId: malformed.worker.id,
+      versions: { briar: "1.1.1" },
       capabilities: {
         providerHealth: {
           codex: "healthy",
@@ -1827,7 +1811,9 @@ describe("detached execution workers", () => {
 
     await recordWorkerHeartbeat(db, projectId, {
       workerId: worker.worker.id,
+      versions: { briar: "1.1.1" },
       readinessState: "busy",
+      capabilities: currentCapabilities(worker),
       observedAt: atMinute(3),
     });
     await expect(
@@ -1840,6 +1826,7 @@ describe("detached execution workers", () => {
 
   it("distinguishes exhausted Agent usage from an unavailable Worker", async () => {
     const worker = await register("channel-reply-usage", 1);
+    const capabilities = currentCapabilities(worker);
     const reply = {
       organizationId: projectId,
       projectId,
@@ -1848,23 +1835,21 @@ describe("detached execution workers", () => {
       effort: "high" as const,
       observedAt: atMinute(2),
     };
+    capabilities.providerHealth.grok = {
+      installed: true,
+      authenticated: true,
+      healthy: false,
+      reason: "usage_exhausted",
+      usageExhausted: true,
+      maxUsedPercent: 100,
+    };
 
     await recordWorkerHeartbeat(db, projectId, {
       workerId: worker.worker.id,
+      versions: { briar: "1.1.1" },
       acceptingWork: false,
       readinessState: "needs_attention",
-      capabilities: {
-        providerHealth: {
-          grok: {
-            installed: true,
-            authenticated: true,
-            healthy: false,
-            reason: "usage_exhausted",
-            usageExhausted: true,
-            maxUsedPercent: 100,
-          },
-        },
-      },
+      capabilities,
       observedAt: atMinute(2),
     });
     await expect(channelReplyWorkerAvailability(db, reply))
@@ -1872,19 +1857,17 @@ describe("detached execution workers", () => {
     await expect(hasAvailableChannelReplyWorker(db, reply))
       .resolves.toBe(false);
 
+    capabilities.providerHealth.grok = {
+      installed: true,
+      authenticated: true,
+      healthy: true,
+    };
     await recordWorkerHeartbeat(db, projectId, {
       workerId: worker.worker.id,
+      versions: { briar: "1.1.1" },
       acceptingWork: true,
       readinessState: "ready",
-      capabilities: {
-        providerHealth: {
-          grok: {
-            installed: true,
-            authenticated: true,
-            healthy: true,
-          },
-        },
-      },
+      capabilities,
       observedAt: atMinute(3),
     });
     await expect(channelReplyWorkerAvailability(db, {
@@ -1892,20 +1875,18 @@ describe("detached execution workers", () => {
       observedAt: atMinute(3),
     })).resolves.toBe("available");
 
+    capabilities.providerHealth.grok = {
+      installed: true,
+      authenticated: false,
+      healthy: false,
+      reason: "not_authenticated",
+    };
     await recordWorkerHeartbeat(db, projectId, {
       workerId: worker.worker.id,
+      versions: { briar: "1.1.1" },
       acceptingWork: false,
       readinessState: "needs_attention",
-      capabilities: {
-        providerHealth: {
-          grok: {
-            installed: true,
-            authenticated: false,
-            healthy: false,
-            reason: "not_authenticated",
-          },
-        },
-      },
+      capabilities,
       observedAt: atMinute(4),
     });
     await expect(channelReplyWorkerAvailability(db, {
@@ -1922,6 +1903,7 @@ describe("detached execution workers", () => {
       ownerUserId: "owner",
       deviceIdentityHash: fingerprint("rename"),
       agentProvider: "codex",
+      capabilities: workerCapabilitiesFixture(),
       versions: {},
       observedAt: atMinute(2),
     });
@@ -1956,6 +1938,10 @@ describe("detached execution workers", () => {
       deviceIdentityHash: fingerprint("shared"),
       credentialTokenHash: fingerprint("shared-rotated"),
       agentProvider: "grok",
+      capabilities: workerCapabilitiesFixture({
+        agentProvider: "grok",
+        providers: ["grok"],
+      }),
       versions: { briar: "1.2.0" },
       observedAt: atMinute(4),
     });
@@ -1989,6 +1975,7 @@ describe("detached execution workers", () => {
       deviceIdentityHash: fingerprint("capacity-shared"),
       credentialTokenHash: fingerprint("capacity-shared-token"),
       agentProvider: "codex",
+      capabilities: workerCapabilitiesFixture(),
       versions: {},
       maxConcurrentSessions: 2,
       observedAt: atMinute(2),
@@ -2049,6 +2036,7 @@ describe("detached execution workers", () => {
       deviceIdentityHash: fingerprint("partially-shared"),
       credentialTokenHash: fingerprint("partially-shared-token"),
       agentProvider: "codex",
+      capabilities: workerCapabilitiesFixture(),
       versions: {},
       observedAt: atMinute(2),
     });
@@ -2169,6 +2157,7 @@ describe("detached execution workers", () => {
         deviceIdentityHash: fingerprint("owned"),
         credentialTokenHash: fingerprint("member-token"),
         agentProvider: "codex",
+        capabilities: workerCapabilitiesFixture(),
         versions: {},
         observedAt: atMinute(3),
       }),
@@ -2185,6 +2174,7 @@ describe("detached execution workers", () => {
       deviceIdentityHash: fingerprint("departing"),
       credentialTokenHash: fingerprint("departing-token"),
       agentProvider: "codex",
+      capabilities: workerCapabilitiesFixture(),
       versions: {},
       observedAt: atMinute(2),
     });
@@ -2223,6 +2213,7 @@ describe("detached execution workers", () => {
         deviceIdentityHash: fingerprint("b"),
         credentialTokenHash: fingerprint("token-b"),
         agentProvider: "codex",
+        capabilities: workerCapabilitiesFixture(),
         versions: {},
         observedAt: atMinute(1),
       }),
@@ -2237,6 +2228,7 @@ describe("detached execution workers", () => {
         deviceIdentityHash: "not-a-digest",
         credentialTokenHash: fingerprint("token-b"),
         agentProvider: "codex",
+        capabilities: workerCapabilitiesFixture(),
         versions: {},
         observedAt: atMinute(1),
       }),
@@ -2251,6 +2243,7 @@ describe("detached execution workers", () => {
         deviceIdentityHash: fingerprint("b"),
         credentialTokenHash: "not-a-digest",
         agentProvider: "codex",
+        capabilities: workerCapabilitiesFixture(),
         versions: {},
         observedAt: atMinute(1),
       }),
@@ -2289,6 +2282,7 @@ describe("detached execution workers", () => {
       ownerUserId: "owner",
       deviceIdentityHash: fingerprint("deleted"),
       agentProvider: "codex",
+      capabilities: workerCapabilitiesFixture(),
       versions: { briar: "1.2.69" },
       observedAt: atMinute(2),
     });
@@ -2457,6 +2451,8 @@ describe("detached execution workers", () => {
     );
     await recordWorkerHeartbeat(db, projectId, {
       workerId: "worker-c",
+      versions: { briar: "1.1.1" },
+      capabilities: workerCapabilitiesFixture(),
       observedAt: atMinute(10),
     });
     expect((await listExecutionWorkers(db, projectId, atMinute(11)))[0].state).toBe(
@@ -2465,6 +2461,8 @@ describe("detached execution workers", () => {
     await expect(
       recordWorkerHeartbeat(db, projectId, {
         workerId: "worker-missing",
+        versions: { briar: "1.1.1" },
+        capabilities: workerCapabilitiesFixture(),
         observedAt: atMinute(11),
       }),
     ).rejects.toBeInstanceOf(WorkerConflictError);
@@ -2485,6 +2483,7 @@ describe("detached execution workers", () => {
     };
     await recordWorkerHeartbeat(db, projectId, {
       workerId: first.worker.id,
+      versions: { briar: "1.1.1" },
       capabilities: capabilities(first, [
         { id: "remote-zeta", label: "Remote Zeta" },
         { id: "remote-shared", label: "Remote Shared" },
@@ -2493,6 +2492,7 @@ describe("detached execution workers", () => {
     });
     await recordWorkerHeartbeat(db, projectId, {
       workerId: second.worker.id,
+      versions: { briar: "1.1.1" },
       capabilities: capabilities(second, [
         { id: "remote-alpha", label: "Remote Alpha" },
         { id: "remote-shared", label: "Remote Shared" },
@@ -2533,6 +2533,7 @@ describe("detached execution workers", () => {
 
     await recordWorkerHeartbeat(db, projectId, {
       workerId: second.worker.id,
+      versions: { briar: "1.1.1" },
       capabilities: capabilities(second, [
         { id: "remote-after-heartbeat", label: "Remote After Heartbeat" },
       ]),
@@ -2587,6 +2588,8 @@ describe("detached execution workers", () => {
       .run();
     const row = await recordWorkerHeartbeat(db, projectId, {
       workerId: "worker-d",
+      versions: { briar: "1.1.1" },
+      capabilities: workerCapabilitiesFixture(),
       observedAt: atMinute(3),
     });
     expect(row.state).toBe("disabled");
@@ -2674,21 +2677,27 @@ describe("detached execution workers", () => {
 
   it("dispatches and claims Agents through every provider advertised by a Worker", async () => {
     const registered = await register("multi-provider");
+    const capabilities = currentCapabilities(registered);
+    capabilities.providers = [
+      "codex",
+      "claude",
+      "cursor",
+      "grok",
+      "agy",
+      "opencode",
+      "openrouter",
+    ];
+    for (const provider of capabilities.providers) {
+      capabilities.providerHealth[provider] = {
+        installed: true,
+        authenticated: true,
+        healthy: true,
+      };
+    }
     await recordWorkerHeartbeat(db, projectId, {
       workerId: registered.worker.id,
-      capabilities: {
-        providers: ["codex", "claude", "cursor", "grok", "agy", "opencode", "openrouter"],
-        providerHealth: {
-          codex: { installed: true, authenticated: true, healthy: true },
-          claude: { installed: true, authenticated: true, healthy: true },
-          cursor: { installed: true, authenticated: true, healthy: true },
-          grok: { installed: true, authenticated: true, healthy: true },
-          agy: { installed: true, authenticated: true, healthy: true },
-          opencode: { installed: true, authenticated: true, healthy: true },
-          openrouter: { installed: true, authenticated: true, healthy: true },
-        },
-        worktrees: true,
-      },
+      versions: { briar: "1.1.1" },
+      capabilities,
       observedAt: atMinute(2),
     });
     const claudeAgentId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -2755,17 +2764,22 @@ describe("detached execution workers", () => {
 
   it("routes a logical Agent through the explicitly selected provider", async () => {
     const registered = await register("provider-override");
+    const capabilities = currentCapabilities(registered);
+    capabilities.providers = ["codex", "claude"];
+    capabilities.providerHealth.claude = {
+      installed: true,
+      authenticated: true,
+      healthy: true,
+    };
+    capabilities.providerHealth.grok = {
+      installed: true,
+      authenticated: false,
+      healthy: false,
+    };
     await recordWorkerHeartbeat(db, projectId, {
       workerId: registered.worker.id,
-      capabilities: {
-        providers: ["codex", "claude"],
-        providerHealth: {
-          codex: { installed: true, authenticated: true, healthy: true },
-          claude: { installed: true, authenticated: true, healthy: true },
-          grok: { installed: true, authenticated: false, healthy: false },
-        },
-        worktrees: true,
-      },
+      versions: { briar: "1.1.1" },
+      capabilities,
       observedAt: atMinute(2),
     });
     const agent = await db
@@ -2839,17 +2853,19 @@ describe("detached execution workers", () => {
 
   it("claims explicit dispatch snapshots ahead of pre-existing or mutated preferences", async () => {
     const registered = await register("dispatch-snapshot");
+    const capabilities = currentCapabilities(registered);
+    capabilities.providers = ["codex", "claude", "grok"];
+    for (const provider of capabilities.providers) {
+      capabilities.providerHealth[provider] = {
+        installed: true,
+        authenticated: true,
+        healthy: true,
+      };
+    }
     await recordWorkerHeartbeat(db, projectId, {
       workerId: registered.worker.id,
-      capabilities: {
-        providers: ["codex", "claude", "grok"],
-        providerHealth: {
-          codex: { installed: true, authenticated: true, healthy: true },
-          claude: { installed: true, authenticated: true, healthy: true },
-          grok: { installed: true, authenticated: true, healthy: true },
-        },
-        worktrees: true,
-      },
+      versions: { briar: "1.1.1" },
+      capabilities,
       observedAt: atMinute(2),
     });
     const runIds = await Promise.all([

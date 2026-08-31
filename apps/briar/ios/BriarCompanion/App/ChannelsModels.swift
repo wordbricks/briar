@@ -323,7 +323,7 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
     let reactions: [ChannelMessageReaction]
     let replyCount: Int
     let lastReplyAt: Date?
-    /// Up to three unique reply authors, newest first. Older payloads omit it.
+    /// Up to three unique reply authors, newest first.
     let replyAuthors: [Author]
     let document: Document?
     var proposal: Proposal?

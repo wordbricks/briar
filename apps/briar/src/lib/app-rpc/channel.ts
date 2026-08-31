@@ -8,7 +8,6 @@ import {
 import {
   ChannelKind as ProtoChannelKind,
   ChannelMemberRole as ProtoChannelMemberRole,
-  ChannelMessageAuthor_Kind as ProtoChannelMessageAuthorKind,
   ChannelService,
   ChannelVisibility as ProtoChannelVisibility,
   DeclineChannelProposalResponse_Outcome as ProtoDeclineOutcome,
@@ -563,31 +562,44 @@ export const agentSkillExecutionProposalFromMessage = (
 const channelMessageAuthorFromMessage = (
   value: ChannelMessageAuthorMessage,
 ): ChannelMessageAuthor => {
-  switch (value.kind) {
-    case ProtoChannelMessageAuthorKind.USER:
+  const required = (fieldValue: string, field: string): string => {
+    if (fieldValue.trim().length === 0) {
+      throw new Error(`Channel message author ${field} is missing`);
+    }
+    return fieldValue;
+  };
+  const optional = (
+    fieldValue: string | undefined,
+    field: string,
+  ): string | null => fieldValue === undefined
+    ? null
+    : required(fieldValue, field);
+
+  switch (value.author.case) {
+    case "user":
       return {
         type: "user",
-        id: value.id ?? "",
-        name: value.name,
-        email: value.email ?? "",
-        image: value.image ?? null,
+        id: required(value.author.value.id, "user id"),
+        name: required(value.author.value.name, "user name"),
+        email: required(value.author.value.email, "user email"),
+        image: value.author.value.image ?? null,
       };
-    case ProtoChannelMessageAuthorKind.AGENT:
+    case "agent":
       return {
         type: "agent",
-        id: value.id ?? null,
-        name: value.name,
-        provider: optionalAgentProviderFromProto(value.provider),
-        image: value.image ?? null,
+        id: optional(value.author.value.id, "agent id"),
+        name: required(value.author.value.name, "agent name"),
+        provider: optionalAgentProviderFromProto(value.author.value.provider),
+        image: value.author.value.image ?? null,
       };
-    case ProtoChannelMessageAuthorKind.WEBHOOK:
+    case "webhook":
       return {
         type: "webhook",
-        id: value.id ?? null,
-        name: value.name,
+        id: optional(value.author.value.id, "webhook id"),
+        name: required(value.author.value.name, "webhook name"),
       };
-    default:
-      throw new Error(`Unknown channel message author kind: ${value.kind}`);
+    case undefined:
+      throw new Error("Channel message author is missing");
   }
 };
 

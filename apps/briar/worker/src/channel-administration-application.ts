@@ -92,6 +92,8 @@ export async function createChannelApplication(
     channel = await createChannel(input.db, {
       id: channelId,
       organizationId: input.organizationId,
+      kind: "channel",
+      dmKey: null,
       slug,
       name: input.command.name,
       topic: input.command.topic,

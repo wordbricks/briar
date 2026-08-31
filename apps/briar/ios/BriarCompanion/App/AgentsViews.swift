@@ -675,9 +675,7 @@ struct SessionDetailView: View {
                 if let trigger = session.trigger {
                     LabeledContent(L10n.text("트리거"), value: trigger.rawValue)
                 }
-                if let type = session.sessionType {
-                    LabeledContent(L10n.text("유형"), value: type.rawValue)
-                }
+                LabeledContent(L10n.text("유형"), value: session.sessionType.rawValue)
                 if let workerLabel = Self.workerLabel(
                     for: session,
                     workers: snapshot?.workers ?? []

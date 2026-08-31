@@ -34,11 +34,11 @@ const projectAgentSessionSummaryJson = (row: ProjectAgentSessionRow) => {
       })
     : [];
   return JSON.stringify({
-    dispatchGroupId: payload.dispatchGroupId ?? row.id,
+    dispatchGroupId: payload.dispatchGroupId,
     agentId: payload.agentId ?? row.agent_id,
     agentName: payload.agentName ?? null,
     skillId: payload.skillId ?? null,
-    sessionType: payload.sessionType ?? row.session_type,
+    sessionType: payload.sessionType,
     trigger: payload.trigger ?? null,
     scheduleId: payload.scheduleId ?? null,
     scheduleRunId: payload.scheduleRunId ?? null,
@@ -57,7 +57,7 @@ const projectAgentSessionSummaryJson = (row: ProjectAgentSessionRow) => {
     ),
     requestedWorkerId: payload.requestedWorkerId ?? null,
     workerId: payload.workerId ?? null,
-    updatedAt: payload.updatedAt ?? row.updated_at,
+    updatedAt: payload.updatedAt,
   });
 };
 

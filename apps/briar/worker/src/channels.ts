@@ -649,7 +649,17 @@ export const channelReplyJson = (
   updatedAt: row.updated_at,
 });
 
-const channelMessageAuthorJson = (
+const requiredChannelMessageAuthorField = (
+  value: string | null,
+  field: string,
+): string => {
+  if (value === null || value.trim().length === 0) {
+    throw new Error(`Channel message author ${field} is missing`);
+  }
+  return value;
+};
+
+export const channelMessageAuthorJson = (
   row: Pick<
     ChannelMessageRow,
     | "author_user_id"
@@ -663,28 +673,44 @@ const channelMessageAuthorJson = (
     | "author_webhook_id"
     | "author_webhook_name"
   >,
-) =>
-  row.author_webhook_name
-    ? {
-        type: "webhook" as const,
-        id: row.author_webhook_id,
-        name: row.author_webhook_name,
-      }
-    : row.author_agent_name
-    ? {
-        type: "agent" as const,
-        id: row.author_agent_id,
-        name: row.author_agent_name,
-        provider: row.author_agent_provider,
-        image: row.author_agent_image,
-      }
-    : {
-        type: "user" as const,
-        id: row.author_user_id ?? "",
-        name: row.author_name ?? "",
-        email: row.author_email ?? "",
-        image: row.author_image,
-      };
+): ChannelMessage["author"] => {
+  const variantCount = Number(row.author_user_id !== null) +
+    Number(row.author_agent_name !== null) +
+    Number(row.author_webhook_name !== null);
+  if (variantCount !== 1) {
+    throw new Error("Channel message must have exactly one author variant");
+  }
+
+  if (row.author_webhook_name !== null) {
+    return {
+      type: "webhook" as const,
+      id: row.author_webhook_id,
+      name: requiredChannelMessageAuthorField(
+        row.author_webhook_name,
+        "webhook name",
+      ),
+    };
+  }
+  if (row.author_agent_name !== null) {
+    return {
+      type: "agent" as const,
+      id: row.author_agent_id,
+      name: requiredChannelMessageAuthorField(
+        row.author_agent_name,
+        "agent name",
+      ),
+      provider: row.author_agent_provider,
+      image: row.author_agent_image,
+    };
+  }
+  return {
+    type: "user",
+    id: requiredChannelMessageAuthorField(row.author_user_id, "user id"),
+    name: requiredChannelMessageAuthorField(row.author_name, "user name"),
+    email: requiredChannelMessageAuthorField(row.author_email, "user email"),
+    image: row.author_image,
+  };
+};
 
 export const channelMessageJson = (
   row: ChannelMessageRow,
@@ -701,7 +727,7 @@ export const channelMessageJson = (
   body: row.deleted_at ? "[deleted]" : row.body,
   blocks: !row.deleted_at && row.blocks_json
     ? JSON.parse(row.blocks_json) as ChannelMessageBlock[]
-    : null,
+    : [],
   mentionedUserIds: row.deleted_at ? [] : mentions.users,
   mentionedAgentIds: row.deleted_at ? [] : mentions.agents,
   attachments: row.deleted_at ? [] : attachments,
@@ -948,8 +974,6 @@ export async function createChannel(
   input: {
     id: string;
     organizationId: string;
-    kind?: ChannelKind;
-    dmKey?: string | null;
     slug: string;
     name: string;
     topic: string | null;
@@ -959,43 +983,15 @@ export async function createChannel(
     memberIds?: string[];
     agentIds?: string[];
     createdAt: string;
-  },
+  } & (
+    | { kind: "channel"; dmKey: null }
+    | { kind: "dm"; dmKey: string | null }
+  ),
 ) {
   const memberIds = [...new Set(input.memberIds ?? [])].filter(
     (userId) => userId !== input.createdByUserId,
   );
   const agentIds = [...new Set(input.agentIds ?? [])];
-  const supportsDirectMessages = Boolean(await db.prepare(
-    `select 1 as available from pragma_table_info('briar_channels')
-     where name = 'kind'`,
-  ).first<{ available: number }>());
-  if (!supportsDirectMessages) {
-    await db.batch([
-      db.prepare(
-        `insert into briar_channels (
-           id, organization_id, slug, name, topic, visibility,
-           default_project_id, created_by_user_id, created_at, updated_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).bind(
-        input.id,
-        input.organizationId,
-        input.slug,
-        input.name,
-        input.topic,
-        input.visibility,
-        input.defaultProjectId,
-        input.createdByUserId,
-        input.createdAt,
-        input.createdAt,
-      ),
-      db.prepare(
-        `insert into briar_channel_members (
-           channel_id, user_id, role, created_at
-         ) values (?, ?, 'owner', ?)`,
-      ).bind(input.id, input.createdByUserId, input.createdAt),
-    ]);
-    return null;
-  }
   await db.batch([
     db
       .prepare(
@@ -1007,8 +1003,8 @@ export async function createChannel(
       .bind(
         input.id,
         input.organizationId,
-        input.kind ?? "channel",
-        input.dmKey ?? null,
+        input.kind,
+        input.dmKey,
         input.slug,
         input.name,
         input.topic,

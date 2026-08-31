@@ -482,20 +482,31 @@ message ChannelWebhook {
   google.protobuf.Timestamp updated_at = 7;
 }
 
-message ChannelMessageAuthor {
-  enum Kind {
-    KIND_UNSPECIFIED = 0;
-    KIND_USER = 1;
-    KIND_AGENT = 2;
-    KIND_WEBHOOK = 3;
-  }
+message ChannelMessageUserAuthor {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  optional string image = 4;
+}
 
-  Kind kind = 1;
-  optional string id = 2;
-  string name = 3;
-  optional string email = 4;
-  optional string image = 5;
-  optional briar.types.v1.AgentProvider provider = 6;
+message ChannelMessageAgentAuthor {
+  optional string id = 1;
+  string name = 2;
+  optional string image = 3;
+  optional briar.types.v1.AgentProvider provider = 4;
+}
+
+message ChannelMessageWebhookAuthor {
+  optional string id = 1;
+  string name = 2;
+}
+
+message ChannelMessageAuthor {
+  oneof author {
+    ChannelMessageUserAuthor user = 1;
+    ChannelMessageAgentAuthor agent = 2;
+    ChannelMessageWebhookAuthor webhook = 3;
+  }
 }
 
 message ChannelMessageReactionPerson {

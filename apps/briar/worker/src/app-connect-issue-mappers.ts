@@ -1014,7 +1014,7 @@ const appProjectAgentSession = (session: ProjectAgentSessionResult) => {
   return create(ProjectAgentSessionSchema, {
     id: decoded.id,
     projectId: decoded.projectId,
-    dispatchGroupId: decoded.dispatchGroupId || undefined,
+    dispatchGroupId: decoded.dispatchGroupId,
     agentId: decoded.agentId ?? undefined,
     agentName: decoded.agentName ?? undefined,
     skillId: decoded.skillId ?? undefined,

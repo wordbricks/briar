@@ -92,7 +92,7 @@ describe("useAutoHuntSessions", () => {
       "briar.auto-hunt-sessions.v1",
       JSON.stringify([{
         id: "remote-session-1",
-        dispatchGroupId: "",
+        dispatchGroupId: "remote-session-1",
         projectId: "project-1",
         agentId: "agent-1",
         sessionType: "task",
@@ -128,7 +128,7 @@ describe("useAutoHuntSessions", () => {
   it("merges a newer remote status without losing local-only details", () => {
     const local = {
       id: "session-1",
-      dispatchGroupId: "",
+      dispatchGroupId: "session-1",
       projectId: "project-1",
       agentId: "agent-1",
       sessionType: "task",

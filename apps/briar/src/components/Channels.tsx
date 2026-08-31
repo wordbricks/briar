@@ -271,7 +271,7 @@ const channelAuthorId = (author: ChannelMessage["author"]) =>
 const channelReplyParticipants = (
   message: ChannelMessage,
 ): ConversationReplyParticipant[] =>
-  [message.author, ...(message.replyAuthors ?? [])]
+  [message.author, ...message.replyAuthors]
     .filter(
       (author, index, authors) =>
         authors.findIndex(

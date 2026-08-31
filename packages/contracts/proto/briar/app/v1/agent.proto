@@ -579,11 +579,11 @@ message ProjectAgentSession {
 
   string id = 1;
   string project_id = 2;
-  optional string dispatch_group_id = 3;
+  string dispatch_group_id = 3;
   optional string agent_id = 4;
   optional string agent_name = 5;
   optional string skill_id = 6;
-  optional ProjectAgentSessionType session_type = 7;
+  ProjectAgentSessionType session_type = 7;
   optional ProjectAgentSessionTrigger trigger = 8;
   optional string schedule_id = 9;
   optional string schedule_run_id = 10;
@@ -601,7 +601,7 @@ message ProjectAgentSession {
   optional string summary = 23;
   optional string error = 24;
   repeated ProjectAgentSessionEvent events = 25;
-  optional google.protobuf.Timestamp updated_at = 28;
+  google.protobuf.Timestamp updated_at = 28;
   bool archived = 29;
 }
 

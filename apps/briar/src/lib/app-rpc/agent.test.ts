@@ -16,6 +16,7 @@ const timestamp = timestampFromDate(new Date("2026-08-30T12:00:00.000Z"));
 const sessionMessage = () => create(ProjectAgentSessionSchema, {
   id: "session-1",
   projectId: "11111111-1111-4111-8111-111111111111",
+  dispatchGroupId: "dispatch-1",
   agentId: "22222222-2222-4222-8222-222222222222",
   sessionType: ProjectAgentSessionType.TASK,
   trigger: ProjectAgentSessionTrigger.MANUAL,
@@ -43,7 +44,7 @@ describe("Agent Connect DTO mapping", () => {
 
     expect(session).toMatchObject({
       id: "session-1",
-      dispatchGroupId: "session-1",
+      dispatchGroupId: "dispatch-1",
       sessionType: "task",
       trigger: "manual",
       status: "running",
@@ -67,12 +68,12 @@ describe("Agent Connect DTO mapping", () => {
     }]);
   });
 
-  it("fails closed when the server sends an unspecified enum", () => {
+  it("fails closed when the server omits the required session type", () => {
     const message = sessionMessage();
-    message.status = ProjectAgentSessionStatus.UNSPECIFIED;
+    message.sessionType = ProjectAgentSessionType.UNSPECIFIED;
 
     expect(() => projectAgentSessionFromMessage(message, true)).toThrow(
-      "Unknown Agent session status",
+      "Unknown Agent session type",
     );
   });
 });

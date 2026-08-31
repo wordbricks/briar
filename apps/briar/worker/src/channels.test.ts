@@ -282,6 +282,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "private-room",
       name: "Private room",
       topic: null,
@@ -314,6 +316,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "alerts",
       name: "Alerts",
       topic: null,
@@ -386,6 +390,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "general",
       name: "General",
       topic: "Everything",
@@ -468,6 +474,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "thread-subscribe",
       name: "Thread subscribe",
       topic: null,
@@ -580,6 +588,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "paged-history",
       name: "Paged history",
       topic: null,
@@ -639,6 +649,7 @@ describe("organization channels", () => {
       id: channelId,
       organizationId,
       kind: "dm",
+      dmKey: null,
       slug: "paged-dm-history",
       name: "Paged DM history",
       topic: null,
@@ -703,6 +714,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "incoming-webhooks",
       name: "Incoming webhooks",
       topic: null,
@@ -899,6 +912,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "other-room",
       name: "Other room",
       topic: null,
@@ -931,6 +946,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "image-room",
       name: "Image room",
       topic: null,
@@ -986,6 +1003,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "document-room",
       name: "Document room",
       topic: null,
@@ -1052,6 +1071,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "delete-image-room",
       name: "Delete image room",
       topic: null,
@@ -1119,6 +1140,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "role-race-room",
       name: "Role race room",
       topic: null,
@@ -1210,6 +1233,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "creator-api-delete-room",
       name: "Creator API delete room",
       topic: null,
@@ -1237,6 +1262,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "vision-room",
       name: "Vision room",
       topic: null,
@@ -1378,6 +1405,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "ideation",
       name: "Ideation",
       topic: null,
@@ -1816,6 +1845,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "reply-images",
       name: "Reply images",
       topic: null,
@@ -1949,6 +1980,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "project-room",
       name: "Project room",
       topic: null,
@@ -2260,6 +2293,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "project-local-preference",
       name: "Project local preference",
       topic: null,
@@ -2590,6 +2625,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "thread-session-lifecycle",
       name: "Thread session lifecycle",
       topic: null,
@@ -3034,6 +3071,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "codex-room",
       name: "Codex room",
       topic: null,
@@ -3107,6 +3146,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "organization-context-fallback",
       name: "Organization context fallback",
       topic: null,
@@ -3225,6 +3266,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "intro",
       name: "Intro",
       topic: null,
@@ -3721,6 +3764,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "preferred-device-api",
       name: "Preferred device API",
       topic: null,
@@ -3835,6 +3880,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "final-reply-failure",
       name: "Final reply failure",
       topic: null,
@@ -4042,6 +4089,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "unavailable-worker",
       name: "Unavailable Worker",
       topic: null,
@@ -4177,6 +4226,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "designated-worker-error",
       name: "Designated Worker error",
       topic: null,
@@ -4265,6 +4316,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "usage-limit-error",
       name: "Usage limit error",
       topic: null,
@@ -4297,6 +4350,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: hiddenId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "leadership",
       name: "Leadership",
       topic: null,
@@ -4359,6 +4414,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "reactions",
       name: "Reactions",
       topic: null,
@@ -4472,6 +4529,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "deletion-thread",
       name: "Deletion thread",
       topic: null,
@@ -4611,6 +4670,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "deletion-hard",
       name: "Deletion hard",
       topic: null,
@@ -4695,6 +4756,8 @@ describe("organization channels", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "deletion-route",
       name: "Deletion route",
       topic: null,

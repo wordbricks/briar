@@ -7,9 +7,11 @@ import {
   AgentSkillExecutionStatus,
 } from "@briar/contracts/gen/briar/app/v1/agent_pb";
 import {
+  ChannelMessageAgentAuthorSchema,
+  ChannelMessageAuthorSchema,
+  ChannelMessageUserAuthorSchema,
   ChannelDocumentContentSchema,
   ChannelLinkPreviewSchema,
-  ChannelMessageAuthor_Kind,
   ChannelMessageSchema,
   ChannelProposalSchema,
   ChannelWebhookSchema,
@@ -98,11 +100,15 @@ describe("Channel Connect DTO mapping", () => {
       channelId: "channel-1",
       body: "Deployment ready",
       author: {
-        kind: ChannelMessageAuthor_Kind.AGENT,
-        id: "agent-1",
-        name: "Release Agent",
-        provider: AgentProvider.CODEX,
-        image: "https://example.com/agent.png",
+        author: {
+          case: "agent",
+          value: create(ChannelMessageAgentAuthorSchema, {
+            id: "agent-1",
+            name: "Release Agent",
+            provider: AgentProvider.CODEX,
+            image: "https://example.com/agent.png",
+          }),
+        },
       },
       blocks: [create(MessageBlockSchema, {
         value: {
@@ -266,6 +272,27 @@ describe("Channel Connect DTO mapping", () => {
         subscribedAt: "2026-08-30T01:02:03.000Z",
       }],
     });
+  });
+
+  it("rejects unset and default channel message author oneofs", () => {
+    expect(() => channelMessageFromMessage(create(ChannelMessageSchema, {
+      id: "message-without-author-variant",
+      channelId: "channel-1",
+      author: create(ChannelMessageAuthorSchema),
+      createdAt: instant("2026-08-30T01:02:03.000Z"),
+    }))).toThrow("Channel message author is missing");
+
+    expect(() => channelMessageFromMessage(create(ChannelMessageSchema, {
+      id: "message-with-default-user-author",
+      channelId: "channel-1",
+      author: {
+        author: {
+          case: "user",
+          value: create(ChannelMessageUserAuthorSchema),
+        },
+      },
+      createdAt: instant("2026-08-30T01:02:03.000Z"),
+    }))).toThrow("Channel message author user id is missing");
   });
 
   it("preserves reset and rejects a cursor that JavaScript cannot represent", () => {

@@ -29860,9 +29860,10 @@ pub struct ProjectAgentSession {
     #[serde(
         rename = "dispatchGroupId",
         alias = "dispatch_group_id",
-        skip_serializing_if = "::core::option::Option::is_none"
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub dispatch_group_id: ::core::option::Option<::buffa::alloc::string::String>,
+    pub dispatch_group_id: ::buffa::alloc::string::String,
     /// Field 4: `agent_id`
     #[serde(
         rename = "agentId",
@@ -29888,12 +29889,10 @@ pub struct ProjectAgentSession {
     #[serde(
         rename = "sessionType",
         alias = "session_type",
-        with = "::buffa::json_helpers::opt_enum",
-        skip_serializing_if = "::core::option::Option::is_none"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub session_type: ::core::option::Option<
-        ::buffa::EnumValue<ProjectAgentSessionType>,
-    >,
+    pub session_type: ::buffa::EnumValue<ProjectAgentSessionType>,
     /// Field 8: `trigger`
     #[serde(
         rename = "trigger",
@@ -30071,16 +30070,6 @@ impl ProjectAgentSession {
 impl ProjectAgentSession {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
-    ///Sets [`Self::dispatch_group_id`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_dispatch_group_id(
-        mut self,
-        value: impl Into<::buffa::alloc::string::String>,
-    ) -> Self {
-        self.dispatch_group_id = Some(value.into());
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
     ///Sets [`Self::agent_id`] to `Some(value)`, consuming and returning `self`.
     pub fn with_agent_id(
         mut self,
@@ -30107,16 +30096,6 @@ impl ProjectAgentSession {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.skill_id = Some(value.into());
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::session_type`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_session_type(
-        mut self,
-        value: impl Into<::buffa::EnumValue<ProjectAgentSessionType>>,
-    ) -> Self {
-        self.session_type = Some(value.into());
         self
     }
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
@@ -30256,8 +30235,10 @@ impl ::buffa::Message for ProjectAgentSession {
         if !self.project_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
         }
-        if let Some(ref v) = self.dispatch_group_id {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        if !self.dispatch_group_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.dispatch_group_id) as u64;
         }
         if let Some(ref v) = self.agent_id {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
@@ -30268,8 +30249,11 @@ impl ::buffa::Message for ProjectAgentSession {
         if let Some(ref v) = self.skill_id {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
-        if let Some(ref v) = self.session_type {
-            size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+        {
+            let val = self.session_type.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
         }
         if let Some(ref v) = self.trigger {
             size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
@@ -30377,8 +30361,8 @@ impl ::buffa::Message for ProjectAgentSession {
         if !self.project_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.project_id, buf);
         }
-        if let Some(ref v) = self.dispatch_group_id {
-            ::buffa::types::put_string_field(3u32, v, buf);
+        if !self.dispatch_group_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.dispatch_group_id, buf);
         }
         if let Some(ref v) = self.agent_id {
             ::buffa::types::put_string_field(4u32, v, buf);
@@ -30389,8 +30373,11 @@ impl ::buffa::Message for ProjectAgentSession {
         if let Some(ref v) = self.skill_id {
             ::buffa::types::put_string_field(6u32, v, buf);
         }
-        if let Some(ref v) = self.session_type {
-            ::buffa::types::put_int32_field(7u32, v.to_i32(), buf);
+        {
+            let val = self.session_type.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(7u32, val, buf);
+            }
         }
         if let Some(ref v) = self.trigger {
             ::buffa::types::put_int32_field(8u32, v.to_i32(), buf);
@@ -30514,12 +30501,7 @@ impl ::buffa::Message for ProjectAgentSession {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(
-                    self
-                        .dispatch_group_id
-                        .get_or_insert_with(::buffa::alloc::string::String::new),
-                    buf,
-                )?;
+                ::buffa::types::merge_string(&mut self.dispatch_group_id, buf)?;
             }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -30562,8 +30544,8 @@ impl ::buffa::Message for ProjectAgentSession {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.session_type = ::core::option::Option::Some(
-                    ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                self.session_type = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
                 );
             }
             8u32 => {
@@ -30784,11 +30766,11 @@ impl ::buffa::Message for ProjectAgentSession {
     fn clear(&mut self) {
         self.id.clear();
         self.project_id.clear();
-        self.dispatch_group_id = ::core::option::Option::None;
+        self.dispatch_group_id.clear();
         self.agent_id = ::core::option::Option::None;
         self.agent_name = ::core::option::Option::None;
         self.skill_id = ::core::option::Option::None;
-        self.session_type = ::core::option::Option::None;
+        self.session_type = ::buffa::EnumValue::from(0);
         self.trigger = ::core::option::Option::None;
         self.schedule_id = ::core::option::Option::None;
         self.schedule_run_id = ::core::option::Option::None;
@@ -66211,31 +66193,224 @@ pub const __CHANNEL_WEBHOOK_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct ChannelMessageAuthor {
-    /// Field 1: `kind`
+pub struct ChannelMessageUserAuthor {
+    /// Field 1: `id`
     #[serde(
-        rename = "kind",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub kind: ::buffa::EnumValue<channel_message_author::Kind>,
-    /// Field 2: `id`
-    #[serde(rename = "id", skip_serializing_if = "::core::option::Option::is_none")]
-    pub id: ::core::option::Option<::buffa::alloc::string::String>,
-    /// Field 3: `name`
+    pub id: ::buffa::alloc::string::String,
+    /// Field 2: `name`
     #[serde(
         rename = "name",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub name: ::buffa::alloc::string::String,
-    /// Field 4: `email`
-    #[serde(rename = "email", skip_serializing_if = "::core::option::Option::is_none")]
-    pub email: ::core::option::Option<::buffa::alloc::string::String>,
-    /// Field 5: `image`
+    /// Field 3: `email`
+    #[serde(
+        rename = "email",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub email: ::buffa::alloc::string::String,
+    /// Field 4: `image`
     #[serde(rename = "image", skip_serializing_if = "::core::option::Option::is_none")]
     pub image: ::core::option::Option<::buffa::alloc::string::String>,
-    /// Field 6: `provider`
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ChannelMessageUserAuthor {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ChannelMessageUserAuthor")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .field("email", &self.email)
+            .field("image", &self.image)
+            .finish()
+    }
+}
+impl ChannelMessageUserAuthor {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageUserAuthor";
+}
+impl ChannelMessageUserAuthor {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::image`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_image(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.image = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(ChannelMessageUserAuthor);
+impl ::buffa::MessageName for ChannelMessageUserAuthor {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ChannelMessageUserAuthor";
+    const FULL_NAME: &'static str = "briar.app.v1.ChannelMessageUserAuthor";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageUserAuthor";
+}
+impl ::buffa::Message for ChannelMessageUserAuthor {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        if !self.email.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.email) as u64;
+        }
+        if let Some(ref v) = self.image {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.name, buf);
+        }
+        if !self.email.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.email, buf);
+        }
+        if let Some(ref v) = self.image {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.email, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.image.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.name.clear();
+        self.email.clear();
+        self.image = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ChannelMessageUserAuthor {
+    const PROTO_FQN: &'static str = "briar.app.v1.ChannelMessageUserAuthor";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ChannelMessageUserAuthor {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CHANNEL_MESSAGE_USER_AUTHOR_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ChannelMessageUserAuthor",
+    to_json: ::buffa::type_registry::any_to_json::<ChannelMessageUserAuthor>,
+    from_json: ::buffa::type_registry::any_from_json::<ChannelMessageUserAuthor>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ChannelMessageAgentAuthor {
+    /// Field 1: `id`
+    #[serde(rename = "id", skip_serializing_if = "::core::option::Option::is_none")]
+    pub id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 2: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    /// Field 3: `image`
+    #[serde(rename = "image", skip_serializing_if = "::core::option::Option::is_none")]
+    pub image: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 4: `provider`
     #[serde(
         rename = "provider",
         with = "::buffa::json_helpers::opt_enum",
@@ -66248,41 +66423,29 @@ pub struct ChannelMessageAuthor {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for ChannelMessageAuthor {
+impl ::core::fmt::Debug for ChannelMessageAgentAuthor {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ChannelMessageAuthor")
-            .field("kind", &self.kind)
+        f.debug_struct("ChannelMessageAgentAuthor")
             .field("id", &self.id)
             .field("name", &self.name)
-            .field("email", &self.email)
             .field("image", &self.image)
             .field("provider", &self.provider)
             .finish()
     }
 }
-impl ChannelMessageAuthor {
+impl ChannelMessageAgentAuthor {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageAuthor";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageAgentAuthor";
 }
-impl ChannelMessageAuthor {
+impl ChannelMessageAgentAuthor {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::id`] to `Some(value)`, consuming and returning `self`.
     pub fn with_id(mut self, value: impl Into<::buffa::alloc::string::String>) -> Self {
         self.id = Some(value.into());
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::email`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_email(
-        mut self,
-        value: impl Into<::buffa::alloc::string::String>,
-    ) -> Self {
-        self.email = Some(value.into());
         self
     }
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
@@ -66306,14 +66469,14 @@ impl ChannelMessageAuthor {
         self
     }
 }
-::buffa::impl_default_instance!(ChannelMessageAuthor);
-impl ::buffa::MessageName for ChannelMessageAuthor {
+::buffa::impl_default_instance!(ChannelMessageAgentAuthor);
+impl ::buffa::MessageName for ChannelMessageAgentAuthor {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "ChannelMessageAuthor";
-    const FULL_NAME: &'static str = "briar.app.v1.ChannelMessageAuthor";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageAuthor";
+    const NAME: &'static str = "ChannelMessageAgentAuthor";
+    const FULL_NAME: &'static str = "briar.app.v1.ChannelMessageAgentAuthor";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageAgentAuthor";
 }
-impl ::buffa::Message for ChannelMessageAuthor {
+impl ::buffa::Message for ChannelMessageAgentAuthor {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -66326,20 +66489,11 @@ impl ::buffa::Message for ChannelMessageAuthor {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        {
-            let val = self.kind.to_i32();
-            if val != 0 {
-                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
-            }
-        }
         if let Some(ref v) = self.id {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         if !self.name.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
-        }
-        if let Some(ref v) = self.email {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         if let Some(ref v) = self.image {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
@@ -66357,26 +66511,17 @@ impl ::buffa::Message for ChannelMessageAuthor {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        {
-            let val = self.kind.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(1u32, val, buf);
-            }
-        }
         if let Some(ref v) = self.id {
-            ::buffa::types::put_string_field(2u32, v, buf);
+            ::buffa::types::put_string_field(1u32, v, buf);
         }
         if !self.name.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.name, buf);
-        }
-        if let Some(ref v) = self.email {
-            ::buffa::types::put_string_field(4u32, v, buf);
+            ::buffa::types::put_string_field(2u32, &self.name, buf);
         }
         if let Some(ref v) = self.image {
-            ::buffa::types::put_string_field(5u32, v, buf);
+            ::buffa::types::put_string_field(3u32, v, buf);
         }
         if let Some(ref v) = self.provider {
-            ::buffa::types::put_int32_field(6u32, v.to_i32(), buf);
+            ::buffa::types::put_int32_field(4u32, v.to_i32(), buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -66394,13 +66539,6 @@ impl ::buffa::Message for ChannelMessageAuthor {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.kind = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(
@@ -66408,24 +66546,14 @@ impl ::buffa::Message for ChannelMessageAuthor {
                     buf,
                 )?;
             }
-            3u32 => {
+            2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.name, buf)?;
             }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(
-                    self.email.get_or_insert_with(::buffa::alloc::string::String::new),
-                    buf,
-                )?;
-            }
-            5u32 => {
+            3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
@@ -66435,7 +66563,7 @@ impl ::buffa::Message for ChannelMessageAuthor {
                     buf,
                 )?;
             }
-            6u32 => {
+            4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
@@ -66452,12 +66580,394 @@ impl ::buffa::Message for ChannelMessageAuthor {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.kind = ::buffa::EnumValue::from(0);
         self.id = ::core::option::Option::None;
         self.name.clear();
-        self.email = ::core::option::Option::None;
         self.image = ::core::option::Option::None;
         self.provider = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ChannelMessageAgentAuthor {
+    const PROTO_FQN: &'static str = "briar.app.v1.ChannelMessageAgentAuthor";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ChannelMessageAgentAuthor {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CHANNEL_MESSAGE_AGENT_AUTHOR_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ChannelMessageAgentAuthor",
+    to_json: ::buffa::type_registry::any_to_json::<ChannelMessageAgentAuthor>,
+    from_json: ::buffa::type_registry::any_from_json::<ChannelMessageAgentAuthor>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ChannelMessageWebhookAuthor {
+    /// Field 1: `id`
+    #[serde(rename = "id", skip_serializing_if = "::core::option::Option::is_none")]
+    pub id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 2: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ChannelMessageWebhookAuthor {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ChannelMessageWebhookAuthor")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .finish()
+    }
+}
+impl ChannelMessageWebhookAuthor {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageWebhookAuthor";
+}
+impl ChannelMessageWebhookAuthor {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_id(mut self, value: impl Into<::buffa::alloc::string::String>) -> Self {
+        self.id = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(ChannelMessageWebhookAuthor);
+impl ::buffa::MessageName for ChannelMessageWebhookAuthor {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ChannelMessageWebhookAuthor";
+    const FULL_NAME: &'static str = "briar.app.v1.ChannelMessageWebhookAuthor";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageWebhookAuthor";
+}
+impl ::buffa::Message for ChannelMessageWebhookAuthor {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if let Some(ref v) = self.id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(ref v) = self.id {
+            ::buffa::types::put_string_field(1u32, v, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.name, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.id.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id = ::core::option::Option::None;
+        self.name.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ChannelMessageWebhookAuthor {
+    const PROTO_FQN: &'static str = "briar.app.v1.ChannelMessageWebhookAuthor";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ChannelMessageWebhookAuthor {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CHANNEL_MESSAGE_WEBHOOK_AUTHOR_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ChannelMessageWebhookAuthor",
+    to_json: ::buffa::type_registry::any_to_json::<ChannelMessageWebhookAuthor>,
+    from_json: ::buffa::type_registry::any_from_json::<ChannelMessageWebhookAuthor>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct ChannelMessageAuthor {
+    #[serde(flatten)]
+    pub author: ::core::option::Option<__buffa::oneof::channel_message_author::Author>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ChannelMessageAuthor {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ChannelMessageAuthor").field("author", &self.author).finish()
+    }
+}
+impl ChannelMessageAuthor {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageAuthor";
+}
+::buffa::impl_default_instance!(ChannelMessageAuthor);
+impl ::buffa::MessageName for ChannelMessageAuthor {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ChannelMessageAuthor";
+    const FULL_NAME: &'static str = "briar.app.v1.ChannelMessageAuthor";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageAuthor";
+}
+impl ::buffa::Message for ChannelMessageAuthor {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if let ::core::option::Option::Some(ref v) = self.author {
+            match v {
+                __buffa::oneof::channel_message_author::Author::User(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+                __buffa::oneof::channel_message_author::Author::Agent(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+                __buffa::oneof::channel_message_author::Author::Webhook(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let ::core::option::Option::Some(ref v) = self.author {
+            match v {
+                __buffa::oneof::channel_message_author::Author::User(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::channel_message_author::Author::Agent(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::channel_message_author::Author::Webhook(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::channel_message_author::Author::User(
+                        ref mut existing,
+                    ),
+                ) = self.author
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.author = ::core::option::Option::Some(
+                        __buffa::oneof::channel_message_author::Author::User(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::channel_message_author::Author::Agent(
+                        ref mut existing,
+                    ),
+                ) = self.author
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.author = ::core::option::Option::Some(
+                        __buffa::oneof::channel_message_author::Author::Agent(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::channel_message_author::Author::Webhook(
+                        ref mut existing,
+                    ),
+                ) = self.author
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.author = ::core::option::Option::Some(
+                        __buffa::oneof::channel_message_author::Author::Webhook(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.author = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -66468,6 +66978,111 @@ impl ::buffa::ExtensionSet for ChannelMessageAuthor {
     }
     fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
         &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for ChannelMessageAuthor {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = ChannelMessageAuthor;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct ChannelMessageAuthor")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<ChannelMessageAuthor, A::Error> {
+                let mut __oneof_author: ::core::option::Option<
+                    __buffa::oneof::channel_message_author::Author,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "user" => {
+                            let v: ::core::option::Option<ChannelMessageUserAuthor> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ChannelMessageUserAuthor,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_author.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'author'",
+                                        ),
+                                    );
+                                }
+                                __oneof_author = Some(
+                                    __buffa::oneof::channel_message_author::Author::User(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "agent" => {
+                            let v: ::core::option::Option<ChannelMessageAgentAuthor> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ChannelMessageAgentAuthor,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_author.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'author'",
+                                        ),
+                                    );
+                                }
+                                __oneof_author = Some(
+                                    __buffa::oneof::channel_message_author::Author::Agent(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "webhook" => {
+                            let v: ::core::option::Option<ChannelMessageWebhookAuthor> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ChannelMessageWebhookAuthor,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_author.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'author'",
+                                        ),
+                                    );
+                                }
+                                __oneof_author = Some(
+                                    __buffa::oneof::channel_message_author::Author::Webhook(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <ChannelMessageAuthor as ::core::default::Default>::default();
+                __r.author = __oneof_author;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
     }
 }
 impl ::buffa::json_helpers::ProtoElemJson for ChannelMessageAuthor {
@@ -66493,160 +67108,10 @@ pub const __CHANNEL_MESSAGE_AUTHOR_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
 pub mod channel_message_author {
     #[allow(unused_imports)]
     use super::*;
-    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-    #[repr(i32)]
-    pub enum Kind {
-        KIND_UNSPECIFIED = 0i32,
-        KIND_USER = 1i32,
-        KIND_AGENT = 2i32,
-        KIND_WEBHOOK = 3i32,
-    }
-    impl Kind {
-        ///Idiomatic alias for [`Self::KIND_UNSPECIFIED`]; `Debug` prints the variant name.
-        #[allow(non_upper_case_globals)]
-        pub const Unspecified: Self = Self::KIND_UNSPECIFIED;
-        ///Idiomatic alias for [`Self::KIND_USER`]; `Debug` prints the variant name.
-        #[allow(non_upper_case_globals)]
-        pub const User: Self = Self::KIND_USER;
-        ///Idiomatic alias for [`Self::KIND_AGENT`]; `Debug` prints the variant name.
-        #[allow(non_upper_case_globals)]
-        pub const Agent: Self = Self::KIND_AGENT;
-        ///Idiomatic alias for [`Self::KIND_WEBHOOK`]; `Debug` prints the variant name.
-        #[allow(non_upper_case_globals)]
-        pub const Webhook: Self = Self::KIND_WEBHOOK;
-    }
-    impl ::core::default::Default for Kind {
-        fn default() -> Self {
-            Self::KIND_UNSPECIFIED
-        }
-    }
-    impl ::serde::Serialize for Kind {
-        fn serialize<S: ::serde::Serializer>(
-            &self,
-            s: S,
-        ) -> ::core::result::Result<S::Ok, S::Error> {
-            s.serialize_str(::buffa::Enumeration::proto_name(self))
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for Kind {
-        fn deserialize<D: ::serde::Deserializer<'de>>(
-            d: D,
-        ) -> ::core::result::Result<Self, D::Error> {
-            struct _V;
-            impl ::serde::de::Visitor<'_> for _V {
-                type Value = Kind;
-                fn expecting(
-                    &self,
-                    f: &mut ::core::fmt::Formatter<'_>,
-                ) -> ::core::fmt::Result {
-                    f.write_str(
-                        concat!("a string, integer, or null for ", stringify!(Kind)),
-                    )
-                }
-                fn visit_str<E: ::serde::de::Error>(
-                    self,
-                    v: &str,
-                ) -> ::core::result::Result<Kind, E> {
-                    <Kind as ::buffa::Enumeration>::from_proto_name(v)
-                        .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
-                }
-                fn visit_i64<E: ::serde::de::Error>(
-                    self,
-                    v: i64,
-                ) -> ::core::result::Result<Kind, E> {
-                    let v32 = i32::try_from(v)
-                        .map_err(|_| {
-                            ::serde::de::Error::custom(
-                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
-                            )
-                        })?;
-                    <Kind as ::buffa::Enumeration>::from_i32(v32)
-                        .ok_or_else(|| {
-                            ::serde::de::Error::custom(
-                                ::buffa::alloc::format!("unknown enum value {v32}"),
-                            )
-                        })
-                }
-                fn visit_u64<E: ::serde::de::Error>(
-                    self,
-                    v: u64,
-                ) -> ::core::result::Result<Kind, E> {
-                    let v32 = i32::try_from(v)
-                        .map_err(|_| {
-                            ::serde::de::Error::custom(
-                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
-                            )
-                        })?;
-                    <Kind as ::buffa::Enumeration>::from_i32(v32)
-                        .ok_or_else(|| {
-                            ::serde::de::Error::custom(
-                                ::buffa::alloc::format!("unknown enum value {v32}"),
-                            )
-                        })
-                }
-                fn visit_unit<E: ::serde::de::Error>(
-                    self,
-                ) -> ::core::result::Result<Kind, E> {
-                    ::core::result::Result::Ok(::core::default::Default::default())
-                }
-            }
-            d.deserialize_any(_V)
-        }
-    }
-    impl ::buffa::json_helpers::ProtoElemJson for Kind {
-        fn serialize_proto_json<S: ::serde::Serializer>(
-            v: &Self,
-            s: S,
-        ) -> ::core::result::Result<S::Ok, S::Error> {
-            ::serde::Serialize::serialize(v, s)
-        }
-        fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-            d: D,
-        ) -> ::core::result::Result<Self, D::Error> {
-            <Self as ::serde::Deserialize>::deserialize(d)
-        }
-    }
-    impl ::buffa::Enumeration for Kind {
-        fn from_i32(value: i32) -> ::core::option::Option<Self> {
-            match value {
-                0i32 => ::core::option::Option::Some(Self::KIND_UNSPECIFIED),
-                1i32 => ::core::option::Option::Some(Self::KIND_USER),
-                2i32 => ::core::option::Option::Some(Self::KIND_AGENT),
-                3i32 => ::core::option::Option::Some(Self::KIND_WEBHOOK),
-                _ => ::core::option::Option::None,
-            }
-        }
-        fn to_i32(&self) -> i32 {
-            *self as i32
-        }
-        fn proto_name(&self) -> &'static str {
-            match self {
-                Self::KIND_UNSPECIFIED => "KIND_UNSPECIFIED",
-                Self::KIND_USER => "KIND_USER",
-                Self::KIND_AGENT => "KIND_AGENT",
-                Self::KIND_WEBHOOK => "KIND_WEBHOOK",
-            }
-        }
-        fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
-            match name {
-                "KIND_UNSPECIFIED" => {
-                    ::core::option::Option::Some(Self::KIND_UNSPECIFIED)
-                }
-                "KIND_USER" => ::core::option::Option::Some(Self::KIND_USER),
-                "KIND_AGENT" => ::core::option::Option::Some(Self::KIND_AGENT),
-                "KIND_WEBHOOK" => ::core::option::Option::Some(Self::KIND_WEBHOOK),
-                _ => ::core::option::Option::None,
-            }
-        }
-        fn values() -> &'static [Self] {
-            &[
-                Self::KIND_UNSPECIFIED,
-                Self::KIND_USER,
-                Self::KIND_AGENT,
-                Self::KIND_WEBHOOK,
-            ]
-        }
-    }
+    #[doc(inline)]
+    pub use super::__buffa::oneof::channel_message_author::Author;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::channel_message_author::Author as AuthorView;
 }
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -166034,7 +166499,7 @@ pub mod __buffa {
             /// Field 2: `project_id`
             pub project_id: &'a str,
             /// Field 3: `dispatch_group_id`
-            pub dispatch_group_id: ::core::option::Option<&'a str>,
+            pub dispatch_group_id: &'a str,
             /// Field 4: `agent_id`
             pub agent_id: ::core::option::Option<&'a str>,
             /// Field 5: `agent_name`
@@ -166042,9 +166507,7 @@ pub mod __buffa {
             /// Field 6: `skill_id`
             pub skill_id: ::core::option::Option<&'a str>,
             /// Field 7: `session_type`
-            pub session_type: ::core::option::Option<
-                ::buffa::EnumValue<super::super::ProjectAgentSessionType>,
-            >,
+            pub session_type: ::buffa::EnumValue<super::super::ProjectAgentSessionType>,
             /// Field 8: `trigger`
             pub trigger: ::core::option::Option<
                 ::buffa::EnumValue<super::super::ProjectAgentSessionTrigger>,
@@ -166153,9 +166616,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.dispatch_group_id = Some(
-                            ::buffa::types::borrow_str(&mut cur)?,
-                        );
+                        view.dispatch_group_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -166183,10 +166644,8 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.session_type = Some(
-                            ::buffa::EnumValue::from(
-                                ::buffa::types::decode_int32(&mut cur)?,
-                            ),
+                        view.session_type = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
                     8u32 => {
@@ -166462,7 +166921,7 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::ProjectAgentSession {
                     id: self.id.to_string(),
                     project_id: self.project_id.to_string(),
-                    dispatch_group_id: self.dispatch_group_id.map(|s| s.to_string()),
+                    dispatch_group_id: self.dispatch_group_id.to_string(),
                     agent_id: self.agent_id.map(|s| s.to_string()),
                     agent_name: self.agent_name.map(|s| s.to_string()),
                     skill_id: self.skill_id.map(|s| s.to_string()),
@@ -166547,8 +167006,11 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.project_id)
                                 as u64;
                 }
-                if let Some(ref v) = self.dispatch_group_id {
-                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                if !self.dispatch_group_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.dispatch_group_id)
+                                as u64;
                 }
                 if let Some(ref v) = self.agent_id {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
@@ -166559,8 +167021,11 @@ pub mod __buffa {
                 if let Some(ref v) = self.skill_id {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
-                if let Some(ref v) = self.session_type {
-                    size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+                {
+                    let val = self.session_type.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
                 }
                 if let Some(ref v) = self.trigger {
                     size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
@@ -166669,8 +167134,8 @@ pub mod __buffa {
                 if !self.project_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.project_id, buf);
                 }
-                if let Some(ref v) = self.dispatch_group_id {
-                    ::buffa::types::put_string_field(3u32, v, buf);
+                if !self.dispatch_group_id.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.dispatch_group_id, buf);
                 }
                 if let Some(ref v) = self.agent_id {
                     ::buffa::types::put_string_field(4u32, v, buf);
@@ -166681,8 +167146,11 @@ pub mod __buffa {
                 if let Some(ref v) = self.skill_id {
                     ::buffa::types::put_string_field(6u32, v, buf);
                 }
-                if let Some(ref v) = self.session_type {
-                    ::buffa::types::put_int32_field(7u32, v.to_i32(), buf);
+                {
+                    let val = self.session_type.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(7u32, val, buf);
+                    }
                 }
                 if let Some(ref v) = self.trigger {
                     ::buffa::types::put_int32_field(8u32, v.to_i32(), buf);
@@ -166801,8 +167269,10 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
                     __map.serialize_entry("projectId", self.project_id)?;
                 }
-                if let ::core::option::Option::Some(__v) = self.dispatch_group_id {
-                    __map.serialize_entry("dispatchGroupId", __v)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.dispatch_group_id,
+                ) {
+                    __map.serialize_entry("dispatchGroupId", self.dispatch_group_id)?;
                 }
                 if let ::core::option::Option::Some(__v) = self.agent_id {
                     __map.serialize_entry("agentId", __v)?;
@@ -166813,8 +167283,10 @@ pub mod __buffa {
                 if let ::core::option::Option::Some(__v) = self.skill_id {
                     __map.serialize_entry("skillId", __v)?;
                 }
-                if let ::core::option::Option::Some(ref __v) = self.session_type {
-                    __map.serialize_entry("sessionType", __v)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.session_type,
+                ) {
+                    __map.serialize_entry("sessionType", &self.session_type)?;
                 }
                 if let ::core::option::Option::Some(ref __v) = self.trigger {
                     __map.serialize_entry("trigger", __v)?;
@@ -166995,7 +167467,7 @@ pub mod __buffa {
             }
             /// Field 3: `dispatch_group_id`
             #[must_use]
-            pub fn dispatch_group_id(&self) -> ::core::option::Option<&'_ str> {
+            pub fn dispatch_group_id(&self) -> &'_ str {
                 self.0.reborrow().dispatch_group_id
             }
             /// Field 4: `agent_id`
@@ -167017,9 +167489,7 @@ pub mod __buffa {
             #[must_use]
             pub fn session_type(
                 &self,
-            ) -> ::core::option::Option<
-                ::buffa::EnumValue<super::super::ProjectAgentSessionType>,
-            > {
+            ) -> ::buffa::EnumValue<super::super::ProjectAgentSessionType> {
                 self.0.reborrow().session_type
             }
             /// Field 8: `trigger`
@@ -222333,20 +222803,999 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct ChannelMessageAuthorView<'a> {
-            /// Field 1: `kind`
-            pub kind: ::buffa::EnumValue<super::super::channel_message_author::Kind>,
-            /// Field 2: `id`
-            pub id: ::core::option::Option<&'a str>,
-            /// Field 3: `name`
+        pub struct ChannelMessageUserAuthorView<'a> {
+            /// Field 1: `id`
+            pub id: &'a str,
+            /// Field 2: `name`
             pub name: &'a str,
-            /// Field 4: `email`
-            pub email: ::core::option::Option<&'a str>,
-            /// Field 5: `image`
+            /// Field 3: `email`
+            pub email: &'a str,
+            /// Field 4: `image`
             pub image: ::core::option::Option<&'a str>,
-            /// Field 6: `provider`
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ChannelMessageUserAuthorView<'a> {
+            type Owned = super::super::ChannelMessageUserAuthor;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.email = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.image = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ChannelMessageUserAuthor,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ChannelMessageUserAuthor,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ChannelMessageUserAuthor {
+                    id: self.id.to_string(),
+                    name: self.name.to_string(),
+                    email: self.email.to_string(),
+                    image: self.image.map(|s| s.to_string()),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ChannelMessageUserAuthorView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.id.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+                }
+                if !self.name.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+                }
+                if !self.email.is_empty() {
+                    size
+                        += 1u64 + ::buffa::types::string_encoded_len(&self.email) as u64;
+                }
+                if let Some(ref v) = self.image {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.id, buf);
+                }
+                if !self.name.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.name, buf);
+                }
+                if !self.email.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.email, buf);
+                }
+                if let Some(ref v) = self.image {
+                    ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ChannelMessageUserAuthorView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+                    __map.serialize_entry("id", self.id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+                    __map.serialize_entry("name", self.name)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.email) {
+                    __map.serialize_entry("email", self.email)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.image {
+                    __map.serialize_entry("image", __v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ChannelMessageUserAuthorView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ChannelMessageUserAuthor";
+            const FULL_NAME: &'static str = "briar.app.v1.ChannelMessageUserAuthor";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageUserAuthor";
+        }
+        ::buffa::impl_default_view_instance!(ChannelMessageUserAuthorView);
+        ::buffa::impl_view_reborrow!(ChannelMessageUserAuthorView);
+        /** Self-contained, `'static` owned view of a `ChannelMessageUserAuthor` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ChannelMessageUserAuthorView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ChannelMessageUserAuthorView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ChannelMessageUserAuthorOwnedView(
+            ::buffa::OwnedView<ChannelMessageUserAuthorView<'static>>,
+        );
+        impl ChannelMessageUserAuthorOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChannelMessageUserAuthorOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChannelMessageUserAuthorOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ChannelMessageUserAuthor,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChannelMessageUserAuthorOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ChannelMessageUserAuthorView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ChannelMessageUserAuthorView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::ChannelMessageUserAuthor {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> &'_ str {
+                self.0.reborrow().id
+            }
+            /// Field 2: `name`
+            #[must_use]
+            pub fn name(&self) -> &'_ str {
+                self.0.reborrow().name
+            }
+            /// Field 3: `email`
+            #[must_use]
+            pub fn email(&self) -> &'_ str {
+                self.0.reborrow().email
+            }
+            /// Field 4: `image`
+            #[must_use]
+            pub fn image(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().image
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ChannelMessageUserAuthorView<'static>>,
+        > for ChannelMessageUserAuthorOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ChannelMessageUserAuthorView<'static>>,
+            ) -> Self {
+                ChannelMessageUserAuthorOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ChannelMessageUserAuthorOwnedView>
+        for ::buffa::OwnedView<ChannelMessageUserAuthorView<'static>> {
+            fn from(wrapper: ChannelMessageUserAuthorOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ChannelMessageUserAuthorView<'static>>,
+        > for ChannelMessageUserAuthorOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ChannelMessageUserAuthorView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ChannelMessageUserAuthor {
+            type View<'a> = ChannelMessageUserAuthorView<'a>;
+            type ViewHandle = ChannelMessageUserAuthorOwnedView;
+        }
+        impl ::serde::Serialize for ChannelMessageUserAuthorOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ChannelMessageAgentAuthorView<'a> {
+            /// Field 1: `id`
+            pub id: ::core::option::Option<&'a str>,
+            /// Field 2: `name`
+            pub name: &'a str,
+            /// Field 3: `image`
+            pub image: ::core::option::Option<&'a str>,
+            /// Field 4: `provider`
             pub provider: ::core::option::Option<
                 ::buffa::EnumValue<super::super::super::super::types::v1::AgentProvider>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ChannelMessageAgentAuthorView<'a> {
+            type Owned = super::super::ChannelMessageAgentAuthor;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.image = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.provider = Some(
+                            ::buffa::EnumValue::from(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ChannelMessageAgentAuthor,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ChannelMessageAgentAuthor,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ChannelMessageAgentAuthor {
+                    id: self.id.map(|s| s.to_string()),
+                    name: self.name.to_string(),
+                    image: self.image.map(|s| s.to_string()),
+                    provider: self.provider,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ChannelMessageAgentAuthorView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if let Some(ref v) = self.id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if !self.name.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+                }
+                if let Some(ref v) = self.image {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(ref v) = self.provider {
+                    size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let Some(ref v) = self.id {
+                    ::buffa::types::put_string_field(1u32, v, buf);
+                }
+                if !self.name.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.name, buf);
+                }
+                if let Some(ref v) = self.image {
+                    ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                if let Some(ref v) = self.provider {
+                    ::buffa::types::put_int32_field(4u32, v.to_i32(), buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ChannelMessageAgentAuthorView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.id {
+                    __map.serialize_entry("id", __v)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+                    __map.serialize_entry("name", self.name)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.image {
+                    __map.serialize_entry("image", __v)?;
+                }
+                if let ::core::option::Option::Some(ref __v) = self.provider {
+                    __map.serialize_entry("provider", __v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ChannelMessageAgentAuthorView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ChannelMessageAgentAuthor";
+            const FULL_NAME: &'static str = "briar.app.v1.ChannelMessageAgentAuthor";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageAgentAuthor";
+        }
+        ::buffa::impl_default_view_instance!(ChannelMessageAgentAuthorView);
+        ::buffa::impl_view_reborrow!(ChannelMessageAgentAuthorView);
+        /** Self-contained, `'static` owned view of a `ChannelMessageAgentAuthor` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ChannelMessageAgentAuthorView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ChannelMessageAgentAuthorView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ChannelMessageAgentAuthorOwnedView(
+            ::buffa::OwnedView<ChannelMessageAgentAuthorView<'static>>,
+        );
+        impl ChannelMessageAgentAuthorOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChannelMessageAgentAuthorOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChannelMessageAgentAuthorOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ChannelMessageAgentAuthor,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChannelMessageAgentAuthorOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ChannelMessageAgentAuthorView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ChannelMessageAgentAuthorView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::ChannelMessageAgentAuthor {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().id
+            }
+            /// Field 2: `name`
+            #[must_use]
+            pub fn name(&self) -> &'_ str {
+                self.0.reborrow().name
+            }
+            /// Field 3: `image`
+            #[must_use]
+            pub fn image(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().image
+            }
+            /// Field 4: `provider`
+            #[must_use]
+            pub fn provider(
+                &self,
+            ) -> ::core::option::Option<
+                ::buffa::EnumValue<super::super::super::super::types::v1::AgentProvider>,
+            > {
+                self.0.reborrow().provider
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ChannelMessageAgentAuthorView<'static>>,
+        > for ChannelMessageAgentAuthorOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ChannelMessageAgentAuthorView<'static>>,
+            ) -> Self {
+                ChannelMessageAgentAuthorOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ChannelMessageAgentAuthorOwnedView>
+        for ::buffa::OwnedView<ChannelMessageAgentAuthorView<'static>> {
+            fn from(wrapper: ChannelMessageAgentAuthorOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ChannelMessageAgentAuthorView<'static>>,
+        > for ChannelMessageAgentAuthorOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ChannelMessageAgentAuthorView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ChannelMessageAgentAuthor {
+            type View<'a> = ChannelMessageAgentAuthorView<'a>;
+            type ViewHandle = ChannelMessageAgentAuthorOwnedView;
+        }
+        impl ::serde::Serialize for ChannelMessageAgentAuthorOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ChannelMessageWebhookAuthorView<'a> {
+            /// Field 1: `id`
+            pub id: ::core::option::Option<&'a str>,
+            /// Field 2: `name`
+            pub name: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ChannelMessageWebhookAuthorView<'a> {
+            type Owned = super::super::ChannelMessageWebhookAuthor;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ChannelMessageWebhookAuthor,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ChannelMessageWebhookAuthor,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ChannelMessageWebhookAuthor {
+                    id: self.id.map(|s| s.to_string()),
+                    name: self.name.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ChannelMessageWebhookAuthorView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if let Some(ref v) = self.id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if !self.name.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let Some(ref v) = self.id {
+                    ::buffa::types::put_string_field(1u32, v, buf);
+                }
+                if !self.name.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.name, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ChannelMessageWebhookAuthorView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.id {
+                    __map.serialize_entry("id", __v)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+                    __map.serialize_entry("name", self.name)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ChannelMessageWebhookAuthorView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ChannelMessageWebhookAuthor";
+            const FULL_NAME: &'static str = "briar.app.v1.ChannelMessageWebhookAuthor";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageWebhookAuthor";
+        }
+        ::buffa::impl_default_view_instance!(ChannelMessageWebhookAuthorView);
+        ::buffa::impl_view_reborrow!(ChannelMessageWebhookAuthorView);
+        /** Self-contained, `'static` owned view of a `ChannelMessageWebhookAuthor` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ChannelMessageWebhookAuthorView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ChannelMessageWebhookAuthorView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ChannelMessageWebhookAuthorOwnedView(
+            ::buffa::OwnedView<ChannelMessageWebhookAuthorView<'static>>,
+        );
+        impl ChannelMessageWebhookAuthorOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChannelMessageWebhookAuthorOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChannelMessageWebhookAuthorOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ChannelMessageWebhookAuthor,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChannelMessageWebhookAuthorOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ChannelMessageWebhookAuthorView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ChannelMessageWebhookAuthorView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::ChannelMessageWebhookAuthor {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().id
+            }
+            /// Field 2: `name`
+            #[must_use]
+            pub fn name(&self) -> &'_ str {
+                self.0.reborrow().name
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ChannelMessageWebhookAuthorView<'static>>,
+        > for ChannelMessageWebhookAuthorOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ChannelMessageWebhookAuthorView<'static>>,
+            ) -> Self {
+                ChannelMessageWebhookAuthorOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ChannelMessageWebhookAuthorOwnedView>
+        for ::buffa::OwnedView<ChannelMessageWebhookAuthorView<'static>> {
+            fn from(wrapper: ChannelMessageWebhookAuthorOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ChannelMessageWebhookAuthorView<'static>>,
+        > for ChannelMessageWebhookAuthorOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ChannelMessageWebhookAuthorView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ChannelMessageWebhookAuthor {
+            type View<'a> = ChannelMessageWebhookAuthorView<'a>;
+            type ViewHandle = ChannelMessageWebhookAuthorOwnedView;
+        }
+        impl ::serde::Serialize for ChannelMessageWebhookAuthorOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ChannelMessageAuthorView<'a> {
+            pub author: ::core::option::Option<
+                super::super::__buffa::view::oneof::channel_message_author::Author<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -222385,50 +223834,95 @@ pub mod __buffa {
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Varint,
+                            ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.kind = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::channel_message_author::Author::User(
+                                ref mut existing,
+                            ),
+                        ) = view.author
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.author = Some(
+                                super::super::__buffa::view::oneof::channel_message_author::Author::User(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::ChannelMessageUserAuthorView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.id = Some(::buffa::types::borrow_str(&mut cur)?);
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::channel_message_author::Author::Agent(
+                                ref mut existing,
+                            ),
+                        ) = view.author
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.author = Some(
+                                super::super::__buffa::view::oneof::channel_message_author::Author::Agent(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::ChannelMessageAgentAuthorView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.name = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.email = Some(::buffa::types::borrow_str(&mut cur)?);
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.image = Some(::buffa::types::borrow_str(&mut cur)?);
-                    }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.provider = Some(
-                            ::buffa::EnumValue::from(
-                                ::buffa::types::decode_int32(&mut cur)?,
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::channel_message_author::Author::Webhook(
+                                ref mut existing,
                             ),
-                        );
+                        ) = view.author
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.author = Some(
+                                super::super::__buffa::view::oneof::channel_message_author::Author::Webhook(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::ChannelMessageWebhookAuthorView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -222459,12 +223953,42 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ChannelMessageAuthor {
-                    kind: self.kind,
-                    id: self.id.map(|s| s.to_string()),
-                    name: self.name.to_string(),
-                    email: self.email.map(|s| s.to_string()),
-                    image: self.image.map(|s| s.to_string()),
-                    provider: self.provider,
+                    author: match self.author.as_ref() {
+                        ::core::option::Option::Some(v) => {
+                            ::core::option::Option::Some(
+                                match v {
+                                    super::super::__buffa::view::oneof::channel_message_author::Author::User(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::channel_message_author::Author::User(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::channel_message_author::Author::Agent(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::channel_message_author::Author::Agent(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::channel_message_author::Author::Webhook(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::channel_message_author::Author::Webhook(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        ::core::option::Option::None => ::core::option::Option::None,
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -222475,30 +223999,43 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for ChannelMessageAuthorView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                {
-                    let val = self.kind.to_i32();
-                    if val != 0 {
-                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                if let ::core::option::Option::Some(ref v) = self.author {
+                    match v {
+                        super::super::__buffa::view::oneof::channel_message_author::Author::User(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                        super::super::__buffa::view::oneof::channel_message_author::Author::Agent(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                        super::super::__buffa::view::oneof::channel_message_author::Author::Webhook(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
                     }
-                }
-                if let Some(ref v) = self.id {
-                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-                }
-                if !self.name.is_empty() {
-                    size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
-                }
-                if let Some(ref v) = self.email {
-                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-                }
-                if let Some(ref v) = self.image {
-                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-                }
-                if let Some(ref v) = self.provider {
-                    size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
@@ -222506,31 +224043,44 @@ pub mod __buffa {
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::EncodeSink,
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                {
-                    let val = self.kind.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(1u32, val, buf);
+                if let ::core::option::Option::Some(ref v) = self.author {
+                    match v {
+                        super::super::__buffa::view::oneof::channel_message_author::Author::User(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                1u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::channel_message_author::Author::Agent(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                2u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::channel_message_author::Author::Webhook(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                3u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
                     }
-                }
-                if let Some(ref v) = self.id {
-                    ::buffa::types::put_string_field(2u32, v, buf);
-                }
-                if !self.name.is_empty() {
-                    ::buffa::types::put_string_field(3u32, &self.name, buf);
-                }
-                if let Some(ref v) = self.email {
-                    ::buffa::types::put_string_field(4u32, v, buf);
-                }
-                if let Some(ref v) = self.image {
-                    ::buffa::types::put_string_field(5u32, v, buf);
-                }
-                if let Some(ref v) = self.provider {
-                    ::buffa::types::put_int32_field(6u32, v.to_i32(), buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -222553,23 +224103,24 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.kind) {
-                    __map.serialize_entry("kind", &self.kind)?;
-                }
-                if let ::core::option::Option::Some(__v) = self.id {
-                    __map.serialize_entry("id", __v)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
-                    __map.serialize_entry("name", self.name)?;
-                }
-                if let ::core::option::Option::Some(__v) = self.email {
-                    __map.serialize_entry("email", __v)?;
-                }
-                if let ::core::option::Option::Some(__v) = self.image {
-                    __map.serialize_entry("image", __v)?;
-                }
-                if let ::core::option::Option::Some(ref __v) = self.provider {
-                    __map.serialize_entry("provider", __v)?;
+                if let ::core::option::Option::Some(ref __ov) = self.author {
+                    match __ov {
+                        super::super::__buffa::view::oneof::channel_message_author::Author::User(
+                            v,
+                        ) => {
+                            __map.serialize_entry("user", v)?;
+                        }
+                        super::super::__buffa::view::oneof::channel_message_author::Author::Agent(
+                            v,
+                        ) => {
+                            __map.serialize_entry("agent", v)?;
+                        }
+                        super::super::__buffa::view::oneof::channel_message_author::Author::Webhook(
+                            v,
+                        ) => {
+                            __map.serialize_entry("webhook", v)?;
+                        }
+                    }
                 }
                 __map.end()
             }
@@ -222666,41 +224217,14 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `kind`
+            /// Oneof `author`.
             #[must_use]
-            pub fn kind(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::channel_message_author::Kind> {
-                self.0.reborrow().kind
-            }
-            /// Field 2: `id`
-            #[must_use]
-            pub fn id(&self) -> ::core::option::Option<&'_ str> {
-                self.0.reborrow().id
-            }
-            /// Field 3: `name`
-            #[must_use]
-            pub fn name(&self) -> &'_ str {
-                self.0.reborrow().name
-            }
-            /// Field 4: `email`
-            #[must_use]
-            pub fn email(&self) -> ::core::option::Option<&'_ str> {
-                self.0.reborrow().email
-            }
-            /// Field 5: `image`
-            #[must_use]
-            pub fn image(&self) -> ::core::option::Option<&'_ str> {
-                self.0.reborrow().image
-            }
-            /// Field 6: `provider`
-            #[must_use]
-            pub fn provider(
+            pub fn author(
                 &self,
             ) -> ::core::option::Option<
-                ::buffa::EnumValue<super::super::super::super::types::v1::AgentProvider>,
+                &super::super::__buffa::view::oneof::channel_message_author::Author<'_>,
             > {
-                self.0.reborrow().provider
+                self.0.reborrow().author.as_ref()
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ChannelMessageAuthorView<'static>>>
@@ -315090,6 +316614,34 @@ pub mod __buffa {
                     ),
                 }
             }
+            pub mod channel_message_author {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum Author<'a> {
+                    User(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::ChannelMessageUserAuthorView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    Agent(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::ChannelMessageAgentAuthorView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    Webhook(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::ChannelMessageWebhookAuthorView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                }
+            }
             pub mod channel_proposal {
                 #[allow(unused_imports)]
                 use super::*;
@@ -316389,6 +317941,83 @@ pub mod __buffa {
                 }
             }
         }
+        pub mod channel_message_author {
+            #[allow(unused_imports)]
+            use super::*;
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Author {
+                User(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::ChannelMessageUserAuthor,
+                    >,
+                ),
+                Agent(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::ChannelMessageAgentAuthor,
+                    >,
+                ),
+                Webhook(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::ChannelMessageWebhookAuthor,
+                    >,
+                ),
+            }
+            impl ::buffa::Oneof for Author {}
+            impl From<super::super::super::ChannelMessageUserAuthor> for Author {
+                fn from(v: super::super::super::ChannelMessageUserAuthor) -> Self {
+                    Self::User(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::ChannelMessageUserAuthor>
+            for ::core::option::Option<Author> {
+                fn from(v: super::super::super::ChannelMessageUserAuthor) -> Self {
+                    Self::Some(Author::from(v))
+                }
+            }
+            impl From<super::super::super::ChannelMessageAgentAuthor> for Author {
+                fn from(v: super::super::super::ChannelMessageAgentAuthor) -> Self {
+                    Self::Agent(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::ChannelMessageAgentAuthor>
+            for ::core::option::Option<Author> {
+                fn from(v: super::super::super::ChannelMessageAgentAuthor) -> Self {
+                    Self::Some(Author::from(v))
+                }
+            }
+            impl From<super::super::super::ChannelMessageWebhookAuthor> for Author {
+                fn from(v: super::super::super::ChannelMessageWebhookAuthor) -> Self {
+                    Self::Webhook(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::ChannelMessageWebhookAuthor>
+            for ::core::option::Option<Author> {
+                fn from(v: super::super::super::ChannelMessageWebhookAuthor) -> Self {
+                    Self::Some(Author::from(v))
+                }
+            }
+            impl serde::Serialize for Author {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::User(v) => {
+                            map.serialize_entry("user", v)?;
+                        }
+                        Self::Agent(v) => {
+                            map.serialize_entry("agent", v)?;
+                        }
+                        Self::Webhook(v) => {
+                            map.serialize_entry("webhook", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
         pub mod channel_proposal {
             #[allow(unused_imports)]
             use super::*;
@@ -317181,6 +318810,9 @@ pub mod __buffa {
         reg.register_json_any(super::__CHANNEL_SUMMARY_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_MEMBER_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_WEBHOOK_JSON_ANY);
+        reg.register_json_any(super::__CHANNEL_MESSAGE_USER_AUTHOR_JSON_ANY);
+        reg.register_json_any(super::__CHANNEL_MESSAGE_AGENT_AUTHOR_JSON_ANY);
+        reg.register_json_any(super::__CHANNEL_MESSAGE_WEBHOOK_AUTHOR_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_MESSAGE_AUTHOR_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_MESSAGE_REACTION_PERSON_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_MESSAGE_REACTION_JSON_ANY);
@@ -318343,6 +319975,18 @@ pub use self::__buffa::view::ChannelMemberOwnedView;
 pub use self::__buffa::view::ChannelWebhookView;
 #[doc(inline)]
 pub use self::__buffa::view::ChannelWebhookOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ChannelMessageUserAuthorView;
+#[doc(inline)]
+pub use self::__buffa::view::ChannelMessageUserAuthorOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ChannelMessageAgentAuthorView;
+#[doc(inline)]
+pub use self::__buffa::view::ChannelMessageAgentAuthorOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ChannelMessageWebhookAuthorView;
+#[doc(inline)]
+pub use self::__buffa::view::ChannelMessageWebhookAuthorOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ChannelMessageAuthorView;
 #[doc(inline)]

@@ -16,6 +16,7 @@ import {
   executeD1Sql,
   type IsolatedTestDatabase,
 } from "./test-helpers/d1";
+import { workerCapabilitiesFixture } from "./test-helpers/worker-runtime";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const userId = "pilot-owner";
@@ -437,9 +438,11 @@ describe("managed computer repository", () => {
 
     await recordWorkerHeartbeat(db, projectId, {
       workerId,
+      versions: { briar: "1.2.173" },
       acceptingWork: true,
       readinessState: "ready",
       readinessDetail: "Ready again",
+      capabilities: workerCapabilitiesFixture(),
       observedAt: "2026-08-22T00:21:00.000Z",
     });
     await expect(db.prepare(

@@ -257,11 +257,11 @@ struct AgentSkillExecutionProposal: Equatable, Hashable, Identifiable, Sendable 
 struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let projectId: UUID
-    let dispatchGroupId: String?
+    let dispatchGroupId: String
     let agentId: UUID?
     let agentName: String?
     let skillId: UUID?
-    let sessionType: SessionType?
+    let sessionType: SessionType
     let trigger: Trigger?
     let scheduleId: String?
     let scheduleRunId: String?
@@ -280,17 +280,17 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
     let summary: String?
     let error: String?
     let events: [Event]?
-    let updatedAt: Date?
+    let updatedAt: Date
     let archived: Bool?
 
     init(
         id: String,
         projectId: UUID,
-        dispatchGroupId: String?,
+        dispatchGroupId: String,
         agentId: UUID?,
         agentName: String? = nil,
         skillId: UUID? = nil,
-        sessionType: SessionType?,
+        sessionType: SessionType,
         trigger: Trigger?,
         scheduleId: String?,
         scheduleRunId: String?,
@@ -308,7 +308,7 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
         summary: String?,
         error: String?,
         events: [Event]?,
-        updatedAt: Date?,
+        updatedAt: Date,
         requestedByUserId: String? = nil,
         archived: Bool? = nil
     ) {
@@ -440,7 +440,7 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
     }
 
     var displayTimestamp: Date {
-        completedAt ?? updatedAt ?? startedAt
+        completedAt ?? updatedAt
     }
 }
 
@@ -575,23 +575,21 @@ extension ProjectAgentSession {
         guard
             !message.id.isEmpty,
             let projectID = UUID(uuidString: message.projectID),
-            message.hasStartedAt
+            !message.dispatchGroupID.isEmpty,
+            message.hasStartedAt,
+            message.hasUpdatedAt
         else {
             throw MobileAPIError.invalidResponse
         }
 
-        let sessionType: SessionType?
-        if message.hasSessionType {
-            switch message.sessionType {
-            case .task:
-                sessionType = .task
-            case .dispatch:
-                sessionType = .dispatch
-            case .unspecified, .UNRECOGNIZED:
-                throw MobileAPIError.invalidResponse
-            }
-        } else {
-            sessionType = nil
+        let sessionType: SessionType
+        switch message.sessionType {
+        case .task:
+            sessionType = .task
+        case .dispatch:
+            sessionType = .dispatch
+        case .unspecified, .UNRECOGNIZED:
+            throw MobileAPIError.invalidResponse
         }
 
         let trigger: Trigger?
@@ -627,7 +625,7 @@ extension ProjectAgentSession {
         self.init(
             id: message.id,
             projectId: projectID,
-            dispatchGroupId: message.hasDispatchGroupID ? message.dispatchGroupID : nil,
+            dispatchGroupId: message.dispatchGroupID,
             agentId: try agentOptionalUUID(message.agentID, isPresent: message.hasAgentID),
             agentName: message.hasAgentName ? message.agentName : nil,
             skillId: try agentOptionalUUID(message.skillID, isPresent: message.hasSkillID),
@@ -649,7 +647,7 @@ extension ProjectAgentSession {
             summary: message.hasSummary ? message.summary : nil,
             error: message.hasError ? message.error : nil,
             events: try message.events.map { try Event(connectMessage: $0) },
-            updatedAt: message.hasUpdatedAt ? try agentDate(message.updatedAt) : nil,
+            updatedAt: try agentDate(message.updatedAt),
             requestedByUserId: message.hasRequestedByUserID ? message.requestedByUserID : nil,
             archived: message.archived
         )
@@ -659,11 +657,11 @@ extension ProjectAgentSession {
         var request = BriarAPI_PutProjectAgentSessionRequest()
         request.projectID = projectID.uuidString.lowercased()
         request.sessionID = id
-        request.dispatchGroupID = dispatchGroupId ?? id
+        request.dispatchGroupID = dispatchGroupId
         if let agentId { request.agentID = agentId.uuidString.lowercased() }
         if let agentName { request.agentName = agentName }
         if let skillId { request.skillID = skillId.uuidString.lowercased() }
-        request.sessionType = switch sessionType ?? .dispatch {
+        request.sessionType = switch sessionType {
         case .task: .task
         case .dispatch: .dispatch
         }
@@ -694,7 +692,7 @@ extension ProjectAgentSession {
         if let requestedWorkerId { request.requestedWorkerID = requestedWorkerId }
         if let workerId { request.workerID = workerId }
         request.events = (events ?? []).map(\.connectMessage)
-        request.updatedAt = .init(date: updatedAt ?? completedAt ?? startedAt)
+        request.updatedAt = .init(date: updatedAt)
         return request
     }
 

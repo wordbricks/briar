@@ -28,7 +28,6 @@ export type OrganizationUsageRunRow = {
   started_at: string;
   updated_at: string;
   completed_at: string | null;
-  has_usage_ledger?: number;
   source_created_at?: string | null;
   created_by_user_id?: string | null;
   created_by_name?: string | null;
@@ -216,15 +215,7 @@ export async function listProjectUsageRuns(
               run.source_created_at, run.created_by_user_id,
               creator.name as created_by_name,
               run.agent_id,
-              coalesce(agent.name, worker.label, run.claimed_by) as agent_name,
-              exists (
-                select 1
-                from briar_run_execution_attempts ledger_attempt
-                join briar_run_usage_records ledger_usage
-                  on ledger_usage.execution_id = ledger_attempt.id
-                where ledger_attempt.run_id = run.id
-                  and ledger_attempt.project_id = run.project_id
-              ) as has_usage_ledger
+              coalesce(agent.name, worker.label, run.claimed_by) as agent_name
        from briar_hunt_runs run
        left join "user" creator on creator.id = run.created_by_user_id
        left join briar_project_agents agent on agent.id = run.agent_id

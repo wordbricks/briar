@@ -2747,13 +2747,9 @@ public nonisolated struct BriarAPI_ProjectAgentSession: @unchecked Sendable {
   }
 
   public var dispatchGroupID: String {
-    get {_storage._dispatchGroupID ?? String()}
+    get {_storage._dispatchGroupID}
     set {_uniqueStorage()._dispatchGroupID = newValue}
   }
-  /// Returns true if `dispatchGroupID` has been explicitly set.
-  public var hasDispatchGroupID: Bool {_storage._dispatchGroupID != nil}
-  /// Clears the value of `dispatchGroupID`. Subsequent reads from it will return its default value.
-  public mutating func clearDispatchGroupID() {_uniqueStorage()._dispatchGroupID = nil}
 
   public var agentID: String {
     get {_storage._agentID ?? String()}
@@ -2783,13 +2779,9 @@ public nonisolated struct BriarAPI_ProjectAgentSession: @unchecked Sendable {
   public mutating func clearSkillID() {_uniqueStorage()._skillID = nil}
 
   public var sessionType: BriarAPI_ProjectAgentSessionType {
-    get {_storage._sessionType ?? .unspecified}
+    get {_storage._sessionType}
     set {_uniqueStorage()._sessionType = newValue}
   }
-  /// Returns true if `sessionType` has been explicitly set.
-  public var hasSessionType: Bool {_storage._sessionType != nil}
-  /// Clears the value of `sessionType`. Subsequent reads from it will return its default value.
-  public mutating func clearSessionType() {_uniqueStorage()._sessionType = nil}
 
   public var trigger: BriarAPI_ProjectAgentSessionTrigger {
     get {_storage._trigger ?? .unspecified}
@@ -6553,11 +6545,11 @@ nonisolated extension BriarAPI_ProjectAgentSession: SwiftProtobuf.Message, Swift
   fileprivate class _StorageClass {
     var _id: String = String()
     var _projectID: String = String()
-    var _dispatchGroupID: String? = nil
+    var _dispatchGroupID: String = String()
     var _agentID: String? = nil
     var _agentName: String? = nil
     var _skillID: String? = nil
-    var _sessionType: BriarAPI_ProjectAgentSessionType? = nil
+    var _sessionType: BriarAPI_ProjectAgentSessionType = .unspecified
     var _trigger: BriarAPI_ProjectAgentSessionTrigger? = nil
     var _scheduleID: String? = nil
     var _scheduleRunID: String? = nil
@@ -6675,9 +6667,9 @@ nonisolated extension BriarAPI_ProjectAgentSession: SwiftProtobuf.Message, Swift
       if !_storage._projectID.isEmpty {
         try visitor.visitSingularStringField(value: _storage._projectID, fieldNumber: 2)
       }
-      try { if let v = _storage._dispatchGroupID {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-      } }()
+      if !_storage._dispatchGroupID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._dispatchGroupID, fieldNumber: 3)
+      }
       try { if let v = _storage._agentID {
         try visitor.visitSingularStringField(value: v, fieldNumber: 4)
       } }()
@@ -6687,9 +6679,9 @@ nonisolated extension BriarAPI_ProjectAgentSession: SwiftProtobuf.Message, Swift
       try { if let v = _storage._skillID {
         try visitor.visitSingularStringField(value: v, fieldNumber: 6)
       } }()
-      try { if let v = _storage._sessionType {
-        try visitor.visitSingularEnumField(value: v, fieldNumber: 7)
-      } }()
+      if _storage._sessionType != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._sessionType, fieldNumber: 7)
+      }
       try { if let v = _storage._trigger {
         try visitor.visitSingularEnumField(value: v, fieldNumber: 8)
       } }()

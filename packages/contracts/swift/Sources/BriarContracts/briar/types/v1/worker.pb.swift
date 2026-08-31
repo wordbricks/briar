@@ -103,14 +103,7 @@ public nonisolated struct BriarTypes_AgentProviderCapability: Sendable {
 
   public var defaultEfforts: [BriarTypes_AgentEffortCapability] = []
 
-  public var allowCustomModels: Bool {
-    get {_allowCustomModels ?? false}
-    set {_allowCustomModels = newValue}
-  }
-  /// Returns true if `allowCustomModels` has been explicitly set.
-  public var hasAllowCustomModels: Bool {self._allowCustomModels != nil}
-  /// Clears the value of `allowCustomModels`. Subsequent reads from it will return its default value.
-  public mutating func clearAllowCustomModels() {self._allowCustomModels = nil}
+  public var allowCustomModels: Bool = false
 
   public var error: String {
     get {_error ?? String()}
@@ -125,7 +118,6 @@ public nonisolated struct BriarTypes_AgentProviderCapability: Sendable {
 
   public init() {}
 
-  fileprivate var _allowCustomModels: Bool? = nil
   fileprivate var _error: String? = nil
 }
 
@@ -394,7 +386,7 @@ nonisolated extension BriarTypes_AgentProviderCapability: SwiftProtobuf.Message,
       case 1: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
       case 2: try { try decoder.decodeRepeatedMessageField(value: &self.models) }()
       case 3: try { try decoder.decodeRepeatedMessageField(value: &self.defaultEfforts) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self._allowCustomModels) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.allowCustomModels) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self._error) }()
       default: break
       }
@@ -415,9 +407,9 @@ nonisolated extension BriarTypes_AgentProviderCapability: SwiftProtobuf.Message,
     if !self.defaultEfforts.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.defaultEfforts, fieldNumber: 3)
     }
-    try { if let v = self._allowCustomModels {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 4)
-    } }()
+    if self.allowCustomModels != false {
+      try visitor.visitSingularBoolField(value: self.allowCustomModels, fieldNumber: 4)
+    }
     try { if let v = self._error {
       try visitor.visitSingularStringField(value: v, fieldNumber: 5)
     } }()
@@ -428,7 +420,7 @@ nonisolated extension BriarTypes_AgentProviderCapability: SwiftProtobuf.Message,
     if lhs.provider != rhs.provider {return false}
     if lhs.models != rhs.models {return false}
     if lhs.defaultEfforts != rhs.defaultEfforts {return false}
-    if lhs._allowCustomModels != rhs._allowCustomModels {return false}
+    if lhs.allowCustomModels != rhs.allowCustomModels {return false}
     if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

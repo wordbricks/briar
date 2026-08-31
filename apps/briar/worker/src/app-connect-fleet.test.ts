@@ -9,13 +9,13 @@ import {
   ManagedComputerState,
   UnbindProjectExecutionWorkerRequest_Reason,
 } from "@briar/contracts/gen/briar/app/v1/fleet_pb";
-import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import worker from "./index";
 import {
   createIsolatedTestDatabase,
   type IsolatedTestDatabase,
 } from "./test-helpers/d1";
+import { workerRuntimeFixture } from "./test-helpers/worker-runtime";
 
 const organizationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const projectId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -205,17 +205,9 @@ describe("FleetService", () => {
       projectId,
       label: "Connect Worker",
       deviceIdentity: `briar_device_${"a".repeat(64)}`,
-      runtime: {
-        agentProvider: AgentProvider.CODEX,
+      runtime: workerRuntimeFixture({
         providers: [],
-        providerHealth: [],
-        capabilities: {
-          providerCapabilities: [],
-          worktrees: true,
-          workflowRequirements: [],
-        },
-        versions: { briar: "2.0.0" },
-      },
+      }),
       maxConcurrentSessions: 2,
     }, options(ownerToken));
     expect(registration.workerToken).toMatch(/^briar_worker_/u);

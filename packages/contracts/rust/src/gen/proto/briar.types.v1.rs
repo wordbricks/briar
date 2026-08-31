@@ -7703,9 +7703,10 @@ pub struct AgentProviderCapability {
     #[serde(
         rename = "allowCustomModels",
         alias = "allow_custom_models",
-        skip_serializing_if = "::core::option::Option::is_none"
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
-    pub allow_custom_models: ::core::option::Option<bool>,
+    pub allow_custom_models: bool,
     /// Field 5: `error`
     #[serde(rename = "error", skip_serializing_if = "::core::option::Option::is_none")]
     pub error: ::core::option::Option<::buffa::alloc::string::String>,
@@ -7732,13 +7733,6 @@ impl AgentProviderCapability {
     pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.AgentProviderCapability";
 }
 impl AgentProviderCapability {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::allow_custom_models`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_allow_custom_models(mut self, value: bool) -> Self {
-        self.allow_custom_models = Some(value);
-        self
-    }
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::error`] to `Some(value)`, consuming and returning `self`.
@@ -7792,7 +7786,7 @@ impl ::buffa::Message for AgentProviderCapability {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        if self.allow_custom_models.is_some() {
+        if self.allow_custom_models {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
         if let Some(ref v) = self.error {
@@ -7830,8 +7824,8 @@ impl ::buffa::Message for AgentProviderCapability {
             );
             v.write_to(__cache, buf);
         }
-        if let Some(v) = self.allow_custom_models {
-            ::buffa::types::put_bool_field(4u32, v, buf);
+        if self.allow_custom_models {
+            ::buffa::types::put_bool_field(4u32, self.allow_custom_models, buf);
         }
         if let Some(ref v) = self.error {
             ::buffa::types::put_string_field(5u32, v, buf);
@@ -7887,9 +7881,7 @@ impl ::buffa::Message for AgentProviderCapability {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.allow_custom_models = ::core::option::Option::Some(
-                    ::buffa::types::decode_bool(buf)?,
-                );
+                self.allow_custom_models = ::buffa::types::decode_bool(buf)?;
             }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -7912,7 +7904,7 @@ impl ::buffa::Message for AgentProviderCapability {
         self.provider = ::buffa::EnumValue::from(0);
         self.models.clear();
         self.default_efforts.clear();
-        self.allow_custom_models = ::core::option::Option::None;
+        self.allow_custom_models = false;
         self.error = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
@@ -21921,7 +21913,7 @@ pub mod __buffa {
                 super::super::__buffa::view::AgentEffortCapabilityView<'a>,
             >,
             /// Field 4: `allow_custom_models`
-            pub allow_custom_models: ::core::option::Option<bool>,
+            pub allow_custom_models: bool,
             /// Field 5: `error`
             pub error: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -21972,9 +21964,9 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.allow_custom_models = Some(
-                            ::buffa::types::decode_bool(&mut cur)?,
-                        );
+                        view.allow_custom_models = ::buffa::types::decode_bool(
+                            &mut cur,
+                        )?;
                     }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -22101,7 +22093,7 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
-                if self.allow_custom_models.is_some() {
+                if self.allow_custom_models {
                     size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
                 }
                 if let Some(ref v) = self.error {
@@ -22140,8 +22132,8 @@ pub mod __buffa {
                     );
                     v.write_to(__cache, buf);
                 }
-                if let Some(v) = self.allow_custom_models {
-                    ::buffa::types::put_bool_field(4u32, v, buf);
+                if self.allow_custom_models {
+                    ::buffa::types::put_bool_field(4u32, self.allow_custom_models, buf);
                 }
                 if let Some(ref v) = self.error {
                     ::buffa::types::put_string_field(5u32, v, buf);
@@ -22178,8 +22170,12 @@ pub mod __buffa {
                 if !self.default_efforts.is_empty() {
                     __map.serialize_entry("defaultEfforts", &*self.default_efforts)?;
                 }
-                if let ::core::option::Option::Some(__v) = self.allow_custom_models {
-                    __map.serialize_entry("allowCustomModels", &__v)?;
+                if self.allow_custom_models {
+                    __map
+                        .serialize_entry(
+                            "allowCustomModels",
+                            &self.allow_custom_models,
+                        )?;
                 }
                 if let ::core::option::Option::Some(__v) = self.error {
                     __map.serialize_entry("error", __v)?;
@@ -22308,7 +22304,7 @@ pub mod __buffa {
             }
             /// Field 4: `allow_custom_models`
             #[must_use]
-            pub fn allow_custom_models(&self) -> ::core::option::Option<bool> {
+            pub fn allow_custom_models(&self) -> bool {
                 self.0.reborrow().allow_custom_models
             }
             /// Field 5: `error`

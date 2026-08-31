@@ -135,9 +135,7 @@ const workerCapabilitiesFromProto = (
             ),
           }
         : {}),
-      ...(capability.allowCustomModels !== undefined
-        ? { allowCustomModels: capability.allowCustomModels }
-        : {}),
+      allowCustomModels: capability.allowCustomModels,
       error: capability.error ?? null,
     };
   }

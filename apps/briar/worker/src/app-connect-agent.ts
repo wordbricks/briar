@@ -892,7 +892,7 @@ const toProjectAgentSession = (input: {
   $typeName: "briar.app.v1.ProjectAgentSession",
   id: input.id,
   projectId: input.projectId,
-  dispatchGroupId: input.payload.dispatchGroupId || undefined,
+  dispatchGroupId: input.payload.dispatchGroupId,
   agentId: input.payload.agentId ?? undefined,
   agentName: input.payload.agentName ?? undefined,
   skillId: input.payload.skillId ?? undefined,
@@ -947,9 +947,6 @@ const rowToProjectAgentSession = (
   options: { archived?: boolean } = {},
 ) => {
   const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
-  // Requester identity is a server-owned projection. Older server-created
-  // task payloads also carried the value inside payload_json.
-  delete payload.requestedByUserId;
   return toProjectAgentSession({
     id: row.id,
     projectId: row.project_id,

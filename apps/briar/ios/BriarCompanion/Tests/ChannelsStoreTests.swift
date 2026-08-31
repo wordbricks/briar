@@ -44,11 +44,12 @@ final class ChannelsStoreTests: XCTestCase {
         proposal.payload = .batch(batch)
         proposal.resultItems = [result]
 
+        var agentAuthor = BriarAPI_ChannelMessageAgentAuthor()
+        agentAuthor.id = agentID.uuidString.lowercased()
+        agentAuthor.name = "Honey"
+        agentAuthor.provider = .codex
         var author = BriarAPI_ChannelMessageAuthor()
-        author.kind = .agent
-        author.id = agentID.uuidString.lowercased()
-        author.name = "Honey"
-        author.provider = .codex
+        author.agent = agentAuthor
 
         var wireMessage = BriarAPI_ChannelMessage()
         wireMessage.id = messageID.uuidString.lowercased()
@@ -74,6 +75,20 @@ final class ChannelsStoreTests: XCTestCase {
             "contract"
         )
         XCTAssertEqual(mapped.proposal?.resultItems.first?.runId, resultRunID)
+    }
+
+    func testRejectsMissingOrDefaultChannelAuthorOneof() {
+        XCTAssertThrowsError(try ChannelMessage.Author(
+            connectMessage: BriarAPI_ChannelMessageAuthor()
+        )) { error in
+            XCTAssertEqual(error as? MobileAPIError, .invalidResponse)
+        }
+
+        var defaultUser = BriarAPI_ChannelMessageAuthor()
+        defaultUser.user = BriarAPI_ChannelMessageUserAuthor()
+        XCTAssertThrowsError(try ChannelMessage.Author(connectMessage: defaultUser)) { error in
+            XCTAssertEqual(error as? MobileAPIError, .invalidResponse)
+        }
     }
 
     func testResetReplacesStateAndKeepsTerminalReplyTombstone() async throws {
@@ -217,7 +232,13 @@ final class ChannelsStoreTests: XCTestCase {
             channelId: channelID,
             parentMessageId: nil,
             body: body,
-            author: .init(type: .user, name: "Briar User", image: nil, provider: nil),
+            author: .init(
+                type: .user,
+                name: "Briar User",
+                image: nil,
+                provider: nil,
+                id: "user-1"
+            ),
             replyCount: 0,
             lastReplyAt: nil,
             document: nil,
@@ -407,7 +428,13 @@ private final class ChannelConnectScenario: @unchecked Sendable {
                 ? UUID(uuidString: request.parentMessageID)
                 : nil,
             body: request.body,
-            author: .init(type: .user, name: "Briar User", image: nil, provider: nil),
+            author: .init(
+                type: .user,
+                name: "Briar User",
+                image: nil,
+                provider: nil,
+                id: "user-1"
+            ),
             mentionedUserIds: request.mentionedUserIds,
             mentionedAgentIds: request.mentionedAgentIds.compactMap(UUID.init(uuidString:)),
             replyCount: 0,
@@ -480,9 +507,7 @@ private final class ChannelConnectScenario: @unchecked Sendable {
     }
 
     private func wireMessage(_ value: ChannelMessage) -> BriarAPI_ChannelMessage {
-        var author = BriarAPI_ChannelMessageAuthor()
-        author.kind = value.author.type == .user ? .user : .agent
-        author.name = value.author.name
+        let author = Self.channelAuthorMessage(value.author)
         var message = BriarAPI_ChannelMessage()
         message.id = value.id.uuidString.lowercased()
         message.channelID = value.channelId.uuidString.lowercased()
@@ -495,6 +520,48 @@ private final class ChannelConnectScenario: @unchecked Sendable {
         message.mentionedAgentIds = value.mentionedAgentIds.map { $0.uuidString.lowercased() }
         message.replyCount = UInt32(value.replyCount)
         message.createdAt = Google_Protobuf_Timestamp(date: value.createdAt)
+        return message
+    }
+
+    private static func channelAuthorMessage(
+        _ value: ChannelMessage.Author
+    ) -> BriarAPI_ChannelMessageAuthor {
+        var message = BriarAPI_ChannelMessageAuthor()
+        switch value.type {
+        case .user:
+            guard let id = value.id else {
+                preconditionFailure("User channel authors require an id")
+            }
+            var author = BriarAPI_ChannelMessageUserAuthor()
+            author.id = id
+            author.name = value.name
+            author.email = "channels-test@briar.local"
+            if let image = value.image { author.image = image }
+            message.user = author
+        case .agent:
+            var author = BriarAPI_ChannelMessageAgentAuthor()
+            if let id = value.id { author.id = id }
+            author.name = value.name
+            if let image = value.image { author.image = image }
+            if let provider = value.provider {
+                author.provider = switch provider {
+                case "codex": .codex
+                case "claude": .claude
+                case "cursor": .cursor
+                case "grok": .grok
+                case "agy": .agy
+                case "opencode": .opencode
+                case "openrouter": .openrouter
+                default: preconditionFailure("Unsupported Agent provider: \(provider)")
+                }
+            }
+            message.agent = author
+        case .webhook:
+            var author = BriarAPI_ChannelMessageWebhookAuthor()
+            if let id = value.id { author.id = id }
+            author.name = value.name
+            message.webhook = author
+        }
         return message
     }
 

@@ -72,7 +72,7 @@ export type AutoHuntSession = {
   agentId?: string;
   agentName?: string | null;
   skillId?: string | null;
-  sessionType?: "task" | "dispatch";
+  sessionType: "task" | "dispatch";
   trigger?: "manual" | "scheduled";
   scheduleId?: string;
   scheduleRunId?: string;
@@ -93,7 +93,7 @@ export type AutoHuntSession = {
   events: AutoHuntSessionEvent[];
   dispatchEvents: AutoHuntDispatchEvent[];
   workers: AutoHuntWorkerResult[];
-  updatedAt?: string;
+  updatedAt: string;
   localOwner?: boolean;
   archived?: boolean;
   detailLoaded?: boolean;
@@ -122,20 +122,20 @@ function readSessions(): AutoHuntSession[] {
     const value = JSON.parse(window.localStorage.getItem(storageKey) ?? "[]");
     if (!Array.isArray(value)) return [];
     const restored = value.filter((session) =>
-      session && typeof session === "object" && typeof session.id === "string"
+      session &&
+      typeof session === "object" &&
+      typeof session.id === "string" &&
+      typeof session.dispatchGroupId === "string" &&
+      session.dispatchGroupId.length > 0 &&
+      (session.sessionType === "task" || session.sessionType === "dispatch") &&
+      typeof session.updatedAt === "string"
     ) as AutoHuntSession[];
     const interruptedAt = new Date().toISOString();
     return restored.map((storedSession) => {
       const session = {
         ...storedSession,
-        dispatchGroupId: storedSession.dispatchGroupId ?? storedSession.id,
-        sessionType: storedSession.sessionType ?? "dispatch",
         workers: storedSession.workers ?? [],
         dispatchEvents: storedSession.dispatchEvents ?? [],
-        updatedAt:
-          storedSession.updatedAt ??
-          storedSession.completedAt ??
-          storedSession.startedAt,
         localOwner: storedSession.localOwner ?? true,
         followUps: storedSession.followUps ?? [],
       };
@@ -275,9 +275,9 @@ function sessionSyncKey(session: Pick<AutoHuntSession, "projectId" | "id">) {
 }
 
 function sessionVersion(
-  session: Pick<AutoHuntSession, "updatedAt" | "completedAt" | "startedAt">,
+  session: Pick<AutoHuntSession, "updatedAt">,
 ) {
-  return session.updatedAt ?? session.completedAt ?? session.startedAt;
+  return session.updatedAt;
 }
 
 export function mergeSynchronizedSessions(
@@ -535,9 +535,7 @@ export function useAutoHuntSessions(
     let active = true;
     void Promise.all(recoverable.map(async (session) => ({
       sessionId: session.id,
-      dispatch: await loadAutoHuntDispatch(
-        session.dispatchGroupId || session.id,
-      ),
+      dispatch: await loadAutoHuntDispatch(session.dispatchGroupId),
     }))).then((loaded) => {
       if (!active) return;
       const dispatches = new Map(
@@ -666,9 +664,10 @@ export function useAutoHuntSessions(
       }
       return existing.id;
     }
+    const sessionId = input.sessionId ?? crypto.randomUUID();
     const session: AutoHuntSession = {
-      id: input.sessionId ?? crypto.randomUUID(),
-      dispatchGroupId: "",
+      id: sessionId,
+      dispatchGroupId: sessionId,
       projectId,
       agentId,
       agentName: input.agentName ?? null,

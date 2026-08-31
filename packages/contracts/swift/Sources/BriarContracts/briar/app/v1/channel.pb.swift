@@ -1815,12 +1815,37 @@ public nonisolated struct BriarAPI_ChannelWebhook: Sendable {
   fileprivate var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
-public nonisolated struct BriarAPI_ChannelMessageAuthor: Sendable {
+public nonisolated struct BriarAPI_ChannelMessageUserAuthor: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var kind: BriarAPI_ChannelMessageAuthor.Kind = .unspecified
+  public var id: String = String()
+
+  public var name: String = String()
+
+  public var email: String = String()
+
+  public var image: String {
+    get {_image ?? String()}
+    set {_image = newValue}
+  }
+  /// Returns true if `image` has been explicitly set.
+  public var hasImage: Bool {self._image != nil}
+  /// Clears the value of `image`. Subsequent reads from it will return its default value.
+  public mutating func clearImage() {self._image = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _image: String? = nil
+}
+
+public nonisolated struct BriarAPI_ChannelMessageAgentAuthor: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
 
   public var id: String {
     get {_id ?? String()}
@@ -1832,15 +1857,6 @@ public nonisolated struct BriarAPI_ChannelMessageAuthor: Sendable {
   public mutating func clearID() {self._id = nil}
 
   public var name: String = String()
-
-  public var email: String {
-    get {_email ?? String()}
-    set {_email = newValue}
-  }
-  /// Returns true if `email` has been explicitly set.
-  public var hasEmail: Bool {self._email != nil}
-  /// Clears the value of `email`. Subsequent reads from it will return its default value.
-  public mutating func clearEmail() {self._email = nil}
 
   public var image: String {
     get {_image ?? String()}
@@ -1862,54 +1878,77 @@ public nonisolated struct BriarAPI_ChannelMessageAuthor: Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public nonisolated enum Kind: SwiftProtobuf.Enum, Swift.CaseIterable {
-    public typealias RawValue = Int
-    case unspecified // = 0
-    case user // = 1
-    case agent // = 2
-    case webhook // = 3
-    case UNRECOGNIZED(Int)
+  public init() {}
 
-    public init() {
-      self = .unspecified
-    }
+  fileprivate var _id: String? = nil
+  fileprivate var _image: String? = nil
+  fileprivate var _provider: BriarTypes_AgentProvider? = nil
+}
 
-    public init?(rawValue: Int) {
-      switch rawValue {
-      case 0: self = .unspecified
-      case 1: self = .user
-      case 2: self = .agent
-      case 3: self = .webhook
-      default: self = .UNRECOGNIZED(rawValue)
-      }
-    }
+public nonisolated struct BriarAPI_ChannelMessageWebhookAuthor: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
 
-    public var rawValue: Int {
-      switch self {
-      case .unspecified: return 0
-      case .user: return 1
-      case .agent: return 2
-      case .webhook: return 3
-      case .UNRECOGNIZED(let i): return i
-      }
-    }
-
-    // The compiler won't synthesize support with the UNRECOGNIZED case.
-    public static let allCases: [BriarAPI_ChannelMessageAuthor.Kind] = [
-      .unspecified,
-      .user,
-      .agent,
-      .webhook,
-    ]
-
+  public var id: String {
+    get {_id ?? String()}
+    set {_id = newValue}
   }
+  /// Returns true if `id` has been explicitly set.
+  public var hasID: Bool {self._id != nil}
+  /// Clears the value of `id`. Subsequent reads from it will return its default value.
+  public mutating func clearID() {self._id = nil}
+
+  public var name: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _id: String? = nil
-  fileprivate var _email: String? = nil
-  fileprivate var _image: String? = nil
-  fileprivate var _provider: BriarTypes_AgentProvider? = nil
+}
+
+public nonisolated struct BriarAPI_ChannelMessageAuthor: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var author: BriarAPI_ChannelMessageAuthor.OneOf_Author? = nil
+
+  public var user: BriarAPI_ChannelMessageUserAuthor {
+    get {
+      if case .user(let v)? = author {return v}
+      return BriarAPI_ChannelMessageUserAuthor()
+    }
+    set {author = .user(newValue)}
+  }
+
+  public var agent: BriarAPI_ChannelMessageAgentAuthor {
+    get {
+      if case .agent(let v)? = author {return v}
+      return BriarAPI_ChannelMessageAgentAuthor()
+    }
+    set {author = .agent(newValue)}
+  }
+
+  public var webhook: BriarAPI_ChannelMessageWebhookAuthor {
+    get {
+      if case .webhook(let v)? = author {return v}
+      return BriarAPI_ChannelMessageWebhookAuthor()
+    }
+    set {author = .webhook(newValue)}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum OneOf_Author: Equatable, Sendable {
+    case user(BriarAPI_ChannelMessageUserAuthor)
+    case agent(BriarAPI_ChannelMessageAgentAuthor)
+    case webhook(BriarAPI_ChannelMessageWebhookAuthor)
+
+  }
+
+  public init() {}
 }
 
 public nonisolated struct BriarAPI_ChannelMessageReactionPerson: Sendable {
@@ -5449,9 +5488,9 @@ nonisolated extension BriarAPI_ChannelWebhook: SwiftProtobuf.Message, SwiftProto
   }
 }
 
-nonisolated extension BriarAPI_ChannelMessageAuthor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ChannelMessageAuthor"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}id\0\u{1}name\0\u{1}email\0\u{1}image\0\u{1}provider\0")
+nonisolated extension BriarAPI_ChannelMessageUserAuthor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ChannelMessageUserAuthor"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}email\0\u{1}image\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5459,12 +5498,10 @@ nonisolated extension BriarAPI_ChannelMessageAuthor: SwiftProtobuf.Message, Swif
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._id) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.name) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._email) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._image) }()
-      case 6: try { try decoder.decodeSingularEnumField(value: &self._provider) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.email) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._image) }()
       default: break
       }
     }
@@ -5475,32 +5512,73 @@ nonisolated extension BriarAPI_ChannelMessageAuthor: SwiftProtobuf.Message, Swif
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if self.kind != .unspecified {
-      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 1)
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
     }
-    try { if let v = self._id {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
     if !self.name.isEmpty {
-      try visitor.visitSingularStringField(value: self.name, fieldNumber: 3)
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
     }
-    try { if let v = self._email {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
+    if !self.email.isEmpty {
+      try visitor.visitSingularStringField(value: self.email, fieldNumber: 3)
+    }
     try { if let v = self._image {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._provider {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 6)
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_ChannelMessageAuthor, rhs: BriarAPI_ChannelMessageAuthor) -> Bool {
-    if lhs.kind != rhs.kind {return false}
+  public static func ==(lhs: BriarAPI_ChannelMessageUserAuthor, rhs: BriarAPI_ChannelMessageUserAuthor) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.email != rhs.email {return false}
+    if lhs._image != rhs._image {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ChannelMessageAgentAuthor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ChannelMessageAgentAuthor"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}image\0\u{1}provider\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self._id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._image) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self._provider) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._id {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+    } }()
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    try { if let v = self._image {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._provider {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ChannelMessageAgentAuthor, rhs: BriarAPI_ChannelMessageAgentAuthor) -> Bool {
     if lhs._id != rhs._id {return false}
     if lhs.name != rhs.name {return false}
-    if lhs._email != rhs._email {return false}
     if lhs._image != rhs._image {return false}
     if lhs._provider != rhs._provider {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -5508,8 +5586,127 @@ nonisolated extension BriarAPI_ChannelMessageAuthor: SwiftProtobuf.Message, Swif
   }
 }
 
-nonisolated extension BriarAPI_ChannelMessageAuthor.Kind: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0KIND_UNSPECIFIED\0\u{1}KIND_USER\0\u{1}KIND_AGENT\0\u{1}KIND_WEBHOOK\0")
+nonisolated extension BriarAPI_ChannelMessageWebhookAuthor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ChannelMessageWebhookAuthor"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self._id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._id {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+    } }()
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ChannelMessageWebhookAuthor, rhs: BriarAPI_ChannelMessageWebhookAuthor) -> Bool {
+    if lhs._id != rhs._id {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ChannelMessageAuthor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ChannelMessageAuthor"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}user\0\u{1}agent\0\u{1}webhook\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try {
+        var v: BriarAPI_ChannelMessageUserAuthor?
+        var hadOneofValue = false
+        if let current = self.author {
+          hadOneofValue = true
+          if case .user(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.author = .user(v)
+        }
+      }()
+      case 2: try {
+        var v: BriarAPI_ChannelMessageAgentAuthor?
+        var hadOneofValue = false
+        if let current = self.author {
+          hadOneofValue = true
+          if case .agent(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.author = .agent(v)
+        }
+      }()
+      case 3: try {
+        var v: BriarAPI_ChannelMessageWebhookAuthor?
+        var hadOneofValue = false
+        if let current = self.author {
+          hadOneofValue = true
+          if case .webhook(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.author = .webhook(v)
+        }
+      }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    switch self.author {
+    case .user?: try {
+      guard case .user(let v)? = self.author else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    }()
+    case .agent?: try {
+      guard case .agent(let v)? = self.author else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    }()
+    case .webhook?: try {
+      guard case .webhook(let v)? = self.author else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    }()
+    case nil: break
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ChannelMessageAuthor, rhs: BriarAPI_ChannelMessageAuthor) -> Bool {
+    if lhs.author != rhs.author {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
 }
 
 nonisolated extension BriarAPI_ChannelMessageReactionPerson: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {

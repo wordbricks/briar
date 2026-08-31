@@ -129,7 +129,7 @@ const ProjectAgentSessionIssue = strictSchema(Schema.Struct({
 }));
 
 export const ProjectAgentSessionInput = strictSchema(Schema.Struct({
-  dispatchGroupId: Schema.String.check(Schema.isMaxLength(128)),
+  dispatchGroupId: Schema.String.check(Schema.isLengthBetween(1, 128)),
   agentId: Schema.NullOr(UuidString),
   agentName: Schema.optional(Schema.NullOr(trimmedText(1, 200))),
   skillId: Schema.optional(Schema.NullOr(UuidString)),

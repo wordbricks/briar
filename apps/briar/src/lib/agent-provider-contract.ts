@@ -57,7 +57,7 @@ export const AgentProviderCapability = Schema.Struct({
       mutableArray(AgentEffortCapability).check(Schema.isMaxLength(20)),
     ),
   ),
-  allowCustomModels: Schema.mutableKey(Schema.optional(Schema.Boolean)),
+  allowCustomModels: Schema.mutableKey(Schema.Boolean),
   error: Schema.mutableKey(
     Schema.NullOr(Schema.Trim.check(Schema.isMaxLength(2_000))),
   ),

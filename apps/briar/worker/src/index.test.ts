@@ -668,6 +668,12 @@ describe("Worker HTTP contract", () => {
       agentName: "Inbox Agent",
       status: "running",
     });
+    expect(() =>
+      decodeProjectAgentSessionInput({
+        ...snapshot,
+        dispatchGroupId: "",
+      })
+    ).toThrow();
     expect(
       decodeProjectAgentSessionInput({
         ...snapshot,

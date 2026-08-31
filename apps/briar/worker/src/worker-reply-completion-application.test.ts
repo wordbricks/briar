@@ -271,6 +271,8 @@ describe("reply completion application", () => {
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: `reply-completion-${sequence}`,
       name: `Reply completion ${sequence}`,
       topic: null,

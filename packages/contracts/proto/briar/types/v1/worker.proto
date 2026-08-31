@@ -25,7 +25,7 @@ message AgentProviderCapability {
   AgentProvider provider = 1;
   repeated AgentModelCapability models = 2;
   repeated AgentEffortCapability default_efforts = 3;
-  optional bool allow_custom_models = 4;
+  bool allow_custom_models = 4;
   optional string error = 5;
 }
 

@@ -119,6 +119,7 @@ import apiWorker from "./index";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { encryptSlackToken } from "./slack";
 import { executeD1Sql } from "./test-helpers/d1";
+import { workerCapabilitiesFixture } from "./test-helpers/worker-runtime";
 
 const releaseWorkflow = normalizeAutoHuntWorkflow({
   version: 2,
@@ -445,16 +446,19 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         byte_size: 8,
       },
     ]);
-    await createIssueMessage(db, {
-      id: "66666666-7777-4888-8999-000000000000",
-      projectId,
-      runId: migrationRunId,
-      parentMessageId: null,
-      authorUserId: "owner",
-      authorAgentProvider: null,
-      body: "Preserve this message through the backlog migration.",
-      createdAt: atMinute(1),
-    });
+    await executeSql(
+      db,
+      `insert into briar_issue_messages (
+         id, project_id, run_id, parent_message_id, author_user_id,
+         author_agent_id, author_agent_name, author_agent_provider,
+         body, created_at, updated_at
+       ) values (
+         '66666666-7777-4888-8999-000000000000', '${projectId}',
+         '${migrationRunId}', null, 'owner', null, null, null,
+         'Preserve this message through the backlog migration.',
+         '${atMinute(1)}', '${atMinute(1)}'
+       );`,
+    );
     await executeSql(
       db,
       await readFile(resolve("migrations/0015_backlog_status.sql"), "utf8"),
@@ -957,6 +961,18 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          issue_source_key text,
          project_id text,
          result_verification text not null
+       );
+       create table briar_channel_issue_transfer_quarantine (
+         entity_kind text not null check (
+           entity_kind in ('agent_transcript_session', 'agent_transcript_archive')
+         ),
+         entity_id text not null,
+         run_id text not null,
+         source_project_id text not null,
+         target_project_id text not null,
+         reason text not null check (reason = 'unverified_transcript_ownership'),
+         detected_at text not null,
+         primary key (entity_kind, entity_id)
        );
        create table briar_issue_execution_proposals (
          target_run_id text not null,
@@ -2063,9 +2079,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(
       projectRows.some((row) => row.id === "usage-unclaimed-queued"),
     ).toBe(true);
-    expect(
-      projectRows.find((row) => row.id === "usage-cap-001"),
-    ).toMatchObject({ has_usage_ledger: 1 });
     expect(await listProjectUsageRuns(
       db,
       usageProject.id,
@@ -2108,7 +2121,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   it("synchronizes the newest project agent session snapshot", async () => {
     const sessionId = "77777777-7777-4777-8777-777777777777";
     const payload = {
-      dispatchGroupId: "",
+      dispatchGroupId: sessionId,
       agentId: null,
       sessionType: "task",
       trigger: "manual",
@@ -2298,10 +2311,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         .update("briar_worker_direct_task_selected")
         .digest("hex"),
       agentProvider: "codex",
-      providers: ["codex"],
-      providerHealth: {
-        codex: { installed: true, authenticated: true, healthy: true },
-      },
+      capabilities: workerCapabilitiesFixture(),
       versions: { briar: "1.1.1" },
       observedAt: atMinute(10),
     });
@@ -2314,10 +2324,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       deviceIdentityHash: "f".repeat(64),
       credentialTokenHash: "0".repeat(64),
       agentProvider: "codex",
-      providers: ["codex"],
-      providerHealth: {
-        codex: { installed: true, authenticated: true, healthy: true },
-      },
+      capabilities: workerCapabilitiesFixture(),
       versions: { briar: "1.1.1" },
       observedAt: atMinute(10),
     });

@@ -4,9 +4,6 @@ import {
   BindManagedComputerSetupRequestSchema,
 } from "@briar/contracts/gen/briar/worker/v1/managed_computer_setup_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
-import {
-  WorkerRuntimeAdvertisementSchema,
-} from "@briar/contracts/gen/briar/types/v1/worker_pb";
 import { describe, expect, it, vi } from "vitest";
 import { HttpError } from "./http-response";
 import type { requireWorkerCredential } from "./worker-route-auth";
@@ -14,6 +11,7 @@ import {
   createManagedComputerSetupService,
   type ManagedComputerSetupServices,
 } from "./worker-connect-managed-computer-setup";
+import { workerRuntimeFixture } from "./test-helpers/worker-runtime";
 
 const managedComputerId = "11111111-1111-4111-8111-111111111111";
 const setupToken = `briar_setup_${"a".repeat(43)}`;
@@ -38,12 +36,12 @@ describe("ManagedComputerSetupService validation", () => {
     const context = {
       responseHeader: new Headers(),
     } as HandlerContext;
+    const runtime = workerRuntimeFixture();
+    runtime.agentProvider = 999 as AgentProvider;
     const request = create(BindManagedComputerSetupRequestSchema, {
       managedComputerId,
       setupToken,
-      runtime: create(WorkerRuntimeAdvertisementSchema, {
-        agentProvider: 999 as AgentProvider,
-      }),
+      runtime,
     });
 
     const error = await Promise.resolve(

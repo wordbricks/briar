@@ -238,9 +238,9 @@ const appendReplySummary = (
   parent: ChannelMessage,
   reply: ChannelMessage,
 ): ChannelMessage => {
-  const replyAuthors: NonNullable<ChannelMessage["replyAuthors"]> = [];
+  const replyAuthors: ChannelMessage["replyAuthors"] = [];
   const seen = new Set<string>();
-  for (const author of [reply.author, ...(parent.replyAuthors ?? [])]) {
+  for (const author of [reply.author, ...parent.replyAuthors]) {
     const id = channelAuthorId(author);
     if (seen.has(id)) continue;
     seen.add(id);

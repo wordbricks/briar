@@ -34,6 +34,7 @@ import {
   acceptOrganizationChannelSkillExecutionProposal,
 } from "./channel-proposal-routes";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
+import { workerCapabilitiesFixture } from "./test-helpers/worker-runtime";
 import {
   bindExecutionWorkerProject,
   countExecutionWorkerDeviceSessions,
@@ -309,11 +310,7 @@ describe("conversational Agent Skill execution approval", () => {
         deviceIdentityHash: sha256(`skill-device-${suffix}`),
         credentialTokenHash: sha256(`briar_worker_skill_credential_${suffix}`),
         agentProvider: "codex",
-        providers: ["codex"],
-        providerHealth: {
-          codex: { installed: true, authenticated: true, healthy: true },
-        },
-        providerCapabilities,
+        capabilities: workerCapabilitiesFixture({ providerCapabilities }),
         versions: { briar: "1.0.0" },
         maxConcurrentSessions: 4,
         observedAt,
@@ -329,10 +326,7 @@ describe("conversational Agent Skill execution approval", () => {
       deviceIdentityHash: sha256("skill-device-stale"),
       credentialTokenHash: sha256("skill-credential-stale"),
       agentProvider: "codex",
-      providers: ["codex"],
-      providerHealth: {
-        codex: { installed: true, authenticated: true, healthy: true },
-      },
+      capabilities: workerCapabilitiesFixture({ providerCapabilities }),
       versions: { briar: "1.0.0" },
       maxConcurrentSessions: 4,
       observedAt: staleObservedAt,
@@ -343,16 +337,15 @@ describe("conversational Agent Skill execution approval", () => {
       ownerUserId: ownerId,
       deviceIdentityHash: sha256("skill-device-stale"),
       agentProvider: "codex",
-      providers: ["codex"],
-      providerHealth: {
-        codex: { installed: true, authenticated: true, healthy: true },
-      },
+      capabilities: workerCapabilitiesFixture({ providerCapabilities }),
       versions: { briar: "1.0.0" },
       observedAt,
     });
     await createChannel(db, {
       id: channelId,
       organizationId,
+      kind: "channel",
+      dmKey: null,
       slug: "skill-approval",
       name: "Skill approval",
       topic: null,

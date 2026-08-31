@@ -26,6 +26,7 @@ function session(
     dispatchEvents: [],
     projectId: project.id,
     agentName: "Inbox Agent",
+    sessionType: "task",
     requestedByUserId: "owner",
     status,
     issues: [
@@ -39,6 +40,7 @@ function session(
       },
     ],
     startedAt,
+    updatedAt: status === "running" ? startedAt : completedAt,
     completedAt: status === "running" ? null : completedAt,
     conversationId: null,
     workspaceRoot: null,

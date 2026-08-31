@@ -5,17 +5,13 @@ import { unstable_splitSqlQuery } from "wrangler";
 import { describe, expect, it } from "vitest";
 import { repositoryWorkflowBootstrap } from "../../src/lib/auto-hunt-contract";
 import {
-  createChannel,
   reserveChannelActionProposalApproval,
 } from "./channels";
 import {
-  channelApprovalTablesAvailable,
   createIssueAttachments,
-  createIssueMessage,
   getIssueAttachment,
   getRunEvidenceImage,
   recordHuntEvent,
-  transferIssue,
 } from "./db";
 import {
   acceptOrganizationInvitation,
@@ -404,6 +400,77 @@ async function createPreDescriptionOrganizationAgent(
   ).run();
 }
 
+async function createPreDirectMessageMigrationChannel(
+  db: D1Database,
+  input: {
+    id: string;
+    organizationId: string;
+    slug: string;
+    name: string;
+    topic: string | null;
+    visibility: "public" | "private";
+    defaultProjectId: string | null;
+    createdByUserId: string;
+    createdAt: string;
+  },
+) {
+  await db.batch([
+    db.prepare(
+      `insert into briar_channels (
+         id, organization_id, slug, name, topic, visibility,
+         default_project_id, created_by_user_id, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      input.id,
+      input.organizationId,
+      input.slug,
+      input.name,
+      input.topic,
+      input.visibility,
+      input.defaultProjectId,
+      input.createdByUserId,
+      input.createdAt,
+      input.createdAt,
+    ),
+    db.prepare(
+      `insert into briar_channel_members (
+         channel_id, user_id, role, created_at
+       ) values (?, ?, 'owner', ?)`,
+    ).bind(input.id, input.createdByUserId, input.createdAt),
+  ]);
+}
+
+async function createPreIssueAgentIdentityMessage(
+  db: D1Database,
+  input: {
+    id: string;
+    projectId: string;
+    runId: string;
+    parentMessageId: string | null;
+    authorUserId: string | null;
+    authorAgentProvider: string | null;
+    body: string;
+    createdAt: string;
+  },
+) {
+  await db.prepare(
+    `insert into briar_issue_messages (
+       id, project_id, run_id, parent_message_id, author_user_id,
+       author_agent_provider, body, created_at, updated_at
+     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    input.id,
+    input.projectId,
+    input.runId,
+    input.parentMessageId,
+    input.authorUserId,
+    input.authorAgentProvider,
+    input.body,
+    input.createdAt,
+    input.createdAt,
+  ).run();
+}
+
 async function withPreWorkflowMigrationDatabase(
   name: string,
   test: (db: D1Database) => Promise<void>,
@@ -541,6 +608,107 @@ async function createPreWebhookChannelMessage(
 }
 
 describe("D1 migrations", () => {
+  it("canonicalizes flexible schedule recurrence without breaking runs", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-schedule-recurrence-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      const now = "2026-08-31T00:00:00.000Z";
+      await applyD1Migrations(db, {
+        through: "0153_issue_attachment_uploads.sql",
+      });
+      await executeD1Sql(db, `
+        insert into "user" (
+          id, name, email, emailVerified, createdAt, updatedAt
+        ) values
+          ('schedule-owner', 'Schedule Owner', 'schedule@example.com', 1,
+           '${now}', '${now}'),
+          ('schedule-other', 'Schedule Other', 'other@example.com', 1,
+           '${now}', '${now}');
+        insert into briar_organizations (
+          id, name, handle, created_at, updated_at
+        ) values (
+          'schedule-org', 'Schedule Org', 'schedule-org', '${now}', '${now}'
+        );
+        insert into briar_projects (
+          id, owner_user_id, organization_id, name, agent_token_hash,
+          created_at, updated_at
+        ) values (
+          'schedule-project', 'schedule-owner', 'schedule-org',
+          'Schedule Project', '${"a".repeat(64)}', '${now}', '${now}'
+        );
+        insert into briar_project_agents (
+          id, organization_id, project_id, name, provider, responsibility,
+          created_at, updated_at
+        ) values (
+          'schedule-agent', 'schedule-org', 'schedule-project',
+          'Schedule Agent', 'codex', 'Run scheduled work', '${now}', '${now}'
+        );
+        insert into briar_project_agent_schedules (
+          id, project_id, agent_id, name, recurrence, frequency, time_of_day,
+          day_of_week, time_zone, enabled, created_at, updated_at, next_run_at,
+          interval_value, interval_unit, days_of_week, notification_level,
+          created_by_user_id
+        ) values (
+          'flexible-schedule', 'schedule-project', 'schedule-agent',
+          'Flexible schedule', 'daily', 'custom', '09:30', null, 'Asia/Seoul',
+          1, '${now}', '${now}', '2026-09-01T00:30:00.000Z', 2, 'week',
+          '1,3,5', 'none', 'schedule-owner'
+        );
+        insert into briar_project_agent_schedule_runs (
+          id, project_id, schedule_id, agent_id, status, scheduled_for,
+          started_at, created_at, updated_at
+        ) values (
+          'schedule-run', 'schedule-project', 'flexible-schedule',
+          'schedule-agent', 'completed', '2026-08-25T00:30:00.000Z',
+          '${now}', '${now}', '${now}'
+        );
+      `);
+
+      await applyD1Migrations(db, {
+        files: ["0154_canonical_project_agent_schedule_recurrence.sql"],
+      });
+
+      expect(await db.prepare(
+        `select recurrence, time_of_day, interval_value, interval_unit,
+                days_of_week, notification_level, created_by_user_id
+         from briar_project_agent_schedules where id = 'flexible-schedule'`,
+      ).first()).toEqual({
+        recurrence: "custom",
+        time_of_day: "09:30",
+        interval_value: 2,
+        interval_unit: "week",
+        days_of_week: "1,3,5",
+        notification_level: "none",
+        created_by_user_id: "schedule-owner",
+      });
+      const columns = await db.prepare(
+        `pragma table_info(briar_project_agent_schedules)`,
+      ).all<{ name: string; notnull: number }>();
+      expect(columns.results.find((column) => column.name === "recurrence"))
+        .toMatchObject({ notnull: 1 });
+      expect(columns.results.map((column) => column.name)).not.toContain(
+        "frequency",
+      );
+      expect(await db.prepare(
+        `select schedule_id from briar_project_agent_schedule_runs
+         where id = 'schedule-run'`,
+      ).first()).toEqual({ schedule_id: "flexible-schedule" });
+      await expect(db.prepare(
+        `update briar_project_agent_schedules
+         set created_by_user_id = 'schedule-other'
+         where id = 'flexible-schedule'`,
+      ).run()).rejects.toThrow(/creator is immutable/iu);
+      expect((await db.prepare(`pragma foreign_key_check`).all()).results)
+        .toEqual([]);
+    } finally {
+      await miniflare.dispose();
+    }
+  }, 60_000);
+
   it("preserves upload ownership through the transitional schema rebuilds", async () => {
     const miniflare = new Miniflare({
       modules: true,
@@ -1390,7 +1558,7 @@ describe("D1 migrations", () => {
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
       ).bind(organizationId, userId, now, now).run();
-      await createChannel(db, {
+      await createPreDirectMessageMigrationChannel(db, {
         id: channelId,
         organizationId,
         slug: "migration",
@@ -1873,7 +2041,7 @@ describe("D1 migrations", () => {
         now,
         now,
       ).run();
-      await createChannel(db, {
+      await createPreDirectMessageMigrationChannel(db, {
         id: channelId,
         organizationId,
         slug: "canonical",
@@ -2220,7 +2388,7 @@ describe("D1 migrations", () => {
         now,
         now,
       ).run();
-      await createChannel(db, {
+      await createPreDirectMessageMigrationChannel(db, {
         id: channelId,
         organizationId,
         slug: "upgrade",
@@ -2534,7 +2702,7 @@ describe("D1 migrations", () => {
         content_type: "image/png",
         byte_size: 8,
       }]);
-      await createIssueMessage(db, {
+      await createPreIssueAgentIdentityMessage(db, {
         id: strandedMessageId,
         projectId,
         runId: prematurelyMovedRunId,
@@ -3064,9 +3232,7 @@ describe("D1 migrations", () => {
          where organization_id = ?`,
       ).bind(organizationId).first<{ current_version: number }>();
 
-      await expect(channelApprovalTablesAvailable(db)).resolves.toBe(false);
       await applyD1Migrations(db, { files: ["0090_channel_issue_approval.sql"] });
-      await expect(channelApprovalTablesAvailable(db)).resolves.toBe(true);
 
       await expect(db.prepare(
         `select status, result_run_id, issue_source_key,
@@ -3253,13 +3419,6 @@ describe("D1 migrations", () => {
         },
         completion: { requiredStages: ["repository_workflow_pending"] },
       });
-      await expect(transferIssue(db, {
-        sourceProjectId: projectId,
-        targetProjectId,
-        targetProjectName: "Transfer Target",
-        runId: prematurelyMovedRunId,
-        observedAt: "2026-08-10T00:01:10.000Z",
-      })).resolves.toBe("transferred");
       await expect(db.prepare(
         `select project_id from briar_issue_attachments where id = ?`,
       ).bind(strandedAttachmentId).first()).resolves.toEqual({
