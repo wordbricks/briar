@@ -14,6 +14,7 @@ import {
   organizationAgentContextMaxEncodedPageBytes,
   OrganizationAgentContextPageTooLargeError,
 } from "./organization-agent-context";
+import { decodeProjectAgentSessionInput } from "./project-request-contract";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const otherOrganizationId = "10000000-0000-4000-8000-000000000002";
@@ -83,6 +84,29 @@ const insertSession = async (input: {
   startedAt: string;
   visibleAt?: string;
 }) => {
+  const payload = decodeProjectAgentSessionInput({
+    dispatchGroupId: input.id,
+    agentId,
+    skillId: null,
+    sessionType: "task",
+    trigger: "manual",
+    scheduleId: null,
+    scheduleRunId: null,
+    parentSessionId: null,
+    request: `Request for ${input.id}`,
+    followUps: [],
+    status: input.status,
+    issues: [],
+    startedAt: input.startedAt,
+    completedAt: input.status === "completed" ? input.startedAt : null,
+    conversationId: null,
+    summary: input.summary,
+    error: null,
+    requestedWorkerId: null,
+    workerId: null,
+    events: [],
+    updatedAt: input.startedAt,
+  });
   await db.prepare(
     `insert into briar_project_agent_sessions (
        project_id, id, agent_id, status, session_type, payload_json,
@@ -93,11 +117,7 @@ const insertSession = async (input: {
     input.id,
     agentId,
     input.status,
-    JSON.stringify({
-      summary: input.summary,
-      request: `Request for ${input.id}`,
-      secretToken: `secret-${input.id}`,
-    }),
+    JSON.stringify(payload),
     input.startedAt,
     input.status === "completed" ? input.startedAt : null,
     input.startedAt,
@@ -516,7 +536,6 @@ describe("Organization Agent context lookup", () => {
     ]);
   });
 
-
   it("rejects malformed cursors and cursors from another lookup scope", async () => {
     const first = await lookupOrganizationAgentContext(db, archives, {
       organizationId,
@@ -583,18 +602,14 @@ describe("Organization Agent context lookup", () => {
   });
 
   it("fits summary pages to the byte budget and rejects one oversized item", async () => {
-    await insertSession({
-      id: "large-session-a",
-      status: "running",
-      summary: "a".repeat(800_000),
-      startedAt: currentDataAt,
-    });
-    await insertSession({
-      id: "large-session-b",
-      status: "running",
-      summary: "b".repeat(800_000),
-      startedAt: currentDataAt,
-    });
+    for (let index = 0; index < 32; index += 1) {
+      await insertSession({
+        id: `large-session-${index.toString().padStart(2, "0")}`,
+        status: "running",
+        summary: "x".repeat(50_000),
+        startedAt: currentDataAt,
+      });
+    }
     const response = await lookupOrganizationAgentContext(db, archives, {
       organizationId,
       workId,
@@ -615,16 +630,24 @@ describe("Organization Agent context lookup", () => {
     expect(
       new TextEncoder().encode(JSON.stringify(page)).byteLength,
     ).toBeLessThanOrEqual(organizationAgentContextMaxEncodedPageBytes);
-    expect(page).toMatchObject({ total: 6, complete: false });
+    expect(page).toMatchObject({ total: 36, complete: false });
     expect(page.nextCursor).not.toBeNull();
 
     await insertSession({
       id: "oversized-session",
       projectId: secondProjectId,
       status: "running",
-      summary: "x".repeat(organizationAgentContextMaxEncodedPageBytes),
+      summary: "Before corruption",
       startedAt: currentDataAt,
     });
+    await db.prepare(
+      `update briar_project_agent_sessions
+       set payload_json = json_set(payload_json, '$.summary', ?)
+       where project_id = ? and id = 'oversized-session'`,
+    ).bind(
+      "x".repeat(organizationAgentContextMaxEncodedPageBytes),
+      secondProjectId,
+    ).run();
     await expect(
       lookupOrganizationAgentContext(db, archives, {
         organizationId,
