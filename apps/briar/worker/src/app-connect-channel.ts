@@ -82,7 +82,6 @@ import {
 import { decodeRequestSync } from "./request-schema";
 import { UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
-import { toConnectError } from "./app-connect-errors";
 import { appOrganizationMember } from "./app-connect-mappers";
 import { appOrganizationAgent } from "./app-connect-agent-mappers";
 import {
@@ -215,14 +214,6 @@ const domainMembershipChange = (
   }
 };
 
-const rpc = async <A>(operation: () => Promise<A>): Promise<A> => {
-  try {
-    return await operation();
-  } catch (error) {
-    throw toConnectError(error);
-  }
-};
-
 const approvalJson = (approval: {
   provider: AgentProvider;
   model?: string;
@@ -257,7 +248,7 @@ const createAppChannelService = (
   input: AppConnectChannelInput,
   services: AppConnectChannelServices = appConnectChannelServices,
 ): ServiceImpl<typeof ChannelService> => ({
-  listChannels: (request) => rpc(async () => {
+  listChannels: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.listChannels({
       db: input.db,
@@ -268,9 +259,9 @@ const createAppChannelService = (
       channels: result.channels.map(appChannelSummaryJson),
       cursor: BigInt(result.cursor),
     });
-  }),
+  },
 
-  syncChannels: (request) => rpc(async () => {
+  syncChannels: async (request) => {
     if (request.cursor > BigInt(Number.MAX_SAFE_INTEGER)) {
       throw new ConnectError("Invalid channel cursor", Code.InvalidArgument);
     }
@@ -291,9 +282,9 @@ const createAppChannelService = (
       removedMessageIds: result.removedMessageIds,
       agentReplies: result.agentReplies.map(appChannelAgentReply),
     });
-  }),
+  },
 
-  listDirectMessageRecipients: (request) => rpc(async () => {
+  listDirectMessageRecipients: async (request) => {
     const organizationId = canonicalUuid(request.organizationId);
     const session = await services.requireSession(input.auth, input.request);
     const role = await getOrganizationRole(
@@ -312,9 +303,9 @@ const createAppChannelService = (
       members: members.map((member) => appOrganizationMember(member)),
       agents: agents.map(appOrganizationAgent),
     });
-  }),
+  },
 
-  createDirectMessage: (request) => rpc(async () => {
+  createDirectMessage: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.createDirectMessage({
       db: input.db,
@@ -326,9 +317,9 @@ const createAppChannelService = (
     return create(ChannelService.method.createDirectMessage.output, {
       channel: appChannelSummaryJson(result.channel),
     });
-  }),
+  },
 
-  createChannel: (request) => rpc(async () => {
+  createChannel: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const organizationId = canonicalUuid(request.organizationId);
     const channel = await services.createChannel({
@@ -354,9 +345,9 @@ const createAppChannelService = (
     return create(ChannelService.method.createChannel.output, {
       channel: appChannelSummary(channel),
     });
-  }),
+  },
 
-  updateChannel: (request) => rpc(async () => {
+  updateChannel: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const organizationId = canonicalUuid(request.organizationId);
     const channelId = canonicalUuid(request.channelId);
@@ -396,9 +387,9 @@ const createAppChannelService = (
     return create(ChannelService.method.updateChannel.output, {
       channel: appChannelSummary(channel),
     });
-  }),
+  },
 
-  deleteChannel: (request) => rpc(async () => {
+  deleteChannel: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const organizationId = canonicalUuid(request.organizationId);
     const channelId = canonicalUuid(request.channelId);
@@ -432,9 +423,9 @@ const createAppChannelService = (
       input.context,
     );
     return create(ChannelService.method.deleteChannel.output, { deleted: true });
-  }),
+  },
 
-  setChannelAgent: (request) => rpc(async () => {
+  setChannelAgent: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const organizationId = canonicalUuid(request.organizationId);
     const channelId = canonicalUuid(request.channelId);
@@ -459,9 +450,9 @@ const createAppChannelService = (
     return create(ChannelService.method.setChannelAgent.output, {
       agents: agents.map(appOrganizationAgent),
     });
-  }),
+  },
 
-  setChannelMember: (request) => rpc(async () => {
+  setChannelMember: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const organizationId = canonicalUuid(request.organizationId);
     const channelId = canonicalUuid(request.channelId);
@@ -486,9 +477,9 @@ const createAppChannelService = (
     return create(ChannelService.method.setChannelMember.output, {
       members: members.map(appChannelMember),
     });
-  }),
+  },
 
-  listChannelWebhooks: (request) => rpc(async () => {
+  listChannelWebhooks: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const webhooks = await services.listChannelWebhooks({
       db: input.db,
@@ -499,9 +490,9 @@ const createAppChannelService = (
     return create(ChannelService.method.listChannelWebhooks.output, {
       webhooks: webhooks.map(appChannelWebhook),
     });
-  }),
+  },
 
-  createChannelWebhook: (request) => rpc(async () => {
+  createChannelWebhook: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.createChannelWebhook({
       db: input.db,
@@ -517,9 +508,9 @@ const createAppChannelService = (
         input.request.url,
       ).toString(),
     });
-  }),
+  },
 
-  updateChannelWebhook: (request) => rpc(async () => {
+  updateChannelWebhook: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const webhook = await services.updateChannelWebhook({
       db: input.db,
@@ -532,9 +523,9 @@ const createAppChannelService = (
     return create(ChannelService.method.updateChannelWebhook.output, {
       webhook: appChannelWebhook(webhook),
     });
-  }),
+  },
 
-  rotateChannelWebhook: (request) => rpc(async () => {
+  rotateChannelWebhook: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.rotateChannelWebhook({
       db: input.db,
@@ -550,9 +541,9 @@ const createAppChannelService = (
         input.request.url,
       ).toString(),
     });
-  }),
+  },
 
-  revokeChannelWebhook: (request) => rpc(async () => {
+  revokeChannelWebhook: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const webhook = await services.revokeChannelWebhook({
       db: input.db,
@@ -564,9 +555,9 @@ const createAppChannelService = (
     return create(ChannelService.method.revokeChannelWebhook.output, {
       webhook: appChannelWebhook(webhook),
     });
-  }),
+  },
 
-  getChannel: (request) => rpc(async () => {
+  getChannel: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.getChannel({
       db: input.db,
@@ -583,9 +574,9 @@ const createAppChannelService = (
       agentReplies: result.agentReplies.map(appChannelAgentReply),
       nextCursor: result.nextCursor ?? undefined,
     });
-  }),
+  },
 
-  markChannelRead: (request) => rpc(async () => {
+  markChannelRead: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.markRead({
       db: input.db,
@@ -602,9 +593,9 @@ const createAppChannelService = (
     return create(ChannelService.method.markChannelRead.output, {
       channel: appChannelSummaryJson(result.channel),
     });
-  }),
+  },
 
-  listChannelMessages: (request) => rpc(async () => {
+  listChannelMessages: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.listMessages({
       db: input.db,
@@ -619,9 +610,9 @@ const createAppChannelService = (
       messages: result.messages.map(appChannelMessage),
       nextCursor: result.nextCursor ?? undefined,
     });
-  }),
+  },
 
-  createChannelMessage: (request) => rpc(async () => {
+  createChannelMessage: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.createMessage({
       db: input.db,
@@ -635,9 +626,9 @@ const createAppChannelService = (
     });
     scheduleChannelMutation(input, request.organizationId);
     return appCreateChannelMessageResponse(result);
-  }),
+  },
 
-  deleteChannelMessage: (request) => rpc(async () => {
+  deleteChannelMessage: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.deleteMessage({
       db: input.db,
@@ -657,9 +648,9 @@ const createAppChannelService = (
         ? appChannelMessage(result.parentMessage)
         : undefined,
     });
-  }),
+  },
 
-  getChannelMessageDocument: (request) => rpc(async () => {
+  getChannelMessageDocument: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const document = await services.getMessageDocument({
       db: input.db,
@@ -671,9 +662,9 @@ const createAppChannelService = (
     return create(ChannelService.method.getChannelMessageDocument.output, {
       document: appChannelDocumentContent(document),
     });
-  }),
+  },
 
-  getChannelLinkPreview: (request) => rpc(async () => {
+  getChannelLinkPreview: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const preview = await services.getLinkPreview({
       db: input.db,
@@ -685,9 +676,9 @@ const createAppChannelService = (
     return create(ChannelService.method.getChannelLinkPreview.output, {
       preview: preview ? appChannelLinkPreview(preview) : undefined,
     });
-  }),
+  },
 
-  toggleChannelMessageReaction: (request) => rpc(async () => {
+  toggleChannelMessageReaction: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.toggleReaction({
       db: input.db,
@@ -701,9 +692,9 @@ const createAppChannelService = (
     return create(ChannelService.method.toggleChannelMessageReaction.output, {
       message: appChannelMessage(result.message),
     });
-  }),
+  },
 
-  setChannelThreadSubscription: (request) => rpc(async () => {
+  setChannelThreadSubscription: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.setThreadSubscription({
       db: input.db,
@@ -718,9 +709,9 @@ const createAppChannelService = (
       rootMessageId: result.rootMessageId,
       subscribers: result.subscribers.map(appChannelSubscriber),
     });
-  }),
+  },
 
-  acceptChannelProposal: (request) => rpc(async () => {
+  acceptChannelProposal: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.acceptProposal({
       db: input.db,
@@ -744,9 +735,9 @@ const createAppChannelService = (
       );
     }
     return appAcceptChannelProposal(result);
-  }),
+  },
 
-  acceptChannelExecutionProposal: (request) => rpc(async () => {
+  acceptChannelExecutionProposal: async (request) => {
     if (!request.approval) {
       throw new ConnectError("approval is required", Code.InvalidArgument);
     }
@@ -770,9 +761,9 @@ const createAppChannelService = (
       );
     }
     return appAcceptChannelExecutionProposal(result);
-  }),
+  },
 
-  declineChannelProposal: (request) => rpc(async () => {
+  declineChannelProposal: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.declineProposal({
       db: input.db,
@@ -784,9 +775,9 @@ const createAppChannelService = (
     });
     scheduleChannelMutation(input, request.organizationId);
     return declineProposalMessage(result);
-  }),
+  },
 
-  acceptChannelSkillExecutionProposal: (request) => rpc(async () => {
+  acceptChannelSkillExecutionProposal: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.acceptSkillExecutionProposal({
       db: input.db,
@@ -811,7 +802,7 @@ const createAppChannelService = (
       }
     }
     return appAcceptChannelSkillExecutionProposal(result);
-  }),
+  },
 });
 
 export function registerAppChannelService(

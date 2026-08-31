@@ -8,7 +8,6 @@ import {
   IssueService,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
-import { agentSkillConflictMessage } from "./agent-skills";
 import {
   appAcceptIssueActionProposalResponse,
   appAcceptIssueExecutionProposalResponse,
@@ -78,12 +77,11 @@ import {
   scheduleProjectAgentSessionRealtimePublish,
   scheduleProjectRealtimePublish,
 } from "./realtime-scheduling";
-import { RequestDecodeError, decodeRequestSync } from "./request-schema";
+import { decodeRequestSync } from "./request-schema";
 import { runEvidenceResponseMessage } from "./run-evidence-connect";
 import { listProjectRunEvidence } from "./run-evidence-routes";
 import { UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
-import { WorkerConflictError } from "./workers";
 import {
   appAgentProviderFromProto,
   appCheckpointPosition,
@@ -167,91 +165,6 @@ const decodeUuid = decodeRequestSync(UuidString);
 
 const canonicalUuid = (value: string) => decodeUuid(value).toLowerCase();
 
-const connectCodeFromHttpStatus = (status: number): Code => {
-  switch (status) {
-    case 400:
-    case 411:
-    case 422:
-      return Code.InvalidArgument;
-    case 401:
-      return Code.Unauthenticated;
-    case 403:
-      return Code.PermissionDenied;
-    case 404:
-      return Code.NotFound;
-    case 409:
-    case 428:
-      return Code.FailedPrecondition;
-    case 410:
-      return Code.OutOfRange;
-    case 413:
-    case 429:
-      return Code.ResourceExhausted;
-    case 501:
-      return Code.Unimplemented;
-    case 503:
-      return Code.Unavailable;
-    default:
-      return Code.Internal;
-  }
-};
-
-const toConnectError = (error: unknown): ConnectError => {
-  if (error instanceof ConnectError) return error;
-  if (error instanceof HttpError) {
-    return new ConnectError(
-      error.message,
-      connectCodeFromHttpStatus(error.status),
-      undefined,
-      undefined,
-      error,
-    );
-  }
-  if (error instanceof RequestDecodeError) {
-    return new ConnectError(
-      "Invalid request",
-      Code.InvalidArgument,
-      undefined,
-      undefined,
-      error,
-    );
-  }
-  if (error instanceof WorkerConflictError) {
-    return new ConnectError(
-      error.message,
-      Code.FailedPrecondition,
-      undefined,
-      undefined,
-      error,
-    );
-  }
-  const skillConflict = agentSkillConflictMessage(error);
-  if (skillConflict) {
-    return new ConnectError(
-      skillConflict,
-      Code.FailedPrecondition,
-      undefined,
-      undefined,
-      error,
-    );
-  }
-  return new ConnectError(
-    "Internal server error",
-    Code.Internal,
-    undefined,
-    undefined,
-    error,
-  );
-};
-
-const rpc = async <A>(run: () => Promise<A>): Promise<A> => {
-  try {
-    return await run();
-  } catch (error) {
-    throw toConnectError(error);
-  }
-};
-
 const optionalProviderBody = (provider: AgentProvider) => {
   const value = appAgentProviderFromProto(provider);
   return value === undefined ? {} : { provider: value };
@@ -278,7 +191,7 @@ export const createAppIssueService = (
   input: AppConnectIssueRouteInput,
   services: AppConnectIssueServices = appConnectIssueServices,
 ): ServiceImpl<typeof IssueService> => ({
-  createIssue: (request) => rpc(async () => {
+  createIssue: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.createIssue({
@@ -292,9 +205,9 @@ export const createAppIssueService = (
       })
     );
     return appCreateIssueResponse(result);
-  }),
+  },
 
-  updateIssue: (request) => rpc(async () => {
+  updateIssue: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.updateIssue({
@@ -310,9 +223,9 @@ export const createAppIssueService = (
       })
     );
     return appUpdateIssueResponse(result);
-  }),
+  },
 
-  deleteIssue: (request) => rpc(async () => {
+  deleteIssue: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.deleteIssue({
@@ -326,9 +239,9 @@ export const createAppIssueService = (
       })
     );
     return appDeleteIssueResponse(result);
-  }),
+  },
 
-  transferIssue: (request) => rpc(async () => {
+  transferIssue: async (request) => {
     const targetProjectId = canonicalUuid(request.targetProjectId);
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(
@@ -343,9 +256,9 @@ export const createAppIssueService = (
       }),
     );
     return appTransferIssueResponse(result);
-  }),
+  },
 
-  setIssueSubscription: (request) => rpc(async () => {
+  setIssueSubscription: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.setSubscription({
@@ -357,9 +270,9 @@ export const createAppIssueService = (
       })
     );
     return appSetIssueSubscriptionResponse(result);
-  }),
+  },
 
-  updateIssuePreferences: (request) => rpc(async () => {
+  updateIssuePreferences: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.updatePreferences({
@@ -377,9 +290,9 @@ export const createAppIssueService = (
       })
     );
     return appUpdateIssuePreferencesResponse(result);
-  }),
+  },
 
-  updateIssueCheckpoints: (request) => rpc(async () => {
+  updateIssueCheckpoints: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.updateCheckpoints({
@@ -397,9 +310,9 @@ export const createAppIssueService = (
       })
     );
     return appUpdateIssueCheckpointsResponse(result);
-  }),
+  },
 
-  setIssueDependency: (request) => rpc(async () => {
+  setIssueDependency: async (request) => {
     const projectId = canonicalUuid(request.projectId);
     const dependentRunId = canonicalUuid(request.runId);
     const prerequisiteRunId = canonicalUuid(request.prerequisiteRunId);
@@ -415,9 +328,9 @@ export const createAppIssueService = (
       })
     );
     return appSetIssueDependencyResponse(result);
-  }),
+  },
 
-  moveRun: (request) => rpc(async () => {
+  moveRun: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.moveRun({
@@ -433,9 +346,9 @@ export const createAppIssueService = (
       })
     );
     return appMoveRunResponse(result);
-  }),
+  },
 
-  retryRun: (request) => rpc(async () => {
+  retryRun: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.recoverRun({
@@ -451,9 +364,9 @@ export const createAppIssueService = (
       })
     );
     return appRetryRunResponse(result);
-  }),
+  },
 
-  cancelRun: (request) => rpc(async () => {
+  cancelRun: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.recoverRun({
@@ -469,9 +382,9 @@ export const createAppIssueService = (
       })
     );
     return appCancelRunResponse(result);
-  }),
+  },
 
-  resumeRun: (request) => rpc(async () => {
+  resumeRun: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.resumeRun({
@@ -488,9 +401,9 @@ export const createAppIssueService = (
       })
     );
     return appResumeRunResponse(result);
-  }),
+  },
 
-  reworkRun: (request) => rpc(async () => {
+  reworkRun: async (request) => {
     if (!request.checkpoint) {
       throw new ConnectError(
         "Checkpoint identity is required",
@@ -516,9 +429,9 @@ export const createAppIssueService = (
       })
     );
     return appReworkRunResponse(result);
-  }),
+  },
 
-  unassignRun: (request) => rpc(async () => {
+  unassignRun: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.unassignRun({
@@ -530,9 +443,9 @@ export const createAppIssueService = (
       })
     );
     return appUnassignRunResponse(result);
-  }),
+  },
 
-  dispatchRun: (request) => rpc(async () => {
+  dispatchRun: async (request) => {
     if (!request.dispatch) {
       throw new ConnectError("Dispatch input is required", Code.InvalidArgument);
     }
@@ -559,9 +472,9 @@ export const createAppIssueService = (
       })
     );
     return appDispatchRunResponse(result);
-  }),
+  },
 
-  reassignRun: (request) => rpc(async () => {
+  reassignRun: async (request) => {
     if (!request.dispatch) {
       throw new ConnectError("Dispatch input is required", Code.InvalidArgument);
     }
@@ -588,9 +501,9 @@ export const createAppIssueService = (
       })
     );
     return appReassignRunResponse(result);
-  }),
+  },
 
-  completeResultReview: (request) => rpc(async () => {
+  completeResultReview: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.completeResultReview({
@@ -601,9 +514,9 @@ export const createAppIssueService = (
       })
     );
     return appCompleteResultReviewResponse(result);
-  }),
+  },
 
-  listIssueMessages: (request) => rpc(async () => {
+  listIssueMessages: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.listMessages({
       db: input.db,
@@ -613,9 +526,9 @@ export const createAppIssueService = (
       userId: session.user.id,
     });
     return appListIssueMessagesResponse(result);
-  }),
+  },
 
-  syncIssueMessages: (request) => rpc(async () => {
+  syncIssueMessages: async (request) => {
     if (request.cursor > BigInt(Number.MAX_SAFE_INTEGER)) {
       throw new ConnectError(
         "Conversation cursor is outside the safe range",
@@ -641,9 +554,9 @@ export const createAppIssueService = (
       const snapshot = await services.listMessages(applicationInput);
       return appResetIssueMessagesResponse(snapshot);
     }
-  }),
+  },
 
-  createIssueMessage: (request) => rpc(async () => {
+  createIssueMessage: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.createMessage({
@@ -659,9 +572,9 @@ export const createAppIssueService = (
       })
     );
     return appCreateIssueMessageResponse(result);
-  }),
+  },
 
-  updateIssueMessage: (request) => rpc(async () => {
+  updateIssueMessage: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.updateMessage({
@@ -679,9 +592,9 @@ export const createAppIssueService = (
       })
     );
     return appUpdateIssueMessageResponse(result);
-  }),
+  },
 
-  deleteIssueMessage: (request) => rpc(async () => {
+  deleteIssueMessage: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.deleteMessage({
@@ -695,9 +608,9 @@ export const createAppIssueService = (
       })
     );
     return appDeleteIssueMessageResponse(result);
-  }),
+  },
 
-  getIssueAgentReply: (request) => rpc(async () => {
+  getIssueAgentReply: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.getAgentReply({
       db: input.db,
@@ -708,9 +621,9 @@ export const createAppIssueService = (
       userId: session.user.id,
     });
     return appGetIssueAgentReplyResponse(result);
-  }),
+  },
 
-  listRunEvidence: (request) => rpc(async () => {
+  listRunEvidence: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.listEvidence({
       db: input.db,
@@ -720,9 +633,9 @@ export const createAppIssueService = (
       userId: session.user.id,
     });
     return runEvidenceResponseMessage(result);
-  }),
+  },
 
-  acceptIssueReworkProposal: (request) => rpc(async () => {
+  acceptIssueReworkProposal: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.acceptReworkProposal({
@@ -736,9 +649,9 @@ export const createAppIssueService = (
       })
     );
     return appAcceptIssueReworkProposalResponse(result);
-  }),
+  },
 
-  acceptIssueActionProposal: (request) => rpc(async () => {
+  acceptIssueActionProposal: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.acceptActionProposal({
@@ -752,9 +665,9 @@ export const createAppIssueService = (
       })
     );
     return appAcceptIssueActionProposalResponse(result);
-  }),
+  },
 
-  acceptIssueExecutionProposal: (request) => rpc(async () => {
+  acceptIssueExecutionProposal: async (request) => {
     if (!request.approval) {
       throw new ConnectError("Execution approval is required", Code.InvalidArgument);
     }
@@ -778,9 +691,9 @@ export const createAppIssueService = (
       })
     );
     return appAcceptIssueExecutionProposalResponse(result);
-  }),
+  },
 
-  acceptIssueSkillExecutionProposal: (request) => rpc(async () => {
+  acceptIssueSkillExecutionProposal: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [request.projectId], () =>
       services.acceptSkillExecutionProposal({
@@ -803,7 +716,7 @@ export const createAppIssueService = (
       );
     }
     return appAcceptIssueSkillExecutionProposalResponse(result);
-  }),
+  },
 });
 
 export function registerAppIssueService(

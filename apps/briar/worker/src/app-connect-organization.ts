@@ -9,7 +9,7 @@ import {
   type ServiceImpl,
 } from "@connectrpc/connect";
 import type { BriarAuth } from "./auth";
-import { withConnectErrors } from "./app-connect-errors";
+
 import {
   appOrganization,
   appOrganizationInvitation,
@@ -102,15 +102,15 @@ const withApplicationErrors = async <A>(operation: Promise<A>) => {
 export const createAppOrganizationService = (
   { request, auth, db }: AppConnectOrganizationInput,
 ): ServiceImpl<typeof OrganizationService> => ({
-  listOrganizations: () => withConnectErrors(async () => {
+  listOrganizations: async () => {
     const session = await requireSession(auth, request);
     const organizations = await withApplicationErrors(
       listOrganizationsApplication({ db, userId: session.user.id }),
     );
     return { organizations: organizations.map(appOrganization) };
-  }),
+  },
 
-  createOrganization: (input) => withConnectErrors(async () => {
+  createOrganization: async (input) => {
     const session = await requireSession(auth, request);
     const organization = await withApplicationErrors(
       createOrganizationApplication({
@@ -121,21 +121,20 @@ export const createAppOrganizationService = (
       }),
     );
     return { organization: appOrganization(organization) };
-  }),
+  },
 
-  checkOrganizationHandleAvailability: (input) =>
-    withConnectErrors(async () => {
-      await requireSession(auth, request);
-      const available = await withApplicationErrors(
-        checkOrganizationHandleAvailabilityApplication({
-          db,
-          handle: input.handle,
-        }),
-      );
-      return { available };
-    }),
+  checkOrganizationHandleAvailability: async (input) => {
+    await requireSession(auth, request);
+    const available = await withApplicationErrors(
+      checkOrganizationHandleAvailabilityApplication({
+        db,
+        handle: input.handle,
+      }),
+    );
+    return { available };
+  },
 
-  updateOrganization: (input) => withConnectErrors(async () => {
+  updateOrganization: async (input) => {
     const session = await requireSession(auth, request);
     const organization = await withApplicationErrors(
       updateOrganizationApplication({
@@ -146,9 +145,9 @@ export const createAppOrganizationService = (
       }),
     );
     return { organization: appOrganization(organization) };
-  }),
+  },
 
-  updateOrganizationLogo: (input) => withConnectErrors(async () => {
+  updateOrganizationLogo: async (input) => {
     const session = await requireSession(auth, request);
     const logo = input.logoUpdate.case === "logo"
       ? input.logoUpdate.value
@@ -166,9 +165,9 @@ export const createAppOrganizationService = (
       }),
     );
     return { organization: appOrganization(organization) };
-  }),
+  },
 
-  listOrganizationInvitations: (input) => withConnectErrors(async () => {
+  listOrganizationInvitations: async (input) => {
     const session = await requireSession(auth, request);
     const observedAt = new Date().toISOString();
     const invitations = await withApplicationErrors(
@@ -183,9 +182,9 @@ export const createAppOrganizationService = (
         appOrganizationInvitation(invitation, observedAt)
       ),
     };
-  }),
+  },
 
-  createOrganizationInvitation: (input) => withConnectErrors(async () => {
+  createOrganizationInvitation: async (input) => {
     const session = await requireSession(auth, request);
     const result = await withApplicationErrors(
       createOrganizationInvitationApplication({
@@ -204,9 +203,9 @@ export const createAppOrganizationService = (
       ),
       invitePath: result.invitePath,
     };
-  }),
+  },
 
-  revokeOrganizationInvitation: (input) => withConnectErrors(async () => {
+  revokeOrganizationInvitation: async (input) => {
     const session = await requireSession(auth, request);
     await withApplicationErrors(revokeOrganizationInvitationApplication({
       db,
@@ -215,9 +214,9 @@ export const createAppOrganizationService = (
       userId: session.user.id,
     }));
     return {};
-  }),
+  },
 
-  getOrganizationInvitation: (input) => withConnectErrors(async () => {
+  getOrganizationInvitation: async (input) => {
     const result = await withApplicationErrors(
       getOrganizationInvitationApplication({ db, token: input.token }),
     );
@@ -227,9 +226,9 @@ export const createAppOrganizationService = (
         result.observedAt,
       ),
     };
-  }),
+  },
 
-  acceptOrganizationInvitation: (input) => withConnectErrors(async () => {
+  acceptOrganizationInvitation: async (input) => {
     const session = await requireSession(auth, request);
     const result = await withApplicationErrors(
       acceptOrganizationInvitationApplication({
@@ -245,9 +244,9 @@ export const createAppOrganizationService = (
       ),
       alreadyAccepted: result.alreadyAccepted,
     };
-  }),
+  },
 
-  listOrganizationMembers: (input) => withConnectErrors(async () => {
+  listOrganizationMembers: async (input) => {
     const session = await requireSession(auth, request);
     const members = await withApplicationErrors(
       listOrganizationMembersApplication({
@@ -261,9 +260,9 @@ export const createAppOrganizationService = (
         appOrganizationMember(member, projectIds)
       ),
     };
-  }),
+  },
 
-  updateOrganizationMemberRole: (input) => withConnectErrors(async () => {
+  updateOrganizationMemberRole: async (input) => {
     const session = await requireSession(auth, request);
     const members = await withApplicationErrors(
       updateOrganizationMemberRoleApplication({
@@ -279,28 +278,27 @@ export const createAppOrganizationService = (
         appOrganizationMember(member, projectIds)
       ),
     };
-  }),
+  },
 
-  updateOrganizationMemberProjects: (input) =>
-    withConnectErrors(async () => {
-      const session = await requireSession(auth, request);
-      const members = await withApplicationErrors(
-        updateOrganizationMemberProjectsApplication({
-          db,
-          organizationId: input.organizationId,
-          userId: session.user.id,
-          memberId: input.userId,
-          projectIds: input.projectIds,
-        }),
-      );
-      return {
-        members: members.map(({ member, projectIds }) =>
-          appOrganizationMember(member, projectIds)
-        ),
-      };
-    }),
+  updateOrganizationMemberProjects: async (input) => {
+    const session = await requireSession(auth, request);
+    const members = await withApplicationErrors(
+      updateOrganizationMemberProjectsApplication({
+        db,
+        organizationId: input.organizationId,
+        userId: session.user.id,
+        memberId: input.userId,
+        projectIds: input.projectIds,
+      }),
+    );
+    return {
+      members: members.map(({ member, projectIds }) =>
+        appOrganizationMember(member, projectIds)
+      ),
+    };
+  },
 
-  removeOrganizationMember: (input) => withConnectErrors(async () => {
+  removeOrganizationMember: async (input) => {
     const session = await requireSession(auth, request);
     await withApplicationErrors(removeOrganizationMemberApplication({
       db,
@@ -309,7 +307,7 @@ export const createAppOrganizationService = (
       memberId: input.userId,
     }));
     return {};
-  }),
+  },
 });
 
 export function registerAppOrganizationService(

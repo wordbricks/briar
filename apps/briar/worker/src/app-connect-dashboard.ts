@@ -37,7 +37,7 @@ import {
   issueConversationNotificationJson,
 } from "./issue-conversation-json";
 import { listProjectMembers } from "./organization-repository";
-import { withConnectErrors } from "./app-connect-errors";
+
 import {
   appAgentProvider,
   appChannelNotification,
@@ -146,86 +146,85 @@ const runJsonWithRelations = (
 export const createAppDashboardService = (
   { request, auth, db, archivesBucket }: AppConnectDashboardInput,
 ): ServiceImpl<typeof DashboardService> => ({
-  getDashboard: async (rpcRequest) =>
-    withConnectErrors(async () => {
-      const input = decodeProjectId({ projectId: rpcRequest.projectId });
-      const session = await requireSession(auth, request);
-      const project = await getProject(db, input.projectId, session.user.id);
-      if (!project) throw new HttpError(404, "Project not found");
+  getDashboard: async (rpcRequest) => {
+    const input = decodeProjectId({ projectId: rpcRequest.projectId });
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, input.projectId, session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
 
-      // Read the cursor before the projection so every concurrent mutation is
-      // either visible here or guaranteed to be returned by SyncDashboard.
-      const cursor = await getDashboardSyncCursor(db, project.id);
-      const observedAt = new Date().toISOString();
-      const [
-        runs,
+    // Read the cursor before the projection so every concurrent mutation is
+    // either visible here or guaranteed to be returned by SyncDashboard.
+    const cursor = await getDashboardSyncCursor(db, project.id);
+    const observedAt = new Date().toISOString();
+    const [
+      runs,
+      projectSettings,
+      checkpointPolicy,
+      attachments,
+      dependencies,
+      resultReviews,
+      workers,
+      organizationProviders,
+      executionPolicy,
+      members,
+      conversationNotifications,
+      channelNotifications,
+    ] = await Promise.all([
+      listDashboardRuns(db, project.id),
+      getProjectSettings(db, project.id),
+      loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
+      listIssueAttachments(db, project.id),
+      listIssueDependencies(db, project.id),
+      listIssueResultReviews(db, project.id),
+      listExecutionWorkers(db, project.id, observedAt),
+      listOrganizationExecutionProviders(db, project.organization_id),
+      getProjectExecutionWorkerPolicy(db, project.id),
+      listProjectMembers(db, project.id),
+      listIssueConversationNotifications(db, project.id, session.user.id),
+      listChannelConversationNotifications(
+        db,
+        project.organization_id,
+        session.user.id,
+      ),
+    ]);
+    const relations = indexRunRelations(
+      attachments,
+      dependencies,
+      resultReviews,
+    );
+    return {
+      project: appProject(project),
+      settings: appProjectSettings(settingsJson(
         projectSettings,
-        checkpointPolicy,
-        attachments,
-        dependencies,
-        resultReviews,
-        workers,
-        organizationProviders,
-        executionPolicy,
-        members,
-        conversationNotifications,
-        channelNotifications,
-      ] = await Promise.all([
-        listDashboardRuns(db, project.id),
-        getProjectSettings(db, project.id),
-        loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
-        listIssueAttachments(db, project.id),
-        listIssueDependencies(db, project.id),
-        listIssueResultReviews(db, project.id),
-        listExecutionWorkers(db, project.id, observedAt),
-        listOrganizationExecutionProviders(db, project.organization_id),
-        getProjectExecutionWorkerPolicy(db, project.id),
-        listProjectMembers(db, project.id),
-        listIssueConversationNotifications(db, project.id, session.user.id),
-        listChannelConversationNotifications(
-          db,
-          project.organization_id,
-          session.user.id,
+        checkpointPolicyJson(checkpointPolicy),
+      )),
+      runs: runs.map((run) =>
+        appDashboardRun(runJsonWithRelations(run, relations))
+      ),
+      workers: workers.map((worker) =>
+        appDashboardWorker(workerJson(worker, observedAt))
+      ),
+      organizationProviders: organizationProviders.map(
+        (provider) => appAgentProvider[provider],
+      ),
+      executionPolicy: appExecutionPolicy(executionPolicy),
+      members: members.map((member) => appOrganizationMember(member)),
+      conversationNotifications: conversationNotifications.map(
+        (notification) => appConversationNotification(
+          issueConversationNotificationJson(notification),
         ),
-      ]);
-      const relations = indexRunRelations(
-        attachments,
-        dependencies,
-        resultReviews,
-      );
-      return {
-        project: appProject(project),
-        settings: appProjectSettings(settingsJson(
-          projectSettings,
-          checkpointPolicyJson(checkpointPolicy),
-        )),
-        runs: runs.map((run) =>
-          appDashboardRun(runJsonWithRelations(run, relations))
-        ),
-        workers: workers.map((worker) =>
-          appDashboardWorker(workerJson(worker, observedAt))
-        ),
-        organizationProviders: organizationProviders.map(
-          (provider) => appAgentProvider[provider],
-        ),
-        executionPolicy: appExecutionPolicy(executionPolicy),
-        members: members.map((member) => appOrganizationMember(member)),
-        conversationNotifications: conversationNotifications.map(
-          (notification) => appConversationNotification(
-            issueConversationNotificationJson(notification),
-          ),
-        ),
-        channelNotifications: channelNotifications.map((notification) =>
-          appChannelNotification(
-            channelConversationNotificationJson(notification),
-          )
-        ),
-        cursor: BigInt(cursor),
-        generatedAt: timestampFromDate(new Date(observedAt)),
-      };
-    }),
+      ),
+      channelNotifications: channelNotifications.map((notification) =>
+        appChannelNotification(
+          channelConversationNotificationJson(notification),
+        )
+      ),
+      cursor: BigInt(cursor),
+      generatedAt: timestampFromDate(new Date(observedAt)),
+    };
+  },
 
-  syncDashboard: async (rpcRequest) => withConnectErrors(async () => {
+  syncDashboard: async (rpcRequest) => {
     const input = decodeProjectId({ projectId: rpcRequest.projectId });
     if (
       rpcRequest.cursor < 0n ||
@@ -356,9 +355,9 @@ export const createAppDashboardService = (
       ),
       generatedAt: timestampFromDate(new Date(observedAt)),
     };
-  }),
+  },
 
-  listRunEvents: async (rpcRequest) => withConnectErrors(async () => {
+  listRunEvents: async (rpcRequest) => {
     const input = decodeRunIds({
       projectId: rpcRequest.projectId,
       runId: rpcRequest.runId,
@@ -391,7 +390,7 @@ export const createAppDashboardService = (
         appRunEvent(dashboardEventJson(event, actorNames))
       ),
     };
-  }),
+  },
 });
 
 export function registerAppDashboardService(

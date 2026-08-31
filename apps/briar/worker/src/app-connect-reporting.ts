@@ -5,7 +5,7 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/reporting_pb";
 import { Code, ConnectError, type ConnectRouter, type ServiceImpl } from "@connectrpc/connect";
 import type { BriarAuth } from "./auth";
-import { withConnectErrors } from "./app-connect-errors";
+
 import {
   appOrganizationUsageRuns,
   appProjectUsageSummary,
@@ -93,74 +93,70 @@ export const createAppReportingService = (
   { request, auth, db }: AppConnectReportingInput,
   services: ReportingApplicationServices = reportingApplicationServices,
 ): ServiceImpl<typeof ReportingService> => ({
-  listOrganizationUsageRuns: (input) =>
-    withConnectErrors(async () => {
-      const session = await requireSession(auth, request);
-      const result = await withApplicationErrors(
-        listOrganizationUsageRunsApplication(
-          {
-            db,
-            organizationId: decodeUuid(input.organizationId),
-            userId: session.user.id,
-            days: organizationUsageDays(input.range),
-          },
-          services,
-        ),
-      );
-      return appOrganizationUsageRuns(result);
-    }),
-
-  getProjectUsageSummary: (input) =>
-    withConnectErrors(async () => {
-      const session = await requireSession(auth, request);
-      const range =
-        input.fromDate !== undefined || input.toDate !== undefined
-          ? decodeProjectUsageDateRange({
-              from: input.fromDate,
-              to: input.toDate,
-            })
-          : undefined;
-      const result = await withApplicationErrors(
-        getProjectUsageSummaryApplication({
-          db,
-          projectId: decodeUuid(input.projectId),
-          userId: session.user.id,
-          period: projectUsagePeriod(input.period),
-          range,
-        }),
-      );
-      return appProjectUsageSummary(result);
-    }),
-
-  listStatusTrayRuns: (input) =>
-    withConnectErrors(async () => {
-      const session = await requireSession(auth, request);
-      const result = await withApplicationErrors(
-        listStatusTrayRunsApplication({
+  listOrganizationUsageRuns: async (input) => {
+    const session = await requireSession(auth, request);
+    const result = await withApplicationErrors(
+      listOrganizationUsageRunsApplication(
+        {
           db,
           organizationId: decodeUuid(input.organizationId),
           userId: session.user.id,
-        }),
-      );
-      return appStatusTrayRuns(result);
-    }),
+          days: organizationUsageDays(input.range),
+        },
+        services,
+      ),
+    );
+    return appOrganizationUsageRuns(result);
+  },
 
-  getRunCostEstimate: (input) =>
-    withConnectErrors(async () => {
-      const session = await requireSession(auth, request);
-      const result = await withApplicationErrors(
-        getRunCostEstimateApplication(
-          {
-            db,
-            projectId: decodeUuid(input.projectId),
-            runId: decodeUuid(input.runId),
-            userId: session.user.id,
-          },
-          services,
-        ),
-      );
-      return appRunCostEstimate(result);
-    }),
+  getProjectUsageSummary: async (input) => {
+    const session = await requireSession(auth, request);
+    const range =
+      input.fromDate !== undefined || input.toDate !== undefined
+        ? decodeProjectUsageDateRange({
+            from: input.fromDate,
+            to: input.toDate,
+          })
+        : undefined;
+    const result = await withApplicationErrors(
+      getProjectUsageSummaryApplication({
+        db,
+        projectId: decodeUuid(input.projectId),
+        userId: session.user.id,
+        period: projectUsagePeriod(input.period),
+        range,
+      }),
+    );
+    return appProjectUsageSummary(result);
+  },
+
+  listStatusTrayRuns: async (input) => {
+    const session = await requireSession(auth, request);
+    const result = await withApplicationErrors(
+      listStatusTrayRunsApplication({
+        db,
+        organizationId: decodeUuid(input.organizationId),
+        userId: session.user.id,
+      }),
+    );
+    return appStatusTrayRuns(result);
+  },
+
+  getRunCostEstimate: async (input) => {
+    const session = await requireSession(auth, request);
+    const result = await withApplicationErrors(
+      getRunCostEstimateApplication(
+        {
+          db,
+          projectId: decodeUuid(input.projectId),
+          runId: decodeUuid(input.runId),
+          userId: session.user.id,
+        },
+        services,
+      ),
+    );
+    return appRunCostEstimate(result);
+  },
 });
 
 export const registerAppReportingService = (

@@ -10,7 +10,7 @@ import {
   type ServiceImpl,
 } from "@connectrpc/connect";
 import type { BriarAuth } from "./auth";
-import { withConnectErrors } from "./app-connect-errors";
+
 import {
   appLinearImportConnection,
   appLinearImportResult,
@@ -132,61 +132,58 @@ export const createAppLinearImportService = (
   { request, auth, db }: AppConnectLinearImportInput,
   services: AppConnectLinearImportServices = appConnectLinearImportServices,
 ): ServiceImpl<typeof LinearImportService> => ({
-  connectLinearImport: (input) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const result = await withApplicationErrors(
-        connectLinearImportApplication(
-          {
-            apiKey: decodeApiKey(input.apiKey),
-            db,
-            projectId: decodeUuid(input.projectId).toLowerCase(),
-            userId: session.user.id,
-          },
-          services,
-        ),
-      );
-      return appLinearImportConnection(result);
-    }),
+  connectLinearImport: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const result = await withApplicationErrors(
+      connectLinearImportApplication(
+        {
+          apiKey: decodeApiKey(input.apiKey),
+          db,
+          projectId: decodeUuid(input.projectId).toLowerCase(),
+          userId: session.user.id,
+        },
+        services,
+      ),
+    );
+    return appLinearImportConnection(result);
+  },
 
-  listLinearImportStates: (input) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const states = await withApplicationErrors(
-        listLinearImportStatesApplication(
-          {
-            apiKey: decodeApiKey(input.apiKey),
-            db,
-            projectId: decodeUuid(input.projectId).toLowerCase(),
-            teamIds: decodeTeamIds(input.teamIds),
-            userId: session.user.id,
-          },
-          services,
-        ),
-      );
-      return appLinearImportStates(states);
-    }),
+  listLinearImportStates: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const states = await withApplicationErrors(
+      listLinearImportStatesApplication(
+        {
+          apiKey: decodeApiKey(input.apiKey),
+          db,
+          projectId: decodeUuid(input.projectId).toLowerCase(),
+          teamIds: decodeTeamIds(input.teamIds),
+          userId: session.user.id,
+        },
+        services,
+      ),
+    );
+    return appLinearImportStates(states);
+  },
 
-  importLinearIssues: (input) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const result = await withApplicationErrors(
-        importLinearIssuesApplication(
-          {
-            apiKey: decodeApiKey(input.apiKey),
-            db,
-            projectId: decodeUuid(input.projectId).toLowerCase(),
-            statusMappings: decodeStatusMappings(
-              input.statusMappings.map(statusMapping),
-            ),
-            teamIds: decodeTeamIds(input.teamIds),
-            userId: session.user.id,
-          },
-          services,
-        ),
-      );
-      return appLinearImportResult(result);
-    }),
+  importLinearIssues: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const result = await withApplicationErrors(
+      importLinearIssuesApplication(
+        {
+          apiKey: decodeApiKey(input.apiKey),
+          db,
+          projectId: decodeUuid(input.projectId).toLowerCase(),
+          statusMappings: decodeStatusMappings(
+            input.statusMappings.map(statusMapping),
+          ),
+          teamIds: decodeTeamIds(input.teamIds),
+          userId: session.user.id,
+        },
+        services,
+      ),
+    );
+    return appLinearImportResult(result);
+  },
 });
 
 export const registerAppLinearImportService = (

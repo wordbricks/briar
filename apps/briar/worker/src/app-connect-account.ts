@@ -15,7 +15,7 @@ import {
   updateAccountProfileApplication,
 } from "./account-application";
 import type { BriarAuth } from "./auth";
-import { withConnectErrors } from "./app-connect-errors";
+
 import { appUser } from "./app-connect-mappers";
 import {
   deleteMobilePushRegistration,
@@ -149,70 +149,66 @@ export const createAppAccountService = (
   { request, auth, db, env, attachmentsBucket, context }: AppConnectAccountInput,
   services: AppConnectAccountServices = appConnectAccountServices,
 ): ServiceImpl<typeof AccountService> => ({
-  getCurrentUser: async () => withConnectErrors(async () => {
+  getCurrentUser: async () => {
     const session = await services.requireSession(auth, request);
     return { user: appUser(session.user) };
-  }),
+  },
 
-  updateAccountProfile: async (rpcRequest) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const user = await services.updateAccountProfile({
-        db,
-        session,
-        profile: {
-          username: nullableUsername(rpcRequest.usernameUpdate),
-          name: rpcRequest.name,
-          image: nullableImage(rpcRequest.imageUpdate),
-        },
-      });
-      return { user: appUser(user) };
-    }),
+  updateAccountProfile: async (rpcRequest) => {
+    const session = await services.requireSession(auth, request);
+    const user = await services.updateAccountProfile({
+      db,
+      session,
+      profile: {
+        username: nullableUsername(rpcRequest.usernameUpdate),
+        name: rpcRequest.name,
+        image: nullableImage(rpcRequest.imageUpdate),
+      },
+    });
+    return { user: appUser(user) };
+  },
 
-  deleteAccount: async (rpcRequest) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      await services.deleteAccount({
-        db,
-        env,
-        attachmentsBucket,
-        context,
-        session,
-        confirmation: rpcRequest.confirmation,
-      });
-      return {};
-    }),
+  deleteAccount: async (rpcRequest) => {
+    const session = await services.requireSession(auth, request);
+    await services.deleteAccount({
+      db,
+      env,
+      attachmentsBucket,
+      context,
+      session,
+      confirmation: rpcRequest.confirmation,
+    });
+    return {};
+  },
 
-  registerMobilePushDevice: async (rpcRequest) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const endpoint = mobilePushEndpoint(rpcRequest.endpoint);
-      await services.registerMobilePushDevice(
-        db,
-        session.user.id,
-        {
-          ...endpoint,
-          token: decodeMobilePushToken(rpcRequest.token),
-          locale: mobilePushLocale(rpcRequest.locale),
-          preferences: decodeMobilePushPreferences(rpcRequest.preferences),
-        },
-        new Date().toISOString(),
-      );
-      return {};
-    }),
+  registerMobilePushDevice: async (rpcRequest) => {
+    const session = await services.requireSession(auth, request);
+    const endpoint = mobilePushEndpoint(rpcRequest.endpoint);
+    await services.registerMobilePushDevice(
+      db,
+      session.user.id,
+      {
+        ...endpoint,
+        token: decodeMobilePushToken(rpcRequest.token),
+        locale: mobilePushLocale(rpcRequest.locale),
+        preferences: decodeMobilePushPreferences(rpcRequest.preferences),
+      },
+      new Date().toISOString(),
+    );
+    return {};
+  },
 
-  unregisterMobilePushDevice: async (rpcRequest) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const endpoint = mobilePushEndpoint(rpcRequest.endpoint);
-      await services.unregisterMobilePushDevice(
-        db,
-        session.user.id,
-        endpoint.platform,
-        decodeMobilePushToken(rpcRequest.token),
-      );
-      return {};
-    }),
+  unregisterMobilePushDevice: async (rpcRequest) => {
+    const session = await services.requireSession(auth, request);
+    const endpoint = mobilePushEndpoint(rpcRequest.endpoint);
+    await services.unregisterMobilePushDevice(
+      db,
+      session.user.id,
+      endpoint.platform,
+      decodeMobilePushToken(rpcRequest.token),
+    );
+    return {};
+  },
 });
 
 export function registerAppAccountService(

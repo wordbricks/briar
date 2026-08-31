@@ -5,6 +5,7 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
 import { describe, expect, it, vi } from "vitest";
 import type { BriarAuth } from "./auth";
+import { connectErrorInterceptor } from "./app-connect-errors";
 import {
   appConnectChannelServices,
   registerAppChannelService,
@@ -169,6 +170,7 @@ describe("app Channel Connect adapter", () => {
       connect: true,
       grpc: false,
       grpcWeb: false,
+      interceptors: [connectErrorInterceptor],
     });
     registerAppChannelService(
       router,
@@ -306,6 +308,7 @@ describe("app Channel Connect adapter", () => {
       connect: true,
       grpc: false,
       grpcWeb: false,
+      interceptors: [connectErrorInterceptor],
     });
     registerAppChannelService(
       router,
@@ -419,6 +422,7 @@ describe("app Channel Connect adapter", () => {
       connect: true,
       grpc: false,
       grpcWeb: false,
+      interceptors: [connectErrorInterceptor],
     });
     registerAppChannelService(
       router,
@@ -518,6 +522,7 @@ describe("app Channel Connect adapter", () => {
       connect: true,
       grpc: false,
       grpcWeb: false,
+      interceptors: [connectErrorInterceptor],
     });
     registerAppChannelService(
       router,
@@ -603,6 +608,7 @@ describe("app Channel Connect adapter", () => {
       connect: true,
       grpc: false,
       grpcWeb: false,
+      interceptors: [connectErrorInterceptor],
     });
     registerAppChannelService(
       router,

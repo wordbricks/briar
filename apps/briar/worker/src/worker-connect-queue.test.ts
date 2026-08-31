@@ -1,5 +1,5 @@
 import { create } from "@bufbuild/protobuf";
-import { Code, ConnectError, type HandlerContext } from "@connectrpc/connect";
+import { type HandlerContext } from "@connectrpc/connect";
 import {
   BlockMergeBatchRequestSchema,
   ChannelReplyClaimIdentitySchema,
@@ -124,8 +124,8 @@ describe("WorkerQueueService lifecycle semantics", () => {
     });
     const error = await Promise.resolve(service.claimWork(request, context))
       .catch((cause: unknown) => cause);
-    expect(error).toBeInstanceOf(ConnectError);
-    expect((error as ConnectError).code).toBe(Code.Unauthenticated);
+    expect(error).toBeInstanceOf(HttpError);
+    expect((error as HttpError).status).toBe(401);
     expect(authenticate).toHaveBeenCalledWith(
       input.db,
       input.request,
@@ -134,7 +134,7 @@ describe("WorkerQueueService lifecycle semantics", () => {
     );
   });
 
-  it("maps a lost task lease to a generated RPC conflict", async () => {
+  it("rejects a lost task lease before returning a response", async () => {
     const authenticate = authentication();
     const renew = vi.fn<WorkerQueueServices["renewProjectAgentTaskLease"]>();
     renew.mockResolvedValue(null);
@@ -151,8 +151,8 @@ describe("WorkerQueueService lifecycle semantics", () => {
     });
     const error = await Promise.resolve(service.renewWorkLease(request, context))
       .catch((cause: unknown) => cause);
-    expect(error).toBeInstanceOf(ConnectError);
-    expect((error as ConnectError).code).toBe(Code.FailedPrecondition);
+    expect(error).toBeInstanceOf(HttpError);
+    expect((error as HttpError).status).toBe(409);
     expect(renew).toHaveBeenCalledWith(
       input.db,
       projectId,
@@ -224,8 +224,8 @@ describe("WorkerQueueService lifecycle semantics", () => {
     const error = await Promise.resolve(
       service.checkpointChannelReplySession(mismatched, context),
     ).catch((cause: unknown) => cause);
-    expect(error).toBeInstanceOf(ConnectError);
-    expect((error as ConnectError).code).toBe(Code.FailedPrecondition);
+    expect(error).toBeInstanceOf(HttpError);
+    expect((error as HttpError).status).toBe(409);
     expect(checkpoint).toHaveBeenCalledTimes(1);
   });
 
@@ -534,8 +534,8 @@ describe("WorkerQueueService lifecycle semantics", () => {
     const error = await Promise.resolve(
       service.recordMergeBatchValidation(request, context),
     ).catch((cause: unknown) => cause);
-    expect(error).toBeInstanceOf(ConnectError);
-    expect((error as ConnectError).code).toBe(Code.InvalidArgument);
+    expect(error).toBeInstanceOf(HttpError);
+    expect((error as HttpError).status).toBe(400);
     expect(application).not.toHaveBeenCalled();
   });
 });

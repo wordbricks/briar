@@ -5,6 +5,7 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { describe, expect, it, vi } from "vitest";
 import type { BriarAuth } from "./auth";
+import { connectErrorInterceptor } from "./app-connect-errors";
 import { HttpError } from "./http-response";
 import {
   appConnectIssueServices,
@@ -64,6 +65,7 @@ const invokeIssueRpc = async (
     connect: true,
     grpc: false,
     grpcWeb: false,
+    interceptors: [connectErrorInterceptor],
   });
   registerAppIssueService(
     router,

@@ -15,7 +15,7 @@ import {
   type ServiceImpl,
 } from "@connectrpc/connect";
 import type { BriarAuth } from "./auth";
-import { withConnectErrors } from "./app-connect-errors";
+
 import {
   appFleetTimestamp,
   appFleetWorkerIcon,
@@ -192,7 +192,7 @@ const withFleetErrors = async <A>(operation: Promise<A>): Promise<A> => {
 export const createAppFleetService = (
   { request, auth, db, env, context }: AppConnectFleetInput,
 ): ServiceImpl<typeof FleetService> => ({
-  registerProjectExecutionWorker: (input, context) => withConnectErrors(async () => {
+  registerProjectExecutionWorker: async (input, context) => {
     const session = await requireSession(auth, request);
     const observedAt = new Date().toISOString();
     const result = await withFleetErrors(
@@ -214,9 +214,9 @@ export const createAppFleetService = (
       worker: appDashboardWorker(workerJson(result.worker, observedAt)),
       workerToken: result.workerToken,
     };
-  }),
+  },
 
-  bindProjectExecutionWorker: (input) => withConnectErrors(async () => {
+  bindProjectExecutionWorker: async (input) => {
     const session = await requireSession(auth, request);
     const observedAt = new Date().toISOString();
     const result = await withFleetErrors(bindProjectExecutionWorkerApplication({
@@ -232,9 +232,9 @@ export const createAppFleetService = (
       deviceId: result.device.id,
       worker: appDashboardWorker(workerJson(result.worker, observedAt)),
     };
-  }),
+  },
 
-  unbindProjectExecutionWorker: (input) => withConnectErrors(async () => {
+  unbindProjectExecutionWorker: async (input) => {
     const session = await requireSession(auth, request);
     return await withFleetErrors(unbindProjectExecutionWorkerApplication({
       db,
@@ -246,9 +246,9 @@ export const createAppFleetService = (
       reason: unbindReason(input.reason),
       observedAt: new Date().toISOString(),
     }));
-  }),
+  },
 
-  listExecutionWorkers: (input) => withConnectErrors(async () => {
+  listExecutionWorkers: async (input) => {
     const session = await requireSession(auth, request);
     const result = await withFleetErrors(listExecutionWorkersApplication({
       db,
@@ -263,9 +263,9 @@ export const createAppFleetService = (
       canManage: result.canManage,
       generatedAt: appFleetTimestamp(result.generatedAt),
     };
-  }),
+  },
 
-  requestExecutionWorkerUpdate: (input) => withConnectErrors(async () => {
+  requestExecutionWorkerUpdate: async (input) => {
     const session = await requireSession(auth, request);
     const result = await withFleetErrors(
       requestExecutionWorkerUpdateApplication({
@@ -284,9 +284,9 @@ export const createAppFleetService = (
       requestId: result.requestId ?? undefined,
       targetVersion: result.targetVersion,
     };
-  }),
+  },
 
-  updateExecutionWorker: (input) => withConnectErrors(async () => {
+  updateExecutionWorker: async (input) => {
     const session = await requireSession(auth, request);
     const icon = input.iconUpdate.case === "icon"
       ? workerIconFromMessage(input.iconUpdate.value)
@@ -314,9 +314,9 @@ export const createAppFleetService = (
           : null,
       ),
     };
-  }),
+  },
 
-  deleteExecutionWorker: (input) => withConnectErrors(async () => {
+  deleteExecutionWorker: async (input) => {
     const session = await requireSession(auth, request);
     return await withFleetErrors(deleteExecutionWorkerApplication({
       db,
@@ -327,9 +327,9 @@ export const createAppFleetService = (
       requestId: decodeWorkerLifecycleRequestId(input.requestId),
       observedAt: new Date().toISOString(),
     }));
-  }),
+  },
 
-  getManagedComputerProduct: (input) => withConnectErrors(async () => {
+  getManagedComputerProduct: async (input) => {
     const session = await requireSession(auth, request);
     const result = await withFleetErrors(getManagedComputerProductApplication({
       db,
@@ -346,9 +346,9 @@ export const createAppFleetService = (
       organizationLimit: result.organizationLimit,
       fleetLimit: result.fleetLimit,
     };
-  }),
+  },
 
-  listManagedComputers: (input) => withConnectErrors(async () => {
+  listManagedComputers: async (input) => {
     const session = await requireSession(auth, request);
     const result = await withFleetErrors(listManagedComputersApplication({
       db,
@@ -360,9 +360,9 @@ export const createAppFleetService = (
       computers: result.computers.map(appManagedComputer),
       generatedAt: appFleetTimestamp(result.generatedAt),
     };
-  }),
+  },
 
-  getManagedComputer: (input) => withConnectErrors(async () => {
+  getManagedComputer: async (input) => {
     const session = await requireSession(auth, request);
     const computer = await withFleetErrors(getManagedComputerApplication({
       db,
@@ -372,35 +372,34 @@ export const createAppFleetService = (
       observedAt: new Date().toISOString(),
     }));
     return { computer: appManagedComputer(computer) };
-  }),
+  },
 
-  validateManagedComputerPromotion: (input) =>
-    withConnectErrors(async () => {
-      const session = await requireSession(auth, request);
-      const decoded = decodeManagedComputerPromotionValidation({
-        code: input.code,
-      });
-      const result = await withFleetErrors(
-        validateManagedComputerPromotionApplication({
-          db,
-          env,
-          organizationId: decodeUuid(input.organizationId),
-          userId: session.user.id,
-          code: decoded.code,
-          observedAt: new Date().toISOString(),
-        }),
-      );
-      return {
-        valid: result.valid,
-        eligible: result.eligible,
-        totalCents: result.totalCents,
-        currency: ManagedComputerCurrency.USD,
-        applicationsEnabled: result.applicationsEnabled,
-        limitReason: appManagedComputerPromotionLimitReason(result.limitReason),
-      };
-    }),
+  validateManagedComputerPromotion: async (input) => {
+    const session = await requireSession(auth, request);
+    const decoded = decodeManagedComputerPromotionValidation({
+      code: input.code,
+    });
+    const result = await withFleetErrors(
+      validateManagedComputerPromotionApplication({
+        db,
+        env,
+        organizationId: decodeUuid(input.organizationId),
+        userId: session.user.id,
+        code: decoded.code,
+        observedAt: new Date().toISOString(),
+      }),
+    );
+    return {
+      valid: result.valid,
+      eligible: result.eligible,
+      totalCents: result.totalCents,
+      currency: ManagedComputerCurrency.USD,
+      applicationsEnabled: result.applicationsEnabled,
+      limitReason: appManagedComputerPromotionLimitReason(result.limitReason),
+    };
+  },
 
-  applyForManagedComputer: (input) => withConnectErrors(async () => {
+  applyForManagedComputer: async (input) => {
     const session = await requireSession(auth, request);
     const decoded = decodeManagedComputerApplication({
       code: input.code,
@@ -419,9 +418,9 @@ export const createAppFleetService = (
       duplicate: result.duplicate,
       entitlement: appManagedComputerEntitlement(),
     };
-  }),
+  },
 
-  retryManagedComputer: (input) => withConnectErrors(async () => {
+  retryManagedComputer: async (input) => {
     const session = await requireSession(auth, request);
     const decoded = decodeManagedComputerRetry({ requestId: input.requestId });
     const result = await withFleetErrors(retryManagedComputerApplication({
@@ -437,9 +436,9 @@ export const createAppFleetService = (
       computer: appManagedComputer(result.computer),
       duplicate: result.duplicate,
     };
-  }),
+  },
 
-  retireManagedComputer: (input) => withConnectErrors(async () => {
+  retireManagedComputer: async (input) => {
     const session = await requireSession(auth, request);
     const result = await withFleetErrors(retireManagedComputerApplication({
       db,
@@ -457,101 +456,97 @@ export const createAppFleetService = (
       computer: appManagedComputer(result.computer),
       duplicate: result.duplicate,
     };
-  }),
+  },
 
-  createManagedComputerRemoteSession: (input) =>
-    withConnectErrors(async () => {
-      const session = await requireSession(auth, request);
-      const decoded = decodeManagedComputerRemoteSessionRequest({
-        requestId: input.requestId,
-        reconnectSessionId: input.reconnectSessionId,
-      });
-      const result = await withFleetErrors(
-        createManagedComputerRemoteSessionApplication({
-          db,
-          env,
-          organizationId: decodeUuid(input.organizationId),
-          managedComputerId: decodeUuid(input.managedComputerId),
-          userId: session.user.id,
-          ...decoded,
-          requestUrl: request.url,
-          origin: request.headers.get("origin"),
-          secFetchSite: request.headers.get("sec-fetch-site"),
-          observedAt: new Date().toISOString(),
-        }),
-      );
-      return {
-        session: appManagedComputerRemoteSession(result.session),
-        socket: appManagedComputerSocketTicket(result.socket),
-        reconnected: result.reconnected,
-      };
-    }),
+  createManagedComputerRemoteSession: async (input) => {
+    const session = await requireSession(auth, request);
+    const decoded = decodeManagedComputerRemoteSessionRequest({
+      requestId: input.requestId,
+      reconnectSessionId: input.reconnectSessionId,
+    });
+    const result = await withFleetErrors(
+      createManagedComputerRemoteSessionApplication({
+        db,
+        env,
+        organizationId: decodeUuid(input.organizationId),
+        managedComputerId: decodeUuid(input.managedComputerId),
+        userId: session.user.id,
+        ...decoded,
+        requestUrl: request.url,
+        origin: request.headers.get("origin"),
+        secFetchSite: request.headers.get("sec-fetch-site"),
+        observedAt: new Date().toISOString(),
+      }),
+    );
+    return {
+      session: appManagedComputerRemoteSession(result.session),
+      socket: appManagedComputerSocketTicket(result.socket),
+      reconnected: result.reconnected,
+    };
+  },
 
-  endManagedComputerRemoteSession: (input) =>
-    withConnectErrors(async () => {
-      const session = await requireSession(auth, request);
-      return await withFleetErrors(
-        endManagedComputerRemoteSessionApplication({
-          db,
-          env,
-          organizationId: decodeUuid(input.organizationId),
-          managedComputerId: decodeUuid(input.managedComputerId),
-          remoteSessionId: decodeUuid(input.remoteSessionId),
-          userId: session.user.id,
-          origin: request.headers.get("origin"),
-          secFetchSite: request.headers.get("sec-fetch-site"),
-          observedAt: new Date().toISOString(),
-        }),
-      );
-    }),
+  endManagedComputerRemoteSession: async (input) => {
+    const session = await requireSession(auth, request);
+    return await withFleetErrors(
+      endManagedComputerRemoteSessionApplication({
+        db,
+        env,
+        organizationId: decodeUuid(input.organizationId),
+        managedComputerId: decodeUuid(input.managedComputerId),
+        remoteSessionId: decodeUuid(input.remoteSessionId),
+        userId: session.user.id,
+        origin: request.headers.get("origin"),
+        secFetchSite: request.headers.get("sec-fetch-site"),
+        observedAt: new Date().toISOString(),
+      }),
+    );
+  },
 
-  createManagedComputerSetupSession: (input) =>
-    withConnectErrors(async () => {
-      const session = await requireSession(auth, request);
-      const decoded = decodeManagedComputerSetupSession({
-        projectId: input.projectId,
-        requestId: input.requestId,
-      });
-      const result = await withFleetErrors(
-        createManagedComputerSetupSessionApplication({
-          db,
-          env,
-          organizationId: decodeUuid(input.organizationId),
-          managedComputerId: decodeUuid(input.managedComputerId),
-          userId: session.user.id,
-          ...decoded,
-          requestUrl: request.url,
-          observedAt: new Date().toISOString(),
-        }),
-      );
-      return {
-        session: appManagedComputerSetupSession(result.session),
-        setupToken: result.setupToken,
-        socket: appManagedComputerSocketTicket(result.socket),
-        agentConnected: result.agentConnected,
-        duplicate: result.duplicate,
-      };
-    }),
+  createManagedComputerSetupSession: async (input) => {
+    const session = await requireSession(auth, request);
+    const decoded = decodeManagedComputerSetupSession({
+      projectId: input.projectId,
+      requestId: input.requestId,
+    });
+    const result = await withFleetErrors(
+      createManagedComputerSetupSessionApplication({
+        db,
+        env,
+        organizationId: decodeUuid(input.organizationId),
+        managedComputerId: decodeUuid(input.managedComputerId),
+        userId: session.user.id,
+        ...decoded,
+        requestUrl: request.url,
+        observedAt: new Date().toISOString(),
+      }),
+    );
+    return {
+      session: appManagedComputerSetupSession(result.session),
+      setupToken: result.setupToken,
+      socket: appManagedComputerSocketTicket(result.socket),
+      agentConnected: result.agentConnected,
+      duplicate: result.duplicate,
+    };
+  },
 
-  getManagedComputerSetupStatus: (input) =>
-    withConnectErrors(async () => {
-      const session = await requireSession(auth, request);
-      const result = await withFleetErrors(
-        getManagedComputerSetupStatusApplication({
-          db,
-          organizationId: decodeUuid(input.organizationId),
-          managedComputerId: decodeUuid(input.managedComputerId),
-          userId: session.user.id,
-          observedAt: new Date().toISOString(),
-        }),
-      );
-      return {
-        session: result.session
-          ? appManagedComputerSetupStatusSession(result.session)
-          : undefined,
-        worker: result.worker ? appDashboardWorker(result.worker) : undefined,
-      };
-    }),
+  getManagedComputerSetupStatus: async (input) => {
+    const session = await requireSession(auth, request);
+    const result = await withFleetErrors(
+      getManagedComputerSetupStatusApplication({
+        db,
+        organizationId: decodeUuid(input.organizationId),
+        managedComputerId: decodeUuid(input.managedComputerId),
+        userId: session.user.id,
+        observedAt: new Date().toISOString(),
+      }),
+    );
+    return {
+      session: result.session
+        ? appManagedComputerSetupStatusSession(result.session)
+        : undefined,
+      worker: result.worker ? appDashboardWorker(result.worker) : undefined,
+    };
+  },
 });
 
 export const registerAppFleetService = (

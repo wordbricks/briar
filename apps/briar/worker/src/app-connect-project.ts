@@ -22,7 +22,7 @@ import type {
 } from "../../src/lib/auto-hunt-contract";
 import { processArchiveCleanupQueue } from "./archive";
 import type { BriarAuth } from "./auth";
-import { withConnectErrors } from "./app-connect-errors";
+
 import {
   appCheckpointPolicy,
   appExecutionPolicy,
@@ -214,238 +214,227 @@ export const createAppProjectService = (
   { request, auth, db, env, context }: AppConnectProjectInput,
   services: AppConnectProjectServices = appConnectProjectServices,
 ): ServiceImpl<typeof ProjectService> => ({
-  listProjects: async () =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const rows = await services.listProjects(db, session.user.id);
-      return { projects: rows.map(appProject) };
-    }),
+  listProjects: async () => {
+    const session = await services.requireSession(auth, request);
+    const rows = await services.listProjects(db, session.user.id);
+    return { projects: rows.map(appProject) };
+  },
 
-  createProject: (input) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const result = await withApplicationErrors(
-        services.createProject({
-          db,
-          user: session.user,
-          name: input.name,
-          organizationId: input.organizationId,
-          locale: normalizeProjectAgentLocale(
-            request.headers.get("accept-language"),
+  createProject: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const result = await withApplicationErrors(
+      services.createProject({
+        db,
+        user: session.user,
+        name: input.name,
+        organizationId: input.organizationId,
+        locale: normalizeProjectAgentLocale(
+          request.headers.get("accept-language"),
+        ),
+      }),
+    );
+    scheduleInboxRealtimeFlush(env, db, context);
+    return { project: appProject(result.project), agentToken: result.agentToken };
+  },
+
+  deleteProject: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const result = await withApplicationErrors(
+      services.deleteProject({
+        db,
+        projectId: decodeUuid(input.projectId),
+        userId: session.user.id,
+      }),
+    );
+    void schedulePostCommitCleanup({
+      context,
+      operation: "project_delete",
+      observedAt: result.observedAt,
+      tasks: [{
+        queue: "archive",
+        run: () =>
+          processArchiveCleanupQueue(
+            db,
+            env.ARCHIVES,
+            env.ATTACHMENTS,
+            result.observedAt,
+            1_000,
           ),
-        }),
-      );
-      scheduleInboxRealtimeFlush(env, db, context);
-      return { project: appProject(result.project), agentToken: result.agentToken };
-    }),
+      }],
+    });
+    scheduleProjectRealtimePublish(env, db, result.projectId, context);
+    return { deleted: true };
+  },
 
-  deleteProject: (input) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const result = await withApplicationErrors(
-        services.deleteProject({
-          db,
-          projectId: decodeUuid(input.projectId),
-          userId: session.user.id,
-        }),
-      );
-      void schedulePostCommitCleanup({
-        context,
-        operation: "project_delete",
-        observedAt: result.observedAt,
-        tasks: [{
-          queue: "archive",
-          run: () =>
-            processArchiveCleanupQueue(
-              db,
-              env.ARCHIVES,
-              env.ATTACHMENTS,
-              result.observedAt,
-              1_000,
-            ),
-        }],
-      });
-      scheduleProjectRealtimePublish(env, db, result.projectId, context);
-      return { deleted: true };
-    }),
-
-  updateProjectIcon: (input) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const icon = input.iconUpdate.case === "icon"
-        ? input.iconUpdate.value
-        : input.iconUpdate.case === "clearIcon"
-        ? null
-        : (() => {
-          throw new ConnectError("icon update is required", Code.InvalidArgument);
-        })();
-      const project = await withApplicationErrors(
-        services.updateIcon({
-          db,
-          projectId: decodeUuid(input.projectId),
-          userId: session.user.id,
-          icon,
-        }),
-      );
-      scheduleProjectRealtimePublish(env, db, project.id, context);
-      return { project: appProject(project) };
-    }),
-
-  updateProjectIssueKeyPrefix: (input) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const project = await withApplicationErrors(
-        services.updateIssueKeyPrefix({
-          db,
-          projectId: decodeUuid(input.projectId),
-          userId: session.user.id,
-          issueKeyPrefix: input.issueKeyPrefix,
-        }),
-      );
-      scheduleProjectRealtimePublish(env, db, project.id, context);
-      return { project: appProject(project) };
-    }),
-
-  updateProjectTabs: (input) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const project = await withApplicationErrors(
-        services.updateTabs({
-          db,
-          projectId: decodeUuid(input.projectId),
-          userId: session.user.id,
-          schedule: input.schedule,
-        }),
-      );
-      scheduleProjectRealtimePublish(env, db, project.id, context);
-      return { project: appProject(project) };
-    }),
-
-  createProjectAgentToken: (input) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const projectId = decodeUuid(input.projectId);
-      const agentToken = await withApplicationErrors(
-        services.createAgentToken({
-          db,
-          projectId,
-          userId: session.user.id,
-        }),
-      );
-      scheduleProjectRealtimePublish(env, db, projectId, context);
-      return { agentToken };
-    }),
-
-  updateProjectSettings: (input) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const projectId = decodeUuid(input.projectId);
-      const linear = requiredMessage(input.linear, "linear");
-      const workflow = requiredMessage(input.workflow, "workflow");
-      const settings = parseProjectSettingsInput({
-        velenOrg: input.velenOrg ?? null,
-        dataSource: input.dataSource ?? null,
-        linear: {
-          enabled: linear.enabled,
-          source: linear.source ?? null,
-          teamKey: linear.teamKey ?? null,
-        },
-        githubRepository: input.githubRepository ?? null,
-        workflow: workflowInputFromMessage(workflow),
-      });
-      const result = await withApplicationErrors(
-        services.updateSettings({
-          db,
-          projectId,
-          userId: session.user.id,
-          settings,
-        }),
-      );
-      scheduleProjectRealtimePublish(env, db, projectId, context);
-      return {
-        settings: appProjectSettings(settingsJson(
-          result.settings,
-          checkpointPolicyJson(result.checkpointPolicy),
-        )),
-      };
-    }),
-
-  updateCheckpointPolicy: (input) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const projectId = decodeUuid(input.projectId);
-      const scope = (() => {
-        switch (input.scope) {
-          case UpdateCheckpointPolicyRequest_Scope.PROJECT:
-            return "project" as const;
-          case UpdateCheckpointPolicyRequest_Scope.USER:
-            return "user" as const;
-          default:
-            throw new ConnectError("scope is required", Code.InvalidArgument);
-        }
+  updateProjectIcon: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const icon = input.iconUpdate.case === "icon"
+      ? input.iconUpdate.value
+      : input.iconUpdate.case === "clearIcon"
+      ? null
+      : (() => {
+        throw new ConnectError("icon update is required", Code.InvalidArgument);
       })();
-      const policy = await withApplicationErrors(
-        services.updateCheckpointPolicy({
-          db,
-          projectId,
-          userId: session.user.id,
-          policy: decodeCheckpointPolicyInput({
-            scope,
-            checkpoints: input.checkpoints.map(checkpointFromMessage),
-            expectedRevision: decodeRevision(Number(input.expectedRevision)),
-          }),
-        }),
-      );
-      scheduleProjectRealtimePublish(env, db, projectId, context);
-      return { checkpointPolicy: appCheckpointPolicy(checkpointPolicyJson(policy)) };
-    }),
+    const project = await withApplicationErrors(
+      services.updateIcon({
+        db,
+        projectId: decodeUuid(input.projectId),
+        userId: session.user.id,
+        icon,
+      }),
+    );
+    scheduleProjectRealtimePublish(env, db, project.id, context);
+    return { project: appProject(project) };
+  },
 
-  getProjectExecutionWorkerPolicy: (input) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const policy = await withApplicationErrors(
-        services.getExecutionWorkerPolicy({
-          db,
-          projectId: decodeUuid(input.projectId),
-          userId: session.user.id,
-        }),
-      );
-      return { policy: appExecutionPolicy(policy) };
-    }),
+  updateProjectIssueKeyPrefix: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const project = await withApplicationErrors(
+      services.updateIssueKeyPrefix({
+        db,
+        projectId: decodeUuid(input.projectId),
+        userId: session.user.id,
+        issueKeyPrefix: input.issueKeyPrefix,
+      }),
+    );
+    scheduleProjectRealtimePublish(env, db, project.id, context);
+    return { project: appProject(project) };
+  },
 
-  updateProjectExecutionWorkerPolicy: (input) =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const projectId = decodeUuid(input.projectId);
-      const selectionMode = (() => {
-        switch (input.selectionMode) {
-          case ProjectExecutionWorkerPolicy_SelectionMode.ANY:
-            return "any" as const;
-          case ProjectExecutionWorkerPolicy_SelectionMode.ALLOWLIST:
-            return "allowlist" as const;
-          default:
-            throw new ConnectError(
-              "selection mode is required",
-              Code.InvalidArgument,
-            );
-        }
-      })();
-      const policy = await withApplicationErrors(
-        services.updateExecutionWorkerPolicy({
-          db,
-          projectId,
-          userId: session.user.id,
-          policy: decodeExecutionWorkerPolicy({
-            selectionMode,
-            defaultWorkerId: input.defaultWorkerId ?? null,
-            allowedWorkerIds: input.allowedWorkerIds,
-          }),
-          observedAt: new Date().toISOString(),
+  updateProjectTabs: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const project = await withApplicationErrors(
+      services.updateTabs({
+        db,
+        projectId: decodeUuid(input.projectId),
+        userId: session.user.id,
+        schedule: input.schedule,
+      }),
+    );
+    scheduleProjectRealtimePublish(env, db, project.id, context);
+    return { project: appProject(project) };
+  },
+
+  createProjectAgentToken: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const projectId = decodeUuid(input.projectId);
+    const agentToken = await withApplicationErrors(
+      services.createAgentToken({
+        db,
+        projectId,
+        userId: session.user.id,
+      }),
+    );
+    scheduleProjectRealtimePublish(env, db, projectId, context);
+    return { agentToken };
+  },
+
+  updateProjectSettings: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const projectId = decodeUuid(input.projectId);
+    const linear = requiredMessage(input.linear, "linear");
+    const workflow = requiredMessage(input.workflow, "workflow");
+    const settings = parseProjectSettingsInput({
+      velenOrg: input.velenOrg ?? null,
+      dataSource: input.dataSource ?? null,
+      linear: {
+        enabled: linear.enabled,
+        source: linear.source ?? null,
+        teamKey: linear.teamKey ?? null,
+      },
+      githubRepository: input.githubRepository ?? null,
+      workflow: workflowInputFromMessage(workflow),
+    });
+    const result = await withApplicationErrors(
+      services.updateSettings({
+        db,
+        projectId,
+        userId: session.user.id,
+        settings,
+      }),
+    );
+    scheduleProjectRealtimePublish(env, db, projectId, context);
+    return {
+      settings: appProjectSettings(settingsJson(
+        result.settings,
+        checkpointPolicyJson(result.checkpointPolicy),
+      )),
+    };
+  },
+
+  updateCheckpointPolicy: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const projectId = decodeUuid(input.projectId);
+    const scope = (() => {
+      switch (input.scope) {
+        case UpdateCheckpointPolicyRequest_Scope.PROJECT:
+          return "project" as const;
+        case UpdateCheckpointPolicyRequest_Scope.USER:
+          return "user" as const;
+        default:
+          throw new ConnectError("scope is required", Code.InvalidArgument);
+      }
+    })();
+    const policy = await withApplicationErrors(
+      services.updateCheckpointPolicy({
+        db,
+        projectId,
+        userId: session.user.id,
+        policy: decodeCheckpointPolicyInput({
+          scope,
+          checkpoints: input.checkpoints.map(checkpointFromMessage),
+          expectedRevision: decodeRevision(Number(input.expectedRevision)),
         }),
-      );
-      scheduleProjectRealtimePublish(env, db, projectId, context);
-      return { policy: appExecutionPolicy(policy) };
-    }),
+      }),
+    );
+    scheduleProjectRealtimePublish(env, db, projectId, context);
+    return { checkpointPolicy: appCheckpointPolicy(checkpointPolicyJson(policy)) };
+  },
+
+  getProjectExecutionWorkerPolicy: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const policy = await withApplicationErrors(
+      services.getExecutionWorkerPolicy({
+        db,
+        projectId: decodeUuid(input.projectId),
+        userId: session.user.id,
+      }),
+    );
+    return { policy: appExecutionPolicy(policy) };
+  },
+
+  updateProjectExecutionWorkerPolicy: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const projectId = decodeUuid(input.projectId);
+    const selectionMode = (() => {
+      switch (input.selectionMode) {
+        case ProjectExecutionWorkerPolicy_SelectionMode.ANY:
+          return "any" as const;
+        case ProjectExecutionWorkerPolicy_SelectionMode.ALLOWLIST:
+          return "allowlist" as const;
+        default:
+          throw new ConnectError(
+            "selection mode is required",
+            Code.InvalidArgument,
+          );
+      }
+    })();
+    const policy = await withApplicationErrors(
+      services.updateExecutionWorkerPolicy({
+        db,
+        projectId,
+        userId: session.user.id,
+        policy: decodeExecutionWorkerPolicy({
+          selectionMode,
+          defaultWorkerId: input.defaultWorkerId ?? null,
+          allowedWorkerIds: input.allowedWorkerIds,
+        }),
+        observedAt: new Date().toISOString(),
+      }),
+    );
+    scheduleProjectRealtimePublish(env, db, projectId, context);
+    return { policy: appExecutionPolicy(policy) };
+  },
 });
 
 export const registerAppProjectService = (

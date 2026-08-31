@@ -89,7 +89,7 @@ import {
   requireWorkerProjectBinding,
 } from "./worker-route-auth";
 import { decodeWorkerClaimInput } from "./worker-request-contract";
-import { withConnectErrors } from "./app-connect-errors";
+
 import { workerClaimMessage } from "./worker-connect-mappers";
 import {
   completeChannelReplyApplication,
@@ -1006,40 +1006,19 @@ export function createWorkerQueueService(
 ): ServiceImpl<typeof WorkerQueueService> {
   const services = { ...workerQueueServices, ...overrides };
   return {
-    claimWork: (request) =>
-      withConnectErrors(() => claimWork(input, request, services)),
-    renewWorkLease: (request) =>
-      withConnectErrors(() => renewWorkLease(input, request, services)),
-    checkpointChannelReplySession: (request) =>
-      withConnectErrors(() =>
-        checkpointChannelReplySessionRpc(input, request, services)
-      ),
-    handoffWork: (request) =>
-      withConnectErrors(() => handoffWork(input, request, services)),
-    completeProjectAgentTask: (request) =>
-      withConnectErrors(() => completeProjectAgentTask(input, request, services)),
-    recordMergeBatchCandidateEnqueued: (request) =>
-      withConnectErrors(() =>
-        recordMergeBatchCandidateEnqueuedRpc(input, request, services)
-      ),
-    recordMergeBatchAuthority: (request) =>
-      withConnectErrors(() => recordMergeBatchAuthorityRpc(input, request, services)),
-    recordMergeBatchValidation: (request) =>
-      withConnectErrors(() => recordMergeBatchValidationRpc(input, request, services)),
-    completeMergeBatchPublication: (request) =>
-      withConnectErrors(() =>
-        completeMergeBatchPublicationRpc(input, request, services)
-      ),
-    blockMergeBatch: (request) =>
-      withConnectErrors(() => blockMergeBatchRpc(input, request, services)),
-    prepareReplyAttachmentUploads: (request, context) =>
-      withConnectErrors(() =>
-        prepareReplyAttachmentUploadsRpc(input, request, context, services)
-      ),
-    completeIssueReply: (request) =>
-      withConnectErrors(() => completeIssueReplyRpc(input, request, services)),
-    completeChannelReply: (request) =>
-      withConnectErrors(() => completeChannelReplyRpc(input, request, services)),
+    claimWork: (request) => claimWork(input, request, services),
+    renewWorkLease: (request) => renewWorkLease(input, request, services),
+    checkpointChannelReplySession: (request) => checkpointChannelReplySessionRpc(input, request, services),
+    handoffWork: (request) => handoffWork(input, request, services),
+    completeProjectAgentTask: (request) => completeProjectAgentTask(input, request, services),
+    recordMergeBatchCandidateEnqueued: (request) => recordMergeBatchCandidateEnqueuedRpc(input, request, services),
+    recordMergeBatchAuthority: (request) => recordMergeBatchAuthorityRpc(input, request, services),
+    recordMergeBatchValidation: (request) => recordMergeBatchValidationRpc(input, request, services),
+    completeMergeBatchPublication: (request) => completeMergeBatchPublicationRpc(input, request, services),
+    blockMergeBatch: (request) => blockMergeBatchRpc(input, request, services),
+    prepareReplyAttachmentUploads: (request, context) => prepareReplyAttachmentUploadsRpc(input, request, context, services),
+    completeIssueReply: (request) => completeIssueReplyRpc(input, request, services),
+    completeChannelReply: (request) => completeChannelReplyRpc(input, request, services),
   };
 }
 

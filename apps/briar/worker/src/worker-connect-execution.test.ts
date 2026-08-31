@@ -1,5 +1,5 @@
 import { create } from "@bufbuild/protobuf";
-import { Code, ConnectError, type HandlerContext } from "@connectrpc/connect";
+import { type HandlerContext } from "@connectrpc/connect";
 import {
   RetryRunResponse_Outcome,
   RetryRunRequestSchema,
@@ -11,6 +11,7 @@ import {
   ClaimIssueRequestSchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { describe, expect, it, vi } from "vitest";
+import { HttpError } from "./http-response";
 import {
   authorizeIssueClaim,
   createWorkerExecutionService,
@@ -89,8 +90,8 @@ describe("WorkerExecutionService execution credential boundary", () => {
       { projectId, runId, claimedBy: "auto-hunt" },
     ), context)).catch((cause: unknown) => cause);
 
-    expect(error).toBeInstanceOf(ConnectError);
-    expect((error as ConnectError).code).toBe(Code.NotFound);
+    expect(error).toBeInstanceOf(HttpError);
+    expect((error as HttpError).status).toBe(404);
     expect(claimIssue).not.toHaveBeenCalled();
   });
 
@@ -143,8 +144,8 @@ describe("WorkerExecutionService execution credential boundary", () => {
       { projectId, runId },
     ), context)).catch((cause: unknown) => cause);
 
-    expect(error).toBeInstanceOf(ConnectError);
-    expect((error as ConnectError).code).toBe(Code.NotFound);
+    expect(error).toBeInstanceOf(HttpError);
+    expect((error as HttpError).status).toBe(404);
     expect(listRunEvidence).not.toHaveBeenCalled();
   });
 

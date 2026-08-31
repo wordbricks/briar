@@ -1,5 +1,5 @@
 import { create } from "@bufbuild/protobuf";
-import { Code, ConnectError, type HandlerContext } from "@connectrpc/connect";
+import { type HandlerContext } from "@connectrpc/connect";
 import {
   BindManagedComputerSetupRequestSchema,
 } from "@briar/contracts/gen/briar/worker/v1/managed_computer_setup_pb";
@@ -8,6 +8,7 @@ import {
   WorkerRuntimeAdvertisementSchema,
 } from "@briar/contracts/gen/briar/types/v1/worker_pb";
 import { describe, expect, it, vi } from "vitest";
+import { HttpError } from "./http-response";
 import type { requireWorkerCredential } from "./worker-route-auth";
 import {
   createManagedComputerSetupService,
@@ -49,8 +50,8 @@ describe("ManagedComputerSetupService validation", () => {
       service.bindManagedComputerSetup(request, context),
     ).catch((cause: unknown) => cause);
 
-    expect(error).toBeInstanceOf(ConnectError);
-    expect((error as ConnectError).code).toBe(Code.InvalidArgument);
+    expect(error).toBeInstanceOf(HttpError);
+    expect((error as HttpError).status).toBe(400);
     expect(context.responseHeader.get("cache-control")).toBe(
       "private, no-store",
     );

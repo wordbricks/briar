@@ -18,6 +18,7 @@ import {
   vi,
 } from "vitest";
 import type { BriarAuth } from "./auth";
+import { connectErrorInterceptor } from "./app-connect-errors";
 import {
   type AppConnectLinearImportServices,
   registerAppLinearImportService,
@@ -152,6 +153,7 @@ describe("LinearImportService", () => {
           connect: true,
           grpc: false,
           grpcWeb: false,
+          interceptors: [connectErrorInterceptor],
         });
         registerAppLinearImportService(router, {
           request,

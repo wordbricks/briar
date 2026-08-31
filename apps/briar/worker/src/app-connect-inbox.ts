@@ -11,7 +11,7 @@ import {
   upsertInboxReadStates,
 } from "./inbox-read-state-repository";
 import { HttpError } from "./http-response";
-import { withConnectErrors } from "./app-connect-errors";
+
 import { appInboxFeedMessage } from "./app-connect-mappers";
 import { hasOrganizationCapability } from "./organization-access";
 import { loadOrganizationInboxFeed } from "./organization-inbox-feed";
@@ -46,7 +46,7 @@ const readVersions = (
 export const createAppInboxService = (
   { request, auth, db, env, context }: AppConnectInboxInput,
 ): ServiceImpl<typeof InboxService> => ({
-  getInboxFeed: async (rpcRequest) => withConnectErrors(async () => {
+  getInboxFeed: async (rpcRequest) => {
     const input = decodeInboxFeedInput({
       organizationId: rpcRequest.organizationId,
       knownVersion: rpcRequest.knownVersion,
@@ -87,18 +87,18 @@ export const createAppInboxService = (
       version,
       unchanged: false,
     };
-  }),
+  },
 
-  getInboxReadStates: async () => withConnectErrors(async () => {
+  getInboxReadStates: async () => {
     const session = await requireSession(auth, request);
     return {
       readVersions: readVersions(
         await listInboxReadStates(db, session.user.id),
       ),
     };
-  }),
+  },
 
-  putInboxReadStates: async (rpcRequest) => withConnectErrors(async () => {
+  putInboxReadStates: async (rpcRequest) => {
     const session = await requireSession(auth, request);
     const input = decodeInboxReadStatesInput({
       readVersions: rpcRequest.readVersions,
@@ -114,9 +114,9 @@ export const createAppInboxService = (
     );
     scheduleInboxRealtimeFlush(env, db, context);
     return { readVersions: readVersions(rows) };
-  }),
+  },
 
-  deleteInboxReadState: async (rpcRequest) => withConnectErrors(async () => {
+  deleteInboxReadState: async (rpcRequest) => {
     const session = await requireSession(auth, request);
     const input = decodeInboxUnreadStateInput({
       messageId: rpcRequest.messageId,
@@ -128,7 +128,7 @@ export const createAppInboxService = (
     );
     scheduleInboxRealtimeFlush(env, db, context);
     return { readVersions: readVersions(rows) };
-  }),
+  },
 });
 
 export function registerAppInboxService(

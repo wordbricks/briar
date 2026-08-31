@@ -5,7 +5,7 @@ import {
   type PublishReplyActivityRequest,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
-import { withConnectErrors } from "./app-connect-errors";
+
 import { HttpError } from "./http-response";
 import {
   publishReplyActivityApplication,
@@ -68,8 +68,7 @@ export const createReplyActivityService = (
   input: WorkerConnectReplyActivityInput,
   services: Partial<ReplyActivityApplicationServices> = {},
 ): ServiceImpl<typeof ReplyActivityService> => ({
-  publishReplyActivity: (request) =>
-    withConnectErrors(() => publishReplyActivity(input, request, services)),
+  publishReplyActivity: (request) => publishReplyActivity(input, request, services),
 });
 
 export const registerReplyActivityService = (

@@ -10,7 +10,7 @@ import {
   RealtimeService,
 } from "@briar/contracts/gen/briar/app/v1/realtime_control_pb";
 import type { BriarAuth } from "./auth";
-import { withConnectErrors } from "./app-connect-errors";
+
 import { HttpError } from "./http-response";
 import {
   createRealtimeTicketApplication,
@@ -91,7 +91,7 @@ export function createAppRealtimeService(
   services: AppConnectRealtimeServices = appConnectRealtimeServices,
 ): ServiceImpl<typeof RealtimeService> {
   return {
-    createRealtimeTicket: (request) => withConnectErrors(async () => {
+    createRealtimeTicket: async (request) => {
       const session = await services.requireSession(input.auth, input.request);
       let issued: Awaited<ReturnType<typeof createRealtimeTicketApplication>>;
       try {
@@ -107,7 +107,7 @@ export function createAppRealtimeService(
       return create(CreateRealtimeTicketResponseSchema, {
         url: socketUrl(input.request.url, issued),
       });
-    }),
+    },
   };
 }
 

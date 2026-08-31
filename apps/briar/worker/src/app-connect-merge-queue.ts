@@ -7,7 +7,7 @@ import {
 import { Code, ConnectError, type ConnectRouter, type ServiceImpl } from "@connectrpc/connect";
 import * as Schema from "effect/Schema";
 import type { BriarAuth } from "./auth";
-import { withConnectErrors } from "./app-connect-errors";
+
 import { appMergeQueueProfile, appMergeQueueStatus } from "./app-connect-merge-queue-mappers";
 import { HttpError } from "./http-response";
 import {
@@ -85,71 +85,68 @@ export const createAppMergeQueueService = (
   { request, auth, db }: AppConnectMergeQueueInput,
   services: MergeQueueApplicationServices = mergeQueueApplicationServices,
 ): ServiceImpl<typeof MergeQueueService> => ({
-  getMergeQueueProfile: (input) =>
-    withConnectErrors(async () => {
-      const session = await requireSession(auth, request);
-      const profile = await withApplicationErrors(
-        getMergeQueueProfileApplication(
-          {
-            db,
-            projectId: decodeUuid(input.projectId).toLowerCase(),
-            userId: session.user.id,
-          },
-          services,
-        ),
-      );
-      return create(GetMergeQueueProfileResponseSchema, {
-        profile: profile ? appMergeQueueProfile(profile) : undefined,
-      });
-    }),
+  getMergeQueueProfile: async (input) => {
+    const session = await requireSession(auth, request);
+    const profile = await withApplicationErrors(
+      getMergeQueueProfileApplication(
+        {
+          db,
+          projectId: decodeUuid(input.projectId).toLowerCase(),
+          userId: session.user.id,
+        },
+        services,
+      ),
+    );
+    return create(GetMergeQueueProfileResponseSchema, {
+      profile: profile ? appMergeQueueProfile(profile) : undefined,
+    });
+  },
 
-  updateMergeQueueProfile: (input) =>
-    withConnectErrors(async () => {
-      const session = await requireSession(auth, request);
-      const profile = await withApplicationErrors(
-        updateMergeQueueProfileApplication(
-          {
-            command: {
-              enabled: input.enabled,
-              maxBatchSize:
-                input.maxBatchSize === undefined
-                  ? undefined
-                  : decodeMaxBatchSize(input.maxBatchSize),
-              quietWindowMs: quietWindowMs(input.quietWindow),
-              readinessStageId:
-                input.readinessStageId === undefined
-                  ? undefined
-                  : decodeWorkflowStageId(input.readinessStageId),
-            },
-            db,
-            observedAt: new Date().toISOString(),
-            projectId: decodeUuid(input.projectId).toLowerCase(),
-            userId: session.user.id,
+  updateMergeQueueProfile: async (input) => {
+    const session = await requireSession(auth, request);
+    const profile = await withApplicationErrors(
+      updateMergeQueueProfileApplication(
+        {
+          command: {
+            enabled: input.enabled,
+            maxBatchSize:
+              input.maxBatchSize === undefined
+                ? undefined
+                : decodeMaxBatchSize(input.maxBatchSize),
+            quietWindowMs: quietWindowMs(input.quietWindow),
+            readinessStageId:
+              input.readinessStageId === undefined
+                ? undefined
+                : decodeWorkflowStageId(input.readinessStageId),
           },
-          services,
-        ),
-      );
-      return create(UpdateMergeQueueProfileResponseSchema, {
-        profile: appMergeQueueProfile(profile),
-      });
-    }),
+          db,
+          observedAt: new Date().toISOString(),
+          projectId: decodeUuid(input.projectId).toLowerCase(),
+          userId: session.user.id,
+        },
+        services,
+      ),
+    );
+    return create(UpdateMergeQueueProfileResponseSchema, {
+      profile: appMergeQueueProfile(profile),
+    });
+  },
 
-  getMergeQueueStatus: (input) =>
-    withConnectErrors(async () => {
-      const session = await requireSession(auth, request);
-      const status = await withApplicationErrors(
-        getMergeQueueStatusApplication(
-          {
-            db,
-            generatedAt: new Date().toISOString(),
-            projectId: decodeUuid(input.projectId).toLowerCase(),
-            userId: session.user.id,
-          },
-          services,
-        ),
-      );
-      return appMergeQueueStatus(status);
-    }),
+  getMergeQueueStatus: async (input) => {
+    const session = await requireSession(auth, request);
+    const status = await withApplicationErrors(
+      getMergeQueueStatusApplication(
+        {
+          db,
+          generatedAt: new Date().toISOString(),
+          projectId: decodeUuid(input.projectId).toLowerCase(),
+          userId: session.user.id,
+        },
+        services,
+      ),
+    );
+    return appMergeQueueStatus(status);
+  },
 });
 
 export const registerAppMergeQueueService = (

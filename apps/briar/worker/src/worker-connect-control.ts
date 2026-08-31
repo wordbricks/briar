@@ -3,7 +3,7 @@ import {
   WorkerReadinessState,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
-import { withConnectErrors } from "./app-connect-errors";
+
 import { appExecutionWorkerUpdateRequestState } from "./app-connect-fleet-mappers";
 import { appDashboardWorker } from "./app-connect-mappers";
 import { HttpError } from "./http-response";
@@ -80,7 +80,7 @@ const withWorkerControlErrors = async <A>(operation: Promise<A>) => {
 export const createWorkerControlService = (
   { request, db }: WorkerConnectControlInput,
 ): ServiceImpl<typeof WorkerControlService> => ({
-  heartbeatWorker: (input) => withConnectErrors(async () => {
+  heartbeatWorker: async (input) => {
     const principal = await requireWorkerCredential(db, request);
     const observedAt = new Date().toISOString();
     const result = await withWorkerControlErrors(heartbeatWorkerApplication({
@@ -101,9 +101,9 @@ export const createWorkerControlService = (
         ? appExecutionWorkerUpdateRequestState(result.updateDirective)
         : undefined,
     };
-  }),
+  },
 
-  updateWorkerLabel: (input) => withConnectErrors(async () => {
+  updateWorkerLabel: async (input) => {
     const principal = await requireWorkerCredential(db, request);
     const device = await withWorkerControlErrors(updateWorkerLabelApplication({
       db,
@@ -113,9 +113,9 @@ export const createWorkerControlService = (
       observedAt: new Date().toISOString(),
     }));
     return { deviceId: device.id, label: device.label };
-  }),
+  },
 
-  prepareWorkerUpdateHandoff: (input) => withConnectErrors(async () => {
+  prepareWorkerUpdateHandoff: async (input) => {
     const principal = await requireWorkerCredential(db, request);
     const result = await withWorkerControlErrors(
       prepareWorkerUpdateHandoffApplication({
@@ -131,9 +131,9 @@ export const createWorkerControlService = (
       activeWorkCount: result.activeWorkCount,
       ready: result.ready,
     };
-  }),
+  },
 
-  getWorkerUpdateHandoff: (input) => withConnectErrors(async () => {
+  getWorkerUpdateHandoff: async (input) => {
     const principal = await requireWorkerCredential(db, request);
     const result = await withWorkerControlErrors(
       getWorkerUpdateHandoffApplication({
@@ -151,9 +151,9 @@ export const createWorkerControlService = (
       activeWorkCount: result.activeWorkCount,
       ready: result.ready,
     };
-  }),
+  },
 
-  failWorkerUpdateHandoff: (input) => withConnectErrors(async () => {
+  failWorkerUpdateHandoff: async (input) => {
     const principal = await requireWorkerCredential(db, request);
     return await withWorkerControlErrors(failWorkerUpdateHandoffApplication({
       db,
@@ -163,7 +163,7 @@ export const createWorkerControlService = (
       error: input.error,
       observedAt: new Date().toISOString(),
     }));
-  }),
+  },
 });
 
 export const registerWorkerControlService = (

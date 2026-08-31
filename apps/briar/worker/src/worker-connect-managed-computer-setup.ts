@@ -7,7 +7,7 @@ import {
   ManagedComputerSetupService,
 } from "@briar/contracts/gen/briar/worker/v1/managed_computer_setup_pb";
 import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
-import { withConnectErrors } from "./app-connect-errors";
+
 import { appFleetTimestamp } from "./app-connect-fleet-mappers";
 import { appProjectGithubCredentialMessage } from "./app-connect-github-mappers";
 import { appDashboardWorker, appProjectSettings } from "./app-connect-mappers";
@@ -74,63 +74,61 @@ export const createManagedComputerSetupService = (
   { request, db, env }: WorkerConnectManagedComputerSetupInput,
   services: ManagedComputerSetupServices = managedComputerSetupServices,
 ): ServiceImpl<typeof ManagedComputerSetupService> => ({
-  getManagedComputerSetupContext: (input, context) =>
-    withConnectErrors(async () => {
-      context.responseHeader.set("Cache-Control", "private, no-store");
-      const principal = await services.requireWorkerCredential(db, request);
-      const managedComputerId = decodeUuid(input.managedComputerId);
-      const result = await withManagedComputerSetupErrors(
-        () => services.getSetupContext({
-          db,
-          env,
-          principal,
-          managedComputerId,
-          setupToken: setupToken(input.setupToken),
-          observedAt: new Date().toISOString(),
-        }),
-      );
-      return {
-        session: create(ManagedComputerSetupSessionSchema, {
-          id: result.session.id,
-          managedComputerId,
-          organizationId: principal.organizationId,
-          projectId: result.session.projectId,
-          status: ManagedComputerSetupSessionStatus.PENDING,
-          expiresAt: appFleetTimestamp(result.session.expiresAt),
-        }),
-        project: result.project,
-        settings: appProjectSettings(result.settings),
-        repositoryCredential: result.repositoryCredential
-          ? appProjectGithubCredentialMessage(result.repositoryCredential)
-          : undefined,
-      };
-    }),
-
-  bindManagedComputerSetup: (input, context) =>
-    withConnectErrors(async () => {
-      context.responseHeader.set("Cache-Control", "private, no-store");
-      const principal = await services.requireWorkerCredential(db, request);
-      const observedAt = new Date().toISOString();
-      const managedComputerId = decodeUuid(input.managedComputerId);
-      const result = await withManagedComputerSetupErrors(
-        () => services.bindSetup({
-          db,
-          principal,
-          managedComputerId,
-          setupToken: setupToken(input.setupToken),
-          runtime: workerRuntimeMetadataFromProto(input.runtime),
-          observedAt,
-        }),
-      );
-      return {
+  getManagedComputerSetupContext: async (input, context) => {
+    context.responseHeader.set("Cache-Control", "private, no-store");
+    const principal = await services.requireWorkerCredential(db, request);
+    const managedComputerId = decodeUuid(input.managedComputerId);
+    const result = await withManagedComputerSetupErrors(
+      () => services.getSetupContext({
+        db,
+        env,
+        principal,
+        managedComputerId,
+        setupToken: setupToken(input.setupToken),
+        observedAt: new Date().toISOString(),
+      }),
+    );
+    return {
+      session: create(ManagedComputerSetupSessionSchema, {
+        id: result.session.id,
         managedComputerId,
         organizationId: principal.organizationId,
-        projectId: result.session.project_id,
-        deviceId: principal.deviceId,
-        worker: appDashboardWorker(workerJson(result.worker, observedAt)),
-        duplicate: result.duplicate,
-      };
-    }),
+        projectId: result.session.projectId,
+        status: ManagedComputerSetupSessionStatus.PENDING,
+        expiresAt: appFleetTimestamp(result.session.expiresAt),
+      }),
+      project: result.project,
+      settings: appProjectSettings(result.settings),
+      repositoryCredential: result.repositoryCredential
+        ? appProjectGithubCredentialMessage(result.repositoryCredential)
+        : undefined,
+    };
+  },
+
+  bindManagedComputerSetup: async (input, context) => {
+    context.responseHeader.set("Cache-Control", "private, no-store");
+    const principal = await services.requireWorkerCredential(db, request);
+    const observedAt = new Date().toISOString();
+    const managedComputerId = decodeUuid(input.managedComputerId);
+    const result = await withManagedComputerSetupErrors(
+      () => services.bindSetup({
+        db,
+        principal,
+        managedComputerId,
+        setupToken: setupToken(input.setupToken),
+        runtime: workerRuntimeMetadataFromProto(input.runtime),
+        observedAt,
+      }),
+    );
+    return {
+      managedComputerId,
+      organizationId: principal.organizationId,
+      projectId: result.session.project_id,
+      deviceId: principal.deviceId,
+      worker: appDashboardWorker(workerJson(result.worker, observedAt)),
+      duplicate: result.duplicate,
+    };
+  },
 });
 
 export const registerManagedComputerSetupService = (

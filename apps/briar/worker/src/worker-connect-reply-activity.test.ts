@@ -6,8 +6,9 @@ import { AgentActivityKind } from "@briar/contracts/gen/briar/types/v1/agent_eve
 import {
   PublishReplyActivityRequestSchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
-import { Code, ConnectError, type HandlerContext } from "@connectrpc/connect";
+import { type HandlerContext } from "@connectrpc/connect";
 import { describe, expect, it, vi } from "vitest";
+import { HttpError } from "./http-response";
 import {
   createChannelActivityPublishToken,
   createIssueActivityPublishToken,
@@ -131,8 +132,8 @@ describe("ReplyActivityService capability boundary", () => {
         },
       ), context),
     ).catch((cause: unknown) => cause);
-    expect(mismatch).toBeInstanceOf(ConnectError);
-    expect((mismatch as ConnectError).code).toBe(Code.Unauthenticated);
+    expect(mismatch).toBeInstanceOf(HttpError);
+    expect((mismatch as HttpError).status).toBe(401);
     expect(publishIssue).toHaveBeenCalledTimes(1);
   });
 
@@ -159,8 +160,8 @@ describe("ReplyActivityService capability boundary", () => {
           },
         ), context),
       ).catch((cause: unknown) => cause);
-      expect(error).toBeInstanceOf(ConnectError);
-      expect((error as ConnectError).code).toBe(Code.InvalidArgument);
+      expect(error).toBeInstanceOf(HttpError);
+      expect((error as HttpError).status).toBe(400);
     }
     expect(publish).not.toHaveBeenCalled();
   });

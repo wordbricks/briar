@@ -27,7 +27,7 @@ import {
   appResumeRunResponse,
   appRetryRunResponse,
 } from "./app-connect-issue-mappers";
-import { withConnectErrors } from "./app-connect-errors";
+
 import { HttpError } from "./http-response";
 import { claimNextQueueWork } from "./queue-claim-routes";
 import { decodeRequestSync } from "./request-schema";
@@ -294,7 +294,7 @@ export function createWorkerExecutionService(
 ): ServiceImpl<typeof WorkerExecutionService> {
   const services = { ...workerExecutionServices, ...overrides };
   return {
-    claimIssue: (request) => withConnectErrors(async () => {
+    claimIssue: async (request) => {
       const projectId = canonicalUuid(request.projectId).toLowerCase();
       const authorization = await services.authorizeIssueClaim({
         db: input.db,
@@ -317,8 +317,8 @@ export function createWorkerExecutionService(
       return create(ClaimIssueResponseSchema, {
         issue: issue ? workerIssueClaimMessage(issue) : undefined,
       });
-    }),
-    listProjectChannelMessages: (request, context) => withConnectErrors(async () => {
+    },
+    listProjectChannelMessages: async (request, context) => {
       context.responseHeader.set("Cache-Control", "private, no-store");
       const projectId = canonicalUuid(request.projectId).toLowerCase();
       const authenticatedProjectId = await services.requireAgentProject(
@@ -356,8 +356,8 @@ export function createWorkerExecutionService(
         }
         throw error;
       }
-    }),
-    listRunEvidence: (request) => withConnectErrors(async () => {
+    },
+    listRunEvidence: async (request) => {
       const authenticatedProjectId = await input.requireRunExecutionProject(
         request.runId,
       );
@@ -371,8 +371,8 @@ export function createWorkerExecutionService(
         runId: request.runId,
       });
       return runEvidenceResponseMessage(result);
-    }),
-    appendTranscriptEvents: (request) => withConnectErrors(async () => {
+    },
+    appendTranscriptEvents: async (request) => {
       const projectId = canonicalUuid(request.projectId).toLowerCase();
       const worker = await services.requireWorkerProjectBinding(
         input.db,
@@ -396,39 +396,38 @@ export function createWorkerExecutionService(
         archivedCompressedBytes: BigInt(result.compressedBytes),
         projectedEntryCount: result.projected,
       });
-    }),
-    reportIssueExecutionTelemetry: (request) =>
-      withConnectErrors(async () => {
-        const projectId = canonicalUuid(request.projectId).toLowerCase();
-        const worker = await services.requireWorkerProjectBinding(
-          input.db,
-          input.request,
-          projectId,
-        );
-        if (!request.executionId) {
-          throw new HttpError(400, "execution_id is required");
-        }
-        if (!request.executionMetrics) {
-          throw new HttpError(400, "execution_metrics is required");
-        }
-        const result = await services.reportTelemetry({
-          db: input.db,
-          projectId,
-          worker,
-          work: transcriptIdentity(request.work),
-          executionId: canonicalUuid(request.executionId).toLowerCase(),
-          agentProvider: transcriptAgentProvider(request.agentProvider),
-          executionMetrics: executionMetrics(request.executionMetrics),
-          usageObservations: request.usageObservations.map(usageObservation),
-          costObservations: request.costObservations.map(costObservation),
-        });
-        return create(ReportIssueExecutionTelemetryResponseSchema, {
-          executionMetricsUpdated: result.metricsUpdated,
-          usageObservationsStored: result.usageStored,
-          costObservationsStored: result.costStored,
-        });
-      }),
-    recordRunEvent: (request) => withConnectErrors(async () => {
+    },
+    reportIssueExecutionTelemetry: async (request) => {
+      const projectId = canonicalUuid(request.projectId).toLowerCase();
+      const worker = await services.requireWorkerProjectBinding(
+        input.db,
+        input.request,
+        projectId,
+      );
+      if (!request.executionId) {
+        throw new HttpError(400, "execution_id is required");
+      }
+      if (!request.executionMetrics) {
+        throw new HttpError(400, "execution_metrics is required");
+      }
+      const result = await services.reportTelemetry({
+        db: input.db,
+        projectId,
+        worker,
+        work: transcriptIdentity(request.work),
+        executionId: canonicalUuid(request.executionId).toLowerCase(),
+        agentProvider: transcriptAgentProvider(request.agentProvider),
+        executionMetrics: executionMetrics(request.executionMetrics),
+        usageObservations: request.usageObservations.map(usageObservation),
+        costObservations: request.costObservations.map(costObservation),
+      });
+      return create(ReportIssueExecutionTelemetryResponseSchema, {
+        executionMetricsUpdated: result.metricsUpdated,
+        usageObservationsStored: result.usageStored,
+        costObservationsStored: result.costStored,
+      });
+    },
+    recordRunEvent: async (request) => {
       const projectId = canonicalUuid(request.projectId).toLowerCase();
       const principal = request.target.case === "sourceIdentity"
         ? await services.requireAgentProject(input.db, input.request)
@@ -461,8 +460,8 @@ export function createWorkerExecutionService(
         status: workerRunStatusMessage(result.status),
         workflowStage: result.workflowStage ?? undefined,
       });
-    }),
-    transitionWorkflowStage: (request) => withConnectErrors(async () => {
+    },
+    transitionWorkflowStage: async (request) => {
       const projectId = canonicalUuid(request.projectId).toLowerCase();
       const authorization = await services.authorizeIssueClaim({
         db: input.db,
@@ -500,8 +499,8 @@ export function createWorkerExecutionService(
             })
           : undefined,
       });
-    }),
-    retryRun: (request) => withConnectErrors(async () => {
+    },
+    retryRun: async (request) => {
       const command = recoveryRunCommand(request);
       const actor = await runControlActor(
         input,
@@ -517,8 +516,8 @@ export function createWorkerExecutionService(
       });
       scheduleRunMutation(input, command.projectId);
       return appRetryRunResponse(result);
-    }),
-    cancelRun: (request) => withConnectErrors(async () => {
+    },
+    cancelRun: async (request) => {
       const command = recoveryRunCommand(request);
       const actor = await runControlActor(
         input,
@@ -534,8 +533,8 @@ export function createWorkerExecutionService(
       });
       scheduleRunMutation(input, command.projectId);
       return appCancelRunResponse(result);
-    }),
-    resumeRun: (request) => withConnectErrors(async () => {
+    },
+    resumeRun: async (request) => {
       const command = resumeRunCommand(request);
       const actor = await runControlActor(
         input,
@@ -550,8 +549,8 @@ export function createWorkerExecutionService(
       });
       scheduleRunMutation(input, command.projectId);
       return appResumeRunResponse(result);
-    }),
-    reworkRun: (request) => withConnectErrors(async () => {
+    },
+    reworkRun: async (request) => {
       const command = reworkRunCommand(request);
       const actor = await runControlActor(
         input,
@@ -566,7 +565,7 @@ export function createWorkerExecutionService(
       });
       scheduleRunMutation(input, command.projectId);
       return appReworkRunResponse(result);
-    }),
+    },
   };
 }
 

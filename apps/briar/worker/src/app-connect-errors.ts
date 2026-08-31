@@ -128,11 +128,3 @@ export const connectErrorInterceptor: Interceptor =
       throw toConnectError(error);
     }
   };
-
-export async function withConnectErrors<A>(operation: () => Promise<A>) {
-  try {
-    return await operation();
-  } catch (error) {
-    throw toConnectError(error);
-  }
-}

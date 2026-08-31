@@ -2,6 +2,7 @@ import { createConnectRouter } from "@connectrpc/connect";
 import { createFetchHandler } from "@connectrpc/connect/protocol";
 import { describe, expect, it, vi } from "vitest";
 import type { BriarAuth } from "./auth";
+import { connectErrorInterceptor } from "./app-connect-errors";
 import {
   type AppConnectRealtimeServices,
   registerAppRealtimeService,
@@ -35,6 +36,7 @@ const invoke = async (
     connect: true,
     grpc: false,
     grpcWeb: false,
+    interceptors: [connectErrorInterceptor],
   });
   registerAppRealtimeService(router, {
     request: connectRequest,

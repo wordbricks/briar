@@ -5,6 +5,7 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/agent_pb";
 import { describe, expect, it, vi } from "vitest";
 import type { BriarAuth } from "./auth";
+import { connectErrorInterceptor } from "./app-connect-errors";
 import {
   registerAppAgentService,
   type AppConnectAgentServices,
@@ -136,6 +137,7 @@ describe("app Agent Connect adapter", () => {
       connect: true,
       grpc: false,
       grpcWeb: false,
+      interceptors: [connectErrorInterceptor],
     });
     registerAppAgentService(
       router,
