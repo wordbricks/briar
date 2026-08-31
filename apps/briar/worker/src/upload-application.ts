@@ -1,10 +1,6 @@
 import { contentDisposition } from "./attachment-storage";
 import { sha256Bytes } from "./crypto-digest";
-import {
-  enqueueUploadObjectCleanup,
-  getScopedUpload,
-  markUploadStored,
-} from "./upload-repository";
+import { enqueueUploadObjectCleanup, getScopedUpload, markUploadStored } from "./upload-repository";
 import { verifyUploadCapability } from "./upload-capability";
 
 export class UploadApplicationError extends Error {
@@ -72,9 +68,7 @@ export async function uploadReservedFileApplication(
     );
   }
   const upload = await services.getScopedUpload(input.db, input.uploadId);
-  if (
-    !upload || upload.expires_at <= observedAt || upload.consumed_at
-  ) {
+  if (!upload || upload.expires_at <= observedAt || upload.consumed_at) {
     throw new UploadApplicationError("unavailable", "Upload is no longer available");
   }
   const contentType = input.contentType.split(";", 1)[0]?.trim().toLowerCase();
@@ -106,15 +100,12 @@ export async function uploadReservedFileApplication(
       purpose: upload.purpose,
       organizationId: upload.organization_id,
       ...(upload.project_id ? { projectId: upload.project_id } : {}),
+      ...(upload.channel_id ? { channelId: upload.channel_id } : {}),
       ...(upload.work_id ? { workId: upload.work_id } : {}),
       ...(upload.run_id ? { runId: upload.run_id } : {}),
     },
   });
-  const stored = await services.markUploadStored(
-    input.db,
-    input.uploadId,
-    observedAt,
-  );
+  const stored = await services.markUploadStored(input.db, input.uploadId, observedAt);
   if (!stored) {
     const current = await services.getScopedUpload(input.db, input.uploadId);
     if (!current?.uploaded_at) {
@@ -124,10 +115,7 @@ export async function uploadReservedFileApplication(
         observedAt,
       });
     }
-    throw new UploadApplicationError(
-      "unavailable",
-      "Upload lost its reservation",
-    );
+    throw new UploadApplicationError("unavailable", "Upload lost its reservation");
   }
   return { objectKey: upload.object_key, replayed: false };
 }
