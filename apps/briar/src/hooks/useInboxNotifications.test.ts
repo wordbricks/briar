@@ -4,7 +4,6 @@ import type { InboxMessageWithReadState } from "./useInbox";
 import {
   findChangedInboxMessages,
   inboxConversationSyncSignal,
-  inboxNotificationVersion,
   shouldSuppressInboxNotification,
 } from "./useInboxNotifications";
 
@@ -64,37 +63,6 @@ describe("inbox notification change detection", () => {
           "conversation-thread:project-1:run-1:root-1": "reply-2",
         },
         [{ ...firstReply, id: "conversation:second" }],
-      ),
-    ).toEqual([]);
-  });
-
-  it("ignores legacy and canonical versions of the same terminal session", () => {
-    const terminalSession: InboxMessageWithReadState = {
-      id: "session:session-1",
-      kind: "session",
-      isUnread: true,
-      occurredAt: "2026-08-01T12:22:38.913Z",
-      projectId: "project-1",
-      projectName: "Briar",
-      targetId: "session-1",
-      title: "Completed task",
-      version: "legacy-terminal-event-id",
-      status: "failed",
-      agentName: "Inbox Agent",
-      issueCount: 1,
-      error: "Runner stopped",
-      summary: null,
-      requiresAttention: true,
-    };
-    const baselineVersion = inboxNotificationVersion(terminalSession);
-
-    expect(
-      findChangedInboxMessages(
-        { [terminalSession.id]: baselineVersion },
-        [{
-          ...terminalSession,
-          version: "failed:2026-08-01T12:22:38.913Z",
-        }],
       ),
     ).toEqual([]);
   });

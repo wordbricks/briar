@@ -26,7 +26,6 @@ import {
   type MobilePushDeviceLocale,
 } from "./app-rpc/account";
 import { UuidString } from "./api/schema-helpers";
-import { inboxSessionMessageVersion } from "./inbox-session-version";
 
 export const inboxNotificationCategories = [
   "urgent",
@@ -545,10 +544,11 @@ function recordAndroidRemoteNotificationReceipt(
 
 function androidRemoteNotificationAlreadyHandled(message: InboxMessage) {
   const identity = inboxNotificationIdentity(message);
-  const version = message.kind === "session"
-    ? inboxSessionMessageVersion(message.status, message.occurredAt)
-    : message.version;
-  if (readAndroidRemoteNotificationReceipts()[`${identity}\u0000${version}`]) {
+  if (
+    readAndroidRemoteNotificationReceipts()[
+      `${identity}\u0000${message.version}`
+    ]
+  ) {
     return true;
   }
   try {
