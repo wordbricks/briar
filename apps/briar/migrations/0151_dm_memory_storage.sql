@@ -3,6 +3,69 @@
 alter table briar_channels add column memory_roster_epoch integer not null default 0;
 alter table briar_channel_messages add column memory_source_version integer not null default 1;
 
+-- Internal memory counters do not change the conversation feed. Preserve the
+-- existing invalidation for all ordinary updates, including future columns.
+drop trigger briar_channel_changes_channels_update_sync;
+create trigger briar_channel_changes_channels_update_sync
+after update on briar_channels
+when old.memory_roster_epoch = new.memory_roster_epoch
+  or old.id is not new.id
+  or old.organization_id is not new.organization_id
+  or old.slug is not new.slug
+  or old.name is not new.name
+  or old.topic is not new.topic
+  or old.visibility is not new.visibility
+  or old.default_project_id is not new.default_project_id
+  or old.created_by_user_id is not new.created_by_user_id
+  or old.archived_at is not new.archived_at
+  or old.created_at is not new.created_at
+  or old.updated_at is not new.updated_at
+  or old.kind is not new.kind
+  or old.dm_key is not new.dm_key
+BEGIN
+  insert into briar_channel_changes (
+    organization_id, channel_id, entity_type, entity_id, operation, created_at
+  ) values (
+    new.organization_id, new.id, 'channel', new.id, 'upsert', datetime('now')
+  );
+  insert into briar_channel_sync_state (organization_id, current_version)
+  values (new.organization_id, last_insert_rowid())
+  on conflict (organization_id) do update
+    set current_version = excluded.current_version;
+END;
+
+drop trigger briar_channel_changes_messages_update_sync;
+create trigger briar_channel_changes_messages_update_sync
+after update on briar_channel_messages
+when old.memory_source_version = new.memory_source_version
+  or old.id is not new.id
+  or old.channel_id is not new.channel_id
+  or old.parent_message_id is not new.parent_message_id
+  or old.author_user_id is not new.author_user_id
+  or old.author_agent_id is not new.author_agent_id
+  or old.author_agent_name is not new.author_agent_name
+  or old.author_agent_provider is not new.author_agent_provider
+  or old.author_webhook_id is not new.author_webhook_id
+  or old.author_webhook_name is not new.author_webhook_name
+  or old.webhook_event_id is not new.webhook_event_id
+  or old.body is not new.body
+  or old.created_at is not new.created_at
+  or old.updated_at is not new.updated_at
+  or old.blocks_json is not new.blocks_json
+  or old.deleted_at is not new.deleted_at
+BEGIN
+  insert into briar_channel_changes (
+    organization_id, channel_id, entity_type, entity_id, operation, created_at
+  ) select channel.organization_id, new.channel_id, 'message', new.id,
+           'upsert', datetime('now')
+    from briar_channels channel where channel.id = new.channel_id;
+  insert into briar_channel_sync_state (organization_id, current_version)
+  select channel.organization_id, last_insert_rowid()
+  from briar_channels channel where channel.id = new.channel_id
+  on conflict (organization_id) do update
+    set current_version = excluded.current_version;
+END;
+
 create table briar_dm_memory_spaces (
   id text primary key not null,
   organization_id text not null references briar_organizations(id) on delete cascade,

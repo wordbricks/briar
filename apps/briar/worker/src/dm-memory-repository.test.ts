@@ -198,7 +198,12 @@ describe("DM memory authoritative storage", () => {
       (id, channel_id, author_user_id, body, created_at, updated_at) values (?, ?, ?, 'Original source', ?, ?)`)
       .bind(messageId, owner.channelId, userId, now, now).run();
     const saved = await saveDmMemory(db, owner, memory({ sourceMessage: { id: messageId, version: 1 } }));
+    const messageChanges = async () => (await db.prepare(`select count(*) as total
+      from briar_channel_changes where entity_type = 'message' and entity_id = ?`)
+      .bind(messageId).first<{ total: number }>())?.total ?? 0;
+    const beforeEdit = await messageChanges();
     await db.prepare("update briar_channel_messages set body = 'Corrected source' where id = ?").bind(messageId).run();
+    expect(await messageChanges()).toBe(beforeEdit + 1);
     expect((await getDmMemory(db, owner, saved.documentId!)).status).toBe("invalidated");
     expect((await listDmMemories(db, owner)).spaces[0].revocationEpoch).toBe(1);
     await expect(saveDmMemory(db, owner, memory({ sourceMessage: { id: messageId, version: 1 } })))
