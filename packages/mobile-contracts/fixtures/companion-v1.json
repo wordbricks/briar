@@ -590,6 +590,23 @@
                 "url": "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/attachments/77777777-7777-4777-8777-777777777777"
               }
             ],
+            "parent": null,
+            "subIssues": [
+              {
+                "id": "44444444-4444-4444-8444-444444444444",
+                "runNumber": 3833,
+                "title": "Native dashboard child",
+                "status": "queued"
+              }
+            ],
+            "relatedIssues": [
+              {
+                "id": "55555555-5555-4555-8555-555555555555",
+                "runNumber": 3834,
+                "title": "Native dashboard companion",
+                "status": "backlog"
+              }
+            ],
             "resultSummary": null,
             "structuredResult": null,
             "resultReviews": [],
@@ -827,6 +844,7 @@
         "priority": 2,
         "difficulty": "hard",
         "assigneeUserId": "fixture-user",
+        "parentRunId": "44444444-4444-4444-8444-444444444444",
         "status": "queued",
         "preferredProvider": "codex",
         "preferredModel": "gpt-5.6-sol",
@@ -841,6 +859,7 @@
         "assigneeUserId": "fixture-user",
         "createdByUserId": "fixture-user",
         "difficulty": "hard",
+        "parentRunId": "44444444-4444-4444-8444-444444444444",
         "attachments": []
       }
     },

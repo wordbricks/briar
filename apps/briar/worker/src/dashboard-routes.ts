@@ -29,6 +29,10 @@ import {
   listIssueConversationNotifications,
   listIssueDependencies,
   listIssueDependenciesByRunIds,
+  listIssueHierarchy,
+  listIssueHierarchyByRunIds,
+  listIssueRelations,
+  listIssueRelationsByRunIds,
   listIssueResultReviews,
   listIssueResultReviewsByRunIds,
   listOrganizationStatusTrayRuns,
@@ -38,6 +42,8 @@ import {
   resolveHuntEventActorNames,
   type IssueAttachmentRow,
   type IssueDependencyRow,
+  type IssueHierarchyRow,
+  type IssueRelationRow,
   type IssueResultReviewRow,
 } from "./db";
 import { HttpError, json } from "./http-response";
@@ -202,6 +208,8 @@ export async function handleDashboardRoute(input: {
       dashboardRows,
       attachments,
       dependencies,
+      hierarchy,
+      relations,
       resultReviews,
       workers,
       organizationProviders,
@@ -210,6 +218,8 @@ export async function handleDashboardRoute(input: {
         listDashboardRunsByIds(db, project.id, changedRunIdList),
         listIssueAttachmentsByRunIds(db, project.id, changedRunIdList),
         listIssueDependenciesByRunIds(db, project.id, changedRunIdList),
+        listIssueHierarchyByRunIds(db, project.id, changedRunIdList),
+        listIssueRelationsByRunIds(db, project.id, changedRunIdList),
         listIssueResultReviewsByRunIds(db, project.id, changedRunIdList),
         listExecutionWorkers(db, project.id, observedAt),
         listOrganizationExecutionProviders(
@@ -226,6 +236,8 @@ export async function handleDashboardRoute(input: {
     }
     const prerequisitesByRun = new Map<string, IssueDependencyRow[]>();
     const dependentsByRun = new Map<string, IssueDependencyRow[]>();
+    const hierarchyByRun = new Map<string, IssueHierarchyRow[]>();
+    const relationsByRun = new Map<string, IssueRelationRow[]>();
     const resultReviewsByRun = new Map<string, IssueResultReviewRow[]>();
     for (const review of resultReviews) {
       if (!changedRunIds.has(review.run_id)) continue;
@@ -245,6 +257,22 @@ export async function handleDashboardRoute(input: {
           dependentsByRun.get(dependency.prerequisite_run_id) ?? [];
         dependents.push(dependency);
         dependentsByRun.set(dependency.prerequisite_run_id, dependents);
+      }
+    }
+    for (const link of hierarchy) {
+      for (const runId of [link.parent_run_id, link.child_run_id]) {
+        if (!changedRunIds.has(runId)) continue;
+        const links = hierarchyByRun.get(runId) ?? [];
+        links.push(link);
+        hierarchyByRun.set(runId, links);
+      }
+    }
+    for (const relation of relations) {
+      for (const runId of [relation.first_run_id, relation.second_run_id]) {
+        if (!changedRunIds.has(runId)) continue;
+        const runRelations = relationsByRun.get(runId) ?? [];
+        runRelations.push(relation);
+        relationsByRun.set(runId, runRelations);
       }
     }
     const changedRuns = dashboardRows.filter((run) =>
@@ -284,6 +312,8 @@ export async function handleDashboardRoute(input: {
           attachmentsByRun.get(run.id) ?? [],
           prerequisitesByRun.get(run.id) ?? [],
           dependentsByRun.get(run.id) ?? [],
+          hierarchyByRun.get(run.id) ?? [],
+          relationsByRun.get(run.id) ?? [],
           resultReviewsByRun.get(run.id) ?? [],
         ),
       ),
@@ -339,6 +369,8 @@ export async function handleDashboardRoute(input: {
       checkpointPolicy,
       attachments,
       dependencies,
+      hierarchy,
+      relations,
       resultReviews,
       workers,
       organizationProviders,
@@ -353,6 +385,8 @@ export async function handleDashboardRoute(input: {
         loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
         listIssueAttachments(db, project.id),
         listIssueDependencies(db, project.id),
+        listIssueHierarchy(db, project.id),
+        listIssueRelations(db, project.id),
         listIssueResultReviews(db, project.id),
         listExecutionWorkers(db, project.id, observedAt),
         listOrganizationExecutionProviders(
@@ -380,6 +414,8 @@ export async function handleDashboardRoute(input: {
     }
     const prerequisitesByRun = new Map<string, IssueDependencyRow[]>();
     const dependentsByRun = new Map<string, IssueDependencyRow[]>();
+    const hierarchyByRun = new Map<string, IssueHierarchyRow[]>();
+    const relationsByRun = new Map<string, IssueRelationRow[]>();
     const resultReviewsByRun = new Map<string, IssueResultReviewRow[]>();
     for (const review of resultReviews) {
       const runReviews = resultReviewsByRun.get(review.run_id) ?? [];
@@ -396,6 +432,20 @@ export async function handleDashboardRoute(input: {
       dependents.push(dependency);
       dependentsByRun.set(dependency.prerequisite_run_id, dependents);
     }
+    for (const link of hierarchy) {
+      for (const runId of [link.parent_run_id, link.child_run_id]) {
+        const links = hierarchyByRun.get(runId) ?? [];
+        links.push(link);
+        hierarchyByRun.set(runId, links);
+      }
+    }
+    for (const relation of relations) {
+      for (const runId of [relation.first_run_id, relation.second_run_id]) {
+        const runRelations = relationsByRun.get(runId) ?? [];
+        runRelations.push(relation);
+        relationsByRun.set(runId, runRelations);
+      }
+    }
     return json({
       project: projectJson(project),
       settings: settingsJson(settings, checkpointPolicyJson(checkpointPolicy)),
@@ -405,6 +455,8 @@ export async function handleDashboardRoute(input: {
           attachmentsByRun.get(run.id) ?? [],
           prerequisitesByRun.get(run.id) ?? [],
           dependentsByRun.get(run.id) ?? [],
+          hierarchyByRun.get(run.id) ?? [],
+          relationsByRun.get(run.id) ?? [],
           resultReviewsByRun.get(run.id) ?? [],
         ),
       ),

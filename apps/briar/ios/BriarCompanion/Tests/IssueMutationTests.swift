@@ -165,6 +165,7 @@ final class IssueMutationTests: XCTestCase {
             priority: 2,
             difficulty: .hard,
             assigneeUserId: nil,
+            parentRunId: nil,
             status: .queued,
             preferredProvider: .claude,
             preferredModel: "sonnet",
@@ -264,6 +265,67 @@ final class IssueMutationTests: XCTestCase {
         _ = try await store.setSubscription(runID: Self.runID, subscribed: false)
         let unsubscribedMethod = await recorder.lastMethod()
         XCTAssertEqual(unsubscribedMethod, "DELETE")
+    }
+
+    func testParentAndRelatedMutationsUseDedicatedEndpoints() async throws {
+        let recorder = MutationAPIRecorder()
+        let store = IssueMutationStore(
+            api: recorder,
+            projectID: Self.projectID,
+            token: "token"
+        )
+        let relatedID = UUID(uuidString: "44444444-4444-4444-8444-444444444444")!
+
+        try await store.setParent(runID: Self.runID, parentID: relatedID)
+        let parentMethod = await recorder.lastMethod()
+        let parentPath = await recorder.lastPath()
+        XCTAssertEqual(parentMethod, "PUT")
+        XCTAssertEqual(
+            parentPath,
+            MobileAPIContract.Endpoint.runParent(
+                projectID: Self.projectID,
+                runID: Self.runID,
+                parentID: relatedID
+            )
+        )
+
+        try await store.setRelated(runID: Self.runID, relatedID: relatedID, enabled: true)
+        let relatedMethod = await recorder.lastMethod()
+        let relatedPath = await recorder.lastPath()
+        XCTAssertEqual(relatedMethod, "PUT")
+        XCTAssertEqual(
+            relatedPath,
+            MobileAPIContract.Endpoint.runRelated(
+                projectID: Self.projectID,
+                runID: Self.runID,
+                relatedID: relatedID
+            )
+        )
+
+        try await store.setParent(runID: Self.runID, parentID: nil)
+        let removedParentMethod = await recorder.lastMethod()
+        let removedParentPath = await recorder.lastPath()
+        XCTAssertEqual(removedParentMethod, "DELETE")
+        XCTAssertEqual(
+            removedParentPath,
+            MobileAPIContract.Endpoint.runParent(
+                projectID: Self.projectID,
+                runID: Self.runID
+            )
+        )
+
+        try await store.setRelated(runID: Self.runID, relatedID: relatedID, enabled: false)
+        let removedRelatedMethod = await recorder.lastMethod()
+        let removedRelatedPath = await recorder.lastPath()
+        XCTAssertEqual(removedRelatedMethod, "DELETE")
+        XCTAssertEqual(
+            removedRelatedPath,
+            MobileAPIContract.Endpoint.runRelated(
+                projectID: Self.projectID,
+                runID: Self.runID,
+                relatedID: relatedID
+            )
+        )
     }
 
     func testDispatchRunRequestEncodesWorkerSelection() throws {
@@ -1355,10 +1417,16 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
             throw MobileAPIError.invalidRequest
         }
         let payload: String
-        if path.hasSuffix("/subscription") {
+        if method == "DELETE", path.hasSuffix("/parent") || path.contains("/related/") {
+            payload = "{}"
+        } else if path.hasSuffix("/subscription") {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","subscribers":[{"userId":"fixture-user","subscribedAt":"2026-08-12T01:00:00.000Z"}]}"#
         } else if path.hasSuffix("/issues") {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","sourceKey":"briar-issue:test","stage":"queued","status":"queued","difficulty":"normal","attachments":[],"createdByUserId":"fixture-user"}"#
+        } else if path.contains("/parent/") {
+            payload = #"{"childRunId":"33333333-3333-4333-8333-333333333333","parentRunId":"44444444-4444-4444-8444-444444444444","outcome":"created"}"#
+        } else if path.contains("/related/") {
+            payload = #"{"runId":"33333333-3333-4333-8333-333333333333","relatedRunId":"44444444-4444-4444-8444-444444444444","outcome":"created"}"#
         } else if path.hasSuffix("/status") {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","outcome":"moved","status":"queued","workflowStage":null}"#
         } else if path.hasSuffix("/resume") {

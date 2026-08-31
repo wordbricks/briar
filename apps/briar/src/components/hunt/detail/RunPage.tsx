@@ -75,6 +75,7 @@ export function RunPage({
   issueKeyPrefix,
   onBack,
   onAddDependency,
+  onAddRelated,
   onAcceptIssueAction,
   onAcceptIssueExecution,
   onAcceptSkillExecution,
@@ -84,6 +85,8 @@ export function RunPage({
   onTransfer,
   transferProjects = [],
   onDependencyOpen,
+  onCreateSubIssue,
+  onLinkSubIssue,
   onRelatedMessageOpen,
   onLoadAttachment,
   onLoadIssueMessages,
@@ -102,6 +105,9 @@ export function RunPage({
   onRework,
   onResume = async () => undefined,
   onRemoveDependency,
+  onRemoveRelated,
+  onSetParent,
+  onUnlinkSubIssue,
   onSendIssueMessage,
   onEditIssueMessage = async () => {
     throw new Error("메시지 수정 기능을 사용할 수 없습니다.");
@@ -141,6 +147,7 @@ export function RunPage({
   issueKeyPrefix?: string;
   onBack: () => void;
   onAddDependency?: (prerequisiteRunId: string) => Promise<unknown>;
+  onAddRelated?: (relatedRunId: string) => Promise<unknown>;
   onAcceptIssueAction?: (proposal: IssueProposedAction) => Promise<IssueProposedAction>;
   onAcceptIssueExecution?: (proposal: IssueExecutionProposal, input: IssueExecutionApprovalInput) => Promise<IssueExecutionProposal>;
   onAcceptSkillExecution?: (proposal: AgentSkillExecutionProposal, input: AgentSkillExecutionApprovalInput) => Promise<AgentSkillExecutionProposal>;
@@ -150,6 +157,8 @@ export function RunPage({
   onTransfer?: (targetProjectId: string) => Promise<unknown>;
   transferProjects?: Project[];
   onDependencyOpen?: (runId: string) => void;
+  onCreateSubIssue?: () => void;
+  onLinkSubIssue?: (childRunId: string) => Promise<unknown>;
   onRelatedMessageOpen?: (relatedMessage: RelatedMessageReference) => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: () => Promise<IssueMessage[]>;
@@ -171,6 +180,9 @@ export function RunPage({
   }) => Promise<unknown>;
   onResume?: () => Promise<unknown>;
   onRemoveDependency?: (prerequisiteRunId: string) => Promise<unknown>;
+  onRemoveRelated?: (relatedRunId: string) => Promise<unknown>;
+  onSetParent?: (parentRunId: string | null) => Promise<unknown>;
+  onUnlinkSubIssue?: (childRunId: string) => Promise<unknown>;
   onSendIssueMessage: (input: {
     body: string;
     clientMessageId?: string;
@@ -1546,7 +1558,21 @@ export function RunPage({
                       <span className="run-property-copy"><strong>{projectLabel}</strong></span>
                     </div>}
                 </section>
-                <IssueDependenciesPanel availableRuns={availableRuns} issueKeyPrefix={issueKeyPrefix} isUpdating={isUpdatingIssue} onAdd={onAddDependency} onOpen={onDependencyOpen} onRemove={onRemoveDependency} run={run} />
+                <IssueDependenciesPanel
+                  availableRuns={availableRuns}
+                  issueKeyPrefix={issueKeyPrefix}
+                  isUpdating={isUpdatingIssue}
+                  onAdd={onAddDependency}
+                  onAddRelated={onAddRelated}
+                  onCreateSubIssue={onCreateSubIssue}
+                  onLinkSubIssue={onLinkSubIssue}
+                  onOpen={onDependencyOpen}
+                  onRemove={onRemoveDependency}
+                  onRemoveRelated={onRemoveRelated}
+                  onSetParent={onSetParent}
+                  onUnlinkSubIssue={onUnlinkSubIssue}
+                  run={run}
+                />
                 <section>
                   <h2>{t("run.repository")}</h2>
                   <div aria-label={`${t("run.repository")}: ${run.repository}`} className="run-property" title={t("run.repository")}>

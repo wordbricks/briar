@@ -3,13 +3,17 @@ import type { BriarAuth } from "./auth";
 import {
   completeIssueResultReview,
   createIssueDependency,
+  createIssueRelation,
   deleteIssue,
   deleteIssueDependency,
+  deleteIssueParent,
+  deleteIssueRelation,
   getHuntRunForProject,
   getProject,
   listIssueAttachments,
   listIssueSubscriptions,
   subscribeIssue,
+  setIssueParent,
   unsubscribeIssue,
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
@@ -113,6 +117,12 @@ export async function handleIssueCoreRoute(input: {
       assigneeUserId,
       session.user.id,
     );
+    if (
+      input.parentRunId &&
+      !(await getHuntRunForProject(db, project.id, input.parentRunId))
+    ) {
+      throw new HttpError(404, "Parent issue not found");
+    }
     const issueId = crypto.randomUUID();
     const sourceKey = `briar-issue:${issueId}`;
     const detail =
@@ -151,6 +161,20 @@ export async function handleIssueCoreRoute(input: {
         throw new HttpError(500, "Issue project assignment failed");
       }
     }
+    if (input.parentRunId) {
+      const parentOutcome = await setIssueParent(db, project.id, {
+        childRunId: created.runId,
+        parentRunId: input.parentRunId,
+        createdByUserId: session.user.id,
+        createdAt: new Date().toISOString(),
+      });
+      if (parentOutcome === "not_found") {
+        throw new HttpError(404, "Parent issue not found");
+      }
+      if (parentOutcome === "cycle") {
+        throw new HttpError(409, "Parent issue would create a hierarchy cycle");
+      }
+    }
     return json(
       {
         runId: created.runId,
@@ -163,6 +187,7 @@ export async function handleIssueCoreRoute(input: {
         assigneeUserId: assigneeUserId ?? null,
         createdByUserId: session.user.id,
         difficulty: input.difficulty,
+        parentRunId: input.parentRunId ?? null,
         attachments: created.attachments.map(issueAttachmentJson),
       },
       201,
@@ -177,6 +202,12 @@ export async function handleIssueCoreRoute(input: {
   );
   const issueDependencyMatch = url.pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/dependencies\/([0-9a-f-]+)$/u,
+  );
+  const issueParentMatch = url.pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/parent(?:\/([0-9a-f-]+))?$/u,
+  );
+  const issueRelationMatch = url.pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/related\/([0-9a-f-]+)$/u,
   );
   const issuePreferencesMatch = url.pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/preferences$/u,
@@ -288,6 +319,85 @@ export async function handleIssueCoreRoute(input: {
       project.id,
       issueDependencyMatch[3],
       issueDependencyMatch[2],
+    );
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+  if (issueParentMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, issueParentMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
+      throw new HttpError(403, "Issue editing permission required");
+    }
+    const parentRunId = issueParentMatch[3];
+    if (!parentRunId) throw new HttpError(400, "Parent issue is required");
+    const outcome = await setIssueParent(db, project.id, {
+      childRunId: issueParentMatch[2],
+      parentRunId,
+      createdByUserId: session.user.id,
+      createdAt: new Date().toISOString(),
+    });
+    if (outcome === "not_found") {
+      throw new HttpError(404, "Parent or child issue not found");
+    }
+    if (outcome === "cycle") {
+      throw new HttpError(409, "Parent issue would create a hierarchy cycle");
+    }
+    return json(
+      { childRunId: issueParentMatch[2], parentRunId, outcome },
+      outcome === "created" ? 201 : 200,
+    );
+  }
+  if (issueParentMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, issueParentMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
+      throw new HttpError(403, "Issue editing permission required");
+    }
+    await deleteIssueParent(db, project.id, issueParentMatch[2]);
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+  if (issueRelationMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, issueRelationMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
+      throw new HttpError(403, "Issue editing permission required");
+    }
+    const outcome = await createIssueRelation(db, project.id, {
+      runId: issueRelationMatch[2],
+      relatedRunId: issueRelationMatch[3],
+      createdByUserId: session.user.id,
+      createdAt: new Date().toISOString(),
+    });
+    if (outcome === "not_found") {
+      throw new HttpError(404, "Related issue not found");
+    }
+    if (outcome === "ineligible") {
+      throw new HttpError(409, "An issue cannot be related to itself");
+    }
+    return json(
+      {
+        runId: issueRelationMatch[2],
+        relatedRunId: issueRelationMatch[3],
+        outcome,
+      },
+      outcome === "created" ? 201 : 200,
+    );
+  }
+  if (issueRelationMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(db, issueRelationMatch[1], session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
+      throw new HttpError(403, "Issue editing permission required");
+    }
+    await deleteIssueRelation(
+      db,
+      project.id,
+      issueRelationMatch[2],
+      issueRelationMatch[3],
     );
     return new Response(null, { status: 204, headers: corsHeaders });
   }

@@ -41,7 +41,8 @@ final class IssueMutationStore: ObservableObject {
 
     func createIssue(
         draft: IssueDraft,
-        attachments: [PendingIssueAttachment]
+        attachments: [PendingIssueAttachment],
+        parentRunId: UUID? = nil
     ) async throws -> CreateIssueResponse {
         try await perform("create") {
             let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -66,6 +67,7 @@ final class IssueMutationStore: ObservableObject {
                         priority: draft.priority,
                         difficulty: draft.difficulty,
                         assigneeUserId: draft.assigneeUserId,
+                        parentRunId: parentRunId,
                         status: draft.status,
                         preferredProvider: draft.preferredProvider,
                         preferredModel: draft.preferredModel,
@@ -85,6 +87,7 @@ final class IssueMutationStore: ObservableObject {
                     "priority": draft.priority.map(String.init) ?? "",
                     "difficulty": draft.difficulty?.rawValue ?? "",
                     "assigneeUserId": draft.assigneeUserId ?? "",
+                    "parentRunId": parentRunId?.uuidString.lowercased() ?? "",
                     "status": draft.status.rawValue,
                     "preferredProvider": draft.preferredProvider?.rawValue ?? "",
                     "preferredModel": draft.preferredModel ?? "",
@@ -220,6 +223,48 @@ final class IssueMutationStore: ObservableObject {
                     token: token,
                     body: nil,
                     as: DependencyResponse.self
+                )
+            } else {
+                try await api.sendVoid(path, method: "DELETE", token: token, body: nil)
+            }
+        }
+    }
+
+    func setParent(runID: UUID, parentID: UUID?) async throws {
+        try await perform("parent-\(runID)") {
+            let path = MobileAPIContract.Endpoint.runParent(
+                projectID: projectID,
+                runID: runID,
+                parentID: parentID
+            )
+            if parentID != nil {
+                let _: ParentIssueResponse = try await api.send(
+                    path,
+                    method: "PUT",
+                    token: token,
+                    body: nil,
+                    as: ParentIssueResponse.self
+                )
+            } else {
+                try await api.sendVoid(path, method: "DELETE", token: token, body: nil)
+            }
+        }
+    }
+
+    func setRelated(runID: UUID, relatedID: UUID, enabled: Bool) async throws {
+        try await perform("related-\(runID)-\(relatedID)") {
+            let path = MobileAPIContract.Endpoint.runRelated(
+                projectID: projectID,
+                runID: runID,
+                relatedID: relatedID
+            )
+            if enabled {
+                let _: RelatedIssueResponse = try await api.send(
+                    path,
+                    method: "PUT",
+                    token: token,
+                    body: nil,
+                    as: RelatedIssueResponse.self
                 )
             } else {
                 try await api.sendVoid(path, method: "DELETE", token: token, body: nil)

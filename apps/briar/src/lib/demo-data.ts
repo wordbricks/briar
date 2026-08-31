@@ -129,6 +129,24 @@ const runSeeds: DemoRunSeed[] = [
     preferredProvider: "codex",
     preferredModel: "gpt-5.6-sol",
     preferredEffort: "xhigh",
+    parent: {
+      id: "demo-4",
+      runNumber: 9,
+      title: "D1 작업 이벤트 스키마 추가",
+      status: "completed",
+    },
+    subIssues: [{
+      id: "demo-3",
+      runNumber: 10,
+      title: "Tauri 시작 시 저장된 세션 복원 실패",
+      status: "blocked",
+    }],
+    relatedIssues: [{
+      id: "demo-2",
+      runNumber: 11,
+      title: "대시보드 작업 상세 패널 개선",
+      status: "paused",
+    }],
     startedAt: ago(42),
     updatedAt: ago(2),
     completedAt: null,
@@ -187,6 +205,12 @@ const runSeeds: DemoRunSeed[] = [
     detail: "Local validation 완료 후 최종 검토를 기다리고 있습니다.",
     resultSummary:
       "## 구현\n\n- 작업 상세 패널을 결과 중심 구조로 정리했습니다.\n- 일시정지 시점까지 완료한 구현과 검증 내용을 결과 탭에서 확인할 수 있습니다.\n\n## 검증\n\n- 컴포넌트 회귀 테스트와 로컬 빌드를 통과했습니다.",
+    relatedIssues: [{
+      id: "demo-1",
+      runNumber: 12,
+      title: "Agent 실행 로그를 작업 상세에 연결",
+      status: "running",
+    }],
     structuredResult: {
       summary:
         "## 구현\n\n- 작업 상세 패널을 결과 중심 구조로 정리했습니다.\n- 일시정지 시점까지 완료한 구현과 검증 내용을 결과 탭에서 확인할 수 있습니다.\n\n## 검증\n\n- 컴포넌트 회귀 테스트와 로컬 빌드를 통과했습니다.",
@@ -235,6 +259,12 @@ const runSeeds: DemoRunSeed[] = [
     workflowStage: "implementing",
     progress: 50,
     detail: "Google OAuth 클라이언트 자격증명 등록이 필요합니다.",
+    parent: {
+      id: "demo-1",
+      runNumber: 12,
+      title: "Agent 실행 로그를 작업 상세에 연결",
+      status: "running",
+    },
     repository: "wordbricks/briar",
     branch: "fix/session-restore",
     commitSha: null,
@@ -263,6 +293,12 @@ const runSeeds: DemoRunSeed[] = [
     workflowStage: "local_qa",
     progress: 100,
     detail: "마이그레이션과 API 검증이 완료되었습니다.",
+    subIssues: [{
+      id: "demo-1",
+      runNumber: 12,
+      title: "Agent 실행 로그를 작업 상세에 연결",
+      status: "running",
+    }],
     repository: "wordbricks/briar",
     branch: "feat/hunt-schema",
     commitSha: "2d0f9a1",

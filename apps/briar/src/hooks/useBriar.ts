@@ -7,6 +7,7 @@ import {
   acceptIssueSkillExecutionProposal as acceptRemoteIssueSkillExecutionProposal,
   acceptIssueReworkProposal as acceptRemoteIssueReworkProposal,
   addIssueDependency,
+  addRelatedIssue,
   beginDeviceAuthorization,
   cancelHuntRun,
   claimProjectAgentScheduleRuns,
@@ -55,6 +56,9 @@ import {
   resumeHuntRun,
   updatePlanningProject as updateRemotePlanningProject,
   removeIssueDependency,
+  removeIssueParent as removeRemoteIssueParent,
+  removeRelatedIssue,
+  setIssueParent as setRemoteIssueParent,
   updateIssue,
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
@@ -2473,6 +2477,12 @@ export function useBriar(options: UseBriarOptions = {}) {
           failed: 0,
           total: 3,
           truncated: false,
+          relations: {
+            hierarchy: { linked: 1, skipped: 0, outsideScope: 0, cycles: 0 },
+            related: { linked: 1, skipped: 0, outsideScope: 0 },
+            dependencies: { linked: 1, skipped: 0, outsideScope: 0, cycles: 0 },
+            unsupported: { duplicate: 0, similar: 0 },
+          },
         };
       }
       if (!token) throw new Error("로그인이 필요합니다.");
@@ -3286,6 +3296,127 @@ export function useBriar(options: UseBriarOptions = {}) {
     [activeProjectId, dashboard, token],
   );
 
+  const changeIssueParent = useCallback(
+    async (childRunId: string, parentRunId: string | null) => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("계층을 수정할 프로젝트가 없습니다.");
+      }
+      setUpdatingIssueId(childRunId);
+      setError(null);
+      try {
+        if (!demoMode) {
+          if (!token) throw new Error("로그인이 필요합니다.");
+          if (parentRunId) {
+            await setRemoteIssueParent(
+              token,
+              activeProjectId,
+              childRunId,
+              parentRunId,
+            );
+          } else {
+            await removeRemoteIssueParent(token, activeProjectId, childRunId);
+          }
+          setDashboard(await loadDashboard(token, activeProjectId));
+          return;
+        }
+        setDashboard((current) => {
+          if (!current) return current;
+          const child = current.runs.find((run) => run.id === childRunId);
+          const parent = parentRunId
+            ? current.runs.find((run) => run.id === parentRunId)
+            : null;
+          if (!child || (parentRunId && !parent)) return current;
+          const reference = (run: typeof child) => ({
+            id: run.id,
+            runNumber: run.runNumber,
+            title: run.title,
+            status: run.status,
+          });
+          return {
+            ...current,
+            runs: current.runs.map((run) => {
+              if (run.id === childRunId) {
+                return { ...run, parent: parent ? reference(parent) : null };
+              }
+              const withoutChild = (run.subIssues ?? []).filter(
+                (candidate) => candidate.id !== childRunId,
+              );
+              return run.id === parentRunId
+                ? { ...run, subIssues: [...withoutChild, reference(child)] }
+                : { ...run, subIssues: withoutChild };
+            }),
+          };
+        });
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : String(caught));
+        throw caught;
+      } finally {
+        setUpdatingIssueId(null);
+      }
+    },
+    [activeProjectId, dashboard, token],
+  );
+
+  const changeRelatedIssue = useCallback(
+    async (runId: string, relatedRunId: string, action: "add" | "remove") => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("관련 이슈를 수정할 프로젝트가 없습니다.");
+      }
+      setUpdatingIssueId(runId);
+      setError(null);
+      try {
+        if (!demoMode) {
+          if (!token) throw new Error("로그인이 필요합니다.");
+          if (action === "add") {
+            await addRelatedIssue(token, activeProjectId, runId, relatedRunId);
+          } else {
+            await removeRelatedIssue(token, activeProjectId, runId, relatedRunId);
+          }
+          setDashboard(await loadDashboard(token, activeProjectId));
+          return;
+        }
+        setDashboard((current) => {
+          if (!current) return current;
+          const left = current.runs.find((run) => run.id === runId);
+          const right = current.runs.find((run) => run.id === relatedRunId);
+          if (!left || !right) return current;
+          const reference = (run: typeof left) => ({
+            id: run.id,
+            runNumber: run.runNumber,
+            title: run.title,
+            status: run.status,
+          });
+          return {
+            ...current,
+            runs: current.runs.map((run) => {
+              const other = run.id === runId
+                ? right
+                : run.id === relatedRunId
+                  ? left
+                  : null;
+              if (!other) return run;
+              const remaining = (run.relatedIssues ?? []).filter(
+                (candidate) => candidate.id !== other.id,
+              );
+              return {
+                ...run,
+                relatedIssues: action === "add"
+                  ? [...remaining, reference(other)]
+                  : remaining,
+              };
+            }),
+          };
+        });
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : String(caught));
+        throw caught;
+      } finally {
+        setUpdatingIssueId(null);
+      }
+    },
+    [activeProjectId, dashboard, token],
+  );
+
   const removeIssue = useCallback(
     async (runId: string) => {
       if (!activeProjectId || !dashboard) {
@@ -3311,6 +3442,13 @@ export function useBriar(options: UseBriarOptions = {}) {
                     ),
                     dependents: (run.dependents ?? []).filter(
                       (dependency) => dependency.id !== runId,
+                    ),
+                    parent: run.parent?.id === runId ? null : run.parent,
+                    subIssues: (run.subIssues ?? []).filter(
+                      (relation) => relation.id !== runId,
+                    ),
+                    relatedIssues: (run.relatedIssues ?? []).filter(
+                      (relation) => relation.id !== runId,
                     ),
                   })),
               }
@@ -3363,6 +3501,13 @@ export function useBriar(options: UseBriarOptions = {}) {
                     ),
                     dependents: (run.dependents ?? []).filter(
                       (dependency) => dependency.id !== runId,
+                    ),
+                    parent: run.parent?.id === runId ? null : run.parent,
+                    subIssues: (run.subIssues ?? []).filter(
+                      (relation) => relation.id !== runId,
+                    ),
+                    relatedIssues: (run.relatedIssues ?? []).filter(
+                      (relation) => relation.id !== runId,
                     ),
                   })),
               }
@@ -4297,6 +4442,11 @@ export function useBriar(options: UseBriarOptions = {}) {
       dependentRunId: string,
       prerequisiteRunId: string,
     ) => changeIssueDependency(dependentRunId, prerequisiteRunId, "remove"),
+    setIssueParent: changeIssueParent,
+    addRelatedIssue: (runId: string, relatedRunId: string) =>
+      changeRelatedIssue(runId, relatedRunId, "add"),
+    removeRelatedIssue: (runId: string, relatedRunId: string) =>
+      changeRelatedIssue(runId, relatedRunId, "remove"),
     readIssueMessages,
     readRunEvents,
     readRunEvidence,

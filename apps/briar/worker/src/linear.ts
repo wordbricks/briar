@@ -45,6 +45,14 @@ export type LinearIssue = {
     key: string;
     name: string;
   } | null;
+  parentId: string | null;
+  relations: LinearIssueRelation[];
+};
+
+export type LinearIssueRelation = {
+  sourceIssueId: string;
+  targetIssueId: string;
+  type: string;
 };
 
 type GraphQlError = { message?: string };
@@ -254,6 +262,7 @@ export async function fetchLinearIssuesForTeams(
     createdAt: string;
     state?: { id: string; name: string; type: string } | null;
     team?: { id: string; key: string; name: string } | null;
+    parent?: { id: string } | null;
   };
   type IssuesPage = {
     issues: {
@@ -296,6 +305,7 @@ export async function fetchLinearIssuesForTeams(
             createdAt
             state { id name type }
             team { id key name }
+            parent { id }
           }
           pageInfo { hasNextPage endCursor }
         }
@@ -332,6 +342,8 @@ export async function fetchLinearIssuesForTeams(
               name: node.team.name,
             }
           : null,
+        parentId: node.parent?.id ?? null,
+        relations: [],
       });
     }
 
@@ -345,5 +357,94 @@ export async function fetchLinearIssuesForTeams(
     after = page.issues.pageInfo.endCursor;
   }
 
+  const concurrency = 6;
+  for (let index = 0; index < issues.length; index += concurrency) {
+    const chunk = issues.slice(index, index + concurrency);
+    const relationLists = await Promise.all(
+      chunk.map((issue) => fetchLinearIssueRelations(apiKey, issue.id)),
+    );
+    relationLists.forEach((relations, offset) => {
+      chunk[offset]!.relations = relations;
+    });
+  }
+
   return { issues, truncated };
+}
+
+async function fetchLinearIssueRelations(
+  apiKey: string,
+  issueId: string,
+): Promise<LinearIssueRelation[]> {
+  const relations: LinearIssueRelation[] = [];
+
+  type RelationPage = {
+    issue: {
+      relations?: {
+        nodes: Array<{ type: string; relatedIssue: { id: string } }>;
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      };
+      inverseRelations?: {
+        nodes: Array<{ type: string; issue: { id: string } }>;
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      };
+    } | null;
+  };
+
+  const loadDirection = async (direction: "relations" | "inverseRelations") => {
+    let after: string | null = null;
+    for (;;) {
+      const connection = direction === "relations"
+        ? `relations(first: $first, after: $after) {
+             nodes { type relatedIssue { id } }
+             pageInfo { hasNextPage endCursor }
+           }`
+        : `inverseRelations(first: $first, after: $after) {
+             nodes { type issue { id } }
+             pageInfo { hasNextPage endCursor }
+           }`;
+      const page: RelationPage = await linearGraphql<RelationPage>(
+        apiKey,
+        `query BriarLinearIssueRelations(
+          $id: String!, $first: Int!, $after: String
+        ) {
+          issue(id: $id) { ${connection} }
+        }`,
+        { id: issueId, first: PAGE_SIZE, after },
+      );
+      const issue = page.issue;
+      if (!issue) break;
+      if (direction === "relations") {
+        const result = issue.relations!;
+        relations.push(...result.nodes.map((relation) => ({
+          sourceIssueId: issueId,
+          targetIssueId: relation.relatedIssue.id,
+          type: relation.type,
+        })));
+        if (!result.pageInfo.hasNextPage || !result.pageInfo.endCursor) break;
+        after = result.pageInfo.endCursor;
+      } else {
+        const result = issue.inverseRelations!;
+        relations.push(...result.nodes.map((relation) => ({
+          sourceIssueId: relation.issue.id,
+          targetIssueId: issueId,
+          type: relation.type,
+        })));
+        if (!result.pageInfo.hasNextPage || !result.pageInfo.endCursor) break;
+        after = result.pageInfo.endCursor;
+      }
+    }
+  };
+
+  await Promise.all([
+    loadDirection("relations"),
+    loadDirection("inverseRelations"),
+  ]);
+  return [
+    ...new Map(
+      relations.map((relation) => [
+        `${relation.sourceIssueId}\0${relation.type}\0${relation.targetIssueId}`,
+        relation,
+      ]),
+    ).values(),
+  ];
 }

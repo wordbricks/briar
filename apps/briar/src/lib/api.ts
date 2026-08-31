@@ -1566,6 +1566,7 @@ export async function createIssue(
   form.set("priority", input.priority === null ? "" : String(input.priority));
   form.set("difficulty", input.difficulty ?? "");
   form.set("assigneeUserId", input.assigneeUserId ?? "");
+  form.set("parentRunId", input.parentRunId ?? "");
   form.set("status", input.status);
   form.set("preferredProvider", input.preferredProvider ?? "");
   form.set("preferredModel", input.preferredModel ?? "");
@@ -2342,6 +2343,63 @@ export async function removeIssueDependency(
 ) {
   await request<void>(
     `/projects/${projectId}/runs/${dependentRunId}/dependencies/${prerequisiteRunId}`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
+export async function setIssueParent(
+  token: string,
+  projectId: string,
+  childRunId: string,
+  parentRunId: string,
+) {
+  return request<{
+    childRunId: string;
+    parentRunId: string;
+    outcome: "created" | "updated" | "already_exists";
+  }>(
+    `/projects/${projectId}/runs/${childRunId}/parent/${parentRunId}`,
+    token,
+    { method: "PUT" },
+  );
+}
+
+export async function removeIssueParent(
+  token: string,
+  projectId: string,
+  childRunId: string,
+) {
+  await request<void>(
+    `/projects/${projectId}/runs/${childRunId}/parent`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
+export async function addRelatedIssue(
+  token: string,
+  projectId: string,
+  runId: string,
+  relatedRunId: string,
+) {
+  return request<{
+    runId: string;
+    relatedRunId: string;
+    outcome: "created" | "already_exists";
+  }>(`/projects/${projectId}/runs/${runId}/related/${relatedRunId}`, token, {
+    method: "PUT",
+  });
+}
+
+export async function removeRelatedIssue(
+  token: string,
+  projectId: string,
+  runId: string,
+  relatedRunId: string,
+) {
+  await request<void>(
+    `/projects/${projectId}/runs/${runId}/related/${relatedRunId}`,
     token,
     { method: "DELETE" },
   );

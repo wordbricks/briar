@@ -566,7 +566,13 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
 
         app.buttons["run-detail-tab-control"].tap()
+        XCTAssertTrue(app.staticTexts["계층"].waitForExistence(timeout: 5))
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["관련 이슈"].waitForExistence(timeout: 5))
         let addDependency = app.buttons["add-dependency-button"]
+        for _ in 0..<4 where !addDependency.exists {
+            app.swipeUp()
+        }
         XCTAssertTrue(addDependency.waitForExistence(timeout: 5))
         addDependency.tap()
 
@@ -583,9 +589,13 @@ final class BriarCompanionUITests: XCTestCase {
         candidate.tap()
 
         XCTAssertTrue(app.collectionViews["dependency-picker"].waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.buttons[
+        let removeDependency = app.buttons[
             "remove-dependency-eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
-        ].waitForExistence(timeout: 5))
+        ]
+        for _ in 0..<4 where !removeDependency.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(removeDependency.waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-dependency-picker")
     }
 

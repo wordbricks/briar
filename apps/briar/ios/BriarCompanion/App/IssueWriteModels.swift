@@ -299,6 +299,7 @@ struct CreateIssueRequest: Codable, Sendable {
     let priority: Int?
     let difficulty: IssueDifficulty?
     let assigneeUserId: String?
+    let parentRunId: UUID?
     let status: DashboardRun.Status
     let preferredProvider: AgentProvider?
     let preferredModel: String?
@@ -315,6 +316,7 @@ struct CreateIssueResponse: Codable, Sendable {
     let assigneeUserId: String?
     let createdByUserId: String
     let difficulty: IssueDifficulty?
+    let parentRunId: UUID?
 }
 
 struct UpdateIssueRequest: Codable, Sendable {
@@ -960,6 +962,18 @@ struct DispatchRunResponse: Codable, Equatable, Sendable {
 struct DependencyResponse: Codable, Sendable {
     let prerequisiteRunId: UUID
     let dependentRunId: UUID
+    let outcome: String
+}
+
+struct ParentIssueResponse: Codable, Sendable {
+    let childRunId: UUID
+    let parentRunId: UUID
+    let outcome: String
+}
+
+struct RelatedIssueResponse: Codable, Sendable {
+    let runId: UUID
+    let relatedRunId: UUID
     let outcome: String
 }
 

@@ -303,7 +303,7 @@ enum L10n {
         "삭제": "Delete",
         "활동 기록, 대화와 첨부가 영구적으로 삭제됩니다.": "Activity history, conversation, and attachments will be permanently deleted.",
         "다른 프로젝트로 이동": "Move to another project",
-        "선택한 프로젝트로 이슈와 대화·첨부·활동 기록이 함께 이동합니다. 의존성은 해제됩니다.": "The issue, conversation, attachments, and activity history will move to the selected project. Dependencies will be removed.",
+        "선택한 프로젝트로 이슈와 대화·첨부·활동 기록이 함께 이동합니다. 부모·하위·관련·실행 의존성 연결은 해제됩니다.": "The issue, conversation, attachments, and activity history will move to the selected project. Parent, sub-issue, related, and execution dependency links will be removed.",
         "수정": "Edit",
         "이슈 상세 탭": "Issue detail tab",
         "설명": "Description",

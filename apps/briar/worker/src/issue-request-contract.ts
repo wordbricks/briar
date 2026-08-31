@@ -35,6 +35,7 @@ const IssueInputBaseFields = {
     null,
   ),
   assigneeUserId: Schema.optional(Schema.NullOr(trimmedText(1, 200))),
+  parentRunId: Schema.optional(Schema.NullOr(UuidString)),
   status: defaulted(Schema.Literals(["backlog", "queued"]), "queued"),
   preferredProvider: Schema.optional(
     Schema.NullOr(Schema.Literals(agentProviders)),

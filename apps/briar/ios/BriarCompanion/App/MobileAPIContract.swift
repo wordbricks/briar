@@ -214,6 +214,15 @@ enum MobileAPIContract {
             "\(run(projectID: projectID, runID: runID))/dependencies/\(prerequisiteID.uuidString.lowercased())"
         }
 
+        static func runParent(projectID: UUID, runID: UUID, parentID: UUID? = nil) -> String {
+            let base = "\(run(projectID: projectID, runID: runID))/parent"
+            return parentID.map { "\(base)/\($0.uuidString.lowercased())" } ?? base
+        }
+
+        static func runRelated(projectID: UUID, runID: UUID, relatedID: UUID) -> String {
+            "\(run(projectID: projectID, runID: runID))/related/\(relatedID.uuidString.lowercased())"
+        }
+
         static func runStatus(projectID: UUID, runID: UUID) -> String {
             "\(run(projectID: projectID, runID: runID))/status"
         }

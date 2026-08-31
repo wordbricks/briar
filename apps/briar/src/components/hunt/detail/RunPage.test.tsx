@@ -858,10 +858,14 @@ describe("RunPage", () => {
     expect(conversationPanel?.hidden).toBe(false);
     await cleanup();
   });
-  it("shows editable prerequisite and follow-up relationships in issue properties", async () => {
+  it("separates hierarchy, related issues, and execution dependencies", async () => {
     const prerequisite = demoDashboard.runs[1];
     const dependent = demoDashboard.runs[0];
+    const parent = demoDashboard.runs[2];
+    const subIssue = demoDashboard.runs[3];
     const addDependency = vi.fn(async () => undefined);
+    const setParent = vi.fn(async () => undefined);
+    const removeRelated = vi.fn(async () => undefined);
     const openRelatedMessage = vi.fn();
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
@@ -875,6 +879,7 @@ describe("RunPage", () => {
           error={null}
           isRecovering={false}
           onAddDependency={addDependency}
+          onAddRelated={async () => undefined}
           onBack={() => undefined}
           onCancel={async () => undefined}
           onLoadAttachment={async () => new Blob()}
@@ -883,6 +888,10 @@ describe("RunPage", () => {
           onMove={async () => undefined}
           onRelatedMessageOpen={openRelatedMessage}
           onRemoveDependency={async () => undefined}
+          onRemoveRelated={removeRelated}
+          onSetParent={setParent}
+          onLinkSubIssue={async () => undefined}
+          onUnlinkSubIssue={async () => undefined}
           onRetry={async () => undefined}
           onSendIssueMessage={async () => {
             throw new Error("not implemented in this test");
@@ -894,6 +903,24 @@ describe("RunPage", () => {
               runNumber: prerequisite.runNumber,
               title: prerequisite.title,
               status: prerequisite.status,
+            }],
+            parent: {
+              id: parent.id,
+              runNumber: parent.runNumber,
+              title: parent.title,
+              status: parent.status,
+            },
+            subIssues: [{
+              id: subIssue.id,
+              runNumber: subIssue.runNumber,
+              title: subIssue.title,
+              status: "completed",
+            }],
+            relatedIssues: [{
+              id: parent.id,
+              runNumber: parent.runNumber,
+              title: parent.title,
+              status: parent.status,
             }],
             dependents: [],
             relatedMessage: {
@@ -914,11 +941,15 @@ describe("RunPage", () => {
     const properties = container.querySelector(".run-properties");
     const dependencies = container.querySelector(".run-properties .issue-dependencies");
     expect(dependencies).not.toBeNull();
+    expect(dependencies?.textContent).toContain("계층");
+    expect(dependencies?.textContent).toContain("1/1 완료");
+    expect(dependencies?.textContent).toContain("관련 이슈");
+    expect(dependencies?.textContent).toContain("실행 의존성");
     expect(dependencies?.textContent).toContain("선행 이슈");
     expect(dependencies?.textContent).toContain(`AH-${prerequisite.runNumber}`);
     expect(dependencies?.textContent).toContain(prerequisite.title);
     expect(dependencies?.textContent).toContain("후속 이슈");
-    expect(dependencies?.querySelector('[aria-label*="의존성 제거"]')).not.toBeNull();
+    expect(dependencies?.querySelector('[aria-label*="연결 제거"]')).not.toBeNull();
     const relatedMessageButton = properties?.querySelector<HTMLButtonElement>(".run-related-message-property");
     expect(relatedMessageButton?.textContent).toContain("관련 메시지");
     expect(relatedMessageButton?.textContent).toContain("관련 메시지로 돌아가기");
@@ -929,12 +960,14 @@ describe("RunPage", () => {
       messageId: "33333333-3333-4333-8333-333333333333",
       rootMessageId: "44444444-4444-4444-8444-444444444444",
     });
-    await act(async () => {
-      dependencies?.querySelector<HTMLButtonElement>(".issue-dependency-add-button")?.click();
-    });
+    const executionGroup = Array.from(
+      dependencies?.querySelectorAll<HTMLElement>(".issue-dependency-group") ?? [],
+    ).find(group => group.textContent?.includes("실행 의존성"));
+    await act(async () => executionGroup
+      ?.querySelector<HTMLButtonElement>(".issue-dependency-add-button")?.click());
     const picker = document.querySelector('[role="dialog"]');
     expect(picker?.textContent).toContain("선행 이슈 추가");
-    expect(picker?.querySelector('[aria-label="이슈 검색"]')).not.toBeNull();
+    expect(picker?.querySelector('[aria-label="연결할 이슈 검색"]')).not.toBeNull();
     const candidateButton = picker?.querySelector<HTMLButtonElement>(".issue-dependency-picker-item");
     expect(candidateButton).not.toBeNull();
     await act(async () => candidateButton?.click());

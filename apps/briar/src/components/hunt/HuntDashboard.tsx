@@ -119,10 +119,13 @@ function HuntDashboardContent({
   onTransferIssue,
   onMoveIssueProject,
   onAddIssueDependency,
+  onAddRelatedIssue,
   onAcceptIssueAction,
   onAcceptIssueExecution,
   onAcceptSkillExecution,
   onRemoveIssueDependency,
+  onRemoveRelatedIssue,
+  onSetIssueParent,
   onRelatedMessageOpen,
   onUpdateIssue,
   onUpdateIssueCheckpoints = async () => undefined,
@@ -195,10 +198,13 @@ function HuntDashboardContent({
     targetProjectId: string,
   ) => Promise<unknown>;
   onAddIssueDependency?: (dependentRunId: string, prerequisiteRunId: string) => Promise<unknown>;
+  onAddRelatedIssue?: (runId: string, relatedRunId: string) => Promise<unknown>;
   onAcceptIssueAction?: (runId: string, proposal: IssueProposedAction) => Promise<IssueProposedAction>;
   onAcceptIssueExecution?: (runId: string, proposal: IssueExecutionProposal, input: IssueExecutionApprovalInput) => Promise<IssueExecutionProposal>;
   onAcceptSkillExecution?: (runId: string, proposal: AgentSkillExecutionProposal, input: AgentSkillExecutionApprovalInput) => Promise<AgentSkillExecutionProposal>;
   onRemoveIssueDependency?: (dependentRunId: string, prerequisiteRunId: string) => Promise<unknown>;
+  onRemoveRelatedIssue?: (runId: string, relatedRunId: string) => Promise<unknown>;
+  onSetIssueParent?: (childRunId: string, parentRunId: string | null) => Promise<unknown>;
   onRelatedMessageOpen?: (relatedMessage: RelatedMessageReference) => void;
   onUpdateIssue: (runId: string, input: UpdateIssueInput) => Promise<unknown>;
   onUpdateIssueCheckpoints?: (runId: string, checkpoints: AutoHuntWorkflowCheckpoint[]) => Promise<unknown>;
@@ -283,12 +289,19 @@ function HuntDashboardContent({
   const [internalIsIssueDialogOpen, setInternalIsIssueDialogOpen] = useState(false);
   const isIssueDialogOpen = controlledIsIssueDialogOpen ?? internalIsIssueDialogOpen;
   const [createIssuePlacement, setCreateIssuePlacement] = useState<HuntRunPlacement | null>(null);
+  const [createIssueParentRunId, setCreateIssueParentRunId] = useState<string | null>(null);
   const setIsIssueDialogOpen = useCallback((isOpen: boolean) => {
     setInternalIsIssueDialogOpen(isOpen);
     onIssueDialogOpenChange?.(isOpen);
   }, [onIssueDialogOpenChange]);
   const openCreateIssueDialog = useCallback((placement: HuntRunPlacement | null = null) => {
     setCreateIssuePlacement(placement);
+    setCreateIssueParentRunId(null);
+    setIsIssueDialogOpen(true);
+  }, [setIsIssueDialogOpen]);
+  const openCreateSubIssueDialog = useCallback((parentRunId: string) => {
+    setCreateIssuePlacement(null);
+    setCreateIssueParentRunId(parentRunId);
     setIsIssueDialogOpen(true);
   }, [setIsIssueDialogOpen]);
   const [editingRunId, setEditingRunId] = useState<string | null>(null);
@@ -308,6 +321,8 @@ function HuntDashboardContent({
       return true;
     }
     if (isIssueDialogOpen) {
+      setCreateIssuePlacement(null);
+      setCreateIssueParentRunId(null);
       setIsIssueDialogOpen(false);
       return true;
     }
@@ -761,9 +776,13 @@ function HuntDashboardContent({
       selectableIssueProjects[0]?.id;
   const createIssueDialog = isIssueDialogOpen ? <CreateIssueDialog availableProviders={availableProviders} compactHeader={companionMode} currentUserId={currentUserId} defaultProjectId={defaultIssueProjectId ?? undefined} defaultStatus={createIssuePlacement?.status === "backlog" ? "backlog" : "queued"} isSubmitting={isCreatingIssue} onClose={() => {
     setCreateIssuePlacement(null);
+    setCreateIssueParentRunId(null);
     setIsIssueDialogOpen(false);
   }} onCreate={async (projectId, input) => {
-    const created = await onCreateIssue(projectId, input);
+    const created = await onCreateIssue(projectId, {
+      ...input,
+      parentRunId: createIssueParentRunId,
+    });
     const createdRunId = runIdFromCreateIssueResult(created);
     const placement = createIssuePlacement;
     if (createdRunId && placement && (placement.status !== input.status || placement.workflowStage !== null)) {
@@ -774,6 +793,7 @@ function HuntDashboardContent({
       }
     }
     setCreateIssuePlacement(null);
+    setCreateIssueParentRunId(null);
     setIsIssueDialogOpen(false);
   }} projects={selectableIssueProjects} members={dashboard?.members ?? []} workflow={dashboard ? {
     ...dashboard.settings.workflow,
@@ -829,7 +849,7 @@ function HuntDashboardContent({
         setSelectedRunMessageId(null);
         setSelectedRunInitialTab(null);
         setSelectedRunId(null);
-      } : undefined} transferProjects={transferDestinationProjects} onAddDependency={onAddIssueDependency ? prerequisiteRunId => onAddIssueDependency(selected.id, prerequisiteRunId) : undefined} onAcceptIssueAction={onAcceptIssueAction ? proposal => onAcceptIssueAction(selected.id, proposal) : undefined} onAcceptIssueExecution={onAcceptIssueExecution ? (proposal, input) => onAcceptIssueExecution(selected.id, proposal, input) : undefined} onAcceptSkillExecution={onAcceptSkillExecution ? (proposal, input) => onAcceptSkillExecution(selected.id, proposal, input) : undefined} onRemoveDependency={onRemoveIssueDependency ? prerequisiteRunId => onRemoveIssueDependency(selected.id, prerequisiteRunId) : undefined} onRelatedMessageOpen={onRelatedMessageOpen} onDependencyOpen={runId => {
+      } : undefined} transferProjects={transferDestinationProjects} onAddDependency={onAddIssueDependency ? prerequisiteRunId => onAddIssueDependency(selected.id, prerequisiteRunId) : undefined} onAddRelated={onAddRelatedIssue ? relatedRunId => onAddRelatedIssue(selected.id, relatedRunId) : undefined} onCreateSubIssue={() => openCreateSubIssueDialog(selected.id)} onLinkSubIssue={onSetIssueParent ? childRunId => onSetIssueParent(childRunId, selected.id) : undefined} onSetParent={onSetIssueParent ? parentRunId => onSetIssueParent(selected.id, parentRunId) : undefined} onUnlinkSubIssue={onSetIssueParent ? childRunId => onSetIssueParent(childRunId, null) : undefined} onAcceptIssueAction={onAcceptIssueAction ? proposal => onAcceptIssueAction(selected.id, proposal) : undefined} onAcceptIssueExecution={onAcceptIssueExecution ? (proposal, input) => onAcceptIssueExecution(selected.id, proposal, input) : undefined} onAcceptSkillExecution={onAcceptSkillExecution ? (proposal, input) => onAcceptSkillExecution(selected.id, proposal, input) : undefined} onRemoveDependency={onRemoveIssueDependency ? prerequisiteRunId => onRemoveIssueDependency(selected.id, prerequisiteRunId) : undefined} onRemoveRelated={onRemoveRelatedIssue ? relatedRunId => onRemoveRelatedIssue(selected.id, relatedRunId) : undefined} onRelatedMessageOpen={onRelatedMessageOpen} onDependencyOpen={runId => {
         setSelectedRunMessageId(null);
         setSelectedRunInitialTab(null);
         setSelectedRunId(runId);

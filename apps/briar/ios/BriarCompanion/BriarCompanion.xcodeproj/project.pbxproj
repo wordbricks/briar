@@ -11,7 +11,6 @@
 		0376DCB4538E3FA2EC0DF1BF /* MobileAPIContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A65B754A339632E2DB2E3E6 /* MobileAPIContract.swift */; };
 		1272FBDF6C710D9D7158A44C /* ChannelsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E40375D18D66D8F485EC3BD0 /* ChannelsModels.swift */; };
 		146988D494B459898B8355AE /* ConversationPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69E1F9AD7F6FE98A0C76ACD0 /* ConversationPresentationTests.swift */; };
-		1A30EA97CEF698FC6B9E0DD4 /* companion.openapi.yaml in Resources */ = {isa = PBXBuildFile; fileRef = AE60699A24ABDD2FDA86710F /* companion.openapi.yaml */; };
 		1D25F8B15FC04A11B87EE369 /* MobileAPIContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE453FFA6A7F97CAF774A8E8 /* MobileAPIContractTests.swift */; };
 		27D6AD1FB92763BB44078C73 /* FoundationStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D59E70E330C5C3C60094A493 /* FoundationStatusView.swift */; };
 		2A28E99DC0C61B5D2BF6B8AC /* IssueWriteModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C9EE6E17DC9F346B0A712DD /* IssueWriteModels.swift */; };
@@ -32,7 +31,6 @@
 		83E461C754E9D88F746961D2 /* InboxStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD28955B6995BA7B485085B /* InboxStore.swift */; };
 		8C3ACBC240C3C93066779D21 /* CompanionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE917D55AAB7F8525B5D6FA0 /* CompanionStore.swift */; };
 		8CC0C5797E179B5BF4797415 /* AppSystemServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = B941ED81ECF5145E9F9BE24C /* AppSystemServices.swift */; };
-		8D8700993D70448DC7819BA9 /* companion-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = CBB9FAF746F389373569EBFB /* companion-v1.json */; };
 		8F3D3B8B9C201AD8938E12AA /* AttachmentPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF612FD7D34E422E51B3A302 /* AttachmentPreview.swift */; };
 		95EA1BD09B301286DE638DEC /* AttachmentPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F35D1C669DD97F245139645C /* AttachmentPipelineTests.swift */; };
 		967C64C6A88A080B5711C4CA /* CompanionReadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5F0E3F338DC5E3C1A397CA /* CompanionReadTests.swift */; };
@@ -46,6 +44,7 @@
 		BB3F64F464D8A8BF1A9EC3EE /* ChannelsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B39FE63A0EDED2FBB809F740 /* ChannelsStoreTests.swift */; };
 		BBAE36DF571DE6A26EB4C1BE /* IssueMutationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 798EBF3A4F42C2F3C5CC6639 /* IssueMutationTests.swift */; };
 		BD262102FD3DB68CD134EB04 /* CoreAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25CB67D8121593018F56432 /* CoreAPITests.swift */; };
+		C0311B2A8111C8CFBC6CAD41 /* companion.openapi.yaml in Resources */ = {isa = PBXBuildFile; fileRef = 00DF0B176B2565E41849FE44 /* companion.openapi.yaml */; };
 		C0EC0DC1C9574D70F706AEF1 /* AttachmentPreviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71138859189D1A26707616E6 /* AttachmentPreviewTests.swift */; };
 		C7617C7DA6B987928F12774A /* IssueWriteViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A110B2A438D4543375A7231 /* IssueWriteViews.swift */; };
 		CCD5AEE5C8D534049AFC1B19 /* SelectableTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 894C6282DA7AFFFA63925739 /* SelectableTextTests.swift */; };
@@ -54,6 +53,7 @@
 		D3A6AD589D6C6456AC8B1345 /* MessageMentions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151B809A488C8E38ABA12C73 /* MessageMentions.swift */; };
 		EA3D7F4BD2F999AF67127AE8 /* AgentsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17FF04740F5A18F25325D2C /* AgentsStore.swift */; };
 		EE5D250A1092057DAB5C1206 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C3D7B1D017C131E8DD36044 /* SessionStore.swift */; };
+		EE86DBBE7F5379E9D29CF1B6 /* companion-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = E320B2061EFAD4F981D4C896 /* companion-v1.json */; };
 		EECEC6D146D6DF1526985D0A /* ProfileImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A1B95F49B19C05E7C2C20F0 /* ProfileImage.swift */; };
 		EEE6E17CFBF66C47153E1380 /* DashboardSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AA73A269C0859E5CC863982 /* DashboardSyncTests.swift */; };
 		EFFC0470BF14D0642F70F03E /* ChannelsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F137DEE3E6FF7F8A153AC8F6 /* ChannelsStore.swift */; };
@@ -82,6 +82,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		00DF0B176B2565E41849FE44 /* companion.openapi.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = companion.openapi.yaml; sourceTree = "<group>"; };
 		05F476E8CD1B263CE45F5CF1 /* InboxStoreSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxStoreSyncTests.swift; sourceTree = "<group>"; };
 		06B1392F6B2DCAD8B6D47B10 /* CompanionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionSettingsView.swift; sourceTree = "<group>"; };
 		0C3D7B1D017C131E8DD36044 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
@@ -119,7 +120,6 @@
 		A25CB67D8121593018F56432 /* CoreAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreAPITests.swift; sourceTree = "<group>"; };
 		A688D7BF6B6F7EB6394D3F7D /* AgentsInboxSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentsInboxSystemTests.swift; sourceTree = "<group>"; };
 		AB6CE869E2BC6D599E7D03D0 /* ChannelGroupingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGroupingTests.swift; sourceTree = "<group>"; };
-		AE60699A24ABDD2FDA86710F /* companion.openapi.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = companion.openapi.yaml; sourceTree = "<group>"; };
 		B2A83FBB5F0F68854441186A /* DmMemory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DmMemory.swift; sourceTree = "<group>"; };
 		B39FE63A0EDED2FBB809F740 /* ChannelsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelsStoreTests.swift; sourceTree = "<group>"; };
 		B941ED81ECF5145E9F9BE24C /* AppSystemServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSystemServices.swift; sourceTree = "<group>"; };
@@ -127,7 +127,6 @@
 		BE4A7257E57301E7AE968D86 /* BriarCompanion.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BriarCompanion.entitlements; sourceTree = "<group>"; };
 		C3A2BD65A5BF60B1D39F7690 /* DeviceAuthorization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAuthorization.swift; sourceTree = "<group>"; };
 		C50DB71AFF1E7CA7B051BEEB /* ProjectIconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectIconView.swift; sourceTree = "<group>"; };
-		CBB9FAF746F389373569EBFB /* companion-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "companion-v1.json"; sourceTree = "<group>"; };
 		CE453FFA6A7F97CAF774A8E8 /* MobileAPIContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileAPIContractTests.swift; sourceTree = "<group>"; };
 		CE917D55AAB7F8525B5D6FA0 /* CompanionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionStore.swift; sourceTree = "<group>"; };
 		D4334565F76CAABE2AFAC90F /* DeepLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLinks.swift; sourceTree = "<group>"; };
@@ -135,6 +134,7 @@
 		DAFDF35566633FE61184320D /* AttachmentPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentPipeline.swift; sourceTree = "<group>"; };
 		DD272B5B12C58571A215C0E8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DF612FD7D34E422E51B3A302 /* AttachmentPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentPreview.swift; sourceTree = "<group>"; };
+		E320B2061EFAD4F981D4C896 /* companion-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "companion-v1.json"; sourceTree = "<group>"; };
 		E40375D18D66D8F485EC3BD0 /* ChannelsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelsModels.swift; sourceTree = "<group>"; };
 		E80FCA400D10FEE6AF26FBAA /* InboxViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxViews.swift; sourceTree = "<group>"; };
 		E824C71CF3A757A4B40140EE /* SelectableText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectableText.swift; sourceTree = "<group>"; };
@@ -145,6 +145,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		165BB695A131E24B226E3634 /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				3D012A40F79A668DEBF59CF2 /* mobile-contracts */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
 		199D6281C5C9968DA1B0EF3F /* Tests */ = {
 			isa = PBXGroup;
 			children = (
@@ -167,6 +175,24 @@
 			path = Tests;
 			sourceTree = "<group>";
 		};
+		203A47FE5F4EA83257E4B557 /* sub-issue-related-issue-ecdd44e9 */ = {
+			isa = PBXGroup;
+			children = (
+				165BB695A131E24B226E3634 /* packages */,
+			);
+			name = "sub-issue-related-issue-ecdd44e9";
+			path = ../../../..;
+			sourceTree = "<group>";
+		};
+		3D012A40F79A668DEBF59CF2 /* mobile-contracts */ = {
+			isa = PBXGroup;
+			children = (
+				00DF0B176B2565E41849FE44 /* companion.openapi.yaml */,
+				582BF1A1CD9D361C47FFC3F4 /* fixtures */,
+			);
+			path = "mobile-contracts";
+			sourceTree = "<group>";
+		};
 		4BCD825065EC73B0BFB812A0 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -177,10 +203,10 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		55445925DA98F587DC5F5449 /* fixtures */ = {
+		582BF1A1CD9D361C47FFC3F4 /* fixtures */ = {
 			isa = PBXGroup;
 			children = (
-				CBB9FAF746F389373569EBFB /* companion-v1.json */,
+				E320B2061EFAD4F981D4C896 /* companion-v1.json */,
 			);
 			path = fixtures;
 			sourceTree = "<group>";
@@ -231,32 +257,15 @@
 			path = App;
 			sourceTree = "<group>";
 		};
-		853B38154B9F759A178D5751 /* packages */ = {
-			isa = PBXGroup;
-			children = (
-				9C5C9ECF18B24A82DC759002 /* mobile-contracts */,
-			);
-			path = packages;
-			sourceTree = "<group>";
-		};
 		995DC18713CA2D81749A5F1C = {
 			isa = PBXGroup;
 			children = (
 				61C931BA8B64C4D161851EBE /* App */,
-				A6A6A295CEEB453BD1437B76 /* briar */,
+				203A47FE5F4EA83257E4B557 /* sub-issue-related-issue-ecdd44e9 */,
 				199D6281C5C9968DA1B0EF3F /* Tests */,
 				9E47CF88E04EB2D5307A8187 /* UITests */,
 				4BCD825065EC73B0BFB812A0 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		9C5C9ECF18B24A82DC759002 /* mobile-contracts */ = {
-			isa = PBXGroup;
-			children = (
-				AE60699A24ABDD2FDA86710F /* companion.openapi.yaml */,
-				55445925DA98F587DC5F5449 /* fixtures */,
-			);
-			path = "mobile-contracts";
 			sourceTree = "<group>";
 		};
 		9E47CF88E04EB2D5307A8187 /* UITests */ = {
@@ -265,15 +274,6 @@
 				0CA08856EAF2B67E13727846 /* BriarCompanionUITests.swift */,
 			);
 			path = UITests;
-			sourceTree = "<group>";
-		};
-		A6A6A295CEEB453BD1437B76 /* briar */ = {
-			isa = PBXGroup;
-			children = (
-				853B38154B9F759A178D5751 /* packages */,
-			);
-			name = briar;
-			path = ../../../..;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -377,8 +377,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				8D8700993D70448DC7819BA9 /* companion-v1.json in Resources */,
-				1A30EA97CEF698FC6B9E0DD4 /* companion.openapi.yaml in Resources */,
+				EE86DBBE7F5379E9D29CF1B6 /* companion-v1.json in Resources */,
+				C0311B2A8111C8CFBC6CAD41 /* companion.openapi.yaml in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
