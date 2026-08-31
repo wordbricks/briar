@@ -3567,6 +3567,10 @@ export function App({
         onResume={() => briar.resumeRun(inboxDetailRun.id)}
         onSendIssueMessage={(input) =>
           sendIssueMessage(inboxDetailRun.id, input)}
+        onEditIssueMessage={(messageId, input) =>
+          briar.updateIssueMessage(inboxDetailRun.id, messageId, input)}
+        onDeleteIssueMessage={(messageId) =>
+          briar.removeIssueMessage(inboxDetailRun.id, messageId)}
         onUpdateIssue={(input) => briar.editIssue(inboxDetailRun.id, input)}
         onUpdateIssueSubscription={(subscribed) =>
           briar.editIssueSubscription(inboxDetailRun.id, subscribed)}
