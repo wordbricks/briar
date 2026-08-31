@@ -11,6 +11,7 @@ import "briar/realtime/v1/realtime.proto";
 import "briar/types/v1/agent_event.proto";
 import "briar/types/v1/agent_execution.proto";
 import "briar/types/v1/provider.proto";
+import "briar/types/v1/upload.proto";
 import "briar/types/v1/worker.proto";
 import "briar/types/v1/workflow.proto";
 import "google/protobuf/empty.proto";
@@ -64,6 +65,8 @@ service WorkerExecutionService {
   rpc AppendTranscriptEvents(AppendTranscriptEventsRequest) returns (AppendTranscriptEventsResponse);
   rpc ReportIssueExecutionTelemetry(ReportIssueExecutionTelemetryRequest) returns (ReportIssueExecutionTelemetryResponse);
   rpc RecordRunEvent(RecordRunEventRequest) returns (RecordRunEventResponse);
+  rpc PrepareRunEvidenceImageUploads(PrepareRunEvidenceImageUploadsRequest) returns (PrepareRunEvidenceImageUploadsResponse);
+  rpc RecordRunEvidence(RecordRunEvidenceRequest) returns (RecordRunEvidenceResponse);
   rpc TransitionWorkflowStage(TransitionWorkflowStageRequest) returns (TransitionWorkflowStageResponse);
   // Shared intentionally with IssueService so run control has one wire DTO.
   // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
@@ -187,12 +190,25 @@ message RecordRunEventResponse {
   optional string workflow_stage = 3;
 }
 
-// Metadata envelope for POST /runs/{run_id}/evidence. The HTTP transport is
-// multipart/form-data with exactly one application/protobuf `request` part;
-// image bytes use separate `images` parts.
+message PrepareRunEvidenceImageUploadsRequest {
+  // Stable across a client retry. Reusing it with different metadata fails.
+  string request_id = 1;
+  string project_id = 2;
+  // Only an exact active issue claim is accepted.
+  WorkClaimIdentity work = 3;
+  repeated briar.types.v1.UploadFileMetadata images = 4;
+}
+
+message PrepareRunEvidenceImageUploadsResponse {
+  bool replayed = 1;
+  repeated briar.types.v1.PreparedUpload uploads = 2;
+}
+
 message RecordRunEvidenceRequest {
   string project_id = 1;
-  string run_id = 2;
+  // Supplies the run ID and exact active issue claim. The transport does not
+  // duplicate either value in headers or paths.
+  WorkClaimIdentity work = 2;
   string evidence_key = 3;
   string stage = 4;
   string type = 5;
@@ -203,6 +219,7 @@ message RecordRunEvidenceRequest {
   optional string command = 10;
   optional string url = 11;
   optional google.protobuf.Struct metadata = 12;
+  repeated briar.types.v1.UploadReference images = 13;
 }
 
 message RecordRunEvidenceResponse {
@@ -342,38 +359,12 @@ message PrepareReplyAttachmentUploadsRequest {
   // Only exact active issue_reply and channel_reply claims are accepted.
   // Other or unknown oneof variants fail closed.
   WorkClaimIdentity work = 4;
-  repeated ReplyAttachmentUploadMetadata attachments = 5;
-}
-
-message ReplyAttachmentUploadMetadata {
-  // Correlates an input file with its server-issued reference. It is not an
-  // authorization or storage identifier.
-  string client_id = 1;
-  string filename = 2;
-  string content_type = 3;
-  uint64 byte_size = 4;
-  // Exact 32-byte SHA-256 digest. Attachment content never enters protobuf.
-  bytes sha256 = 5;
-}
-
-message ReplyAttachmentUploadReference {
-  // Opaque server-issued identifier. Completion accepts references belonging
-  // to the exact claim and prepare request only.
-  string attachment_id = 1;
-}
-
-message PreparedReplyAttachmentUpload {
-  string client_id = 1;
-  ReplyAttachmentUploadReference reference = 2;
-  string upload_url = 3;
-  // Short-lived bearer capability for the ordinary HTTP byte upload.
-  string upload_capability = 4;
-  google.protobuf.Timestamp expires_at = 5;
+  repeated briar.types.v1.UploadFileMetadata attachments = 5;
 }
 
 message PrepareReplyAttachmentUploadsResponse {
   bool replayed = 1;
-  repeated PreparedReplyAttachmentUpload uploads = 2;
+  repeated briar.types.v1.PreparedUpload uploads = 2;
 }
 
 message ReplyFailure {
@@ -418,7 +409,7 @@ message IssueReplySkillExecutionAction {}
 
 message IssueReplySuccess {
   string body = 1;
-  repeated ReplyAttachmentUploadReference attachments = 2;
+  repeated briar.types.v1.UploadReference attachments = 2;
 
   // A reply can propose at most one follow-up action. Unknown action variants
   // and unspecified nested enums are rejected rather than ignored.
@@ -513,7 +504,7 @@ message ChannelReplyArtifactsAction {
 message ChannelReplySuccess {
   string body = 1;
   optional string conversation_id = 2;
-  repeated ReplyAttachmentUploadReference attachments = 3;
+  repeated briar.types.v1.UploadReference attachments = 3;
 
   // A document may accompany at most one proposal. Skill execution and
   // delegation remain exclusive from every artifact at the wire boundary.

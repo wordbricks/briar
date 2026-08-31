@@ -266,6 +266,28 @@ pub type OwnedRecordRunEventRequestView = ::buffa::view::OwnedView<
 pub type OwnedRecordRunEventResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::RecordRunEventResponseView<'static>,
 >;
+///Shorthand for `OwnedView<PrepareRunEvidenceImageUploadsRequestView<'static>>`.
+pub type OwnedPrepareRunEvidenceImageUploadsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::PrepareRunEvidenceImageUploadsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<PrepareRunEvidenceImageUploadsResponseView<'static>>`.
+pub type OwnedPrepareRunEvidenceImageUploadsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::PrepareRunEvidenceImageUploadsResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RecordRunEvidenceRequestView<'static>>`.
+pub type OwnedRecordRunEvidenceRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RecordRunEvidenceRequestView<'static>,
+>;
+///Shorthand for `OwnedView<RecordRunEvidenceResponseView<'static>>`.
+pub type OwnedRecordRunEvidenceResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RecordRunEvidenceResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<TransitionWorkflowStageRequestView<'static>>`.
 pub type OwnedTransitionWorkflowStageRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::TransitionWorkflowStageRequestView<
@@ -1228,6 +1250,84 @@ for crate::proto::briar::worker::v1::__buffa::view::RecordRunEventResponseView<'
 impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::RecordRunEventResponse>
 for ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::RecordRunEventResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::PrepareRunEvidenceImageUploadsResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::PrepareRunEvidenceImageUploadsResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::PrepareRunEvidenceImageUploadsResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::PrepareRunEvidenceImageUploadsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::RecordRunEvidenceResponse>
+for crate::proto::briar::worker::v1::__buffa::view::RecordRunEvidenceResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::RecordRunEvidenceResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RecordRunEvidenceResponseView<
+        'static,
+    >,
 > {
     fn encode(
         &self,
@@ -4711,6 +4811,18 @@ pub const WORKER_EXECUTION_SERVICE_RECORD_RUN_EVENT_SPEC: ::connectrpc::Spec = :
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `PrepareRunEvidenceImageUploads` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_EXECUTION_SERVICE_PREPARE_RUN_EVIDENCE_IMAGE_UPLOADS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerExecutionService/PrepareRunEvidenceImageUploads",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RecordRunEvidence` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_EXECUTION_SERVICE_RECORD_RUN_EVIDENCE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerExecutionService/RecordRunEvidence",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `TransitionWorkflowStage` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const WORKER_EXECUTION_SERVICE_TRANSITION_WORKFLOW_STAGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.worker.v1.WorkerExecutionService/TransitionWorkflowStage",
@@ -4929,6 +5041,52 @@ pub trait WorkerExecutionService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::worker::v1::RecordRunEventResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the PrepareRunEvidenceImageUploads RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn prepare_run_evidence_image_uploads<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::PrepareRunEvidenceImageUploadsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::PrepareRunEvidenceImageUploadsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RecordRunEvidence RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn record_run_evidence<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::RecordRunEvidenceRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::RecordRunEvidenceResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -5256,6 +5414,64 @@ impl<S: WorkerExecutionService> WorkerExecutionServiceExt for S {
             .with_spec(WORKER_EXECUTION_SERVICE_RECORD_RUN_EVENT_SPEC)
             .route_view(
                 WORKER_EXECUTION_SERVICE_SERVICE_NAME,
+                "PrepareRunEvidenceImageUploads",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::PrepareRunEvidenceImageUploadsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::PrepareRunEvidenceImageUploadsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.prepare_run_evidence_image_uploads(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::PrepareRunEvidenceImageUploadsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_EXECUTION_SERVICE_PREPARE_RUN_EVIDENCE_IMAGE_UPLOADS_SPEC)
+            .route_view(
+                WORKER_EXECUTION_SERVICE_SERVICE_NAME,
+                "RecordRunEvidence",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::RecordRunEvidenceRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::RecordRunEvidenceRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.record_run_evidence(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::RecordRunEvidenceResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_EXECUTION_SERVICE_RECORD_RUN_EVIDENCE_SPEC)
+            .route_view(
+                WORKER_EXECUTION_SERVICE_SERVICE_NAME,
                 "TransitionWorkflowStage",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -5498,6 +5714,20 @@ for WorkerExecutionServiceServer<T> {
                         .with_spec(WORKER_EXECUTION_SERVICE_RECORD_RUN_EVENT_SPEC),
                 )
             }
+            "PrepareRunEvidenceImageUploads" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            WORKER_EXECUTION_SERVICE_PREPARE_RUN_EVIDENCE_IMAGE_UPLOADS_SPEC,
+                        ),
+                )
+            }
+            "RecordRunEvidence" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_EXECUTION_SERVICE_RECORD_RUN_EVIDENCE_SPEC),
+                )
+            }
             "TransitionWorkflowStage" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -5675,6 +5905,50 @@ for WorkerExecutionServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::worker::v1::RecordRunEventResponse,
+                        >(format)
+                })
+            }
+            "PrepareRunEvidenceImageUploads" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::PrepareRunEvidenceImageUploadsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::PrepareRunEvidenceImageUploadsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::PrepareRunEvidenceImageUploadsRequest,
+                    >::from_parts(&req, &body);
+                    svc.prepare_run_evidence_image_uploads(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::PrepareRunEvidenceImageUploadsResponse,
+                        >(format)
+                })
+            }
+            "RecordRunEvidence" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::RecordRunEvidenceRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::RecordRunEvidenceRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::RecordRunEvidenceRequest,
+                    >::from_parts(&req, &body);
+                    svc.record_run_evidence(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::RecordRunEvidenceResponse,
                         >(format)
                 })
             }
@@ -6183,6 +6457,96 @@ where
                 &self.transport,
                 &self.config,
                 WORKER_EXECUTION_SERVICE_RECORD_RUN_EVENT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the PrepareRunEvidenceImageUploads RPC. Sends a request to /briar.worker.v1.WorkerExecutionService/PrepareRunEvidenceImageUploads.
+    pub async fn prepare_run_evidence_image_uploads(
+        &self,
+        request: crate::proto::briar::worker::v1::PrepareRunEvidenceImageUploadsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::PrepareRunEvidenceImageUploadsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.prepare_run_evidence_image_uploads_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the PrepareRunEvidenceImageUploads RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn prepare_run_evidence_image_uploads_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::PrepareRunEvidenceImageUploadsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::PrepareRunEvidenceImageUploadsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_EXECUTION_SERVICE_PREPARE_RUN_EVIDENCE_IMAGE_UPLOADS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RecordRunEvidence RPC. Sends a request to /briar.worker.v1.WorkerExecutionService/RecordRunEvidence.
+    pub async fn record_run_evidence(
+        &self,
+        request: crate::proto::briar::worker::v1::RecordRunEvidenceRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::RecordRunEvidenceResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.record_run_evidence_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RecordRunEvidence RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn record_run_evidence_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::RecordRunEvidenceRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::RecordRunEvidenceResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_EXECUTION_SERVICE_RECORD_RUN_EVIDENCE_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package briar.types.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarTypes_";
+
+// Metadata for one file whose bytes will be transferred through an
+// owning service's short-lived raw upload capability.
+message UploadFileMetadata {
+  // Correlates a local file with its prepared upload. It is not an
+  // authorization or storage identifier.
+  string client_id = 1;
+  string filename = 2;
+  string content_type = 3;
+  uint64 byte_size = 4;
+  // Exact 32-byte SHA-256 digest. File bytes never enter protobuf.
+  bytes sha256 = 5;
+}
+
+message UploadReference {
+  // Opaque server-issued identifier. An owning mutation accepts only uploads
+  // reserved for its exact authorization scope.
+  string upload_id = 1;
+}
+
+message PreparedUpload {
+  string client_id = 1;
+  UploadReference reference = 2;
+  string upload_url = 3;
+  // Short-lived bearer capability for the ordinary HTTP byte upload.
+  string upload_capability = 4;
+  google.protobuf.Timestamp expires_at = 5;
+}
