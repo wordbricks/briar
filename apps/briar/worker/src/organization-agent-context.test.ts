@@ -1,7 +1,6 @@
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  decodeOrganizationAgentContextLookupResponse,
   decodeOrganizationAgentContextManifest,
 } from "../../src/lib/organization-agent-context-contract";
 import {
@@ -478,8 +477,6 @@ describe("Organization Agent context lookup", () => {
         },
       ],
     });
-    expect(() => decodeOrganizationAgentContextLookupResponse(summaries))
-      .not.toThrow();
     expect(JSON.stringify(summaries)).not.toContain("Inspect project state.");
     expect(JSON.stringify(summaries)).not.toContain("Visible issue description");
     expect(JSON.stringify(summaries)).not.toContain("Archived only");

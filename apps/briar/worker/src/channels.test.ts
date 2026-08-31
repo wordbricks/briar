@@ -1,8 +1,21 @@
 import { createHash } from "node:crypto";
+import {
+  create,
+  fromJson,
+  toJson,
+} from "@bufbuild/protobuf";
+import { ValueSchema } from "@bufbuild/protobuf/wkt";
+import {
+  OrganizationAgentContextService,
+  OrganizationAgentContextServiceGetManifestRequestSchema,
+  OrganizationAgentContextServiceGetManifestResponseSchema,
+  OrganizationAgentContextServiceLookupRequestSchema,
+  OrganizationAgentContextServiceLookupResponseSchema,
+} from "@briar/contracts/gen/briar/worker/v1/organization_agent_context_pb";
+import { createMethodUrl } from "@connectrpc/connect/protocol";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  channelReplyClaimTokenHeader,
   channelReplyNoAvailableWorkerError,
   channelReplyProviderUsageExhaustedError,
 } from "../../src/lib/channels-contract";
@@ -1645,68 +1658,120 @@ describe("organization channels", () => {
       observedAt: claimPayload!.leaseExpiresAt ?? undefined,
     })).resolves.toBeNull();
 
-    const manifestUrl =
-      `https://briar-api.example/organizations/${organizationId}/channel-reply-claims/${claimed!.id}/organization-context/manifest?workerId=${otherWorkerId}`;
+    const claim = {
+      organizationId,
+      workId: claimed!.id,
+      workerId: otherWorkerId,
+      claimToken: claimPayload!.claimToken,
+    };
+    const connectHeaders = {
+      authorization: `Bearer ${contextWorkerToken}`,
+      "connect-protocol-version": "1",
+      "content-type": "application/json",
+    };
+    const manifestRequest = create(
+      OrganizationAgentContextServiceGetManifestRequestSchema,
+      { claim },
+    );
     const manifestResponse = await apiWorker.fetch(
-      new Request(manifestUrl, {
-        headers: {
-          authorization: `Bearer ${contextWorkerToken}`,
-          [channelReplyClaimTokenHeader]: claimPayload!.claimToken,
-        },
+      new Request(createMethodUrl(
+        "https://briar-api.example",
+        OrganizationAgentContextService.method.getManifest,
+      ), {
+        method: "POST",
+        headers: connectHeaders,
+        body: JSON.stringify(toJson(
+          OrganizationAgentContextServiceGetManifestRequestSchema,
+          manifestRequest,
+        )),
       }),
       apiEnv,
     );
     expect(manifestResponse.status).toBe(200);
-    expect(manifestResponse.headers.get("ETag")).toMatch(
-      /^"[0-9a-f]{64}"$/u,
+    const manifest = fromJson(
+      OrganizationAgentContextServiceGetManifestResponseSchema,
+      await manifestResponse.json(),
     );
-    await expect(manifestResponse.json()).resolves.toMatchObject({
-      schemaVersion: 2,
+    expect(manifest.result.case).toBe("manifest");
+    if (manifest.result.case !== "manifest") return;
+    expect(manifest.result.value).toMatchObject({
       organizationId,
       workId: claimed!.id,
-      projects: expect.arrayContaining([
-        expect.objectContaining({ id: projectId }),
-      ]),
-      loadedQueries: [],
+      projects: expect.arrayContaining([expect.objectContaining({
+        id: projectId,
+      })]),
     });
+    expect(manifest.result.value.revision).toMatch(/^[0-9a-f]{64}$/u);
+
+    const unchangedRequest = create(
+      OrganizationAgentContextServiceGetManifestRequestSchema,
+      { claim, knownRevision: manifest.result.value.revision },
+    );
     const unchangedManifest = await apiWorker.fetch(
-      new Request(manifestUrl, {
-        headers: {
-          authorization: `Bearer ${contextWorkerToken}`,
-          [channelReplyClaimTokenHeader]: claimPayload!.claimToken,
-          "If-None-Match": manifestResponse.headers.get("ETag")!,
-        },
+      new Request(createMethodUrl(
+        "https://briar-api.example",
+        OrganizationAgentContextService.method.getManifest,
+      ), {
+        method: "POST",
+        headers: connectHeaders,
+        body: JSON.stringify(toJson(
+          OrganizationAgentContextServiceGetManifestRequestSchema,
+          unchangedRequest,
+        )),
       }),
       apiEnv,
     );
-    expect(unchangedManifest.status).toBe(304);
+    expect(unchangedManifest.status).toBe(200);
+    expect(fromJson(
+      OrganizationAgentContextServiceGetManifestResponseSchema,
+      await unchangedManifest.json(),
+    ).result).toMatchObject({
+      case: "unchanged",
+      value: { organizationId, workId: claimed!.id },
+    });
 
+    const lookupRequest = create(
+      OrganizationAgentContextServiceLookupRequestSchema,
+      {
+        claim,
+        queries: [{
+          query: {
+            case: "projectSettings",
+            value: { projectId },
+          },
+        }],
+      },
+    );
     const lookupResponse = await apiWorker.fetch(
       new Request(
-        `https://briar-api.example/organizations/${organizationId}/channel-reply-claims/${claimed!.id}/organization-context/lookup`,
+        createMethodUrl(
+          "https://briar-api.example",
+          OrganizationAgentContextService.method.lookup,
+        ),
         {
           method: "POST",
-          headers: {
-            authorization: `Bearer ${contextWorkerToken}`,
-            "content-type": "application/json",
-            [channelReplyClaimTokenHeader]: claimPayload!.claimToken,
-          },
-          body: JSON.stringify({
-            workerId: otherWorkerId,
-            requests: [{ resource: "project-settings", projectId }],
-          }),
+          headers: connectHeaders,
+          body: JSON.stringify(toJson(
+            OrganizationAgentContextServiceLookupRequestSchema,
+            lookupRequest,
+          )),
         },
       ),
       apiEnv,
     );
     expect(lookupResponse.status).toBe(200);
-    await expect(lookupResponse.json()).resolves.toMatchObject({
-      schemaVersion: 2,
-      results: [{
-        request: { resource: "project-settings", projectId },
-        data: { id: projectId, settings: expect.any(Object) },
-      }],
+    const lookup = fromJson(
+      OrganizationAgentContextServiceLookupResponseSchema,
+      await lookupResponse.json(),
+    );
+    expect(lookup.results[0].query?.query).toMatchObject({
+      case: "projectSettings",
+      value: { projectId },
     });
+    expect(toJson(
+      ValueSchema,
+      lookup.results[0].data!,
+    )).toMatchObject({ id: projectId, settings: expect.any(Object) });
 
     const completed = await completeChannelReply(db, claimed!, {
       jobId: claimed!.id,

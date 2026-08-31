@@ -53,24 +53,6 @@ const defaultedWith = <S extends Schema.Constraint>(
 
 const OrganizationAgentContextId = stringBetween(1, 128);
 
-/**
- * Attached to an Organization Agent claim to advertise the private, paginated
- * context protocol supported by the claiming Worker.
- */
-export const OrganizationAgentContextDescriptor = strict(Schema.Struct({
-  schemaVersion: Schema.Literal(1),
-  snapshotAt: IsoDateTimeWithOffset,
-}));
-export type OrganizationAgentContextDescriptor =
-  typeof OrganizationAgentContextDescriptor.Type;
-
-/** Query used to authenticate a claim-scoped context manifest request. */
-export const OrganizationAgentContextClaimQuery = strict(Schema.Struct({
-  workerId: Schema.Trim.check(Schema.isLengthBetween(1, 64)),
-}));
-export type OrganizationAgentContextClaimQuery =
-  typeof OrganizationAgentContextClaimQuery.Type;
-
 const OrganizationAgentContextLookupIds = mutableArrayBetween(
   OrganizationAgentContextId,
   1,
@@ -112,31 +94,6 @@ export const OrganizationAgentContextLookupRequest = Schema.Union([
 ]);
 export type OrganizationAgentContextLookupRequest =
   typeof OrganizationAgentContextLookupRequest.Type;
-
-export const OrganizationAgentContextLookupInput = strict(Schema.Struct({
-  workerId: Schema.Trim.check(Schema.isLengthBetween(1, 64)),
-  requests: mutableArrayBetween(OrganizationAgentContextLookupRequest, 1, 12),
-}));
-export type OrganizationAgentContextLookupInput =
-  typeof OrganizationAgentContextLookupInput.Type;
-
-export const OrganizationAgentContextLookupResult = strict(Schema.Struct({
-  request: OrganizationAgentContextLookupRequest,
-  // This opaque extension point accepts omission as well as explicit undefined.
-  data: Schema.optional(Schema.Unknown),
-}));
-export type OrganizationAgentContextLookupResult =
-  typeof OrganizationAgentContextLookupResult.Type;
-
-export const OrganizationAgentContextLookupResponse = strict(Schema.Struct({
-  schemaVersion: Schema.Literal(2),
-  organizationId: OrganizationAgentContextId,
-  workId: OrganizationAgentContextId,
-  snapshotAt: IsoDateTimeWithOffset,
-  results: mutableArrayAtMost(OrganizationAgentContextLookupResult, 12),
-}));
-export type OrganizationAgentContextLookupResponse =
-  typeof OrganizationAgentContextLookupResponse.Type;
 
 const OrganizationAgentContextResourceRevision = strict(Schema.Struct({
   count: nonNegativeInteger,
@@ -200,35 +157,6 @@ export const OrganizationAgentContextRequestTurn = strict(Schema.Struct({
 export type OrganizationAgentContextRequestTurn =
   typeof OrganizationAgentContextRequestTurn.Type;
 
-export const decodeOrganizationAgentContextDescriptor =
-  Schema.decodeUnknownSync(
-    OrganizationAgentContextDescriptor,
-    strictSchemaOptions,
-  );
-export const decodeOrganizationAgentContextClaimQuery = Schema.decodeUnknownSync(
-  OrganizationAgentContextClaimQuery,
-  strictSchemaOptions,
-);
-export const decodeOrganizationAgentContextLookupRequest =
-  Schema.decodeUnknownSync(
-    OrganizationAgentContextLookupRequest,
-    strictSchemaOptions,
-  );
-export const decodeOrganizationAgentContextLookupInput =
-  Schema.decodeUnknownSync(
-    OrganizationAgentContextLookupInput,
-    strictSchemaOptions,
-  );
-export const decodeOrganizationAgentContextLookupResult =
-  Schema.decodeUnknownSync(
-    OrganizationAgentContextLookupResult,
-    strictSchemaOptions,
-  );
-export const decodeOrganizationAgentContextLookupResponse =
-  Schema.decodeUnknownSync(
-    OrganizationAgentContextLookupResponse,
-    strictSchemaOptions,
-  );
 export const decodeOrganizationAgentContextManifest = Schema.decodeUnknownSync(
   OrganizationAgentContextManifest,
   strictSchemaOptions,

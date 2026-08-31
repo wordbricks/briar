@@ -11,7 +11,6 @@ import { handleAccountRoute } from "./account-routes";
 import { handleIssueConversationRoute } from "./issue-conversation-routes";
 import { handleIssueCoreRoute } from "./issue-core-routes";
 import { handleChannelMessageRoute } from "./channel-message-routes";
-import { handleChannelOrganizationContextRoute } from "./channel-organization-context-routes";
 import { handleChannelReplyResultRoute } from "./channel-reply-result-routes";
 import { handleManagedComputerRoute } from "./managed-computer-routes";
 import { handleProjectAgentRoute } from "./project-agent-routes";
@@ -36,10 +35,6 @@ import {
   RequestDecodeError,
 } from "./request-schema";
 import { ManagedComputerServiceError } from "./managed-computer-service";
-import {
-  OrganizationAgentContextCursorError,
-  OrganizationAgentContextPageTooLargeError,
-} from "./organization-agent-context";
 import {
   agentSkillConflictMessage,
 } from "./agent-skills";
@@ -243,17 +238,6 @@ async function route(
   });
   if (issueCoreResponse !== undefined) return issueCoreResponse;
 
-  const channelOrganizationContextResponse =
-    await handleChannelOrganizationContextRoute({
-      request,
-      url,
-      db,
-      env,
-    });
-  if (channelOrganizationContextResponse !== undefined) {
-    return channelOrganizationContextResponse;
-  }
-
   const channelReplyResultResponse = await handleChannelReplyResultRoute({
     request,
     url,
@@ -396,12 +380,6 @@ export default {
       }
       if (error instanceof WorkerLifecycleConflictError) {
         return json({ message: error.message }, 409);
-      }
-      if (error instanceof OrganizationAgentContextCursorError) {
-        return json({ message: error.message }, 400);
-      }
-      if (error instanceof OrganizationAgentContextPageTooLargeError) {
-        return json({ message: error.message }, 413);
       }
       if (error instanceof RequestDecodeError) {
         return json({

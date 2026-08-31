@@ -9,6 +9,10 @@ import {
 import * as SchemaIssue from "effect/SchemaIssue";
 import { agentSkillConflictMessage } from "./agent-skills";
 import { HttpError } from "./http-response";
+import {
+  OrganizationAgentContextCursorError,
+  OrganizationAgentContextPageTooLargeError,
+} from "./organization-agent-context";
 import { RequestDecodeError } from "./request-schema";
 import { ProjectWorkflowInputError } from "./run-request-contract";
 import { TranscriptLimitError, WorkerConflictError } from "./workers";
@@ -75,6 +79,24 @@ export const toConnectError = (error: unknown): ConnectError => {
     );
   }
   if (error instanceof TranscriptLimitError) {
+    return new ConnectError(
+      error.message,
+      Code.ResourceExhausted,
+      undefined,
+      undefined,
+      error,
+    );
+  }
+  if (error instanceof OrganizationAgentContextCursorError) {
+    return new ConnectError(
+      error.message,
+      Code.InvalidArgument,
+      undefined,
+      undefined,
+      error,
+    );
+  }
+  if (error instanceof OrganizationAgentContextPageTooLargeError) {
     return new ConnectError(
       error.message,
       Code.ResourceExhausted,

@@ -7,6 +7,12 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { create, fromJson } from "@bufbuild/protobuf";
+import { timestampFromDate, ValueSchema } from "@bufbuild/protobuf/wkt";
+import {
+  OrganizationAgentContextServiceGetManifestResponseSchema,
+  OrganizationAgentContextServiceLookupResponseSchema,
+} from "@briar/contracts/gen/briar/worker/v1/organization_agent_context_pb";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cleanupOrphanedOrganizationAgentWorkspaces,
@@ -14,6 +20,7 @@ import {
   hydrateOrganizationAgentContext,
   organizationAgentContextDirectory,
   prepareOrganizationAgentWorkspace,
+  type OrganizationAgentContextClient,
 } from "./organization-agent-context";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
@@ -23,31 +30,41 @@ const projectA = "44444444-4444-4444-8444-444444444444";
 const snapshotAt = "2026-08-10T01:00:00.000Z";
 const claimToken = `briar_channel_claim_${"a".repeat(64)}`;
 
-const indexManifest = () => ({
-  schemaVersion: 2,
+const timestamp = () => timestampFromDate(new Date(snapshotAt));
+
+const protoManifest = () => ({
   organizationId,
   workId,
-  snapshotAt,
+  snapshotAt: timestamp(),
   revision: "a".repeat(64),
   projects: [{
     id: projectA,
     name: "A",
     issueKeyPrefix: "AH",
-    createdAt: snapshotAt,
-    updatedAt: snapshotAt,
-    resources: {
-      settings: { revision: snapshotAt },
-      agents: { count: 1, revision: snapshotAt },
-      issues: {
-        count: 1,
-        openCount: 1,
-        pullRequestCount: 0,
-        revision: snapshotAt,
-      },
-      sessions: { count: 2, archivedCount: 1, revision: snapshotAt },
+    createdAt: timestamp(),
+    updatedAt: timestamp(),
+    settingsRevision: timestamp(),
+    agents: { count: 1, revision: timestamp() },
+    issues: {
+      count: 1,
+      openCount: 1,
+      pullRequestCount: 0,
+      revision: timestamp(),
     },
+    sessions: { count: 2, archivedCount: 1, revision: timestamp() },
   }],
-  loadedQueries: [],
+});
+
+const contextClient = (input: {
+  getManifest?: OrganizationAgentContextClient["getManifest"];
+  lookup?: OrganizationAgentContextClient["lookup"];
+}): OrganizationAgentContextClient => ({
+  getManifest: input.getManifest ?? vi.fn(() => {
+    throw new Error("Unexpected manifest request");
+  }),
+  lookup: input.lookup ?? vi.fn(() => {
+    throw new Error("Unexpected lookup request");
+  }),
 });
 
 describe("Organization Agent context downloader", () => {
@@ -106,16 +123,12 @@ describe("Organization Agent context downloader", () => {
 
   it("downloads only the revision manifest and reuses an unchanged cached index", async () => {
     const firstWorkspace = await workspace();
-    const firstFetcher = vi.fn(async (
-      _rawUrl: string | URL | Request,
-      init?: RequestInit,
-    ) => {
-      expect(new Headers(init?.headers).get("If-None-Match")).toBeNull();
-      return new Response(JSON.stringify(indexManifest()), {
-        headers: {
-          "Content-Type": "application/json",
-          ETag: `"${"a".repeat(64)}"`,
-        },
+    const firstGetManifest = vi.fn<
+      OrganizationAgentContextClient["getManifest"]
+    >(async (request) => {
+      expect(request.knownRevision).toBeUndefined();
+      return create(OrganizationAgentContextServiceGetManifestResponseSchema, {
+        result: { case: "manifest", value: protoManifest() },
       });
     });
     const first = await downloadOrganizationAgentContextManifest({
@@ -127,7 +140,7 @@ describe("Organization Agent context downloader", () => {
       claimToken,
       snapshotAt,
       workspacePath: firstWorkspace,
-      fetcher: firstFetcher,
+      client: contextClient({ getManifest: firstGetManifest }),
     });
     expect(first.manifest.projects).toHaveLength(1);
     expect(await readFile(first.manifestPath, "utf8")).not.toContain(
@@ -135,14 +148,21 @@ describe("Organization Agent context downloader", () => {
     );
 
     const secondWorkspace = await workspace();
-    const secondFetcher = vi.fn(async (
-      _rawUrl: string | URL | Request,
-      init?: RequestInit,
-    ) => {
-      expect(new Headers(init?.headers).get("If-None-Match")).toBe(
-        `"${"a".repeat(64)}"`,
-      );
-      return new Response(null, { status: 304 });
+    const secondGetManifest = vi.fn<
+      OrganizationAgentContextClient["getManifest"]
+    >(async (request) => {
+      expect(request.knownRevision).toBe("a".repeat(64));
+      return create(OrganizationAgentContextServiceGetManifestResponseSchema, {
+        result: {
+          case: "unchanged",
+          value: {
+            organizationId,
+            workId,
+            snapshotAt: timestamp(),
+            revision: "a".repeat(64),
+          },
+        },
+      });
     });
     const second = await downloadOrganizationAgentContextManifest({
       apiUrl: "https://briar.example",
@@ -153,54 +173,52 @@ describe("Organization Agent context downloader", () => {
       claimToken,
       snapshotAt,
       workspacePath: secondWorkspace,
-      fetcher: secondFetcher,
+      client: contextClient({ getManifest: secondGetManifest }),
     });
     expect(second.manifest.projects).toEqual(first.manifest.projects);
   });
 
   it("hydrates selected detail files and atomically updates the manifest", async () => {
     const workspacePath = await workspace();
-    const fetcher = vi.fn(async (
-      rawUrl: string | URL | Request,
-      init?: RequestInit,
-    ) => {
-      const url = new URL(String(rawUrl));
-      if (url.pathname.endsWith("/manifest")) {
-        return new Response(JSON.stringify(indexManifest()), {
-          headers: { "Content-Type": "application/json" },
+    const getManifest = vi.fn<
+      OrganizationAgentContextClient["getManifest"]
+    >(async () =>
+      create(OrganizationAgentContextServiceGetManifestResponseSchema, {
+        result: { case: "manifest", value: protoManifest() },
+      }));
+    const lookup = vi.fn<OrganizationAgentContextClient["lookup"]>(
+      async (input) => {
+        expect(input.claim).toMatchObject({ workerId, claimToken });
+        const queries = input.queries ?? [];
+        expect(queries).toHaveLength(1);
+        expect(queries[0].query).toMatchObject({
+          case: "issueSummaries",
+          value: { projectId: projectA, limit: 25 },
         });
-      }
-      expect(url.pathname).toMatch(/\/organization-context\/lookup$/u);
-      expect(init?.method).toBe("POST");
-      const body = JSON.parse(String(init?.body));
-      expect(body).toMatchObject({
-        workerId,
-        requests: [{
-          resource: "issues",
-          projectId: projectA,
-          detail: "summary",
-        }],
-      });
-      return new Response(JSON.stringify({
-        schemaVersion: 2,
-        organizationId,
-        workId,
-        snapshotAt,
-        results: [{
-          request: body.requests[0],
-          data: {
-            schemaVersion: 2,
-            resource: "issues",
-            projectId: projectA,
-            detail: "summary",
-            total: 1,
-            items: [{ id: "issue-a", title: "Only requested summary" }],
-            nextCursor: null,
-            complete: true,
-          },
-        }],
-      }), { headers: { "Content-Type": "application/json" } });
-    });
+        return create(OrganizationAgentContextServiceLookupResponseSchema, {
+          organizationId,
+          workId,
+          snapshotAt: timestamp(),
+          results: [{
+            query: queries[0],
+            data: fromJson(ValueSchema, {
+              schemaVersion: 2,
+              resource: "issues",
+              projectId: projectA,
+              detail: "summary",
+              total: 1,
+              items: [{
+                id: "issue-a",
+                title: "Only requested summary",
+              }],
+              nextCursor: null,
+              complete: true,
+            }),
+          }],
+        });
+      },
+    );
+    const client = contextClient({ getManifest, lookup });
     const prepared = await downloadOrganizationAgentContextManifest({
       apiUrl: "https://briar.example",
       workerToken: "worker-token",
@@ -210,7 +228,7 @@ describe("Organization Agent context downloader", () => {
       claimToken,
       snapshotAt,
       workspacePath,
-      fetcher,
+      client,
     });
     const request = {
       resource: "issues" as const,
@@ -229,7 +247,7 @@ describe("Organization Agent context downloader", () => {
       snapshotAt,
       workspacePath,
       requests: [request],
-      fetcher,
+      client,
     });
     expect(hydrated.loaded).toBe(1);
     expect(hydrated.manifest.loadedQueries).toEqual([
@@ -255,9 +273,10 @@ describe("Organization Agent context downloader", () => {
       snapshotAt,
       workspacePath,
       requests: [request],
-      fetcher,
+      client,
     });
     expect(repeated.loaded).toBe(0);
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(getManifest).toHaveBeenCalledOnce();
+    expect(lookup).toHaveBeenCalledOnce();
   });
 });
