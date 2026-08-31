@@ -216,7 +216,7 @@ fn reports_health_drift_and_repairs_bundled_assets() {
     let mut config = read_cli_config(&config_path).expect("config should be readable");
     config.projects[0]
         .auto_hunt
-        .as_mut()
+        .as_option_mut()
         .expect("Auto Hunt settings should exist")
         .velen_org = None;
     write_cli_config(&config_path, &config).expect("optional Velen config should save");
@@ -238,16 +238,19 @@ fn reports_health_drift_and_repairs_bundled_assets() {
     let mut config = read_cli_config(&config_path).expect("config should be readable");
     config.projects[0]
         .auto_hunt
-        .as_mut()
-        .and_then(|auto_hunt| auto_hunt.workflow.as_mut())
+        .as_option_mut()
+        .and_then(|auto_hunt| auto_hunt.workflow.as_option_mut())
         .expect("workflow should exist")
-        .requirements = vec![WorkflowRequirementConfig {
-        id: "custom_tool".to_string(),
-        label: "Custom Tool".to_string(),
-        kind: WorkflowRequirementKind::Executable,
-        tool: "briar-tool-that-does-not-exist".to_string(),
-        reason: "Runs repository validation.".to_string(),
-    }];
+        .requirements = vec![
+        briar_contracts::proto::briar::types::v1::WorkflowRequirement {
+            id: "custom_tool".to_string(),
+            label: "Custom Tool".to_string(),
+            kind: "executable".to_string(),
+            tool: "briar-tool-that-does-not-exist".to_string(),
+            reason: "Runs repository validation.".to_string(),
+            ..Default::default()
+        },
+    ];
     write_cli_config(&config_path, &config).expect("workflow requirement should save");
     let missing_tool = auto_hunt_health_sync_with(
         &config_path,
@@ -271,37 +274,46 @@ fn reports_health_drift_and_repairs_bundled_assets() {
 #[test]
 fn inspects_local_workers_without_mutating_their_configuration() {
     let config_path = test_config_path("inspect-workers");
-    let contents = serde_json::json!({
-        "apiUrl": "https://briar.example.com",
-        "projects": [
-            {
-                "id": "project-1",
-                "repositoryPath": "/repo/one",
-                "agentToken": "briar_agent_one",
-                "executionWorker": {
-                    "workerId": "worker-1",
-                    "deviceId": "device-1",
-                    "label": "Dev Mac",
-                    "maxConcurrentSessions": 3,
-                    "token": "briar_worker_secret"
+    let project_one = "11111111-1111-4111-8111-111111111111";
+    let project_two = "22222222-2222-4222-8222-222222222222";
+    let config = LocalConfig {
+        projects: vec![
+            LocalProjectConfig {
+                id: project_one.to_string(),
+                repository_path: "/repo/one".to_string(),
+                api_url: "https://briar.example.com".to_string(),
+                agent_token: Some("briar_agent_one".to_string()),
+                execution_worker: LocalExecutionWorkerConfig {
+                    worker_id: "worker-1".to_string(),
+                    device_id: "33333333-3333-4333-8333-333333333333".to_string(),
+                    organization_id: "44444444-4444-4444-8444-444444444444".to_string(),
+                    label: "Dev Mac".to_string(),
+                    max_concurrent_sessions: 3,
+                    token: Some("briar_worker_secret".to_string()),
+                    ..Default::default()
                 }
+                .into(),
+                ..Default::default()
             },
-            {
-                "id": "project-2",
-                "repositoryPath": "/repo/two",
-                "agentToken": "briar_agent_two"
-            }
-        ]
-    })
-    .to_string();
-    fs::write(&config_path, &contents).expect("config should be written");
+            LocalProjectConfig {
+                id: project_two.to_string(),
+                repository_path: "/repo/two".to_string(),
+                api_url: "https://briar.example.com".to_string(),
+                agent_token: Some("briar_agent_two".to_string()),
+                ..Default::default()
+            },
+        ],
+        ..default_local_config("https://briar.example.com")
+    };
+    write_cli_config(&config_path, &config).expect("config should be written");
+    let contents = fs::read_to_string(&config_path).expect("config should be readable");
 
     let statuses = inspect_execution_workers_at(
         &config_path,
         vec![
-            "project-2".to_string(),
+            project_two.to_string(),
             "missing-project".to_string(),
-            "project-1".to_string(),
+            project_one.to_string(),
         ],
     )
     .expect("worker status should be readable");
@@ -310,7 +322,7 @@ fn inspects_local_workers_without_mutating_their_configuration() {
         statuses,
         vec![
             LocalExecutionWorkerStatus {
-                project_id: "project-2".to_string(),
+                project_id: project_two.to_string(),
                 registered: false,
                 worker_id: None,
                 device_id: None,
@@ -318,10 +330,10 @@ fn inspects_local_workers_without_mutating_their_configuration() {
                 max_concurrent_sessions: None,
             },
             LocalExecutionWorkerStatus {
-                project_id: "project-1".to_string(),
+                project_id: project_one.to_string(),
                 registered: true,
                 worker_id: Some("worker-1".to_string()),
-                device_id: Some("device-1".to_string()),
+                device_id: Some("33333333-3333-4333-8333-333333333333".to_string()),
                 label: Some("Dev Mac".to_string()),
                 max_concurrent_sessions: Some(3),
             },
@@ -336,60 +348,66 @@ fn inspects_local_workers_without_mutating_their_configuration() {
 #[test]
 fn resolves_the_registered_worker_device_for_the_requested_organization() {
     let config_path = test_config_path("current-worker-device");
-    fs::write(
-        &config_path,
-        serde_json::json!({
-            "apiUrl": "https://briar.example.com",
-            "projects": [
-                {
-                    "id": "project-1",
-                    "repositoryPath": "/repo/one",
-                    "agentToken": "briar_agent_one",
-                    "executionWorker": {
-                        "workerId": "worker-1",
-                        "deviceId": "device-local",
-                        "organizationId": "organization-1",
-                        "label": "Dev Mac",
-                        "maxConcurrentSessions": 3,
-                        "token": "briar_worker_secret"
+    let local_device = "44444444-4444-4444-8444-444444444444";
+    let local_organization = "55555555-5555-4555-8555-555555555555";
+    let config = LocalConfig {
+        projects: [
+            (
+                "11111111-1111-4111-8111-111111111111",
+                "/repo/one",
+                "worker-1",
+                local_device,
+                local_organization,
+                "briar_worker_secret",
+            ),
+            (
+                "22222222-2222-4222-8222-222222222222",
+                "/repo/two",
+                "worker-2",
+                local_device,
+                local_organization,
+                "briar_worker_secret",
+            ),
+            (
+                "33333333-3333-4333-8333-333333333333",
+                "/repo/three",
+                "worker-3",
+                "66666666-6666-4666-8666-666666666666",
+                "77777777-7777-4777-8777-777777777777",
+                "briar_worker_other",
+            ),
+        ]
+        .into_iter()
+        .map(
+            |(id, repository_path, worker_id, device_id, organization_id, token)| {
+                LocalProjectConfig {
+                    id: id.to_string(),
+                    repository_path: repository_path.to_string(),
+                    api_url: "https://briar.example.com".to_string(),
+                    agent_token: Some(format!("briar_agent_{worker_id}")),
+                    execution_worker: LocalExecutionWorkerConfig {
+                        worker_id: worker_id.to_string(),
+                        device_id: device_id.to_string(),
+                        organization_id: organization_id.to_string(),
+                        label: "Dev Mac".to_string(),
+                        max_concurrent_sessions: 3,
+                        token: Some(token.to_string()),
+                        ..Default::default()
                     }
-                },
-                {
-                    "id": "project-2",
-                    "repositoryPath": "/repo/two",
-                    "agentToken": "briar_agent_two",
-                    "executionWorker": {
-                        "workerId": "worker-2",
-                        "deviceId": "device-local",
-                        "organizationId": "organization-1",
-                        "label": "Dev Mac",
-                        "maxConcurrentSessions": 3,
-                        "token": "briar_worker_secret"
-                    }
-                },
-                {
-                    "id": "project-3",
-                    "repositoryPath": "/repo/three",
-                    "agentToken": "briar_agent_three",
-                    "executionWorker": {
-                        "workerId": "worker-3",
-                        "deviceId": "device-other-org",
-                        "organizationId": "organization-2",
-                        "label": "Dev Mac",
-                        "maxConcurrentSessions": 3,
-                        "token": "briar_worker_other"
-                    }
+                    .into(),
+                    ..Default::default()
                 }
-            ]
-        })
-        .to_string(),
-    )
-    .expect("config should be written");
+            },
+        )
+        .collect(),
+        ..default_local_config("https://briar.example.com")
+    };
+    write_cli_config(&config_path, &config).expect("config should be written");
 
     assert_eq!(
-        current_execution_worker_device_id_at(&config_path, "organization-1")
+        current_execution_worker_device_id_at(&config_path, local_organization)
             .expect("device should resolve"),
-        Some("device-local".to_string())
+        Some(local_device.to_string())
     );
     assert_eq!(
         current_execution_worker_device_id_at(&config_path, "missing-organization")

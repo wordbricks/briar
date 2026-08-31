@@ -264,11 +264,7 @@ pub(super) fn maintain_expired_auto_hunt_worktrees(
     let mut errors = Vec::new();
     for project in &config.projects {
         let project_id = project.id.clone();
-        let api_url = project
-            .api_url
-            .as_deref()
-            .unwrap_or(config.api_url.as_str())
-            .to_string();
+        let api_url = project.api_url.clone();
         let runtime = connected_project_runtime(config_path, &project_id, home).and_then(
             |(runner, workspace)| {
                 let include_velen = project_auto_hunt_uses_velen(config_path, &project_id)?;
@@ -725,14 +721,15 @@ pub(super) async fn start_project_auto_hunt(
             .into_iter()
             .find(|project| project.id == project_id)
             .map(|project| project.agent_token)
-            .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+            .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?
+            .ok_or_else(|| "이 프로젝트에 Agent token이 없습니다.".to_string())?;
         let (worker_transport, worker_config) =
             worker_connect::authenticated_worker_connect(&request.api_url, &agent_token)?;
         let worker_execution_client =
             WorkerExecutionServiceClient::new(worker_transport, worker_config);
         let settings = project_llm_settings_from(&config_path, &project_id)?;
         let provider = request.agent_provider;
-        if !app_provider_settings_from(&config_path)?.is_enabled(provider) {
+        if !provider_is_enabled(&app_provider_settings_from(&config_path)?, provider) {
             return Err(
                 "선택한 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
             );

@@ -9,10 +9,7 @@ pub(super) async fn connected_project_ids(app: tauri::AppHandle) -> Result<Vec<S
         if !config_path.exists() {
             return Ok(Vec::new());
         }
-        let contents = fs::read_to_string(config_path)
-            .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-        let config = serde_json::from_str::<CliConfig>(&contents)
-            .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+        let config = read_cli_config(&config_path)?;
         Ok(config
             .projects
             .into_iter()
@@ -108,7 +105,7 @@ pub(super) async fn project_llm_chat(
                 agent::AgentProviderKind::for_conversation_id(&project_id, conversation_id)
             })
             .unwrap_or(settings.provider);
-        if !app_provider_settings_from(&config_path)?.is_enabled(provider) {
+        if !provider_is_enabled(&app_provider_settings_from(&config_path)?, provider) {
             return Err(
                 "이 대화의 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
             );
@@ -356,7 +353,7 @@ pub(super) async fn run_project_agent(
         let (runner, connected_workspace) =
             connected_project_runtime(&config_path, &project_id, &home)?;
         let provider = request.agent_provider;
-        if !app_provider_settings_from(&config_path)?.is_enabled(provider) {
+        if !provider_is_enabled(&app_provider_settings_from(&config_path)?, provider) {
             return Err(
                 "선택한 에이전트 프로바이더가 앱 설정에서 비활성화되어 있습니다.".to_string(),
             );
@@ -499,8 +496,8 @@ pub(super) fn project_worktree_root(
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
     let settings = project
         .auto_hunt
-        .as_ref()
-        .and_then(|auto_hunt| auto_hunt.worktrees.as_ref());
+        .as_option()
+        .and_then(|auto_hunt| auto_hunt.worktrees.as_option());
     if settings.and_then(|settings| settings.enabled) == Some(false) {
         return Ok(None);
     }
@@ -529,8 +526,8 @@ pub(super) fn project_auto_hunt_full_access(
         .projects
         .iter()
         .find(|project| project.id == project_id)
-        .and_then(|project| project.auto_hunt.as_ref())
-        .and_then(|auto_hunt| auto_hunt.sandbox.as_ref())
+        .and_then(|project| project.auto_hunt.as_option())
+        .and_then(|auto_hunt| auto_hunt.sandbox.as_option())
         .and_then(|sandbox| sandbox.full_access)
         .unwrap_or(true))
 }
@@ -548,8 +545,8 @@ pub(super) fn project_sandbox_settings_from(
     Ok(ProjectSandboxSettings {
         full_access: project
             .auto_hunt
-            .as_ref()
-            .and_then(|auto_hunt| auto_hunt.sandbox.as_ref())
+            .as_option()
+            .and_then(|auto_hunt| auto_hunt.sandbox.as_option())
             .and_then(|sandbox| sandbox.full_access)
             .unwrap_or(true),
     })
@@ -566,12 +563,8 @@ pub(super) fn update_project_sandbox_settings_at(
         .iter_mut()
         .find(|project| project.id == project_id)
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
-    let auto_hunt = project
-        .auto_hunt
-        .get_or_insert_with(StoredAutoHuntConfig::default);
-    let sandbox = auto_hunt
-        .sandbox
-        .get_or_insert_with(StoredSandboxConfig::default);
+    let auto_hunt = project.auto_hunt.get_or_insert_default();
+    let sandbox = auto_hunt.sandbox.get_or_insert_default();
     sandbox.full_access = Some(settings.full_access);
     write_cli_config(config_path, &config)?;
     Ok(settings)
@@ -585,7 +578,7 @@ pub(super) fn project_auto_hunt_uses_velen(
         .projects
         .iter()
         .find(|project| project.id == project_id)
-        .and_then(|project| project.auto_hunt.as_ref())
+        .and_then(|project| project.auto_hunt.as_option())
         .and_then(|auto_hunt| auto_hunt.velen_org.as_deref())
         .is_some_and(|org| !org.trim().is_empty()))
 }
@@ -599,9 +592,10 @@ pub(super) fn project_auto_hunt_workflow_json(
         .projects
         .iter()
         .find(|project| project.id == project_id)
-        .and_then(|project| project.auto_hunt.as_ref())
-        .and_then(|auto_hunt| auto_hunt.workflow.as_ref())
+        .and_then(|project| project.auto_hunt.as_option())
+        .and_then(|auto_hunt| auto_hunt.workflow.as_option())
         .ok_or_else(|| "저장소 기반 워크플로우가 생성되지 않았습니다.".to_string())?;
+    let workflow = workflow_from_proto(workflow)?;
     if workflow
         .stages
         .iter()
@@ -609,8 +603,8 @@ pub(super) fn project_auto_hunt_workflow_json(
     {
         return Err("저장소 기반 워크플로우가 생성되지 않았습니다.".to_string());
     }
-    validate_generated_workflow(workflow)?;
-    serde_json::to_string_pretty(&canonicalize_workflow(workflow.clone()))
+    validate_generated_workflow(&workflow)?;
+    serde_json::to_string_pretty(&canonicalize_workflow(workflow))
         .map_err(|error| format!("프로젝트 워크플로우를 직렬화하지 못했습니다: {error}"))
 }
 

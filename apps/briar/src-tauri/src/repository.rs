@@ -692,10 +692,7 @@ pub(super) fn project_repository_readiness_at(
     project_id: &str,
     home: &Path,
 ) -> Result<RepositoryReadiness, String> {
-    let contents = fs::read_to_string(config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    let config = serde_json::from_str::<CliConfig>(&contents)
-        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let config = read_cli_config(config_path)?;
     let project = config
         .projects
         .iter()
@@ -703,9 +700,10 @@ pub(super) fn project_repository_readiness_at(
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
     let workflow = project
         .auto_hunt
-        .as_ref()
-        .and_then(|auto_hunt| auto_hunt.workflow.as_ref())
-        .cloned()
+        .as_option()
+        .and_then(|auto_hunt| auto_hunt.workflow.as_option())
+        .map(workflow_from_proto)
+        .transpose()?
         .unwrap_or_else(repository_workflow_bootstrap);
     let runner = project_runner(&config, project_id, home)?;
     let mut readiness = inspect_repository_readiness_on(
@@ -715,7 +713,7 @@ pub(super) fn project_repository_readiness_at(
     );
     readiness.github_repository_id = project
         .auto_hunt
-        .as_ref()
+        .as_option()
         .and_then(|auto_hunt| auto_hunt.github_repository_id);
     Ok(readiness)
 }

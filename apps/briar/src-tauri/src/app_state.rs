@@ -91,26 +91,6 @@ impl ExitConfirmationState {
     }
 }
 
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct CliProject {
-    pub(super) id: String,
-    pub(super) repository_path: String,
-    /// API environment that issued this project's agent token. Legacy entries
-    /// omit it and remain readable until the next connection save.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) api_url: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) repository_remote: Option<String>,
-    pub(super) agent_token: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) llm: Option<agent::ProjectLlmSettings>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) auto_hunt: Option<StoredAutoHuntConfig>,
-    #[serde(flatten)]
-    pub(super) extra: BTreeMap<String, serde_json::Value>,
-}
-
 #[derive(Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct AutoHuntConfig {
@@ -244,40 +224,6 @@ pub(super) fn repository_workflow_bootstrap() -> WorkflowConfig {
     }
 }
 
-#[derive(Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct StoredAutoHuntConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) velen_org: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) data_source: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) linear: Option<StoredLinearConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) github_repository_id: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) github_repository: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) workflow: Option<WorkflowConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) worktrees: Option<StoredWorktreeConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) sandbox: Option<StoredSandboxConfig>,
-    #[serde(flatten)]
-    pub(super) extra: BTreeMap<String, serde_json::Value>,
-}
-
-/// Auto Hunt filesystem access. Full access is the default; an explicit
-/// `fullAccess: false` confines writes to the checkout and worktree root.
-#[derive(Clone, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct StoredSandboxConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) full_access: Option<bool>,
-    #[serde(flatten)]
-    pub(super) extra: BTreeMap<String, serde_json::Value>,
-}
-
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct ProjectSandboxSettings {
@@ -287,57 +233,6 @@ pub(super) struct ProjectSandboxSettings {
 impl Default for ProjectSandboxSettings {
     fn default() -> Self {
         Self { full_access: true }
-    }
-}
-
-/// Per-issue worktree settings owned by the CLI (`briar project configure`).
-/// The app only reads them, to learn which directory agents must be able to
-/// write in.
-#[derive(Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct StoredWorktreeConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) enabled: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) root: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) branch_prefix: Option<String>,
-    #[serde(flatten)]
-    pub(super) extra: BTreeMap<String, serde_json::Value>,
-}
-
-#[derive(Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct StoredLinearConfig {
-    pub(super) enabled: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) source: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) team_key: Option<String>,
-    #[serde(flatten)]
-    pub(super) extra: BTreeMap<String, serde_json::Value>,
-}
-
-impl From<AutoHuntConfig> for StoredAutoHuntConfig {
-    fn from(config: AutoHuntConfig) -> Self {
-        Self {
-            velen_org: config.velen_org,
-            data_source: config.data_source,
-            linear: Some(StoredLinearConfig {
-                enabled: config.linear_enabled,
-                source: config.linear_source,
-                team_key: config.linear_team,
-                extra: BTreeMap::new(),
-            }),
-            github_repository_id: config.github_repository_id,
-            github_repository: config.github_repository,
-            workflow: Some(canonicalize_workflow(config.workflow)),
-            // Worktree and sandbox settings belong to the CLI; callers carry the
-            // stored values over instead of letting an app-side save erase them.
-            worktrees: None,
-            sandbox: None,
-            extra: BTreeMap::new(),
-        }
     }
 }
 
@@ -587,35 +482,6 @@ pub(super) struct WorkflowRequirementHealth {
     pub(super) detail: String,
 }
 
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct CliConfig {
-    pub(super) api_url: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) user_token: Option<String>,
-    #[serde(default)]
-    pub(super) agent_providers: StoredAppProviderSettings,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) openrouter_api_key: Option<String>,
-    #[serde(default)]
-    pub(super) app_settings: StoredAppRuntimeSettings,
-    #[serde(default)]
-    pub(super) projects: Vec<CliProject>,
-    #[serde(flatten)]
-    pub(super) extra: BTreeMap<String, serde_json::Value>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct StoredExecutionWorker {
-    pub(super) worker_id: String,
-    pub(super) device_id: String,
-    #[serde(default)]
-    pub(super) organization_id: Option<String>,
-    pub(super) label: String,
-    pub(super) max_concurrent_sessions: u32,
-}
-
 #[derive(Debug, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct LocalExecutionWorkerStatus {
@@ -625,15 +491,6 @@ pub(super) struct LocalExecutionWorkerStatus {
     pub(super) device_id: Option<String>,
     pub(super) label: Option<String>,
     pub(super) max_concurrent_sessions: Option<u32>,
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct StoredAppRuntimeSettings {
-    #[serde(default)]
-    pub(super) prevent_sleep_while_running: bool,
-    #[serde(default)]
-    pub(super) browser_automation_provider: BrowserAutomationProvider,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize, specta::Type)]
@@ -664,8 +521,8 @@ pub(super) struct AppRuntimeSettingsUpdate {
     pub(super) prevent_sleep_while_running: bool,
 }
 
-impl From<StoredAppRuntimeSettings> for AppRuntimeSettings {
-    fn from(settings: StoredAppRuntimeSettings) -> Self {
+impl From<LocalAppSettings> for AppRuntimeSettings {
+    fn from(settings: LocalAppSettings) -> Self {
         Self {
             prevent_sleep_while_running: settings.prevent_sleep_while_running,
             prevent_sleep_supported: cfg!(target_os = "macos"),
@@ -822,67 +679,10 @@ impl Drop for SleepPreventionState {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct StoredAppProviderSettings {
-    #[serde(default = "enabled_by_default")]
-    pub(super) codex: bool,
-    #[serde(default = "enabled_by_default")]
-    pub(super) claude: bool,
-    #[serde(default = "enabled_by_default")]
-    pub(super) cursor: bool,
-    #[serde(default = "enabled_by_default")]
-    pub(super) grok: bool,
-    #[serde(default = "enabled_by_default")]
-    pub(super) agy: bool,
-    #[serde(default = "enabled_by_default")]
-    pub(super) opencode: bool,
-    #[serde(default = "enabled_by_default")]
-    pub(super) openrouter: bool,
-}
-
 #[derive(Clone, Copy, Debug, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct OpenRouterCredentialStatus {
     pub(super) configured: bool,
-}
-
-impl Default for StoredAppProviderSettings {
-    fn default() -> Self {
-        Self {
-            codex: true,
-            claude: true,
-            cursor: true,
-            grok: true,
-            agy: true,
-            opencode: true,
-            openrouter: true,
-        }
-    }
-}
-
-impl StoredAppProviderSettings {
-    pub(super) fn is_enabled(self, provider: agent::AgentProviderKind) -> bool {
-        match provider {
-            agent::AgentProviderKind::Codex => self.codex,
-            agent::AgentProviderKind::Claude => self.claude,
-            agent::AgentProviderKind::Cursor => self.cursor,
-            agent::AgentProviderKind::Grok => self.grok,
-            agent::AgentProviderKind::Agy => self.agy,
-            agent::AgentProviderKind::Opencode => self.opencode,
-            agent::AgentProviderKind::Openrouter => self.openrouter,
-        }
-    }
-
-    pub(super) fn any_enabled(self) -> bool {
-        self.codex
-            || self.claude
-            || self.cursor
-            || self.grok
-            || self.agy
-            || self.opencode
-            || self.openrouter
-    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, specta::Type)]
@@ -897,8 +697,8 @@ pub(super) struct AppProviderSettings {
     pub(super) openrouter: bool,
 }
 
-impl From<StoredAppProviderSettings> for AppProviderSettings {
-    fn from(settings: StoredAppProviderSettings) -> Self {
+impl From<LocalAgentProviderSettings> for AppProviderSettings {
+    fn from(settings: LocalAgentProviderSettings) -> Self {
         Self {
             codex: settings.codex,
             claude: settings.claude,
@@ -911,7 +711,7 @@ impl From<StoredAppProviderSettings> for AppProviderSettings {
     }
 }
 
-impl From<AppProviderSettings> for StoredAppProviderSettings {
+impl From<AppProviderSettings> for LocalAgentProviderSettings {
     fn from(settings: AppProviderSettings) -> Self {
         Self {
             codex: settings.codex,
@@ -921,12 +721,9 @@ impl From<AppProviderSettings> for StoredAppProviderSettings {
             agy: settings.agy,
             opencode: settings.opencode,
             openrouter: settings.openrouter,
+            ..Default::default()
         }
     }
-}
-
-pub(super) fn enabled_by_default() -> bool {
-    true
 }
 
 pub(super) fn session_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {

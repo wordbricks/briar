@@ -232,9 +232,17 @@ impl ApprovalPolicy {
 pub(crate) struct ModelEffort(String);
 
 impl ModelEffort {
+    pub(crate) fn from_id(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub(crate) fn id(&self) -> &str {
+        &self.0
+    }
+
     #[cfg(test)]
     pub(crate) fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
+        Self::from_id(value)
     }
 
     fn as_str(&self) -> &str {

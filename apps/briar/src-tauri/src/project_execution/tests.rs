@@ -1,6 +1,7 @@
 use super::*;
 use crate::test_support::{
     config_with_cli_owned_settings, config_with_worktree_settings, test_config_path,
+    TEST_PROJECT_ID,
 };
 
 #[test]
@@ -35,17 +36,17 @@ fn resolves_the_configured_auto_hunt_worktree_root_per_project() {
     let config_path = test_config_path("worktree-root");
     config_with_worktree_settings(
         &config_path,
-        StoredWorktreeConfig {
+        LocalWorktreeConfig {
             enabled: None,
             root: Some("/custom/worktrees".to_string()),
             branch_prefix: None,
-            extra: BTreeMap::new(),
+            ..Default::default()
         },
     );
     assert_eq!(
-        project_worktree_root(&config_path, "project-1", Path::new("/Users/dev"))
+        project_worktree_root(&config_path, TEST_PROJECT_ID, Path::new("/Users/dev"))
             .expect("root should resolve"),
-        Some(PathBuf::from("/custom/worktrees/project-1"))
+        Some(PathBuf::from("/custom/worktrees").join(TEST_PROJECT_ID))
     );
 }
 
@@ -54,32 +55,32 @@ fn falls_back_to_the_default_worktree_root_and_honors_opt_out() {
     let config_path = test_config_path("worktree-default");
     config_with_worktree_settings(
         &config_path,
-        StoredWorktreeConfig {
+        LocalWorktreeConfig {
             enabled: None,
             root: None,
             branch_prefix: None,
-            extra: BTreeMap::new(),
+            ..Default::default()
         },
     );
     assert_eq!(
-        project_worktree_root(&config_path, "project-1", Path::new("/Users/dev"))
+        project_worktree_root(&config_path, TEST_PROJECT_ID, Path::new("/Users/dev"))
             .expect("root should resolve"),
-        Some(PathBuf::from("/Users/dev/briar/workspaces/project-1"))
+        Some(PathBuf::from("/Users/dev/briar/workspaces").join(TEST_PROJECT_ID))
     );
 
     let disabled_path = test_config_path("worktree-disabled");
     config_with_worktree_settings(
         &disabled_path,
-        StoredWorktreeConfig {
+        LocalWorktreeConfig {
             enabled: Some(false),
             root: None,
             branch_prefix: None,
-            extra: BTreeMap::new(),
+            ..Default::default()
         },
     );
     // Opted out: no extra writable root is granted to the agent.
     assert_eq!(
-        project_worktree_root(&disabled_path, "project-1", Path::new("/Users/dev"))
+        project_worktree_root(&disabled_path, TEST_PROJECT_ID, Path::new("/Users/dev"))
             .expect("root should resolve"),
         None
     );
@@ -89,7 +90,7 @@ fn falls_back_to_the_default_worktree_root_and_honors_opt_out() {
 fn project_filesystem_access_controls_saved_agent_sandbox() {
     let config_path = test_config_path("sandbox-default");
     config_with_cli_owned_settings(&config_path, None, None);
-    let full_access = project_auto_hunt_full_access(&config_path, "project-1")
+    let full_access = project_auto_hunt_full_access(&config_path, TEST_PROJECT_ID)
         .expect("sandbox setting should resolve");
     assert!(full_access);
     assert_eq!(
@@ -101,12 +102,12 @@ fn project_filesystem_access_controls_saved_agent_sandbox() {
     config_with_cli_owned_settings(
         &sandboxed,
         None,
-        Some(StoredSandboxConfig {
+        Some(LocalSandboxConfig {
             full_access: Some(false),
-            extra: BTreeMap::new(),
+            ..Default::default()
         }),
     );
-    let full_access = project_auto_hunt_full_access(&sandboxed, "project-1")
+    let full_access = project_auto_hunt_full_access(&sandboxed, TEST_PROJECT_ID)
         .expect("sandbox setting should resolve");
     assert!(!full_access);
     assert_eq!(
@@ -121,28 +122,28 @@ fn app_settings_can_change_and_preserve_the_workspace_sandbox() {
     config_with_cli_owned_settings(
         &config_path,
         None,
-        Some(StoredSandboxConfig {
+        Some(LocalSandboxConfig {
             full_access: Some(false),
-            extra: BTreeMap::new(),
+            ..Default::default()
         }),
     );
 
     assert!(
-        !project_sandbox_settings_from(&config_path, "project-1")
+        !project_sandbox_settings_from(&config_path, TEST_PROJECT_ID)
             .expect("sandbox setting should load")
             .full_access
     );
     update_project_sandbox_settings_at(
         &config_path,
-        "project-1",
+        TEST_PROJECT_ID,
         ProjectSandboxSettings { full_access: true },
     )
     .expect("sandbox setting should update");
-    assert!(project_auto_hunt_full_access(&config_path, "project-1")
+    assert!(project_auto_hunt_full_access(&config_path, TEST_PROJECT_ID)
         .expect("updated sandbox setting should resolve"));
     update_project_sandbox_settings_at(
         &config_path,
-        "project-1",
+        TEST_PROJECT_ID,
         ProjectSandboxSettings { full_access: false },
     )
     .expect("sandbox setting should update");
@@ -151,7 +152,7 @@ fn app_settings_can_change_and_preserve_the_workspace_sandbox() {
         &config_path,
         CliConnectionInput {
             api_url: "http://127.0.0.1:8787".to_string(),
-            project_id: "project-1".to_string(),
+            project_id: TEST_PROJECT_ID.to_string(),
             agent_token: "briar_agent_x".to_string(),
             repository_path: "/repo".to_string(),
             repository_remote: None,
@@ -172,6 +173,8 @@ fn app_settings_can_change_and_preserve_the_workspace_sandbox() {
     )
     .expect("settings should save");
 
-    assert!(!project_auto_hunt_full_access(&config_path, "project-1")
-        .expect("sandbox setting should survive an app-side save"));
+    assert!(
+        !project_auto_hunt_full_access(&config_path, TEST_PROJECT_ID)
+            .expect("sandbox setting should survive an app-side save")
+    );
 }

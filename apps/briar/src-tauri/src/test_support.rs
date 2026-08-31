@@ -1,6 +1,8 @@
 use super::*;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+pub(super) const TEST_PROJECT_ID: &str = "11111111-1111-4111-8111-111111111111";
+
 pub(super) fn test_config_path(name: &str) -> PathBuf {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -12,42 +14,32 @@ pub(super) fn test_config_path(name: &str) -> PathBuf {
 }
 
 /// Write a project whose auto-hunt block carries CLI-owned worktree settings.
-pub(super) fn config_with_worktree_settings(config_path: &Path, worktrees: StoredWorktreeConfig) {
+pub(super) fn config_with_worktree_settings(config_path: &Path, worktrees: LocalWorktreeConfig) {
     config_with_cli_owned_settings(config_path, Some(worktrees), None)
 }
 
 pub(super) fn config_with_cli_owned_settings(
     config_path: &Path,
-    worktrees: Option<StoredWorktreeConfig>,
-    sandbox: Option<StoredSandboxConfig>,
+    worktrees: Option<LocalWorktreeConfig>,
+    sandbox: Option<LocalSandboxConfig>,
 ) {
-    let config = CliConfig {
-        api_url: "http://127.0.0.1:8787".to_string(),
-        user_token: None,
-        agent_providers: StoredAppProviderSettings::default(),
-        openrouter_api_key: None,
-        app_settings: StoredAppRuntimeSettings::default(),
-        projects: vec![CliProject {
-            id: "project-1".to_string(),
+    let config = LocalConfig {
+        projects: vec![LocalProjectConfig {
+            id: TEST_PROJECT_ID.to_string(),
             repository_path: "/repo".to_string(),
-            api_url: Some("http://127.0.0.1:8787".to_string()),
+            api_url: "http://127.0.0.1:8787".to_string(),
             repository_remote: None,
-            agent_token: "briar_agent_x".to_string(),
-            llm: None,
-            auto_hunt: Some(StoredAutoHuntConfig {
+            agent_token: Some("briar_agent_x".to_string()),
+            auto_hunt: LocalAutoHuntConfig {
                 velen_org: Some("wordbricks".to_string()),
-                data_source: None,
-                linear: None,
-                github_repository: None,
-                github_repository_id: None,
-                workflow: None,
-                worktrees,
-                sandbox,
-                extra: BTreeMap::new(),
-            }),
-            extra: BTreeMap::new(),
+                worktrees: worktrees.into(),
+                sandbox: sandbox.into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
         }],
-        extra: BTreeMap::new(),
+        ..default_local_config("http://127.0.0.1:8787")
     };
     write_cli_config(config_path, &config).expect("config should be written");
 }

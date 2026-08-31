@@ -97,6 +97,7 @@ mod app_state;
 mod auto_hunt;
 mod execution_worker;
 mod ipc;
+mod local_config;
 mod native_ui;
 mod project_config;
 mod project_execution;
@@ -111,6 +112,7 @@ use execution_worker::*;
 use host::{bundled_bun_binary, cli_execution_path, LocalExecutionEnvironment};
 #[cfg(test)]
 use host::{bundled_runtime_directories, cli_execution_path_with_runtime};
+use local_config::*;
 use native_ui::*;
 use project_config::*;
 use project_execution::*;

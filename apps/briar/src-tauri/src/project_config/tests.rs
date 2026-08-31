@@ -1,6 +1,7 @@
 use super::*;
 use crate::test_support::{
     config_with_cli_owned_settings, config_with_worktree_settings, test_config_path,
+    TEST_PROJECT_ID,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -234,48 +235,41 @@ fn workflow_analysis_uses_the_connected_checkout_without_an_origin() {
 
 #[test]
 fn writes_cli_connection_without_losing_non_auth_config() {
-    let unique = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock should be after unix epoch")
-        .as_nanos();
-    let directory = std::env::temp_dir().join(format!("briar-connect-test-{unique}"));
-    let config_path = directory.join("config.json");
-    fs::create_dir_all(&directory).expect("test config directory should be created");
-    fs::write(
-        &config_path,
-        r#"{
-  "apiUrl": "https://old.example.com",
-  "userToken": "existing-user-token",
-  "customSetting": true,
-  "projects": [
-    {
-      "id": "existing-project",
-      "repositoryPath": "/existing/repository",
-      "agentToken": "briar_agent_existing",
-      "autoHunt": {
-        "velenOrg": "existing",
-        "dataSource": "postgres://existing",
-        "linear": {
-          "enabled": true,
-          "source": "linear://existing",
-          "teamKey": "OLD",
-          "customLinearSetting": true
-        },
-        "githubRepository": "example/existing",
-        "customAutoHuntSetting": true
-      },
-      "label": "keep me"
-    }
-  ]
-}"#,
-    )
-    .expect("test config should be written");
+    let config_path = test_config_path("connect");
+    let existing_project_id = "22222222-2222-4222-8222-222222222222";
+    let new_project_id = "33333333-3333-4333-8333-333333333333";
+    let config = LocalConfig {
+        user_token: Some("existing-user-token".to_string()),
+        projects: vec![LocalProjectConfig {
+            id: existing_project_id.to_string(),
+            repository_path: "/existing/repository".to_string(),
+            api_url: "https://old.example.com".to_string(),
+            agent_token: Some("briar_agent_existing".to_string()),
+            auto_hunt: LocalAutoHuntConfig {
+                velen_org: Some("existing".to_string()),
+                data_source: Some("postgres://existing".to_string()),
+                linear: LocalLinearConfig {
+                    enabled: true,
+                    source: Some("linear://existing".to_string()),
+                    team_key: Some("OLD".to_string()),
+                    ..Default::default()
+                }
+                .into(),
+                github_repository: Some("example/existing".to_string()),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        }],
+        ..default_local_config("https://old.example.com")
+    };
+    write_cli_config(&config_path, &config).expect("test config should be written");
 
     write_cli_connection(
         &config_path,
         CliConnectionInput {
             api_url: "https://briar.example.com".to_string(),
-            project_id: "new-project".to_string(),
+            project_id: new_project_id.to_string(),
             agent_token: "briar_agent_new".to_string(),
             repository_path: "/new/repository".to_string(),
             repository_remote: Some("git@github.com:example/repository.git".to_string()),
@@ -302,23 +296,16 @@ fn writes_cli_connection_without_losing_non_auth_config() {
     .expect("saved config should be valid json");
     assert_eq!(saved["apiUrl"], "https://briar.example.com");
     assert!(saved["userToken"].is_null());
-    assert_eq!(saved["customSetting"], true);
     assert_eq!(saved["projects"].as_array().map(Vec::len), Some(2));
-    assert_eq!(saved["projects"][0]["label"], "keep me");
     assert_eq!(saved["projects"][0]["autoHunt"]["linear"]["enabled"], true);
-    assert_eq!(
-        saved["projects"][0]["autoHunt"]["linear"]["customLinearSetting"],
-        true
-    );
     assert_eq!(saved["projects"][1]["apiUrl"], "https://briar.example.com");
-    assert_eq!(
-        saved["projects"][0]["autoHunt"]["customAutoHuntSetting"],
-        true
-    );
-    assert_eq!(saved["projects"][1]["id"], "new-project");
+    assert_eq!(saved["projects"][1]["id"], new_project_id);
     assert_eq!(saved["projects"][1]["repositoryPath"], "/new/repository");
-    assert_eq!(saved["projects"][1]["llm"]["approvalPolicy"], "never");
-    assert_eq!(saved["projects"][1]["autoHunt"]["linear"]["enabled"], false);
+    assert_eq!(
+        saved["projects"][1]["llm"]["approvalPolicy"],
+        "LOCAL_APPROVAL_POLICY_NEVER"
+    );
+    assert!(saved["projects"][1]["autoHunt"]["linear"]["enabled"].is_null());
     assert_eq!(
         saved["projects"][1]["autoHunt"]["sandbox"]["fullAccess"],
         true
@@ -331,89 +318,51 @@ fn writes_cli_connection_without_losing_non_auth_config() {
     );
     assert!(saved["projects"][1]["autoHunt"]["linearEnabled"].is_null());
 
-    fs::remove_dir_all(directory).expect("test config directory should be removed");
+    fs::remove_dir_all(config_path.parent().expect("config should have a parent"))
+        .expect("test config directory should be removed");
 }
 
 #[test]
 fn removes_only_the_selected_cli_connection() {
-    let unique = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock should be after unix epoch")
-        .as_nanos();
-    let directory = std::env::temp_dir().join(format!("briar-disconnect-test-{unique}"));
-    let config_path = directory.join("config.json");
-    fs::create_dir_all(&directory).expect("test config directory should be created");
-    fs::write(
-        &config_path,
-        r#"{
-  "apiUrl": "https://briar.example.com",
-  "projects": [
-    {"id":"keep","repositoryPath":"/keep","agentToken":"briar_agent_keep"},
-    {"id":"delete","repositoryPath":"/delete","agentToken":"briar_agent_delete"}
-  ]
-}"#,
-    )
-    .expect("test config should be written");
+    let config_path = test_config_path("disconnect");
+    let keep = "22222222-2222-4222-8222-222222222222";
+    let delete = "33333333-3333-4333-8333-333333333333";
+    let project = |id: &str, path: &str, token: &str| LocalProjectConfig {
+        id: id.to_string(),
+        repository_path: path.to_string(),
+        api_url: "https://briar.example.com".to_string(),
+        agent_token: Some(token.to_string()),
+        ..Default::default()
+    };
+    let config = LocalConfig {
+        projects: vec![
+            project(keep, "/keep", "briar_agent_keep"),
+            project(delete, "/delete", "briar_agent_delete"),
+        ],
+        ..default_local_config("https://briar.example.com")
+    };
+    write_cli_config(&config_path, &config).expect("test config should be written");
 
-    remove_cli_connection(&config_path, "delete").expect("connection should be removed");
+    remove_cli_connection(&config_path, delete).expect("connection should be removed");
     let saved: serde_json::Value = serde_json::from_str(
         &fs::read_to_string(&config_path).expect("saved config should be readable"),
     )
     .expect("saved config should be valid json");
     assert_eq!(saved["projects"].as_array().map(Vec::len), Some(1));
-    assert_eq!(saved["projects"][0]["id"], "keep");
+    assert_eq!(saved["projects"][0]["id"], keep);
 
-    fs::remove_dir_all(directory).expect("test config directory should be removed");
+    fs::remove_dir_all(config_path.parent().expect("config should have a parent"))
+        .expect("test config directory should be removed");
 }
 
 #[test]
-fn stores_project_approval_policy_locally() {
-    let unique = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock should be after unix epoch")
-        .as_nanos();
-    let directory = std::env::temp_dir().join(format!("briar-llm-settings-test-{unique}"));
-    let config_path = directory.join("config.json");
-    fs::create_dir_all(&directory).expect("test config directory should be created");
-    fs::write(
-        &config_path,
-        r#"{
-  "apiUrl": "https://briar.example.com",
-  "customSetting": true,
-  "projects": [
-    {"id":"project-1","repositoryPath":"/repo","agentToken":"briar_agent_test"}
-  ]
-}"#,
-    )
-    .expect("test config should be written");
+fn stores_project_settings_as_canonical_protojson() {
+    let config_path = test_config_path("canonical-project-settings");
+    config_with_cli_owned_settings(&config_path, None, None);
 
-    assert_eq!(
-        project_llm_settings_from(&config_path, "project-1")
-            .expect("legacy project settings should load")
-            .approval_policy,
-        agent::ApprovalPolicy::Never
-    );
-    assert_eq!(
-        project_llm_settings_from(&config_path, "project-1")
-            .expect("legacy project settings should load")
-            .effort,
-        None
-    );
-    assert!(
-        app_provider_settings_from(&config_path)
-            .expect("legacy provider settings should load")
-            .codex
-    );
-    let legacy_runtime_settings =
-        app_runtime_settings_from(&config_path).expect("legacy runtime settings should load");
-    assert!(!legacy_runtime_settings.prevent_sleep_while_running);
-    assert_eq!(
-        legacy_runtime_settings.browser_automation_provider,
-        BrowserAutomationProvider::EgoBrowser
-    );
     update_app_provider_settings_at(
         &config_path,
-        StoredAppProviderSettings {
+        LocalAgentProviderSettings {
             codex: false,
             claude: true,
             cursor: true,
@@ -421,6 +370,7 @@ fn stores_project_approval_policy_locally() {
             agy: true,
             opencode: true,
             openrouter: true,
+            ..Default::default()
         },
     )
     .expect("provider settings should save");
@@ -440,7 +390,7 @@ fn stores_project_approval_policy_locally() {
     .expect("runtime settings should preserve browser automation settings");
     update_project_llm_settings_at(
         &config_path,
-        "project-1",
+        TEST_PROJECT_ID,
         agent::ProjectLlmSettings {
             provider: agent::AgentProviderKind::Claude,
             model: Some("sonnet".to_string()),
@@ -454,17 +404,26 @@ fn stores_project_approval_policy_locally() {
         &fs::read_to_string(&config_path).expect("saved config should be readable"),
     )
     .expect("saved config should be json");
-    assert_eq!(saved["customSetting"], true);
-    assert_eq!(saved["agentProviders"]["codex"], false);
+    assert!(saved["agentProviders"]["codex"].is_null());
     assert_eq!(saved["agentProviders"]["claude"], true);
     assert_eq!(saved["appSettings"]["preventSleepWhileRunning"], true);
-    assert_eq!(saved["appSettings"]["browserAutomationProvider"], "aside");
-    assert_eq!(saved["projects"][0]["llm"]["provider"], "claude");
+    assert_eq!(
+        saved["appSettings"]["browserAutomationProvider"],
+        "LOCAL_BROWSER_AUTOMATION_PROVIDER_ASIDE"
+    );
+    assert_eq!(
+        saved["projects"][0]["llm"]["provider"],
+        "AGENT_PROVIDER_CLAUDE"
+    );
     assert_eq!(saved["projects"][0]["llm"]["model"], "sonnet");
     assert_eq!(saved["projects"][0]["llm"]["effort"], "high");
-    assert_eq!(saved["projects"][0]["llm"]["approvalPolicy"], "on-request");
+    assert_eq!(
+        saved["projects"][0]["llm"]["approvalPolicy"],
+        "LOCAL_APPROVAL_POLICY_ON_REQUEST"
+    );
 
-    fs::remove_dir_all(directory).expect("test config directory should be removed");
+    fs::remove_dir_all(config_path.parent().expect("config should have a parent"))
+        .expect("test config directory should be removed");
 }
 
 #[test]
@@ -483,7 +442,7 @@ fn initializes_provider_settings_when_local_config_is_missing() {
 
     update_app_provider_settings_at(
         &config_path,
-        StoredAppProviderSettings {
+        LocalAgentProviderSettings {
             codex: true,
             claude: false,
             cursor: false,
@@ -491,18 +450,23 @@ fn initializes_provider_settings_when_local_config_is_missing() {
             agy: false,
             opencode: false,
             openrouter: false,
+            ..Default::default()
         },
     )
     .expect("provider settings should initialize the local config");
 
     let saved = read_cli_config(&config_path).expect("saved config should be readable");
-    assert!(saved.agent_providers.codex);
-    assert!(!saved.agent_providers.claude);
-    assert!(!saved.agent_providers.cursor);
-    assert!(!saved.agent_providers.grok);
-    assert!(!saved.agent_providers.agy);
-    assert!(!saved.agent_providers.opencode);
-    assert!(!saved.agent_providers.openrouter);
+    let saved = saved
+        .agent_providers
+        .as_option()
+        .expect("provider settings should exist");
+    assert!(saved.codex);
+    assert!(!saved.claude);
+    assert!(!saved.cursor);
+    assert!(!saved.grok);
+    assert!(!saved.agy);
+    assert!(!saved.opencode);
+    assert!(!saved.openrouter);
 
     fs::remove_dir_all(
         config_path
@@ -514,35 +478,8 @@ fn initializes_provider_settings_when_local_config_is_missing() {
 
 #[test]
 fn updates_the_connected_project_workflow_locally() {
-    let unique = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock should be after unix epoch")
-        .as_nanos();
-    let directory = std::env::temp_dir().join(format!("briar-workflow-update-test-{unique}"));
-    let config_path = directory.join("config.json");
-    fs::create_dir_all(&directory).expect("test config directory should be created");
-    fs::write(
-        &config_path,
-        r#"{
-  "apiUrl": "https://briar.example.com",
-  "projects": [{
-    "id": "project-1",
-    "repositoryPath": "/repo",
-    "agentToken": "briar_agent_test",
-    "autoHunt": {
-      "velenOrg": "wordbricks",
-      "workflow": {
-        "version": 2,
-        "stages": [{"id":"analyzing","label":"Analyze","required":true}],
-        "execution": {"checkpoints":[]},
-        "completion": {"requiredStages":["analyzing"]},
-        "release": {"enabled":false}
-      }
-    }
-  }]
-}"#,
-    )
-    .expect("test config should be written");
+    let config_path = test_config_path("workflow-update");
+    config_with_cli_owned_settings(&config_path, None, None);
 
     let mut workflow = repository_workflow_bootstrap();
     workflow.stages = vec![WorkflowStageConfig {
@@ -566,7 +503,7 @@ fn updates_the_connected_project_workflow_locally() {
         position: WorkflowCheckpointPosition::After,
     }];
 
-    let canonical = update_project_workflow_at(&config_path, "project-1", workflow)
+    let canonical = update_project_workflow_at(&config_path, TEST_PROJECT_ID, workflow)
         .expect("workflow should save");
     assert_eq!(canonical.requirements[0].tool, "xcodebuild");
     assert_eq!(
@@ -586,14 +523,13 @@ fn updates_the_connected_project_workflow_locally() {
         saved["projects"][0]["autoHunt"]["workflow"]["requirements"][0]["tool"],
         "xcodebuild"
     );
-    let runtime_workflow = project_auto_hunt_workflow_json(&config_path, "project-1")
+    let runtime_workflow = project_auto_hunt_workflow_json(&config_path, TEST_PROJECT_ID)
         .expect("runtime workflow should load");
     assert!(runtime_workflow.contains("repository_qa"));
     assert!(runtime_workflow.contains("cargo test"));
     assert!(runtime_workflow.contains("\"checkpoints\""));
-    assert!(!runtime_workflow.contains("\"release\""));
-
-    fs::remove_dir_all(directory).expect("test config directory should be removed");
+    fs::remove_dir_all(config_path.parent().expect("config should have a parent"))
+        .expect("test config directory should be removed");
 }
 
 #[test]
@@ -624,41 +560,26 @@ fn canonicalizes_long_checkpoint_keys_identically_to_the_web_contract() {
 }
 
 #[test]
-fn disconnecting_velen_clears_legacy_linear_settings() {
-    let unique = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock should be after unix epoch")
-        .as_nanos();
-    let directory = std::env::temp_dir().join(format!("briar-velen-disconnect-test-{unique}"));
-    let config_path = directory.join("config.json");
-    fs::create_dir_all(&directory).expect("test config directory should be created");
-    fs::write(
-        &config_path,
-        r#"{
-  "apiUrl": "https://briar.example.com",
-  "projects": [{
-    "id": "project-1",
-    "repositoryPath": "/repo",
-    "agentToken": "briar_agent_test",
-    "autoHunt": {
-      "velenOrg": "wordbricks",
-      "dataSource": "postgres://wordbricks",
-      "linear": {
-        "enabled": true,
-        "source": "linear://wordbricks",
-        "teamKey": "BRIAR"
-      }
+fn disconnecting_velen_clears_linear_settings() {
+    let config_path = test_config_path("velen-disconnect");
+    config_with_cli_owned_settings(&config_path, None, None);
+    let mut config = read_cli_config(&config_path).expect("config should load");
+    let auto_hunt = config.projects[0].auto_hunt.get_or_insert_default();
+    auto_hunt.data_source = Some("postgres://wordbricks".to_string());
+    auto_hunt.linear = LocalLinearConfig {
+        enabled: true,
+        source: Some("linear://wordbricks".to_string()),
+        team_key: Some("BRIAR".to_string()),
+        ..Default::default()
     }
-  }]
-}"#,
-    )
-    .expect("test config should be written");
+    .into();
+    write_cli_config(&config_path, &config).expect("test config should be written");
 
     let inspect = |_org: Option<String>| -> Result<VelenInspection, String> {
         panic!("disconnecting Velen should not inspect a source")
     };
     assert_eq!(
-        update_project_velen_org_at(&config_path, "project-1", None, &inspect)
+        update_project_velen_org_at(&config_path, TEST_PROJECT_ID, None, &inspect)
             .expect("Velen should disconnect"),
         None
     );
@@ -671,10 +592,11 @@ fn disconnecting_velen_clears_legacy_linear_settings() {
     assert!(saved["projects"][0]["autoHunt"]["dataSource"].is_null());
     assert_eq!(
         saved["projects"][0]["autoHunt"]["linear"],
-        serde_json::json!({"enabled": false})
+        serde_json::json!({})
     );
 
-    fs::remove_dir_all(directory).expect("test config directory should be removed");
+    fs::remove_dir_all(config_path.parent().expect("config should have a parent"))
+        .expect("test config directory should be removed");
 }
 
 #[test]
@@ -848,25 +770,31 @@ fn saving_project_settings_keeps_cli_owned_worktree_settings() {
     let config_path = test_config_path("worktree-preserve");
     config_with_worktree_settings(
         &config_path,
-        StoredWorktreeConfig {
+        LocalWorktreeConfig {
             enabled: None,
             root: Some("/custom/worktrees".to_string()),
             branch_prefix: Some("hunt".to_string()),
-            extra: BTreeMap::new(),
+            ..Default::default()
         },
     );
     let mut config = read_cli_config(&config_path).expect("config should load");
-    config.projects[0].extra.insert(
-        "executionWorker".to_string(),
-        serde_json::json!({ "workerId": "worker-1" }),
-    );
+    config.projects[0].execution_worker = LocalExecutionWorkerConfig {
+        worker_id: "worker-1".to_string(),
+        device_id: "22222222-2222-4222-8222-222222222222".to_string(),
+        organization_id: "33333333-3333-4333-8333-333333333333".to_string(),
+        token: Some("briar_worker_test".to_string()),
+        label: "Worker".to_string(),
+        max_concurrent_sessions: 1,
+        ..Default::default()
+    }
+    .into();
     write_cli_config(&config_path, &config).expect("worker binding should save");
 
     write_cli_connection(
         &config_path,
         CliConnectionInput {
             api_url: "http://127.0.0.1:8787".to_string(),
-            project_id: "project-1".to_string(),
+            project_id: TEST_PROJECT_ID.to_string(),
             agent_token: "briar_agent_x".to_string(),
             repository_path: "/repo".to_string(),
             repository_remote: None,
@@ -891,15 +819,20 @@ fn saving_project_settings_keeps_cli_owned_worktree_settings() {
         .expect("config should reload")
         .projects
         .into_iter()
-        .find(|project| project.id == "project-1")
+        .find(|project| project.id == TEST_PROJECT_ID)
         .expect("project should survive the app-side save");
     assert_eq!(
-        saved_project.extra["executionWorker"]["workerId"],
-        "worker-1",
+        saved_project
+            .execution_worker
+            .as_option()
+            .expect("worker should survive")
+            .worker_id,
+        "worker-1"
     );
     let worktrees = saved_project
         .auto_hunt
-        .and_then(|auto_hunt| auto_hunt.worktrees)
+        .into_option()
+        .and_then(|auto_hunt| auto_hunt.worktrees.into_option())
         .expect("worktree settings should survive an app-side save");
     assert_eq!(worktrees.root.as_deref(), Some("/custom/worktrees"));
     assert_eq!(worktrees.branch_prefix.as_deref(), Some("hunt"));

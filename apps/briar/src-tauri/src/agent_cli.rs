@@ -843,7 +843,7 @@ pub(super) fn load_agent_provider_models_sync(
 
 pub(super) fn connected_agent_provider(
     prerequisites: &OnboardingPrerequisites,
-    enabled: StoredAppProviderSettings,
+    enabled: LocalAgentProviderSettings,
 ) -> Result<agent::AgentProviderKind, String> {
     [
         (agent::AgentProviderKind::Codex, &prerequisites.codex),
@@ -856,7 +856,7 @@ pub(super) fn connected_agent_provider(
     ]
     .into_iter()
     .find_map(|(provider, status)| {
-        (enabled.is_enabled(provider) && status.installed && status.authenticated)
+        (provider_is_enabled(&enabled, provider) && status.installed && status.authenticated)
             .then_some(provider)
     })
     .ok_or_else(|| {

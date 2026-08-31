@@ -34,20 +34,9 @@ pub(super) fn write_cli_connection(
         return Err("Agent 토큰이 올바르지 않습니다.".to_string());
     }
     let mut config = if config_path.exists() {
-        let contents = fs::read_to_string(config_path)
-            .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-        serde_json::from_str::<CliConfig>(&contents)
-            .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?
+        read_cli_config(config_path)?
     } else {
-        CliConfig {
-            api_url: api_url.clone(),
-            user_token: None,
-            agent_providers: StoredAppProviderSettings::default(),
-            openrouter_api_key: None,
-            app_settings: StoredAppRuntimeSettings::default(),
-            projects: Vec::new(),
-            extra: BTreeMap::new(),
-        }
+        default_local_config(api_url.clone())
     };
     if !config.api_url.trim().is_empty()
         && config.api_url.trim_end_matches('/') != api_url.trim_end_matches('/')
@@ -61,82 +50,52 @@ pub(super) fn write_cli_connection(
         .projects
         .iter()
         .find(|project| project.id == project_id);
-    let stored_auto_hunt = stored_project.and_then(|project| project.auto_hunt.as_ref());
-    let stored_worktrees = stored_auto_hunt.and_then(|auto_hunt| auto_hunt.worktrees.clone());
-    let stored_sandbox = stored_auto_hunt.and_then(|auto_hunt| auto_hunt.sandbox.clone());
-    let stored_extra = stored_project
-        .map(|project| project.extra.clone())
+    let stored_auto_hunt = stored_project.and_then(|project| project.auto_hunt.as_option());
+    let stored_worktrees = stored_auto_hunt
+        .map(|auto_hunt| auto_hunt.worktrees.clone())
         .unwrap_or_default();
-    let mut auto_hunt: StoredAutoHuntConfig = agent_config.auto_hunt.into();
+    let stored_sandbox = stored_auto_hunt
+        .map(|auto_hunt| auto_hunt.sandbox.clone())
+        .unwrap_or_default();
+    let stored_execution_worker = stored_project
+        .map(|project| project.execution_worker.clone())
+        .unwrap_or_default();
+    let stored_active_claim = stored_project
+        .map(|project| project.active_claim.clone())
+        .unwrap_or_default();
+    let mut auto_hunt = auto_hunt_to_proto(&agent_config.auto_hunt);
     auto_hunt.worktrees = stored_worktrees;
-    auto_hunt.sandbox = Some(stored_sandbox.unwrap_or_else(|| StoredSandboxConfig {
-        full_access: Some(ProjectSandboxSettings::default().full_access),
-        extra: BTreeMap::new(),
-    }));
+    auto_hunt.sandbox = if stored_sandbox.is_set() {
+        stored_sandbox
+    } else {
+        LocalSandboxConfig {
+            full_access: Some(ProjectSandboxSettings::default().full_access),
+            ..Default::default()
+        }
+        .into()
+    };
     config.projects.retain(|project| project.id != project_id);
-    config.projects.push(CliProject {
+    config.projects.push(LocalProjectConfig {
         id: project_id,
         repository_path,
-        api_url: Some(api_url),
+        api_url,
         repository_remote,
-        agent_token,
-        llm: Some(agent_config.llm),
-        auto_hunt: Some(auto_hunt),
-        extra: stored_extra,
+        agent_token: Some(agent_token),
+        llm: project_llm_settings_to_proto(&agent_config.llm).into(),
+        auto_hunt: auto_hunt.into(),
+        execution_worker: stored_execution_worker,
+        active_claim: stored_active_claim,
+        ..Default::default()
     });
 
     write_cli_config(config_path, &config)
-}
-
-pub(super) fn write_cli_config(config_path: &Path, config: &CliConfig) -> Result<(), String> {
-    let config_directory = config_path
-        .parent()
-        .ok_or_else(|| "Briar 설정 폴더를 찾을 수 없습니다.".to_string())?;
-    fs::create_dir_all(config_directory)
-        .map_err(|error| format!("Briar 설정 폴더를 만들지 못했습니다: {error}"))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(config_directory, fs::Permissions::from_mode(0o700))
-            .map_err(|error| format!("Briar 설정 폴더 권한을 지정하지 못했습니다: {error}"))?;
-    }
-
-    let mut serialized = serde_json::to_vec_pretty(&config)
-        .map_err(|error| format!("Briar 로컬 설정을 만들지 못했습니다: {error}"))?;
-    serialized.push(b'\n');
-    let temporary_path = config_path.with_extension("json.tmp");
-    let mut options = OpenOptions::new();
-    options.create(true).truncate(true).write(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    let mut file = options
-        .open(&temporary_path)
-        .map_err(|error| format!("Briar 로컬 설정을 열지 못했습니다: {error}"))?;
-    file.write_all(&serialized)
-        .and_then(|_| file.sync_all())
-        .map_err(|error| format!("Briar 로컬 설정을 저장하지 못했습니다: {error}"))?;
-    fs::rename(&temporary_path, config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 교체하지 못했습니다: {error}"))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(config_path, fs::Permissions::from_mode(0o600))
-            .map_err(|error| format!("Briar 로컬 설정 권한을 지정하지 못했습니다: {error}"))?;
-    }
-    Ok(())
 }
 
 pub(super) fn remove_cli_connection(config_path: &Path, project_id: &str) -> Result<(), String> {
     if !config_path.exists() {
         return Ok(());
     }
-    let contents = fs::read_to_string(config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    let mut config = serde_json::from_str::<CliConfig>(&contents)
-        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let mut config = read_cli_config(config_path)?;
     let previous_count = config.projects.len();
     config.projects.retain(|project| project.id != project_id);
     if config.projects.len() == previous_count {
@@ -156,26 +115,8 @@ pub(super) fn cli_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String>
         .join("config.json"))
 }
 
-pub(super) fn read_cli_config(config_path: &Path) -> Result<CliConfig, String> {
-    if !config_path.exists() {
-        return Ok(CliConfig {
-            api_url: String::new(),
-            user_token: None,
-            agent_providers: StoredAppProviderSettings::default(),
-            openrouter_api_key: None,
-            app_settings: StoredAppRuntimeSettings::default(),
-            projects: Vec::new(),
-            extra: BTreeMap::new(),
-        });
-    }
-    let contents = fs::read_to_string(config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    serde_json::from_str::<CliConfig>(&contents)
-        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))
-}
-
 pub(super) fn project_repository_path(
-    config: &CliConfig,
+    config: &LocalConfig,
     project_id: &str,
 ) -> Result<PathBuf, String> {
     config
@@ -187,7 +128,7 @@ pub(super) fn project_repository_path(
 }
 
 pub(super) fn project_runner(
-    config: &CliConfig,
+    config: &LocalConfig,
     project_id: &str,
     home: &Path,
 ) -> Result<Arc<dyn host::CommandRunner>, String> {
@@ -659,22 +600,27 @@ pub(super) fn project_llm_settings_from(
     config_path: &Path,
     project_id: &str,
 ) -> Result<agent::ProjectLlmSettings, String> {
-    let contents = fs::read_to_string(config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    let config = serde_json::from_str::<CliConfig>(&contents)
-        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
-    config
+    let config = read_cli_config(config_path)?;
+    let project = config
         .projects
         .iter()
         .find(|project| project.id == project_id)
-        .map(|project| project.llm.clone().unwrap_or_default())
-        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())
+        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+    project
+        .llm
+        .as_option()
+        .map(project_llm_settings_from_proto)
+        .transpose()
+        .map(|settings| settings.unwrap_or_default())
 }
 
 pub(super) fn app_provider_settings_from(
     config_path: &Path,
-) -> Result<StoredAppProviderSettings, String> {
-    Ok(read_cli_config(config_path)?.agent_providers)
+) -> Result<LocalAgentProviderSettings, String> {
+    read_cli_config(config_path)?
+        .agent_providers
+        .into_option()
+        .ok_or_else(|| "Briar 로컬 설정의 agentProviders 값이 없습니다.".to_string())
 }
 
 pub(super) const OPENROUTER_OPENCODE_CONFIG: &str =
@@ -724,19 +670,27 @@ pub(super) fn update_openrouter_api_key_at(
     Ok(OpenRouterCredentialStatus { configured })
 }
 
-pub(super) fn app_runtime_settings_from(
-    config_path: &Path,
-) -> Result<StoredAppRuntimeSettings, String> {
-    Ok(read_cli_config(config_path)?.app_settings)
+pub(super) fn app_runtime_settings_from(config_path: &Path) -> Result<LocalAppSettings, String> {
+    read_cli_config(config_path)?
+        .app_settings
+        .into_option()
+        .ok_or_else(|| "Briar 로컬 설정의 appSettings 값이 없습니다.".to_string())
 }
 
 pub(super) fn update_app_runtime_settings_at(
     config_path: &Path,
     settings: AppRuntimeSettingsUpdate,
-) -> Result<StoredAppRuntimeSettings, String> {
+) -> Result<LocalAppSettings, String> {
     let mut config = read_cli_config(config_path)?;
-    config.app_settings.prevent_sleep_while_running = settings.prevent_sleep_while_running;
-    let saved = config.app_settings;
+    config
+        .app_settings
+        .get_or_insert_default()
+        .prevent_sleep_while_running = settings.prevent_sleep_while_running;
+    let saved = config
+        .app_settings
+        .as_option()
+        .expect("validated app settings")
+        .clone();
     write_cli_config(config_path, &config)?;
     Ok(saved)
 }
@@ -744,10 +698,13 @@ pub(super) fn update_app_runtime_settings_at(
 pub(super) fn browser_automation_settings_from(
     config_path: &Path,
 ) -> Result<BrowserAutomationSettings, String> {
+    let config = read_cli_config(config_path)?;
+    let app_settings = config
+        .app_settings
+        .as_option()
+        .expect("validated app settings");
     Ok(BrowserAutomationSettings {
-        provider: read_cli_config(config_path)?
-            .app_settings
-            .browser_automation_provider,
+        provider: browser_automation_provider_from_proto(app_settings)?,
     })
 }
 
@@ -756,20 +713,24 @@ pub(super) fn update_browser_automation_settings_at(
     settings: BrowserAutomationSettings,
 ) -> Result<BrowserAutomationSettings, String> {
     let mut config = read_cli_config(config_path)?;
-    config.app_settings.browser_automation_provider = settings.provider;
+    config
+        .app_settings
+        .get_or_insert_default()
+        .browser_automation_provider =
+        Some(browser_automation_provider_to_proto(settings.provider));
     write_cli_config(config_path, &config)?;
     Ok(settings)
 }
 
 pub(super) fn update_app_provider_settings_at(
     config_path: &Path,
-    settings: StoredAppProviderSettings,
-) -> Result<StoredAppProviderSettings, String> {
-    if !settings.any_enabled() {
+    settings: LocalAgentProviderSettings,
+) -> Result<LocalAgentProviderSettings, String> {
+    if !providers_any_enabled(&settings) {
         return Err("하나 이상의 에이전트 프로바이더를 활성화해야 합니다.".to_string());
     }
     let mut config = read_cli_config(config_path)?;
-    config.agent_providers = settings;
+    config.agent_providers = settings.clone().into();
     write_cli_config(config_path, &config)?;
     Ok(settings)
 }
@@ -831,11 +792,14 @@ pub(super) fn update_project_llm_settings_at(
     {
         return Err("모델 ID는 공백 없이 128자 이하여야 합니다.".to_string());
     }
-    let contents = fs::read_to_string(config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    let mut config = serde_json::from_str::<CliConfig>(&contents)
-        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
-    if !config.agent_providers.is_enabled(settings.provider) {
+    let mut config = read_cli_config(config_path)?;
+    if !provider_is_enabled(
+        config
+            .agent_providers
+            .as_option()
+            .expect("validated provider settings"),
+        settings.provider,
+    ) {
         return Err("앱 설정에서 먼저 이 에이전트 프로바이더를 활성화하세요.".to_string());
     }
     let project = config
@@ -843,7 +807,7 @@ pub(super) fn update_project_llm_settings_at(
         .iter_mut()
         .find(|project| project.id == project_id)
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
-    project.llm = Some(settings.clone());
+    project.llm = project_llm_settings_to_proto(&settings).into();
     write_cli_config(config_path, &config)?;
     Ok(settings)
 }
@@ -855,10 +819,7 @@ pub(super) fn update_project_workflow_at(
 ) -> Result<WorkflowConfig, String> {
     let workflow = canonicalize_workflow(workflow);
     validate_generated_workflow(&workflow)?;
-    let contents = fs::read_to_string(config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    let mut config = serde_json::from_str::<CliConfig>(&contents)
-        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let mut config = read_cli_config(config_path)?;
     let project = config
         .projects
         .iter_mut()
@@ -866,9 +827,9 @@ pub(super) fn update_project_workflow_at(
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
     let auto_hunt = project
         .auto_hunt
-        .as_mut()
+        .as_option_mut()
         .ok_or_else(|| "이 프로젝트에 이슈 처리 설정이 없습니다.".to_string())?;
-    auto_hunt.workflow = Some(workflow.clone());
+    auto_hunt.workflow = workflow_to_proto(&workflow).into();
     write_cli_config(config_path, &config)?;
     Ok(workflow)
 }
@@ -879,10 +840,7 @@ pub(super) fn update_project_velen_org_at(
     org: Option<String>,
     inspect_velen: &dyn Fn(Option<String>) -> Result<VelenInspection, String>,
 ) -> Result<Option<String>, String> {
-    let contents = fs::read_to_string(config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    let mut config = serde_json::from_str::<CliConfig>(&contents)
-        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let mut config = read_cli_config(config_path)?;
     let project = config
         .projects
         .iter_mut()
@@ -890,7 +848,7 @@ pub(super) fn update_project_velen_org_at(
         .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
     let auto_hunt = project
         .auto_hunt
-        .as_mut()
+        .as_option_mut()
         .ok_or_else(|| "이 프로젝트에 이슈 처리 설정이 없습니다.".to_string())?;
     let org = org
         .map(|org| org.trim().to_string())
@@ -903,12 +861,13 @@ pub(super) fn update_project_velen_org_at(
     auto_hunt.velen_org = org.clone();
     if org.is_none() {
         auto_hunt.data_source = None;
-        auto_hunt.linear = Some(StoredLinearConfig {
+        auto_hunt.linear = LocalLinearConfig {
             enabled: false,
             source: None,
             team_key: None,
-            extra: BTreeMap::new(),
-        });
+            ..Default::default()
+        }
+        .into();
     }
     write_cli_config(config_path, &config)?;
     Ok(org)

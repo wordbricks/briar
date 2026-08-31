@@ -202,24 +202,14 @@ pub(super) fn inspect_execution_workers_at(
                 .map(|project| (project_id, project))
         })
         .map(|(project_id, project)| {
-            let worker = project
-                .extra
-                .get("executionWorker")
-                .filter(|value| !value.is_null())
-                .map(|value| {
-                    serde_json::from_value::<StoredExecutionWorker>(value.clone())
-                        .map_err(|error| format!("Worker 로컬 설정이 손상되었습니다: {error}"))
-                })
-                .transpose()?;
+            let worker = project.execution_worker.as_option();
             Ok(LocalExecutionWorkerStatus {
                 project_id,
                 registered: worker.is_some(),
-                worker_id: worker.as_ref().map(|worker| worker.worker_id.clone()),
-                device_id: worker.as_ref().map(|worker| worker.device_id.clone()),
-                label: worker.as_ref().map(|worker| worker.label.clone()),
-                max_concurrent_sessions: worker
-                    .as_ref()
-                    .map(|worker| worker.max_concurrent_sessions),
+                worker_id: worker.map(|worker| worker.worker_id.clone()),
+                device_id: worker.map(|worker| worker.device_id.clone()),
+                label: worker.map(|worker| worker.label.clone()),
+                max_concurrent_sessions: worker.map(|worker| worker.max_concurrent_sessions),
             })
         })
         .collect()
@@ -233,16 +223,9 @@ pub(super) fn current_execution_worker_device_id_at(
     let mut device_ids = config
         .projects
         .iter()
-        .filter_map(|project| project.extra.get("executionWorker"))
-        .filter(|value| !value.is_null())
-        .map(|value| {
-            serde_json::from_value::<StoredExecutionWorker>(value.clone())
-                .map_err(|error| format!("Worker 로컬 설정이 손상되었습니다: {error}"))
-        })
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .filter(|worker| worker.organization_id.as_deref() == Some(organization_id))
-        .map(|worker| worker.device_id)
+        .filter_map(|project| project.execution_worker.as_option())
+        .filter(|worker| worker.organization_id == organization_id)
+        .map(|worker| worker.device_id.clone())
         .collect::<BTreeSet<_>>();
     if device_ids.len() > 1 {
         return Err("같은 조직의 로컬 Worker device ID가 서로 다릅니다.".to_string());
@@ -526,10 +509,7 @@ pub(super) fn auto_hunt_health_sync_with(
     project_id: &str,
     inspect_velen: &dyn Fn(Option<String>) -> Result<VelenInspection, String>,
 ) -> Result<AutoHuntHealth, String> {
-    let contents = fs::read_to_string(config_path)
-        .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
-    let config = serde_json::from_str::<CliConfig>(&contents)
-        .map_err(|error| format!("Briar 로컬 설정이 손상되었습니다: {error}"))?;
+    let config = read_cli_config(config_path)?;
     let project = config
         .projects
         .iter()
@@ -569,7 +549,13 @@ pub(super) fn auto_hunt_health_sync_with(
     );
     let skill_expected_version = read_trimmed_file(&skill_source.join("VERSION"))
         .unwrap_or_else(|| expected_version.clone());
-    let skill_directory = match project.llm.clone().unwrap_or_default().provider {
+    let llm = project
+        .llm
+        .as_option()
+        .map(project_llm_settings_from_proto)
+        .transpose()?
+        .unwrap_or_default();
+    let skill_directory = match llm.provider {
         agent::AgentProviderKind::Codex => ".codex",
         agent::AgentProviderKind::Claude => ".claude",
         agent::AgentProviderKind::Cursor => ".cursor",
@@ -595,7 +581,7 @@ pub(super) fn auto_hunt_health_sync_with(
 
     let velen_org = project
         .auto_hunt
-        .as_ref()
+        .as_option()
         .and_then(|auto_hunt| auto_hunt.velen_org.clone());
     let (velen_authenticated, velen_email, velen_healthy) = if let Some(org) = velen_org.as_deref()
     {
@@ -610,10 +596,14 @@ pub(super) fn auto_hunt_health_sync_with(
     } else {
         (false, None, true)
     };
-    let requirements = project
+    let workflow = project
         .auto_hunt
+        .as_option()
+        .and_then(|auto_hunt| auto_hunt.workflow.as_option())
+        .map(workflow_from_proto)
+        .transpose()?;
+    let requirements = workflow
         .as_ref()
-        .and_then(|auto_hunt| auto_hunt.workflow.as_ref())
         .map(|workflow| inspect_workflow_requirements(runner.as_ref(), &workflow.requirements))
         .unwrap_or_default();
     for requirement in requirements
