@@ -91,8 +91,6 @@ const APPS_INSTALLED_REQUEST_ID = 6;
 const approvalMethods = new Set([
   "item/commandExecution/requestApproval",
   "item/fileChange/requestApproval",
-  "execCommandApproval",
-  "applyPatchApproval",
 ]);
 
 export function createCodexAppServerState(
@@ -1093,9 +1091,6 @@ function approvalDecision(
     method === "item/fileChange/requestApproval"
   ) {
     return { decision: approved ? "accept" : "decline" };
-  }
-  if (method === "execCommandApproval" || method === "applyPatchApproval") {
-    return { decision: approved ? "approved" : "denied" };
   }
   return null;
 }

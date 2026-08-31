@@ -531,7 +531,7 @@ describe("Codex App Server runner", () => {
     ]);
   });
 
-  it("keeps approval handling compatible with the desktop decisions", () => {
+  it("maps current App Server approval decisions", () => {
     const approval = {
       id: 4,
       method: "item/commandExecution/requestApproval",
