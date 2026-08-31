@@ -630,9 +630,9 @@ export async function bindManagedComputerSetup(
     setupToken: string;
     worker: {
       agentProvider: AgentProvider;
-      providers?: AgentProvider[];
-      providerHealth?: ProviderHealthMap;
-      providerCapabilities?: AgentProviderCapabilityCatalog;
+      providers: AgentProvider[];
+      providerHealth: ProviderHealthMap;
+      providerCapabilities: AgentProviderCapabilityCatalog;
       versions: Record<string, string>;
     };
     observedAt: string;

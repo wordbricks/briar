@@ -851,19 +851,19 @@ export async function bindManagedComputerSetupSession(
     organizationId: string;
     deviceId: string;
     agentProvider: AgentProvider;
-    providers?: AgentProvider[];
-    providerHealth?: ProviderHealthMap;
-    providerCapabilities?: AgentProviderCapabilityCatalog;
+    providers: AgentProvider[];
+    providerHealth: ProviderHealthMap;
+    providerCapabilities: AgentProviderCapabilityCatalog;
     versions: Record<string, string>;
     observedAt: string;
   },
 ) {
   const capabilitiesJson = JSON.stringify({
-    providers: input.providers ?? [],
-    providerHealth: input.providerHealth ?? {},
+    providers: input.providers,
+    providerHealth: input.providerHealth,
     providerCapabilities: input.providerCapabilities,
   });
-  const versionsJson = JSON.stringify(input.versions ?? {});
+  const versionsJson = JSON.stringify(input.versions);
   await db.batch([
     db.prepare(
       `insert into briar_execution_workers (
