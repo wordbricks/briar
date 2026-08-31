@@ -33,7 +33,7 @@ import {
   recordHuntEvent,
   transferIssue,
 } from "./db";
-import { workerCapabilitiesFixture } from "./test-helpers/worker-runtime";
+import { workerRuntimeMetadataFixture } from "./test-helpers/worker-runtime";
 import { RequestDecodeError } from "./request-schema";
 import {
   dispatchHuntRun,
@@ -287,9 +287,7 @@ describe("channel issue proposal approval route", () => {
     credentialTokenHash: createHash("sha256")
       .update(`channel-${suffix}-credential`)
       .digest("hex"),
-    agentProvider: "codex",
-    capabilities: workerCapabilitiesFixture({ providerCapabilities }),
-    versions: { briar: "1.0.0" },
+    runtime: workerRuntimeMetadataFixture({ providerCapabilities }),
     observedAt,
   });
 

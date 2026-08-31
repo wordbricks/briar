@@ -37,8 +37,8 @@ import {
   acceptOrganizationChannelSkillExecutionProposal,
 } from "./channel-proposal-routes";
 import {
-  workerCapabilitiesFixture,
   workerClaimRuntimeFixture,
+  workerRuntimeMetadataFixture,
 } from "./test-helpers/worker-runtime";
 import {
   bindExecutionWorkerProject,
@@ -266,9 +266,7 @@ describe("conversational Agent Skill execution approval", () => {
         label: `Skill Worker ${suffix}`,
         deviceIdentityHash: sha256(`skill-device-${suffix}`),
         credentialTokenHash: sha256(`briar_worker_skill_credential_${suffix}`),
-        agentProvider: "codex",
-        capabilities: workerCapabilitiesFixture({ providerCapabilities }),
-        versions: { briar: "1.0.0" },
+        runtime: workerRuntimeMetadataFixture({ providerCapabilities }),
         maxConcurrentSessions: 4,
         observedAt,
       });
@@ -282,9 +280,7 @@ describe("conversational Agent Skill execution approval", () => {
       label: "Stale device Worker",
       deviceIdentityHash: sha256("skill-device-stale"),
       credentialTokenHash: sha256("skill-credential-stale"),
-      agentProvider: "codex",
-      capabilities: workerCapabilitiesFixture({ providerCapabilities }),
-      versions: { briar: "1.0.0" },
+      runtime: workerRuntimeMetadataFixture({ providerCapabilities }),
       maxConcurrentSessions: 4,
       observedAt: staleObservedAt,
     });
@@ -293,9 +289,7 @@ describe("conversational Agent Skill execution approval", () => {
       organizationId,
       ownerUserId: ownerId,
       deviceIdentityHash: sha256("skill-device-stale"),
-      agentProvider: "codex",
-      capabilities: workerCapabilitiesFixture({ providerCapabilities }),
-      versions: { briar: "1.0.0" },
+      runtime: workerRuntimeMetadataFixture({ providerCapabilities }),
       observedAt,
     });
     await createChannel(db, {

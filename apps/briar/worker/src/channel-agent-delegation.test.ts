@@ -24,7 +24,7 @@ import {
 import { HttpError } from "./http-response";
 import { createOrganizationAgent } from "./organization-agents";
 import { rethrowReplyCompletionHttpError } from "./reply-completion-http-error";
-import { workerCapabilitiesFixture } from "./test-helpers/worker-runtime";
+import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
 import {
   completeChannelReplyApplication,
 } from "./worker-reply-completion-application";
@@ -137,19 +137,19 @@ describe("Organization Agent channel delegation", () => {
     ]) {
       await db.prepare(
         `insert into briar_execution_workers (
-           id, project_id, label, host_fingerprint, agent_provider, state,
-           accepting_work, readiness_state, capabilities_json,
+           id, project_id, label, host_fingerprint, runtime_proto_json, state,
+           accepting_work, readiness_state,
            last_heartbeat_at, created_at, updated_at, device_id
-         ) values (?, ?, 'Delegation worker', ?, 'claude', 'online', 1, 'ready',
-                   ?, ?, ?, ?, ?)`,
+         ) values (?, ?, 'Delegation worker', ?, ?, 'online', 1, 'ready',
+                   ?, ?, ?, ?)`,
       ).bind(
         id,
         boundProjectId,
         id === projectWorkerId ? "d".repeat(64) : "e".repeat(64),
-        JSON.stringify(workerCapabilitiesFixture({
+        workerRuntimeProtoJsonFixture({
           agentProvider: "claude",
           providers: ["claude"],
-        })),
+        }),
         now,
         now,
         now,

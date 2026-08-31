@@ -116,7 +116,7 @@ import apiWorker from "./index";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { encryptSlackToken } from "./slack";
 import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
-import { workerCapabilitiesFixture } from "./test-helpers/worker-runtime";
+import { workerRuntimeMetadataFixture } from "./test-helpers/worker-runtime";
 
 const releaseWorkflow = normalizeAutoHuntWorkflow({
   version: 2,
@@ -460,9 +460,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       label: "Lifecycle Worker",
       deviceIdentityHash: "c".repeat(64),
       credentialTokenHash: "d".repeat(64),
-      agentProvider: "codex",
-      capabilities: workerCapabilitiesFixture(),
-      versions: { briar: "1.1.0" },
+      runtime: workerRuntimeMetadataFixture(),
       observedAt: createdAt,
     });
   }, 60_000);
@@ -1504,9 +1502,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       credentialTokenHash: createHash("sha256")
         .update("briar_worker_direct_task_selected")
         .digest("hex"),
-      agentProvider: "codex",
-      capabilities: workerCapabilitiesFixture(),
-      versions: { briar: "1.1.1" },
+      runtime: workerRuntimeMetadataFixture(),
       observedAt: atMinute(10),
     });
     const other = await registerExecutionWorker(db, projectId, {
@@ -1517,9 +1513,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       label: "Other direct task Worker",
       deviceIdentityHash: "f".repeat(64),
       credentialTokenHash: "0".repeat(64),
-      agentProvider: "codex",
-      capabilities: workerCapabilitiesFixture(),
-      versions: { briar: "1.1.1" },
+      runtime: workerRuntimeMetadataFixture(),
       observedAt: atMinute(10),
     });
     const taskId = "55555555-5555-4555-8555-555555555555";

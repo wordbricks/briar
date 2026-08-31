@@ -13,7 +13,10 @@ import {
 } from "./managed-computer-repository";
 import { recordWorkerHeartbeat } from "./workers";
 import { executeD1Sql } from "./test-helpers/d1";
-import { workerCapabilitiesFixture } from "./test-helpers/worker-runtime";
+import {
+  workerRuntimeMetadataFixture,
+  workerRuntimeProtoJsonFixture,
+} from "./test-helpers/worker-runtime";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const userId = "pilot-owner";
@@ -392,12 +395,12 @@ describe("managed computer repository", () => {
       ).bind(deviceId, observedAt, computerId),
       db.prepare(
         `insert into briar_execution_workers (
-           id, project_id, device_id, label, host_fingerprint, agent_provider,
-           versions_json, capabilities_json, state, accepting_work,
+           id, project_id, device_id, label, host_fingerprint,
+           runtime_proto_json, state, accepting_work,
            readiness_state, readiness_detail, last_heartbeat_at, created_at,
            updated_at
          ) values (
-           ?, ?, ?, 'Retiring computer', ?, 'codex', '{}', '{}', 'online', 1,
+           ?, ?, ?, 'Retiring computer', ?, ?, 'online', 1,
            'ready', null, ?, ?, ?
          )`,
       ).bind(
@@ -405,6 +408,7 @@ describe("managed computer repository", () => {
         projectId,
         deviceId,
         "2".repeat(64),
+        workerRuntimeProtoJsonFixture(),
         observedAt,
         observedAt,
         observedAt,
@@ -428,11 +432,10 @@ describe("managed computer repository", () => {
 
     await recordWorkerHeartbeat(db, projectId, {
       workerId,
-      versions: { briar: "1.2.173" },
+      runtime: workerRuntimeMetadataFixture(),
       acceptingWork: true,
       readinessState: "ready",
       readinessDetail: "Ready again",
-      capabilities: workerCapabilitiesFixture(),
       observedAt: "2026-08-22T00:21:00.000Z",
     });
     await expect(db.prepare(

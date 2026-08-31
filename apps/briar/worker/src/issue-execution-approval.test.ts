@@ -45,7 +45,7 @@ import {
 import { HttpError } from "./http-response";
 import { createOrganizationAgent } from "./organization-agents";
 import { RequestDecodeError } from "./request-schema";
-import { workerCapabilitiesFixture } from "./test-helpers/worker-runtime";
+import { workerRuntimeMetadataFixture } from "./test-helpers/worker-runtime";
 import { completeIssueReplyApplication } from "./worker-reply-completion-application";
 import { completeIssueReplyInputFromProto } from "./worker-reply-completion-mappers";
 import {
@@ -262,9 +262,7 @@ describe("conversational issue execution approval", () => {
       deviceIdentityHash: createHash("sha256").update("execution-device").digest("hex"),
       credentialTokenHash: createHash("sha256")
         .update(executionWorkerCredential).digest("hex"),
-      agentProvider: "codex",
-      capabilities: workerCapabilitiesFixture({ providerCapabilities }),
-      versions: { briar: "1.0.0" },
+      runtime: workerRuntimeMetadataFixture({ providerCapabilities }),
       observedAt: new Date().toISOString(),
     });
   }, 60_000);
@@ -1541,9 +1539,7 @@ describe("conversational issue execution approval", () => {
         .update(`committed-device-${sequence}`).digest("hex"),
       credentialTokenHash: createHash("sha256")
         .update(`committed-token-${sequence}`).digest("hex"),
-      agentProvider: "codex",
-      capabilities: workerCapabilitiesFixture({ providerCapabilities }),
-      versions: { briar: "1.0.0" },
+      runtime: workerRuntimeMetadataFixture({ providerCapabilities }),
       observedAt: new Date().toISOString(),
     });
     const workerApproval = await seedIssueProposal();
@@ -1715,9 +1711,7 @@ describe("conversational issue execution approval", () => {
         .update(`selected-device-${sequence}`).digest("hex"),
       credentialTokenHash: createHash("sha256")
         .update(`selected-token-${sequence}`).digest("hex"),
-      agentProvider: "codex",
-      capabilities: workerCapabilitiesFixture({ providerCapabilities }),
-      versions: { briar: "1.0.0" },
+      runtime: workerRuntimeMetadataFixture({ providerCapabilities }),
       observedAt: new Date().toISOString(),
     });
     const selected = await seedIssueProposal();
