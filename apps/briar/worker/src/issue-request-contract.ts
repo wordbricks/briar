@@ -155,14 +155,26 @@ const IssueUpdateChanges = strictSchema(Schema.Struct({
   ),
 ));
 
+export const issueUpdateChangeFields = [
+  "title",
+  "description",
+  "priority",
+] as const;
+
+const IssueUpdateProposalPayloadFields = {
+  changes: IssueUpdateChanges,
+} as const;
+
+export const IssueUpdateProposalPayload = strictSchema(Schema.Struct(
+  IssueUpdateProposalPayloadFields,
+));
+
 export const IssueUpdateProposalAction = strictSchema(Schema.Struct({
   type: Schema.Literal("request_issue_update"),
-  changes: IssueUpdateChanges,
+  ...IssueUpdateProposalPayloadFields,
 }));
 
-export const IssueCreateProposalAction = strictSchema(Schema.Struct({
-  type: Schema.Literal("request_issue_create"),
-  executeAfterCreate: defaulted(Schema.Boolean, false),
+const IssueCreateProposalPayloadFields = {
   issue: strictSchema(Schema.Struct({
     title: IssueTitle,
     description: Schema.NullOr(
@@ -171,6 +183,16 @@ export const IssueCreateProposalAction = strictSchema(Schema.Struct({
     priority: Schema.NullOr(integerBetween(1, 4)),
     status: Schema.Literals(["backlog", "queued"]),
   })),
+} as const;
+
+export const IssueCreateProposalPayload = strictSchema(Schema.Struct(
+  IssueCreateProposalPayloadFields,
+));
+
+export const IssueCreateProposalAction = strictSchema(Schema.Struct({
+  type: Schema.Literal("request_issue_create"),
+  executeAfterCreate: defaulted(Schema.Boolean, false),
+  ...IssueCreateProposalPayloadFields,
 }));
 
 export const IssueAgentProposedAction = Schema.Union([

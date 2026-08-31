@@ -291,7 +291,7 @@ describe("app Issue Connect adapter", () => {
       executionProposal: null,
       outcome: "accepted",
       resultRunId: runId,
-    } as never);
+    });
     const { client, flushBackgroundTasks } = createIssueClient({
       acceptActionProposal,
     });

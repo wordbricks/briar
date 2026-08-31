@@ -1,6 +1,12 @@
 import { issueAttachmentReferences } from "../../src/lib/issue-markdown";
 import { agentProviderLabels } from "../../src/lib/agent-provider";
+import * as Schema from "effect/Schema";
 import { agentSkillExecutionProposalJson } from "./agent-skill-execution-approval";
+import {
+  IssueCreateProposalPayload,
+  IssueUpdateProposalPayload,
+  issueUpdateChangeFields,
+} from "./issue-request-contract";
 import type {
   AgentSkillExecutionProposalRow,
   ChannelConversationNotificationRow,
@@ -12,6 +18,13 @@ import type {
   IssueMessageRow,
   IssueReworkProposalRow,
 } from "./db";
+
+const decodeStoredIssueCreateProposal = Schema.decodeUnknownSync(
+  IssueCreateProposalPayload,
+);
+const decodeStoredIssueUpdateProposal = Schema.decodeUnknownSync(
+  IssueUpdateProposalPayload,
+);
 
 export const issueAttachmentJson = (attachment: IssueAttachmentRow) => ({
   id: attachment.id,
@@ -32,30 +45,32 @@ export const issueReworkProposalJson = (proposal: IssueReworkProposalRow) => ({
 });
 
 export const issueActionProposalJson = (proposal: IssueActionProposalRow) => {
-  const payload = JSON.parse(proposal.payload_json) as Record<string, unknown>;
-  const result = {
+  const payload: unknown = JSON.parse(proposal.payload_json);
+  if (proposal.action_type === "request_issue_create") {
+    const action = decodeStoredIssueCreateProposal(payload);
+    return {
+      id: proposal.id,
+      type: proposal.action_type,
+      ...action,
+      executeAfterCreate: proposal.execute_after_create === 1,
+      status: proposal.status,
+      acceptedAt: proposal.accepted_at,
+      resultRunId: proposal.result_run_id,
+    };
+  }
+
+  const action = decodeStoredIssueUpdateProposal(payload);
+  return {
     id: proposal.id,
     type: proposal.action_type,
-    ...payload,
-  };
-  if (
-    proposal.action_type === "request_issue_update" && payload.changes &&
-    typeof payload.changes === "object" && !Array.isArray(payload.changes)
-  ) {
-    Object.assign(result, { changedFields: Object.keys(payload.changes) });
-  }
-  Object.assign(result, {
+    ...action,
+    changedFields: issueUpdateChangeFields.filter((field) =>
+      Object.hasOwn(action.changes, field)
+    ),
     status: proposal.status,
-  });
-  if (proposal.action_type === "request_issue_create") {
-    Object.assign(result, {
-      executeAfterCreate: proposal.execute_after_create === 1,
-    });
-  }
-  return Object.assign(result, {
     acceptedAt: proposal.accepted_at,
     resultRunId: proposal.result_run_id,
-  });
+  };
 };
 
 export const issueExecutionProposalJson = (

@@ -85,6 +85,7 @@ import * as Schema from "effect/Schema";
 import {
   IssueCreateProposalAction,
   IssueUpdateProposalAction,
+  issueUpdateChangeFields,
 } from "./issue-request-contract";
 import { ProjectAgentSessionInput } from "./project-request-contract";
 import { strictSchema } from "./schema-codecs";
@@ -625,7 +626,7 @@ const TrustedUpdateProposal = strictSchema(Schema.Struct({
   ...IssueUpdateProposalAction.fields,
   ...trustedProposalMetadata,
   changedFields: Schema.Array(
-    Schema.Literals(["title", "description", "priority"]),
+    Schema.Literals(issueUpdateChangeFields),
   ),
 }));
 
