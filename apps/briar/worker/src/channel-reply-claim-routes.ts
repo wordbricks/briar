@@ -1,5 +1,6 @@
 import { bindDmMemoryReplyClaim, excludeForgottenDmSources, supportsDmMemory } from "./dm-memory-claim";
 import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
+import { dmLearningPolicy, supportsDmMemoryLearningRequests } from "./dm-memory-learning-policy";
 import { decodeOrganizationAgentContextDescriptor } from "../../src/lib/organization-agent-context-contract";
 import { channelReplyContextMessageJson } from "../../src/lib/channels-contract";
 import { agentReplyDisplayParentMessageId } from "../../src/lib/issue-reply-decision";
@@ -403,6 +404,9 @@ export async function claimNextChannelReplyWork(
         activity,
         handoffContext: memoryBinding ? null : handoffContext,
         memory: memoryBinding?.memory ?? null,
+        ...(supportsDmMemoryLearningRequests(binding.capabilities_json) ? {
+          memoryLearning: { enabled: memoryBinding !== null && dmLearningPolicy(env, job.organization_id) !== null },
+        } : {}),
         session: {
           id: job.channel_reply_session.id,
           threadId: job.channel_reply_session.thread_root_message_id,

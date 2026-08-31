@@ -2,6 +2,8 @@ import { flushDmMemoryActivityRevocations } from "./dm-memory-activity-revocatio
 import { cleanupAbandonedReplyLookups } from "./channel-reply-lookup-budget";
 import * as Schema from "effect/Schema";
 import { expireDmMemories } from "./dm-memory-access";
+import { maintainDmMemoryLearning } from "./dm-memory-learning-maintenance";
+import { dmLearningCapacityTable } from "./dm-memory-capacity";
 import { chunkDmMemory, dmMemoryEmbeddingPrefix, dmMemoryEmbeddingProfile, dmMemorySplitterProfile, memoryUtf8Slice } from "./dm-memory-chunks";
 import { DmMemoryIndexError, dmMemoryVectorStore, type DmMemoryVectorStore } from "./dm-memory-vector-store";
 import { sha256 } from "./crypto-digest";
@@ -262,16 +264,19 @@ export async function reconcileDmMemory(db: D1Database, store: DmMemoryVectorSto
 }
 
 async function finishMemoryPurges(db: D1Database, now: string) {
+  const derived = await dmLearningCapacityTable(db) === "briar_dm_memory_jobs"
+    ? "or vector.document_id in (select document_id from briar_dm_memory_purge_documents where root_document_id = job.document_id)" : "";
   await db.prepare(`update briar_dm_memory_jobs set status = 'succeeded', stage = 'purged', updated_at = ?
     where id in (select job.id from briar_dm_memory_jobs job
       where job.kind = 'delete' and job.status not in ('succeeded', 'cancelled')
         and not exists (select 1 from briar_dm_memory_vectors vector
-          where vector.document_id = job.document_id and vector.state <> 'purged')
+          where (vector.document_id = job.document_id ${derived}) and vector.state <> 'purged')
       order by job.available_at, job.id limit 100)`)
     .bind(now).run();
 }
 
 export async function runDmMemoryMaintenance(env: Env, observedAt: string) {
+  await maintainDmMemoryLearning(env.DB, observedAt);
   let store: DmMemoryVectorStore | null = null;
   try { store = dmMemoryVectorStore(env.DM_MEMORY_AI, env.DM_MEMORY_INDEX); }
   catch { /* Revocation and expiry cleanup must run even without a vector binding. */ }

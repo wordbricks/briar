@@ -1,4 +1,6 @@
 import { dmMemoryCapability } from "../src/lib/dm-memory-query-contract";
+import { decodeClaimedDmMemory } from "../src/lib/dm-memory-learning-contract";
+import { releaseClaimedDmMemory, renewClaimedDmMemory, runClaimedDmMemory } from "./dm-memory-learning";
 import { spawn } from "node:child_process";
 import { platform } from "node:os";
 import { join } from "node:path";
@@ -433,7 +435,10 @@ async function workerCommand() {
               protocol: 1,
             },
             organizationAgentContext: organizationAgentContextCapability,
-            dmMemory: dmMemoryCapability,
+            dmMemory: { ...dmMemoryCapability, learningRequests: 1 },
+            ...(config.openrouterApiKey?.trim()
+              ? { dmMemoryLearning: { protocol: 1, transport: "openrouter" } }
+              : {}),
           },
         }),
       },
@@ -497,6 +502,8 @@ async function workerCommand() {
           : undefined;
         const work = workType === "mergeBatch"
           ? decodeClaimedMergeBatch(claim.work)
+          : workType === "dmMemory"
+          ? decodeClaimedDmMemory(claim.work)
           : workType === "issueReply"
           ? decodeClaimedIssueReply(claim.work)
           : workType === "projectAgentTask"
@@ -517,6 +524,10 @@ async function workerCommand() {
         return { work };
       },
       renewLease: async (issue) => {
+        if (issue.workType === "dmMemory") {
+          await renewClaimedDmMemory({ apiUrl: config.apiUrl, workerToken, claim: decodeClaimedDmMemory(issue) });
+          return;
+        }
         if (issue.workType === "mergeBatch") {
           await renewMergeBatchClaim(
             mergeBatchApi,
@@ -740,7 +751,10 @@ async function workerCommand() {
                   protocol: 1,
                 },
                 organizationAgentContext: organizationAgentContextCapability,
-                dmMemory: dmMemoryCapability,
+                dmMemory: { ...dmMemoryCapability, learningRequests: 1 },
+                ...(config.openrouterApiKey?.trim()
+                  ? { dmMemoryLearning: { protocol: 1, transport: "openrouter" } }
+                  : {}),
                 workflowRequirements: requirementHealth.map((item) => ({
                   id: item.id,
                   healthy: item.healthy,
@@ -821,7 +835,10 @@ async function workerCommand() {
                         protocol: 1,
                       },
                       organizationAgentContext: organizationAgentContextCapability,
-                      dmMemory: dmMemoryCapability,
+                      dmMemory: { ...dmMemoryCapability, learningRequests: 1 },
+                      ...(config.openrouterApiKey?.trim()
+                        ? { dmMemoryLearning: { protocol: 1, transport: "openrouter" } }
+                        : {}),
                       workflowRequirements: refreshedHealth.map((item) => ({
                         id: item.id,
                         healthy: item.healthy,
@@ -843,6 +860,10 @@ async function workerCommand() {
         });
       },
       handoff: async (issue, requestId, checkpoint) => {
+        if (issue.workType === "dmMemory") {
+          await releaseClaimedDmMemory({ apiUrl: config.apiUrl, workerToken, claim: decodeClaimedDmMemory(issue) });
+          return;
+        }
         if (issue.workType === "mergeBatch") {
           try {
             await releaseMergeBatchClaim(
@@ -884,6 +905,11 @@ async function workerCommand() {
         );
       },
       runIssue: async (issue, signal, reportCheckpoint) => {
+        if (issue.workType === "dmMemory") {
+          await runClaimedDmMemory({ apiUrl: config.apiUrl, workerToken, claim: decodeClaimedDmMemory(issue),
+            apiKey: config.openrouterApiKey ?? null, signal });
+          return;
+        }
         if (issue.workType === "mergeBatch") {
           await executeClaimedMergeBatch({
             claim: decodeClaimedMergeBatch(issue),

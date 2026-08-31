@@ -1,4 +1,5 @@
 import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
+import { dmLearningPolicy, supportsDmMemoryLearningRequests } from "./dm-memory-learning-policy";
 import type { AgentProvider } from "../../src/lib/agent-provider";
 import { channelReplyClaimTokenHeader } from "../../src/lib/channels-contract";
 import { hydrateAgentSkills } from "./agent-skills";
@@ -43,7 +44,7 @@ import {
   scheduleChannelActivityClear,
   scheduleChannelRealtimePublish,
 } from "./realtime-scheduling";
-import { leaseExpiryFrom } from "./workers";
+import { executionWorkerBindingById, leaseExpiryFrom } from "./workers";
 import { requireWorkerOrganization } from "./worker-route-auth";
 
 export type ChannelReplyResultRouteInput = {
@@ -253,6 +254,14 @@ export async function handleChannelReplyResultRoute(
     );
     if (!agent) throw new HttpError(409, "Reply job lost its Agent");
     const result = input.result!;
+    if (result.memorySaveRequest) {
+      const binding = await executionWorkerBindingById(db, principal.deviceId, input.workerId);
+      if (!binding || !supportsDmMemoryLearningRequests(binding.capabilities_json) ||
+        !dmLearningPolicy(env, job.organization_id) || !await db.prepare(`select 1 from briar_dm_memory_reply_fences
+          where job_id = ? and claim_token_hash = ? and protocol = 1`).bind(job.id, claimTokenHash).first()) {
+        throw new HttpError(409, "Memory learning is unavailable", "memory_learning_unavailable");
+      }
+    }
     if (
       (result.executionProposal || result.issueProposal?.executeAfterCreate) &&
       !(await channelExecutionProposalTablesAvailable(db))
@@ -446,6 +455,7 @@ export async function handleChannelReplyResultRoute(
         claimTokenHash,
         body: result.body,
         memoryCitations: result.memoryCitations,
+        memorySaveRequest: result.memorySaveRequest,
         document,
         issueProposal,
         issueBatchProposal,

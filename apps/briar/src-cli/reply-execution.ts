@@ -860,6 +860,7 @@ async function runClaimedChannelReply(
       },
       workspaceAvailable: Boolean(analysisWorktree),
       organizationContextAvailable: organizationContext !== null,
+      memoryLearningAvailable: reply.memoryLearning?.enabled === true,
       delegationTargets: reply.delegationTargets,
       delegation: reply.delegation,
       skillExecutionTarget: reply.skillExecutionTarget,
@@ -979,6 +980,14 @@ async function runClaimedChannelReply(
       if (contextRequests === null || contextRequests === undefined) {
         const parsedResult = parseChannelReplyAgentResult(parsed);
         result = parsedResult.result;
+        if (result.memorySaveRequest && reply.memoryLearning?.enabled !== true) {
+          throw new Error("memory_learning_unavailable");
+        }
+        // Old servers use a strict reply decoder and have no learning-request field.
+        if (!reply.memoryLearning) {
+          const { memorySaveRequest: _request, ...compatible } = result;
+          result = compatible;
+        }
         attachmentPaths = parsedResult.attachmentPaths;
         break;
       }
@@ -995,7 +1004,8 @@ async function runClaimedChannelReply(
         parsedRecord.executionProposal !== null ||
         parsedRecord.skillExecutionProposal !== null ||
         parsedRecord.delegation !== null ||
-        (parsedRecord.memoryCitations !== null && parsedRecord.memoryCitations !== undefined)
+        (parsedRecord.memoryCitations !== null && parsedRecord.memoryCitations !== undefined) ||
+        (parsedRecord.memorySaveRequest !== null && parsedRecord.memorySaveRequest !== undefined)
       ) {
         throw new Error(
           "Organization context lookup cannot include a channel reply or proposal",

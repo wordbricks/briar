@@ -630,6 +630,7 @@ const ClaimedChannelReplyInput = Schema.Struct({
   leaseExpiresAt: IsoDateTimeWithOffset,
   activity: defaulted(Schema.NullOr(ChannelActivityCredential), null),
   memory: defaulted(Schema.NullOr(dmMemoryDescriptorSchema), null),
+  memoryLearning: Schema.optional(Schema.Struct({ enabled: Schema.Boolean })),
   organizationContext: Schema.optional(
     Schema.NullOr(OrganizationAgentContextDescriptor),
   ),

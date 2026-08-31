@@ -1,3 +1,4 @@
+import { dmLearningCapacityTable } from "./dm-memory-capacity";
 import type { AgentProvider } from "../../src/lib/agent-provider";
 import { getAgentSkill } from "./agent-skills";
 import type { BriarAuth } from "./auth";
@@ -136,9 +137,13 @@ export async function handleProjectAgentTaskRoute(
          (select count(*)
           from briar_project_agent_task_jobs task
           where task.claimed_worker_id = ? and task.status = 'running'
-            and task.lease_expires_at > ?) as count`,
+            and task.lease_expires_at > ?)
+         + (select count(*) from ${await dmLearningCapacityTable(db)} learning
+            where learning.claimed_worker_id = ? and learning.status = 'running'
+              and learning.kind in ('extract', 'explicit_request', 'consolidate')
+              and learning.lease_expires_at > ?) as count`,
     )
-    .bind(worker.id, observedAt, worker.id, observedAt)
+    .bind(worker.id, observedAt, worker.id, observedAt, worker.id, observedAt)
     .first<{ count: number }>();
   if ((active?.count ?? 0) >= worker.max_concurrent_sessions) {
     throw new HttpError(409, "Worker has no available execution slot");

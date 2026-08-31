@@ -3,6 +3,7 @@ import {
   dmMemoryCreateInput,
   dmMemoryEditInput,
   dmMemorySettingsInput,
+  dmMemoryLearningRetryInput,
 } from "../../src/lib/dm-memory-contract";
 import type { BriarAuth } from "./auth";
 import { requireChannelAccess } from "./channel-route-access";
@@ -23,6 +24,9 @@ import { readJson } from "./request-readers";
 import { decodeRequestSync } from "./request-schema";
 import { requireSession } from "./session-auth";
 import { UuidString } from "./schema-codecs";
+import { dmLearningPolicy } from "./dm-memory-learning-policy";
+import { readDmLearningStatus } from "./dm-memory-learning-status";
+import { retryDmLearningJob } from "./dm-memory-learning-retry";
 
 const decodeCreate = decodeRequestSync(dmMemoryCreateInput);
 const decodeEdit = decodeRequestSync(dmMemoryEditInput);
@@ -34,7 +38,7 @@ export async function handleDmMemoryRoute(input: {
 }): Promise<Response | undefined> {
   const { request, url, auth, db } = input;
   const match = url.pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/memory(?:\/(settings|export|documents)(?:\/([0-9a-f-]+)(?:\/(revisions))?)?)?$/u,
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/memory(?:\/(settings|export|documents|jobs)(?:\/([0-9a-f-]+)(?:\/(revisions|retry))?)?)?$/u,
   );
   if (!match) return undefined;
   const session = await requireSession(auth, request);
@@ -53,10 +57,18 @@ export async function handleDmMemoryRoute(input: {
   const cursor = cursorParam === null || match[5] ? undefined : decodeId(cursorParam);
   const resource = match[3];
   const documentId = match[4] === undefined ? undefined : decodeId(match[4]);
+  if (resource === "jobs" && documentId && match[5] === "retry" && request.method === "POST") {
+    return privateNoStoreJson(await retryDmLearningJob(db, owner, documentId,
+      decodeRequestSync(dmMemoryLearningRetryInput)(await readJson(request, 4096)),
+      dmLearningPolicy(input.env ?? {}, owner.organizationId)));
+  }
   if (!resource && request.method === "GET") {
     const page = await listDmMemories(db, owner, spaceId, cursor);
+    const policy = dmLearningPolicy(input.env ?? {}, owner.organizationId);
+    const learning = await readDmLearningStatus(db, owner, page.selectedSpaceId, policy);
     return privateNoStoreJson({ ...page, capabilities: { ...page.capabilities,
-      recall: String(input.env?.DM_MEMORY_RETRIEVAL_ENABLED) === "true" } });
+      recall: String(input.env?.DM_MEMORY_RETRIEVAL_ENABLED) === "true",
+      automaticLearning: learning?.configuration != null }, learning });
   }
   if (resource === "export" && !documentId && request.method === "GET") {
     const selected = spaceId ? spaces.find((space) => space.id === spaceId) : spaces[0];
@@ -65,11 +77,13 @@ export async function handleDmMemoryRoute(input: {
   }
   if (resource === "settings" && !documentId && request.method === "PATCH") {
     const body = decodeSettings(await readJson(request, 4096));
-    return privateNoStoreJson({ space: await updateDmMemorySettings(db, owner, body) });
+    return privateNoStoreJson({ space: await updateDmMemorySettings(db, owner, body,
+      { learningAvailable: dmLearningPolicy(input.env ?? {}, owner.organizationId) !== null }) });
   }
   if (resource === "documents" && documentId && request.method === "GET") {
-    if (match[5]) return privateNoStoreJson(await listDmMemoryRevisions(db, owner, documentId,
+    if (match[5] === "revisions") return privateNoStoreJson(await listDmMemoryRevisions(db, owner, documentId,
       cursorParam === null ? undefined : Number(revisionNumber(cursorParam))));
+    if (match[5]) throw new HttpError(405, "Method not allowed");
     const version = url.searchParams.get("version");
     return privateNoStoreJson({ document: await getDmMemory(db, owner, documentId,
       version === null ? undefined : Number(revisionNumber(version))) });
