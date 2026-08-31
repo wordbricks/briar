@@ -33,9 +33,13 @@ export function providerStructuredOutputContract<T, E, RE>(
     transformed.codec,
     strictSchemaOptions,
   );
+  const decodeJson = Schema.decodeUnknownSync(
+    Schema.fromJsonString(transformed.codec),
+    strictSchemaOptions,
+  );
   return {
     jsonSchema: transformed.jsonSchema,
     decode,
-    decodeJson: (text: string) => decode(JSON.parse(text) as unknown),
+    decodeJson,
   };
 }
