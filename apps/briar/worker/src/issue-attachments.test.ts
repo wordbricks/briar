@@ -18,6 +18,11 @@ import {
 } from "./issue-request-contract";
 import { uploadReservedFileApplication } from "./upload-application";
 import {
+  createIssueFromServerFilesApplication,
+  type ServerIssueCreateApplicationServices,
+} from "./server-issue-create-application";
+import { processUploadCleanupQueue } from "./upload-repository";
+import {
   createIsolatedTestDatabase,
   type IsolatedTestDatabase,
 } from "./test-helpers/d1";
@@ -359,5 +364,78 @@ describe("issue create and update attachment mutations", () => {
       `select request_id from briar_issue_update_mutation_receipts
        where request_id = ?`,
     ).bind(requestId).first()).toBeNull();
+  });
+
+  it("durably retries provider-upload cleanup after issue finalization fails", async () => {
+    const existingObjectKeys = new Set(objects.keys());
+    const finalizeFailure = new Error("forced D1 issue finalize failure");
+    const createIssue: ServerIssueCreateApplicationServices["createIssue"] = async () => {
+      throw finalizeFailure;
+    };
+
+    await expect(createIssueFromServerFilesApplication({
+      db,
+      attachmentsBucket: bucket,
+      signingSecret,
+      projectId,
+      userId: ownerId,
+      sourceKey: `provider-create:${crypto.randomUUID()}`,
+      request: {
+        title: "Provider issue",
+        status: "queued",
+        checkpoints: [],
+      },
+      files: [new File(["provider bytes"], "provider.png", {
+        type: "image/png",
+      })],
+      attribution: {
+        actor: "provider:test",
+        detail: "Provider-created issue",
+        context: { origin: "provider-test" },
+      },
+    }, { createIssue })).rejects.toBe(finalizeFailure);
+
+    const objectKey = [...objects.keys()].find(
+      (key) => !existingObjectKeys.has(key),
+    );
+    expect(objectKey).toBeDefined();
+    await expect(db.prepare(
+      `select attempts, generation from briar_upload_cleanup_queue
+       where object_key = ?`,
+    ).bind(objectKey).first()).resolves.toEqual({ attempts: 0, generation: 1 });
+    await expect(db.prepare(
+      `select upload_id from briar_uploads where object_key = ?`,
+    ).bind(objectKey).first()).resolves.toBeNull();
+
+    let targetAttempts = 0;
+    const deleteObject = vi.fn(async (key: string) => {
+      if (key === objectKey && targetAttempts++ === 0) {
+        throw new Error("temporary R2 failure");
+      }
+    });
+    const firstAttemptAt = new Date(Date.now() + 1_000).toISOString();
+    await expect(processUploadCleanupQueue(
+      db,
+      { delete: deleteObject },
+      firstAttemptAt,
+    )).resolves.toMatchObject({ failed: 1 });
+    await expect(db.prepare(
+      `select attempts, generation, last_error
+       from briar_upload_cleanup_queue where object_key = ?`,
+    ).bind(objectKey).first()).resolves.toEqual({
+      attempts: 1,
+      generation: 2,
+      last_error: "temporary R2 failure",
+    });
+
+    await expect(processUploadCleanupQueue(
+      db,
+      { delete: deleteObject },
+      new Date(Date.now() + 10_000).toISOString(),
+    )).resolves.toMatchObject({ deleted: 1 });
+    await expect(db.prepare(
+      `select object_key from briar_upload_cleanup_queue where object_key = ?`,
+    ).bind(objectKey).first()).resolves.toBeNull();
+    expect(deleteObject).toHaveBeenLastCalledWith(objectKey);
   });
 });

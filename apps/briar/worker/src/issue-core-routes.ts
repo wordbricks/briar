@@ -89,6 +89,13 @@ type CreateProjectIssueResult = {
   attachments: ReturnType<typeof issueAttachmentJson>[];
 };
 
+export type IssueCreateAttribution = {
+  sourceKey: string;
+  actor: string;
+  detail: string;
+  context: Readonly<Record<string, unknown>>;
+};
+
 type UpdateProjectIssueResult = {
   runId: string;
   title: string;
@@ -124,6 +131,7 @@ export async function createProjectIssue(
     request: unknown;
     clientIssueId: string;
     attachmentIds: readonly string[];
+    attribution?: IssueCreateAttribution;
   },
 ): Promise<CreateProjectIssueResult> {
   const project = await requireIssueProject(
@@ -141,7 +149,15 @@ export async function createProjectIssue(
     preferredModel: issue.preferredModel ?? null,
     preferredEffort: issue.preferredEffort ?? null,
   };
-  const sourceKey = `briar-issue:${input.clientIssueId}`;
+  const attribution = input.attribution ?? {
+    sourceKey: `briar-issue:${input.clientIssueId}`,
+    actor: "briar-app",
+    detail: canonicalIssue.status === "backlog"
+      ? "Briar 앱에서 생성된 이슈가 백로그에 추가되었습니다."
+      : "Briar 앱에서 생성된 이슈가 처리를 기다리고 있습니다.",
+    context: { origin: "briar-app" },
+  };
+  const sourceKey = attribution.sourceKey;
   const attachmentIds = validateAttachmentReferences(input.attachmentIds);
   const requestHash = await sha256(JSON.stringify({
     projectId: project.id,
@@ -150,6 +166,7 @@ export async function createProjectIssue(
     clientIssueId: input.clientIssueId,
     issue: canonicalIssue,
     attachmentIds,
+    attribution,
   }));
   const existingReceipt = await findIssueCreateMutationReceipt(
     input.db,
@@ -201,9 +218,6 @@ export async function createProjectIssue(
   if (!uploads) {
     throw new HttpError(409, "Issue attachments are unavailable or out of scope");
   }
-  const detail = canonicalIssue.status === "backlog"
-    ? "Briar 앱에서 생성된 이슈가 백로그에 추가되었습니다."
-    : "Briar 앱에서 생성된 이슈가 처리를 기다리고 있습니다.";
   const attachmentRows = uploads.map((upload) => ({
     id: upload.upload_id,
     run_id: input.clientIssueId,
@@ -235,10 +249,10 @@ export async function createProjectIssue(
       workflowStage: null,
       eventKey: `${sourceKey}:${canonicalIssue.status}:intake`,
       occurredAt: observedAt,
-      actor: "briar-app",
+      actor: attribution.actor,
       repository: (await getProjectSettings(input.db, project.id))
         ?.github_repository ?? project.name,
-      detail,
+      detail: attribution.detail,
       priority: canonicalIssue.priority,
       difficulty: canonicalIssue.difficulty,
       assigneeUserId: canonicalIssue.assigneeUserId,
@@ -257,7 +271,7 @@ export async function createProjectIssue(
       stagingQaDetail: null,
       productionQaDetail: null,
       context: {
-        origin: "briar-app",
+        ...attribution.context,
         issueId: input.clientIssueId,
         attachmentCount: uploads.length,
         fullAuto: canonicalIssue.fullAuto,

@@ -378,6 +378,38 @@ export function consumeUploadStatements(
   );
 }
 
+/**
+ * Relinquishes every unconsumed object in a prepared batch. The database
+ * trigger records each object in the durable cleanup queue before its upload
+ * row can be deleted, so a queue-write failure rolls back the whole D1 batch.
+ */
+export async function abandonUploadBatch(
+  db: D1Database,
+  batchRequestId: string,
+) {
+  const results = await db.batch([
+    db
+      .prepare(
+        `delete from briar_uploads
+         where batch_request_id = ? and consumed_at is null
+         returning upload_id`,
+      )
+      .bind(batchRequestId),
+    db
+      .prepare(
+        `delete from briar_upload_batches
+         where request_id = ?
+           and not exists (
+             select 1 from briar_uploads upload
+             where upload.batch_request_id = briar_upload_batches.request_id
+           )
+         returning request_id`,
+      )
+      .bind(batchRequestId),
+  ]);
+  return results[0]?.results.length ?? 0;
+}
+
 export async function enqueueExpiredUploadCleanup(db: D1Database, observedAt: string, limit = 100) {
   const uploads = await db
     .prepare(

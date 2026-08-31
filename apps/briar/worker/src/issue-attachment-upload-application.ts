@@ -43,6 +43,27 @@ const normalizedContentType = (value: string, filename: string) => {
 export function issueAttachmentUploadMetadata(
   attachments: readonly UploadFileMetadata[],
 ): UploadMetadata[] {
+  if (
+    attachments.some(
+      (attachment) => attachment.byteSize > BigInt(Number.MAX_SAFE_INTEGER),
+    )
+  ) {
+    throw new HttpError(400, "Issue attachment metadata is invalid");
+  }
+  return normalizedIssueAttachmentUploadMetadata(
+    attachments.map((attachment) => ({
+      clientId: attachment.clientId,
+      filename: attachment.filename,
+      contentType: attachment.contentType,
+      byteSize: Number(attachment.byteSize),
+      sha256: attachment.sha256,
+    })),
+  );
+}
+
+export function normalizedIssueAttachmentUploadMetadata(
+  attachments: readonly UploadMetadata[],
+): UploadMetadata[] {
   if (attachments.length === 0) {
     throw new HttpError(400, "At least one issue attachment is required");
   }
@@ -53,7 +74,7 @@ export function issueAttachmentUploadMetadata(
       !isIssueAttachmentReference(clientId) ||
       clientId.length > 128 ||
       attachment.sha256.byteLength !== 32 ||
-      attachment.byteSize > BigInt(Number.MAX_SAFE_INTEGER)
+      !Number.isSafeInteger(attachment.byteSize)
     ) {
       throw new HttpError(400, "Issue attachment metadata is invalid");
     }
@@ -61,7 +82,7 @@ export function issueAttachmentUploadMetadata(
       clientId,
       filename,
       contentType: normalizedContentType(attachment.contentType, filename),
-      byteSize: Number(attachment.byteSize),
+      byteSize: attachment.byteSize,
       sha256: attachment.sha256,
     };
   });
@@ -79,7 +100,7 @@ export function issueAttachmentUploadMetadata(
   return files;
 }
 
-type PrepareIssueAttachmentInput = {
+type PrepareIssueAttachmentContext = {
   db: D1Database;
   signingSecret: string;
   projectId: string;
@@ -87,13 +108,20 @@ type PrepareIssueAttachmentInput = {
   preparationRequestId: string;
   mutationId: string;
   runId: string | null;
-  attachments: readonly UploadFileMetadata[];
   observedAt?: string;
+};
+
+export type PrepareIssueAttachmentUploadsInput =
+  & PrepareIssueAttachmentContext
+  & { attachments: readonly UploadMetadata[] };
+
+type PrepareIssueAttachmentInput = PrepareIssueAttachmentContext & {
+  attachments: readonly UploadFileMetadata[];
 };
 
 async function prepareIssueAttachmentsApplication(
   purpose: IssueAttachmentUploadPurpose,
-  input: PrepareIssueAttachmentInput,
+  input: PrepareIssueAttachmentUploadsInput,
   overrides: Partial<IssueAttachmentUploadApplicationServices>,
 ) {
   const services = { ...applicationServices, ...overrides };
@@ -109,7 +137,7 @@ async function prepareIssueAttachmentsApplication(
   ) {
     throw new HttpError(404, "Run not found");
   }
-  const attachments = issueAttachmentUploadMetadata(input.attachments);
+  const attachments = normalizedIssueAttachmentUploadMetadata(input.attachments);
   const observedAt = input.observedAt ?? new Date().toISOString();
   const expiresAt = new Date(
     Date.parse(observedAt) + UPLOAD_CAPABILITY_MAX_TTL_MS,
@@ -161,6 +189,16 @@ export function prepareCreateIssueAttachmentsApplication(
   input: Omit<PrepareIssueAttachmentInput, "runId">,
   overrides: Partial<IssueAttachmentUploadApplicationServices> = {},
 ) {
+  return prepareCreateIssueAttachmentUploadsApplication({
+    ...input,
+    attachments: issueAttachmentUploadMetadata(input.attachments),
+  }, overrides);
+}
+
+export function prepareCreateIssueAttachmentUploadsApplication(
+  input: Omit<PrepareIssueAttachmentUploadsInput, "runId">,
+  overrides: Partial<IssueAttachmentUploadApplicationServices> = {},
+) {
   return prepareIssueAttachmentsApplication(
     "issue_create",
     { ...input, runId: null },
@@ -172,12 +210,18 @@ export function prepareUpdateIssueAttachmentsApplication(
   input: PrepareIssueAttachmentInput & { runId: string },
   overrides: Partial<IssueAttachmentUploadApplicationServices> = {},
 ) {
-  return prepareIssueAttachmentsApplication("issue_update", input, overrides);
+  return prepareIssueAttachmentsApplication("issue_update", {
+    ...input,
+    attachments: issueAttachmentUploadMetadata(input.attachments),
+  }, overrides);
 }
 
 export function prepareIssueMessageAttachmentsApplication(
   input: PrepareIssueAttachmentInput & { runId: string },
   overrides: Partial<IssueAttachmentUploadApplicationServices> = {},
 ) {
-  return prepareIssueAttachmentsApplication("issue_message", input, overrides);
+  return prepareIssueAttachmentsApplication("issue_message", {
+    ...input,
+    attachments: issueAttachmentUploadMetadata(input.attachments),
+  }, overrides);
 }
