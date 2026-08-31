@@ -92,7 +92,10 @@ import {
   listOrganizationChannels,
 } from "./organization-channel-routes";
 import { channelReplyWorkerAvailability } from "./workers";
-import { workerClaimRuntimeFixture } from "./test-helpers/worker-runtime";
+import {
+  workerClaimRuntimeFixture,
+  workerRuntimeProtoJsonFixture,
+} from "./test-helpers/worker-runtime";
 import { requireWorkerProjectBinding } from "./worker-route-auth";
 
 const organizationId = "a0000000-0000-4000-8000-000000000001";
@@ -203,13 +206,17 @@ describe("organization channels", () => {
       ),
       db.prepare(
         `insert into briar_execution_workers (
-           id, project_id, label, host_fingerprint, agent_provider, state,
+           id, project_id, label, host_fingerprint, runtime_proto_json, state,
            last_heartbeat_at, created_at, updated_at, device_id
-         ) values (?, ?, 'Other Worker', ?, 'claude', 'online', ?, ?, ?, ?)`,
+         ) values (?, ?, 'Other Worker', ?, ?, 'online', ?, ?, ?, ?)`,
       ).bind(
         otherWorkerId,
         otherProjectId,
         "c".repeat(64),
+        workerRuntimeProtoJsonFixture({
+          agentProvider: "claude",
+          providers: ["claude"],
+        }),
         at(0),
         at(0),
         at(0),
@@ -251,12 +258,24 @@ describe("organization channels", () => {
     await db
       .prepare(
         `insert into briar_execution_workers (
-           id, project_id, label, host_fingerprint, agent_provider, state,
+           id, project_id, label, host_fingerprint, runtime_proto_json, state,
            last_heartbeat_at, created_at, updated_at, device_id
-         ) values (?, ?, 'Worker', ?, 'claude', 'online', ?, ?, ?, ?)
+         ) values (?, ?, 'Worker', ?, ?, 'online', ?, ?, ?, ?)
          on conflict (id) do nothing`,
       )
-      .bind(boundWorkerId, projectId, "b".repeat(64), at(0), at(0), at(0), deviceId)
+      .bind(
+        boundWorkerId,
+        projectId,
+        "b".repeat(64),
+        workerRuntimeProtoJsonFixture({
+          agentProvider: "claude",
+          providers: ["claude"],
+        }),
+        at(0),
+        at(0),
+        at(0),
+        deviceId,
+      )
       .run();
   };
 
@@ -1340,12 +1359,12 @@ describe("organization channels", () => {
     const claimRequestedAt = new Date().toISOString();
     await db.prepare(
       `update briar_execution_workers
-       set capabilities_json = ?, last_heartbeat_at = ? where id = ?`,
+       set runtime_proto_json = ?, last_heartbeat_at = ? where id = ?`,
     ).bind(
       workerClaimRuntimeFixture({
-        agentProvider: "claude",
-        providers: ["claude"],
-      }).workerCapabilitiesJson,
+        agentProvider: "grok",
+        providers: ["grok"],
+      }).runtimeProtoJson,
       claimRequestedAt,
       otherWorkerId,
     ).run();
@@ -1530,9 +1549,6 @@ describe("organization channels", () => {
     // Organization work still requires the exact host binding to be enabled at
     // the atomic claim boundary.
     await db.prepare(
-      `update briar_execution_workers set capabilities_json = '{}' where id = ?`,
-    ).bind(otherWorkerId).run();
-    await db.prepare(
       `update briar_execution_workers set state = 'disabled' where id = ?`,
     ).bind(otherWorkerId).run();
     await expect(
@@ -1555,12 +1571,12 @@ describe("organization channels", () => {
     const claimRequestedAt = new Date().toISOString();
     await db.prepare(
       `update briar_execution_workers
-       set capabilities_json = ?, last_heartbeat_at = ? where id = ?`,
+       set runtime_proto_json = ?, last_heartbeat_at = ? where id = ?`,
     ).bind(
       workerClaimRuntimeFixture({
         agentProvider: "claude",
         providers: ["claude"],
-      }).workerCapabilitiesJson,
+      }).runtimeProtoJson,
       claimRequestedAt,
       otherWorkerId,
     ).run();
@@ -1918,10 +1934,11 @@ describe("organization channels", () => {
     });
     await db.prepare(
       `update briar_execution_workers
-       set capabilities_json = ?, last_heartbeat_at = ? where id = ?`,
+       set runtime_proto_json = ?, last_heartbeat_at = ? where id = ?`,
     ).bind(
-      JSON.stringify({
-        providerHealth: { claude: { healthy: true } },
+      workerRuntimeProtoJsonFixture({
+        agentProvider: "claude",
+        providers: ["claude"],
       }),
       at(72),
       otherWorkerId,
@@ -2301,7 +2318,7 @@ describe("organization channels", () => {
         },
       },
     });
-    const capabilities = claimRuntime.workerCapabilitiesJson;
+    const runtimeProtoJson = claimRuntime.runtimeProtoJson;
     // The preceding lease lifecycle test intentionally leaves its historical
     // job queued. Close that fixture so this test observes only its own job.
     await db.prepare(
@@ -2352,16 +2369,16 @@ describe("organization channels", () => {
       db.prepare(
         `insert into briar_execution_workers (
            id, project_id, device_id, label, host_fingerprint,
-           agent_provider, capabilities_json, state, accepting_work,
+           runtime_proto_json, state, accepting_work,
            readiness_state, last_heartbeat_at, created_at, updated_at
-         ) values (?, ?, ?, 'Fallback binding', ?, 'claude', ?, 'online', 1,
+         ) values (?, ?, ?, 'Fallback binding', ?, ?, 'online', 1,
                    'ready', ?, ?, ?)`,
       ).bind(
         fallbackWorkerId,
         projectId,
         fallbackDeviceId,
         "9".repeat(64),
-        capabilities,
+        runtimeProtoJson,
         observedAt,
         observedAt,
         observedAt,
@@ -2373,10 +2390,10 @@ describe("organization channels", () => {
       ).bind(observedAt, observedAt, deviceId),
       db.prepare(
         `update briar_execution_workers
-         set capabilities_json = ?, state = 'online', accepting_work = 1,
+         set runtime_proto_json = ?, state = 'online', accepting_work = 1,
              readiness_state = 'ready', last_heartbeat_at = ?, updated_at = ?
          where id = ?`,
-      ).bind(capabilities, observedAt, observedAt, boundWorkerId),
+      ).bind(runtimeProtoJson, observedAt, observedAt, boundWorkerId),
     ]);
     await addChannelAgent(db, {
       channelId,
@@ -2553,7 +2570,7 @@ describe("organization channels", () => {
         },
       },
     });
-    const capabilities = claimRuntime.workerCapabilitiesJson;
+    const runtimeProtoJson = claimRuntime.runtimeProtoJson;
     await db.prepare(
       `update briar_channel_agent_reply_jobs
        set status = 'failed', completed_at = ?, updated_at = ?
@@ -2579,20 +2596,20 @@ describe("organization channels", () => {
       db.prepare(
         `insert into briar_execution_workers (
            id, project_id, device_id, label, host_fingerprint,
-           agent_provider, capabilities_json, state, accepting_work,
+           runtime_proto_json, state, accepting_work,
            readiness_state, last_heartbeat_at, created_at, updated_at
-         ) values (?, ?, ?, 'Session owner Worker', ?, 'claude', ?,
+         ) values (?, ?, ?, 'Session owner Worker', ?, ?,
                    'online', 1, 'ready', ?, ?, ?)
          on conflict (id) do update set label = excluded.label,
            state = 'online', accepting_work = 1,
-           readiness_state = 'ready', capabilities_json = excluded.capabilities_json,
+           readiness_state = 'ready', runtime_proto_json = excluded.runtime_proto_json,
            last_heartbeat_at = excluded.last_heartbeat_at`,
       ).bind(
         boundWorkerId,
         projectId,
         deviceId,
         "5".repeat(64),
-        capabilities,
+        runtimeProtoJson,
         startedAt,
         startedAt,
         startedAt,
@@ -2605,19 +2622,19 @@ describe("organization channels", () => {
       db.prepare(
         `insert into briar_execution_workers (
            id, project_id, device_id, label, host_fingerprint,
-           agent_provider, capabilities_json, state, accepting_work,
+           runtime_proto_json, state, accepting_work,
            readiness_state, last_heartbeat_at, created_at, updated_at
-         ) values (?, ?, ?, 'Session fallback Worker', ?, 'claude', ?,
+         ) values (?, ?, ?, 'Session fallback Worker', ?, ?,
                    'online', 1, 'ready', ?, ?, ?)
          on conflict (id) do update set state = 'online', accepting_work = 1,
-           readiness_state = 'ready', capabilities_json = excluded.capabilities_json,
+           readiness_state = 'ready', runtime_proto_json = excluded.runtime_proto_json,
            last_heartbeat_at = excluded.last_heartbeat_at`,
       ).bind(
         fallbackWorkerId,
         projectId,
         fallbackDeviceId,
         "6".repeat(64),
-        capabilities,
+        runtimeProtoJson,
         startedAt,
         startedAt,
         startedAt,
@@ -2625,9 +2642,9 @@ describe("organization channels", () => {
       db.prepare(
         `update briar_execution_workers
          set state = 'online', accepting_work = 1, readiness_state = 'ready',
-             capabilities_json = ?, last_heartbeat_at = ?
+             runtime_proto_json = ?, last_heartbeat_at = ?
          where id in (?, ?)`,
-      ).bind(capabilities, startedAt, boundWorkerId, fallbackWorkerId),
+      ).bind(runtimeProtoJson, startedAt, boundWorkerId, fallbackWorkerId),
       db.prepare(
         `update briar_execution_worker_devices
          set state = 'online', last_heartbeat_at = ?
@@ -3164,7 +3181,7 @@ describe("organization channels", () => {
       agentProvider: "claude",
       providers: ["claude"],
     });
-    const capabilities = claimRuntime.workerCapabilitiesJson;
+    const runtimeProtoJson = claimRuntime.runtimeProtoJson;
     await createChannel(db, {
       id: channelId,
       organizationId,
@@ -3202,10 +3219,10 @@ describe("organization channels", () => {
       db.prepare(
         `update briar_execution_workers
          set state = 'online', accepting_work = 1, readiness_state = 'ready',
-             capabilities_json = ?, last_heartbeat_at = ?, updated_at = ?
+             runtime_proto_json = ?, last_heartbeat_at = ?, updated_at = ?
          where id = ?`,
       ).bind(
-        capabilities,
+        runtimeProtoJson,
         observedAt,
         observedAt,
         otherWorkerId,
@@ -3232,16 +3249,16 @@ describe("organization channels", () => {
       db.prepare(
         `insert into briar_execution_workers (
            id, project_id, device_id, label, host_fingerprint,
-           agent_provider, capabilities_json, state, accepting_work,
+           runtime_proto_json, state, accepting_work,
            readiness_state, last_heartbeat_at, created_at, updated_at
-         ) values (?, ?, ?, 'Organization fallback binding', ?, 'claude', ?,
+         ) values (?, ?, ?, 'Organization fallback binding', ?, ?,
                    'online', 1, 'ready', ?, ?, ?)`,
       ).bind(
         fallbackWorkerId,
         otherProjectId,
         fallbackDeviceId,
         "c1".repeat(32),
-        capabilities,
+        runtimeProtoJson,
         observedAt,
         observedAt,
         observedAt,
@@ -3502,7 +3519,7 @@ describe("organization channels", () => {
     expect(repeated.channel.id).toBe(createdBody.channel.id);
 
     const claimedAt = new Date().toISOString();
-    const { workerCapabilitiesJson } = workerClaimRuntimeFixture({
+    const { runtimeProtoJson } = workerClaimRuntimeFixture({
       agentProvider: "claude",
       providers: ["claude"],
     });
@@ -3515,10 +3532,10 @@ describe("organization channels", () => {
       db.prepare(
         `update briar_execution_workers
          set state = 'online', accepting_work = 1, readiness_state = 'busy',
-             capabilities_json = ?, last_heartbeat_at = ?, updated_at = ?
+             runtime_proto_json = ?, last_heartbeat_at = ?, updated_at = ?
          where id = ?`,
       ).bind(
-        workerCapabilitiesJson,
+        runtimeProtoJson,
         claimedAt,
         claimedAt,
         otherWorkerId,
@@ -3825,13 +3842,13 @@ describe("organization channels", () => {
       db.prepare(
         `update briar_execution_workers
          set state = 'online', accepting_work = 1, readiness_state = 'ready',
-             capabilities_json = ?, last_heartbeat_at = ?, updated_at = ?
+             runtime_proto_json = ?, last_heartbeat_at = ?, updated_at = ?
          where id = ?`,
       ).bind(
         workerClaimRuntimeFixture({
           agentProvider: "claude",
           providers: ["claude"],
-        }).workerCapabilitiesJson,
+        }).runtimeProtoJson,
         observedAt,
         observedAt,
         otherWorkerId,
@@ -4169,8 +4186,9 @@ describe("organization channels", () => {
     const fallbackDeviceId = "c0000000-0000-4000-8000-000000000098";
     const fallbackWorkerId = "d0000000-0000-4000-8000-000000000098";
     const observedAt = new Date().toISOString();
-    const capabilities = JSON.stringify({
-      providerHealth: { claude: { healthy: true } },
+    const runtimeProtoJson = workerRuntimeProtoJsonFixture({
+      agentProvider: "claude",
+      providers: ["claude"],
       providerCapabilities: {
         ...emptyAgentProviderCapabilityCatalog(),
         claude: {
@@ -4190,9 +4208,9 @@ describe("organization channels", () => {
       db.prepare(
         `update briar_execution_workers
          set label = 'Pinned Mac', state = 'disabled', accepting_work = 1,
-             readiness_state = 'ready', capabilities_json = ?,
+             readiness_state = 'ready', runtime_proto_json = ?,
              last_heartbeat_at = ? where id = ?`,
-      ).bind(capabilities, observedAt, boundWorkerId),
+      ).bind(runtimeProtoJson, observedAt, boundWorkerId),
       db.prepare(
         `insert into briar_execution_worker_devices (
            id, organization_id, owner_user_id, label, device_identity_hash,
@@ -4215,16 +4233,16 @@ describe("organization channels", () => {
       db.prepare(
         `insert into briar_execution_workers (
            id, project_id, device_id, label, host_fingerprint,
-           agent_provider, capabilities_json, state, accepting_work,
+           runtime_proto_json, state, accepting_work,
            readiness_state, last_heartbeat_at, created_at, updated_at
-         ) values (?, ?, ?, 'Eligible Mac', ?, 'claude', ?, 'online', 1,
+         ) values (?, ?, ?, 'Eligible Mac', ?, ?, 'online', 1,
                    'ready', ?, ?, ?)`,
       ).bind(
         fallbackWorkerId,
         projectId,
         fallbackDeviceId,
         sha256Hex(`${fallbackWorkerId}:host`),
-        capabilities,
+        runtimeProtoJson,
         observedAt,
         observedAt,
         observedAt,
@@ -4295,10 +4313,12 @@ describe("organization channels", () => {
       db.prepare(
         `update briar_execution_workers
          set state = 'online', accepting_work = 0,
-             readiness_state = 'needs_attention', capabilities_json = ?,
+             readiness_state = 'needs_attention', runtime_proto_json = ?,
              last_heartbeat_at = ?, updated_at = ? where id = ?`,
       ).bind(
-        JSON.stringify({
+        workerRuntimeProtoJsonFixture({
+          agentProvider: "grok",
+          providers: ["grok"],
           providerHealth: {
             grok: {
               installed: true,

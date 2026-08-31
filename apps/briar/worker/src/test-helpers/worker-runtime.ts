@@ -12,7 +12,8 @@ import { workerRuntimeMetadataFromProto } from "../worker-runtime-mappers";
 
 type WorkerRuntimeFixtureInput = {
   readonly agentProvider?: WorkerRuntimeInput["agentProvider"];
-  readonly providers?: WorkerRuntimeInput["providers"];
+  readonly providers?: ReadonlyArray<WorkerRuntimeInput["agentProvider"]>;
+  readonly providerHealth?: Partial<WorkerRuntimeInput["providerHealth"]>;
   readonly providerCapabilities?: AgentProviderCapabilityCatalog;
 };
 
@@ -31,12 +32,12 @@ export const workerRuntimeFixture = (
         reason: available.has(provider) ? null : "not_installed",
         usageExhausted: false,
         maxUsedPercent: null,
+        ...input.providerHealth?.[provider],
       },
     ]),
   ) as WorkerRuntimeInput["providerHealth"];
   return workerRuntimeToProto({
     agentProvider: input.agentProvider ?? "codex",
-    providers,
     providerHealth,
     providerCapabilities: input.providerCapabilities ??
       emptyAgentProviderCapabilityCatalog(),
@@ -47,17 +48,17 @@ export const workerRuntimeFixture = (
   });
 };
 
-export const workerCapabilitiesFixture = (
+export const workerRuntimeMetadataFixture = (
   input: WorkerRuntimeFixtureInput = {},
-) => workerRuntimeMetadataFromProto(workerRuntimeFixture(input)).capabilities;
+) => workerRuntimeMetadataFromProto(workerRuntimeFixture(input));
+
+export const workerRuntimeProtoJsonFixture = (
+  input: WorkerRuntimeFixtureInput = {},
+) => workerRuntimeMetadataFixture(input).runtimeProtoJson;
 
 export const workerClaimRuntimeFixture = (
   input: WorkerRuntimeFixtureInput = {},
 ) => {
-  const runtime = workerRuntimeMetadataFromProto(workerRuntimeFixture(input));
-  return {
-    providers: runtime.providers,
-    workerAgentProvider: runtime.agentProvider,
-    workerCapabilitiesJson: JSON.stringify(runtime.capabilities),
-  };
+  const runtime = workerRuntimeMetadataFixture(input);
+  return { runtime, runtimeProtoJson: runtime.runtimeProtoJson };
 };

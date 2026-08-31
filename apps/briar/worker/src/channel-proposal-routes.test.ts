@@ -1163,7 +1163,6 @@ describe("channel issue proposal approval route", () => {
       leaseExpiresAt: leaseExpiryFrom("2026-08-10T00:02:30.000Z"),
       runId: acceptedBody.resultRunId,
       workerId: sourceWorker.worker.id,
-      agentProvider: "codex",
     })).resolves.toBeNull();
 
     await dispatchHuntRun(db, organizationId, projectAId, {
@@ -1211,7 +1210,6 @@ describe("channel issue proposal approval route", () => {
       claimedAt: "2026-08-10T00:03:00.000Z",
       leaseExpiresAt: leaseExpiryFrom("2026-08-10T00:03:00.000Z"),
       runId: acceptedBody.resultRunId,
-      agentProvider: "codex",
     })).resolves.toBeNull();
   });
 
@@ -1481,7 +1479,6 @@ describe("channel issue proposal approval route", () => {
       leaseExpiresAt: leaseExpiryFrom("2026-08-10T00:08:30.000Z"),
       runId: acceptedBody.resultRunId,
       workerId: targetWorker.worker.id,
-      agentProvider: "codex",
       detachedOnly: false,
     })).resolves.toBeNull();
 
@@ -1504,7 +1501,6 @@ describe("channel issue proposal approval route", () => {
       leaseExpiresAt: leaseExpiryFrom("2026-08-10T00:09:30.000Z"),
       runId: acceptedBody.resultRunId,
       workerId: targetWorker.worker.id,
-      agentProvider: "codex",
       detachedOnly: true,
     })).resolves.toMatchObject({ id: acceptedBody.resultRunId });
   });
@@ -1546,7 +1542,6 @@ describe("channel issue proposal approval route", () => {
         leaseExpiresAt: leaseExpiryFrom("2026-08-10T00:11:00.000Z"),
         runId: acceptedBody.resultRunId,
         workerId: sourceWorker.worker.id,
-        agentProvider: "codex",
         detachedOnly: true,
       });
       expect(claimed).not.toBeNull();
@@ -1656,7 +1651,6 @@ describe("channel issue proposal approval route", () => {
         leaseExpiresAt: leaseExpiryFrom("2026-08-10T00:12:30.000Z"),
         runId: acceptedBody.resultRunId,
         workerId: targetWorker.worker.id,
-        agentProvider: "codex",
         detachedOnly: false,
       })).resolves.toBeNull();
 
@@ -1679,7 +1673,6 @@ describe("channel issue proposal approval route", () => {
         leaseExpiresAt: leaseExpiryFrom("2026-08-10T00:13:30.000Z"),
         runId: acceptedBody.resultRunId,
         workerId: targetWorker.worker.id,
-        agentProvider: "codex",
         detachedOnly: true,
       })).resolves.toMatchObject({ id: acceptedBody.resultRunId });
     },

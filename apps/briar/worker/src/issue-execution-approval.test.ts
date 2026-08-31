@@ -820,7 +820,6 @@ describe("conversational issue execution approval", () => {
       leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
       runId,
       workerId: "execution-any-worker",
-      agentProvider: "codex",
       detachedOnly: true,
     })).rejects.toThrow("conversational execution approval audit is missing");
     await expect(unassignHuntRun(db, organizationId, projectAId, {
@@ -1509,7 +1508,6 @@ describe("conversational issue execution approval", () => {
       leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
       runId: agentApproval.runId,
       workerId: "execution-any-worker",
-      agentProvider: "codex",
       detachedOnly: true,
     })).resolves.toMatchObject({ id: agentApproval.runId });
     await db.prepare(`delete from briar_project_agents where id = ?`)
@@ -1557,7 +1555,6 @@ describe("conversational issue execution approval", () => {
       leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
       runId: workerApproval.runId,
       workerId: selectedWorkerId,
-      agentProvider: "codex",
       detachedOnly: true,
     })).resolves.toMatchObject({ id: workerApproval.runId });
     await db.prepare(`delete from briar_execution_workers where id = ?`)
@@ -1625,7 +1622,6 @@ describe("conversational issue execution approval", () => {
       leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
       runId: memberApproval.runId,
       workerId: "execution-any-worker",
-      agentProvider: "codex",
       detachedOnly: true,
     })).resolves.toMatchObject({ id: memberApproval.runId });
     await db.prepare(`delete from "user" where id = ?`).bind(approverId).run();

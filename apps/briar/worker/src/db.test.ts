@@ -1543,7 +1543,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       await expect(
         claimNextProjectAgentTask(db, projectId, {
           workerId: other.worker.id,
-          agentProviders: ["codex"],
           claimTokenHash,
           claimedAt: atMinute(12),
           leaseExpiresAt: atMinute(14),
@@ -1552,7 +1551,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
       const claimed = await claimNextProjectAgentTask(db, projectId, {
         workerId: selected.worker.id,
-        agentProviders: ["codex"],
         claimTokenHash,
         claimedAt: atMinute(12),
         leaseExpiresAt: atMinute(14),

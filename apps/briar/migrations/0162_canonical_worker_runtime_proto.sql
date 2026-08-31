@@ -296,22 +296,25 @@ where json_extract(health.value, '$.healthy') = 1
     'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER'
   );
 
-create trigger briar_execution_worker_runtime_insert_guard
-before insert on briar_execution_workers
-when not (
-  json_valid(new.runtime_proto_json)
-  and json_type(new.runtime_proto_json) = 'object'
-  and length(cast(new.runtime_proto_json as blob)) <= 1048576
-  and json_extract(new.runtime_proto_json, '$.agentProvider') in (
+-- This view centralizes the subset of the generated contract on which SQL
+-- scheduling depends. Full message validation remains at the Connect ingress.
+create view briar_invalid_execution_worker_runtime as
+select worker.id
+from briar_execution_workers worker
+where not (
+  json_valid(worker.runtime_proto_json)
+  and json_type(worker.runtime_proto_json) = 'object'
+  and length(cast(worker.runtime_proto_json as blob)) <= 1048576
+  and json_extract(worker.runtime_proto_json, '$.agentProvider') in (
     'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
     'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
     'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER'
   )
-  and json_type(new.runtime_proto_json, '$.providerHealth') = 'array'
-  and json_array_length(new.runtime_proto_json, '$.providerHealth') = 7
+  and json_type(worker.runtime_proto_json, '$.providerHealth') = 'array'
+  and json_array_length(worker.runtime_proto_json, '$.providerHealth') = 7
   and (
     select count(distinct json_extract(health.value, '$.provider'))
-    from json_each(new.runtime_proto_json, '$.providerHealth') health
+    from json_each(worker.runtime_proto_json, '$.providerHealth') health
     where health.type = 'object'
       and json_extract(health.value, '$.provider') in (
         'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
@@ -319,17 +322,17 @@ when not (
         'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER'
       )
   ) = 7
-  and json_type(new.runtime_proto_json, '$.capabilities') = 'object'
+  and json_type(worker.runtime_proto_json, '$.capabilities') = 'object'
   and json_type(
-    new.runtime_proto_json, '$.capabilities.providerCapabilities'
+    worker.runtime_proto_json, '$.capabilities.providerCapabilities'
   ) = 'array'
   and json_array_length(
-    new.runtime_proto_json, '$.capabilities.providerCapabilities'
+    worker.runtime_proto_json, '$.capabilities.providerCapabilities'
   ) = 7
   and (
     select count(distinct json_extract(capability.value, '$.provider'))
     from json_each(
-      new.runtime_proto_json, '$.capabilities.providerCapabilities'
+      worker.runtime_proto_json, '$.capabilities.providerCapabilities'
     ) capability
     where capability.type = 'object'
       and json_extract(capability.value, '$.provider') in (
@@ -339,9 +342,16 @@ when not (
       )
   ) = 7
   and (
-    json_type(new.runtime_proto_json, '$.versions') is null
-    or json_type(new.runtime_proto_json, '$.versions') = 'object'
+    json_type(worker.runtime_proto_json, '$.versions') is null
+    or json_type(worker.runtime_proto_json, '$.versions') = 'object'
   )
+);
+
+create trigger briar_execution_worker_runtime_insert_guard
+after insert on briar_execution_workers
+when exists (
+  select 1 from briar_invalid_execution_worker_runtime invalid
+  where invalid.id = new.id
 )
 begin
   select raise(abort, 'Worker runtime ProtoJSON is invalid');
@@ -690,51 +700,10 @@ end;
 
 
 create trigger briar_execution_worker_runtime_update_guard
-before update of runtime_proto_json on briar_execution_workers
-when not (
-  json_valid(new.runtime_proto_json)
-  and json_type(new.runtime_proto_json) = 'object'
-  and length(cast(new.runtime_proto_json as blob)) <= 1048576
-  and json_extract(new.runtime_proto_json, '$.agentProvider') in (
-    'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
-    'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-    'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER'
-  )
-  and json_type(new.runtime_proto_json, '$.providerHealth') = 'array'
-  and json_array_length(new.runtime_proto_json, '$.providerHealth') = 7
-  and (
-    select count(distinct json_extract(health.value, '$.provider'))
-    from json_each(new.runtime_proto_json, '$.providerHealth') health
-    where health.type = 'object'
-      and json_extract(health.value, '$.provider') in (
-        'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
-        'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-        'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER'
-      )
-  ) = 7
-  and json_type(new.runtime_proto_json, '$.capabilities') = 'object'
-  and json_type(
-    new.runtime_proto_json, '$.capabilities.providerCapabilities'
-  ) = 'array'
-  and json_array_length(
-    new.runtime_proto_json, '$.capabilities.providerCapabilities'
-  ) = 7
-  and (
-    select count(distinct json_extract(capability.value, '$.provider'))
-    from json_each(
-      new.runtime_proto_json, '$.capabilities.providerCapabilities'
-    ) capability
-    where capability.type = 'object'
-      and json_extract(capability.value, '$.provider') in (
-        'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
-        'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-        'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER'
-      )
-  ) = 7
-  and (
-    json_type(new.runtime_proto_json, '$.versions') is null
-    or json_type(new.runtime_proto_json, '$.versions') = 'object'
-  )
+after update of runtime_proto_json on briar_execution_workers
+when exists (
+  select 1 from briar_invalid_execution_worker_runtime invalid
+  where invalid.id = new.id
 )
 begin
   select raise(abort, 'Worker runtime ProtoJSON is invalid');

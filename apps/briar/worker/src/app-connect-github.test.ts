@@ -26,6 +26,7 @@ import {
 } from "./db";
 import { githubSha256Hex } from "./github";
 import worker from "./index";
+import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
 
 const installOrganizationId = "11111111-1111-4111-8111-111111111111";
 const projectOrganizationId = "22222222-2222-4222-8222-222222222222";
@@ -188,13 +189,14 @@ describe("GitHub Connect services", () => {
       ).bind(deviceId, await sha256(workerToken), observedAt),
       db.prepare(
         `insert into briar_execution_workers (
-           id, project_id, label, host_fingerprint, agent_provider, state,
+           id, project_id, label, host_fingerprint, runtime_proto_json, state,
            last_heartbeat_at, created_at, updated_at, device_id
-         ) values (?, ?, 'GitHub Worker', ?, 'codex', 'online', ?, ?, ?, ?)`,
+         ) values (?, ?, 'GitHub Worker', ?, ?, 'online', ?, ?, ?, ?)`,
       ).bind(
         workerId,
         projectId,
         "b".repeat(64),
+        workerRuntimeProtoJsonFixture(),
         observedAt,
         observedAt,
         observedAt,

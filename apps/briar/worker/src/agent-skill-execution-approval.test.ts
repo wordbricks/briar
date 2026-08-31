@@ -430,7 +430,6 @@ describe("conversational Agent Skill execution approval", () => {
     const claimed = await claimNextIssueAgentReply(db, projectId, {
       workerId,
       agentProvider: "codex",
-      agentProviders: ["codex"],
       claimTokenHash: claimHash,
       claimedAt,
       leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
@@ -671,7 +670,6 @@ describe("conversational Agent Skill execution approval", () => {
 
     const wrongWorkerClaim = await claimNextProjectAgentTask(db, projectId, {
       workerId: otherWorkerId,
-      agentProviders: ["codex"],
       claimTokenHash: sha256("wrong-worker-claim"),
       claimedAt: new Date().toISOString(),
       leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
@@ -694,7 +692,6 @@ describe("conversational Agent Skill execution approval", () => {
     const claimHash = sha256(claimToken);
     const claimed = await claimNextProjectAgentTask(db, projectId, {
       workerId,
-      agentProviders: ["codex"],
       claimTokenHash: claimHash,
       claimedAt: new Date().toISOString(),
       leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
@@ -919,7 +916,6 @@ describe("conversational Agent Skill execution approval", () => {
     const taskClaimHash = sha256(taskClaimToken);
     const task = await claimNextProjectAgentTask(db, projectId, {
       workerId,
-      agentProviders: ["codex"],
       claimTokenHash: taskClaimHash,
       claimedAt: new Date().toISOString(),
       leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
@@ -959,7 +955,6 @@ describe("conversational Agent Skill execution approval", () => {
     const claimToken = "briar_agent_task_claim_invoke_is_consent";
     expect(await claimNextProjectAgentTask(db, projectId, {
       workerId,
-      agentProviders: ["codex"],
       claimTokenHash: sha256(claimToken),
       claimedAt: new Date().toISOString(),
       leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
@@ -1220,7 +1215,6 @@ describe("conversational Agent Skill execution approval", () => {
     const claimToken = "briar_agent_task_claim_retryable_receipt";
     expect(await claimNextProjectAgentTask(db, projectId, {
       workerId,
-      agentProviders: ["codex"],
       claimTokenHash: sha256(claimToken),
       claimedAt: new Date().toISOString(),
       leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
@@ -1254,7 +1248,6 @@ describe("conversational Agent Skill execution approval", () => {
     const successToken = "briar_agent_task_claim_retryable_receipt_success";
     expect(await claimNextProjectAgentTask(db, projectId, {
       workerId,
-      agentProviders: ["codex"],
       claimTokenHash: sha256(successToken),
       claimedAt: new Date().toISOString(),
       leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
@@ -1532,7 +1525,6 @@ describe("conversational Agent Skill execution approval", () => {
       const claimHash = sha256(claimToken);
       const claimed = await claimNextProjectAgentTask(db, projectId, {
         workerId,
-        agentProviders: ["codex"],
         claimTokenHash: claimHash,
         claimedAt: new Date().toISOString(),
         leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
@@ -1586,7 +1578,6 @@ describe("conversational Agent Skill execution approval", () => {
     const reapHash = sha256("reap-claim");
     expect(await claimNextProjectAgentTask(db, projectId, {
       workerId,
-      agentProviders: ["codex"],
       claimTokenHash: reapHash,
       claimedAt: new Date(Date.now() - 120_000).toISOString(),
       leaseExpiresAt: new Date(Date.now() - 60_000).toISOString(),

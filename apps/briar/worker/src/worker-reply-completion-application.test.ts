@@ -162,10 +162,19 @@ describe("reply completion application", () => {
       ),
       db.prepare(
         `insert into briar_execution_workers (
-           id, project_id, label, host_fingerprint, agent_provider, state,
+           id, project_id, label, host_fingerprint, runtime_proto_json, state,
            last_heartbeat_at, created_at, updated_at, device_id
-         ) values (?, ?, 'Reply Worker', ?, 'codex', 'online', ?, ?, ?, ?)`,
-      ).bind(workerId, projectId, "c".repeat(64), at(0), at(0), at(0), deviceId),
+         ) values (?, ?, 'Reply Worker', ?, ?, 'online', ?, ?, ?, ?)`,
+      ).bind(
+        workerId,
+        projectId,
+        "c".repeat(64),
+        workerClaimRuntimeFixture().runtimeProtoJson,
+        at(0),
+        at(0),
+        at(0),
+        deviceId,
+      ),
     ]);
     agentId = (await createProjectAgent(db, projectId, {
       name: "Reply Agent",
@@ -177,11 +186,11 @@ describe("reply completion application", () => {
     })).id;
     await db.prepare(
       `update briar_execution_workers
-       set capabilities_json = ?, accepting_work = 1,
+       set runtime_proto_json = ?, accepting_work = 1,
            readiness_state = 'ready', last_heartbeat_at = ?, updated_at = ?
        where id = ?`,
     ).bind(
-      JSON.stringify({ providerHealth: { codex: { healthy: true } } }),
+      workerClaimRuntimeFixture().runtimeProtoJson,
       at(0),
       at(0),
       workerId,
@@ -227,7 +236,6 @@ describe("reply completion application", () => {
     const claimed = await claimNextIssueAgentReply(db, projectId, {
       workerId,
       agentProvider: "codex",
-      agentProviders: ["codex"],
       claimTokenHash: await sha256(claimToken),
       claimedAt: at(100 + sequence),
       leaseExpiresAt: at(1_000 + sequence),

@@ -11,6 +11,7 @@ import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
 import { emptyAgentProviderCapabilityCatalog } from "../../src/lib/agent-provider-contract";
+import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
 
 describe("AgentService mutations", () => {
   const organizationId = "11111111-1111-4111-8111-111111111111";
@@ -188,8 +189,8 @@ describe("AgentService mutations", () => {
     const workerId = "designated-worker";
     const otherWorkerId = "other-project-worker";
     const observedAt = new Date().toISOString();
-    const capabilities = JSON.stringify({
-      providerHealth: { codex: { healthy: true } },
+    const runtimeProtoJson = workerRuntimeProtoJsonFixture({
+      providers: ["codex"],
       providerCapabilities: {
         ...emptyAgentProviderCapabilityCatalog(),
         codex: {
@@ -232,9 +233,9 @@ describe("AgentService mutations", () => {
           .prepare(
             `insert into briar_execution_workers (
              id, project_id, device_id, label, host_fingerprint,
-             agent_provider, capabilities_json, state, accepting_work,
+             runtime_proto_json, state, accepting_work,
              readiness_state, last_heartbeat_at, created_at, updated_at
-           ) values (?, ?, ?, ?, ?, 'codex', ?, 'online', 1, 'ready', ?, ?, ?)`,
+           ) values (?, ?, ?, ?, ?, ?, 'online', 1, 'ready', ?, ?, ?)`,
           )
           .bind(
             id,
@@ -242,7 +243,7 @@ describe("AgentService mutations", () => {
             deviceId,
             label,
             fingerprint,
-            capabilities,
+            runtimeProtoJson,
             observedAt,
             observedAt,
             observedAt,

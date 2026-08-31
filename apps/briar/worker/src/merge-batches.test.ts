@@ -21,6 +21,7 @@ import {
   selectAuthoritativeMergeGroupHead,
 } from "./merge-batches";
 import { getMergeQueueStatus } from "./merge-queue-status";
+import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
 
 const baseTime = Date.parse("2026-08-21T00:00:00.000Z");
 const installationId = 901;
@@ -191,10 +192,10 @@ describe("repository merge queue coordinator", () => {
       ),
       db.prepare(
         `insert into briar_execution_workers (
-           id, project_id, device_id, label, host_fingerprint, agent_provider,
-           versions_json, capabilities_json, state, accepting_work,
+           id, project_id, device_id, label, host_fingerprint,
+           runtime_proto_json, state, accepting_work,
            readiness_state, last_heartbeat_at, created_at, updated_at
-         ) values (?, ?, ?, ?, ?, 'codex', '{}', '{}', 'online', 1, 'ready',
+         ) values (?, ?, ?, ?, ?, ?, 'online', 1, 'ready',
                    ?, ?, ?)`,
       ).bind(
         workerId,
@@ -202,6 +203,7 @@ describe("repository merge queue coordinator", () => {
         deviceId,
         `Merge worker ${scenario}`,
         (scenario + 200).toString(16).padStart(64, "0"),
+        workerRuntimeProtoJsonFixture(),
         at(scenario, 0),
         at(scenario, 0),
         at(scenario, 0),
