@@ -98,31 +98,6 @@ create index briar_upload_cleanup_queue_due_idx
     next_attempt_at, attempts, queued_at, object_key
   );
 
-insert or ignore into briar_upload_cleanup_queue (
-  object_key, batch_request_id, attempts, generation, queued_at,
-  next_attempt_at, last_error
-)
-select object_key, batch_request_id, attempts, generation, queued_at,
-       next_attempt_at, last_error
-from briar_reply_upload_cleanup_queue;
-
--- Pending capabilities are deliberately not migrated. They belong to the
--- removed reply-only protocol. Preserve only deletion ownership for objects
--- that were uploaded but never consumed; completed aggregate attachments have
--- their own durable metadata and must not enter cleanup.
-insert or ignore into briar_upload_cleanup_queue (
-  object_key, batch_request_id, queued_at, next_attempt_at
-)
-select object_key, batch_request_id,
-       strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
-       strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-from briar_reply_attachment_uploads
-where consumed_at is null;
-
-drop table briar_reply_upload_cleanup_queue;
-drop table briar_reply_attachment_uploads;
-drop table briar_reply_attachment_upload_batches;
-
 -- Evidence idempotency includes its ordered image references. This also lets
 -- an interrupted finalize resume without allowing images to be added later
 -- under an already-completed evidence key.
