@@ -323,14 +323,11 @@ export type IssueReplyWorkspaceMode =
 export function issueReplyWorkspaceMode(input: {
   worktreesEnabled: boolean;
   hasConfiguredWorktree: boolean;
-  requiresPreferredWorker?: boolean;
-  branch: string | null;
+  requiresPreferredWorker: boolean;
 }): IssueReplyWorkspaceMode {
   if (!input.worktreesEnabled) return "project";
   if (input.hasConfiguredWorktree) return "shared";
-  const requiresExisting =
-    input.requiresPreferredWorker ?? input.branch !== null;
-  return requiresExisting ? "missing-required" : "cached-analysis";
+  return input.requiresPreferredWorker ? "missing-required" : "cached-analysis";
 }
 
 /**

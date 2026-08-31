@@ -28684,9 +28684,10 @@ pub struct ClaimedIssueReply {
     #[serde(
         rename = "requiresPreferredWorker",
         alias = "requires_preferred_worker",
-        skip_serializing_if = "::core::option::Option::is_none"
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
-    pub requires_preferred_worker: ::core::option::Option<bool>,
+    pub requires_preferred_worker: bool,
     /// Field 15: `claim_token`
     #[serde(
         rename = "claimToken",
@@ -28811,13 +28812,6 @@ impl ClaimedIssueReply {
         self.branch = Some(value.into());
         self
     }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::requires_preferred_worker`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_requires_preferred_worker(mut self, value: bool) -> Self {
-        self.requires_preferred_worker = Some(value);
-        self
-    }
 }
 ::buffa::impl_default_instance!(ClaimedIssueReply);
 impl ::buffa::MessageName for ClaimedIssueReply {
@@ -28901,7 +28895,7 @@ impl ::buffa::Message for ClaimedIssueReply {
         if let Some(ref v) = self.branch {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
-        if self.requires_preferred_worker.is_some() {
+        if self.requires_preferred_worker {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
         if !self.claim_token.is_empty() {
@@ -29014,8 +29008,8 @@ impl ::buffa::Message for ClaimedIssueReply {
         if let Some(ref v) = self.branch {
             ::buffa::types::put_string_field(13u32, v, buf);
         }
-        if let Some(v) = self.requires_preferred_worker {
-            ::buffa::types::put_bool_field(14u32, v, buf);
+        if self.requires_preferred_worker {
+            ::buffa::types::put_bool_field(14u32, self.requires_preferred_worker, buf);
         }
         if !self.claim_token.is_empty() {
             ::buffa::types::put_string_field(15u32, &self.claim_token, buf);
@@ -29192,9 +29186,7 @@ impl ::buffa::Message for ClaimedIssueReply {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.requires_preferred_worker = ::core::option::Option::Some(
-                    ::buffa::types::decode_bool(buf)?,
-                );
+                self.requires_preferred_worker = ::buffa::types::decode_bool(buf)?;
             }
             15u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -29279,7 +29271,7 @@ impl ::buffa::Message for ClaimedIssueReply {
         self.active_skill = ::buffa::MessageField::none();
         self.skill_execution_target = ::buffa::MessageField::none();
         self.branch = ::core::option::Option::None;
-        self.requires_preferred_worker = ::core::option::Option::None;
+        self.requires_preferred_worker = false;
         self.claim_token.clear();
         self.claimed_at = ::buffa::MessageField::none();
         self.lease_expires_at = ::buffa::MessageField::none();
@@ -85744,7 +85736,7 @@ pub mod __buffa {
             /// Field 13: `branch`
             pub branch: ::core::option::Option<&'a str>,
             /// Field 14: `requires_preferred_worker`
-            pub requires_preferred_worker: ::core::option::Option<bool>,
+            pub requires_preferred_worker: bool,
             /// Field 15: `claim_token`
             pub claim_token: &'a str,
             /// Field 16: `claimed_at`
@@ -85953,9 +85945,9 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.requires_preferred_worker = Some(
-                            ::buffa::types::decode_bool(&mut cur)?,
-                        );
+                        view.requires_preferred_worker = ::buffa::types::decode_bool(
+                            &mut cur,
+                        )?;
                     }
                     15u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -86291,7 +86283,7 @@ pub mod __buffa {
                 if let Some(ref v) = self.branch {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
-                if self.requires_preferred_worker.is_some() {
+                if self.requires_preferred_worker {
                     size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
                 }
                 if !self.claim_token.is_empty() {
@@ -86412,8 +86404,12 @@ pub mod __buffa {
                 if let Some(ref v) = self.branch {
                     ::buffa::types::put_string_field(13u32, v, buf);
                 }
-                if let Some(v) = self.requires_preferred_worker {
-                    ::buffa::types::put_bool_field(14u32, v, buf);
+                if self.requires_preferred_worker {
+                    ::buffa::types::put_bool_field(
+                        14u32,
+                        self.requires_preferred_worker,
+                        buf,
+                    );
                 }
                 if !self.claim_token.is_empty() {
                     ::buffa::types::put_string_field(15u32, &self.claim_token, buf);
@@ -86536,9 +86532,12 @@ pub mod __buffa {
                 if let ::core::option::Option::Some(__v) = self.branch {
                     __map.serialize_entry("branch", __v)?;
                 }
-                if let ::core::option::Option::Some(__v) = self.requires_preferred_worker
-                {
-                    __map.serialize_entry("requiresPreferredWorker", &__v)?;
+                if self.requires_preferred_worker {
+                    __map
+                        .serialize_entry(
+                            "requiresPreferredWorker",
+                            &self.requires_preferred_worker,
+                        )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.claim_token) {
                     __map.serialize_entry("claimToken", self.claim_token)?;
@@ -86757,7 +86756,7 @@ pub mod __buffa {
             }
             /// Field 14: `requires_preferred_worker`
             #[must_use]
-            pub fn requires_preferred_worker(&self) -> ::core::option::Option<bool> {
+            pub fn requires_preferred_worker(&self) -> bool {
                 self.0.reborrow().requires_preferred_worker
             }
             /// Field 15: `claim_token`

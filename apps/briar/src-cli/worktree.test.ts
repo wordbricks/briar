@@ -523,38 +523,22 @@ describe("conversation worktree allocation", () => {
       worktreesEnabled: true,
       hasConfiguredWorktree: false,
       requiresPreferredWorker: false,
-      branch: null,
     })).toBe("cached-analysis");
     expect(issueReplyWorkspaceMode({
       worktreesEnabled: true,
       hasConfiguredWorktree: false,
       requiresPreferredWorker: true,
-      branch: "briar/in-progress",
     })).toBe("missing-required");
     expect(issueReplyWorkspaceMode({
       worktreesEnabled: true,
       hasConfiguredWorktree: true,
       requiresPreferredWorker: true,
-      branch: "briar/in-progress",
     })).toBe("shared");
     expect(issueReplyWorkspaceMode({
       worktreesEnabled: false,
       hasConfiguredWorktree: false,
-      branch: null,
+      requiresPreferredWorker: false,
     })).toBe("project");
-  });
-
-  it("uses branch presence as the safe rollout fallback for older servers", () => {
-    expect(issueReplyWorkspaceMode({
-      worktreesEnabled: true,
-      hasConfiguredWorktree: false,
-      branch: null,
-    })).toBe("cached-analysis");
-    expect(issueReplyWorkspaceMode({
-      worktreesEnabled: true,
-      hasConfiguredWorktree: false,
-      branch: "briar/in-progress",
-    })).toBe("missing-required");
   });
 
   it("uses a detached latest-remote checkout and removes it without a branch", async () => {

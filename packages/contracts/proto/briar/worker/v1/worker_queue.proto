@@ -955,7 +955,7 @@ message ClaimedIssueReply {
   optional DetachedAgentSkill active_skill = 11;
   optional DetachedAgentSkillExecutionTarget skill_execution_target = 12;
   optional string branch = 13;
-  optional bool requires_preferred_worker = 14;
+  bool requires_preferred_worker = 14;
   string claim_token = 15;
   google.protobuf.Timestamp claimed_at = 16;
   google.protobuf.Timestamp lease_expires_at = 17;

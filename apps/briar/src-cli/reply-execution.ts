@@ -270,7 +270,6 @@ async function runClaimedIssueReply(
     worktreesEnabled: projectUsesWorktrees,
     hasConfiguredWorktree: configuredWorktree !== null,
     requiresPreferredWorker: issue.requiresPreferredWorker,
-    branch: issue.branch,
   });
   if (workspaceMode === "missing-required") {
     throw new Error(
