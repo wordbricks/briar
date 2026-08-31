@@ -11,3 +11,5 @@ bun run scripts/generate-contract-fingerprint.ts --image "$contract_image"
 buf generate \
   "$contract_image" \
   --template packages/contracts/buf.gen.yaml
+bun run scripts/normalize-swift-contract-mocks.ts \
+  packages/contracts/swift/Sources/BriarContractsMocks

@@ -7,7 +7,6 @@
 
 import BriarContracts
 import Connect
-import ConnectMocks
 import Foundation
 import SwiftProtobuf
 

@@ -39,16 +39,16 @@ targets:
         GENERATE_INFOPLIST_FILE: true
         SKIP_INSTALL: true
   BriarContractsMocks:
-    type: framework
+    type: framework.static
     platform: iOS
     sources:
       - path: ../../../../packages/contracts/swift/Sources/BriarContractsMocks
+    # Contract generation removes Connect-Swift's unused ConnectMocks import for unary RPCs.
+    # Its safety check fails generation before a streaming mock can require that runtime.
     dependencies:
       - target: BriarContracts
       - package: Connect
         product: Connect
-      - package: Connect
-        product: ConnectMocks
       - package: SwiftProtobuf
         product: SwiftProtobuf
     settings:

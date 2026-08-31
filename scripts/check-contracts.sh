@@ -26,6 +26,8 @@ buf generate \
   "$generated_root/briar.contracts.image.binpb" \
   --template packages/contracts/buf.gen.yaml \
   --output "$generated_root/output"
+bun run scripts/normalize-swift-contract-mocks.ts \
+  "$generated_root/output/packages/contracts/swift/Sources/BriarContractsMocks"
 
 generated_paths=(
   "packages/contracts/src/gen"
