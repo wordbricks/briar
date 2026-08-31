@@ -411,7 +411,7 @@ describe("reply completion application", () => {
       contentType: "text/html",
       body,
       observedAt: at(202 + sequence),
-    })).rejects.toMatchObject({ reason: "unavailable" });
+    })).resolves.toMatchObject({ replayed: true });
 
     const requestId = "fb000000-0000-4000-8000-000000000001";
     const completion = completeIssueReplyInputFromProto(create(
@@ -425,7 +425,7 @@ describe("reply completion application", () => {
           case: "success",
           value: {
             body: "Done.",
-            attachments: [{ attachmentId: upload.attachmentId }],
+            attachments: [{ uploadId: upload.attachmentId }],
           },
         },
       },
@@ -554,7 +554,7 @@ describe("reply completion application", () => {
           case: "success",
           value: {
             body: "Not uploaded.",
-            attachments: [{ attachmentId: upload.attachmentId }],
+            attachments: [{ uploadId: upload.attachmentId }],
           },
         },
       },

@@ -117,6 +117,16 @@ drop table briar_reply_upload_cleanup_queue;
 drop table briar_reply_attachment_uploads;
 drop table briar_reply_attachment_upload_batches;
 
+-- Evidence idempotency includes its ordered image references. This also lets
+-- an interrupted finalize resume without allowing images to be added later
+-- under an already-completed evidence key.
+alter table briar_run_evidence
+  add column image_upload_ids_json text not null default '[]'
+  check (
+    json_valid(image_upload_ids_json)
+    and json_type(image_upload_ids_json) = 'array'
+  );
+
 --> statement-breakpoint
 create trigger briar_upload_batch_insert_guard
 before insert on briar_upload_batches
@@ -257,6 +267,10 @@ when not (
         and batch.purpose = 'run_evidence'
         and batch.project_id = evidence.project_id
         and batch.run_id = evidence.run_id
+        and exists (
+          select 1 from json_each(evidence.image_upload_ids_json) expected
+          where expected.value = old.upload_id
+        )
         and batch.expires_at > new.consumed_at
     )
   )

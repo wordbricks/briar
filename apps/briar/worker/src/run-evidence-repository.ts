@@ -30,6 +30,7 @@ export type RunEvidenceRow = {
   actor: string;
   observed_at: string;
   recorded_at: string;
+  image_upload_ids_json: string;
   github_association_started_at?: string | null;
 };
 
@@ -67,6 +68,7 @@ export async function recordRunEvidence(
     metadata: Record<string, unknown> | null;
     actor: string;
     observedAt: string;
+    imageUploadIds?: readonly string[];
   },
   fence?: { claimTokenHash: string; authenticatedAt: string },
 ) {
@@ -144,6 +146,7 @@ export async function recordRunEvidence(
     }
   }
   const metadataJson = input.metadata ? stableJson(input.metadata) : null;
+  const imageUploadIdsJson = stableJson(input.imageUploadIds ?? []);
   const storedEvidenceKey = await scopedEvidenceKey(
     input.evidenceKey,
     run.current_revision,
@@ -357,6 +360,7 @@ export async function recordRunEvidence(
       existing.command === input.command &&
       existing.url === input.url &&
       existing.metadata_json === metadataJson &&
+      existing.image_upload_ids_json === imageUploadIdsJson &&
       existing.actor === input.actor &&
       existing.observed_at === input.observedAt;
     if (!same) throw new EventKeyConflictError();
@@ -388,6 +392,7 @@ export async function recordRunEvidence(
     actor: input.actor,
     observed_at: input.observedAt,
     recorded_at: recordedAt,
+    image_upload_ids_json: imageUploadIdsJson,
     github_association_started_at: githubAssociationStartedAt,
   };
   const inserted = await db
@@ -395,10 +400,11 @@ export async function recordRunEvidence(
       `insert into briar_run_evidence (
          id, project_id, run_id, attempt, revision, evidence_key, workflow_stage,
          evidence_type, status, detail, command, url, metadata_json,
-         actor, observed_at, recorded_at, github_association_started_at
+         actor, observed_at, recorded_at, github_association_started_at,
+         image_upload_ids_json
        )
        select ?, run.project_id, run.id, run.current_attempt,
-              run.current_revision, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+              run.current_revision, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
        from briar_hunt_runs run
        where run.id = ? and run.project_id = ?
          ${runFenceSql}`,
@@ -417,6 +423,7 @@ export async function recordRunEvidence(
       evidence.observed_at,
       evidence.recorded_at,
       evidence.github_association_started_at,
+      evidence.image_upload_ids_json,
       run.id,
       projectId,
       ...runFenceBindings(evidence.recorded_at),

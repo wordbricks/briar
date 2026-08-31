@@ -73,8 +73,7 @@ export async function uploadReservedFileApplication(
   }
   const upload = await services.getScopedUpload(input.db, input.uploadId);
   if (
-    !upload || upload.expires_at <= observedAt || upload.consumed_at ||
-    upload.uploaded_at
+    !upload || upload.expires_at <= observedAt || upload.consumed_at
   ) {
     throw new UploadApplicationError("unavailable", "Upload is no longer available");
   }
@@ -91,6 +90,11 @@ export async function uploadReservedFileApplication(
       "invalid_request",
       "Uploaded content digest does not match its reservation",
     );
+  }
+  // A client may lose the 204 response and retry its whole prepared batch.
+  // Matching immutable metadata and digest make this PUT safely idempotent.
+  if (upload.uploaded_at) {
+    return { objectKey: upload.object_key, replayed: true };
   }
   await input.bucket.put(upload.object_key, input.body, {
     httpMetadata: {
@@ -125,5 +129,5 @@ export async function uploadReservedFileApplication(
       "Upload lost its reservation",
     );
   }
-  return { objectKey: upload.object_key };
+  return { objectKey: upload.object_key, replayed: false };
 }
