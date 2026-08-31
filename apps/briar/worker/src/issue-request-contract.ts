@@ -231,14 +231,6 @@ export const AgentSkillExecutionProposalAcceptInput = strictSchema(
   }),
 );
 
-export const IssueAgentReplyLease = strictSchema(Schema.Struct({
-  projectId: UuidString,
-  workerId: trimmedText(1, 128),
-  claimToken: Schema.String.check(
-    Schema.isStartsWith("briar_reply_claim_"),
-  ),
-}));
-
 export const IssueKeptAttachmentIds = mutableArray(UuidString).check(
   Schema.isMaxLength(50),
 );
@@ -263,9 +255,6 @@ export const decodeIssueAgentReplyResult = decodeRequestSync(
 );
 export const decodeAgentSkillExecutionProposalAcceptInput = decodeRequestSync(
   AgentSkillExecutionProposalAcceptInput,
-);
-export const decodeIssueAgentReplyLease = decodeRequestSync(
-  IssueAgentReplyLease,
 );
 export const decodeIssueKeptAttachmentIds = decodeRequestSync(
   IssueKeptAttachmentIds,

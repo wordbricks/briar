@@ -5,8 +5,6 @@ import {
   channelMessageReactionInputSchema,
   channelProposalAcceptInputSchema,
   channelReadInputSchema,
-  channelReplyClaimInputSchema,
-  channelReplyLeaseInputSchema,
   directMessageInputSchema,
 } from "../../src/lib/channels-contract";
 import { decodeRequestSync } from "./request-schema";
@@ -29,10 +27,4 @@ export const decodeChannelIssueBatchProposalPayload = decodeRequestSync(
 );
 export const decodeChannelExecutionProposalAcceptInput = decodeRequestSync(
   channelExecutionProposalAcceptInputSchema,
-);
-export const decodeChannelReplyClaimInput = decodeRequestSync(
-  channelReplyClaimInputSchema,
-);
-export const decodeChannelReplyLeaseInput = decodeRequestSync(
-  channelReplyLeaseInputSchema,
 );

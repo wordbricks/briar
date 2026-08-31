@@ -1135,16 +1135,6 @@ export const channelReplyCompletionSchema = strict(Schema.Struct({
   }),
 ));
 
-export const channelReplyClaimInputSchema = strict(Schema.Struct({
-  organizationId: Uuid,
-  workerId: Schema.Trim.check(Schema.isLengthBetween(1, 64)),
-}));
-
-export const channelReplyLeaseInputSchema = strict(Schema.Struct({
-  ...channelReplyClaimInputSchema.fields,
-  claimToken: Schema.Trim.check(Schema.isLengthBetween(1, 200)),
-}));
-
 export const channelIssueProposalPayloadSchema = Schema.Struct({
   issue: strict(Schema.Struct({
     title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),

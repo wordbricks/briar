@@ -25,12 +25,6 @@ export const WorkerClaimInput = strictSchema(Schema.Struct({
   projectId: UuidString,
 }));
 
-export const IssueReplyClaimInput = strictSchema(Schema.Struct({
-  claimedBy: trimmedText(1, 128),
-  workerId: trimmedText(1, 128),
-  projectId: UuidString,
-}));
-
 const WorkerIcon = Schema.Union([
   strictSchema(Schema.Struct({
     type: Schema.Literal("emoji"),
@@ -105,11 +99,6 @@ export const DispatchRun = strictSchema(Schema.Struct({
   }),
 ));
 
-export const LeaseRenew = strictSchema(Schema.Struct({
-  claimToken: trimmedText(1, 200),
-  projectId: Schema.optional(UuidString),
-}));
-
 export const ProjectAgentScheduleClaimToken = Schema.Trim.check(
   Schema.isPattern(/^briar_schedule_claim_[0-9a-f]{64}$/u),
 );
@@ -171,15 +160,11 @@ export const ProjectAgentScheduleRunCompletion = strictSchema(Schema.Struct({
 ));
 
 export const decodeWorkerClaimInput = decodeRequestSync(WorkerClaimInput);
-export const decodeIssueReplyClaimInput = decodeRequestSync(
-  IssueReplyClaimInput,
-);
 export const decodeWorkerSettings = decodeRequestSync(WorkerSettings);
 export const decodeExecutionWorkerPolicy = decodeRequestSync(
   ExecutionWorkerPolicy,
 );
 export const decodeDispatchRun = decodeRequestSync(DispatchRun);
-export const decodeLeaseRenew = decodeRequestSync(LeaseRenew);
 export const decodeProjectAgentScheduleRunRenew = decodeRequestSync(
   ProjectAgentScheduleRunRenew,
 );
