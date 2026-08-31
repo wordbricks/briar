@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 import {
+  decodeStoredMergeQueueValidationCommands,
   MERGE_QUEUE_VALIDATION_CONTEXT,
 } from "../../src/lib/merge-queue-validation-contract";
 import { sha256 } from "./crypto-digest";
@@ -98,9 +99,11 @@ export const claimedMergeBatch = (
   claim: NonNullable<Awaited<ReturnType<typeof claimNextMergeBatch>>>,
   claimToken: string,
 ) => {
-  const validationCommands = JSON.parse(
-    claim.batch.validation_commands_json,
-  ) as string[];
+  const validationCommands = [
+    ...decodeStoredMergeQueueValidationCommands(
+      claim.batch.validation_commands_json,
+    ),
+  ];
   return {
     workType: "mergeBatch" as const,
     workId: claim.batch.id,

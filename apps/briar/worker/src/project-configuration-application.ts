@@ -3,6 +3,9 @@ import {
   canonicalizeCheckpointSet,
 } from "../../src/lib/auto-hunt-contract";
 import {
+  decodeStoredMergeQueueValidationCommands,
+} from "../../src/lib/merge-queue-validation-contract";
+import {
   getGithubConnectionForOrganization,
   listGithubConnectionRepositories,
 } from "./github-connection-repository";
@@ -164,9 +167,9 @@ export async function updateProjectSettingsApplication(
     const boundary = workflow.stages.find((stage) =>
       stage.id === mergeQueueProfile.readiness_stage_id
     );
-    const storedCommands = JSON.parse(
+    const storedCommands = decodeStoredMergeQueueValidationCommands(
       mergeQueueProfile.validation_commands_json,
-    ) as string[];
+    );
     if (
       JSON.stringify(validationCommandsFromStage(boundary)) !==
         JSON.stringify(storedCommands)

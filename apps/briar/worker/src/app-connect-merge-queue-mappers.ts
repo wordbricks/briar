@@ -9,11 +9,11 @@ import {
   MergeQueueProfileSchema,
 } from "@briar/contracts/gen/briar/app/v1/merge_queue_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
-import type { MergeBatchCandidateState, MergeBatchState } from "./merge-batches";
 import {
   decodeStoredMergeQueueValidationCommands,
-  type getMergeQueueStatusApplication,
-} from "./merge-queue-application";
+} from "../../src/lib/merge-queue-validation-contract";
+import type { MergeBatchCandidateState, MergeBatchState } from "./merge-batches";
+import type { getMergeQueueStatusApplication } from "./merge-queue-application";
 import type { MergeQueueProfileRow } from "./merge-queue-profile";
 
 const internal = (message: string): never => {

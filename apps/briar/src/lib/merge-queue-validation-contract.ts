@@ -1,3 +1,6 @@
+import * as Schema from "effect/Schema";
+import { autoHuntStageCheckMaxLength } from "./auto-hunt-contract";
+
 export const MERGE_QUEUE_VALIDATION_CONTEXT = "merge-queue" as const;
 export const MERGE_QUEUE_GITHUB_STATUS_CONTEXT = "briar/merge-queue" as const;
 export const MERGE_QUEUE_VALIDATION_SOURCE_REF_PREFIX =
@@ -6,3 +9,16 @@ export const MERGE_QUEUE_VALIDATION_BASE_REF_PREFIX =
   "refs/briar/merge-group-validation-base";
 export const MERGE_QUEUE_VALIDATION_COMMAND_TIMEOUT_MS = 20 * 60_000;
 export const MERGE_QUEUE_VALIDATION_MAX_COMMANDS = 20;
+
+const StoredMergeQueueValidationCommands = Schema.fromJsonString(
+  Schema.Array(
+    Schema.Trimmed.check(
+      Schema.isLengthBetween(1, autoHuntStageCheckMaxLength),
+    ),
+  ).check(Schema.isMaxLength(MERGE_QUEUE_VALIDATION_MAX_COMMANDS)),
+);
+
+export const decodeStoredMergeQueueValidationCommands =
+  Schema.decodeUnknownSync(StoredMergeQueueValidationCommands);
+export const encodeStoredMergeQueueValidationCommands =
+  Schema.encodeSync(StoredMergeQueueValidationCommands);

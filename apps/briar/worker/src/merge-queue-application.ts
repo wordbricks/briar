@@ -1,9 +1,9 @@
 import {
-  autoHuntStageCheckMaxLength,
   normalizeAutoHuntWorkflow,
 } from "../../src/lib/auto-hunt-contract";
-import { MERGE_QUEUE_VALIDATION_MAX_COMMANDS } from "../../src/lib/merge-queue-validation-contract";
-import * as Schema from "effect/Schema";
+import {
+  decodeStoredMergeQueueValidationCommands,
+} from "../../src/lib/merge-queue-validation-contract";
 import {
   getGithubConnectionForOrganization,
   listGithubConnectionRepositories,
@@ -17,15 +17,6 @@ import { getProjectSettings } from "./project-settings-repository";
 
 const DEFAULT_MERGE_QUEUE_QUIET_WINDOW_MS = 300_000;
 const DEFAULT_MERGE_QUEUE_MAX_BATCH_SIZE = 5;
-
-const StoredMergeQueueValidationCommands = Schema.fromJsonString(
-  Schema.Array(Schema.Trim.check(Schema.isLengthBetween(1, autoHuntStageCheckMaxLength))).check(
-    Schema.isMaxLength(MERGE_QUEUE_VALIDATION_MAX_COMMANDS),
-  ),
-);
-export const decodeStoredMergeQueueValidationCommands = Schema.decodeUnknownSync(
-  StoredMergeQueueValidationCommands,
-);
 
 export type MergeQueueApplicationErrorReason =
   | "active_batch"
