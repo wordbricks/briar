@@ -199,9 +199,6 @@ describe("issue proposal payload migration", () => {
       },
     })).rejects.toThrow(/payload cannot include status/iu);
 
-    await applyD1Migrations(db, {
-      files: ["0160_retire_channel_plan_proposals.sql"],
-    });
     expect(await db.prepare(
       `select count(*) as count from briar_channel_action_proposals
        where id = 'legacy-plan'`,
