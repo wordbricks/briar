@@ -11,9 +11,20 @@ final class CompanionStore: ObservableObject {
     @Published private(set) var user: CurrentUserResponse.User?
     @Published private(set) var organizations: [OrganizationSummary] = []
     @Published private(set) var projects: [ProjectsResponse.Project] = []
+    @Published private(set) var workspaces: [WorkspacesResponse.Workspace] = []
+    @Published private(set) var teams: [WorkspaceTeamsResponse.Team] = []
+    @Published private(set) var planningProjects: [PlanningProject] = []
     @Published var selectedProjectID: UUID? {
         didSet {
             persistSelectedProjectID()
+            if oldValue != selectedProjectID {
+                selectDefaultPlanningProject(for: selectedProjectID)
+            }
+        }
+    }
+    @Published var selectedPlanningProjectID: UUID? {
+        didSet {
+            persistSelectedPlanningProjectID()
         }
     }
     @Published private(set) var loading = false
@@ -28,6 +39,10 @@ final class CompanionStore: ObservableObject {
 
     private static func selectedProjectKey(for userID: String) -> String {
         "companion.selectedProjectID.\(userID)"
+    }
+
+    private static func selectedPlanningProjectKey(for userID: String) -> String {
+        "companion.selectedPlanningProjectID.\(userID)"
     }
 
     init(api: any MobileAPIClientProtocol, defaults: UserDefaults = .standard) {
@@ -85,6 +100,11 @@ final class CompanionStore: ObservableObject {
                 defaults: defaults
             )
             selectedProjectID = storedProjectID ?? Self.defaultProjectID(for: currentProjects)
+            if loadedProjects.projects.contains(where: {
+                $0.workspaceId != nil || $0.teamId != nil
+            }) {
+                try? await loadHierarchy(token: token)
+            }
             errorMessage = nil
         } catch {
             if activeToken == token,
@@ -147,7 +167,11 @@ final class CompanionStore: ObservableObject {
         user = nil
         organizations = []
         projects = []
+        workspaces = []
+        teams = []
+        planningProjects = []
         selectedProjectID = nil
+        selectedPlanningProjectID = nil
         loading = false
         errorMessage = nil
     }
@@ -181,12 +205,133 @@ final class CompanionStore: ObservableObject {
         projects.first?.id
     }
 
+    func selectPlanningProject(_ planningProjectID: UUID?) {
+        guard let planningProjectID else {
+            selectedPlanningProjectID = nil
+            return
+        }
+        guard let planningProject = planningProjects.first(where: {
+            $0.id == planningProjectID
+        }) else { return }
+        if selectedProjectID != planningProject.teamId {
+            selectedProjectID = planningProject.teamId
+        }
+        selectedPlanningProjectID = planningProject.id
+    }
+
+    func createPlanningProject(
+        teamID: UUID,
+        name: String,
+        description: String? = nil,
+        status: PlanningProjectStatus = .planned
+    ) async throws -> PlanningProject {
+        guard let token = activeToken else { throw CancellationError() }
+        let response: PlanningProjectResponse = try await api.send(
+            MobileAPIContract.Endpoint.teamProjects(teamID: teamID),
+            method: "POST",
+            token: token,
+            body: PlanningProjectCreateRequest(
+                name: name,
+                description: description,
+                status: status
+            ),
+            as: PlanningProjectResponse.self
+        )
+        planningProjects.append(response.project)
+        planningProjects.sort {
+            $0.teamId.uuidString == $1.teamId.uuidString
+                ? ($0.sortOrder, $0.name) < ($1.sortOrder, $1.name)
+                : $0.teamId.uuidString < $1.teamId.uuidString
+        }
+        selectPlanningProject(response.project.id)
+        return response.project
+    }
+
+    private func loadHierarchy(token: String) async throws {
+        let workspaceResponse: WorkspacesResponse = try await api.send(
+            MobileAPIContract.Endpoint.workspaces,
+            method: "GET",
+            token: token,
+            body: nil,
+            as: WorkspacesResponse.self
+        )
+        var loadedTeams: [WorkspaceTeamsResponse.Team] = []
+        var loadedPlanningProjects: [PlanningProject] = []
+        for workspace in workspaceResponse.workspaces {
+            let teamResponse: WorkspaceTeamsResponse = try await api.send(
+                MobileAPIContract.Endpoint.workspaceTeams(workspaceID: workspace.id),
+                method: "GET",
+                token: token,
+                body: nil,
+                as: WorkspaceTeamsResponse.self
+            )
+            loadedTeams.append(contentsOf: teamResponse.teams)
+            for team in teamResponse.teams {
+                let projectResponse: TeamProjectsResponse = try await api.send(
+                    MobileAPIContract.Endpoint.teamProjects(teamID: team.id),
+                    method: "GET",
+                    token: token,
+                    body: nil,
+                    as: TeamProjectsResponse.self
+                )
+                loadedPlanningProjects.append(contentsOf: projectResponse.projects)
+            }
+        }
+        workspaces = workspaceResponse.workspaces
+        teams = loadedTeams
+        planningProjects = loadedPlanningProjects.sorted {
+            $0.teamId.uuidString == $1.teamId.uuidString
+                ? ($0.sortOrder, $0.name) < ($1.sortOrder, $1.name)
+                : $0.teamId.uuidString < $1.teamId.uuidString
+        }
+        restorePlanningProjectSelection()
+    }
+
+    private func restorePlanningProjectSelection() {
+        guard let userID = user?.id, let teamID = selectedProjectID else {
+            selectedPlanningProjectID = nil
+            return
+        }
+        let available = planningProjects.filter { $0.teamId == teamID }
+        let stored = defaults.string(
+            forKey: Self.selectedPlanningProjectKey(for: userID)
+        ).flatMap(UUID.init(uuidString:))
+        selectedPlanningProjectID = available.first(where: { $0.id == stored })?.id
+            ?? available.first(where: \.isDefault)?.id
+            ?? available.first?.id
+    }
+
+    private func selectDefaultPlanningProject(for teamID: UUID?) {
+        guard let teamID else {
+            selectedPlanningProjectID = nil
+            return
+        }
+        guard selectedPlanningProjectID.flatMap({ selectedID in
+            planningProjects.first(where: {
+                $0.id == selectedID && $0.teamId == teamID
+            })
+        }) == nil else { return }
+        selectedPlanningProjectID = planningProjects.first(where: {
+            $0.teamId == teamID && $0.isDefault
+        })?.id ?? planningProjects.first(where: { $0.teamId == teamID })?.id
+    }
+
     private func persistSelectedProjectID() {
         guard let userID = user?.id else { return }
         if let selectedProjectID {
             defaults.set(selectedProjectID.uuidString, forKey: Self.selectedProjectKey(for: userID))
         } else {
             defaults.removeObject(forKey: Self.selectedProjectKey(for: userID))
+        }
+    }
+
+    private func persistSelectedPlanningProjectID() {
+        guard let userID = user?.id else { return }
+        let key = Self.selectedPlanningProjectKey(for: userID)
+        if let selectedPlanningProjectID {
+            defaults.set(selectedPlanningProjectID.uuidString, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
         }
     }
 

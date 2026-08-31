@@ -1483,7 +1483,7 @@ export async function processArchiveCleanupQueue(
            ) or (
              queue.run_id is null
              and not exists (
-               select 1 from briar_projects project
+               select 1 from briar_teams project
                where project.id = queue.project_id
              )
            )
@@ -1511,7 +1511,7 @@ export async function processArchiveCleanupQueue(
           .bind(item.run_id)
           .first<{ present: number }>()
       : await db
-          .prepare(`select 1 as present from briar_projects where id = ?`)
+          .prepare(`select 1 as present from briar_teams where id = ?`)
           .bind(item.project_id)
           .first<{ present: number }>();
     if (stillOwned) continue;
@@ -1637,7 +1637,7 @@ export async function processArchiveCleanupQueue(
                ) or (
                  run_id is null
                  and not exists (
-                   select 1 from briar_projects project
+                   select 1 from briar_teams project
                    where project.id = briar_archive_cleanup_queue.project_id
                  )
                )

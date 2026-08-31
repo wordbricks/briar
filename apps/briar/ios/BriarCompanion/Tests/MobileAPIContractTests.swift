@@ -694,6 +694,15 @@ final class MobileAPIContractTests: XCTestCase {
         )
         let user: CurrentUserResponse = try decodeResponse("getCurrentUser")
         let projects: ProjectsResponse = try decodeResponse("listProjects")
+        let workspaces: WorkspacesResponse = try decodeResponse("listWorkspaces")
+        let teams: WorkspaceTeamsResponse = try decodeResponse("listWorkspaceTeams")
+        let planningProjects: TeamProjectsResponse = try decodeResponse("listTeamProjects")
+        let createdProject: PlanningProjectResponse = try decodeResponse("createPlanningProject")
+        let updatedProject: PlanningProjectResponse = try decodeResponse("updatePlanningProject")
+        let movedIssue: IssueProjectMoveResponse = try decodeResponse("moveIssueProject")
+        let issueLocation: IssueHierarchyLocationResponse = try decodeResponse(
+            "resolveIssueHierarchyLocation"
+        )
         let snapshot: DashboardSnapshot = try decodeResponse("getDashboardSnapshot")
         let delta: DashboardDelta = try decodeResponse("getDashboardDelta")
         let events: RunEventsResponse = try decodeResponse("listRunEvents")
@@ -740,6 +749,15 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(projects.projects.first?.role, .owner)
         XCTAssertEqual(projects.projects.first?.effectiveIssueKeyPrefix, "BR")
         XCTAssertEqual(projects.projects.first?.issueKey(runNumber: 42), "BR-42")
+        XCTAssertEqual(workspaces.workspaces.first?.name, "Wordbricks")
+        XCTAssertEqual(teams.teams.first?.name, "Briar")
+        XCTAssertEqual(teams.teams.first?.repository?.name, "wordbricks/briar")
+        XCTAssertEqual(planningProjects.projects.first?.name, "General")
+        XCTAssertEqual(planningProjects.projects.first?.isDefault, true)
+        XCTAssertEqual(createdProject.project.status, .planned)
+        XCTAssertEqual(updatedProject.project.status, .active)
+        XCTAssertEqual(movedIssue.outcome, "moved")
+        XCTAssertEqual(issueLocation.projectName, "General")
         XCTAssertEqual(snapshot.cursor, 41)
         XCTAssertEqual(snapshot.runs.first?.status, .running)
         XCTAssertEqual(snapshot.runs.first?.workflow?.stages.count, 3)
@@ -831,7 +849,21 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(MobileAPIContract.Endpoint.deviceToken, "/api/auth/device/token")
         XCTAssertEqual(MobileAPIContract.Endpoint.currentUser, "/me")
         XCTAssertEqual(MobileAPIContract.Endpoint.projects, "/projects")
+        XCTAssertEqual(MobileAPIContract.Endpoint.workspaces, "/workspaces")
         let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        let workspaceID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.workspaceTeams(workspaceID: workspaceID),
+            "/workspaces/22222222-2222-4222-8222-222222222222/teams"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.teamProjects(teamID: projectID),
+            "/teams/11111111-1111-4111-8111-111111111111/projects"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.planningProject(projectID: projectID),
+            "/projects/11111111-1111-4111-8111-111111111111"
+        )
         XCTAssertEqual(
             MobileAPIContract.Endpoint.dashboard(projectID: projectID),
             "/projects/11111111-1111-4111-8111-111111111111/dashboard"
@@ -845,6 +877,20 @@ final class MobileAPIContractTests: XCTestCase {
             "/projects/11111111-1111-4111-8111-111111111111/agent-tasks"
         )
         let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.planningProjectIssue(
+                projectID: projectID,
+                runID: runID
+            ),
+            "/projects/11111111-1111-4111-8111-111111111111/issues/33333333-3333-4333-8333-333333333333"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.issueHierarchyLocation(
+                teamID: projectID,
+                runID: runID
+            ),
+            "/teams/11111111-1111-4111-8111-111111111111/issues/33333333-3333-4333-8333-333333333333/location"
+        )
         XCTAssertEqual(
             MobileAPIContract.Endpoint.runEvents(projectID: projectID, runID: runID),
             "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/events"

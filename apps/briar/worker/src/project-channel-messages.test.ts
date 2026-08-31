@@ -59,13 +59,13 @@ describe("Project Agent channel message history", () => {
          ) values (?, ?, 'owner', ?, ?)`,
       ).bind(organizationId, ownerId, at(0), at(0)),
       db.prepare(
-        `insert into briar_projects (
+        `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, 'History Project', ?, ?, ?)`,
       ).bind(projectId, ownerId, organizationId, tokenHash(token), at(0), at(0)),
       db.prepare(
-        `insert into briar_projects (
+        `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, 'Other Project', ?, ?, ?)`,

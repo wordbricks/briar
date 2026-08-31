@@ -116,7 +116,7 @@ export async function listOrganizationIssueSubscriptionRunIds(
       `select subscription.run_id
        from briar_issue_subscriptions subscription
        join briar_hunt_runs run on run.id = subscription.run_id
-       join briar_projects project on project.id = run.project_id
+       join briar_teams project on project.id = run.project_id
        join briar_organization_members membership
          on membership.organization_id = project.organization_id
         and membership.user_id = subscription.user_id
@@ -150,7 +150,7 @@ export async function subscribeIssue(
        )
        select run.id, project.organization_id, ?, ?
        from briar_hunt_runs run
-       join briar_projects project on project.id = run.project_id
+       join briar_teams project on project.id = run.project_id
        join briar_organization_members membership
          on membership.organization_id = project.organization_id
         and membership.user_id = ?

@@ -157,6 +157,8 @@ export const mobileCurrentUserResponseSchema = mutableStruct({
 
 const mobileDashboardProjectSchema = mutableStruct({
   id: uuidString,
+  workspaceId: optional(uuidString),
+  teamId: optional(uuidString),
   name: Schema.String,
   issueKeyPrefix: defaulted(
     Schema.String.check(Schema.isPattern(/^[A-Z0-9]{1,3}$/u)),
@@ -172,6 +174,113 @@ const mobileDashboardProjectSchema = mutableStruct({
 
 export const mobileProjectsResponseSchema = mutableStruct({
   projects: mutableArray(mobileDashboardProjectSchema),
+});
+
+export const mobileWorkspaceSchema = mutableStruct({
+  id: uuidString,
+  name: nonEmptyString,
+  handle: nonEmptyString,
+  logo: nullable(Schema.String),
+  role: mobileRoleSchema,
+  createdAt: isoDateTime,
+});
+
+export const mobileWorkspacesResponseSchema = mutableStruct({
+  workspaces: mutableArray(mobileWorkspaceSchema),
+});
+
+const mobileTeamRepositorySchema = mutableStruct({
+  id: nullable(Schema.Finite),
+  name: nonEmptyString,
+});
+
+export const mobileTeamSchema = passthrough(mutableStruct({
+  id: uuidString,
+  workspaceId: uuidString,
+  workspaceName: nonEmptyString,
+  name: nonEmptyString,
+  issueKeyPrefix: nonEmptyString,
+  icon: nullable(Schema.String),
+  role: mobileRoleSchema,
+  repository: nullable(mobileTeamRepositorySchema),
+  createdAt: isoDateTime,
+  updatedAt: isoDateTime,
+}));
+
+export const mobileWorkspaceTeamsResponseSchema = mutableStruct({
+  workspaceId: uuidString,
+  teams: mutableArray(mobileTeamSchema),
+});
+
+export const mobilePlanningProjectStatusSchema = Schema.Literals([
+  "planned",
+  "active",
+  "completed",
+  "cancelled",
+]);
+
+export const mobilePlanningProjectSchema = mutableStruct({
+  id: uuidString,
+  workspaceId: uuidString,
+  workspaceName: nonEmptyString,
+  teamId: uuidString,
+  teamName: nonEmptyString,
+  name: nonEmptyString,
+  description: Schema.String,
+  status: mobilePlanningProjectStatusSchema,
+  leadUserId: nullable(Schema.String),
+  leadName: nullable(Schema.String),
+  startDate: nullable(Schema.String),
+  targetDate: nullable(Schema.String),
+  icon: nullable(Schema.String),
+  color: nullable(Schema.String),
+  sortOrder: Schema.Finite,
+  isDefault: Schema.Boolean,
+  role: mobileRoleSchema,
+  createdAt: isoDateTime,
+  updatedAt: isoDateTime,
+});
+
+export const mobileTeamProjectsResponseSchema = mutableStruct({
+  workspaceId: uuidString,
+  teamId: uuidString,
+  projects: mutableArray(mobilePlanningProjectSchema),
+});
+
+export const mobilePlanningProjectResponseSchema = mutableStruct({
+  project: mobilePlanningProjectSchema,
+});
+
+export const mobilePlanningProjectCreateRequestSchema = strict(mutableStruct({
+  name: nonEmptyString,
+  description: optional(Schema.String),
+  status: optional(mobilePlanningProjectStatusSchema),
+}));
+
+export const mobilePlanningProjectUpdateRequestSchema = strict(mutableStruct({
+  name: optional(nonEmptyString),
+  description: optional(Schema.String),
+  status: optional(mobilePlanningProjectStatusSchema),
+}));
+
+export const mobileIssueProjectMoveRequestSchema = strict(mutableStruct({
+  targetProjectId: uuidString,
+}));
+
+export const mobileIssueProjectMoveResponseSchema = mutableStruct({
+  outcome: Schema.Literals(["moved", "same_project"]),
+  issueId: uuidString,
+  workspaceId: uuidString,
+  teamId: uuidString,
+  projectId: uuidString,
+});
+
+export const mobileIssueHierarchyLocationResponseSchema = mutableStruct({
+  runId: uuidString,
+  workspaceId: uuidString,
+  teamId: uuidString,
+  projectId: uuidString,
+  projectName: nonEmptyString,
 });
 
 export const mobileIssueAttachmentSchema = mutableStruct({
@@ -263,6 +372,10 @@ export const mobileResultReviewSchema = mutableStruct({
 
 export const mobileDashboardRunSchema = mutableStruct({
   id: uuidString,
+  workspaceId: optional(uuidString),
+  teamId: optional(uuidString),
+  projectId: optional(uuidString),
+  projectName: optionalNullable(Schema.String),
   runNumber: optional(positiveInteger),
   currentAttempt: optional(positiveInteger),
   currentRevision: optional(positiveInteger),
@@ -329,6 +442,10 @@ const mobileInboxMessageBaseFields = {
   id: nonEmptyString,
   projectId: uuidString,
   projectName: Schema.String,
+  workspaceId: optional(uuidString),
+  teamId: optional(uuidString),
+  planningProjectId: optionalNullable(uuidString),
+  planningProjectName: optionalNullable(Schema.String),
   targetId: nonEmptyString,
   title: Schema.String,
   occurredAt: isoDateTime,
@@ -1386,6 +1503,24 @@ export const mobileOperationSchemas = {
   },
   getCurrentUser: { response: mobileCurrentUserResponseSchema },
   listProjects: { response: mobileProjectsResponseSchema },
+  listWorkspaces: { response: mobileWorkspacesResponseSchema },
+  listWorkspaceTeams: { response: mobileWorkspaceTeamsResponseSchema },
+  listTeamProjects: { response: mobileTeamProjectsResponseSchema },
+  createPlanningProject: {
+    request: mobilePlanningProjectCreateRequestSchema,
+    response: mobilePlanningProjectResponseSchema,
+  },
+  updatePlanningProject: {
+    request: mobilePlanningProjectUpdateRequestSchema,
+    response: mobilePlanningProjectResponseSchema,
+  },
+  moveIssueProject: {
+    request: mobileIssueProjectMoveRequestSchema,
+    response: mobileIssueProjectMoveResponseSchema,
+  },
+  resolveIssueHierarchyLocation: {
+    response: mobileIssueHierarchyLocationResponseSchema,
+  },
   getInboxFeed: { response: mobileInboxFeedResponseSchema },
   getInboxReadStates: { response: mobileInboxReadStatesSchema },
   putInboxReadStates: {

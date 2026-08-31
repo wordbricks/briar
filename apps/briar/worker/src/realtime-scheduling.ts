@@ -352,7 +352,7 @@ export function scheduleProjectRealtimePublish(
   if (!env.CHANNEL_REALTIME) return;
   const publish = Promise.all([
     db.prepare(
-      `select organization_id from briar_projects where id = ?`,
+      `select organization_id from briar_teams where id = ?`,
     ).bind(projectId).first<{ organization_id: string }>(),
     getDashboardSyncCursor(db, projectId),
   ]).then(([project, cursor]) => {
@@ -384,7 +384,7 @@ export function scheduleProjectAgentSessionRealtimePublish(
   if (!env.CHANNEL_REALTIME) return;
   const publish = Promise.all([
     db.prepare(
-      `select organization_id from briar_projects where id = ?`,
+      `select organization_id from briar_teams where id = ?`,
     ).bind(projectId).first<{ organization_id: string }>(),
     getProjectAgentSessionSyncCursor(db, projectId),
   ]).then(([project, version]) => {

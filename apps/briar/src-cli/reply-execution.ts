@@ -1068,9 +1068,10 @@ async function runClaimedChannelReply(
 async function failClaimedChannelReply(
   config: Config,
   project: ProjectConfig,
-  reply: ClaimedChannelReply,
+  reply: Pick<ClaimedChannelReply, "workId" | "organizationId" | "claimToken">,
   workerToken: string,
   error: unknown,
+  signal?: AbortSignal,
 ) {
   const workerId = project.executionWorker?.workerId;
   if (!workerId) throw error;
@@ -1080,6 +1081,7 @@ async function failClaimedChannelReply(
     workerToken,
     {
       method: "POST",
+      signal,
       body: JSON.stringify({
         organizationId: reply.organizationId,
         workerId,

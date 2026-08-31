@@ -23,6 +23,7 @@ import { handleManagedComputerRoute } from "./managed-computer-routes";
 import { handleOrganizationChannelRoute } from "./organization-channel-routes";
 import { handleOrganizationWorkerRoute } from "./organization-worker-routes";
 import { handleOrganizationRoute } from "./organization-routes";
+import { handleHierarchyRoute } from "./hierarchy-routes";
 import { handleProjectAgentRoute } from "./project-agent-routes";
 import { handleProjectAgentSessionRoute } from "./project-agent-session-routes";
 import { handleProjectAgentTaskRoute } from "./project-agent-task-routes";
@@ -199,6 +200,14 @@ async function route(
     context,
   });
   if (managedComputerResponse !== undefined) return managedComputerResponse;
+
+  const hierarchyResponse = await handleHierarchyRoute({
+    request,
+    url,
+    auth,
+    db,
+  });
+  if (hierarchyResponse !== undefined) return hierarchyResponse;
 
   const organizationResponse = await handleOrganizationRoute({
     request,

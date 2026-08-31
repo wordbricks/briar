@@ -157,7 +157,7 @@ const skillsCommand = Command.make("skills").pipe(
 );
 
 const projectCommand = Command.make("project").pipe(
-  Command.withDescription("Create and configure Briar projects"),
+  Command.withDescription("Compatibility alias for repository-backed Teams"),
   Command.withSubcommands([
     leaf(
       "list",
@@ -197,6 +197,51 @@ const projectCommand = Command.make("project").pipe(
       },
       configureProject,
       "Configure project integrations and execution policy",
+    ),
+  ]),
+);
+
+const teamCommand = Command.make("team").pipe(
+  Command.withDescription("Create and configure repository-backed Briar Teams"),
+  Command.withSubcommands([
+    leaf(
+      "list",
+      switches("json"),
+      listProjectsCommand,
+      "List Teams available to the signed-in user",
+    ),
+    leaf(
+      "create",
+      optionalStrings("name"),
+      createProject,
+      "Create and connect a Team",
+    ),
+    leaf("doctor", {}, projectDoctor, "Inspect Team readiness"),
+    leaf(
+      "configure",
+      {
+        ...optionalStrings(
+          "velen-org",
+          "data-source",
+          "linear-source",
+          "linear-team",
+          "worktree-root",
+          "branch-prefix",
+          "github-repository",
+        ),
+        ...switches(
+          "disable-velen",
+          "enable-linear",
+          "disable-linear",
+          "enable-worktrees",
+          "disable-worktrees",
+          "enable-full-access",
+          "disable-full-access",
+          "i-understand-the-risk",
+        ),
+      },
+      configureProject,
+      "Configure Team integrations and execution policy",
     ),
   ]),
 );
@@ -295,7 +340,7 @@ const issueCommand = Command.make("issue").pipe(
       "create",
       {
         ...requiredStrings("title"),
-        ...optionalStrings("description", "description-file", "status"),
+        ...optionalStrings("description", "description-file", "status", "project"),
         ...optionalIntegers("priority"),
       },
       createIssueCommand,
@@ -738,6 +783,7 @@ export const briarCommand = Command.make("briar").pipe(
     versionCommand,
     skillsCommand,
     projectCommand,
+    teamCommand,
     connectCommand,
     issueCommand,
     channelCommand,

@@ -28,6 +28,8 @@ struct CompanionShellView: View {
     let issueConversationView: IssueConversationViewTracker
 
     let projects: [ProjectsResponse.Project]
+    var planningProjects: [PlanningProject] = []
+    var selectedPlanningProjectID: UUID? = nil
     let project: ProjectsResponse.Project
     let snapshot: DashboardSnapshot?
     let errorMessage: String?
@@ -37,6 +39,7 @@ struct CompanionShellView: View {
     let refresh: () async -> Void
     let ensureIssueAvailable: (UUID, UUID) async -> Bool
     let selectProject: (UUID) -> Void
+    var selectPlanningProject: (UUID?) -> Void = { _ in }
     let signOut: () -> Void
 
     private var companionLocale: CompanionLocale {
@@ -143,6 +146,10 @@ struct CompanionShellView: View {
                 TaskListView(
                     project: project,
                     projects: projects,
+                    planningProjects: planningProjects.filter {
+                        $0.teamId == project.id && $0.status != .cancelled
+                    },
+                    selectedPlanningProjectID: selectedPlanningProjectID,
                     projectAgents: agents.agents.filter { $0.projectId == project.id },
                     snapshot: snapshot,
                     errorMessage: errorMessage,
@@ -157,7 +164,7 @@ struct CompanionShellView: View {
                         navigation.open(.session(projectID: projectID, sessionID: sessionID))
                     }
                 )
-                .id(project.id)
+                .id("\(project.id.uuidString):\(selectedPlanningProjectID?.uuidString ?? "all")")
                 .navigationTitle(L10n.text("Tasks", locale: companionLocale))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { companionToolbar(showsProjectMenu: true) }
@@ -432,17 +439,30 @@ struct CompanionShellView: View {
                         },
                         id: \.id
                     ) { candidate in
-                        Button {
-                            navigation.cancelPendingIssue()
-                            selectProject(candidate.id)
-                        } label: {
-                            if candidate.id == project.id {
-                                Label(
-                                    "\(candidate.name) · \(candidate.organizationName)",
-                                    systemImage: "checkmark"
-                                )
+                        Menu("\(candidate.name) · \(candidate.organizationName)") {
+                            let childProjects = planningProjects.filter {
+                                $0.teamId == candidate.id && $0.status != .cancelled
+                            }
+                            if childProjects.isEmpty {
+                                Button(candidate.name) {
+                                    navigation.cancelPendingIssue()
+                                    selectProject(candidate.id)
+                                    selectPlanningProject(nil)
+                                }
                             } else {
-                                Text("\(candidate.name) · \(candidate.organizationName)")
+                                ForEach(childProjects) { child in
+                                    Button {
+                                        navigation.cancelPendingIssue()
+                                        selectProject(candidate.id)
+                                        selectPlanningProject(child.id)
+                                    } label: {
+                                        if child.id == selectedPlanningProjectID {
+                                            Label(child.name, systemImage: "checkmark")
+                                        } else {
+                                            Text(child.name)
+                                        }
+                                    }
+                                }
                             }
                         }
                         .accessibilityIdentifier(
@@ -500,6 +520,8 @@ struct TaskListView: View {
 
     let project: ProjectsResponse.Project
     let projects: [ProjectsResponse.Project]
+    let planningProjects: [PlanningProject]
+    let selectedPlanningProjectID: UUID?
     let projectAgents: [ProjectAgent]
     let snapshot: DashboardSnapshot?
     let errorMessage: String?
@@ -516,6 +538,8 @@ struct TaskListView: View {
     init(
         project: ProjectsResponse.Project,
         projects: [ProjectsResponse.Project] = [],
+        planningProjects: [PlanningProject] = [],
+        selectedPlanningProjectID: UUID? = nil,
         projectAgents: [ProjectAgent] = [],
         snapshot: DashboardSnapshot?,
         errorMessage: String?,
@@ -530,6 +554,8 @@ struct TaskListView: View {
     ) {
         self.project = project
         self.projects = projects
+        self.planningProjects = planningProjects
+        self.selectedPlanningProjectID = selectedPlanningProjectID
         self.projectAgents = projectAgents
         self.snapshot = snapshot
         self.errorMessage = errorMessage
@@ -544,13 +570,18 @@ struct TaskListView: View {
         _mutations = StateObject(wrappedValue: IssueMutationStore(
             api: api,
             projectID: project.id,
+            issueProjectID: selectedPlanningProjectID,
             token: token
         ))
     }
 
     private var runs: [DashboardRun] {
+        let scopedRuns = (snapshot?.runs ?? []).filter { run in
+            guard let selectedPlanningProjectID else { return true }
+            return run.projectId == nil || run.projectId == selectedPlanningProjectID
+        }
         TaskOrdering.byMostRecentlyUpdated(
-            (snapshot?.runs ?? []).filter(filter.includes)
+            scopedRuns.filter(filter.includes)
         )
     }
 
@@ -574,6 +605,13 @@ struct TaskListView: View {
                         Section {
                             Label(errorMessage, systemImage: "wifi.exclamationmark")
                                 .foregroundStyle(.orange)
+                        }
+                    }
+                    if let mutationError = mutations.errorMessage,
+                       !mutationError.isEmpty {
+                        Section {
+                            Label(mutationError, systemImage: "exclamationmark.triangle")
+                                .foregroundStyle(.red)
                         }
                     }
                     if snapshot == nil {
@@ -636,6 +674,29 @@ struct TaskListView: View {
                                     .accessibilityIdentifier(
                                         "task-process-now-\(run.id.uuidString.lowercased())"
                                     )
+                                }
+                            }
+                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                if let sourceProjectID = run.projectId {
+                                    ForEach(planningProjects.filter {
+                                        $0.id != sourceProjectID && $0.status != .cancelled
+                                    }) { target in
+                                        Button {
+                                            Task {
+                                                do {
+                                                    _ = try await mutations.moveIssueProject(
+                                                        runID: run.id,
+                                                        sourceProjectID: sourceProjectID,
+                                                        targetProjectID: target.id
+                                                    )
+                                                    await refresh()
+                                                } catch {}
+                                            }
+                                        } label: {
+                                            Label(target.name, systemImage: "folder")
+                                        }
+                                        .tint(.indigo)
+                                    }
                                 }
                             }
                         }

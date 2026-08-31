@@ -69,6 +69,10 @@ struct InboxFeedMessage: Codable, Equatable, Sendable {
     let kind: InboxMessageKind
     let projectId: UUID
     let projectName: String
+    let workspaceId: UUID?
+    let teamId: UUID?
+    let planningProjectId: UUID?
+    let planningProjectName: String?
     let targetId: String
     let title: String
     let occurredAt: Date
@@ -96,6 +100,10 @@ struct InboxFeedMessage: Codable, Equatable, Sendable {
         kind: InboxMessageKind,
         projectId: UUID,
         projectName: String,
+        workspaceId: UUID? = nil,
+        teamId: UUID? = nil,
+        planningProjectId: UUID? = nil,
+        planningProjectName: String? = nil,
         targetId: String,
         title: String,
         occurredAt: Date,
@@ -122,6 +130,10 @@ struct InboxFeedMessage: Codable, Equatable, Sendable {
         self.kind = kind
         self.projectId = projectId
         self.projectName = projectName
+        self.workspaceId = workspaceId
+        self.teamId = teamId
+        self.planningProjectId = planningProjectId
+        self.planningProjectName = planningProjectName
         self.targetId = targetId
         self.title = title
         self.occurredAt = occurredAt

@@ -328,6 +328,8 @@ struct CompanionRootView: View {
             channels: channels,
             issueConversationView: issueConversationView,
             projects: companion.projects,
+            planningProjects: companion.planningProjects,
+            selectedPlanningProjectID: companion.selectedPlanningProjectID,
             project: project,
             snapshot: dashboard.snapshot,
             errorMessage: dashboard.errorMessage,
@@ -336,19 +338,33 @@ struct CompanionRootView: View {
             user: companion.user,
             refresh: { await dashboard.refresh(forceSnapshot: true) },
             ensureIssueAvailable: { projectID, runID in
+                let location: IssueHierarchyLocationResponse? = try? await api.send(
+                    MobileAPIContract.Endpoint.issueHierarchyLocation(
+                        teamID: projectID,
+                        runID: runID
+                    ),
+                    method: "GET",
+                    token: token,
+                    body: nil,
+                    as: IssueHierarchyLocationResponse.self
+                )
+                let resolvedTeamID = location?.teamId ?? projectID
                 guard let target = companion.projects.first(where: {
-                    $0.id == projectID
+                    $0.id == resolvedTeamID
                 }) else { return false }
                 // Keep the account selection and every project-scoped store
                 // aligned before loading the canonical dashboard.
-                companion.selectedProjectID = projectID
-                dashboard.select(projectID: projectID, token: token)
+                companion.selectedProjectID = resolvedTeamID
+                if let planningProjectID = location?.projectId {
+                    companion.selectPlanningProject(planningProjectID)
+                }
+                dashboard.select(projectID: resolvedTeamID, token: token)
                 channels.select(
                     organizationID: target.organizationId,
                     token: token
                 )
                 agents.select(
-                    projectID: projectID,
+                    projectID: resolvedTeamID,
                     token: token,
                     locale: locale.rawValue
                 )
@@ -359,6 +375,7 @@ struct CompanionRootView: View {
                 )
             },
             selectProject: { companion.selectedProjectID = $0 },
+            selectPlanningProject: { companion.selectPlanningProject($0) },
             signOut: signOut
         )
     }

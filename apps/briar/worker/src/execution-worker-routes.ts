@@ -604,7 +604,7 @@ export async function handleExecutionWorkerRoute(
     } catch (error) {
       if (workerId && error instanceof WorkerConflictError) {
         const project = await db
-          .prepare(`select organization_id from briar_projects where id = ?`)
+          .prepare(`select organization_id from briar_teams where id = ?`)
           .bind(projectId)
           .first<{ organization_id: string }>();
         if (project) {

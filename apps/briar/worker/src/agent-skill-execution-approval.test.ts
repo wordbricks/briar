@@ -233,7 +233,7 @@ describe("conversational Agent Skill execution approval", () => {
          ) values (?, ?, 'developer', ?, ?)`,
       ).bind(organizationId, memberId, observedAt, observedAt),
       db.prepare(
-        `insert into briar_projects (
+        `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, 'Skill approval project', ?, ?, ?)`,
@@ -274,7 +274,7 @@ describe("conversational Agent Skill execution approval", () => {
         observedAt,
       ),
       db.prepare(
-        `insert into briar_projects (
+        `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, 'Stale device bootstrap', ?, ?, ?)`,

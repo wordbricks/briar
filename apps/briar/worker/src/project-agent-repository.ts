@@ -99,7 +99,7 @@ export async function createProjectAgent(
   // Organization identity follows the project and is required before the
   // Agent can appear in a channel roster.
   const organization = await db
-    .prepare(`select organization_id from briar_projects where id = ?`)
+    .prepare(`select organization_id from briar_teams where id = ?`)
     .bind(projectId)
     .first<{ organization_id: string }>();
   if (!organization) throw new Error("Project not found");

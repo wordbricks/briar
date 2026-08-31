@@ -3,6 +3,10 @@ import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { channelReplyClaimTokenHeader } from "../../src/lib/channels-contract";
 import {
+  channelReplyClaimValidationError,
+  decodeChannelReplyClaimOrFail,
+} from "../../src-cli/channel-reply-claim";
+import {
   addChannelAgent,
   channelReplyJson,
   completeChannelReply,
@@ -107,7 +111,7 @@ describe("Organization Agent channel delegation", () => {
       [otherProjectId, "Other"],
     ]) {
       await db.prepare(
-        `insert into briar_projects (
+        `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, ?, ?, ?, ?)`,
@@ -1232,6 +1236,86 @@ describe("Organization Agent channel delegation", () => {
       listChannelAgentReplies(db, channelId, messageId),
     ).resolves.toEqual([]);
     await expect(claim(projectWorkerId)).resolves.toEqual({ work: null });
+  });
+
+  it("retries and fails undecodable Worker claims without waiting for their leases", async () => {
+    const job = await queueOrganizationReply("Check claim validation failure reporting.");
+    const response = await claim(otherWorkerId);
+    const valid = await decodeChannelReplyClaimOrFail(response.work, {
+      organizationId,
+      failClaim: async () => { throw new Error("The API claim should be valid"); },
+    });
+    expect(valid.workId).toBe(job.id);
+    expect(valid.session).not.toBeNull();
+
+    const rejected = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${job.id}/complete`, {
+        organizationId,
+        workerId: otherWorkerId,
+        claimToken: "briar_channel_claim_wrong_token",
+        error: channelReplyClaimValidationError,
+      }),
+      env(),
+    );
+    expect(rejected.status).toBe(409);
+    await expect(getChannelAgentReplyJob(db, organizationId, job.id))
+      .resolves.toMatchObject({ status: "running", attempts: 1 });
+
+    let raw = response.work;
+    for (const expectedStatus of ["queued", "queued", "failed"]) {
+      let reportedStatus = 0;
+      let reportedBody: unknown;
+      await expect(decodeChannelReplyClaimOrFail({
+        ...raw,
+        session: { ...valid.session, claimReason: "unsupported_future_reason" },
+      }, {
+        organizationId,
+        failClaim: async (reference, error) => {
+          const failed = await apiWorker.fetch(
+            workerRequest(`/channel-reply-claims/${reference.workId}/complete`, {
+              organizationId: reference.organizationId,
+              workerId: otherWorkerId,
+              claimToken: reference.claimToken,
+              error: error.message,
+            }),
+            env(),
+          );
+          reportedStatus = failed.status;
+          reportedBody = await failed.json();
+        },
+      })).rejects.toThrow(`Reported failure for reply ${job.id}`);
+      expect(reportedStatus).toBe(200);
+      expect(reportedBody).toMatchObject({
+        agentReply: { status: expectedStatus, error: channelReplyClaimValidationError },
+      });
+      await expect(getChannelAgentReplyJob(db, organizationId, job.id))
+        .resolves.toMatchObject({
+          status: expectedStatus,
+          claimed_worker_id: null,
+          claim_token_hash: null,
+          lease_expires_at: null,
+        });
+      if (expectedStatus === "queued") {
+        // No clock advance or lease expiry: the same job is immediately claimable.
+        const retry = await claim(otherWorkerId);
+        expect(retry.work).toMatchObject({ workId: job.id });
+        raw = retry.work;
+      }
+    }
+
+    await expect(getChannelAgentReplyJob(db, organizationId, job.id))
+      .resolves.toMatchObject({
+        status: "failed",
+        attempts: 3,
+        claimed_worker_id: null,
+        claim_token_hash: null,
+        lease_expires_at: null,
+        error: channelReplyClaimValidationError,
+      });
+    const replies = await listChannelAgentReplies(db, channelId, job.trigger_message_id);
+    expect(replies.some((reply) => reply.status === "running" || reply.status === "queued"))
+      .toBe(false);
+    await expect(claim(otherWorkerId)).resolves.toEqual({ work: null });
   });
 
   it("requires the claim token header for delegated attachment reads", async () => {
