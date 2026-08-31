@@ -7,7 +7,7 @@ import {
 
 describe("worker queue claim validation", () => {
   it("reports an invalid claimed channel reply with its generated claim identity", async () => {
-    const completeChannelReply = vi.fn(async () => ({}));
+    const completeChannelReply = vi.fn(async (_request: unknown) => ({}));
     const client = {
       claimWork: async () => ({
         retryAfterMs: 0,
