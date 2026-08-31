@@ -311,7 +311,8 @@ describe("D1 to R2 log archives", () => {
          started_at, completed_at, updated_at
        ) values (
          '${projectId}', 'project-session-1', 'completed', 'task',
-         '{"summary":"done"}', '${oldTime}', '${oldTime}', '${oldTime}'
+         '{"dispatchGroupId":"project-session-1","agentId":null,"sessionType":"task","trigger":"manual","scheduleId":null,"scheduleRunId":null,"parentSessionId":null,"request":"Archive the completed session","status":"completed","issues":[],"startedAt":"${oldTime}","completedAt":"${oldTime}","conversationId":null,"summary":"done","error":null,"events":[],"updatedAt":"${oldTime}"}',
+         '${oldTime}', '${oldTime}', '${oldTime}'
        );`,
     );
     const rawTranscript =
