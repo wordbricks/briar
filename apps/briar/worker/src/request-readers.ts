@@ -427,9 +427,9 @@ export async function readIssueRequest(request: Request) {
           ? difficulty
           : undefined,
       assigneeUserId:
-        typeof assigneeUserId === "string" && assigneeUserId.trim()
-          ? assigneeUserId
-          : null,
+        typeof assigneeUserId === "string"
+          ? assigneeUserId.trim() || null
+          : undefined,
       status: typeof status === "string" && status ? status : undefined,
       preferredProvider:
         typeof preferredProvider === "string" && preferredProvider.trim()

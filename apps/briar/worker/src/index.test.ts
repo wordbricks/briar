@@ -908,6 +908,62 @@ describe("Worker HTTP contract", () => {
     expect(input.difficulty).toBeNull();
   });
 
+  it("decodes assigneeUserId as undefined when omitted and null when explicitly empty or null", async () => {
+    const omittedJsonRequest = new Request(
+      "https://briar-api.example/projects/22222222-2222-4222-8222-222222222222/issues",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: "담당자 미지정 이슈",
+        }),
+      },
+    );
+    const { input: omittedJson } = await readIssueRequest(omittedJsonRequest);
+    expect(omittedJson.assigneeUserId).toBeUndefined();
+
+    const explicitNullJsonRequest = new Request(
+      "https://briar-api.example/projects/22222222-2222-4222-8222-222222222222/issues",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: "담당자 명시적 null 이슈",
+          assigneeUserId: null,
+        }),
+      },
+    );
+    const { input: explicitNullJson } = await readIssueRequest(explicitNullJsonRequest);
+    expect(explicitNullJson.assigneeUserId).toBeNull();
+
+    const multipartForm = new FormData();
+    multipartForm.set("title", "멀티파트 이슈");
+    const omittedMultipartRequest = new Request(
+      "https://briar-api.example/projects/22222222-2222-4222-8222-222222222222/issues",
+      {
+        method: "POST",
+        headers: { "Content-Length": "1024" },
+        body: multipartForm,
+      },
+    );
+    const { input: omittedMultipart } = await readIssueRequest(omittedMultipartRequest);
+    expect(omittedMultipart.assigneeUserId).toBeUndefined();
+
+    const explicitEmptyMultipartForm = new FormData();
+    explicitEmptyMultipartForm.set("title", "멀티파트 미배정 이슈");
+    explicitEmptyMultipartForm.set("assigneeUserId", "");
+    const explicitEmptyMultipartRequest = new Request(
+      "https://briar-api.example/projects/22222222-2222-4222-8222-222222222222/issues",
+      {
+        method: "POST",
+        headers: { "Content-Length": "1024" },
+        body: explicitEmptyMultipartForm,
+      },
+    );
+    const { input: explicitEmptyMultipart } = await readIssueRequest(explicitEmptyMultipartRequest);
+    expect(explicitEmptyMultipart.assigneeUserId).toBeNull();
+  });
+
   it("rejects an effort preference without a provider on issue creation", async () => {
     const issueRequest = () =>
       new Request(
