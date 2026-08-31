@@ -1,3 +1,4 @@
+import { DashboardService } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import { isRepositoryWorkflowPending } from "../src/lib/auto-hunt-contract";
 import { projectSettingsFromProto } from "../src/lib/app-rpc/project-configuration-mappers";
 import { requiredMessage } from "../src/lib/app-rpc/mappers";
@@ -6,7 +7,7 @@ import {
   type Config,
   type ProjectConfig,
 } from "./config-contract";
-import { fetchDashboard } from "./app-connect-client";
+import { createAuthenticatedConnectClient } from "./connect-client";
 
 export type RemoteProjectSettings = Omit<ProjectSettings, "githubRepositoryId"> & {
   readonly githubRepositoryId?: number | null;
@@ -23,11 +24,11 @@ export const fetchRemoteProjectSettings: FetchRemoteProjectSettings = async (
   projectId,
   userToken,
 ) => {
-  const response = await fetchDashboard(
+  const response = await createAuthenticatedConnectClient(
+    DashboardService,
     apiUrl,
     userToken,
-    projectId,
-  );
+  ).getDashboard({ projectId });
   return projectSettingsFromProto(
     requiredMessage(response.settings, "dashboard.settings"),
   );

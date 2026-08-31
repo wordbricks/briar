@@ -34,7 +34,8 @@ import { timestampDate } from "@bufbuild/protobuf/wkt";
 import type {
   QueuedAttachment,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
-import { fetchDashboard } from "./app-connect-client";
+import { DashboardService } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+import { createAuthenticatedConnectClient } from "./connect-client";
 import {
   localClaimResult,
   localClaimResultJson,
@@ -371,11 +372,11 @@ async function syncCompletedWorktreeRecordsFromDashboard(
   project: ProjectConfig,
 ): Promise<number> {
   if (!config.userToken) return 0;
-  const dashboard = await fetchDashboard(
+  const dashboard = await createAuthenticatedConnectClient(
+    DashboardService,
     config.apiUrl,
     config.userToken,
-    project.id,
-  );
+  ).getDashboard({ projectId: project.id });
   const completedRuns = dashboard.runs
     .filter(
       (run): run is typeof run & {

@@ -46,7 +46,6 @@ import {
 import {
   fetchProjects,
   isUnauthenticatedConnectError,
-  updateRemoteProjectSettings,
 } from "./app-connect-client";
 import { createAuthenticatedConnectClient } from "./connect-client";
 import { HttpRequestError } from "./http-request-error";
@@ -336,9 +335,11 @@ async function configureProject() {
   await saveConfig(config);
 
   if (config.userToken) {
-    await updateRemoteProjectSettings(
+    await createAuthenticatedConnectClient(
+      ProjectService,
       config.apiUrl,
       config.userToken,
+    ).updateProjectSettings(
       create(UpdateProjectSettingsRequestSchema, {
         projectId: project.id,
         velenOrg: velenOrg ?? undefined,

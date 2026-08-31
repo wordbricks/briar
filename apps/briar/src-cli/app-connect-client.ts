@@ -6,16 +6,11 @@ import {
   AccountService,
   type GetCurrentUserResponse,
 } from "@briar/contracts/gen/briar/app/v1/account_pb";
-import {
-  DashboardService,
-  type GetDashboardResponse,
-} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import { FleetService } from "@briar/contracts/gen/briar/app/v1/fleet_pb";
 import { MergeQueueService } from "@briar/contracts/gen/briar/app/v1/merge_queue_pb";
 import {
   ProjectService,
   type ListProjectsResponse,
-  type UpdateProjectSettingsRequest,
 } from "@briar/contracts/gen/briar/app/v1/project_pb";
 import {
   managedComputerFromProto,
@@ -51,30 +46,6 @@ export async function fetchProjects(
     apiUrl,
     token,
   ).listProjects({})).projects;
-}
-
-export async function fetchDashboard(
-  apiUrl: string,
-  token: string,
-  projectId: string,
-): Promise<GetDashboardResponse> {
-  return createAuthenticatedConnectClient(
-    DashboardService,
-    apiUrl,
-    token,
-  ).getDashboard({ projectId });
-}
-
-export async function updateRemoteProjectSettings(
-  apiUrl: string,
-  token: string,
-  input: UpdateProjectSettingsRequest,
-) {
-  return createAuthenticatedConnectClient(
-    ProjectService,
-    apiUrl,
-    token,
-  ).updateProjectSettings(input);
 }
 
 export async function fetchManagedComputer(
