@@ -74,6 +74,7 @@ enum AppIconService {
         guard UIApplication.shared.supportsAlternateIcons || icon == .purple else {
             throw AppIconError.unsupported
         }
+        let storageKey = storageKey
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             UIApplication.shared.setAlternateIconName(icon.alternateIconName) { error in
                 if let error {

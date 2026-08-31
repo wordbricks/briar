@@ -27,6 +27,8 @@
     "mode": "smart"
   },
   "vars": {
+    "DM_MEMORY_INDEX_ENABLED": "false",
+    "DM_MEMORY_RETRIEVAL_ENABLED": "false",
     "APNS_TEAM_ID": "QFJZ2V3829",
     "MANAGED_COMPUTER_AWS_REGION": "us-east-1",
     "MANAGED_COMPUTER_AWS_LAUNCH_TEMPLATE_ID": "lt-0bf7a358da7b03e93",
@@ -71,6 +73,14 @@
       "database_name": "briar-db",
       "database_id": "b83c9a2a-2a41-48ec-8bc4-ef038f5c9685",
       "migrations_dir": "migrations"
+    }
+  ],
+  "ai": { "binding": "DM_MEMORY_AI", "remote": true },
+  "vectorize": [
+    {
+      "binding": "DM_MEMORY_INDEX",
+      "index_name": "briar-dm-memory-prod-m3-v1",
+      "remote": true
     }
   ],
   "durable_objects": {

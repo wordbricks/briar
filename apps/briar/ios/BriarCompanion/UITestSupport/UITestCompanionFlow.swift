@@ -313,6 +313,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             inbox: BriarAPI_InboxServiceClientMock(),
             issue: IssueServiceMock(scenario: scenario),
             channel: ChannelServiceMock(scenario: scenario),
+            dmMemory: DmMemoryServiceMock(scenario: scenario),
             agent: AgentServiceMock(),
             realtime: BriarAPI_RealtimeServiceClientMock(),
             preparedUploadClient: UITestPreparedUploadClient()
@@ -345,6 +346,8 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
     private actor Scenario {
         private var issueStatus: DashboardRun.Status?
         private var dependencyAdded = false
+        private var memoryVersion: UInt32 = 1
+        private var memoryDeleted = false
         private let delaysMessageSend: Bool
         private let delaysChannelLoad: Bool
         private let hasChannelHistory: Bool
@@ -424,6 +427,125 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
                 try await Task.sleep(for: .seconds(2))
             }
             return UITestAPIClient.createIssueMessageResponse(request)
+        }
+
+        private func memoryDocument(detail: Bool) -> BriarAPI_DmMemoryDocument {
+            var document = BriarAPI_DmMemoryDocument()
+            document.id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+            document.memorySpaceID = "99999999-9999-4999-8999-999999999999"
+            document.kind = .observation
+            document.title = "Synthetic memory"
+            document.version = memoryVersion
+            document.status = .active
+            document.memoryClass = .profile
+            document.evidenceType = .explicitUser
+            document.protectedByUser = true
+            document.sourceLanguage = "ko"
+            document.createdAt = Google_Protobuf_Timestamp(
+                date: Date(timeIntervalSince1970: 1_788_220_800)
+            )
+            document.updatedAt = document.createdAt
+            document.indexState = .pending
+            if detail {
+                document.body = "합성 데이터: 설명은 결론부터 제시한다."
+                var source = BriarAPI_DmMemorySource()
+                source.type = .userEditEvent
+                source.id = "fixture-edit"
+                source.version = 1
+                document.sources = [source]
+            }
+            return document
+        }
+
+        func listDmMemories() -> BriarAPI_ListDmMemoriesResponse {
+            var response = BriarAPI_ListDmMemoriesResponse()
+            response.eligible = true
+            var capabilities = BriarAPI_DmMemoryCapabilities()
+            capabilities.recall = false
+            capabilities.automaticLearning = false
+            response.capabilities = capabilities
+            var space = BriarAPI_DmMemorySpace()
+            space.id = "99999999-9999-4999-8999-999999999999"
+            space.channelID = "12121212-1212-4212-8212-121212121212"
+            space.agentID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            space.rosterEpoch = 1
+            space.status = .active
+            space.useEnabled = true
+            space.memoryRevision = UInt64(memoryVersion)
+            space.createdAt = Google_Protobuf_Timestamp(
+                date: Date(timeIntervalSince1970: 1_788_220_800)
+            )
+            space.updatedAt = space.createdAt
+            response.spaces = [space]
+            response.selectedSpaceID = space.id
+            response.documents = memoryDeleted ? [] : [memoryDocument(detail: false)]
+            return response
+        }
+
+        func getDmMemoryDocument() -> BriarAPI_GetDmMemoryDocumentResponse {
+            var response = BriarAPI_GetDmMemoryDocumentResponse()
+            response.document = memoryDocument(detail: true)
+            return response
+        }
+
+        func updateDmMemoryDocument() async throws -> BriarAPI_UpdateDmMemoryDocumentResponse {
+            try await Task.sleep(for: .seconds(1))
+            memoryVersion += 1
+            var response = BriarAPI_UpdateDmMemoryDocumentResponse()
+            response.documentID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+            response.version = memoryVersion
+            return response
+        }
+
+        func deleteDmMemoryDocument() -> BriarAPI_DeleteDmMemoryDocumentResponse {
+            memoryDeleted = true
+            var response = BriarAPI_DeleteDmMemoryDocumentResponse()
+            response.deleted = true
+            response.purgeState = "pending"
+            return response
+        }
+    }
+
+    private final class DmMemoryServiceMock: BriarAPI_DmMemoryServiceClientMock,
+        @unchecked Sendable
+    {
+        private let scenario: Scenario
+
+        init(scenario: Scenario) {
+            self.scenario = scenario
+            super.init()
+        }
+
+        override func listDmMemories(
+            request _: BriarAPI_ListDmMemoriesRequest,
+            headers _: Connect.Headers = [:]
+        ) async -> ResponseMessage<BriarAPI_ListDmMemoriesResponse> {
+            .success(await scenario.listDmMemories())
+        }
+
+        override func getDmMemoryDocument(
+            request _: BriarAPI_GetDmMemoryDocumentRequest,
+            headers _: Connect.Headers = [:]
+        ) async -> ResponseMessage<BriarAPI_GetDmMemoryDocumentResponse> {
+            .success(await scenario.getDmMemoryDocument())
+        }
+
+        override func updateDmMemoryDocument(
+            request _: BriarAPI_UpdateDmMemoryDocumentRequest,
+            headers _: Connect.Headers = [:]
+        ) async -> ResponseMessage<BriarAPI_UpdateDmMemoryDocumentResponse> {
+            do {
+                return .success(try await scenario.updateDmMemoryDocument())
+            } catch {
+                return .failure(error)
+            }
+        }
+
+        override func deleteDmMemoryDocument(
+            request _: BriarAPI_DeleteDmMemoryDocumentRequest,
+            headers _: Connect.Headers = [:]
+        ) async -> ResponseMessage<BriarAPI_DeleteDmMemoryDocumentResponse> {
+            .success(await scenario.deleteDmMemoryDocument())
         }
     }
 

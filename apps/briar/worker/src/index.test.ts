@@ -43,6 +43,7 @@ import {
 import { slackCreateIssueShortcutCallbackId } from "./slack";
 
 const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
+  runDmMemoryMaintenance: vi.fn(async () => ({ expired: 0, indexing: null, cleanup: null })),
   cleanupExpiredChannelReplySessions: vi.fn(async () => []),
   maintainUploadCleanup: vi.fn(async () => ({
     enqueuedUploads: 0,
@@ -301,6 +302,7 @@ describe("Worker HTTP contract", () => {
     );
     await Promise.all(minute.pending);
     expect(minuteDependencies.reconcileGithubMergedRuns).toHaveBeenCalledOnce();
+    expect(minuteDependencies.runDmMemoryMaintenance).toHaveBeenCalledOnce();
     expect(
       minuteDependencies.reconcileEnabledMergeQueueRuns,
     ).toHaveBeenCalledOnce();

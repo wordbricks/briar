@@ -35,6 +35,9 @@ export async function createWorkerTestPlugin() {
   );
 
   return cloudflareTest({
+    // Unit tests use injected doubles for remote-only bindings. Never open a
+    // proxy session to production AI or Vectorize resources from Vitest.
+    remoteBindings: false,
     wrangler: {
       configPath: "./wrangler.jsonc",
     },

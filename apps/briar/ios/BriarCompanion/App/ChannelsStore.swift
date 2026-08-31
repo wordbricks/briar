@@ -97,12 +97,28 @@ final class ChannelsStore: ObservableObject {
     private struct Services: Sendable {
         let channel: any BriarAPI_ChannelServiceClientInterface
         let dashboard: any BriarAPI_DashboardServiceClientInterface
+        let dmMemory: any BriarAPI_DmMemoryServiceClientInterface
     }
 
     static let messagePageSize = 20
     static let cachedConversationLimit = 5
     static let cachedThreadLimit = 5
     static let cachedMessageLimit = 40
+
+    func makeMemoryStore(channelID: UUID) -> DmMemoryStore? {
+        guard let organizationID, let token, let dmMemoryService else { return nil }
+        let expectedGeneration = generation
+        return DmMemoryStore(
+            service: dmMemoryService,
+            downloadClient: api,
+            token: token,
+            organizationID: organizationID,
+            channelID: channelID,
+            scopeIsCurrent: { [weak self] in
+            self?.generation == expectedGeneration
+            }
+        )
+    }
 
     private struct CachedChannelConversation {
         let messages: [ChannelMessage]
@@ -168,6 +184,7 @@ final class ChannelsStore: ObservableObject {
     private let servicesForToken: @Sendable (String) -> Services
     private var channelService: (any BriarAPI_ChannelServiceClientInterface)?
     private var dashboardService: (any BriarAPI_DashboardServiceClientInterface)?
+    private var dmMemoryService: (any BriarAPI_DmMemoryServiceClientInterface)?
     private let realtime: (any MobileRealtimeClientProtocol)?
     private let managesRealtime: Bool
     private let attachmentReference: @Sendable () -> String
@@ -220,7 +237,11 @@ final class ChannelsStore: ObservableObject {
         self.preparedUploadClient = preparedUploadClient
         servicesForToken = { token in
             let services = servicesFactory.authenticatedServices(token: token)
-            return Services(channel: services.channel, dashboard: services.dashboard)
+            return Services(
+                channel: services.channel,
+                dashboard: services.dashboard,
+                dmMemory: services.dmMemory
+            )
         }
         self.realtime = realtime
         self.managesRealtime = managesRealtime
@@ -234,6 +255,7 @@ final class ChannelsStore: ObservableObject {
         preparedUploadClient: any PreparedUploadClientProtocol,
         channelService: any BriarAPI_ChannelServiceClientInterface,
         dashboardService: any BriarAPI_DashboardServiceClientInterface,
+        dmMemoryService: any BriarAPI_DmMemoryServiceClientInterface,
         realtime: (any MobileRealtimeClientProtocol)? = nil,
         managesRealtime: Bool = true,
         pollInterval: Duration = .seconds(60),
@@ -245,7 +267,11 @@ final class ChannelsStore: ObservableObject {
         self.api = api
         self.preparedUploadClient = preparedUploadClient
         servicesForToken = { _ in
-            Services(channel: channelService, dashboard: dashboardService)
+            Services(
+                channel: channelService,
+                dashboard: dashboardService,
+                dmMemory: dmMemoryService
+            )
         }
         self.realtime = realtime
         self.managesRealtime = managesRealtime
@@ -273,6 +299,7 @@ final class ChannelsStore: ObservableObject {
         let services = token.map(servicesForToken)
         channelService = services?.channel
         dashboardService = services?.dashboard
+        dmMemoryService = services?.dmMemory
         syncCursor = nil
         proposalRevisions = [:]
         latestProposals = [:]

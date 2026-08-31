@@ -1,0 +1,205 @@
+syntax = "proto3";
+
+package briar.app.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarAPI_";
+
+service DmMemoryService {
+  rpc ListDmMemories(ListDmMemoriesRequest) returns (ListDmMemoriesResponse);
+  rpc GetDmMemoryDocument(GetDmMemoryDocumentRequest) returns (GetDmMemoryDocumentResponse);
+  rpc CreateDmMemoryDocument(CreateDmMemoryDocumentRequest) returns (CreateDmMemoryDocumentResponse);
+  rpc UpdateDmMemoryDocument(UpdateDmMemoryDocumentRequest) returns (UpdateDmMemoryDocumentResponse);
+  rpc DeleteDmMemoryDocument(DeleteDmMemoryDocumentRequest) returns (DeleteDmMemoryDocumentResponse);
+  rpc UpdateDmMemorySettings(UpdateDmMemorySettingsRequest) returns (UpdateDmMemorySettingsResponse);
+}
+
+message ListDmMemoriesRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  optional string memory_space_id = 3;
+  optional string cursor = 4;
+}
+
+message ListDmMemoriesResponse {
+  bool eligible = 1;
+  DmMemoryCapabilities capabilities = 2;
+  repeated DmMemorySpace spaces = 3;
+  optional string selected_space_id = 4;
+  repeated DmMemoryDocument documents = 5;
+  optional string next_cursor = 6;
+}
+
+message GetDmMemoryDocumentRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string document_id = 3;
+}
+
+message GetDmMemoryDocumentResponse {
+  DmMemoryDocument document = 1;
+}
+
+message CreateDmMemoryDocumentRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string request_id = 3;
+  optional string memory_space_id = 4;
+  string title = 5;
+  string body = 6;
+  DmMemoryClass memory_class = 7;
+  string source_language = 8;
+  optional google.protobuf.Timestamp observed_at = 9;
+  optional google.protobuf.Timestamp valid_until = 10;
+  optional DmMemorySourceMessage source_message = 11;
+}
+
+message UpdateDmMemoryDocumentRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string document_id = 3;
+  string request_id = 4;
+  optional string memory_space_id = 5;
+  uint32 expected_version = 6;
+  string title = 7;
+  string body = 8;
+  DmMemoryClass memory_class = 9;
+  string source_language = 10;
+  optional google.protobuf.Timestamp observed_at = 11;
+  optional google.protobuf.Timestamp valid_until = 12;
+  optional DmMemorySourceMessage source_message = 13;
+}
+
+message CreateDmMemoryDocumentResponse {
+  string document_id = 1;
+  uint32 version = 2;
+  bool replayed = 3;
+}
+
+message UpdateDmMemoryDocumentResponse {
+  string document_id = 1;
+  uint32 version = 2;
+  bool replayed = 3;
+}
+
+message DeleteDmMemoryDocumentRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string document_id = 3;
+}
+
+message DeleteDmMemoryDocumentResponse {
+  bool deleted = 1;
+  string purge_state = 2;
+}
+
+message UpdateDmMemorySettingsRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string request_id = 3;
+  optional string memory_space_id = 4;
+  uint64 expected_memory_revision = 5;
+  bool use_enabled = 6;
+  bool auto_enabled = 7;
+}
+
+message UpdateDmMemorySettingsResponse {
+  DmMemorySpace space = 1;
+}
+
+message DmMemoryCapabilities {
+  bool recall = 1;
+  bool automatic_learning = 2;
+}
+
+message DmMemorySpace {
+  string id = 1;
+  string channel_id = 2;
+  string agent_id = 3;
+  uint64 roster_epoch = 4;
+  DmMemorySpaceStatus status = 5;
+  bool use_enabled = 6;
+  bool auto_enabled = 7;
+  uint64 memory_revision = 8;
+  uint64 revocation_epoch = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+message DmMemoryDocument {
+  string id = 1;
+  string memory_space_id = 2;
+  DmMemoryDocumentKind kind = 3;
+  string title = 4;
+  uint32 version = 5;
+  DmMemoryDocumentStatus status = 6;
+  bool conflicted = 7;
+  DmMemoryClass memory_class = 8;
+  DmMemoryEvidenceType evidence_type = 9;
+  bool protected_by_user = 10;
+  string source_language = 11;
+  optional google.protobuf.Timestamp observed_at = 12;
+  optional google.protobuf.Timestamp valid_until = 13;
+  google.protobuf.Timestamp created_at = 14;
+  google.protobuf.Timestamp updated_at = 15;
+  DmMemoryIndexState index_state = 16;
+  optional string body = 17;
+  repeated DmMemorySource sources = 18;
+}
+
+message DmMemorySourceMessage {
+  string id = 1;
+  uint32 version = 2;
+}
+
+message DmMemorySource {
+  DmMemorySourceType type = 1;
+  string id = 2;
+  uint32 version = 3;
+}
+
+enum DmMemoryClass {
+  DM_MEMORY_CLASS_UNSPECIFIED = 0;
+  DM_MEMORY_CLASS_PROFILE = 1;
+  DM_MEMORY_CLASS_LOG = 2;
+  DM_MEMORY_CLASS_NOTE = 3;
+}
+
+enum DmMemorySpaceStatus {
+  DM_MEMORY_SPACE_STATUS_UNSPECIFIED = 0;
+  DM_MEMORY_SPACE_STATUS_ACTIVE = 1;
+  DM_MEMORY_SPACE_STATUS_CLOSED = 2;
+}
+
+enum DmMemoryDocumentKind {
+  DM_MEMORY_DOCUMENT_KIND_UNSPECIFIED = 0;
+  DM_MEMORY_DOCUMENT_KIND_OBSERVATION = 1;
+  DM_MEMORY_DOCUMENT_KIND_TOPIC = 2;
+}
+
+enum DmMemoryDocumentStatus {
+  DM_MEMORY_DOCUMENT_STATUS_UNSPECIFIED = 0;
+  DM_MEMORY_DOCUMENT_STATUS_ACTIVE = 1;
+  DM_MEMORY_DOCUMENT_STATUS_INVALIDATED = 2;
+  DM_MEMORY_DOCUMENT_STATUS_SUPERSEDED = 3;
+}
+
+enum DmMemoryEvidenceType {
+  DM_MEMORY_EVIDENCE_TYPE_UNSPECIFIED = 0;
+  DM_MEMORY_EVIDENCE_TYPE_EXPLICIT_USER = 1;
+  DM_MEMORY_EVIDENCE_TYPE_OBSERVED = 2;
+}
+
+enum DmMemoryIndexState {
+  DM_MEMORY_INDEX_STATE_UNSPECIFIED = 0;
+  DM_MEMORY_INDEX_STATE_PENDING = 1;
+  DM_MEMORY_INDEX_STATE_READY = 2;
+  DM_MEMORY_INDEX_STATE_FAILED = 3;
+}
+
+enum DmMemorySourceType {
+  DM_MEMORY_SOURCE_TYPE_UNSPECIFIED = 0;
+  DM_MEMORY_SOURCE_TYPE_MESSAGE = 1;
+  DM_MEMORY_SOURCE_TYPE_USER_EDIT_EVENT = 2;
+}

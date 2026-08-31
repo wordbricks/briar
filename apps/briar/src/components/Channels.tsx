@@ -1,6 +1,7 @@
 import {
   AtSign,
   Bot,
+  Brain,
   Check,
   ChevronLeft,
   Copy,
@@ -22,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { Spinner } from "./ui/spinner";
+import { DmMemoryDialog } from "./DmMemoryDialog";
 import {
   useCallback,
   useEffect,
@@ -315,6 +317,7 @@ export function Channels({
   onCreateAgent,
   surface = "channel",
 }: ChannelsProps) {
+  const [memoryOpen, setMemoryOpen] = useState(false);
   const { t, localeTag } = useI18n();
   const imageCache = useChannelMessageImageCache(`${organizationId}\0${token}`);
   useEffect(() => {
@@ -1260,6 +1263,10 @@ export function Channels({
                 </div>
               )}
               <div className="channel-header-actions">
+                {surface === "dm" && <button type="button" className="channel-header-icon"
+                  aria-label={t("memory.title")} title={t("memory.title")} onClick={() => setMemoryOpen(true)}>
+                  <Brain size={16} aria-hidden="true" />
+                </button>}
                 {surface === "channel" ? <button
                   type="button"
                   className="channel-header-icon"
@@ -1661,6 +1668,10 @@ export function Channels({
           if (!open) setHeaderProfile(null);
         }}
       />
+      {memoryOpen && surface === "dm" && activeChannel && <DmMemoryDialog
+        key={`${organizationId}:${activeChannel.id}:${currentUserId}`}
+        scope={{ token, organizationId, channelId: activeChannel.id }} onClose={() => setMemoryOpen(false)}
+      />}
       {surface === "channel" && webhooksOpen && activeChannel ? (
         <ChannelWebhooksDialog
           channel={activeChannel}

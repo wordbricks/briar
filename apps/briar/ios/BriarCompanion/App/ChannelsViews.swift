@@ -430,6 +430,7 @@ struct ChannelMessagesView: View {
     @State private var previewFile: PreviewFile?
     @State private var selectedThread: ChannelThreadRoute?
     @State private var selectedProfile: ConversationProfileTarget?
+    @State private var memoryStore: DmMemoryStore?
 
     let channel: ChannelSummary
     let currentUserID: String?
@@ -487,6 +488,14 @@ struct ChannelMessagesView: View {
         .channelNavigationSubtitle(currentChannel.isDirectMessage ? nil : navigationSubtitle)
         .toolbar {
             if currentChannel.isDirectMessage {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(locale == .ko ? "기억" : "Memory", systemImage: "brain") {
+                        memoryStore = channels.makeMemoryStore(channelID: channel.id)
+                    }
+                    .accessibilityIdentifier("dm-memory-open")
+                }
+            }
+            if currentChannel.isDirectMessage {
                 ToolbarItem(placement: .principal) {
                     DirectMessageNavigationTitle(
                         channel: currentChannel,
@@ -509,6 +518,9 @@ struct ChannelMessagesView: View {
         }
         .toolbarBackground(.hidden, for: .navigationBar)
         .task(id: channel.id) { await channels.openChannel(channel.id) }
+        .sheet(item: $memoryStore) { store in DmMemoryView(store: store, locale: locale) }
+        .onChange(of: currentUserID) { _, _ in memoryStore = nil }
+        .onChange(of: channel.id) { _, _ in memoryStore = nil }
         .sheet(item: $previewFile) { file in
             QuickLookPreview(fileURL: file.url)
                 .accessibilityIdentifier("channel-attachment-preview")

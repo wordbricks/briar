@@ -10,6 +10,7 @@ import { requireSession } from "./session-auth";
 import { handleAccountRoute } from "./account-routes";
 import { handleIssueConversationRoute } from "./issue-conversation-routes";
 import { handleChannelMessageRoute } from "./channel-message-routes";
+import { handleDmMemoryRoute } from "./dm-memory-routes";
 import { handleChannelReplyResultRoute } from "./channel-reply-result-routes";
 import { handleManagedComputerRoute } from "./managed-computer-routes";
 import { handleProjectAgentRoute } from "./project-agent-routes";
@@ -128,15 +129,18 @@ async function route(
   if (realtimeResponse !== undefined) return realtimeResponse;
 
   const uploadResponse = await handleUploadRoute({
-      request,
-      url,
-      db,
-      bucket: attachmentsBucket,
-      signingSecret: env.BETTER_AUTH_SECRET,
-    });
+    request,
+    url,
+    db,
+    bucket: attachmentsBucket,
+    signingSecret: env.BETTER_AUTH_SECRET,
+  });
   if (uploadResponse !== undefined) {
     return uploadResponse;
   }
+
+  const memoryResponse = await handleDmMemoryRoute({ request, url, auth, db });
+  if (memoryResponse !== undefined) return memoryResponse;
 
   const channelMessageResponse = await handleChannelMessageRoute({
     request,

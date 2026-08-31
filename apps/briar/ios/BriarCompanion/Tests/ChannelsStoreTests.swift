@@ -141,6 +141,7 @@ final class ChannelsStoreTests: XCTestCase {
             preparedUploadClient: api,
             channelService: channelService,
             dashboardService: BriarAPI_DashboardServiceClientMock(),
+            dmMemoryService: BriarAPI_DmMemoryServiceClientMock(),
             managesRealtime: false,
             pollInterval: .seconds(3_600)
         )
@@ -169,6 +170,7 @@ final class ChannelsStoreTests: XCTestCase {
             preparedUploadClient: api,
             channelService: scenario.service(),
             dashboardService: BriarAPI_DashboardServiceClientMock(),
+            dmMemoryService: BriarAPI_DmMemoryServiceClientMock(),
             managesRealtime: false,
             pollInterval: .seconds(3_600),
             attachmentReference: { "new-upload-ref" }

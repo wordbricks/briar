@@ -47,6 +47,7 @@ struct AuthenticatedMobileServices: Sendable {
     let inbox: any BriarAPI_InboxServiceClientInterface
     let issue: any BriarAPI_IssueServiceClientInterface
     let channel: any BriarAPI_ChannelServiceClientInterface
+    let dmMemory: any BriarAPI_DmMemoryServiceClientInterface
     let agent: any BriarAPI_AgentServiceClientInterface
     let realtime: any BriarAPI_RealtimeServiceClientInterface
     let preparedUploadClient: any PreparedUploadClientProtocol
@@ -58,6 +59,7 @@ struct AuthenticatedMobileServices: Sendable {
         inbox: any BriarAPI_InboxServiceClientInterface,
         issue: any BriarAPI_IssueServiceClientInterface,
         channel: any BriarAPI_ChannelServiceClientInterface,
+        dmMemory: any BriarAPI_DmMemoryServiceClientInterface,
         agent: any BriarAPI_AgentServiceClientInterface,
         realtime: any BriarAPI_RealtimeServiceClientInterface,
         preparedUploadClient: any PreparedUploadClientProtocol
@@ -68,6 +70,7 @@ struct AuthenticatedMobileServices: Sendable {
         self.inbox = inbox
         self.issue = issue
         self.channel = channel
+        self.dmMemory = dmMemory
         self.agent = agent
         self.realtime = realtime
         self.preparedUploadClient = preparedUploadClient
@@ -90,6 +93,7 @@ struct AuthenticatedMobileServices: Sendable {
         inbox = BriarAPI_InboxServiceClient(client: protocolClient)
         issue = BriarAPI_IssueServiceClient(client: protocolClient)
         channel = BriarAPI_ChannelServiceClient(client: protocolClient)
+        dmMemory = BriarAPI_DmMemoryServiceClient(client: protocolClient)
         agent = BriarAPI_AgentServiceClient(client: protocolClient)
         realtime = BriarAPI_RealtimeServiceClient(client: protocolClient)
         preparedUploadClient = PreparedUploadHTTPClient(baseURL: baseURL, session: session)

@@ -7,6 +7,7 @@ import { registerAppAccountService } from "./app-connect-account";
 import { registerAppAgentService } from "./app-connect-agent";
 import { registerAppChannelService } from "./app-connect-channel";
 import { registerAppDashboardService } from "./app-connect-dashboard";
+import { registerAppDmMemoryService } from "./app-connect-dm-memory";
 import { registerAppFleetService } from "./app-connect-fleet";
 import { registerAppGithubServices } from "./app-connect-github";
 import { registerAppInboxService } from "./app-connect-inbox";
@@ -86,6 +87,7 @@ export async function handleAppConnectRequest(
     ...sharedInput,
     archivesBucket: input.env.ARCHIVES,
   });
+  registerAppDmMemoryService(router, sharedInput);
   registerAppInboxService(router, {
     ...sharedInput,
     env: input.env,

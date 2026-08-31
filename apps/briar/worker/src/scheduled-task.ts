@@ -19,6 +19,7 @@ import {
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { cleanupExpiredChannelReplySessions } from "./channels";
 import { maintainUploadCleanup } from "./upload-repository";
+import { runDmMemoryMaintenance } from "./dm-memory-indexing";
 
 export type ScheduledTaskDependencies = {
   archiveCompletedLogs: typeof archiveCompletedLogs;
@@ -32,6 +33,7 @@ export type ScheduledTaskDependencies = {
   reconcileManagedComputers: typeof reconcileManagedComputers;
   cleanupExpiredChannelReplySessions: typeof cleanupExpiredChannelReplySessions;
   maintainUploadCleanup: typeof maintainUploadCleanup;
+  runDmMemoryMaintenance: typeof runDmMemoryMaintenance;
 };
 
 interface DashboardChangePruneFailure {
@@ -50,6 +52,7 @@ const scheduledTaskDependencies: ScheduledTaskDependencies = {
   reconcileManagedComputers,
   cleanupExpiredChannelReplySessions,
   maintainUploadCleanup,
+  runDmMemoryMaintenance,
 };
 const GITHUB_RECONCILIATION_CRON = "* * * * *";
 const LOG_MAINTENANCE_CRON = "17 */6 * * *";
@@ -64,7 +67,7 @@ export async function handleScheduledTask(
   if (controller.cron === GITHUB_RECONCILIATION_CRON) {
     ctx.waitUntil((async () => {
       try {
-        const [github, mergeQueue, managedComputerRetirements] =
+        const [github, mergeQueue, managedComputerRetirements, dmMemory] =
           await Promise.all([
           dependencies.reconcileGithubMergedRuns(env.DB),
           dependencies.reconcileEnabledMergeQueueRuns(env.DB, observedAt),
@@ -73,6 +76,7 @@ export async function handleScheduledTask(
             env,
             observedAt,
           ),
+          dependencies.runDmMemoryMaintenance(env, observedAt),
         ]);
         await Promise.all([
           flushOrganizationInboxRealtimeOutbox(env, env.DB),
@@ -84,6 +88,7 @@ export async function handleScheduledTask(
           github,
           mergeQueue,
           managedComputerRetirements,
+          dmMemory,
         }));
       } catch (error) {
         console.error(JSON.stringify({
