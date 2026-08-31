@@ -7,6 +7,7 @@ readonly workspace_root
 readonly xcodebuild_bin="/usr/bin/xcodebuild"
 readonly xcode_select_bin="/usr/bin/xcode-select"
 readonly xcrun_bin="/usr/bin/xcrun"
+readonly xcodegen_bin="${XCODEGEN_BIN:-xcodegen}"
 
 readonly swift_project="apps/briar/ios/BriarCompanion/BriarCompanion.xcodeproj"
 readonly swift_dev_scheme="BriarCompanion-Dev"
@@ -82,6 +83,17 @@ require_xcode() {
   fi
 
   configure_runtime
+}
+
+generate_project() {
+  command -v "$xcodegen_bin" >/dev/null ||
+    fail "xcodegen is unavailable. Run this command through: mise exec -- bun run"
+  (
+    cd "$workspace_root"
+    "$xcodegen_bin" generate \
+      --spec apps/briar/ios/BriarCompanion/project.yml \
+      --project apps/briar/ios/BriarCompanion
+  )
 }
 
 runtime_is_available() {
@@ -203,6 +215,7 @@ bootstrap() {
 
 build_for_testing() {
   require_xcode
+  generate_project
   require_runtime
   cd "$workspace_root"
 
@@ -218,6 +231,7 @@ build_for_testing() {
 
 run_tests() {
   require_xcode
+  generate_project
   require_runtime
   require_default_device "$iphone_destination_overridden" "$iphone_name"
   cd "$workspace_root"
@@ -233,6 +247,7 @@ run_tests() {
 
 run_ipad_accessibility_test() {
   require_xcode
+  generate_project
   require_runtime
   require_default_device "$ipad_destination_overridden" "$ipad_name"
   cd "$workspace_root"
@@ -249,6 +264,7 @@ run_ipad_accessibility_test() {
 
 build_production() {
   require_xcode
+  generate_project
   require_runtime
   cd "$workspace_root"
 

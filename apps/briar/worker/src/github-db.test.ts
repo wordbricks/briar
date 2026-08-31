@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { create } from "@bufbuild/protobuf";
 import {
   GitHubPullRequestIdentitySchema,
-} from "@briar/contracts/gen/briar/types/v1/github_pb";
+} from "@briar/contracts/gen/briar/types/v1/github_identity_pb";
 import { beforeAll, describe, expect, it } from "vitest";
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
 import type {

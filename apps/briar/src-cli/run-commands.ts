@@ -33,7 +33,7 @@ import {
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import type {
   GitHubPullRequestIdentity,
-} from "@briar/contracts/gen/briar/types/v1/github_pb";
+} from "@briar/contracts/gen/briar/types/v1/github_identity_pb";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {
   briarIssueUrl,

@@ -10,7 +10,7 @@ import "briar/app/v1/fleet.proto";
 import "briar/realtime/v1/realtime.proto";
 import "briar/types/v1/agent_event.proto";
 import "briar/types/v1/agent_execution.proto";
-import "briar/types/v1/github.proto";
+import "briar/types/v1/github_identity.proto";
 import "briar/types/v1/provider.proto";
 import "briar/types/v1/upload.proto";
 import "briar/types/v1/worker.proto";

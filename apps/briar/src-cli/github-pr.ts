@@ -3,7 +3,7 @@ import { ProjectGitHubService } from "@briar/contracts/gen/briar/app/v1/github_p
 import {
   type GitHubPullRequestIdentity,
   GitHubPullRequestIdentitySchema,
-} from "@briar/contracts/gen/briar/types/v1/github_pb";
+} from "@briar/contracts/gen/briar/types/v1/github_identity_pb";
 import { githubPullRequestFromProto } from "../src/lib/app-rpc/github-mappers";
 import { requiredMessage } from "../src/lib/app-rpc/mappers";
 import { createAuthenticatedConnectClient } from "./connect-client";

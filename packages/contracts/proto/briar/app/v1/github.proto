@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package briar.app.v1;
 
-import "briar/types/v1/github.proto";
+import "briar/types/v1/github_identity.proto";
 import "google/protobuf/timestamp.proto";
 
 option swift_prefix = "BriarAPI_";

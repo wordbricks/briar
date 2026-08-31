@@ -19,7 +19,7 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/github_pb";
 import {
   GitHubPullRequestIdentitySchema,
-} from "@briar/contracts/gen/briar/types/v1/github_pb";
+} from "@briar/contracts/gen/briar/types/v1/github_identity_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
 
 type IntegrationResult = Awaited<

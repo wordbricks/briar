@@ -10,7 +10,7 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/github_pb";
 import type {
   GitHubPullRequestIdentity,
-} from "@briar/contracts/gen/briar/types/v1/github_pb";
+} from "@briar/contracts/gen/briar/types/v1/github_identity_pb";
 import {
   requiredMessage,
   requiredTimestamp,

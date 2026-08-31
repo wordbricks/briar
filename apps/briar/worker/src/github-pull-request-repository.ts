@@ -1,6 +1,6 @@
 import type {
   GitHubPullRequestIdentity,
-} from "@briar/contracts/gen/briar/types/v1/github_pb";
+} from "@briar/contracts/gen/briar/types/v1/github_identity_pb";
 import { attemptGithubMergeAutoResume } from "./github-merge-reconciliation";
 import {
   type GithubPullRequestState,

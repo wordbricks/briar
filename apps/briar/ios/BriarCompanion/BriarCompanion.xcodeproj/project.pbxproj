@@ -94,6 +94,7 @@
 		8F93611A53BF30C71375722B /* account.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6560F18BE176A37A2F5C2627 /* account.connect.swift */; };
 		921C8B38B3838485535BF1AF /* provider.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 279214785628E863F8B7FB7A /* provider.pb.swift */; };
 		93F911C575ED24F7ECB0C47C /* inbox.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1745F8806A14CA3818736C8 /* inbox.pb.swift */; };
+		9573627019D47EA6CCD32299 /* github_identity.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C38A5FA46AD37662E8ABC31 /* github_identity.pb.swift */; };
 		957E8AFF03429BC551975288 /* reporting.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80BB9356BE45ADFDEE713D69 /* reporting.mock.swift */; };
 		95EA1BD09B301286DE638DEC /* AttachmentPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F35D1C669DD97F245139645C /* AttachmentPipelineTests.swift */; };
 		967C64C6A88A080B5711C4CA /* CompanionReadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5F0E3F338DC5E3C1A397CA /* CompanionReadTests.swift */; };
@@ -333,6 +334,7 @@
 		894C6282DA7AFFFA63925739 /* SelectableTextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectableTextTests.swift; sourceTree = "<group>"; };
 		8A65B754A339632E2DB2E3E6 /* MobileAPIContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileAPIContract.swift; sourceTree = "<group>"; };
 		8BFE8FB1BE3297692F1673DD /* agent.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = agent.pb.swift; sourceTree = "<group>"; };
+		8C38A5FA46AD37662E8ABC31 /* github_identity.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = github_identity.pb.swift; sourceTree = "<group>"; };
 		8D58A82DF665701A38796406 /* realtime.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = realtime.pb.swift; sourceTree = "<group>"; };
 		8F5F2EB1A3439EA050E954B1 /* merge_queue.mock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = merge_queue.mock.swift; sourceTree = "<group>"; };
 		9178761C6C06EBFE0C17E556 /* issue.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = issue.pb.swift; sourceTree = "<group>"; };
@@ -631,6 +633,7 @@
 				26B48D4369CF90BDF9892925 /* agent_event.pb.swift */,
 				A231FC159634EA821A13C4D3 /* agent_execution.pb.swift */,
 				D388D7198B7FA49827CD3F52 /* error.pb.swift */,
+				8C38A5FA46AD37662E8ABC31 /* github_identity.pb.swift */,
 				279214785628E863F8B7FB7A /* provider.pb.swift */,
 				941275D22C27FF9A4E054E5F /* upload.pb.swift */,
 				CA71D4C0DF552FFD0C500981 /* worker.pb.swift */,
@@ -1054,6 +1057,7 @@
 				E120F8FE913482D43E546870 /* fleet.pb.swift in Sources */,
 				652CDF7E34C556D39C14B29E /* github.connect.swift in Sources */,
 				46A4FEB0B6808074B6BFD513 /* github.pb.swift in Sources */,
+				9573627019D47EA6CCD32299 /* github_identity.pb.swift in Sources */,
 				0E591256797429437E9A2027 /* inbox.connect.swift in Sources */,
 				93F911C575ED24F7ECB0C47C /* inbox.pb.swift in Sources */,
 				8733685C8D417EB80DAC77CE /* issue.connect.swift in Sources */,

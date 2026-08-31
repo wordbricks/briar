@@ -9,7 +9,7 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/github_pb";
 import {
   GitHubPullRequestIdentitySchema,
-} from "@briar/contracts/gen/briar/types/v1/github_pb";
+} from "@briar/contracts/gen/briar/types/v1/github_identity_pb";
 import { describe, expect, it } from "vitest";
 import {
   githubIntegrationFromProto,
