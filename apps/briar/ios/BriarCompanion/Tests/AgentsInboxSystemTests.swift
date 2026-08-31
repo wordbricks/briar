@@ -13,14 +13,6 @@ final class AgentsInboxSystemTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let legacyPreferences = try JSONSerialization.data(withJSONObject: [
-            "urgent": true,
-            "action_required": false,
-            "important": true,
-            "activity": false,
-        ])
-        defaults.set(legacyPreferences, forKey: "briar.settings.inbox-notifications.v1")
-
         var preferences = InboxNotificationPreferences.load(defaults: defaults)
         XCTAssertTrue(preferences.playSound)
 

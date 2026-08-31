@@ -393,29 +393,8 @@ final class InboxStore: ObservableObject {
         guard
             let data = defaults.data(forKey: storageKey),
             let decoded = try? JSONDecoder().decode(Storage.self, from: data)
-        else {
-            // Migrate legacy per-project keys once so local reads are not lost.
-            if readVersions.isEmpty {
-                readVersions = migrateLegacyReadVersions()
-            }
-            return
-        }
+        else { return }
         readVersions = decoded.readVersions
-    }
-
-    private func migrateLegacyReadVersions() -> [String: String] {
-        var migrated: [String: String] = [:]
-        for (key, value) in defaults.dictionaryRepresentation() {
-            guard key.hasPrefix("\(storageKeyPrefix).") else { continue }
-            guard !key.contains(".user.") else { continue }
-            guard let data = value as? Data,
-                  let decoded = try? JSONDecoder().decode(Storage.self, from: data)
-            else { continue }
-            for (messageID, version) in decoded.readVersions {
-                migrated[messageID] = version
-            }
-        }
-        return migrated
     }
 
     private func persistIfPossible() {

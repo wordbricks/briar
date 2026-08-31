@@ -137,7 +137,7 @@ struct InboxNotificationPreferences: Equatable, Sendable {
             return InboxNotificationPreferences()
         }
         return InboxNotificationPreferences(
-            playSound: decoded.play_sound ?? true,
+            playSound: decoded.play_sound,
             urgent: decoded.urgent,
             actionRequired: decoded.action_required,
             important: decoded.important,
@@ -161,7 +161,7 @@ struct InboxNotificationPreferences: Equatable, Sendable {
     private static let storageKey = "briar.settings.inbox-notifications.v1"
 
     private struct Storage: Codable {
-        var play_sound: Bool?
+        var play_sound: Bool
         var urgent: Bool
         var action_required: Bool
         var important: Bool
