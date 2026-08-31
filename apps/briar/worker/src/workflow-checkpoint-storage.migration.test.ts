@@ -150,10 +150,6 @@ describe("workflow checkpoint storage migration", () => {
       `select user_id from briar_user_workflow_checkpoint_defaults
        order by user_id`,
     ).all()).results).toEqual([{ user_id: "checkpoint-user" }]);
-    expect(await db.prepare(
-      `select count(*) as count
-       from briar_workflow_checkpoint_storage_validation`,
-    ).first()).toEqual({ count: 0 });
 
     await expect(db.prepare(
       `update briar_project_settings

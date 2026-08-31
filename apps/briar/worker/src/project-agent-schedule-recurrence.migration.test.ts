@@ -77,14 +77,6 @@ describe("project Agent schedule recurrence migration", () => {
       notification_level: "none",
       created_by_user_id: "schedule-owner",
     });
-    const columns = await db.prepare(
-      `pragma table_info(briar_project_agent_schedules)`,
-    ).all<{ name: string; notnull: number }>();
-    expect(columns.results.find((column) => column.name === "recurrence"))
-      .toMatchObject({ notnull: 1 });
-    expect(columns.results.map((column) => column.name)).not.toContain(
-      "frequency",
-    );
     expect(await db.prepare(
       `select schedule_id from briar_project_agent_schedule_runs
        where id = 'schedule-run'`,

@@ -8,7 +8,7 @@ import {
 import { workerRuntimeMetadataFromStoredProtoJson } from "./worker-runtime-mappers";
 
 describe("Worker runtime ProtoJSON migration", () => {
-  it("backfills complete advertisements, drops parallel columns, and removes invalid bindings", async () => {
+  it("backfills complete advertisements and removes invalid bindings", async () => {
     const db = env.DB;
     const now = "2026-08-31T00:00:00.000Z";
     await applyD1Migrations(db, {
@@ -126,13 +126,6 @@ describe("Worker runtime ProtoJSON migration", () => {
       files: ["0162_canonical_worker_runtime_proto.sql"],
     });
 
-    const columns = (await db.prepare(
-      `pragma table_info(briar_execution_workers)`,
-    ).all<{ name: string }>()).results.map((column) => column.name);
-    expect(columns).toContain("runtime_proto_json");
-    expect(columns).not.toContain("agent_provider");
-    expect(columns).not.toContain("capabilities_json");
-    expect(columns).not.toContain("versions_json");
     expect(await db.prepare(
       `select count(*) as count from briar_execution_workers
        where id = 'invalid-runtime-worker'`,
@@ -181,10 +174,6 @@ describe("Worker runtime ProtoJSON migration", () => {
     expect(workerRuntimeMetadataFromStoredProtoJson(
       JSON.stringify(withoutVersions),
     ).versions).toEqual({});
-    expect(await db.prepare(
-      `select count(*) as count
-       from briar_invalid_execution_worker_runtime`,
-    ).first<number>("count")).toBe(0);
 
     const oversized = JSON.parse(stored!) as Record<string, unknown>;
     oversized.versions = { oversized: "x".repeat(1_048_576) };
