@@ -3,7 +3,6 @@ import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 import {
   archiveFormatVersion,
-  decodeArchivedIssueMessage,
   decodeArchivedProjectAgentSession,
   decodeArchiveLine,
   decodeArchiveManifest,
@@ -39,35 +38,12 @@ describe("archive Effect contracts", () => {
     });
   });
 
-  it("decodes legacy issue messages with nullable Agent fields defaulted", () => {
-    const decoded = decodeArchivedIssueMessage({
-      id: "message-1",
-      run_id: "run-1",
-      parent_message_id: null,
-      author_user_id: "user-1",
-      author_agent_provider: null,
-      author_name: "Ada",
-      author_image: null,
-      body: "Archived message",
-      reply_count: 0,
-      created_at: "2026-01-01T00:00:00.000Z",
-      updated_at: "2026-01-01T00:00:00.000Z",
-      futureMessageField: { ignored: true },
-    });
-
-    expect(decoded).toMatchObject({
-      author_agent_id: null,
-      author_agent_name: null,
-      author_agent_image: null,
-    });
-    expect(decoded).not.toHaveProperty("futureMessageField");
-  });
-
   it("preserves non-strict archived rows without leaking unknown fields", () => {
     const decoded = decodeArchivedProjectAgentSession({
       project_id: "project-1",
       id: "session-1",
       agent_id: null,
+      requested_by_user_id: null,
       status: "completed",
       session_type: "task",
       payload_json: "{}",

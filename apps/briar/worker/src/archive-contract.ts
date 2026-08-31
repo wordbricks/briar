@@ -1,4 +1,3 @@
-import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { agentProviders } from "../../src/lib/agent-provider";
 import type {
@@ -15,7 +14,7 @@ import type {
 } from "./agent-worklog";
 import { PositiveSafeInteger, schemaDecodeOptions } from "./schema-codecs";
 
-export const archiveFormatVersion = 1;
+export const archiveFormatVersion = 2;
 
 const archiveKinds = [
   "run_events",
@@ -136,21 +135,17 @@ export const ArchivedRunEvidenceImage = Schema.Struct({
   created_at: Schema.String,
 });
 
-const LegacyNullableString = NullableString.pipe(
-  Schema.withDecodingDefault(Effect.succeed(null)),
-);
-
 export const ArchivedIssueMessage = Schema.Struct({
   id: Schema.String,
   run_id: Schema.String,
   parent_message_id: NullableString,
   author_user_id: NullableString,
-  author_agent_id: LegacyNullableString,
-  author_agent_name: LegacyNullableString,
+  author_agent_id: NullableString,
+  author_agent_name: NullableString,
   author_agent_provider: Schema.NullOr(Schema.Literals(agentProviders)),
   author_name: NullableString,
   author_image: NullableString,
-  author_agent_image: LegacyNullableString,
+  author_agent_image: NullableString,
   body: Schema.String,
   reply_count: FiniteNumber,
   created_at: Schema.String,
@@ -161,7 +156,7 @@ export const ArchivedProjectAgentSession = Schema.Struct({
   project_id: Schema.String,
   id: Schema.String,
   agent_id: NullableString,
-  requested_by_user_id: LegacyNullableString,
+  requested_by_user_id: NullableString,
   status: Schema.Literals([
     "running",
     "completed",

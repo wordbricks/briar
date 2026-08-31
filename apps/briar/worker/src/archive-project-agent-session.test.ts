@@ -35,6 +35,7 @@ const sessionRecord = (overrides: Record<string, unknown> = {}) => ({
     project_id: projectId,
     id: sessionId,
     agent_id: "agent-1",
+    requested_by_user_id: null,
     status: "completed",
     session_type: "task",
     payload_json: '{"summary":"done"}',
