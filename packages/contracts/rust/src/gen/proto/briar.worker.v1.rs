@@ -6455,6 +6455,16 @@ pub struct RecordRunEvidenceRequest {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub images: ::buffa::alloc::vec::Vec<super::super::types::v1::UploadReference>,
+    /// Field 14: `github_pull_request`
+    #[serde(
+        rename = "githubPullRequest",
+        alias = "github_pull_request",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub github_pull_request: ::buffa::MessageField<
+        super::super::types::v1::GitHubPullRequestIdentity,
+        ::buffa::Inline<super::super::types::v1::GitHubPullRequestIdentity>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -6475,6 +6485,7 @@ impl ::core::fmt::Debug for RecordRunEvidenceRequest {
             .field("url", &self.url)
             .field("metadata", &self.metadata)
             .field("images", &self.images)
+            .field("github_pull_request", &self.github_pull_request)
             .finish()
     }
 }
@@ -6596,6 +6607,14 @@ impl ::buffa::Message for RecordRunEvidenceRequest {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.github_pull_request.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.github_pull_request.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -6667,6 +6686,14 @@ impl ::buffa::Message for RecordRunEvidenceRequest {
                 buf,
             );
             v.write_to(__cache, buf);
+        }
+        if self.github_pull_request.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                14u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.github_pull_request.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -6800,6 +6827,17 @@ impl ::buffa::Message for RecordRunEvidenceRequest {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.images.push(elem);
             }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.github_pull_request.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -6821,6 +6859,7 @@ impl ::buffa::Message for RecordRunEvidenceRequest {
         self.url = ::core::option::Option::None;
         self.metadata = ::buffa::MessageField::none();
         self.images.clear();
+        self.github_pull_request = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -49668,6 +49707,12 @@ pub mod __buffa {
                     'a,
                 >,
             >,
+            /// Field 14: `github_pull_request`
+            pub github_pull_request: ::buffa::MessageFieldView<
+                super::super::super::super::types::v1::__buffa::view::GitHubPullRequestIdentityView<
+                    'a,
+                >,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for RecordRunEvidenceRequestView<'a> {
@@ -49842,6 +49887,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.github_pull_request.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.github_pull_request = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::types::v1::__buffa::view::GitHubPullRequestIdentityView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     13u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -49932,6 +50002,17 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    github_pull_request: match self.github_pull_request.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::types::v1::GitHubPullRequestIdentity,
+                                ::buffa::Inline<
+                                    super::super::super::super::types::v1::GitHubPullRequestIdentity,
+                                >,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -50018,6 +50099,14 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if self.github_pull_request.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.github_pull_request.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -50091,6 +50180,14 @@ pub mod __buffa {
                     );
                     v.write_to(__cache, buf);
                 }
+                if self.github_pull_request.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        14u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.github_pull_request.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -50160,6 +50257,14 @@ pub mod __buffa {
                 }
                 if !self.images.is_empty() {
                     __map.serialize_entry("images", &*self.images)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .github_pull_request
+                        .as_option()
+                    {
+                        __map.serialize_entry("githubPullRequest", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -50348,6 +50453,17 @@ pub mod __buffa {
                 >,
             > {
                 &self.0.reborrow().images
+            }
+            /// Field 14: `github_pull_request`
+            #[must_use]
+            pub fn github_pull_request(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::types::v1::__buffa::view::GitHubPullRequestIdentityView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().github_pull_request
             }
         }
         impl ::core::convert::From<

@@ -3,6 +3,9 @@ import {
   GitHubPullRequestSchema,
   GitHubPullRequestState,
 } from "@briar/contracts/gen/briar/app/v1/github_pb";
+import {
+  GitHubPullRequestIdentitySchema,
+} from "@briar/contracts/gen/briar/types/v1/github_pb";
 import { describe, expect, it } from "vitest";
 import {
   executeClaimedMergeBatch,
@@ -107,11 +110,13 @@ function pullRequestResponse() {
   return toJsonString(
     GitHubPullRequestSchema,
     create(GitHubPullRequestSchema, {
-      repositoryId: 701n,
+      identity: create(GitHubPullRequestIdentitySchema, {
+        repositoryId: 701n,
+        pullRequestId: 501n,
+        pullRequestNodeId: "PR_kwDOBriar42",
+        pullRequestNumber: 42n,
+      }),
       repository: "wordbricks/briar",
-      pullRequestId: 501n,
-      pullRequestNodeId: "PR_kwDOBriar42",
-      pullRequestNumber: 42n,
       url: "https://github.com/wordbricks/briar/pull/42",
       state: GitHubPullRequestState.OPEN,
       draft: false,

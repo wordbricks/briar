@@ -7,6 +7,9 @@ import {
   GitHubPullRequestState,
   ProjectGitHubCredentialSchema,
 } from "@briar/contracts/gen/briar/app/v1/github_pb";
+import {
+  GitHubPullRequestIdentitySchema,
+} from "@briar/contracts/gen/briar/types/v1/github_pb";
 import { describe, expect, it } from "vitest";
 import {
   githubIntegrationFromProto,
@@ -56,9 +59,11 @@ describe("GitHub Connect boundary", () => {
     ))).toThrow("safe integer range");
 
     expect(() => githubPullRequestFromProto(create(GitHubPullRequestSchema, {
-      repositoryId: 1n,
-      pullRequestId: 2n,
-      pullRequestNumber: 3n,
+      identity: create(GitHubPullRequestIdentitySchema, {
+        repositoryId: 1n,
+        pullRequestId: 2n,
+        pullRequestNumber: 3n,
+      }),
       state: GitHubPullRequestState.MERGED,
       merged: false,
     }))).toThrow("merge state is inconsistent");

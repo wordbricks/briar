@@ -391,15 +391,16 @@ public nonisolated struct BriarAPI_GitHubPullRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var repositoryID: UInt64 = 0
+  public var identity: BriarTypes_GitHubPullRequestIdentity {
+    get {_identity ?? BriarTypes_GitHubPullRequestIdentity()}
+    set {_identity = newValue}
+  }
+  /// Returns true if `identity` has been explicitly set.
+  public var hasIdentity: Bool {self._identity != nil}
+  /// Clears the value of `identity`. Subsequent reads from it will return its default value.
+  public mutating func clearIdentity() {self._identity = nil}
 
   public var repository: String = String()
-
-  public var pullRequestID: UInt64 = 0
-
-  public var pullRequestNodeID: String = String()
-
-  public var pullRequestNumber: UInt64 = 0
 
   public var url: String = String()
 
@@ -422,6 +423,8 @@ public nonisolated struct BriarAPI_GitHubPullRequest: Sendable {
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _identity: BriarTypes_GitHubPullRequestIdentity? = nil
 }
 
 public nonisolated struct BriarAPI_CreateGitHubPullRequestRequest: Sendable {
@@ -1165,7 +1168,7 @@ nonisolated extension BriarAPI_GetProjectGitHubRepositoryResponse: SwiftProtobuf
 
 nonisolated extension BriarAPI_GitHubPullRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GitHubPullRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}repository_id\0\u{1}repository\0\u{3}pull_request_id\0\u{3}pull_request_node_id\0\u{3}pull_request_number\0\u{1}url\0\u{1}state\0\u{1}draft\0\u{1}merged\0\u{1}body\0\u{3}head_sha\0\u{3}head_ref\0\u{3}base_sha\0\u{3}base_ref\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}identity\0\u{1}repository\0\u{1}url\0\u{1}state\0\u{1}draft\0\u{1}merged\0\u{1}body\0\u{3}head_sha\0\u{3}head_ref\0\u{3}base_sha\0\u{3}base_ref\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1173,77 +1176,66 @@ nonisolated extension BriarAPI_GitHubPullRequest: SwiftProtobuf.Message, SwiftPr
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self.repositoryID) }()
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._identity) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.repository) }()
-      case 3: try { try decoder.decodeSingularUInt64Field(value: &self.pullRequestID) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.pullRequestNodeID) }()
-      case 5: try { try decoder.decodeSingularUInt64Field(value: &self.pullRequestNumber) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self.url) }()
-      case 7: try { try decoder.decodeSingularEnumField(value: &self.state) }()
-      case 8: try { try decoder.decodeSingularBoolField(value: &self.draft) }()
-      case 9: try { try decoder.decodeSingularBoolField(value: &self.merged) }()
-      case 10: try { try decoder.decodeSingularStringField(value: &self.body) }()
-      case 11: try { try decoder.decodeSingularStringField(value: &self.headSha) }()
-      case 12: try { try decoder.decodeSingularStringField(value: &self.headRef) }()
-      case 13: try { try decoder.decodeSingularStringField(value: &self.baseSha) }()
-      case 14: try { try decoder.decodeSingularStringField(value: &self.baseRef) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.url) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self.state) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.draft) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.merged) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self.body) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self.headSha) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self.headRef) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self.baseSha) }()
+      case 11: try { try decoder.decodeSingularStringField(value: &self.baseRef) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.repositoryID != 0 {
-      try visitor.visitSingularUInt64Field(value: self.repositoryID, fieldNumber: 1)
-    }
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._identity {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
     if !self.repository.isEmpty {
       try visitor.visitSingularStringField(value: self.repository, fieldNumber: 2)
     }
-    if self.pullRequestID != 0 {
-      try visitor.visitSingularUInt64Field(value: self.pullRequestID, fieldNumber: 3)
-    }
-    if !self.pullRequestNodeID.isEmpty {
-      try visitor.visitSingularStringField(value: self.pullRequestNodeID, fieldNumber: 4)
-    }
-    if self.pullRequestNumber != 0 {
-      try visitor.visitSingularUInt64Field(value: self.pullRequestNumber, fieldNumber: 5)
-    }
     if !self.url.isEmpty {
-      try visitor.visitSingularStringField(value: self.url, fieldNumber: 6)
+      try visitor.visitSingularStringField(value: self.url, fieldNumber: 3)
     }
     if self.state != .unspecified {
-      try visitor.visitSingularEnumField(value: self.state, fieldNumber: 7)
+      try visitor.visitSingularEnumField(value: self.state, fieldNumber: 4)
     }
     if self.draft != false {
-      try visitor.visitSingularBoolField(value: self.draft, fieldNumber: 8)
+      try visitor.visitSingularBoolField(value: self.draft, fieldNumber: 5)
     }
     if self.merged != false {
-      try visitor.visitSingularBoolField(value: self.merged, fieldNumber: 9)
+      try visitor.visitSingularBoolField(value: self.merged, fieldNumber: 6)
     }
     if !self.body.isEmpty {
-      try visitor.visitSingularStringField(value: self.body, fieldNumber: 10)
+      try visitor.visitSingularStringField(value: self.body, fieldNumber: 7)
     }
     if !self.headSha.isEmpty {
-      try visitor.visitSingularStringField(value: self.headSha, fieldNumber: 11)
+      try visitor.visitSingularStringField(value: self.headSha, fieldNumber: 8)
     }
     if !self.headRef.isEmpty {
-      try visitor.visitSingularStringField(value: self.headRef, fieldNumber: 12)
+      try visitor.visitSingularStringField(value: self.headRef, fieldNumber: 9)
     }
     if !self.baseSha.isEmpty {
-      try visitor.visitSingularStringField(value: self.baseSha, fieldNumber: 13)
+      try visitor.visitSingularStringField(value: self.baseSha, fieldNumber: 10)
     }
     if !self.baseRef.isEmpty {
-      try visitor.visitSingularStringField(value: self.baseRef, fieldNumber: 14)
+      try visitor.visitSingularStringField(value: self.baseRef, fieldNumber: 11)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_GitHubPullRequest, rhs: BriarAPI_GitHubPullRequest) -> Bool {
-    if lhs.repositoryID != rhs.repositoryID {return false}
+    if lhs._identity != rhs._identity {return false}
     if lhs.repository != rhs.repository {return false}
-    if lhs.pullRequestID != rhs.pullRequestID {return false}
-    if lhs.pullRequestNodeID != rhs.pullRequestNodeID {return false}
-    if lhs.pullRequestNumber != rhs.pullRequestNumber {return false}
     if lhs.url != rhs.url {return false}
     if lhs.state != rhs.state {return false}
     if lhs.draft != rhs.draft {return false}

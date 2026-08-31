@@ -19,26 +19,8 @@ async function hasUnboundGithubPullRequestEvidence(
          and evidence.evidence_type = 'pull_request'
          and evidence.status in ('pending', 'passed')
          and not exists (
-           select 1 from briar_run_pull_requests link
-           where link.run_id = evidence.run_id
-             and link.attempt = evidence.attempt
-             and link.revision = evidence.revision
-             and link.repository_id = cast(json_extract(
-               evidence.metadata_json,
-               '$.githubPullRequest.repositoryId'
-             ) as integer)
-             and link.pull_request_id = cast(json_extract(
-               evidence.metadata_json,
-               '$.githubPullRequest.pullRequestId'
-             ) as integer)
-             and link.pull_request_node_id = json_extract(
-               evidence.metadata_json,
-               '$.githubPullRequest.pullRequestNodeId'
-             )
-             and link.pull_request_number = cast(json_extract(
-               evidence.metadata_json,
-               '$.githubPullRequest.pullRequestNumber'
-             ) as integer)
+           select 1 from briar_run_evidence_pull_requests association
+           where association.evidence_id = evidence.id
          )
        limit 1`,
     )
@@ -293,26 +275,8 @@ export async function reconcileGithubMergedRuns(
              and evidence.evidence_type = 'pull_request'
              and evidence.status in ('pending', 'passed')
              and not exists (
-               select 1 from briar_run_pull_requests link
-               where link.run_id = evidence.run_id
-                 and link.attempt = evidence.attempt
-                 and link.revision = evidence.revision
-                 and link.repository_id = cast(json_extract(
-                   evidence.metadata_json,
-                   '$.githubPullRequest.repositoryId'
-                 ) as integer)
-                 and link.pull_request_id = cast(json_extract(
-                   evidence.metadata_json,
-                   '$.githubPullRequest.pullRequestId'
-                 ) as integer)
-                 and link.pull_request_node_id = json_extract(
-                   evidence.metadata_json,
-                   '$.githubPullRequest.pullRequestNodeId'
-                 )
-                 and link.pull_request_number = cast(json_extract(
-                   evidence.metadata_json,
-                   '$.githubPullRequest.pullRequestNumber'
-                 ) as integer)
+               select 1 from briar_run_evidence_pull_requests association
+               where association.evidence_id = evidence.id
              )
          )
          and (

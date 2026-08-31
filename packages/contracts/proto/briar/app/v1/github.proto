@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package briar.app.v1;
 
+import "briar/types/v1/github.proto";
 import "google/protobuf/timestamp.proto";
 
 option swift_prefix = "BriarAPI_";
@@ -100,20 +101,17 @@ enum GitHubPullRequestState {
 }
 
 message GitHubPullRequest {
-  uint64 repository_id = 1;
+  briar.types.v1.GitHubPullRequestIdentity identity = 1;
   string repository = 2;
-  uint64 pull_request_id = 3;
-  string pull_request_node_id = 4;
-  uint64 pull_request_number = 5;
-  string url = 6;
-  GitHubPullRequestState state = 7;
-  bool draft = 8;
-  bool merged = 9;
-  string body = 10;
-  string head_sha = 11;
-  string head_ref = 12;
-  string base_sha = 13;
-  string base_ref = 14;
+  string url = 3;
+  GitHubPullRequestState state = 4;
+  bool draft = 5;
+  bool merged = 6;
+  string body = 7;
+  string head_sha = 8;
+  string head_ref = 9;
+  string base_sha = 10;
+  string base_ref = 11;
 }
 
 message CreateGitHubPullRequestRequest {

@@ -119,15 +119,18 @@ const observedAt = (request: RecordRunEvidenceRequest) => {
 
 export const recordRunEvidenceApplicationRequest = (
   request: RecordRunEvidenceRequest,
-) => decodeRunEvidenceApplicationInput({
-  evidenceKey: request.evidenceKey,
-  stage: request.stage,
-  type: request.type,
-  status: runEvidenceStatus(request.status),
-  observedAt: observedAt(request),
-  actor: request.actor,
-  detail: request.detail ?? null,
-  command: request.command ?? null,
-  url: request.url ?? null,
-  metadata: request.metadata ?? null,
+) => ({
+  ...decodeRunEvidenceApplicationInput({
+    evidenceKey: request.evidenceKey,
+    stage: request.stage,
+    type: request.type,
+    status: runEvidenceStatus(request.status),
+    observedAt: observedAt(request),
+    actor: request.actor,
+    detail: request.detail ?? null,
+    command: request.command ?? null,
+    url: request.url ?? null,
+    metadata: request.metadata ?? null,
+  }),
+  githubPullRequest: request.githubPullRequest ?? null,
 });

@@ -8,7 +8,11 @@ import {
   type ProjectGitHubCredential as ProjectGitHubCredentialMessage,
   type ProjectGitHubRepository as ProjectGitHubRepositoryMessage,
 } from "@briar/contracts/gen/briar/app/v1/github_pb";
+import type {
+  GitHubPullRequestIdentity,
+} from "@briar/contracts/gen/briar/types/v1/github_pb";
 import {
+  requiredMessage,
   requiredTimestamp,
   safeNumber,
 } from "./mappers";
@@ -49,11 +53,8 @@ export type ProjectGithubRepository = {
 };
 
 export type GithubPullRequest = {
-  repositoryId: number;
+  identity: GitHubPullRequestIdentity;
   repository: string;
-  pullRequestId: number;
-  pullRequestNodeId: string;
-  pullRequestNumber: number;
   url: string;
   state: "open" | "closed" | "merged";
   draft: boolean;
@@ -153,18 +154,16 @@ export const githubPullRequestFromProto = (
   value: GitHubPullRequestMessage,
 ): GithubPullRequest => {
   const state = githubPullRequestStateFromProto(value.state);
+  const identity = requiredMessage(value.identity, "githubPullRequest.identity");
+  positiveSafeNumber(identity.repositoryId, "githubPullRequest.repositoryId");
+  positiveSafeNumber(identity.pullRequestId, "githubPullRequest.id");
+  positiveSafeNumber(identity.pullRequestNumber, "githubPullRequest.number");
   if (value.merged !== (state === "merged")) {
     throw new Error("GitHub pull request merge state is inconsistent");
   }
   return {
-    repositoryId: positiveSafeNumber(value.repositoryId, "githubPullRequest.repositoryId"),
+    identity,
     repository: value.repository,
-    pullRequestId: positiveSafeNumber(value.pullRequestId, "githubPullRequest.id"),
-    pullRequestNodeId: value.pullRequestNodeId,
-    pullRequestNumber: positiveSafeNumber(
-      value.pullRequestNumber,
-      "githubPullRequest.number",
-    ),
     url: value.url,
     state,
     draft: value.draft,

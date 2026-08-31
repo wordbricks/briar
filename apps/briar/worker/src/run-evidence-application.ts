@@ -1,3 +1,6 @@
+import type {
+  GitHubPullRequestIdentity,
+} from "@briar/contracts/gen/briar/types/v1/github_pb";
 import {
   EventKeyConflictError,
   HuntTransitionError,
@@ -194,7 +197,9 @@ export async function recordRunEvidenceApplication(
     projectId: string;
     principal: WorkerRunExecutionPrincipal;
     work: IssueWorkIdentity;
-    evidence: typeof RunEvidenceApplicationInput.Type;
+    evidence: typeof RunEvidenceApplicationInput.Type & {
+      githubPullRequest?: GitHubPullRequestIdentity | null;
+    };
     imageUploadIds: readonly string[];
     authenticatedAt?: string;
   },
@@ -221,6 +226,7 @@ export async function recordRunEvidenceApplication(
         command: input.evidence.command ?? null,
         url: input.evidence.url ?? null,
         metadata: input.evidence.metadata ?? null,
+        githubPullRequest: input.evidence.githubPullRequest ?? null,
         observedAt: new Date(input.evidence.observedAt).toISOString(),
         imageUploadIds: input.imageUploadIds,
         requireExisting: uploads === null,

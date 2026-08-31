@@ -1,3 +1,6 @@
+import type {
+  GitHubPullRequestIdentity,
+} from "@briar/contracts/gen/briar/types/v1/github_pb";
 import {
   githubPullRequestEvidenceIdentity,
   type GithubPullRequestEvidenceIdentity,
@@ -38,6 +41,10 @@ export type RunEvidenceRow = {
   recorded_at: string;
   image_upload_ids_json?: string;
   github_association_started_at?: string | null;
+  github_repository_id?: number | null;
+  github_pull_request_id?: number | null;
+  github_pull_request_node_id?: string | null;
+  github_pull_request_number?: number | null;
 };
 
 export type RunEvidenceImageRow = {
@@ -67,6 +74,7 @@ export async function recordRunEvidence(
     command: string | null;
     url: string | null;
     metadata: Record<string, unknown> | null;
+    githubPullRequest?: GitHubPullRequestIdentity | null;
     actor: string;
     observedAt: string;
     imageUploadIds?: readonly string[];
@@ -118,10 +126,15 @@ export async function recordRunEvidence(
     target: { repository: string; number: number };
     identity: GithubPullRequestEvidenceIdentity;
   } | null = null;
-  if (
+  const linksPullRequest =
     input.type === "pull_request" &&
-    ["pending", "passed"].includes(input.status)
-  ) {
+    ["pending", "passed"].includes(input.status);
+  if (input.githubPullRequest && !linksPullRequest) {
+    throw new HuntTransitionError(
+      "GitHub pull request identity is only valid for active pull request evidence",
+    );
+  }
+  if (linksPullRequest) {
     const target = input.url ? githubPullRequestUrlTarget(input.url) : null;
     const settings = await db
       .prepare(
@@ -134,22 +147,29 @@ export async function recordRunEvidence(
     const configuredRepository = settings?.github_repository
       ?.trim()
       .toLowerCase();
-    if (configuredRepository) {
-      if (!target || configuredRepository !== target.repository) {
-        throw new HuntTransitionError(
-          `Pull request evidence must use the project's configured GitHub repository: ${configuredRepository}`,
-        );
-      }
+    if (
+      configuredRepository &&
+      (!target || configuredRepository !== target.repository)
+    ) {
+      throw new HuntTransitionError(
+        `Pull request evidence must use the project's configured GitHub repository: ${configuredRepository}`,
+      );
+    }
+    if (target) {
       const identity = githubPullRequestEvidenceIdentity(
-        input.metadata,
+        input.githubPullRequest,
         target,
       );
       if (!identity) {
         throw new HuntTransitionError(
-          "GitHub pull request evidence for the configured repository requires immutable repository and PR identity metadata; update and use the bundled Briar CLI",
+          "GitHub pull request evidence for the configured repository requires its typed immutable identity; update and use the bundled Briar CLI",
         );
       }
       verifiedGithubPullRequest = { target, identity };
+    } else if (input.githubPullRequest) {
+      throw new HuntTransitionError(
+        "GitHub pull request identity requires a canonical GitHub pull request URL",
+      );
     }
   }
   const metadataJson = input.metadata ? stableJson(input.metadata) : null;
@@ -160,8 +180,22 @@ export async function recordRunEvidence(
   );
   const existing = await db
     .prepare(
-      `select * from briar_run_evidence
-       where run_id = ? and attempt = ? and evidence_key = ?`,
+      `select evidence.*,
+              link.repository_id as github_repository_id,
+              link.pull_request_id as github_pull_request_id,
+              link.pull_request_node_id as github_pull_request_node_id,
+              link.pull_request_number as github_pull_request_number
+       from briar_run_evidence evidence
+       left join briar_run_evidence_pull_requests association
+         on association.evidence_id = evidence.id
+       left join briar_run_pull_requests link
+         on link.run_id = association.run_id
+        and link.attempt = association.attempt
+        and link.revision = association.revision
+        and link.repository_id = association.repository_id
+        and link.pull_request_number = association.pull_request_number
+       where evidence.run_id = ? and evidence.attempt = ?
+         and evidence.evidence_key = ?`,
     )
     .bind(run.id, run.current_attempt, storedEvidenceKey)
     .first<RunEvidenceRow>();
@@ -172,17 +206,18 @@ export async function recordRunEvidence(
       and event.attempt = run.current_attempt
       and event.revision = run.current_revision
   ), run.created_at)`;
-  const linkPullRequest = async (
+  const pullRequestStatements = (
+    evidenceId: string,
     url: string | null,
     recordedAt: string,
     associationStartedAt: string,
-  ) => {
+  ): D1PreparedStatement[] => {
     if (
       input.type !== "pull_request" ||
       !url ||
       !["pending", "passed"].includes(input.status)
     ) {
-      return;
+      return [];
     }
     const checkedAt = new Date().toISOString();
     const statements: D1PreparedStatement[] = [
@@ -315,50 +350,34 @@ export async function recordRunEvidence(
         projectId,
         ...runFenceBindings(checkedAt),
       ));
-    }
-    await db.batch(statements);
-    const fencedRun = await db
-      .prepare(
-        `select 1 as active from briar_hunt_runs run
-         where run.id = ? and run.project_id = ?
-           ${runFenceSql}`,
-      )
-      .bind(
+      statements.push(db.prepare(
+        `insert into briar_run_evidence_pull_requests (
+           evidence_id, run_id, attempt, revision,
+           repository_id, pull_request_number
+         ) values (?, ?, ?, ?, ?, ?)
+         on conflict(evidence_id) do nothing`,
+      ).bind(
+        evidenceId,
         run.id,
-        projectId,
-        ...runFenceBindings(new Date().toISOString()),
-      )
-      .first<{ active: number }>();
-    if (!fencedRun) {
-      throw new HuntTransitionError(
-        "Run claim or revision changed while recording pull request evidence",
-      );
+        run.current_attempt,
+        run.current_revision,
+        identity.repositoryId,
+        identity.pullRequestNumber,
+      ));
     }
-    if (verifiedGithubPullRequest) {
-      const { identity } = verifiedGithubPullRequest;
-      const linked = await db
-        .prepare(
-          `select 1 as linked from briar_run_pull_requests
-           where project_id = ? and run_id = ? and attempt = ? and revision = ?
-             and repository_id = ? and pull_request_number = ?`,
-        )
-        .bind(
-          projectId,
-          run.id,
-          run.current_attempt,
-          run.current_revision,
-          identity.repositoryId,
-          identity.pullRequestNumber,
-        )
-        .first<{ linked: number }>();
-      if (!linked) {
-        throw new HuntTransitionError(
-          "Run claim or revision changed while recording pull request evidence",
-        );
-      }
-    }
+    return statements;
   };
   if (existing) {
+    const sameGithubPullRequest = verifiedGithubPullRequest
+      ? existing.github_repository_id ===
+          verifiedGithubPullRequest.identity.repositoryId &&
+        existing.github_pull_request_id ===
+          verifiedGithubPullRequest.identity.pullRequestId &&
+        existing.github_pull_request_node_id ===
+          verifiedGithubPullRequest.identity.pullRequestNodeId &&
+        existing.github_pull_request_number ===
+          verifiedGithubPullRequest.identity.pullRequestNumber
+      : existing.github_repository_id == null;
     const same =
       existing.workflow_stage === input.stage &&
       existing.evidence_type === input.type &&
@@ -369,13 +388,11 @@ export async function recordRunEvidence(
       existing.metadata_json === metadataJson &&
       (existing.image_upload_ids_json ?? "[]") === imageUploadIdsJson &&
       existing.actor === input.actor &&
-      existing.observed_at === input.observedAt;
+      existing.observed_at === input.observedAt &&
+      sameGithubPullRequest;
     if (!same) throw new EventKeyConflictError();
-    await linkPullRequest(
-      existing.url,
-      existing.recorded_at,
-      existing.github_association_started_at ?? existing.recorded_at,
-    );
+    // An exact replay is read-only. The original mutation already committed
+    // evidence, the immutable PR link, and their association in one batch.
     return existing;
   }
   if (input.requireExisting) {
@@ -458,17 +475,35 @@ export async function recordRunEvidence(
         consumedAt: input.imageUploads.consumedAt,
       })
     : [];
-  const [inserted] = await db.batch([insertEvidence, ...uploadStatements]);
+  const pullRequestBatch = pullRequestStatements(
+    evidence.id,
+    evidence.url,
+    evidence.recorded_at,
+    evidence.github_association_started_at ?? evidence.recorded_at,
+  );
+  let inserted: D1Result;
+  try {
+    [inserted] = await db.batch([
+      insertEvidence,
+      ...uploadStatements,
+      ...pullRequestBatch,
+    ]);
+  } catch (error) {
+    if (
+      verifiedGithubPullRequest && error instanceof Error &&
+      error.message.includes("FOREIGN KEY constraint failed")
+    ) {
+      throw new HuntTransitionError(
+        "Run claim or revision changed while recording pull request evidence",
+      );
+    }
+    throw error;
+  }
   if ((inserted.meta.changes ?? 0) === 0) {
     throw new HuntTransitionError(
       "Run claim or revision changed while recording evidence",
     );
   }
-  await linkPullRequest(
-    evidence.url,
-    evidence.recorded_at,
-    evidence.github_association_started_at ?? evidence.recorded_at,
-  );
   return evidence;
 }
 

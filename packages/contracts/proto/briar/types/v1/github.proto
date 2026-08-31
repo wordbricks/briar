@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package briar.types.v1;
+
+option swift_prefix = "BriarTypes_";
+
+// Provider-assigned IDs that remain authoritative across mutable pull request
+// state, content, branches, and repository renames.
+message GitHubPullRequestIdentity {
+  uint64 repository_id = 1;
+  uint64 pull_request_id = 2;
+  string pull_request_node_id = 3;
+  uint64 pull_request_number = 4;
+}

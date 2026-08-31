@@ -1,3 +1,6 @@
+import type {
+  GitHubPullRequestIdentity,
+} from "@briar/contracts/gen/briar/types/v1/github_pb";
 import { attemptGithubMergeAutoResume } from "./github-merge-reconciliation";
 import {
   type GithubPullRequestState,
@@ -44,35 +47,29 @@ export type GithubPullRequestEvidenceIdentity = {
 };
 
 export const githubPullRequestEvidenceIdentity = (
-  metadata: Record<string, unknown> | null,
+  value: GitHubPullRequestIdentity | null | undefined,
   target: { repository: string; number: number },
 ): GithubPullRequestEvidenceIdentity | null => {
-  const value = metadata?.githubPullRequest;
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const identity = value as Record<string, unknown>;
-  const repository = typeof identity.repository === "string"
-    ? identity.repository.trim().toLowerCase()
-    : "";
-  const repositoryId = identity.repositoryId;
-  const pullRequestId = identity.pullRequestId;
-  const pullRequestNodeId = identity.pullRequestNodeId;
-  const pullRequestNumber = identity.pullRequestNumber;
+  if (!value) return null;
+  const repository = target.repository;
+  const repositoryId = Number(value.repositoryId);
+  const pullRequestId = Number(value.pullRequestId);
+  const pullRequestNodeId = value.pullRequestNodeId.trim();
+  const pullRequestNumber = Number(value.pullRequestNumber);
   if (
     !Number.isSafeInteger(repositoryId) || Number(repositoryId) <= 0 ||
     !Number.isSafeInteger(pullRequestId) || Number(pullRequestId) <= 0 ||
     !Number.isSafeInteger(pullRequestNumber) || Number(pullRequestNumber) <= 0 ||
-    repository !== target.repository ||
     pullRequestNumber !== target.number ||
-    typeof pullRequestNodeId !== "string" ||
-    pullRequestNodeId.trim().length < 1 ||
-    pullRequestNodeId.trim().length > 200
+    pullRequestNodeId.length < 1 ||
+    pullRequestNodeId.length > 200
   ) return null;
   return {
-    repositoryId: Number(repositoryId),
+    repositoryId,
     repository,
-    pullRequestId: Number(pullRequestId),
-    pullRequestNodeId: pullRequestNodeId.trim(),
-    pullRequestNumber: Number(pullRequestNumber),
+    pullRequestId,
+    pullRequestNodeId,
+    pullRequestNumber,
   };
 };
 

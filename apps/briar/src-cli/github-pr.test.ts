@@ -1,3 +1,7 @@
+import { create } from "@bufbuild/protobuf";
+import {
+  GitHubPullRequestIdentitySchema,
+} from "@briar/contracts/gen/briar/types/v1/github_pb";
 import { describe, expect, it, vi } from "vitest";
 import {
   appendBriarIssueLink,
@@ -10,14 +14,17 @@ const projectId = "11111111-1111-4111-8111-111111111111";
 const runId = "22222222-2222-4222-8222-222222222222";
 const issueUrl =
   `https://briar-api.example/open/issues/${projectId}/${runId}`;
-const identity = {
-  repositoryId: 701,
-  repository: "wordbricks/briar",
-  pullRequestId: 501,
+const identity = create(GitHubPullRequestIdentitySchema, {
+  repositoryId: 701n,
+  pullRequestId: 501n,
   pullRequestNodeId: "PR_kwDOExample",
-  pullRequestNumber: 417,
-};
-const githubResponse = (body: string) => ({ body, ...identity });
+  pullRequestNumber: 417n,
+});
+const githubResponse = (body: string) => ({
+  body,
+  identity,
+  repository: "wordbricks/briar",
+});
 
 describe("GitHub PR Briar issue link", () => {
   it("builds the public Briar issue URL from the configured API", () => {
@@ -120,9 +127,11 @@ describe("GitHub PR Briar issue link", () => {
     const api = {
       getPullRequest: vi.fn().mockResolvedValue({
         body: "",
-        ...identity,
-        repositoryId: 999,
         repository: "other/repository",
+        identity: create(GitHubPullRequestIdentitySchema, {
+          ...identity,
+          repositoryId: 999n,
+        }),
       }),
       updatePullRequest: vi.fn().mockResolvedValue(undefined),
     };

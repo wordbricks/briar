@@ -99821,14 +99821,15 @@ pub const __GET_PROJECT_GIT_HUB_REPOSITORY_RESPONSE_JSON_ANY: ::buffa::type_regi
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GitHubPullRequest {
-    /// Field 1: `repository_id`
+    /// Field 1: `identity`
     #[serde(
-        rename = "repositoryId",
-        alias = "repository_id",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+        rename = "identity",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub repository_id: u64,
+    pub identity: ::buffa::MessageField<
+        super::super::types::v1::GitHubPullRequestIdentity,
+        ::buffa::Inline<super::super::types::v1::GitHubPullRequestIdentity>,
+    >,
     /// Field 2: `repository`
     #[serde(
         rename = "repository",
@@ -99836,66 +99837,42 @@ pub struct GitHubPullRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub repository: ::buffa::alloc::string::String,
-    /// Field 3: `pull_request_id`
-    #[serde(
-        rename = "pullRequestId",
-        alias = "pull_request_id",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub pull_request_id: u64,
-    /// Field 4: `pull_request_node_id`
-    #[serde(
-        rename = "pullRequestNodeId",
-        alias = "pull_request_node_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub pull_request_node_id: ::buffa::alloc::string::String,
-    /// Field 5: `pull_request_number`
-    #[serde(
-        rename = "pullRequestNumber",
-        alias = "pull_request_number",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub pull_request_number: u64,
-    /// Field 6: `url`
+    /// Field 3: `url`
     #[serde(
         rename = "url",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub url: ::buffa::alloc::string::String,
-    /// Field 7: `state`
+    /// Field 4: `state`
     #[serde(
         rename = "state",
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub state: ::buffa::EnumValue<GitHubPullRequestState>,
-    /// Field 8: `draft`
+    /// Field 5: `draft`
     #[serde(
         rename = "draft",
         with = "::buffa::json_helpers::proto_bool",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub draft: bool,
-    /// Field 9: `merged`
+    /// Field 6: `merged`
     #[serde(
         rename = "merged",
         with = "::buffa::json_helpers::proto_bool",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub merged: bool,
-    /// Field 10: `body`
+    /// Field 7: `body`
     #[serde(
         rename = "body",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub body: ::buffa::alloc::string::String,
-    /// Field 11: `head_sha`
+    /// Field 8: `head_sha`
     #[serde(
         rename = "headSha",
         alias = "head_sha",
@@ -99903,7 +99880,7 @@ pub struct GitHubPullRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub head_sha: ::buffa::alloc::string::String,
-    /// Field 12: `head_ref`
+    /// Field 9: `head_ref`
     #[serde(
         rename = "headRef",
         alias = "head_ref",
@@ -99911,7 +99888,7 @@ pub struct GitHubPullRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub head_ref: ::buffa::alloc::string::String,
-    /// Field 13: `base_sha`
+    /// Field 10: `base_sha`
     #[serde(
         rename = "baseSha",
         alias = "base_sha",
@@ -99919,7 +99896,7 @@ pub struct GitHubPullRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub base_sha: ::buffa::alloc::string::String,
-    /// Field 14: `base_ref`
+    /// Field 11: `base_ref`
     #[serde(
         rename = "baseRef",
         alias = "base_ref",
@@ -99934,11 +99911,8 @@ pub struct GitHubPullRequest {
 impl ::core::fmt::Debug for GitHubPullRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("GitHubPullRequest")
-            .field("repository_id", &self.repository_id)
+            .field("identity", &self.identity)
             .field("repository", &self.repository)
-            .field("pull_request_id", &self.pull_request_id)
-            .field("pull_request_node_id", &self.pull_request_node_id)
-            .field("pull_request_number", &self.pull_request_number)
             .field("url", &self.url)
             .field("state", &self.state)
             .field("draft", &self.draft)
@@ -99974,32 +99948,20 @@ impl ::buffa::Message for GitHubPullRequest {
     /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
     /// points reject, never a silently wrapped size.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if self.repository_id != 0u64 {
-            size += 1u64 + ::buffa::types::uint64_encoded_len(self.repository_id) as u64;
+        if self.identity.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.identity.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
         }
         if !self.repository.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.repository) as u64;
-        }
-        if self.pull_request_id != 0u64 {
-            size
-                += 1u64
-                    + ::buffa::types::uint64_encoded_len(self.pull_request_id) as u64;
-        }
-        if !self.pull_request_node_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.pull_request_node_id)
-                        as u64;
-        }
-        if self.pull_request_number != 0u64 {
-            size
-                += 1u64
-                    + ::buffa::types::uint64_encoded_len(self.pull_request_number)
-                        as u64;
         }
         if !self.url.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.url) as u64;
@@ -100036,55 +99998,51 @@ impl ::buffa::Message for GitHubPullRequest {
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::EncodeSink,
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if self.repository_id != 0u64 {
-            ::buffa::types::put_uint64_field(1u32, self.repository_id, buf);
+        if self.identity.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.identity.write_to(__cache, buf);
         }
         if !self.repository.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.repository, buf);
         }
-        if self.pull_request_id != 0u64 {
-            ::buffa::types::put_uint64_field(3u32, self.pull_request_id, buf);
-        }
-        if !self.pull_request_node_id.is_empty() {
-            ::buffa::types::put_string_field(4u32, &self.pull_request_node_id, buf);
-        }
-        if self.pull_request_number != 0u64 {
-            ::buffa::types::put_uint64_field(5u32, self.pull_request_number, buf);
-        }
         if !self.url.is_empty() {
-            ::buffa::types::put_string_field(6u32, &self.url, buf);
+            ::buffa::types::put_string_field(3u32, &self.url, buf);
         }
         {
             let val = self.state.to_i32();
             if val != 0 {
-                ::buffa::types::put_int32_field(7u32, val, buf);
+                ::buffa::types::put_int32_field(4u32, val, buf);
             }
         }
         if self.draft {
-            ::buffa::types::put_bool_field(8u32, self.draft, buf);
+            ::buffa::types::put_bool_field(5u32, self.draft, buf);
         }
         if self.merged {
-            ::buffa::types::put_bool_field(9u32, self.merged, buf);
+            ::buffa::types::put_bool_field(6u32, self.merged, buf);
         }
         if !self.body.is_empty() {
-            ::buffa::types::put_string_field(10u32, &self.body, buf);
+            ::buffa::types::put_string_field(7u32, &self.body, buf);
         }
         if !self.head_sha.is_empty() {
-            ::buffa::types::put_string_field(11u32, &self.head_sha, buf);
+            ::buffa::types::put_string_field(8u32, &self.head_sha, buf);
         }
         if !self.head_ref.is_empty() {
-            ::buffa::types::put_string_field(12u32, &self.head_ref, buf);
+            ::buffa::types::put_string_field(9u32, &self.head_ref, buf);
         }
         if !self.base_sha.is_empty() {
-            ::buffa::types::put_string_field(13u32, &self.base_sha, buf);
+            ::buffa::types::put_string_field(10u32, &self.base_sha, buf);
         }
         if !self.base_ref.is_empty() {
-            ::buffa::types::put_string_field(14u32, &self.base_ref, buf);
+            ::buffa::types::put_string_field(11u32, &self.base_ref, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -100102,9 +100060,13 @@ impl ::buffa::Message for GitHubPullRequest {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
+                    ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                self.repository_id = ::buffa::types::decode_uint64(buf)?;
+                ::buffa::Message::merge_length_delimited(
+                    self.identity.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -100116,32 +100078,11 @@ impl ::buffa::Message for GitHubPullRequest {
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.pull_request_id = ::buffa::types::decode_uint64(buf)?;
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.pull_request_node_id, buf)?;
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.pull_request_number = ::buffa::types::decode_uint64(buf)?;
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.url, buf)?;
             }
-            7u32 => {
+            4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
@@ -100150,49 +100091,49 @@ impl ::buffa::Message for GitHubPullRequest {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
-            8u32 => {
+            5u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 self.draft = ::buffa::types::decode_bool(buf)?;
             }
-            9u32 => {
+            6u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 self.merged = ::buffa::types::decode_bool(buf)?;
             }
-            10u32 => {
+            7u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.body, buf)?;
             }
-            11u32 => {
+            8u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.head_sha, buf)?;
             }
-            12u32 => {
+            9u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.head_ref, buf)?;
             }
-            13u32 => {
+            10u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.base_sha, buf)?;
             }
-            14u32 => {
+            11u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
@@ -100207,11 +100148,8 @@ impl ::buffa::Message for GitHubPullRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.repository_id = 0u64;
+        self.identity = ::buffa::MessageField::none();
         self.repository.clear();
-        self.pull_request_id = 0u64;
-        self.pull_request_node_id.clear();
-        self.pull_request_number = 0u64;
         self.url.clear();
         self.state = ::buffa::EnumValue::from(0);
         self.draft = false;
@@ -274837,33 +274775,31 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct GitHubPullRequestView<'a> {
-            /// Field 1: `repository_id`
-            pub repository_id: u64,
+            /// Field 1: `identity`
+            pub identity: ::buffa::MessageFieldView<
+                super::super::super::super::types::v1::__buffa::view::GitHubPullRequestIdentityView<
+                    'a,
+                >,
+            >,
             /// Field 2: `repository`
             pub repository: &'a str,
-            /// Field 3: `pull_request_id`
-            pub pull_request_id: u64,
-            /// Field 4: `pull_request_node_id`
-            pub pull_request_node_id: &'a str,
-            /// Field 5: `pull_request_number`
-            pub pull_request_number: u64,
-            /// Field 6: `url`
+            /// Field 3: `url`
             pub url: &'a str,
-            /// Field 7: `state`
+            /// Field 4: `state`
             pub state: ::buffa::EnumValue<super::super::GitHubPullRequestState>,
-            /// Field 8: `draft`
+            /// Field 5: `draft`
             pub draft: bool,
-            /// Field 9: `merged`
+            /// Field 6: `merged`
             pub merged: bool,
-            /// Field 10: `body`
+            /// Field 7: `body`
             pub body: &'a str,
-            /// Field 11: `head_sha`
+            /// Field 8: `head_sha`
             pub head_sha: &'a str,
-            /// Field 12: `head_ref`
+            /// Field 9: `head_ref`
             pub head_ref: &'a str,
-            /// Field 13: `base_sha`
+            /// Field 10: `base_sha`
             pub base_sha: &'a str,
-            /// Field 14: `base_ref`
+            /// Field 11: `base_ref`
             pub base_ref: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -274902,9 +274838,27 @@ pub mod __buffa {
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Varint,
+                            ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.repository_id = ::buffa::types::decode_uint64(&mut cur)?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.identity.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.identity = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::types::v1::__buffa::view::GitHubPullRequestIdentityView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -274916,36 +274870,11 @@ pub mod __buffa {
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.pull_request_id = ::buffa::types::decode_uint64(&mut cur)?;
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.pull_request_node_id = ::buffa::types::borrow_str(
-                            &mut cur,
-                        )?;
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.pull_request_number = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.url = ::buffa::types::borrow_str(&mut cur)?;
                     }
-                    7u32 => {
+                    4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
@@ -274954,49 +274883,49 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
-                    8u32 => {
+                    5u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.draft = ::buffa::types::decode_bool(&mut cur)?;
                     }
-                    9u32 => {
+                    6u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.merged = ::buffa::types::decode_bool(&mut cur)?;
                     }
-                    10u32 => {
+                    7u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.body = ::buffa::types::borrow_str(&mut cur)?;
                     }
-                    11u32 => {
+                    8u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.head_sha = ::buffa::types::borrow_str(&mut cur)?;
                     }
-                    12u32 => {
+                    9u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.head_ref = ::buffa::types::borrow_str(&mut cur)?;
                     }
-                    13u32 => {
+                    10u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.base_sha = ::buffa::types::borrow_str(&mut cur)?;
                     }
-                    14u32 => {
+                    11u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
@@ -275032,11 +274961,18 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::GitHubPullRequest {
-                    repository_id: self.repository_id,
+                    identity: match self.identity.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::types::v1::GitHubPullRequestIdentity,
+                                ::buffa::Inline<
+                                    super::super::super::super::types::v1::GitHubPullRequestIdentity,
+                                >,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     repository: self.repository.to_string(),
-                    pull_request_id: self.pull_request_id,
-                    pull_request_node_id: self.pull_request_node_id.to_string(),
-                    pull_request_number: self.pull_request_number,
                     url: self.url.to_string(),
                     state: self.state,
                     draft: self.draft,
@@ -275056,41 +274992,23 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for GitHubPullRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if self.repository_id != 0u64 {
+                if self.identity.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.identity.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
                     size
-                        += 1u64
-                            + ::buffa::types::uint64_encoded_len(self.repository_id)
-                                as u64;
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
                 }
                 if !self.repository.is_empty() {
                     size
                         += 1u64
                             + ::buffa::types::string_encoded_len(&self.repository)
                                 as u64;
-                }
-                if self.pull_request_id != 0u64 {
-                    size
-                        += 1u64
-                            + ::buffa::types::uint64_encoded_len(self.pull_request_id)
-                                as u64;
-                }
-                if !self.pull_request_node_id.is_empty() {
-                    size
-                        += 1u64
-                            + ::buffa::types::string_encoded_len(
-                                &self.pull_request_node_id,
-                            ) as u64;
-                }
-                if self.pull_request_number != 0u64 {
-                    size
-                        += 1u64
-                            + ::buffa::types::uint64_encoded_len(
-                                self.pull_request_number,
-                            ) as u64;
                 }
                 if !self.url.is_empty() {
                     size += 1u64 + ::buffa::types::string_encoded_len(&self.url) as u64;
@@ -275136,63 +275054,51 @@ pub mod __buffa {
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::EncodeSink,
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if self.repository_id != 0u64 {
-                    ::buffa::types::put_uint64_field(1u32, self.repository_id, buf);
+                if self.identity.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.identity.write_to(__cache, buf);
                 }
                 if !self.repository.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.repository, buf);
                 }
-                if self.pull_request_id != 0u64 {
-                    ::buffa::types::put_uint64_field(3u32, self.pull_request_id, buf);
-                }
-                if !self.pull_request_node_id.is_empty() {
-                    ::buffa::types::put_string_field(
-                        4u32,
-                        &self.pull_request_node_id,
-                        buf,
-                    );
-                }
-                if self.pull_request_number != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        5u32,
-                        self.pull_request_number,
-                        buf,
-                    );
-                }
                 if !self.url.is_empty() {
-                    ::buffa::types::put_string_field(6u32, &self.url, buf);
+                    ::buffa::types::put_string_field(3u32, &self.url, buf);
                 }
                 {
                     let val = self.state.to_i32();
                     if val != 0 {
-                        ::buffa::types::put_int32_field(7u32, val, buf);
+                        ::buffa::types::put_int32_field(4u32, val, buf);
                     }
                 }
                 if self.draft {
-                    ::buffa::types::put_bool_field(8u32, self.draft, buf);
+                    ::buffa::types::put_bool_field(5u32, self.draft, buf);
                 }
                 if self.merged {
-                    ::buffa::types::put_bool_field(9u32, self.merged, buf);
+                    ::buffa::types::put_bool_field(6u32, self.merged, buf);
                 }
                 if !self.body.is_empty() {
-                    ::buffa::types::put_string_field(10u32, &self.body, buf);
+                    ::buffa::types::put_string_field(7u32, &self.body, buf);
                 }
                 if !self.head_sha.is_empty() {
-                    ::buffa::types::put_string_field(11u32, &self.head_sha, buf);
+                    ::buffa::types::put_string_field(8u32, &self.head_sha, buf);
                 }
                 if !self.head_ref.is_empty() {
-                    ::buffa::types::put_string_field(12u32, &self.head_ref, buf);
+                    ::buffa::types::put_string_field(9u32, &self.head_ref, buf);
                 }
                 if !self.base_sha.is_empty() {
-                    ::buffa::types::put_string_field(13u32, &self.base_sha, buf);
+                    ::buffa::types::put_string_field(10u32, &self.base_sha, buf);
                 }
                 if !self.base_ref.is_empty() {
-                    ::buffa::types::put_string_field(14u32, &self.base_ref, buf);
+                    ::buffa::types::put_string_field(11u32, &self.base_ref, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -275215,40 +275121,14 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.repository_id) {
-                    __map
-                        .serialize_entry(
-                            "repositoryId",
-                            &::buffa::json_helpers::ProtoJson(&self.repository_id),
-                        )?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.identity.as_option()
+                    {
+                        __map.serialize_entry("identity", __v)?;
+                    }
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.repository) {
                     __map.serialize_entry("repository", self.repository)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.pull_request_id) {
-                    __map
-                        .serialize_entry(
-                            "pullRequestId",
-                            &::buffa::json_helpers::ProtoJson(&self.pull_request_id),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(
-                    self.pull_request_node_id,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "pullRequestNodeId",
-                            self.pull_request_node_id,
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.pull_request_number,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "pullRequestNumber",
-                            &::buffa::json_helpers::ProtoJson(&self.pull_request_number),
-                        )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.url) {
                     __map.serialize_entry("url", self.url)?;
@@ -275372,74 +275252,65 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `repository_id`
+            /// Field 1: `identity`
             #[must_use]
-            pub fn repository_id(&self) -> u64 {
-                self.0.reborrow().repository_id
+            pub fn identity(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::types::v1::__buffa::view::GitHubPullRequestIdentityView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().identity
             }
             /// Field 2: `repository`
             #[must_use]
             pub fn repository(&self) -> &'_ str {
                 self.0.reborrow().repository
             }
-            /// Field 3: `pull_request_id`
-            #[must_use]
-            pub fn pull_request_id(&self) -> u64 {
-                self.0.reborrow().pull_request_id
-            }
-            /// Field 4: `pull_request_node_id`
-            #[must_use]
-            pub fn pull_request_node_id(&self) -> &'_ str {
-                self.0.reborrow().pull_request_node_id
-            }
-            /// Field 5: `pull_request_number`
-            #[must_use]
-            pub fn pull_request_number(&self) -> u64 {
-                self.0.reborrow().pull_request_number
-            }
-            /// Field 6: `url`
+            /// Field 3: `url`
             #[must_use]
             pub fn url(&self) -> &'_ str {
                 self.0.reborrow().url
             }
-            /// Field 7: `state`
+            /// Field 4: `state`
             #[must_use]
             pub fn state(
                 &self,
             ) -> ::buffa::EnumValue<super::super::GitHubPullRequestState> {
                 self.0.reborrow().state
             }
-            /// Field 8: `draft`
+            /// Field 5: `draft`
             #[must_use]
             pub fn draft(&self) -> bool {
                 self.0.reborrow().draft
             }
-            /// Field 9: `merged`
+            /// Field 6: `merged`
             #[must_use]
             pub fn merged(&self) -> bool {
                 self.0.reborrow().merged
             }
-            /// Field 10: `body`
+            /// Field 7: `body`
             #[must_use]
             pub fn body(&self) -> &'_ str {
                 self.0.reborrow().body
             }
-            /// Field 11: `head_sha`
+            /// Field 8: `head_sha`
             #[must_use]
             pub fn head_sha(&self) -> &'_ str {
                 self.0.reborrow().head_sha
             }
-            /// Field 12: `head_ref`
+            /// Field 9: `head_ref`
             #[must_use]
             pub fn head_ref(&self) -> &'_ str {
                 self.0.reborrow().head_ref
             }
-            /// Field 13: `base_sha`
+            /// Field 10: `base_sha`
             #[must_use]
             pub fn base_sha(&self) -> &'_ str {
                 self.0.reborrow().base_sha
             }
-            /// Field 14: `base_ref`
+            /// Field 11: `base_ref`
             #[must_use]
             pub fn base_ref(&self) -> &'_ str {
                 self.0.reborrow().base_ref

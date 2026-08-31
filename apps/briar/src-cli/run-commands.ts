@@ -31,6 +31,9 @@ import {
   TransitionWorkflowStageResponse_Outcome,
   TransitionWorkflowStageResponseSchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import type {
+  GitHubPullRequestIdentity,
+} from "@briar/contracts/gen/briar/types/v1/github_pb";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {
   briarIssueUrl,
@@ -372,6 +375,7 @@ async function addRunEvidence() {
   let metadata = metadataValue
     ? jsonObject(metadataValue, "Evidence metadata")
     : undefined;
+  let githubPullRequest: GitHubPullRequestIdentity | undefined;
   if (
     type === "pull_request" &&
     url &&
@@ -385,12 +389,7 @@ async function addRunEvidence() {
       pullRequestUrl: url,
       issueUrl: briarIssueUrl(config.apiUrl, project.id, runId),
     });
-    if (github.identity) {
-      metadata = {
-        ...(metadata ?? {}),
-        githubPullRequest: github.identity,
-      };
-    }
+    githubPullRequest = github.identity;
   }
   const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
@@ -456,6 +455,7 @@ async function addRunEvidence() {
       command: value("--command"),
       url,
       metadata,
+      githubPullRequest,
       images: uploadIds.map((uploadId) => ({ uploadId })),
     },
   ));

@@ -17,6 +17,9 @@ import {
   ProjectGitHubRepositorySchema,
   UpdateGitHubPullRequestResponseSchema,
 } from "@briar/contracts/gen/briar/app/v1/github_pb";
+import {
+  GitHubPullRequestIdentitySchema,
+} from "@briar/contracts/gen/briar/types/v1/github_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
 
 type IntegrationResult = Awaited<
@@ -148,20 +151,22 @@ const pullRequestState = {
 
 const appPullRequest = (result: PullRequestResult) =>
   create(GitHubPullRequestSchema, {
-    repositoryId: positiveUint64(
-      result.repositoryId,
-      "GitHub pull request repository id",
-    ),
+    identity: create(GitHubPullRequestIdentitySchema, {
+      repositoryId: positiveUint64(
+        result.repositoryId,
+        "GitHub pull request repository id",
+      ),
+      pullRequestId: positiveUint64(
+        result.pullRequestId,
+        "GitHub pull request id",
+      ),
+      pullRequestNodeId: result.pullRequestNodeId,
+      pullRequestNumber: positiveUint64(
+        result.pullRequestNumber,
+        "GitHub pull request number",
+      ),
+    }),
     repository: result.repository,
-    pullRequestId: positiveUint64(
-      result.pullRequestId,
-      "GitHub pull request id",
-    ),
-    pullRequestNodeId: result.pullRequestNodeId,
-    pullRequestNumber: positiveUint64(
-      result.pullRequestNumber,
-      "GitHub pull request number",
-    ),
     url: result.url,
     state: pullRequestState[result.state],
     draft: result.draft,

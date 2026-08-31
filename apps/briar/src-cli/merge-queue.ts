@@ -165,11 +165,13 @@ function readPullRequest(
 }
 
 function assertRepositoryIdentity(
-  pullRequest: Pick<GitHubPullRequest, "repositoryId" | "repository">,
+  pullRequest: GitHubPullRequest,
   claim: Pick<ClaimedMergeBatch, "repository" | "repositoryId">,
 ) {
+  const identity = pullRequest.identity;
   if (
-    pullRequest.repositoryId !== BigInt(claim.repositoryId) ||
+    !identity ||
+    identity.repositoryId !== BigInt(claim.repositoryId) ||
     pullRequest.repository.toLowerCase() !== claim.repository.toLowerCase()
   ) {
     throw new MergeQueueAuthorityError(
@@ -184,10 +186,12 @@ function assertPullRequestIdentity(
   pullRequest: GitHubPullRequest,
   member: MergeBatchMember,
 ) {
+  const identity = pullRequest.identity;
   if (
-    pullRequest.pullRequestNodeId !== member.pullRequestNodeId ||
-    pullRequest.pullRequestId !== BigInt(member.pullRequestId) ||
-    pullRequest.pullRequestNumber !== BigInt(member.pullRequestNumber) ||
+    !identity ||
+    identity.pullRequestNodeId !== member.pullRequestNodeId ||
+    identity.pullRequestId !== BigInt(member.pullRequestId) ||
+    identity.pullRequestNumber !== BigInt(member.pullRequestNumber) ||
     pullRequest.headSha !== member.headSha ||
     pullRequest.baseRef !== "main" ||
     pullRequest.state !== GitHubPullRequestState.OPEN ||
