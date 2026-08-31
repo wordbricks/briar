@@ -172,6 +172,23 @@ export const ProjectAgentSessionInput = strictSchema(Schema.Struct({
   updatedAt: IsoDateTimeWithOffset,
 }));
 
+/**
+ * Internal session snapshots may carry the server-owned requester binding used
+ * to verify approved Agent Skill executions. It is intentionally absent from
+ * the public write contract above, so clients cannot set it.
+ */
+export const StoredProjectAgentSessionPayload = strictSchema(Schema.Struct({
+  ...ProjectAgentSessionInput.fields,
+  requestedByUserId: Schema.optional(Schema.NullOr(Schema.String)),
+}));
+
+const StoredProjectAgentSessionPayloadJson = Schema.fromJsonString(
+  StoredProjectAgentSessionPayload,
+);
+
+export const decodeStoredProjectAgentSessionPayload =
+  Schema.decodeUnknownSync(StoredProjectAgentSessionPayloadJson);
+
 export const ProjectAgentTaskInput = strictSchema(Schema.Struct({
   agentId: UuidString,
   skillId: Schema.optional(Schema.NullOr(UuidString)),

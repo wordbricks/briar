@@ -4,6 +4,7 @@ import {
 } from "./project-agent-session-repository";
 import type { ProjectAgentSessionRow } from "./project-agent-model";
 import { projectAgentSessionJson } from "./project-agent-session-json";
+import { decodeStoredProjectAgentSessionPayload } from "./project-request-contract";
 
 export const projectAgentTaskSessionEvent = (
   type: "started" | "completed" | "failed",
@@ -35,13 +36,7 @@ export async function syncProjectAgentTaskSession(
 ) {
   const current = await getProjectAgentSession(db, job.project_id, job.id);
   if (!current) return null;
-  let payload: Record<string, unknown>;
-  try {
-    payload = JSON.parse(current.payload_json) as Record<string, unknown>;
-  } catch {
-    payload = {};
-  }
-  const currentEvents = Array.isArray(payload.events) ? payload.events : [];
+  const payload = decodeStoredProjectAgentSessionPayload(current.payload_json);
   const terminal = job.status === "completed" || job.status === "failed";
   const nextPayload = {
     ...payload,
@@ -56,7 +51,7 @@ export async function syncProjectAgentTaskSession(
     completedAt: terminal ? job.completed_at : null,
     updatedAt: job.updated_at,
     events: [
-      ...currentEvents,
+      ...payload.events,
       projectAgentTaskSessionEvent(
         terminal ? (job.status === "completed" ? "completed" : "failed") : "started",
         job.updated_at,

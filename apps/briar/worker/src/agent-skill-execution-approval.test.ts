@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+import { AgentService } from "@briar/contracts/gen/briar/app/v1/agent_pb";
+import { createClient } from "@connectrpc/connect";
+import { createConnectTransport } from "@connectrpc/connect-web";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
@@ -318,6 +321,22 @@ describe("conversational Agent Skill execution approval", () => {
     GOOGLE_CLIENT_SECRET: "google-secret",
   }) as unknown as Env;
 
+  const agentClient = createClient(
+    AgentService,
+    createConnectTransport({
+      baseUrl: "https://briar.example",
+      fetch: (input, init) =>
+        apiWorker.fetch(
+          new Request(input, { ...init, redirect: "manual" }),
+          env(),
+        ),
+    }),
+  );
+
+  const agentOptions = {
+    headers: { authorization: `Bearer ${ownerToken}` },
+  };
+
   const agentRpc = (
     method: "PutProjectAgentSession" | "RunProjectAgentTask",
     body: Record<string, unknown>,
@@ -624,6 +643,20 @@ describe("conversational Agent Skill execution approval", () => {
     expect(await tableCount("briar_project_agent_task_jobs")).toBe(1);
     expect(await tableCount("briar_project_agent_sessions")).toBe(1);
     expect(await tableCount("briar_agent_skill_execution_approval_audit")).toBe(1);
+    await expect(
+      agentClient.getProjectAgentSession(
+        {
+          projectId,
+          sessionId: acceptedBody.proposal.resultSessionId,
+        },
+        agentOptions,
+      ),
+    ).resolves.toMatchObject({
+      session: {
+        id: acceptedBody.proposal.resultSessionId,
+        requestedByUserId: ownerId,
+      },
+    });
 
     const retry = await acceptIssue(seeded.runId, seeded.proposal.id);
     expect(retry.status).toBe(200);

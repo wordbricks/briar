@@ -33,6 +33,7 @@ import {
   attachmentObjectIsReferencedSql,
   attachmentObjectReferenceBindings,
 } from "./attachment-object-ownership";
+import { decodeStoredProjectAgentSessionPayload } from "./project-request-contract";
 
 export const defaultArchiveRowLimit = 500;
 export const maxArchiveUncompressedBytes = 16 * 1024 * 1024;
@@ -915,12 +916,7 @@ async function restoreArchivedProjectAgentSessionRequester(
     .bind(session.project_id, session.id)
     .first<{ approved_by_user_id: string }>();
   if (!approval) return session;
-  let payload: Record<string, unknown>;
-  try {
-    payload = JSON.parse(session.payload_json) as Record<string, unknown>;
-  } catch {
-    return session;
-  }
+  const payload = decodeStoredProjectAgentSessionPayload(session.payload_json);
   return {
     ...session,
     requested_by_user_id: approval.approved_by_user_id,

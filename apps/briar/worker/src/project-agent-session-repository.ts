@@ -6,36 +6,23 @@ import {
   type ProjectAgentSessionRow,
   type ProjectAgentSessionSummaryRow,
 } from "./project-agent-model";
+import { decodeStoredProjectAgentSessionPayload } from "./project-request-contract";
 
 const projectAgentSessionChangePageSize = 500;
 
 const projectAgentSessionSummaryJson = (row: ProjectAgentSessionRow) => {
-  const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
-  const status = typeof payload.status === "string"
-    ? payload.status
-    : row.status;
-  const startedAt = typeof payload.startedAt === "string"
-    ? payload.startedAt
-    : row.started_at;
-  const completedAt = typeof payload.completedAt === "string"
-    ? payload.completedAt
-    : row.completed_at;
-  const issues = Array.isArray(payload.issues)
-    ? payload.issues.map((value) => {
-        const issue = value as Record<string, unknown>;
-        return {
-          runId: issue.runId,
-          runNumber: issue.runNumber,
-          sourceKey: issue.sourceKey,
-          title: issue.title,
-          outcome: issue.outcome,
-          summary: null,
-        };
-      })
-    : [];
+  const payload = decodeStoredProjectAgentSessionPayload(row.payload_json);
+  const issues = payload.issues.map((issue) => ({
+    runId: issue.runId,
+    runNumber: issue.runNumber,
+    sourceKey: issue.sourceKey,
+    title: issue.title,
+    outcome: issue.outcome,
+    summary: null,
+  }));
   return JSON.stringify({
     dispatchGroupId: payload.dispatchGroupId,
-    agentId: payload.agentId ?? row.agent_id,
+    agentId: payload.agentId,
     agentName: payload.agentName ?? null,
     skillId: payload.skillId ?? null,
     sessionType: payload.sessionType,
@@ -44,16 +31,14 @@ const projectAgentSessionSummaryJson = (row: ProjectAgentSessionRow) => {
     scheduleRunId: payload.scheduleRunId ?? null,
     parentSessionId: payload.parentSessionId ?? null,
     requestedByUserId: row.requested_by_user_id,
-    request: typeof payload.request === "string"
-      ? payload.request.slice(0, 500)
-      : null,
-    status,
+    request: payload.request?.slice(0, 500) ?? null,
+    status: payload.status,
     issues,
-    startedAt,
-    completedAt,
+    startedAt: payload.startedAt,
+    completedAt: payload.completedAt,
     inboxVersion: inboxSessionMessageVersion(
-      status,
-      completedAt ?? startedAt,
+      payload.status,
+      payload.completedAt ?? payload.startedAt,
     ),
     requestedWorkerId: payload.requestedWorkerId ?? null,
     workerId: payload.workerId ?? null,

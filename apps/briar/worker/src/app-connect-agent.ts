@@ -112,6 +112,7 @@ import {
   decodeProjectAgentInput,
   decodeProjectAgentScheduleInput,
   decodeProjectAgentSessionInput,
+  decodeStoredProjectAgentSessionPayload,
   decodeProjectAgentTaskInput,
 } from "./project-request-contract";
 import { decodeRequestSync } from "./request-schema";
@@ -937,16 +938,14 @@ const rowToProjectAgentSession = (
     ? Exclude<R, null>
     : never,
   options: { archived?: boolean } = {},
-) => {
-  const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
-  return toProjectAgentSession({
+) =>
+  toProjectAgentSession({
     id: row.id,
     projectId: row.project_id,
     requestedByUserId: row.requested_by_user_id,
-    payload: decodeProjectAgentSessionInput(payload),
+    payload: decodeStoredProjectAgentSessionPayload(row.payload_json),
     archived: options.archived,
   });
-};
 
 const summaryToProjectAgentSession = (
   row: Awaited<ReturnType<typeof listProjectAgentSessionSummaries>>[number],

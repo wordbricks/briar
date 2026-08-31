@@ -7,6 +7,7 @@ import {
 import { getArchivedProjectAgentSession } from "./archive";
 import { HttpError } from "./http-response";
 import { projectAgentSessionJson } from "./project-agent-session-json";
+import { decodeStoredProjectAgentSessionPayload } from "./project-request-contract";
 import {
   getProjectAgentSession,
   upsertProjectAgentSessionSummary,
@@ -177,12 +178,13 @@ export async function approveAgentSkillExecutionProposal(
     if (!session) {
       throw stale("The approved Agent Skill execution session was not found");
     }
-    let sessionPayload: Record<string, unknown>;
+    let sessionPayload: ReturnType<
+      typeof decodeStoredProjectAgentSessionPayload
+    >;
     try {
-      sessionPayload = JSON.parse(session.payload_json) as Record<
-        string,
-        unknown
-      >;
+      sessionPayload = decodeStoredProjectAgentSessionPayload(
+        session.payload_json,
+      );
     } catch {
       throw stale("The approved Agent Skill execution session is invalid");
     }
