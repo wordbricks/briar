@@ -13,6 +13,8 @@ import {
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  decodeManagedComputerRemoteRelayControlFrame,
+  encodeManagedComputerRemoteAgentControlFrame,
   managedComputerRemoteHeartbeatRequest,
   managedComputerRemoteHeartbeatResponse,
 } from "../../src/lib/managed-computer-remote-protocol";
@@ -227,11 +229,19 @@ describe("ManagedComputerRemoteSessionHub", () => {
     });
   });
 
-  it("never forwards text payloads from either side", async () => {
-    const controller = new FakeSocket({
+  it("keeps RFB binary-only and accepts only typed agent failures", async () => {
+    const staleController = new FakeSocket({
       role: "controller",
       sessionId: "11111111-1111-4111-8111-111111111111",
       connectionGeneration: 1,
+      maxExpiresAt: "2099-01-01T00:00:00.000Z",
+      controllerBytes: 0,
+      screenBytes: 0,
+    });
+    const controller = new FakeSocket({
+      role: "controller",
+      sessionId: "11111111-1111-4111-8111-111111111111",
+      connectionGeneration: 2,
       maxExpiresAt: "2099-01-01T00:00:00.000Z",
       controllerBytes: 0,
       screenBytes: 0,
@@ -250,8 +260,8 @@ describe("ManagedComputerRemoteSessionHub", () => {
           tag === "agent"
             ? [agent]
             : tag === "controller"
-              ? [controller]
-              : [agent, controller],
+              ? [staleController, controller]
+              : [agent, staleController, controller],
         setWebSocketAutoResponse: vi.fn(),
       } as unknown as DurableObjectState,
       {} as Env,
@@ -263,11 +273,47 @@ describe("ManagedComputerRemoteSessionHub", () => {
     );
     expect(agent.sent).toEqual([]);
 
-    await hub.webSocketMessage(agent as unknown as WebSocket, "display_error");
+    await hub.webSocketMessage(
+      agent as unknown as WebSocket,
+      encodeManagedComputerRemoteAgentControlFrame({
+        type: "display_error",
+        sessionId: controller.deserializeAttachment().sessionId!,
+        code: "display_closed",
+      }),
+    );
     expect(controller.close).toHaveBeenCalledWith(
       1011,
       "Remote display unavailable",
     );
+    expect(staleController.close).not.toHaveBeenCalled();
+
+    controller.close.mockClear();
+    await hub.webSocketMessage(
+      agent as unknown as WebSocket,
+      JSON.stringify({
+        type: "display_error",
+        sessionId: controller.deserializeAttachment().sessionId,
+        code: "display_closed",
+        injected: true,
+      }),
+    );
+    expect(agent.close).toHaveBeenCalledWith(
+      1008,
+      "Remote display control is invalid",
+    );
+    expect(controller.close).not.toHaveBeenCalled();
+
+    agent.close.mockClear();
+    await hub.webSocketMessage(
+      agent as unknown as WebSocket,
+      encodeManagedComputerRemoteAgentControlFrame({
+        type: "display_error",
+        sessionId: "22222222-2222-4222-8222-222222222222",
+        code: "display_closed",
+      }),
+    );
+    expect(agent.close).not.toHaveBeenCalled();
+    expect(controller.close).not.toHaveBeenCalled();
   });
 
   it("relays a validated binary challenge and completion flow", async () => {
@@ -453,6 +499,57 @@ describe("ManagedComputerRemoteSessionHub", () => {
       ["controllerReady", sessionId],
       ["controllerEnded", sessionId],
     ]);
+  });
+
+  it("announces only the latest live controller to a reconnecting agent", async () => {
+    vi.stubGlobal("WebSocketPair", FakeWebSocketPair);
+    vi.stubGlobal("Response", FakeUpgradeResponse);
+    const sessionId = "11111111-1111-4111-8111-111111111111";
+    const staleController = new FakeSocket({
+      role: "controller",
+      sessionId,
+      connectionGeneration: 1,
+      maxExpiresAt: "2099-01-01T00:00:00.000Z",
+      controllerBytes: 0,
+      screenBytes: 0,
+    });
+    const liveController = new FakeSocket({
+      role: "controller",
+      sessionId,
+      connectionGeneration: 2,
+      maxExpiresAt: "2099-01-01T00:00:00.000Z",
+      controllerBytes: 0,
+      screenBytes: 0,
+    });
+    const acceptWebSocket = vi.fn();
+    const hub = new ManagedComputerRemoteSessionHub(
+      {
+        getWebSockets: (tag?: string) =>
+          tag === "controller" ? [staleController, liveController] : [],
+        setWebSocketAutoResponse: vi.fn(),
+        acceptWebSocket,
+      } as unknown as DurableObjectState,
+      {} as Env,
+    );
+
+    const response = await hub.fetch(new Request(
+      "https://managed-computer-remote.internal/connect",
+      {
+        headers: {
+          Upgrade: "websocket",
+          "X-Briar-Remote-Role": "agent",
+          "X-Briar-Remote-Protocol": "briar-remote-agent-v1.token",
+        },
+      },
+    ));
+
+    expect(response.status).toBe(101);
+    const agent = acceptWebSocket.mock.calls[0]![0] as FakeSocket;
+    expect(agent.sent).toHaveLength(1);
+    expect(decodeManagedComputerRemoteRelayControlFrame(agent.sent[0])).toEqual({
+      type: "controller_ready",
+      sessionId,
+    });
   });
 
   it("keeps the controller alive when an agent socket is replaced", async () => {

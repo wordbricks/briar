@@ -11,6 +11,8 @@ import {
   isManagedComputerSetupToController,
 } from "../../src/lib/managed-computer-setup-codec";
 import {
+  decodeManagedComputerRemoteAgentControlFrame,
+  encodeManagedComputerRemoteRelayControlFrame,
   managedComputerRemoteHeartbeatRequest,
   managedComputerRemoteHeartbeatResponse,
 } from "../../src/lib/managed-computer-remote-protocol";
@@ -51,6 +53,30 @@ function messageSize(message: string | ArrayBuffer) {
 
 function attachment(socket: WebSocket) {
   return socket.deserializeAttachment() as RemoteSocketAttachment | null;
+}
+
+function latestLiveController(
+  sockets: WebSocket[],
+  sessionId?: string,
+): WebSocket | null {
+  const now = new Date().toISOString();
+  let selected: WebSocket | null = null;
+  let selectedGeneration = -1;
+  for (const socket of sockets) {
+    const current = attachment(socket);
+    if (
+      socket.readyState !== socketOpen || current?.role !== "controller" ||
+      !current.sessionId ||
+      (sessionId !== undefined && current.sessionId !== sessionId) ||
+      (current.maxExpiresAt !== null && current.maxExpiresAt <= now) ||
+      current.connectionGeneration <= selectedGeneration
+    ) {
+      continue;
+    }
+    selected = socket;
+    selectedGeneration = current.connectionGeneration;
+  }
+  return selected;
 }
 
 function setupControllerControlFrame(
@@ -231,10 +257,12 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
       controllerBytes: 0,
       screenBytes: 0,
     } satisfies RemoteSocketAttachment);
-    const controller = this.ctx.getWebSockets("controller")[0];
+    const controller = latestLiveController(
+      this.ctx.getWebSockets("controller"),
+    );
     const current = controller ? attachment(controller) : null;
     if (current?.sessionId) {
-      server.send(JSON.stringify({
+      server.send(encodeManagedComputerRemoteRelayControlFrame({
         type: "controller_ready",
         sessionId: current.sessionId,
       }));
@@ -260,10 +288,12 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
     ) {
       return new Response("Invalid remote session", { status: 400 });
     }
-    const agent = this.ctx.getWebSockets("agent").find((socket) =>
+    const agentAvailable = this.ctx.getWebSockets("agent").some((socket) =>
       socket.readyState === socketOpen
     );
-    if (!agent) return new Response("Remote display agent offline", { status: 409 });
+    if (!agentAvailable) {
+      return new Response("Remote display agent offline", { status: 409 });
+    }
 
     const connected = await markManagedComputerRemoteSessionConnected(
       this.env.DB,
@@ -302,7 +332,17 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
       action: "client_connected",
       occurredAt: new Date().toISOString(),
     });
-    agent.send(JSON.stringify({ type: "controller_ready", sessionId }));
+    const liveAgent = this.ctx.getWebSockets("agent").find((socket) =>
+      socket.readyState === socketOpen
+    );
+    if (liveAgent) {
+      liveAgent.send(encodeManagedComputerRemoteRelayControlFrame({
+        type: "controller_ready",
+        sessionId,
+      }));
+    } else {
+      server.close(4004, "Remote display agent offline");
+    }
     return new Response(null, {
       status: 101,
       headers: { "Sec-WebSocket-Protocol": protocol },
@@ -403,9 +443,17 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
       return;
     }
     if (typeof message === "string") {
-      for (const controller of this.ctx.getWebSockets("controller")) {
-        controller.close(1011, "Remote display unavailable");
+      let control;
+      try {
+        control = decodeManagedComputerRemoteAgentControlFrame(message);
+      } catch {
+        socket.close(1008, "Remote display control is invalid");
+        return;
       }
+      latestLiveController(
+        this.ctx.getWebSockets("controller"),
+        control.sessionId,
+      )?.close(1011, "Remote display unavailable");
       return;
     }
     const controller = this.ctx.getWebSockets("controller").find((candidate) =>
@@ -532,7 +580,10 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
   private tellAgentSessionEnded(sessionId: string) {
     for (const agent of this.ctx.getWebSockets("agent")) {
       if (agent.readyState !== socketOpen) continue;
-      agent.send(JSON.stringify({ type: "controller_ended", sessionId }));
+      agent.send(encodeManagedComputerRemoteRelayControlFrame({
+        type: "controller_ended",
+        sessionId,
+      }));
     }
   }
 }

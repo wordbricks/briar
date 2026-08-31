@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  decodeManagedComputerRemoteAgentControlFrame,
+  encodeManagedComputerRemoteRelayControlFrame,
   managedComputerRemoteHeartbeatIntervalMs,
   managedComputerRemoteHeartbeatRequest,
   managedComputerRemoteHeartbeatResponse,
@@ -57,6 +59,7 @@ const fakeWebSockets: FakeWebSocket[] = [];
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   fakeWebSockets.length = 0;
 });
@@ -74,6 +77,81 @@ describe("managed computer remote session agent", () => {
       BRIAR_REMOTE_DISPLAY_HOST: "0.0.0.0",
       BRIAR_REMOTE_DISPLAY_PORT: "5901",
     })).toThrow("loopback");
+  });
+
+  it("opens and closes the display only for strict relay controls", async () => {
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    const localSocket = {
+      write: vi.fn(),
+      end: vi.fn(),
+    } as unknown as Bun.Socket<undefined>;
+    const connect = vi.fn(async (
+      options: Bun.TCPSocketConnectOptions<undefined>,
+    ) => {
+      options.socket.open?.(localSocket);
+      return localSocket;
+    });
+    vi.stubGlobal("Bun", { connect });
+    const agent = new ManagedComputerRemoteSessionAgent(config);
+
+    agent.start();
+    const socket = fakeWebSockets[0];
+    socket.readyState = FakeWebSocket.OPEN;
+    socket.emit("open");
+
+    socket.emit("message", {
+      data: JSON.stringify({
+        type: "controller_ready",
+        sessionId: managedComputerId,
+        injected: true,
+      }),
+    });
+    await vi.waitFor(() => expect(connect).not.toHaveBeenCalled());
+
+    socket.emit("message", {
+      data: encodeManagedComputerRemoteRelayControlFrame({
+        type: "controller_ready",
+        sessionId: managedComputerId,
+      }),
+    });
+    await vi.waitFor(() => expect(connect).toHaveBeenCalledOnce());
+
+    socket.emit("message", {
+      data: encodeManagedComputerRemoteRelayControlFrame({
+        type: "controller_ended",
+        sessionId: managedComputerId,
+      }),
+    });
+    await vi.waitFor(() => expect(localSocket.end).toHaveBeenCalledOnce());
+    agent.stop();
+  });
+
+  it("reports a display connection failure for the active session", async () => {
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    const connect = vi.fn(async () => {
+      throw new Error("display offline");
+    });
+    vi.stubGlobal("Bun", { connect });
+    const agent = new ManagedComputerRemoteSessionAgent(config);
+
+    agent.start();
+    const socket = fakeWebSockets[0];
+    socket.readyState = FakeWebSocket.OPEN;
+    socket.emit("open");
+    socket.emit("message", {
+      data: encodeManagedComputerRemoteRelayControlFrame({
+        type: "controller_ready",
+        sessionId: managedComputerId,
+      }),
+    });
+
+    await vi.waitFor(() => expect(socket.sent).toHaveLength(1));
+    expect(decodeManagedComputerRemoteAgentControlFrame(socket.sent[0])).toEqual({
+      type: "display_error",
+      sessionId: managedComputerId,
+      code: "display_connect_failed",
+    });
+    agent.stop();
   });
 
   it("heartbeats the relay and accepts its automatic response", async () => {
