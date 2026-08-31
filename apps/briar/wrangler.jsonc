@@ -52,7 +52,7 @@
       "/projects*",
       "/managed-computers*",
       "/runs*",
-      "/reply-attachment-uploads*",
+      "/uploads*",
       "/health",
       "/html-artifact-preview",
       "/github/*",

@@ -21,6 +21,7 @@ import type {
   ClaimedChannelReply,
   ClaimedIssueReply,
 } from "./worker-queue-contract";
+import { uploadPreparedFiles } from "./upload-client";
 
 type ChannelReplyResult = ParsedChannelReplyAgentResult["result"];
 type CompletionDisposition = "completed" | "requeued" | "failed";
@@ -351,43 +352,17 @@ export function createReplyCompletionClient(
       }),
       input.signal,
     );
-    if (prepared.uploads.length !== files.length) {
-      throw new Error("Worker reply prepare returned the wrong upload count");
-    }
-    const uploads = new Map(prepared.uploads.map((upload) => [upload.clientId, upload]));
-    if (uploads.size !== files.length) {
-      throw new Error("Worker reply prepare returned duplicate client IDs");
-    }
-    const apiOrigin = new URL(apiUrl).origin;
-    const attachmentIds: string[] = [];
-    for (const { clientId, file } of files) {
-      const upload = uploads.get(clientId);
-      if (
-        !upload?.reference?.attachmentId || !upload.uploadCapability ||
-        !upload.uploadUrl
-      ) {
-        throw new Error("Worker reply prepare returned an incomplete upload");
-      }
+    for (const upload of prepared.uploads) {
       requiredTimestamp(upload.expiresAt, "upload expiry");
-      const uploadUrl = new URL(upload.uploadUrl);
-      if (uploadUrl.origin !== apiOrigin) {
-        throw new Error("Worker reply prepare returned an unsafe upload URL");
-      }
-      const response = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${upload.uploadCapability}`,
-          "Content-Type": file.type,
-        },
-        body: file,
-        signal: input.signal,
-      });
-      if (response.status !== 204) {
-        throw new Error(`Worker reply attachment upload failed (${response.status})`);
-      }
-      attachmentIds.push(upload.reference.attachmentId);
     }
-    return attachmentIds;
+    return uploadPreparedFiles({
+      apiUrl,
+      files,
+      uploads: prepared.uploads,
+      uploadId: (upload) => upload.reference?.attachmentId,
+      fetch,
+      signal: input.signal,
+    });
   };
 
   return {

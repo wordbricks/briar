@@ -15,7 +15,7 @@ import {
 import { flushOrganizationInboxRealtimeOutbox } from "./realtime-scheduling";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { cleanupExpiredChannelReplySessions } from "./channels";
-import { maintainReplyUploadCleanup } from "./reply-completion-repository";
+import { maintainUploadCleanup } from "./upload-repository";
 
 export type ScheduledTaskDependencies = {
   archiveCompletedLogs: typeof archiveCompletedLogs;
@@ -28,7 +28,7 @@ export type ScheduledTaskDependencies = {
   reconcileDrainingManagedComputers: typeof reconcileDrainingManagedComputers;
   reconcileManagedComputers: typeof reconcileManagedComputers;
   cleanupExpiredChannelReplySessions: typeof cleanupExpiredChannelReplySessions;
-  maintainReplyUploadCleanup: typeof maintainReplyUploadCleanup;
+  maintainUploadCleanup: typeof maintainUploadCleanup;
 };
 
 interface DashboardChangePruneFailure {
@@ -46,7 +46,7 @@ const scheduledTaskDependencies: ScheduledTaskDependencies = {
   reconcileDrainingManagedComputers,
   reconcileManagedComputers,
   cleanupExpiredChannelReplySessions,
-  maintainReplyUploadCleanup,
+  maintainUploadCleanup,
 };
 const GITHUB_RECONCILIATION_CRON = "* * * * *";
 const LOG_MAINTENANCE_CRON = "17 */6 * * *";
@@ -120,7 +120,7 @@ export async function handleScheduledTask(
         }));
       }
       const [archive, expired, cleanup, slackRevocations, github, managedComputers,
-        channelReplySessions, replyUploads] =
+        channelReplySessions, uploads] =
         await Promise.all([
         dependencies.archiveCompletedLogs(env.DB, env.ARCHIVES, observedAt),
         dependencies.expireArchives(
@@ -139,7 +139,7 @@ export async function handleScheduledTask(
         dependencies.reconcileGithubMergedRuns(env.DB),
         dependencies.reconcileManagedComputers(env.DB, env, observedAt),
         dependencies.cleanupExpiredChannelReplySessions(env.DB, { observedAt }),
-        dependencies.maintainReplyUploadCleanup(
+        dependencies.maintainUploadCleanup(
           env.DB,
           env.ATTACHMENTS,
           observedAt,
@@ -163,7 +163,7 @@ export async function handleScheduledTask(
           sessionId: session.id,
           reason: "ttl_expired",
         })),
-        replyUploads,
+        uploads,
       }));
     } catch (error) {
       console.error(JSON.stringify({

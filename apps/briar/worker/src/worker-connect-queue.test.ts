@@ -357,7 +357,7 @@ describe("WorkerQueueService lifecycle semantics", () => {
           attachmentId: "77777777-7777-4777-8777-777777777777",
         },
         uploadUrl:
-          "https://briar.example/reply-attachment-uploads/77777777-7777-4777-8777-777777777777",
+          "https://briar.example/uploads/77777777-7777-4777-8777-777777777777",
         uploadCapability: "opaque-capability",
       }],
     });

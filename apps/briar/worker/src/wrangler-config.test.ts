@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 describe("Wrangler asset routing", () => {
-  it("routes Connect and raw reply upload APIs before static assets", async () => {
+  it("routes Connect and raw upload APIs before static assets", async () => {
     const path = fileURLToPath(new URL("../../wrangler.jsonc", import.meta.url));
     const source = await readFile(path, "utf8");
     const runWorkerFirst = source.match(
@@ -12,7 +12,7 @@ describe("Wrangler asset routing", () => {
 
     expect(runWorkerFirst).toContain('"/briar.app.v1.*"');
     expect(runWorkerFirst).toContain('"/briar.worker.v1.*"');
-    expect(runWorkerFirst).toContain('"/reply-attachment-uploads*"');
+    expect(runWorkerFirst).toContain('"/uploads*"');
     expect(runWorkerFirst).not.toContain('"/issue-reply-claims*"');
     expect(runWorkerFirst).not.toContain('"/channel-reply-claims*"');
     expect(runWorkerFirst).not.toContain('"/worker-claims"');

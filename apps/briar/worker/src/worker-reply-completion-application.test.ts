@@ -27,14 +27,17 @@ import {
 } from "./channels";
 import type { IssueAgentReplyJobRow } from "./issue-agent-reply-repository";
 import {
-  enqueueExpiredReplyAttachmentUploadCleanup,
-  enqueueReplyUploadObjectCleanup,
-  processReplyUploadCleanupQueue,
-} from "./reply-completion-repository";
+  enqueueExpiredUploadCleanup,
+  enqueueUploadObjectCleanup,
+  processUploadCleanupQueue,
+} from "./upload-repository";
+import {
+  uploadReservedFileApplication,
+  UploadApplicationError,
+} from "./upload-application";
 import {
   prepareReplyAttachmentUploadsApplication,
   ReplyCompletionApplicationError,
-  uploadReplyAttachmentApplication,
   completeChannelReplyApplication,
   completeIssueReplyApplication,
 } from "./worker-reply-completion-application";
@@ -389,26 +392,26 @@ describe("reply completion application", () => {
     })).rejects.toMatchObject({ reason: "replay_conflict" });
     const upload = prepared.uploads[0]!;
 
-    await expect(uploadReplyAttachmentApplication({
+    await expect(uploadReservedFileApplication({
       db,
       bucket,
       signingSecret,
-      attachmentId: upload.attachmentId,
+      uploadId: upload.attachmentId,
       capability: upload.uploadCapability,
       contentType: "text/html",
       body,
       observedAt: at(201 + sequence),
     })).resolves.toBeDefined();
-    await expect(uploadReplyAttachmentApplication({
+    await expect(uploadReservedFileApplication({
       db,
       bucket,
       signingSecret,
-      attachmentId: upload.attachmentId,
+      uploadId: upload.attachmentId,
       capability: upload.uploadCapability,
       contentType: "text/html",
       body,
       observedAt: at(202 + sequence),
-    })).rejects.toMatchObject({ reason: "claim_conflict" });
+    })).rejects.toMatchObject({ reason: "unavailable" });
 
     const requestId = "fb000000-0000-4000-8000-000000000001";
     const completion = completeIssueReplyInputFromProto(create(
@@ -472,10 +475,10 @@ describe("reply completion application", () => {
     })).rejects.toMatchObject({ reason: "replay_conflict" });
 
     await expect(db.prepare(
-      `select completion_request_id, consumed_at
-       from briar_reply_attachment_uploads where attachment_id = ?`,
+      `select consumer_id, consumed_at
+       from briar_uploads where upload_id = ?`,
     ).bind(upload.attachmentId).first()).resolves.toEqual({
-      completion_request_id: requestId,
+      consumer_id: requestId,
       consumed_at: at(210 + sequence),
     });
     await expect(db.prepare(
@@ -484,27 +487,26 @@ describe("reply completion application", () => {
 
     const unused = prepared.uploads[1]!;
     const unusedObject = await db.prepare(
-      `select object_key from briar_reply_attachment_uploads
-       where attachment_id = ?`,
+      `select object_key from briar_uploads where upload_id = ?`,
     ).bind(unused.attachmentId).first<{ object_key: string }>();
-    await expect(enqueueExpiredReplyAttachmentUploadCleanup(
+    await expect(enqueueExpiredUploadCleanup(
       db,
       at(1_001 + sequence),
     )).resolves.toBe(1);
     await expect(db.prepare(
       `select upload.consumed_at, cleanup.object_key as cleanup_object_key
-       from briar_reply_attachment_uploads upload
-       left join briar_reply_upload_cleanup_queue cleanup
+       from briar_uploads upload
+       left join briar_upload_cleanup_queue cleanup
          on cleanup.object_key = upload.object_key
-       where upload.attachment_id in (?, ?)
-       order by upload.attachment_id`,
+       where upload.upload_id in (?, ?)
+       order by upload.upload_id`,
     ).bind(upload.attachmentId, unused.attachmentId).all()).resolves.toMatchObject({
       results: [
         expect.objectContaining({ consumed_at: at(210 + sequence) }),
       ],
     });
     await expect(db.prepare(
-      `select object_key from briar_reply_upload_cleanup_queue
+      `select object_key from briar_upload_cleanup_queue
        where object_key = ?`,
     ).bind(unusedObject!.object_key).first()).resolves.toEqual({
       object_key: unusedObject!.object_key,
@@ -564,41 +566,41 @@ describe("reply completion application", () => {
       request,
       observedAt: at(301 + sequence),
     })).rejects.toMatchObject({ reason: "claim_conflict" });
-    await expect(uploadReplyAttachmentApplication({
+    await expect(uploadReservedFileApplication({
       db,
       bucket,
       signingSecret,
-      attachmentId: upload.attachmentId,
+      uploadId: upload.attachmentId,
       capability: upload.uploadCapability,
       contentType: "text/html",
       body,
       observedAt: at(302 + sequence),
     })).rejects.toMatchObject({ reason: "invalid_request" });
-    await expect(uploadReplyAttachmentApplication({
+    await expect(uploadReservedFileApplication({
       db,
       bucket,
       signingSecret,
-      attachmentId: upload.attachmentId,
+      uploadId: upload.attachmentId,
       capability: upload.uploadCapability,
       contentType: "image/png",
       body: body.slice(0, body.byteLength - 1),
       observedAt: at(303 + sequence),
     })).rejects.toMatchObject({ reason: "invalid_request" });
-    await expect(uploadReplyAttachmentApplication({
+    await expect(uploadReservedFileApplication({
       db,
       bucket,
       signingSecret,
-      attachmentId: upload.attachmentId,
+      uploadId: upload.attachmentId,
       capability: upload.uploadCapability,
       contentType: "image/png",
       body: new Uint8Array(body.byteLength).fill(120).buffer,
       observedAt: at(304 + sequence),
     })).rejects.toMatchObject({ reason: "invalid_request" });
-    await expect(uploadReplyAttachmentApplication({
+    await expect(uploadReservedFileApplication({
       db,
       bucket,
       signingSecret,
-      attachmentId: crypto.randomUUID(),
+      uploadId: crypto.randomUUID(),
       capability: upload.uploadCapability,
       contentType: "image/png",
       body,
@@ -611,16 +613,16 @@ describe("reply completion application", () => {
       request: prepareRequest,
       observedAt: at(901 + sequence),
     })).rejects.toMatchObject({ reason: "replay_conflict" });
-    await expect(uploadReplyAttachmentApplication({
+    await expect(uploadReservedFileApplication({
       db,
       bucket,
       signingSecret,
-      attachmentId: upload.attachmentId,
+      uploadId: upload.attachmentId,
       capability: upload.uploadCapability,
       contentType: "image/png",
       body,
       observedAt: at(1_001 + sequence),
-    })).rejects.toBeInstanceOf(ReplyCompletionApplicationError);
+    })).rejects.toBeInstanceOf(UploadApplicationError);
     await db.prepare(
       `update briar_issue_agent_reply_jobs
        set status = 'failed', claim_token_hash = null, lease_expires_at = null
@@ -859,7 +861,7 @@ describe("reply completion application", () => {
 
   it("keeps failed R2 cleanup durable and retries with generation CAS", async () => {
     const objectKey = "reply-attachments/orphaned/retry";
-    await enqueueReplyUploadObjectCleanup(db, {
+    await enqueueUploadObjectCleanup(db, {
       objectKey,
       batchRequestId: crypto.randomUUID(),
       observedAt: at(600),
@@ -867,26 +869,26 @@ describe("reply completion application", () => {
     const deleteObject = vi.fn()
       .mockRejectedValueOnce(new Error("temporary R2 failure"))
       .mockResolvedValueOnce(undefined);
-    await expect(processReplyUploadCleanupQueue(
+    await expect(processUploadCleanupQueue(
       db,
       { delete: deleteObject },
       at(600),
     )).resolves.toEqual({ processed: 1, deleted: 0, failed: 1 });
     await expect(db.prepare(
       `select attempts, generation, last_error
-       from briar_reply_upload_cleanup_queue where object_key = ?`,
+       from briar_upload_cleanup_queue where object_key = ?`,
     ).bind(objectKey).first()).resolves.toEqual({
       attempts: 1,
       generation: 2,
       last_error: "temporary R2 failure",
     });
-    await expect(processReplyUploadCleanupQueue(
+    await expect(processUploadCleanupQueue(
       db,
       { delete: deleteObject },
       at(603),
     )).resolves.toEqual({ processed: 1, deleted: 1, failed: 0 });
     await expect(db.prepare(
-      `select object_key from briar_reply_upload_cleanup_queue
+      `select object_key from briar_upload_cleanup_queue
        where object_key = ?`,
     ).bind(objectKey).first()).resolves.toBeNull();
   });

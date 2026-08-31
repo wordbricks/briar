@@ -43,7 +43,7 @@ describe("generated reply completion client", () => {
         uploads: [{
           clientId: "attachment-1",
           reference: { attachmentId },
-          uploadUrl: `http://127.0.0.1:8787/reply-attachment-uploads/${attachmentId}`,
+          uploadUrl: `http://127.0.0.1:8787/uploads/${attachmentId}`,
           uploadCapability: "opaque-capability",
           expiresAt: timestampFromDate(new Date("2026-08-31T10:00:00.000Z")),
         }],
@@ -117,7 +117,7 @@ describe("generated reply completion client", () => {
       sha256: expect.any(Uint8Array),
     });
     expect(upload).toHaveBeenCalledWith(
-      new URL(`http://127.0.0.1:8787/reply-attachment-uploads/${attachmentId}`),
+      new URL(`http://127.0.0.1:8787/uploads/${attachmentId}`),
       expect.objectContaining({
         method: "PUT",
         headers: {

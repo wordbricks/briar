@@ -17,7 +17,7 @@ import { handleProjectAgentRoute } from "./project-agent-routes";
 import { handlePublicRoute } from "./public-routes";
 import { handleIncomingChannelWebhookRoute } from "./incoming-channel-webhook";
 import { handleRealtimeRoute } from "./realtime-routes";
-import { handleReplyAttachmentUploadRoute } from "./reply-attachment-upload-route";
+import { handleUploadRoute } from "./upload-route";
 import {
   requireAgentProject,
   requireWorkerProjectBinding,
@@ -161,16 +161,15 @@ async function route(
   });
   if (realtimeResponse !== undefined) return realtimeResponse;
 
-  const replyAttachmentUploadResponse =
-    await handleReplyAttachmentUploadRoute({
+  const uploadResponse = await handleUploadRoute({
       request,
       url,
       db,
       bucket: attachmentsBucket,
       signingSecret: env.BETTER_AUTH_SECRET,
     });
-  if (replyAttachmentUploadResponse !== undefined) {
-    return replyAttachmentUploadResponse;
+  if (uploadResponse !== undefined) {
+    return uploadResponse;
   }
 
   const channelMessageResponse = await handleChannelMessageRoute({

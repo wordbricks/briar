@@ -303,9 +303,10 @@ export async function completeIssueAgentReplyOutput(
        where ${completedClaim("job")}
          ${input.commit
            ? `and exists (
-                select 1 from briar_reply_attachment_uploads upload
-                where upload.attachment_id = ?
-                  and upload.completion_request_id = ?
+                select 1 from briar_uploads upload
+                where upload.upload_id = ?
+                  and upload.consumer_kind = 'reply_completion'
+                  and upload.consumer_id = ?
                   and upload.consumed_at = ?
               )`
            : ""}`,

@@ -1,4 +1,3 @@
-import { contentDisposition } from "./attachment-storage";
 import { hydrateAgentSkills } from "./agent-skills";
 import {
   channelReplySessionRetentionUntil,
@@ -8,7 +7,7 @@ import {
   getOrganizationProject,
   listChannelAgents,
 } from "./channels";
-import { sha256, sha256Bytes } from "./crypto-digest";
+import { sha256 } from "./crypto-digest";
 import { completeIssueAgentReplyOutput } from "./issue-agent-reply-completion-repository";
 import {
   failIssueAgentReply,
@@ -17,14 +16,8 @@ import {
 import { issueAttachmentMarkdown } from "../../src/lib/issue-markdown";
 import { getOrganizationAgent } from "./organization-agents";
 import {
-  enqueueExpiredReplyAttachmentUploadCleanup,
-  enqueueReplyUploadObjectCleanup,
   findReplyCompletionReceipt,
-  getScopedReplyAttachmentUpload,
-  markReplyAttachmentUploaded,
   prepareReplyAttachmentUploadRows,
-  processReplyUploadCleanupQueue,
-  replyAttachmentMetadataHash,
   resolveReplyCompletionAttachments,
   type ReplyClaimScope,
   type ReplyCompletionCommit,
@@ -33,10 +26,13 @@ import {
   type ScopedReplyAttachmentUploadRow,
 } from "./reply-completion-repository";
 import {
-  createReplyUploadTicket,
-  REPLY_UPLOAD_TICKET_MAX_TTL_MS,
-  verifyReplyUploadTicket,
-} from "./reply-upload-ticket";
+  createUploadCapability,
+  UPLOAD_CAPABILITY_MAX_TTL_MS,
+} from "./upload-capability";
+import {
+  enqueueExpiredUploadCleanup,
+  processUploadCleanupQueue,
+} from "./upload-repository";
 import {
   scheduleChannelActivityClear,
   scheduleChannelRealtimePublish,
@@ -71,16 +67,11 @@ export type ReplyCompletionWorker = {
 
 export type ReplyCompletionApplicationServices = {
   readonly sha256: typeof sha256;
-  readonly sha256Bytes: typeof sha256Bytes;
   readonly getClaimedIssueAgentReply: typeof getClaimedIssueAgentReply;
   readonly getClaimedChannelReply: typeof getClaimedChannelReply;
   readonly prepareReplyAttachmentUploadRows:
     typeof prepareReplyAttachmentUploadRows;
-  readonly replyAttachmentMetadataHash: typeof replyAttachmentMetadataHash;
-  readonly createReplyUploadTicket: typeof createReplyUploadTicket;
-  readonly verifyReplyUploadTicket: typeof verifyReplyUploadTicket;
-  readonly getScopedReplyAttachmentUpload: typeof getScopedReplyAttachmentUpload;
-  readonly markReplyAttachmentUploaded: typeof markReplyAttachmentUploaded;
+  readonly createUploadCapability: typeof createUploadCapability;
   readonly resolveReplyCompletionAttachments:
     typeof resolveReplyCompletionAttachments;
   readonly findReplyCompletionReceipt: typeof findReplyCompletionReceipt;
@@ -92,10 +83,8 @@ export type ReplyCompletionApplicationServices = {
   readonly listChannelAgents: typeof listChannelAgents;
   readonly hydrateAgentSkills: typeof hydrateAgentSkills;
   readonly getOrganizationProject: typeof getOrganizationProject;
-  readonly enqueueExpiredReplyAttachmentUploadCleanup:
-    typeof enqueueExpiredReplyAttachmentUploadCleanup;
-  readonly enqueueReplyUploadObjectCleanup: typeof enqueueReplyUploadObjectCleanup;
-  readonly processReplyUploadCleanupQueue: typeof processReplyUploadCleanupQueue;
+  readonly enqueueExpiredUploadCleanup: typeof enqueueExpiredUploadCleanup;
+  readonly processUploadCleanupQueue: typeof processUploadCleanupQueue;
   readonly scheduleProjectRealtimePublish: typeof scheduleProjectRealtimePublish;
   readonly scheduleIssueActivityClear: typeof scheduleIssueActivityClear;
   readonly scheduleChannelRealtimePublish: typeof scheduleChannelRealtimePublish;
@@ -104,15 +93,10 @@ export type ReplyCompletionApplicationServices = {
 
 const applicationServices: ReplyCompletionApplicationServices = {
   sha256,
-  sha256Bytes,
   getClaimedIssueAgentReply,
   getClaimedChannelReply,
   prepareReplyAttachmentUploadRows,
-  replyAttachmentMetadataHash,
-  createReplyUploadTicket,
-  verifyReplyUploadTicket,
-  getScopedReplyAttachmentUpload,
-  markReplyAttachmentUploaded,
+  createUploadCapability,
   resolveReplyCompletionAttachments,
   findReplyCompletionReceipt,
   completeIssueAgentReplyOutput,
@@ -123,9 +107,8 @@ const applicationServices: ReplyCompletionApplicationServices = {
   listChannelAgents,
   hydrateAgentSkills,
   getOrganizationProject,
-  enqueueExpiredReplyAttachmentUploadCleanup,
-  enqueueReplyUploadObjectCleanup,
-  processReplyUploadCleanupQueue,
+  enqueueExpiredUploadCleanup,
+  processUploadCleanupQueue,
   scheduleProjectRealtimePublish,
   scheduleIssueActivityClear,
   scheduleChannelRealtimePublish,
@@ -234,20 +217,16 @@ export async function prepareReplyAttachmentUploadsApplication(
   const leaseExpiresAt = Date.parse(job.lease_expires_at ?? "");
   const expiresAtMs = Math.min(
     leaseExpiresAt,
-    Date.parse(observedAt) + REPLY_UPLOAD_TICKET_MAX_TTL_MS,
+    Date.parse(observedAt) + UPLOAD_CAPABILITY_MAX_TTL_MS,
   );
   if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.parse(observedAt)) {
     throw claimConflict();
   }
-  const metadataHash = await services.replyAttachmentMetadataHash(
-    input.request.attachments,
-  );
   let prepared;
   try {
     prepared = await services.prepareReplyAttachmentUploadRows(input.db, {
       ...scope,
       requestId: input.request.requestId,
-      metadataHash,
       attachments: input.request.attachments,
       createdAt: observedAt,
       expiresAt: new Date(expiresAtMs).toISOString(),
@@ -274,19 +253,19 @@ export async function prepareReplyAttachmentUploadsApplication(
   const ticketExpiresAt = Date.parse(prepared.batch.expires_at);
   const uploads = await Promise.all(prepared.uploads.map(async (upload) => ({
     clientId: upload.client_id,
-    attachmentId: upload.attachment_id,
-    uploadCapability: await services.createReplyUploadTicket(
+    attachmentId: upload.upload_id,
+    uploadCapability: await services.createUploadCapability(
       input.env.BETTER_AUTH_SECRET,
-      { attachmentId: upload.attachment_id, expiresAt: ticketExpiresAt },
+      { uploadId: upload.upload_id, expiresAt: ticketExpiresAt },
     ),
     expiresAt: prepared.batch.expires_at,
   })));
   const enqueueCleanup = async () => {
-    await services.enqueueExpiredReplyAttachmentUploadCleanup(
+    await services.enqueueExpiredUploadCleanup(
       input.db,
       observedAt,
     );
-    await services.processReplyUploadCleanupQueue(
+    await services.processUploadCleanupQueue(
       input.db,
       input.env.ATTACHMENTS,
       observedAt,
@@ -295,110 +274,6 @@ export async function prepareReplyAttachmentUploadsApplication(
   if (input.context) input.context.waitUntil(enqueueCleanup());
   else await enqueueCleanup();
   return { replayed: prepared.replayed, uploads };
-}
-
-const equalHexDigest = (stored: ArrayBuffer, actualHex: string) => {
-  const storedBytes = new Uint8Array(stored);
-  if (storedBytes.byteLength !== 32 || actualHex.length !== 64) return false;
-  let difference = 0;
-  for (let index = 0; index < storedBytes.length; index += 1) {
-    const actual = Number.parseInt(actualHex.slice(index * 2, index * 2 + 2), 16);
-    difference |= storedBytes[index]! ^ actual;
-  }
-  return difference === 0;
-};
-
-export async function uploadReplyAttachmentApplication(
-  input: {
-    db: D1Database;
-    bucket: R2Bucket;
-    signingSecret: string;
-    attachmentId: string;
-    capability: string;
-    contentType: string;
-    body: ArrayBuffer;
-    observedAt?: string;
-  },
-  overrides: Partial<ReplyCompletionApplicationServices> = {},
-) {
-  const services = servicesWith(overrides);
-  const observedAt = input.observedAt ?? new Date().toISOString();
-  const ticket = await services.verifyReplyUploadTicket(
-    input.signingSecret,
-    input.capability,
-    input.attachmentId,
-    Date.parse(observedAt),
-  );
-  if (!ticket) {
-    throw new ReplyCompletionApplicationError(
-      "invalid_capability",
-      "Reply attachment upload capability is invalid or expired",
-    );
-  }
-  const upload = await services.getScopedReplyAttachmentUpload(
-    input.db,
-    input.attachmentId,
-  );
-  if (
-    !upload || upload.expires_at <= observedAt || upload.consumed_at ||
-    upload.uploaded_at
-  ) {
-    throw new ReplyCompletionApplicationError(
-      "claim_conflict",
-      "Reply attachment upload is no longer available",
-    );
-  }
-  const contentType = input.contentType.split(";", 1)[0]?.trim().toLowerCase();
-  if (contentType !== upload.content_type || input.body.byteLength !== upload.byte_size) {
-    throw new ReplyCompletionApplicationError(
-      "invalid_request",
-      "Reply attachment content metadata does not match its reservation",
-    );
-  }
-  const digest = await services.sha256Bytes(input.body);
-  if (!equalHexDigest(upload.sha256, digest)) {
-    throw new ReplyCompletionApplicationError(
-      "invalid_request",
-      "Reply attachment content digest does not match its reservation",
-    );
-  }
-  await input.bucket.put(upload.object_key, input.body, {
-    httpMetadata: {
-      contentType: upload.content_type,
-      contentDisposition: contentDisposition(upload.filename),
-    },
-    customMetadata: {
-      attachmentId: upload.attachment_id,
-      replyKind: upload.reply_kind,
-      organizationId: upload.organization_id,
-      projectId: upload.project_id,
-      workId: upload.work_id,
-      runId: upload.run_id,
-    },
-  });
-  const stored = await services.markReplyAttachmentUploaded(
-    input.db,
-    input.attachmentId,
-    observedAt,
-  );
-  if (!stored) {
-    const current = await services.getScopedReplyAttachmentUpload(
-      input.db,
-      input.attachmentId,
-    );
-    if (!current?.uploaded_at) {
-      await services.enqueueReplyUploadObjectCleanup(input.db, {
-        objectKey: upload.object_key,
-        batchRequestId: upload.batch_request_id,
-        observedAt,
-      });
-    }
-    throw new ReplyCompletionApplicationError(
-      "claim_conflict",
-      "Reply attachment upload lost its reservation",
-    );
-  }
-  return { objectKey: upload.object_key };
 }
 
 const completionPayloadHash = (
@@ -488,7 +363,7 @@ const recoverConcurrentReceipt = async (
 const isReplyCompletionGuardAbort = (cause: unknown) =>
   cause instanceof Error && [
     "invalid reply completion receipt",
-    "invalid reply attachment upload state transition",
+    "invalid upload state transition",
   ].some((message) => cause.message.includes(message));
 
 const recoverReceiptOrGuardConflict = async (
@@ -524,7 +399,7 @@ const recoverReceiptOrGuardConflict = async (
 
 const issueAttachments = (attachments: ScopedReplyAttachmentUploadRow[]) =>
   attachments.map((attachment) => ({
-    id: attachment.attachment_id,
+    id: attachment.upload_id,
     object_key: attachment.object_key,
     filename: attachment.filename,
     content_type: attachment.content_type,
@@ -620,7 +495,7 @@ export async function completeIssueReplyApplication(
       const replyBody = [
         input.request.outcome.completion.body!,
         ...attachments.map((attachment) => issueAttachmentMarkdown(
-          attachment.attachment_id,
+          attachment.upload_id,
           attachment.filename,
         )),
       ].filter(Boolean).join("\n\n");
@@ -877,7 +752,7 @@ export async function completeChannelReplyApplication(
         completedAt: observedAt,
         conversationId: input.request.conversationId,
         attachments: attachments.map((attachment) => ({
-          id: attachment.attachment_id,
+          id: attachment.upload_id,
           organization_id: scope.organizationId,
           object_key: attachment.object_key,
           filename: attachment.filename,

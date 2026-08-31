@@ -1,30 +1,35 @@
 import { corsHeaders, HttpError } from "./http-response";
-import { rethrowReplyCompletionHttpError } from "./reply-completion-http-error";
-import { uploadReplyAttachmentApplication } from "./worker-reply-completion-application";
+import {
+  uploadReservedFileApplication,
+  UploadApplicationError,
+} from "./upload-application";
+import { verifyUploadCapability } from "./upload-capability";
 
-const MAX_REPLY_ATTACHMENT_BYTES = 20 * 1_024 * 1_024;
-const uploadPath = /^\/reply-attachment-uploads\/([^/]+)$/u;
+const MAX_UPLOAD_BYTES = 20 * 1_024 * 1_024;
+const uploadPath = /^\/uploads\/([^/]+)$/u;
 const privateNoStoreHeaders = {
   ...corsHeaders,
   "Cache-Control": "private, no-store",
 };
 
-export type ReplyAttachmentUploadRouteServices = {
-  uploadReplyAttachmentApplication: typeof uploadReplyAttachmentApplication;
+export type UploadRouteServices = {
+  uploadReservedFileApplication: typeof uploadReservedFileApplication;
+  verifyUploadCapability: typeof verifyUploadCapability;
 };
 
-const routeServices: ReplyAttachmentUploadRouteServices = {
-  uploadReplyAttachmentApplication,
+const routeServices: UploadRouteServices = {
+  uploadReservedFileApplication,
+  verifyUploadCapability,
 };
 
 const boundedBody = async (request: Request) => {
   const declaredLength = request.headers.get("content-length");
   if (declaredLength !== null) {
     if (!/^\d+$/u.test(declaredLength)) {
-      throw new HttpError(400, "Reply attachment Content-Length is invalid");
+      throw new HttpError(400, "Upload Content-Length is invalid");
     }
-    if (Number(declaredLength) > MAX_REPLY_ATTACHMENT_BYTES) {
-      throw new HttpError(413, "Reply attachment is too large");
+    if (Number(declaredLength) > MAX_UPLOAD_BYTES) {
+      throw new HttpError(413, "Upload is too large");
     }
   }
   if (!request.body) return new ArrayBuffer(0);
@@ -36,9 +41,9 @@ const boundedBody = async (request: Request) => {
       const chunk = await reader.read();
       if (chunk.done) break;
       byteLength += chunk.value.byteLength;
-      if (byteLength > MAX_REPLY_ATTACHMENT_BYTES) {
+      if (byteLength > MAX_UPLOAD_BYTES) {
         await reader.cancel();
-        throw new HttpError(413, "Reply attachment is too large");
+        throw new HttpError(413, "Upload is too large");
       }
       chunks.push(chunk.value);
     }
@@ -55,12 +60,16 @@ const boundedBody = async (request: Request) => {
 };
 
 const errorResponse = (error: unknown) => {
-  let mapped: unknown;
-  try {
-    rethrowReplyCompletionHttpError(error);
-  } catch (cause) {
-    mapped = cause;
-  }
+  const mapped = error instanceof UploadApplicationError
+    ? new HttpError(
+        error.reason === "invalid_capability"
+          ? 401
+          : error.reason === "unavailable"
+          ? 409
+          : 400,
+        error.message,
+      )
+    : error;
   if (mapped instanceof HttpError) {
     return Response.json(
       { message: mapped.message },
@@ -70,7 +79,7 @@ const errorResponse = (error: unknown) => {
   throw mapped;
 };
 
-export async function handleReplyAttachmentUploadRoute(
+export async function handleUploadRoute(
   input: {
     request: Request;
     url: URL;
@@ -78,7 +87,7 @@ export async function handleReplyAttachmentUploadRoute(
     bucket: R2Bucket;
     signingSecret: string;
   },
-  overrides: Partial<ReplyAttachmentUploadRouteServices> = {},
+  overrides: Partial<UploadRouteServices> = {},
 ) {
   const match = uploadPath.exec(input.url.pathname);
   if (!match) return undefined;
@@ -91,19 +100,32 @@ export async function handleReplyAttachmentUploadRoute(
     }
     const contentEncoding = input.request.headers.get("content-encoding");
     if (contentEncoding && contentEncoding.toLowerCase() !== "identity") {
-      throw new HttpError(415, "Encoded reply attachment bodies are unsupported");
+      throw new HttpError(415, "Encoded upload bodies are unsupported");
     }
     const authorization = input.request.headers.get("authorization") ?? "";
     const capability = authorization.startsWith("Bearer ")
       ? authorization.slice("Bearer ".length)
       : "";
+    const uploadId = match[1]!;
+    const validCapability = await (overrides.verifyUploadCapability ??
+      routeServices.verifyUploadCapability)(
+        input.signingSecret,
+        capability,
+        uploadId,
+      );
+    if (!validCapability) {
+      throw new UploadApplicationError(
+        "invalid_capability",
+        "Upload capability is invalid or expired",
+      );
+    }
     const body = await boundedBody(input.request);
-    await (overrides.uploadReplyAttachmentApplication ??
-      routeServices.uploadReplyAttachmentApplication)({
+    await (overrides.uploadReservedFileApplication ??
+      routeServices.uploadReservedFileApplication)({
         db: input.db,
         bucket: input.bucket,
         signingSecret: input.signingSecret,
-        attachmentId: match[1]!,
+        uploadId,
         capability,
         contentType: input.request.headers.get("content-type") ?? "",
         body,
