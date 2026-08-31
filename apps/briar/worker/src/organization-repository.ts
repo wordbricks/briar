@@ -95,7 +95,7 @@ const makeOrganizationQueries = (sql: SqlClient.SqlClient) => {
     from briar_organization_invitations invitation
     join briar_organizations organization
       on organization.id = invitation.organization_id
-    join briar_projects project
+    join briar_teams project
       on project.id = invitation.initial_project_id
      and project.organization_id = invitation.organization_id
   `;
@@ -163,7 +163,7 @@ const makeOrganizationQueries = (sql: SqlClient.SqlClient) => {
     execute: ({ projectId }) => sql`
       select member.user_id, user.name, user.email, user.image,
              member.role, member.created_at
-      from briar_projects project
+      from briar_teams project
       join briar_organization_members member
         on member.organization_id = project.organization_id
       join "user" on user.id = member.user_id

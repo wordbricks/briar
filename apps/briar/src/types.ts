@@ -309,6 +309,10 @@ export type RunEvidence = {
 
 export type HuntRun = {
   id: string;
+  workspaceId?: string | null;
+  teamId?: string;
+  projectId?: string;
+  projectName?: string | null;
   runNumber: number;
   currentAttempt: number;
   currentRevision: number;
@@ -715,6 +719,37 @@ export type Project = {
   organizationName: string;
   role: OrganizationRole;
   createdAt: string;
+};
+
+/** Repository and execution boundary formerly exposed as Project. */
+export type Team = Project;
+
+export type PlanningProjectStatus =
+  | "planned"
+  | "active"
+  | "completed"
+  | "cancelled";
+
+export type PlanningProject = {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  teamId: string;
+  teamName: string;
+  name: string;
+  description: string;
+  status: PlanningProjectStatus;
+  leadUserId: string | null;
+  leadName: string | null;
+  startDate: string | null;
+  targetDate: string | null;
+  icon: string | null;
+  color: string | null;
+  sortOrder: number;
+  isDefault: boolean;
+  role: OrganizationRole;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type ProjectAgent = {

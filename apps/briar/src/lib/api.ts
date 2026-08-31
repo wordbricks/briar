@@ -21,15 +21,20 @@ import { decodeInboxReadVersions } from "./api/inbox-contract";
 import { listProjects } from "./app-rpc/project";
 export {
   createAgentToken,
+  createPlanningProject,
   createProject,
   deleteProject,
   loadProjectExecutionWorkerPolicy,
+  loadTeamProjects,
+  moveIssueToPlanningProject,
+  resolveIssueHierarchyLocation,
   updateCheckpointPolicy,
   updateProjectIcon,
   updateProjectExecutionWorkerPolicy,
   updateProjectIssueKeyPrefix,
   updateProjectSettings,
   updateProjectTabs,
+  updatePlanningProject,
 } from "./app-rpc/project";
 export {
   acceptOrganizationInvitation,

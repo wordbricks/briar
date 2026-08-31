@@ -12,10 +12,17 @@ final class CompanionStore: ObservableObject {
     @Published private(set) var user: CurrentUser?
     @Published private(set) var organizations: [OrganizationSummary] = []
     @Published private(set) var projects: [Project] = []
+    @Published private(set) var planningProjects: [PlanningProject] = []
     @Published var selectedProjectID: UUID? {
         didSet {
             persistSelectedProjectID()
+            if oldValue != selectedProjectID {
+                selectDefaultPlanningProject(for: selectedProjectID)
+            }
         }
+    }
+    @Published var selectedPlanningProjectID: UUID? {
+        didSet { persistSelectedPlanningProjectID() }
     }
     @Published private(set) var loading = false
     @Published private(set) var errorMessage: String?
@@ -29,6 +36,10 @@ final class CompanionStore: ObservableObject {
 
     private static func selectedProjectKey(for userID: String) -> String {
         "companion.selectedProjectID.\(userID)"
+    }
+
+    private static func selectedPlanningProjectKey(for userID: String) -> String {
+        "companion.selectedPlanningProjectID.\(userID)"
     }
 
     init(
@@ -78,6 +89,7 @@ final class CompanionStore: ObservableObject {
             user = loadedUser
             if expectedCatalogRevision == projectCatalogRevision {
                 applyProjectCatalog(projects)
+                try await loadPlanningProjects(using: project)
             }
             let currentProjects = expectedCatalogRevision == projectCatalogRevision
                 ? projects
@@ -88,6 +100,7 @@ final class CompanionStore: ObservableObject {
                 defaults: defaults
             )
             selectedProjectID = storedProjectID ?? Self.defaultProjectID(for: currentProjects)
+            restorePlanningProjectSelection()
             errorMessage = nil
         } catch {
             if activeToken == token,
@@ -124,6 +137,7 @@ final class CompanionStore: ObservableObject {
                 expectedCatalogRevision == projectCatalogRevision
             else { throw CancellationError() }
             applyProjectCatalog(projects)
+            try await loadPlanningProjects(using: project)
             if let selectedProjectID,
                !projects.contains(where: { $0.id == selectedProjectID }) {
                 self.selectedProjectID = Self.defaultProjectID(for: projects)
@@ -149,7 +163,9 @@ final class CompanionStore: ObservableObject {
         user = nil
         organizations = []
         projects = []
+        planningProjects = []
         selectedProjectID = nil
+        selectedPlanningProjectID = nil
         loading = false
         errorMessage = nil
     }
@@ -183,12 +199,116 @@ final class CompanionStore: ObservableObject {
         projects.first?.id
     }
 
+    func selectPlanningProject(_ planningProjectID: UUID?) {
+        guard let planningProjectID else {
+            selectedPlanningProjectID = nil
+            return
+        }
+        guard let planningProject = planningProjects.first(where: {
+            $0.id == planningProjectID
+        }) else { return }
+        if selectedProjectID != planningProject.teamId {
+            selectedProjectID = planningProject.teamId
+        }
+        selectedPlanningProjectID = planningProject.id
+    }
+
+    func createPlanningProject(
+        teamID: UUID,
+        name: String,
+        description: String? = nil,
+        status: PlanningProjectStatus = .planned
+    ) async throws -> PlanningProject {
+        guard let token = activeToken else { throw CancellationError() }
+        var request = BriarAPI_CreatePlanningProjectRequest()
+        request.teamID = coreUUIDString(teamID)
+        request.name = name
+        if let description { request.description_p = description }
+        request.status = planningProjectStatusMessage(status)
+        let response = await servicesFactory.authenticatedServices(token: token).project
+            .createPlanningProject(request: request, headers: [:])
+        let message = try response.briarValue()
+        guard message.hasProject else { throw MobileAPIError.invalidResponse }
+        let project = try PlanningProject(connectMessage: message.project)
+        planningProjects.append(project)
+        sortPlanningProjects()
+        selectPlanningProject(project.id)
+        return project
+    }
+
+    private func loadPlanningProjects(
+        using service: any BriarAPI_ProjectServiceClientInterface
+    ) async throws {
+        var loaded: [PlanningProject] = []
+        for team in projects {
+            var request = BriarAPI_ListTeamPlanningProjectsRequest()
+            request.teamID = coreUUIDString(team.id)
+            let response = await service.listTeamPlanningProjects(
+                request: request,
+                headers: [:]
+            )
+            loaded.append(contentsOf: try response.briarValue().projects.map(
+                PlanningProject.init(connectMessage:)
+            ))
+        }
+        planningProjects = loaded
+        sortPlanningProjects()
+    }
+
+    private func sortPlanningProjects() {
+        planningProjects.sort {
+            $0.teamId == $1.teamId
+                ? ($0.sortOrder, $0.name) < ($1.sortOrder, $1.name)
+                : $0.teamId.uuidString < $1.teamId.uuidString
+        }
+    }
+
+    private func restorePlanningProjectSelection() {
+        guard let userID = user?.id, let teamID = selectedProjectID else {
+            selectedPlanningProjectID = nil
+            return
+        }
+        let available = planningProjects.filter { $0.teamId == teamID }
+        let stored = defaults.string(
+            forKey: Self.selectedPlanningProjectKey(for: userID)
+        ).flatMap(UUID.init(uuidString:))
+        selectedPlanningProjectID = available.first(where: { $0.id == stored })?.id
+            ?? available.first(where: \.isDefault)?.id
+            ?? available.first?.id
+    }
+
+    private func selectDefaultPlanningProject(for teamID: UUID?) {
+        guard let teamID else {
+            selectedPlanningProjectID = nil
+            return
+        }
+        if let selectedPlanningProjectID,
+           planningProjects.contains(where: {
+               $0.id == selectedPlanningProjectID && $0.teamId == teamID
+           }) {
+            return
+        }
+        selectedPlanningProjectID = planningProjects.first(where: {
+            $0.teamId == teamID && $0.isDefault
+        })?.id ?? planningProjects.first(where: { $0.teamId == teamID })?.id
+    }
+
     private func persistSelectedProjectID() {
         guard let userID = user?.id else { return }
         if let selectedProjectID {
             defaults.set(selectedProjectID.uuidString, forKey: Self.selectedProjectKey(for: userID))
         } else {
             defaults.removeObject(forKey: Self.selectedProjectKey(for: userID))
+        }
+    }
+
+    private func persistSelectedPlanningProjectID() {
+        guard let userID = user?.id else { return }
+        let key = Self.selectedPlanningProjectKey(for: userID)
+        if let selectedPlanningProjectID {
+            defaults.set(selectedPlanningProjectID.uuidString, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
         }
     }
 

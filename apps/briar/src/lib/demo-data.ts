@@ -288,6 +288,10 @@ export const demoRunEvents: Record<string, HuntEvent[]> = Object.fromEntries(
 
 const runs: HuntRun[] = runSeeds.map(({ events, ...run }) => ({
   ...run,
+  workspaceId: "demo-organization",
+  teamId: "demo-project",
+  projectId: "demo-project",
+  projectName: "General",
   eventCount: events.length,
   lastEventAt: events[0]?.occurredAt ?? run.updatedAt,
 }));

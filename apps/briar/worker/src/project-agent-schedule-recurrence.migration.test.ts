@@ -10,7 +10,7 @@ describe("project Agent schedule recurrence migration", () => {
     const db = env.DB;
     const now = "2026-08-31T00:00:00.000Z";
     await applyD1Migrations(db, {
-      through: "0153_issue_attachment_uploads.sql",
+      through: "0155_issue_attachment_uploads.sql",
     });
     await executeD1Sql(db, `
       insert into "user" (
@@ -61,7 +61,7 @@ describe("project Agent schedule recurrence migration", () => {
     `);
 
     await applyD1Migrations(db, {
-      files: ["0154_canonical_project_agent_schedule_recurrence.sql"],
+      files: ["0156_canonical_project_agent_schedule_recurrence.sql"],
     });
 
     expect(await db.prepare(

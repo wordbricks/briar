@@ -275,6 +275,10 @@ const appInboxIdentity = (message: InboxFeedMessage) =>
     title: message.title,
     occurredAt: timestamp(message.occurredAt),
     version: message.version,
+    workspaceId: message.workspaceId,
+    teamId: message.teamId,
+    planningProjectId: message.planningProjectId ?? undefined,
+    planningProjectName: message.planningProjectName ?? undefined,
   });
 
 export const appInboxFeedMessage = (message: InboxFeedMessage) => {
@@ -535,6 +539,10 @@ type DashboardRunJson = ReturnType<typeof dashboardRunJson>;
 export const appDashboardRun = (run: DashboardRunJson) =>
   create(DashboardRunSchema, {
     id: run.id,
+    workspaceId: run.workspaceId ?? undefined,
+    teamId: run.teamId ?? undefined,
+    planningProjectId: run.projectId ?? undefined,
+    planningProjectName: run.projectName ?? undefined,
     runNumber: run.runNumber,
     currentAttempt: run.currentAttempt,
     currentRevision: run.currentRevision,

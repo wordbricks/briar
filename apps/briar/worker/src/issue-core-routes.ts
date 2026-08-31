@@ -51,6 +51,7 @@ import { sha256 } from "./crypto-digest";
 import { listProjectMembers } from "./organization-repository";
 import { schedulePostCommitCleanup } from "./post-commit-cleanup";
 import { decodeIssueCheckpointsInput } from "./run-request-contract";
+import { getPlanningProjectForUser } from "./hierarchy-repository";
 
 async function requireIssueAssigneeMembership(
   db: D1Database,
@@ -116,6 +117,7 @@ export async function createProjectIssue(
   input: IssueCoreApplicationInput & {
     request: unknown;
     clientIssueId: string;
+    planningProjectId?: string;
     attachmentIds: readonly string[];
     attribution?: IssueCreateAttribution;
   },
@@ -126,6 +128,16 @@ export async function createProjectIssue(
     "Issue editing permission required",
   );
   const issue = decodeIssueInput(input.request);
+  const planningProject = input.planningProjectId
+    ? await getPlanningProjectForUser(
+      input.db,
+      input.planningProjectId,
+      input.userId,
+    )
+    : null;
+  if (input.planningProjectId && planningProject?.team_id !== project.id) {
+    throw new HttpError(404, "Planning project not found");
+  }
   const canonicalIssue = {
     ...issue,
     description: issue.description ?? null,
@@ -151,6 +163,7 @@ export async function createProjectIssue(
     organizationId: project.organization_id,
     userId: input.userId,
     clientIssueId: input.clientIssueId,
+    planningProjectId: planningProject?.id ?? null,
     issue: canonicalIssue,
     attachmentIds,
     attribution,
@@ -275,6 +288,16 @@ export async function createProjectIssue(
           uploads,
           createdAt: observedAt,
         }),
+        ...(planningProject
+          ? [
+              input.db.prepare(
+                `update briar_hunt_runs
+                 set planning_project_id = ?
+                 where id = ? and project_id = ?
+                 returning id`,
+              ).bind(planningProject.id, input.clientIssueId, project.id),
+            ]
+          : []),
         issueCreateMutationReceiptStatement(input.db, {
           clientIssueId: input.clientIssueId,
           organizationId: project.organization_id,

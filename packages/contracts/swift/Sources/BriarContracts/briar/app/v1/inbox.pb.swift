@@ -256,11 +256,51 @@ public nonisolated struct BriarAPI_InboxMessageIdentity: Sendable {
 
   public var version: String = String()
 
+  public var workspaceID: String {
+    get {_workspaceID ?? String()}
+    set {_workspaceID = newValue}
+  }
+  /// Returns true if `workspaceID` has been explicitly set.
+  public var hasWorkspaceID: Bool {self._workspaceID != nil}
+  /// Clears the value of `workspaceID`. Subsequent reads from it will return its default value.
+  public mutating func clearWorkspaceID() {self._workspaceID = nil}
+
+  public var teamID: String {
+    get {_teamID ?? String()}
+    set {_teamID = newValue}
+  }
+  /// Returns true if `teamID` has been explicitly set.
+  public var hasTeamID: Bool {self._teamID != nil}
+  /// Clears the value of `teamID`. Subsequent reads from it will return its default value.
+  public mutating func clearTeamID() {self._teamID = nil}
+
+  public var planningProjectID: String {
+    get {_planningProjectID ?? String()}
+    set {_planningProjectID = newValue}
+  }
+  /// Returns true if `planningProjectID` has been explicitly set.
+  public var hasPlanningProjectID: Bool {self._planningProjectID != nil}
+  /// Clears the value of `planningProjectID`. Subsequent reads from it will return its default value.
+  public mutating func clearPlanningProjectID() {self._planningProjectID = nil}
+
+  public var planningProjectName: String {
+    get {_planningProjectName ?? String()}
+    set {_planningProjectName = newValue}
+  }
+  /// Returns true if `planningProjectName` has been explicitly set.
+  public var hasPlanningProjectName: Bool {self._planningProjectName != nil}
+  /// Clears the value of `planningProjectName`. Subsequent reads from it will return its default value.
+  public mutating func clearPlanningProjectName() {self._planningProjectName = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _occurredAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _workspaceID: String? = nil
+  fileprivate var _teamID: String? = nil
+  fileprivate var _planningProjectID: String? = nil
+  fileprivate var _planningProjectName: String? = nil
 }
 
 public nonisolated struct BriarAPI_InboxIssueMessage: Sendable {
@@ -1006,7 +1046,7 @@ nonisolated extension BriarAPI_MobilePushNotificationTarget: SwiftProtobuf.Messa
 
 nonisolated extension BriarAPI_InboxMessageIdentity: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".InboxMessageIdentity"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}project_id\0\u{3}project_name\0\u{3}target_id\0\u{1}title\0\u{3}occurred_at\0\u{1}version\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}project_id\0\u{3}project_name\0\u{3}target_id\0\u{1}title\0\u{3}occurred_at\0\u{1}version\0\u{3}workspace_id\0\u{3}team_id\0\u{3}planning_project_id\0\u{3}planning_project_name\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1021,6 +1061,10 @@ nonisolated extension BriarAPI_InboxMessageIdentity: SwiftProtobuf.Message, Swif
       case 5: try { try decoder.decodeSingularStringField(value: &self.title) }()
       case 6: try { try decoder.decodeSingularMessageField(value: &self._occurredAt) }()
       case 7: try { try decoder.decodeSingularStringField(value: &self.version) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self._workspaceID) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self._teamID) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self._planningProjectID) }()
+      case 11: try { try decoder.decodeSingularStringField(value: &self._planningProjectName) }()
       default: break
       }
     }
@@ -1052,6 +1096,18 @@ nonisolated extension BriarAPI_InboxMessageIdentity: SwiftProtobuf.Message, Swif
     if !self.version.isEmpty {
       try visitor.visitSingularStringField(value: self.version, fieldNumber: 7)
     }
+    try { if let v = self._workspaceID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+    } }()
+    try { if let v = self._teamID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 9)
+    } }()
+    try { if let v = self._planningProjectID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 10)
+    } }()
+    try { if let v = self._planningProjectName {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 11)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1063,6 +1119,10 @@ nonisolated extension BriarAPI_InboxMessageIdentity: SwiftProtobuf.Message, Swif
     if lhs.title != rhs.title {return false}
     if lhs._occurredAt != rhs._occurredAt {return false}
     if lhs.version != rhs.version {return false}
+    if lhs._workspaceID != rhs._workspaceID {return false}
+    if lhs._teamID != rhs._teamID {return false}
+    if lhs._planningProjectID != rhs._planningProjectID {return false}
+    if lhs._planningProjectName != rhs._planningProjectName {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

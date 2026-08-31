@@ -58,7 +58,7 @@ const agentSelect = `
          agent.skill_markdown, agent.effort, agent.designated_worker_id,
          agent.designated_worker_label, agent.created_at, agent.updated_at
   from briar_project_agents agent
-  left join briar_projects project on project.id = agent.project_id`;
+  left join briar_teams project on project.id = agent.project_id`;
 
 export async function listOrganizationAgents(
   db: D1Database,

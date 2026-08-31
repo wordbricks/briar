@@ -1,3 +1,4 @@
+import BriarContracts
 import SwiftUI
 import UIKit
 
@@ -361,6 +362,8 @@ struct CompanionRootView: View {
             channels: channels,
             issueConversationView: issueConversationView,
             projects: companion.projects,
+            planningProjects: companion.planningProjects,
+            selectedPlanningProjectID: companion.selectedPlanningProjectID,
             project: project,
             snapshot: dashboard.snapshot,
             errorMessage: dashboard.errorMessage,
@@ -371,29 +374,40 @@ struct CompanionRootView: View {
             user: companion.user,
             refresh: { await dashboard.refresh(forceSnapshot: true) },
             ensureIssueAvailable: { projectID, runID in
+                var request = BriarAPI_ResolveIssueHierarchyLocationRequest()
+                request.sourceTeamID = coreUUIDString(projectID)
+                request.runID = coreUUIDString(runID)
+                guard let location = try? await services.project
+                    .resolveIssueHierarchyLocation(request: request, headers: [:])
+                    .briarValue(),
+                    let resolvedTeamID = UUID(uuidString: location.teamID),
+                    let planningProjectID = UUID(uuidString: location.projectID)
+                else { return false }
                 guard let target = companion.projects.first(where: {
-                    $0.id == projectID
+                    $0.id == resolvedTeamID
                 }) else { return false }
                 // Keep the account selection and every project-scoped store
                 // aligned before loading the canonical dashboard.
-                companion.selectedProjectID = projectID
-                dashboard.select(projectID: projectID, token: token)
+                companion.selectedProjectID = resolvedTeamID
+                companion.selectPlanningProject(planningProjectID)
+                dashboard.select(projectID: resolvedTeamID, token: token)
                 channels.select(
                     organizationID: target.organizationId,
                     token: token
                 )
                 agents.select(
-                    projectID: projectID,
+                    projectID: resolvedTeamID,
                     token: token,
                     locale: locale.rawValue
                 )
                 return await dashboard.ensureRunAvailable(
-                    projectID: projectID,
+                    projectID: resolvedTeamID,
                     runID: runID,
                     token: token
                 )
             },
             selectProject: { companion.selectedProjectID = $0 },
+            selectPlanningProject: { companion.selectPlanningProject($0) },
             signOut: signOut
         )
     }

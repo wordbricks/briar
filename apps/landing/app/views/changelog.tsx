@@ -30,6 +30,56 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.176",
+        date: "2026년 8월 31일",
+        title: "팀과 프로젝트 계층을 세우고 이슈 작업 흐름을 더 안정화합니다",
+        summary:
+          "Workspace → Team → Project → Issue 계층을 도입하고, 프로퍼티 편집·채널 Agent 실행·접힌 사이드바의 DM 사용성을 함께 다듬었습니다.",
+        items: [
+          "기존 실행 Project를 Team으로 유지하면서 Team 안에 여러 planning Project를 만들고 모든 이슈를 하나의 Project에 배정할 수 있습니다.",
+          "기존 데이터에는 Team별 General Project와 이슈 관계를 자동으로 채워 새 계층으로 안전하게 이전합니다.",
+          "데스크톱에서 Project를 생성·수정·완료·보관하고 이슈를 같은 Team의 다른 Project로 이동할 수 있습니다.",
+          "이슈 Properties 패널에서 상태, 우선순위, 난이도, 담당자, Project, 프로바이더, 모델, effort를 바로 검색하고 변경할 수 있습니다.",
+          "CLI와 iOS Companion이 새 Team·Project 탐색, 생성, 이동 계약을 지원합니다.",
+          "잘못된 채널 답장 claim을 즉시 실패로 보고해 15분 lease 만료를 기다리지 않고 안전하게 재시도합니다.",
+          "사이드바를 접었을 때 macOS 창 제어 영역과 DM 도구 모음이 겹치지 않도록 여백을 유지합니다.",
+        ],
+      },
+      {
+        version: "1.2.175",
+        date: "2026년 8월 31일",
+        title: "이슈 작업을 찾고 관리형 컴퓨터를 더 안전하게 관리합니다",
+        summary:
+          "My Issues 목록과 이슈 수정 CLI를 추가하고, 이슈 기본값·Inbox 작업·관리형 컴퓨터 권한과 실행 환경을 정리했습니다.",
+        items: [
+          "My Issues에서 범위 탭, 검색, 프로젝트·속성 필터, 접을 수 있는 상태 그룹, 행 메타데이터를 사용하고 기존 칸반 보기로 전환할 수 있습니다.",
+          "Briar CLI에서 이슈 제목, 본문, 우선순위, 난이도, 담당자를 수정하거나 해제할 수 있습니다.",
+          "새 이슈의 담당자를 작성자로 기본 지정하고 데스크톱과 iOS 작성 화면에 같은 기본값을 적용합니다.",
+          "데스크톱 Inbox 대화 메시지를 수정하거나 삭제할 수 있습니다.",
+          "이슈 본문 글자 크기를 15px로 맞춰 긴 내용을 읽기 쉽게 했습니다.",
+          "관리형 컴퓨터의 GitHub CLI 브라우저 실행을 서비스에서 분리하고 새 컴퓨터가 업데이트된 검증 이미지와 Launch Template을 사용하도록 했습니다.",
+          "관리형 컴퓨터 owner와 worker가 로컬 관리자 경로를 사용할 수 있게 하면서 EC2 Parameter Store 읽기는 차단했습니다.",
+          "관리형 이미지 검증에서 visudo 경로를 올바르게 찾고 런타임과 브라우저 실행 설정을 일치시켰습니다.",
+        ],
+      },
+      {
+        version: "1.2.174",
+        date: "2026년 8월 31일",
+        title: "조직 생성부터 저장소 연결까지 첫 실행을 한 흐름으로 시작합니다",
+        summary:
+          "조직이 없는 사용자도 새 조직을 만들거나 초대에 참여하고, GitHub 저장소·관리형 컴퓨터·내 이슈로 이어지는 첫 실행 흐름을 더 쉽게 시작하도록 다듬었습니다.",
+        items: [
+          "조직이 없는 로그인 사용자가 새 조직을 만들거나 초대 링크와 Join 코드로 기존 조직에 참여할 수 있습니다.",
+          "초대 토큰을 새로고침과 인증 리다이렉트 뒤에도 안전하게 유지하고, 역할에 따라 필요한 준비 단계와 안내를 분리합니다.",
+          "GitHub CLI 없이 GitHub App으로 원격 저장소를 가져오고, 저장소 ID 복구로 이름 변경이나 재사용 시 잘못된 저장소 연결을 막습니다.",
+          "조직 사이드바의 내 이슈와 일반 Issues가 같은 검색·필터·리스트·칸반 흐름을 사용합니다.",
+          "관리형 컴퓨터 연결에서 프로바이더 인증과 Worker 준비 상태를 더 분명하게 확인하고, 새 컴퓨터는 최신 검증 이미지로 시작합니다.",
+          "iOS와 Android Inbox가 앱이 종료되거나 백그라운드여도 원격 푸시 알림을 전달하고, 중복 알림과 만료된 기기 토큰을 정리합니다.",
+          "DM Agent 응답에 최근 맥락만 전달해 오래된 대화가 작업을 방해하지 않게 합니다.",
+          "Kanban 열 숨김과 접기 설정을 공통 저장소로 통합하면서 기존 사용자별·프로젝트별 설정을 유지합니다.",
+        ],
+      },
+      {
         version: "1.2.173",
         date: "2026년 8월 30일",
         title: "조직의 내 이슈와 저장소 작업을 한곳에서 확인합니다",
@@ -1315,6 +1365,56 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.176",
+        date: "August 31, 2026",
+        title: "Add Team and Project hierarchy and stabilize issue workflows",
+        summary:
+          "Introduce a Workspace → Team → Project → Issue hierarchy while refining property editing, channel Agent execution, and collapsed-sidebar DM usability.",
+        items: [
+          "Keep existing execution Projects as Teams, create multiple planning Projects inside each Team, and assign every issue to exactly one Project.",
+          "Migrate existing data safely by backfilling a General Project and issue relationships for every Team.",
+          "Create, edit, complete, and archive Projects from desktop, then move issues between Projects in the same Team.",
+          "Search and change status, priority, difficulty, assignee, Project, provider, model, and effort directly from the issue Properties panel.",
+          "Support the new Team and Project browsing, creation, and movement contracts in the CLI and iOS Companion.",
+          "Report invalid channel-reply claims immediately so they retry safely without waiting for a 15-minute lease to expire.",
+          "Keep the DM toolbar clear of macOS window controls when the sidebar is collapsed.",
+        ],
+      },
+      {
+        version: "1.2.175",
+        date: "August 31, 2026",
+        title: "Find issue work faster and tighten managed-computer access",
+        summary:
+          "Add a richer My Issues list and an issue-update CLI command while tightening issue defaults, Inbox actions, and managed-computer access.",
+        items: [
+          "Browse My Issues in a grouped list with scope tabs, search, project and property filters, collapsible status groups, row metadata, and a Kanban view.",
+          "Update an issue from the Briar CLI, including its title, description, priority, difficulty, or assignee.",
+          "Assign newly created issues to the creator by default and use the same default in desktop and iOS issue forms.",
+          "Edit or delete Inbox conversation messages from the desktop app.",
+          "Keep issue descriptions readable with a 15px body size.",
+          "Launch GitHub CLI browser sessions independently from managed-computer services and point new computers at the updated verified image and Launch Template.",
+          "Let managed-computer owners and workers use the local admin path without granting access to EC2 Parameter Store.",
+          "Make managed-image checks resolve visudo correctly and keep runtime and browser-launch configuration consistent.",
+        ],
+      },
+      {
+        version: "1.2.174",
+        date: "August 31, 2026",
+        title: "Start with an organization, repository, and first run in one flow",
+        summary:
+          "Make it easier to create or join an organization and continue into GitHub repositories, managed computers, and My Issues from one first-run flow.",
+        items: [
+          "Create an organization when you have none, or join an existing one with an invitation link or Join code.",
+          "Keep invitation tokens safe across refreshes and authentication redirects, and split first-run guidance by the member's role.",
+          "Import remote repositories through the GitHub App without the GitHub CLI, and recover repository IDs so renames or reused names do not point to the wrong repository.",
+          "Use the same search, filters, list, and kanban flow for organization-wide My Issues and regular Issues.",
+          "See clearer provider-authentication and Worker-readiness states while setting up managed computers, with new computers starting from the latest verified image.",
+          "Deliver Inbox push notifications on iOS and Android while the app is closed or in the background, while suppressing duplicates and cleaning up expired device tokens.",
+          "Limit direct-message Agent replies to recent context so older conversation history does not distract the task.",
+          "Share one Kanban storage layer for hidden and collapsed columns while preserving existing user and project preferences.",
+        ],
+      },
       {
         version: "1.2.173",
         date: "August 30, 2026",
@@ -2692,7 +2792,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-173">
+          <a href="#v1-2-176">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2714,7 +2814,13 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.173"
+                      entry.version === "1.2.176"
+                        ? "2026-08-31"
+                        : entry.version === "1.2.175"
+                        ? "2026-08-31"
+                        : entry.version === "1.2.174"
+                        ? "2026-08-31"
+                        : entry.version === "1.2.173"
                         ? "2026-08-30"
                         : entry.version === "1.2.172"
                         ? "2026-08-29"

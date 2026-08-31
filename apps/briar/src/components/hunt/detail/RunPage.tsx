@@ -1,4 +1,4 @@
-import { Activity, ArrowLeft, ArrowUp, BadgeCheck, Bot, BrainCircuit, Check, ChevronRight, CircleAlert, Clock3, Columns3, FolderGit2, FolderInput, GitCommitHorizontal, GitFork, GitPullRequest, Image as ImageIcon, ListChecks, Maximize2, MessageSquare, Play, RefreshCw, RotateCcw, Signal, Trash2, UserRound, Waypoints, X } from "lucide-react";
+import { Activity, ArrowLeft, ArrowUp, BadgeCheck, Bot, BrainCircuit, Check, ChevronRight, CircleAlert, Clock3, Columns3, FolderGit2, FolderInput, Gauge, GitCommitHorizontal, GitFork, GitPullRequest, Image as ImageIcon, ListChecks, Maximize2, MessageSquare, Play, RefreshCw, RotateCcw, Signal, Trash2, UserRound, Waypoints, X } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { MainContent } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ import { clampConversationPaneWidth, conversationPaneWidthDefault, conversationP
 import { loadRunCostEstimate } from "@/lib/api";
 import { copyIssueId, copyIssueShareLink, shareIssueLink } from "@/lib/issue-links";
 import { formatIssueKey } from "@/lib/issue-key";
-import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, AgentExecutionCostEstimate, ExecutionWorker, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, OrganizationMember, Project, ProjectAgent, ProjectExecutionWorkerPolicy, RelatedMessageReference, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
+import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, AgentExecutionCostEstimate, ExecutionWorker, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, OrganizationMember, PlanningProject, Project, ProjectAgent, ProjectExecutionWorkerPolicy, RelatedMessageReference, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
 import { agentEffortOptions, agentModelDisplayName, agentModelOptions, agentProviderLabels, type AgentProvider, type ModelEffort } from "@/lib/project-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
 import { useI18n } from "@/i18n";
@@ -42,9 +42,11 @@ import { IssueActionsMenu } from "./IssueActionsMenu";
 import { IssueAgentActivityPanel } from "./IssueAgentActivityPanel";
 import { IssueAssigneeAvatar } from "./IssueAssigneeAvatar";
 import { IssueDependenciesPanel } from "./IssueDependenciesPanel";
+import { IssueDifficultyIcon } from "../IssueDifficultyIcon";
 import { IssueStatusHistoryPanel } from "./IssueStatusHistoryPanel";
 import { IssueWorkflowProgress } from "./IssueWorkflowProgress";
 import { RunStatusPill } from "./RunStatusPill";
+import { ProjectIcon } from "../../ProjectIcon";
 import { DraftIssueDescriptionEditor } from "../editor/DraftIssueDescriptionEditor";
 import { formatDate, formatExecutionUsdTicks, formatRatePerMillion, localizeEvent, localizeStatus, localizeWorkflowStage, relativeTime } from "../model/formatters";
 import { placementForId, placementIdForRun, placementMatchesRun } from "../model/kanban";
@@ -89,9 +91,11 @@ export function RunPage({
   onLoadRunEvidence,
   onLoadRunEvidenceImage,
   onCompleteResultReview,
+  issueProjects = [],
   mentionMembers = [],
   mentionAgents = [],
   onMove,
+  onMoveIssueProject,
   onOpenFullPage,
   onProcessNow,
   onRetry,
@@ -153,9 +157,11 @@ export function RunPage({
   onLoadRunEvidence: () => Promise<RunEvidence[]>;
   onLoadRunEvidenceImage?: (image: RunEvidenceImage) => Promise<Blob>;
   onCompleteResultReview?: () => Promise<unknown>;
+  issueProjects?: PlanningProject[];
   mentionMembers?: OrganizationMember[];
   mentionAgents?: ProjectAgent[];
   onMove: (placement: HuntRunPlacement) => Promise<unknown>;
+  onMoveIssueProject?: (targetProjectId: string) => Promise<unknown>;
   onOpenFullPage?: () => void;
   onProcessNow?: () => void;
   onRetry: () => Promise<unknown>;
@@ -583,6 +589,47 @@ export function RunPage({
     value: "4"
   }];
   const priorityValue = run.priority === null ? "none" : String(run.priority);
+  const difficultyOptions = [{
+    label: t("run.notSet"),
+    value: "none"
+  }, ...(["easy", "normal", "hard"] as const).map(value => ({
+    label: t(`issue.difficulty.${value}` as MessageKey),
+    value,
+    leading: <IssueDifficultyIcon difficulty={value} size={14} />
+  }))];
+  const difficultyValue = run.difficulty ?? "none";
+  const assigneeOptions = [{
+    label: t("run.unassigned"),
+    value: ""
+  }, ...mentionMembers.map(member => ({
+    label: member.name,
+    value: member.userId,
+    leading: <IssueAssigneeAvatar member={member} />
+  }))];
+  const currentProject = issueProjects.find(project => project.id === run.projectId) ??
+    (run.projectId && run.projectName ? {
+      id: run.projectId,
+      name: run.projectName,
+      icon: null
+    } : null);
+  const projectOptions = issueProjects
+    .filter(project => !run.teamId || project.teamId === run.teamId)
+    .filter(project => project.status !== "cancelled")
+    .map(project => ({
+      label: project.name,
+      value: project.id,
+      leading: <ProjectIcon project={project} className="run-project-option-icon" />
+    }));
+  if (currentProject && !projectOptions.some(option => option.value === currentProject.id)) {
+    projectOptions.unshift({
+      label: currentProject.name,
+      value: currentProject.id,
+      leading: <ProjectIcon project={currentProject} className="run-project-option-icon" />
+    });
+  }
+  const projectValue = currentProject?.id ?? "";
+  const projectLabel = currentProject?.name ?? run.projectName ?? t("run.notSet");
+  const canEditProject = Boolean(onMoveIssueProject && run.projectId && projectOptions.length > 1);
   const issueContent = run.issueDescription?.trim() || null;
   const editableIssueAttachments = run.attachments.filter(attachment => inlineKeptAttachmentIds.includes(attachment.id)).map(attachment => ({
     attachment,
@@ -785,6 +832,35 @@ export function RunPage({
       attachments: []
     }));
   };
+  const updateIssueDifficulty = (value: string) => {
+    if (!onUpdateIssue) return;
+    const nextDifficulty = value === "none" ? null : value as NonNullable<HuntRun["difficulty"]>;
+    if (nextDifficulty === run.difficulty) return;
+    void runAction(() => onUpdateIssue({
+      title: run.title,
+      description: run.issueDescription,
+      priority: run.priority,
+      difficulty: nextDifficulty,
+      attachments: []
+    }));
+  };
+  const updateIssueAssignee = (value: string) => {
+    if (!onUpdateIssue) return;
+    const nextAssigneeUserId = value || null;
+    if (nextAssigneeUserId === (run.assigneeUserId ?? null)) return;
+    void runAction(() => onUpdateIssue({
+      title: run.title,
+      description: run.issueDescription,
+      priority: run.priority,
+      difficulty: run.difficulty,
+      assigneeUserId: nextAssigneeUserId,
+      attachments: []
+    }));
+  };
+  const updateIssueProject = (value: string) => {
+    if (!onMoveIssueProject || !run.projectId || value === run.projectId) return;
+    void runAction(() => onMoveIssueProject(value));
+  };
   const resumePausedRun = async () => {
     if (isResumePending || isRecovering || run.resumeRequestedAt) return;
     setIsResumePending(true);
@@ -885,7 +961,7 @@ export function RunPage({
       const placement = placementForId(value);
       if (!placement || placementMatchesRun(run, placement)) return;
       void runAction(() => onMove(placement));
-    }} options={statusSelectOptions} size="small" title={statusBadgeTitle} value={placementValue} />
+    }} options={statusSelectOptions} searchable searchPlaceholder={t("dashboard.status")} size="small" title={statusBadgeTitle} value={placementValue} />
       <SelectMenu align="start" className="run-page-property-select priority" disabled={isUpdatingIssue || !onUpdateIssue} hideChevron label={t("issue.priority")} leadingIcon={<Signal aria-hidden="true" size={13} />} onValueChange={updateIssuePriority} options={priorityOptions} size="small" title={t("issue.priority")} value={priorityValue} />
       {assignee && <span aria-label={`${t("issue.assignee")}: ${assignee.name}`} className="run-page-property-badge assignee" title={`${t("issue.assignee")}: ${assignee.name}`}>
           <IssueAssigneeAvatar member={assignee} />
@@ -1331,24 +1407,30 @@ export function RunPage({
                     </button>
                   </header>
                   <section>
-                  <label className="run-property run-status-control">
+                  <label className="run-property run-property-editable run-status-control">
                     <span className={`run-property-icon ${meta.tone}`}><Activity size={15} /></span>
                     <span className="run-property-copy">
                       <SelectMenu align="end" className="run-status-select" disabled={isRecovering} label={t("dashboard.status")} onValueChange={value => {
                         const placement = placementForId(value);
                         if (!placement || placementMatchesRun(run, placement)) return;
                         void runAction(() => onMove(placement));
-                      }} options={statusSelectOptions} size="small" value={placementValue} />
+                      }} options={statusSelectOptions} searchable searchPlaceholder={t("dashboard.status")} size="small" value={placementValue} />
                     </span>
                     {isRecovering && <Spinner size={14} />}
                   </label>
-                  <label className="run-property">
+                  <label className="run-property run-property-editable">
                     <span className="run-property-icon priority"><Signal size={15} /></span>
                     <span className="run-property-copy">
                       <SelectMenu align="end" className="run-priority-select" disabled={isUpdatingIssue || !onUpdateIssue} label={t("issue.priority")} onValueChange={updateIssuePriority} options={priorityOptions} size="small" value={priorityValue} />
                     </span>
                   </label>
-                  <label className="run-property">
+                  <label className="run-property run-property-editable">
+                    <span className="run-property-icon difficulty">{run.difficulty ? <IssueDifficultyIcon difficulty={run.difficulty} size={16} /> : <Gauge aria-hidden="true" size={16} />}</span>
+                    <span className="run-property-copy">
+                      <SelectMenu align="end" className="run-difficulty-select" disabled={isUpdatingIssue || !onUpdateIssue} label={t("issue.difficulty")} onValueChange={updateIssueDifficulty} options={difficultyOptions} size="small" value={difficultyValue} />
+                    </span>
+                  </label>
+                  <label className="run-property run-property-editable">
                     <span className="run-property-icon provider">
                       <Waypoints size={15} />
                     </span>
@@ -1365,7 +1447,7 @@ export function RunPage({
                       }} providers={availableProviders} size="small" value={run.preferredProvider ?? ""} />
                     </span>
                   </label>
-                  <label className="run-property">
+                  <label className="run-property run-property-editable">
                     <span className="run-property-icon model">
                       <BrainCircuit size={15} />
                     </span>
@@ -1380,7 +1462,7 @@ export function RunPage({
                       }} options={run.preferredProvider ? agentModelOptions(providerModels, run.preferredProvider, t("settings.providerDefaultModel"), run.preferredModel) : []} placeholder={t("issue.selectProviderFirst")} searchEmptyMessage={t("issue.noModelsFound")} searchPlaceholder={t("issue.searchModels")} searchable={run.preferredProvider === "opencode" || run.preferredProvider === "agy"} size="small" value={run.preferredModel ?? ""} />
                     </span>
                   </label>
-                  <label className="run-property">
+                  <label className="run-property run-property-editable">
                     <span className="run-property-icon effort">
                       <BrainCircuit size={15} />
                     </span>
@@ -1408,10 +1490,12 @@ export function RunPage({
                         <strong>{t("issue.fullAuto")}</strong>
                       </span>
                     </div> : null}
-                  <div aria-label={`${t("issue.assignee")}: ${assignee?.name ?? t("run.unassigned")}`} className="run-property" title={t("issue.assignee")}>
+                  <label aria-label={`${t("issue.assignee")}: ${assignee?.name ?? t("run.unassigned")}`} className="run-property run-property-editable" title={t("issue.assignee")}>
                     <span className="run-property-icon assignee"><UserRound size={15} /></span>
-                    <span className="run-property-copy"><strong>{assignee?.name ?? t("run.unassigned")}</strong></span>
-                  </div>
+                    <span className="run-property-copy">
+                      <SelectMenu align="end" className="run-assignee-select" disabled={isUpdatingIssue || !onUpdateIssue} label={t("issue.assignee")} onValueChange={updateIssueAssignee} options={assigneeOptions} searchEmptyMessage={t("organization.noResults")} searchPlaceholder={t("organization.search")} searchable={assigneeOptions.length > 8} size="small" value={run.assigneeUserId ?? ""} />
+                    </span>
+                  </label>
                   <div aria-label={`${t("run.creator")}: ${creator?.name ?? t("run.creatorUnknown")}`} className="run-property" title={t("run.creator")}>
                     <span className="run-property-icon assignee"><UserRound size={15} /></span>
                     <span className="run-property-copy"><strong>{creator?.name ?? t("run.creatorUnknown")}</strong></span>
@@ -1449,6 +1533,18 @@ export function RunPage({
                       {executionIdentity}
                     </span>
                   </div>
+                </section>
+                <section>
+                  <h2>{t("issue.project")}</h2>
+                  {canEditProject ? <label aria-label={`${t("issue.project")}: ${projectLabel}`} className="run-property run-property-editable" title={t("issue.project")}>
+                      <span className="run-property-icon project"><ProjectIcon className="run-property-project-icon" project={currentProject ?? { name: projectLabel, icon: null }} /></span>
+                      <span className="run-property-copy">
+                        <SelectMenu align="end" className="run-project-select" disabled={isUpdatingIssue} label={t("issue.project")} onValueChange={updateIssueProject} options={projectOptions} searchEmptyMessage={t("organization.noResults")} searchPlaceholder={t("organization.search")} searchable={projectOptions.length > 8} size="small" value={projectValue} />
+                      </span>
+                    </label> : <div aria-label={`${t("issue.project")}: ${projectLabel}`} className="run-property" title={t("issue.project")}>
+                      <span className="run-property-icon project"><ProjectIcon className="run-property-project-icon" project={currentProject ?? { name: projectLabel, icon: null }} /></span>
+                      <span className="run-property-copy"><strong>{projectLabel}</strong></span>
+                    </div>}
                 </section>
                 <IssueDependenciesPanel availableRuns={availableRuns} issueKeyPrefix={issueKeyPrefix} isUpdating={isUpdatingIssue} onAdd={onAddDependency} onOpen={onDependencyOpen} onRemove={onRemoveDependency} run={run} />
                 <section>

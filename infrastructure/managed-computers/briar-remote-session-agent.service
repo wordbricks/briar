@@ -9,16 +9,14 @@ Type=simple
 User=briar
 Group=briar
 Environment=HOME=/home/briar
+Environment=GH_BROWSER=/opt/briar/bin/briar-open-browser
 Environment=BRIAR_MANAGED_CREDENTIAL_FILE=/var/lib/briar/worker-credential.json
 Environment=BRIAR_REMOTE_DISPLAY_HOST=127.0.0.1
 Environment=BRIAR_REMOTE_DISPLAY_PORT=5901
 Environment=PATH=/opt/briar/bin:/opt/briar/provider/node_modules/.bin:/home/briar/.cargo/bin:/home/briar/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStartPre=/opt/briar/bin/verify-managed-admin
 ExecStart=/opt/briar/bin/bun /opt/briar/bin/briar-remote-session-agent.js
 Restart=always
 RestartSec=2
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=read-only
-ReadOnlyPaths=/var/lib/briar
-ReadWritePaths=/home/briar
+# Guided setup launches programs in the same owner-controlled account.
+NoNewPrivileges=false

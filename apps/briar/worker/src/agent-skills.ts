@@ -178,13 +178,6 @@ const activeAgentSkillJobPredicate = (skillAlias: string) => `
       and reply.status in ('queued', 'running')
   )`;
 
-const activeDirectAgentSkillJobPredicate = (skillAlias: string) => `
-  exists (
-    select 1 from briar_project_agent_task_jobs task
-    where task.skill_id = ${skillAlias}.id
-      and task.status in ('queued', 'running')
-  )`;
-
 const agentSkillRuntimeChanged = (
   current: Pick<
     AgentSkillRow,
@@ -252,7 +245,7 @@ export async function assertAgentSkillReplacementAllowed(
               skill.approval_policy
        from briar_agent_skills skill
        where skill.agent_id = ? and skill.id in (${placeholders})
-         and (${activeDirectAgentSkillJobPredicate("skill")})
+         and (${activeAgentSkillJobPredicate("skill")})
        order by skill.position, skill.created_at, skill.id`,
     )
     .bind(agentId, ...retainedSkillIds)
@@ -270,12 +263,12 @@ export async function assertAgentSkillReplacementAllowed(
   });
   if (changed) {
     throw new AgentSkillConflictError(
-      `Agent Skill "${changed.name}" cannot change body or execution settings while queued or running direct Agent work still references it`,
+      `Agent Skill "${changed.name}" cannot change body or execution settings while queued or running work still references it`,
     );
   }
 }
 
-function guardActiveDirectAgentSkillRuntimeStatement(
+function guardActiveAgentSkillRuntimeStatement(
   db: D1Database,
   agentId: string,
   skills: readonly AgentSkillRow[],
@@ -315,7 +308,7 @@ function guardActiveDirectAgentSkillRuntimeStatement(
        from briar_agent_skills skill
        join requested on requested.id = skill.id
        where skill.agent_id = ?
-         and (${activeDirectAgentSkillJobPredicate("skill")})
+         and (${activeAgentSkillJobPredicate("skill")})
          and (
            skill.body is not requested.body
            or skill.provider is not requested.provider
@@ -397,7 +390,7 @@ export function replaceAgentSkillStatements(
     // ineligible or resume it with a different provider. The self-insert turns
     // a preflight race into the same retryable primary-key conflict used by the
     // deletion guard below.
-    guardActiveDirectAgentSkillRuntimeStatement(db, agentId, skills),
+    guardActiveAgentSkillRuntimeStatement(db, agentId, skills),
     // Close the race between the friendly preflight check and this atomic
     // batch. Copying a still-referenced removed row conflicts with its own
     // primary key and rolls the complete Agent update back.

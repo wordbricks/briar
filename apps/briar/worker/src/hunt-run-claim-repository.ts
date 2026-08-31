@@ -216,7 +216,7 @@ export async function claimNextQueuedHuntRun(
               run.current_attempt, run.claim_attempts, ?,
               run.claimed_by, run.claimed_at, ?
        from briar_hunt_runs run
-       join briar_projects project on project.id = run.project_id
+       join briar_teams project on project.id = run.project_id
        where run.project_id = ? and run.last_execution_id = ?`,
     )
     .bind(
@@ -287,7 +287,7 @@ export async function findProjectIdByAgentTokenHash(
     .prepare(
       `select token.project_id
        from briar_project_agent_tokens token
-       join briar_projects project on project.id = token.project_id
+       join briar_teams project on project.id = token.project_id
        join briar_organization_members membership
          on membership.organization_id = project.organization_id
         and membership.user_id = token.issued_to_user_id
@@ -302,7 +302,7 @@ export async function findProjectIdByAgentTokenHash(
          )
        union all
        select id as project_id
-       from briar_projects
+       from briar_teams
        where agent_token_hash = ?
        limit 1`,
     )
@@ -322,7 +322,7 @@ export async function issueProjectAgentToken(
          token_hash, project_id, issued_to_user_id, created_at
        )
        select ?, project.id, ?, ?
-       from briar_projects project
+       from briar_teams project
        join briar_organization_members membership
          on membership.organization_id = project.organization_id
         and membership.user_id = ?

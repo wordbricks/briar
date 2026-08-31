@@ -253,6 +253,9 @@ export const createAppIssueService = (
         projectId: canonicalUuid(request.projectId),
         userId: session.user.id,
         clientIssueId: canonicalUuid(request.clientIssueId),
+        planningProjectId: request.planningProjectId
+          ? canonicalUuid(request.planningProjectId)
+          : undefined,
         request: createIssueApplicationRequest(request),
         attachmentIds: request.attachments.map((attachment) =>
           canonicalUuid(attachment.uploadId)

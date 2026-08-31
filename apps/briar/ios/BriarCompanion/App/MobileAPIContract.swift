@@ -71,6 +71,92 @@ struct Project: Codable, Equatable, Sendable {
     }
 }
 
+enum PlanningProjectStatus: String, CaseIterable, Sendable {
+    case planned
+    case active
+    case completed
+    case cancelled
+}
+
+struct PlanningProject: Equatable, Identifiable, Sendable {
+    let id: UUID
+    let workspaceId: UUID
+    let workspaceName: String
+    let teamId: UUID
+    let teamName: String
+    let name: String
+    let description: String
+    let status: PlanningProjectStatus
+    let leadUserId: String?
+    let leadName: String?
+    let startDate: String?
+    let targetDate: String?
+    let icon: String?
+    let color: String?
+    let sortOrder: Int
+    let isDefault: Bool
+    let role: Project.Role
+    let createdAt: Date
+    let updatedAt: Date
+
+    init(connectMessage message: BriarAPI_PlanningProject) throws {
+        guard
+            let id = UUID(uuidString: message.id),
+            let workspaceId = UUID(uuidString: message.workspaceID),
+            let teamId = UUID(uuidString: message.teamID),
+            message.hasCreatedAt,
+            message.hasUpdatedAt
+        else { throw MobileAPIError.invalidResponse }
+        let status: PlanningProjectStatus
+        switch message.status {
+        case .planned: status = .planned
+        case .active: status = .active
+        case .completed: status = .completed
+        case .cancelled: status = .cancelled
+        case .unspecified, .UNRECOGNIZED: throw MobileAPIError.invalidResponse
+        }
+        let role: Project.Role
+        switch message.role {
+        case .owner: role = .owner
+        case .coOwner: role = .coOwner
+        case .developer: role = .developer
+        case .editor: role = .editor
+        case .viewer: role = .viewer
+        case .unspecified, .UNRECOGNIZED: throw MobileAPIError.invalidResponse
+        }
+        self.id = id
+        self.workspaceId = workspaceId
+        self.workspaceName = message.workspaceName
+        self.teamId = teamId
+        self.teamName = message.teamName
+        self.name = message.name
+        self.description = message.description_p
+        self.status = status
+        self.leadUserId = message.hasLeadUserID ? message.leadUserID : nil
+        self.leadName = message.hasLeadName ? message.leadName : nil
+        self.startDate = message.hasStartDate ? message.startDate : nil
+        self.targetDate = message.hasTargetDate ? message.targetDate : nil
+        self.icon = message.hasIcon ? message.icon : nil
+        self.color = message.hasColor ? message.color : nil
+        self.sortOrder = Int(message.sortOrder)
+        self.isDefault = message.isDefault
+        self.role = role
+        self.createdAt = message.createdAt.date
+        self.updatedAt = message.updatedAt.date
+    }
+}
+
+func planningProjectStatusMessage(
+    _ status: PlanningProjectStatus
+) -> BriarAPI_PlanningProjectStatus {
+    switch status {
+    case .planned: .planned
+    case .active: .active
+    case .completed: .completed
+    case .cancelled: .cancelled
+    }
+}
+
 extension Project {
     init(connectMessage message: BriarAPI_Project) throws {
         guard

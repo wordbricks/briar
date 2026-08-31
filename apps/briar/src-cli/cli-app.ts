@@ -1,5 +1,6 @@
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import {
   Argument,
   CliError,
@@ -30,6 +31,7 @@ import {
   addRunEvidence,
   changeIssueDependencyCommand,
   createIssueCommand,
+  updateIssueCommand,
   listChannelMessagesCommand,
   listCurrentRunEvidence,
   recoverRun,
@@ -160,7 +162,7 @@ const skillsCommand = Command.make("skills").pipe(
 );
 
 const projectCommand = Command.make("project").pipe(
-  Command.withDescription("Create and configure Briar projects"),
+  Command.withDescription("Compatibility alias for repository-backed Teams"),
   Command.withSubcommands([
     leaf(
       "list",
@@ -204,6 +206,51 @@ const projectCommand = Command.make("project").pipe(
   ]),
 );
 
+const teamCommand = Command.make("team").pipe(
+  Command.withDescription("Create and configure repository-backed Briar Teams"),
+  Command.withSubcommands([
+    leaf(
+      "list",
+      switches("json"),
+      listProjectsCommand,
+      "List Teams available to the signed-in user",
+    ),
+    leaf(
+      "create",
+      optionalStrings("name"),
+      createProject,
+      "Create and connect a Team",
+    ),
+    leaf("doctor", {}, projectDoctor, "Inspect Team readiness"),
+    leaf(
+      "configure",
+      {
+        ...optionalStrings(
+          "velen-org",
+          "data-source",
+          "linear-source",
+          "linear-team",
+          "worktree-root",
+          "branch-prefix",
+          "github-repository",
+        ),
+        ...switches(
+          "disable-velen",
+          "enable-linear",
+          "disable-linear",
+          "enable-worktrees",
+          "disable-worktrees",
+          "enable-full-access",
+          "disable-full-access",
+          "i-understand-the-risk",
+        ),
+      },
+      configureProject,
+      "Configure Team integrations and execution policy",
+    ),
+  ]),
+);
+
 const connectCommand = leaf(
   "connect",
   requiredStrings("project-id", "agent-token"),
@@ -211,19 +258,100 @@ const connectCommand = leaf(
   "Connect the current repository to an existing project",
 );
 
+const issueUpdateCommand = Command.make(
+  "update",
+  {
+    run: Flag.string("run").pipe(
+      Flag.withMetavar("uuid"),
+      Flag.withDescription("Issue run ID"),
+    ),
+    title: Flag.string("title").pipe(
+      Flag.withDescription("New issue title"),
+      Flag.optional,
+    ),
+    description: Flag.string("description").pipe(
+      Flag.withDescription("New issue description"),
+      Flag.optional,
+    ),
+    descriptionFile: Flag.string("description-file").pipe(
+      Flag.withDescription("Read the new description from a file"),
+      Flag.optional,
+    ),
+    clearDescription: Flag.boolean("clear-description").pipe(
+      Flag.withDescription("Clear the issue description"),
+      Flag.withDefault(false),
+    ),
+    priority: Flag.integer("priority").pipe(
+      Flag.withDescription("New priority from 1 to 4"),
+      Flag.optional,
+    ),
+    clearPriority: Flag.boolean("clear-priority").pipe(
+      Flag.withDescription("Clear the issue priority"),
+      Flag.withDefault(false),
+    ),
+    difficulty: Flag.choice("difficulty", ["easy", "normal", "hard"]).pipe(
+      Flag.withDescription("New issue difficulty"),
+      Flag.optional,
+    ),
+    clearDifficulty: Flag.boolean("clear-difficulty").pipe(
+      Flag.withDescription("Clear the issue difficulty"),
+      Flag.withDefault(false),
+    ),
+    assigneeUserId: Flag.string("assignee-user-id").pipe(
+      Flag.withDescription("Assign the issue to a project member"),
+      Flag.optional,
+    ),
+    clearAssignee: Flag.boolean("clear-assignee").pipe(
+      Flag.withDescription("Unassign the issue"),
+      Flag.withDefault(false),
+    ),
+  },
+  Effect.fn("issueUpdateCommand")(function* (input) {
+    yield* runHandler(() =>
+      updateIssueCommand({
+        runId: input.run,
+        title: Option.getOrUndefined(input.title),
+        description: Option.getOrUndefined(input.description),
+        descriptionFile: Option.getOrUndefined(input.descriptionFile),
+        clearDescription: input.clearDescription,
+        priority: Option.getOrUndefined(input.priority),
+        clearPriority: input.clearPriority,
+        difficulty: Option.getOrUndefined(input.difficulty),
+        clearDifficulty: input.clearDifficulty,
+        assigneeUserId: Option.getOrUndefined(input.assigneeUserId),
+        clearAssignee: input.clearAssignee,
+      })
+    );
+  }),
+).pipe(
+  Command.withDescription("Update an issue"),
+  Command.withExamples([
+    {
+      command: "briar issue update --run <uuid> --title 'New title'",
+      description: "Change an issue title",
+    },
+    {
+      command:
+        "briar issue update --run <uuid> --description-file issue.md --priority 2",
+      description: "Replace an issue description and priority",
+    },
+  ]),
+);
+
 const issueCommand = Command.make("issue").pipe(
-  Command.withDescription("Create issues and manage dependencies"),
+  Command.withDescription("Create and update issues and manage dependencies"),
   Command.withSubcommands([
     leaf(
       "create",
       {
         ...requiredStrings("title"),
-        ...optionalStrings("description", "description-file", "status"),
+        ...optionalStrings("description", "description-file", "status", "project"),
         ...optionalIntegers("priority"),
       },
       createIssueCommand,
       "Create an issue",
     ),
+    issueUpdateCommand,
     Command.make("dependency").pipe(
       Command.withSubcommands([
         leaf(
@@ -678,6 +806,7 @@ export const briarCommand = Command.make("briar").pipe(
     versionCommand,
     skillsCommand,
     projectCommand,
+    teamCommand,
     connectCommand,
     issueCommand,
     channelCommand,

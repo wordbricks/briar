@@ -62,6 +62,7 @@ import { LoginScreen } from "./components/LoginScreen";
 import { OrganizationSettings } from "./components/OrganizationSettings";
 import { OrganizationCreate } from "./components/OrganizationCreate";
 import { ProjectOnboarding } from "./components/ProjectOnboarding";
+import { PlanningProjectDialog } from "./components/PlanningProjectDialog";
 import { ProjectLobby } from "./components/ProjectLobby";
 import { ProjectAgents } from "./components/ProjectAgents";
 import { ProjectIcon } from "./components/ProjectIcon";
@@ -118,8 +119,13 @@ import {
   markInitialOnboardingComplete,
 } from "./lib/initial-onboarding";
 import {
+  beginOrganizationInvitation,
+  clearOrganizationInvitationProgress,
   leaveOrganizationInvitationRoute,
+  loadOrganizationInvitationProgress,
   loadOrganizationInvitationToken,
+  organizationInvitationProgressFrom,
+  storeOrganizationInvitationProgress,
 } from "./lib/organization-invitation";
 import { syncAppBadgeCount } from "./lib/app-badge";
 import {
@@ -192,6 +198,7 @@ import {
   loadProjectUsageSummary,
   runProjectAgentTaskOnWorker,
   retryHuntRun,
+  resolveIssueHierarchyLocation,
 } from "./lib/api";
 import type {
   ChannelSummary,
@@ -286,8 +293,11 @@ export function App({
   const [invitationToken, setInvitationToken] = useState(
     loadOrganizationInvitationToken,
   );
+  const [invitationProgress, setInvitationProgress] = useState(
+    loadOrganizationInvitationProgress,
+  );
   const [acceptingInvitation, setAcceptingInvitation] = useState(false);
-  const invitationAcceptanceAttemptRef = useRef<string | null>(null);
+  const invitationDeveloperSetupRequestRef = useRef<string | null>(null);
   const plannedUpdateRecoveryRef = useRef<Promise<void> | null>(null);
   const scheduleSessionOptions = useMemo<UseBriarOptions>(() => ({
     adoptRemoteAgentSession: autoHunt.adoptRemoteSession,
@@ -1338,6 +1348,15 @@ export function App({
   const [createIssueProjectId, setCreateIssueProjectId] = useState<string | null>(
     null,
   );
+  const [planningProjectTeamId, setPlanningProjectTeamId] = useState<
+    string | null
+  >(null);
+  const [planningProjectEditId, setPlanningProjectEditId] = useState<
+    string | null
+  >(null);
+  const [activePlanningProjectId, setActivePlanningProjectId] = useState<
+    string | null
+  >(null);
   const [quickStartingRunId, setQuickStartingRunId] = useState<string | null>(
     null,
   );
@@ -1444,22 +1463,42 @@ export function App({
     if (pendingBriarLink.kind === "issue") {
       const target = pendingBriarLink;
       setPendingBriarLink(null);
-      void navigateToIssueLink({
-        target,
-        activeProjectId: briar.activeProjectId,
-        availableProjectIds: briar.projects.map((project) => project.id),
-        lockedProjectId: projectWindowProjectId,
-        ensureProjectSelected: briar.ensureProjectSelected,
-        openIssue: ({ projectId, runId }) => {
-          setRequestedSessionId(null);
-          setRequestedRunMessageId(null);
-          setRequestedRunInitialTab(null);
-          setRequestedRunId(runId);
-          setCompanionPage("issues");
-          setCompanionStatus("all");
-          navigateToIssue(runId, projectId);
-        },
-      }).then((outcome) => {
+      void (async () => {
+        let resolvedTarget = target;
+        if (briar.token) {
+          try {
+            const location = await resolveIssueHierarchyLocation(
+              briar.token,
+              target.projectId,
+              target.runId,
+            );
+            resolvedTarget = {
+              ...target,
+              projectId: location.teamId,
+              runId: location.runId,
+            };
+            setActivePlanningProjectId(location.projectId);
+          } catch {
+            // Compatibility with servers that predate hierarchy resolution.
+          }
+        }
+        return navigateToIssueLink({
+          target: resolvedTarget,
+          activeProjectId: briar.activeProjectId,
+          availableProjectIds: briar.projects.map((project) => project.id),
+          lockedProjectId: projectWindowProjectId,
+          ensureProjectSelected: briar.ensureProjectSelected,
+          openIssue: ({ projectId, runId }) => {
+            setRequestedSessionId(null);
+            setRequestedRunMessageId(null);
+            setRequestedRunInitialTab(null);
+            setRequestedRunId(runId);
+            setCompanionPage("issues");
+            setCompanionStatus("all");
+            navigateToIssue(runId, projectId);
+          },
+        });
+      })().then((outcome) => {
         if (outcome.status !== "rejected") return;
         toast(
           t(
@@ -2093,9 +2132,13 @@ export function App({
             organization.id === settingsTarget.organizationId,
         )
       : null;
+  const hasCurrentUserInvitationProgress = Boolean(
+    briar.user && invitationProgress?.userId === briar.user.id,
+  );
   const shouldShowInitialOnboarding =
     !briar.remoteMode &&
-    !hasCompletedOnboarding;
+    !hasCompletedOnboarding &&
+    !hasCurrentUserInvitationProgress;
   const shouldShowFirstOrganizationSetup =
     resolveShouldShowFirstOrganizationSetup({
     hasUser: briar.user !== null,
@@ -2110,8 +2153,14 @@ export function App({
       !briar.isCreatingProject &&
       !briar.projectConnection &&
       !invitationToken &&
+      !hasCurrentUserInvitationProgress &&
       (pendingFirstRunTutorialUserId === briar.user.id ||
         hasPendingFirstRunTutorial(briar.user.id)),
+  );
+  const shouldShowInvitationCollaboratorTutorial = Boolean(
+    !briar.remoteMode &&
+      hasCurrentUserInvitationProgress &&
+      invitationProgress?.nextStep === "collaborator",
   );
   const sendIssueMessage = (
     runId: string,
@@ -2351,11 +2400,19 @@ export function App({
   }, [briar.activeProjectId]);
 
   const acceptCurrentInvitation = useCallback(async () => {
-    if (!invitationToken) return;
+    if (!invitationToken || !briar.user) return;
     setAcceptingInvitation(true);
     try {
-      await briar.acceptInvitation(invitationToken);
-      leaveOrganizationInvitationRoute();
+      const result = await briar.acceptInvitation(invitationToken);
+      const progress = organizationInvitationProgressFrom(
+        result.invitation,
+        briar.user.id,
+      );
+      storeOrganizationInvitationProgress(progress);
+      setInvitationProgress(progress);
+      markInitialOnboardingComplete();
+      setHasCompletedOnboarding(true);
+      leaveOrganizationInvitationRoute({ preserveProgress: true });
       setInvitationToken(null);
       setRequestedRunId(null);
       setRequestedSessionId(null);
@@ -2365,19 +2422,48 @@ export function App({
     } finally {
       setAcceptingInvitation(false);
     }
-  }, [briar.acceptInvitation, invitationToken, resetNavigation]);
+  }, [briar.acceptInvitation, briar.user, invitationToken, resetNavigation]);
 
   useEffect(() => {
-    if (!invitationToken || !briar.user || acceptingInvitation) return;
-    const attemptKey = `${invitationToken}:${briar.user.id}`;
-    if (invitationAcceptanceAttemptRef.current === attemptKey) return;
-    invitationAcceptanceAttemptRef.current = attemptKey;
-    void acceptCurrentInvitation();
+    if (
+      !briar.user ||
+      !invitationProgress ||
+      invitationProgress.userId === briar.user.id
+    ) {
+      return;
+    }
+    clearOrganizationInvitationProgress();
+    invitationDeveloperSetupRequestRef.current = null;
+    setInvitationProgress(null);
+  }, [briar.user, invitationProgress]);
+
+  useEffect(() => {
+    if (
+      briar.remoteMode ||
+      !briar.user ||
+      invitationProgress?.userId !== briar.user.id ||
+      invitationProgress?.nextStep !== "developer" ||
+      briar.isCreatingProject ||
+      briar.projectConnection ||
+      !briar.projects.some(
+        (project) => project.id === invitationProgress.initialProjectId,
+      )
+    ) {
+      return;
+    }
+    const requestKey = `${briar.user.id}:${invitationProgress.initialProjectId}`;
+    if (invitationDeveloperSetupRequestRef.current === requestKey) return;
+    invitationDeveloperSetupRequestRef.current = requestKey;
+    setDeveloperToolsProjectSetupRequested(true);
+    void briar.reconnectProject(invitationProgress.initialProjectId);
   }, [
-    acceptCurrentInvitation,
-    acceptingInvitation,
+    briar.isCreatingProject,
+    briar.projectConnection,
+    briar.projects,
+    briar.reconnectProject,
+    briar.remoteMode,
     briar.user,
-    invitationToken,
+    invitationProgress,
   ]);
 
   useEffect(() => {
@@ -3482,6 +3568,10 @@ export function App({
         onResume={() => briar.resumeRun(inboxDetailRun.id)}
         onSendIssueMessage={(input) =>
           sendIssueMessage(inboxDetailRun.id, input)}
+        onEditIssueMessage={(messageId, input) =>
+          briar.updateIssueMessage(inboxDetailRun.id, messageId, input)}
+        onDeleteIssueMessage={(messageId) =>
+          briar.removeIssueMessage(inboxDetailRun.id, messageId)}
         onUpdateIssue={(input) => briar.editIssue(inboxDetailRun.id, input)}
         onUpdateIssueSubscription={(subscribed) =>
           briar.editIssueSubscription(inboxDetailRun.id, subscribed)}
@@ -3618,21 +3708,6 @@ export function App({
 
   if (briar.restoringSession) {
     content = <SessionLoadingScreen />;
-  } else if (shouldShowInitialOnboarding) {
-    content = (
-      <InitialOnboarding
-        authenticated={Boolean(briar.user)}
-        error={briar.error}
-        loading={briar.loading}
-        loginCode={briar.loginCode}
-        onCancelLogin={briar.cancelLogin}
-        onComplete={() => {
-          markInitialOnboardingComplete();
-          setHasCompletedOnboarding(true);
-        }}
-        onLogin={(method) => void briar.login({ method, locale })}
-      />
-    );
   } else if (invitationToken) {
     content = (
       <InvitationOnboarding
@@ -3653,6 +3728,21 @@ export function App({
         }}
         token={invitationToken}
         user={briar.user}
+      />
+    );
+  } else if (shouldShowInitialOnboarding) {
+    content = (
+      <InitialOnboarding
+        authenticated={Boolean(briar.user)}
+        error={briar.error}
+        loading={briar.loading}
+        loginCode={briar.loginCode}
+        onCancelLogin={briar.cancelLogin}
+        onComplete={() => {
+          markInitialOnboardingComplete();
+          setHasCompletedOnboarding(true);
+        }}
+        onLogin={(method) => void briar.login({ method, locale })}
       />
     );
   } else if (!briar.user) {
@@ -3676,6 +3766,10 @@ export function App({
           markFirstRunTutorialPending(briar.user!.id);
           setPendingFirstRunTutorialUserId(briar.user!.id);
           resetNavigation("lobby");
+        }}
+        onJoin={(token) => {
+          beginOrganizationInvitation(token);
+          setInvitationToken(token);
         }}
         onLogout={() => void briar.logout()}
         user={briar.user}
@@ -3710,6 +3804,22 @@ export function App({
             connectedProjectIds={briar.connectedProjectIds}
             isOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
+            onAddPlanningProject={(teamId) => {
+              setPlanningProjectEditId(null);
+              setPlanningProjectTeamId(teamId);
+            }}
+            onPlanningProjectEdit={(projectId) => {
+              setPlanningProjectTeamId(null);
+              setPlanningProjectEditId(projectId);
+            }}
+            onPlanningProjectOpen={(planningProjectId, teamId) => {
+              setActivePlanningProjectId(planningProjectId);
+              navigationActiveProjectIdRef.current = teamId;
+              briar.setActiveProjectId(teamId);
+              setRequestedRunId(null);
+              setIssueListRequestKey((key) => key + 1);
+              navigateToPage("issues");
+            }}
             onAgentSessionOpen={(sessionId) => {
               setRequestedRunId(null);
               setRequestedSessionId(sessionId);
@@ -3752,6 +3862,7 @@ export function App({
                 : undefined
             }
             onIssuesOpen={() => {
+              setActivePlanningProjectId(null);
               setRequestedRunId(null);
               setIssueListRequestKey((key) => key + 1);
               navigateToPage("issues");
@@ -3773,6 +3884,7 @@ export function App({
               navigateToPage("lobby", project?.id ?? null);
             }}
             onProjectChange={(projectId) => {
+              setActivePlanningProjectId(null);
               navigationActiveProjectIdRef.current = projectId;
               briar.setActiveProjectId(projectId);
               setRequestedRunId(null);
@@ -3797,6 +3909,7 @@ export function App({
             onLogout={() => void briar.logout()}
             organizations={briar.organizations}
             projects={visibleProjects}
+            planningProjects={briar.planningProjects}
             projectReadiness={briar.projectReadiness}
             projectReadinessError={briar.projectReadinessError}
             projectWindowProjectId={projectWindowProjectId}
@@ -3927,6 +4040,7 @@ export function App({
             channelInboxSyncSignal={channelInboxSyncSignal}
             channels={organizationDirectMessages}
             currentUserId={briar.user?.id ?? null}
+            isSidebarOpen={isSidebarOpen}
             key={`desktop-dms:${briar.activeOrganizationId}`}
             onChannelFallback={(channelId) =>
               handleDesktopChannelFallback(channelId, "dms")
@@ -4315,6 +4429,7 @@ export function App({
                 );
               }
             }}
+            onMoveIssueProject={briar.moveIssueProject}
             onAddIssueDependency={briar.addIssueDependency}
             onAcceptIssueAction={briar.acceptConversationIssueAction}
             onAcceptIssueExecution={briar.acceptConversationIssueExecution}
@@ -4350,6 +4465,8 @@ export function App({
             onDeleteIssueMessage={briar.removeIssueMessage}
             processingIssueIds={processingIssueIds}
             projects={activeOrganizationProjects}
+            issueProjects={briar.planningProjects}
+            activeIssueProjectId={activePlanningProjectId}
             sessions={autoHunt.sessions}
             token={briar.token}
           />
@@ -4603,6 +4720,7 @@ export function App({
               channelInboxSyncSignal={channelInboxSyncSignal}
               channels={organizationDirectMessages}
               currentUserId={briar.user?.id ?? null}
+              isSidebarOpen
               onChannelSelect={setActiveChannelId}
               onChannelsChange={setOrganizationChannels}
               onIssueCreated={async (projectId, runId) => {
@@ -4668,6 +4786,7 @@ export function App({
             onViewingIssueConversationChange={setViewingIssueConversationRunId}
             onDeleteIssue={briar.deleteIssue}
             onTransferIssue={briar.transferIssue}
+            onMoveIssueProject={briar.moveIssueProject}
             onAddIssueDependency={briar.addIssueDependency}
             onAcceptIssueAction={briar.acceptConversationIssueAction}
             onAcceptIssueExecution={briar.acceptConversationIssueExecution}
@@ -4703,6 +4822,8 @@ export function App({
             onDeleteIssueMessage={briar.removeIssueMessage}
             processingIssueIds={processingIssueIds}
             projects={activeOrganizationProjects}
+            issueProjects={briar.planningProjects}
+            activeIssueProjectId={activePlanningProjectId}
             sessions={autoHunt.sessions}
             token={briar.token}
           />
@@ -4729,6 +4850,35 @@ export function App({
   return (
     <>
       {content}
+      <PlanningProjectDialog
+        onCreate={(input) => {
+          if (!planningProjectTeamId) {
+            return Promise.reject(new Error("프로젝트를 추가할 팀이 없습니다."));
+          }
+          return briar.addPlanningProject(planningProjectTeamId, input);
+        }}
+        onUpdate={briar.editPlanningProject}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPlanningProjectTeamId(null);
+            setPlanningProjectEditId(null);
+          }
+        }}
+        open={planningProjectTeamId !== null || planningProjectEditId !== null}
+        project={
+          briar.planningProjects.find(
+            (project) => project.id === planningProjectEditId,
+          ) ?? null
+        }
+        teamName={
+          briar.projects.find((team) => team.id === (
+            planningProjectTeamId ?? briar.planningProjects.find(
+              (project) => project.id === planningProjectEditId,
+            )?.teamId
+          ))
+            ?.name ?? ""
+        }
+      />
       {commandPaletteAvailable && isCommandPaletteOpen ? (
         <CommandPalette
           contextLabel={commandPaletteContextLabel}
@@ -4768,6 +4918,11 @@ export function App({
           includeDeveloperTools={developerToolsProjectSetupRequested}
           loading={briar.loading}
           onCancel={() => {
+            if (invitationProgress?.nextStep === "developer") {
+              clearOrganizationInvitationProgress();
+              setInvitationProgress(null);
+              invitationDeveloperSetupRequestRef.current = null;
+            }
             setDeveloperToolsProjectSetupRequested(false);
             briar.cancelProjectCreation();
             restoreRepositorySetupTrigger();
@@ -4786,6 +4941,11 @@ export function App({
           onConnect={briar.connectProject}
           onCreate={briar.addProject}
           onFinish={() => {
+            if (invitationProgress?.nextStep === "developer") {
+              clearOrganizationInvitationProgress();
+              setInvitationProgress(null);
+              invitationDeveloperSetupRequestRef.current = null;
+            }
             repositorySetupTriggerRef.current = null;
             setDeveloperToolsProjectSetupRequested(false);
             briar.finishProjectCreation();
@@ -4800,6 +4960,14 @@ export function App({
           onRepositorySelect={briar.selectProjectRepository}
           onRepositoryInspect={briar.inspectProjectRepository}
           onResolveGithubRepository={briar.resolveGithubProjectRepository}
+          requireDeveloperAgent={
+            invitationProgress?.nextStep === "developer"
+          }
+          startWithDeveloperTools={Boolean(
+            invitationProgress?.nextStep === "developer" &&
+              invitationProgress.initialProjectId ===
+                briar.projectConnection?.project.id,
+          )}
         />
       ) : null}
       <WorkerDispatchDialog
@@ -4818,7 +4986,18 @@ export function App({
         workers={briar.dashboard?.workers ?? []}
       />
       <FirstRunTutorial
+        initialPhase={
+          shouldShowInvitationCollaboratorTutorial
+            ? "collaborator-demo"
+            : "purpose"
+        }
         onCollaboratorComplete={() => {
+          if (shouldShowInvitationCollaboratorTutorial) {
+            clearOrganizationInvitationProgress();
+            setInvitationProgress(null);
+            resetNavigation("lobby");
+            return;
+          }
           if (!briar.user) return;
           clearFirstRunTutorialPending(briar.user.id);
           setPendingFirstRunTutorialUserId(null);
@@ -4831,7 +5010,10 @@ export function App({
           setDeveloperToolsProjectSetupRequested(true);
           briar.startProjectCreation();
         }}
-        open={shouldShowFirstRunTutorial}
+        open={
+          shouldShowFirstRunTutorial ||
+          shouldShowInvitationCollaboratorTutorial
+        }
       />
       {isLaunchIntroVisible ? (
         <LaunchIntro

@@ -39,7 +39,7 @@ describe("agent execution metrics storage cutover", () => {
     ]);
 
     await applyD1Migrations(db, {
-      files: ["0161_canonical_agent_execution_metrics_storage.sql"],
+      files: ["0163_canonical_agent_execution_metrics_storage.sql"],
     });
 
     expect((await db.prepare(

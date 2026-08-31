@@ -826,6 +826,42 @@ public nonisolated struct BriarAPI_DashboardRun: @unchecked Sendable {
   /// Clears the value of `agentID`. Subsequent reads from it will return its default value.
   public mutating func clearAgentID() {_uniqueStorage()._agentID = nil}
 
+  public var workspaceID: String {
+    get {_storage._workspaceID ?? String()}
+    set {_uniqueStorage()._workspaceID = newValue}
+  }
+  /// Returns true if `workspaceID` has been explicitly set.
+  public var hasWorkspaceID: Bool {_storage._workspaceID != nil}
+  /// Clears the value of `workspaceID`. Subsequent reads from it will return its default value.
+  public mutating func clearWorkspaceID() {_uniqueStorage()._workspaceID = nil}
+
+  public var teamID: String {
+    get {_storage._teamID ?? String()}
+    set {_uniqueStorage()._teamID = newValue}
+  }
+  /// Returns true if `teamID` has been explicitly set.
+  public var hasTeamID: Bool {_storage._teamID != nil}
+  /// Clears the value of `teamID`. Subsequent reads from it will return its default value.
+  public mutating func clearTeamID() {_uniqueStorage()._teamID = nil}
+
+  public var planningProjectID: String {
+    get {_storage._planningProjectID ?? String()}
+    set {_uniqueStorage()._planningProjectID = newValue}
+  }
+  /// Returns true if `planningProjectID` has been explicitly set.
+  public var hasPlanningProjectID: Bool {_storage._planningProjectID != nil}
+  /// Clears the value of `planningProjectID`. Subsequent reads from it will return its default value.
+  public mutating func clearPlanningProjectID() {_uniqueStorage()._planningProjectID = nil}
+
+  public var planningProjectName: String {
+    get {_storage._planningProjectName ?? String()}
+    set {_uniqueStorage()._planningProjectName = newValue}
+  }
+  /// Returns true if `planningProjectName` has been explicitly set.
+  public var hasPlanningProjectName: Bool {_storage._planningProjectName != nil}
+  /// Clears the value of `planningProjectName`. Subsequent reads from it will return its default value.
+  public mutating func clearPlanningProjectName() {_uniqueStorage()._planningProjectName = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated enum ExecutionReadiness: SwiftProtobuf.Enum, Swift.CaseIterable {
@@ -2059,7 +2095,7 @@ nonisolated extension BriarAPI_IssueDependencyReference: SwiftProtobuf.Message, 
 
 nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DashboardRun"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}run_number\0\u{3}current_attempt\0\u{3}current_revision\0\u{3}source_key\0\u{3}source_created_at\0\u{1}title\0\u{1}status\0\u{3}workflow_stage\0\u{1}workflow\0\u{3}paused_at\0\u{3}resume_requested_at\0\u{1}checkpoint\0\u{1}progress\0\u{1}detail\0\u{1}priority\0\u{1}difficulty\0\u{3}assignee_user_id\0\u{3}created_by_user_id\0\u{1}subscribers\0\u{3}issue_description\0\u{3}related_message\0\u{1}attachments\0\u{1}prerequisites\0\u{1}dependents\0\u{3}execution_readiness\0\u{3}waiting_on_prerequisite_count\0\u{3}result_summary\0\u{3}structured_result\0\u{3}result_reviews\0\u{3}pull_request_urls\0\u{1}branch\0\u{3}commit_sha\0\u{3}preferred_provider\0\u{3}preferred_model\0\u{3}preferred_effort\0\u{3}full_auto\0\u{3}requested_provider\0\u{3}requested_model\0\u{3}requested_effort\0\u{3}requested_worker_id\0\u{3}requested_by_user_id\0\u{3}dispatch_mode\0\u{3}dispatched_at\0\u{3}claimed_by\0\u{3}claimed_at\0\u{3}worker_id\0\u{3}started_at\0\u{3}updated_at\0\u{3}completed_at\0\u{3}last_event_at\0\u{3}event_count\0\u{1}source\0\u{1}repository\0\u{1}tracker\0\u{3}waiting_checkpoint\0\u{3}issue_checkpoints\0\u{3}execution_metrics\0\u{3}target_sha\0\u{3}staging_qa_status\0\u{3}production_qa_status\0\u{3}staging_qa_detail\0\u{3}production_qa_detail\0\u{4}\u{2}lease_expires_at\0\u{3}claim_attempts\0\u{3}agent_id\0\u{b}context\0\u{c}@\u{1}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}run_number\0\u{3}current_attempt\0\u{3}current_revision\0\u{3}source_key\0\u{3}source_created_at\0\u{1}title\0\u{1}status\0\u{3}workflow_stage\0\u{1}workflow\0\u{3}paused_at\0\u{3}resume_requested_at\0\u{1}checkpoint\0\u{1}progress\0\u{1}detail\0\u{1}priority\0\u{1}difficulty\0\u{3}assignee_user_id\0\u{3}created_by_user_id\0\u{1}subscribers\0\u{3}issue_description\0\u{3}related_message\0\u{1}attachments\0\u{1}prerequisites\0\u{1}dependents\0\u{3}execution_readiness\0\u{3}waiting_on_prerequisite_count\0\u{3}result_summary\0\u{3}structured_result\0\u{3}result_reviews\0\u{3}pull_request_urls\0\u{1}branch\0\u{3}commit_sha\0\u{3}preferred_provider\0\u{3}preferred_model\0\u{3}preferred_effort\0\u{3}full_auto\0\u{3}requested_provider\0\u{3}requested_model\0\u{3}requested_effort\0\u{3}requested_worker_id\0\u{3}requested_by_user_id\0\u{3}dispatch_mode\0\u{3}dispatched_at\0\u{3}claimed_by\0\u{3}claimed_at\0\u{3}worker_id\0\u{3}started_at\0\u{3}updated_at\0\u{3}completed_at\0\u{3}last_event_at\0\u{3}event_count\0\u{1}source\0\u{1}repository\0\u{1}tracker\0\u{3}waiting_checkpoint\0\u{3}issue_checkpoints\0\u{3}execution_metrics\0\u{3}target_sha\0\u{3}staging_qa_status\0\u{3}production_qa_status\0\u{3}staging_qa_detail\0\u{3}production_qa_detail\0\u{4}\u{2}lease_expires_at\0\u{3}claim_attempts\0\u{3}agent_id\0\u{3}workspace_id\0\u{3}team_id\0\u{3}planning_project_id\0\u{3}planning_project_name\0\u{b}context\0\u{c}@\u{1}\u{1}")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -2128,6 +2164,10 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
     var _leaseExpiresAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _claimAttempts: UInt32 = 0
     var _agentID: String? = nil
+    var _workspaceID: String? = nil
+    var _teamID: String? = nil
+    var _planningProjectID: String? = nil
+    var _planningProjectName: String? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -2204,6 +2244,10 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
       _leaseExpiresAt = source._leaseExpiresAt
       _claimAttempts = source._claimAttempts
       _agentID = source._agentID
+      _workspaceID = source._workspaceID
+      _teamID = source._teamID
+      _planningProjectID = source._planningProjectID
+      _planningProjectName = source._planningProjectName
     }
   }
 
@@ -2288,6 +2332,10 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
         case 65: try { try decoder.decodeSingularMessageField(value: &_storage._leaseExpiresAt) }()
         case 66: try { try decoder.decodeSingularUInt32Field(value: &_storage._claimAttempts) }()
         case 67: try { try decoder.decodeSingularStringField(value: &_storage._agentID) }()
+        case 68: try { try decoder.decodeSingularStringField(value: &_storage._workspaceID) }()
+        case 69: try { try decoder.decodeSingularStringField(value: &_storage._teamID) }()
+        case 70: try { try decoder.decodeSingularStringField(value: &_storage._planningProjectID) }()
+        case 71: try { try decoder.decodeSingularStringField(value: &_storage._planningProjectName) }()
         default: break
         }
       }
@@ -2498,6 +2546,18 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
       try { if let v = _storage._agentID {
         try visitor.visitSingularStringField(value: v, fieldNumber: 67)
       } }()
+      try { if let v = _storage._workspaceID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 68)
+      } }()
+      try { if let v = _storage._teamID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 69)
+      } }()
+      try { if let v = _storage._planningProjectID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 70)
+      } }()
+      try { if let v = _storage._planningProjectName {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 71)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -2573,6 +2633,10 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
         if _storage._leaseExpiresAt != rhs_storage._leaseExpiresAt {return false}
         if _storage._claimAttempts != rhs_storage._claimAttempts {return false}
         if _storage._agentID != rhs_storage._agentID {return false}
+        if _storage._workspaceID != rhs_storage._workspaceID {return false}
+        if _storage._teamID != rhs_storage._teamID {return false}
+        if _storage._planningProjectID != rhs_storage._planningProjectID {return false}
+        if _storage._planningProjectName != rhs_storage._planningProjectName {return false}
         return true
       }
       if !storagesAreEqual {return false}

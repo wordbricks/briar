@@ -21,6 +21,11 @@ service ProjectService {
   rpc UpdateCheckpointPolicy(UpdateCheckpointPolicyRequest) returns (UpdateCheckpointPolicyResponse);
   rpc GetProjectExecutionWorkerPolicy(GetProjectExecutionWorkerPolicyRequest) returns (GetProjectExecutionWorkerPolicyResponse);
   rpc UpdateProjectExecutionWorkerPolicy(UpdateProjectExecutionWorkerPolicyRequest) returns (UpdateProjectExecutionWorkerPolicyResponse);
+  rpc ListTeamPlanningProjects(ListTeamPlanningProjectsRequest) returns (ListTeamPlanningProjectsResponse);
+  rpc CreatePlanningProject(CreatePlanningProjectRequest) returns (CreatePlanningProjectResponse);
+  rpc UpdatePlanningProject(UpdatePlanningProjectRequest) returns (UpdatePlanningProjectResponse);
+  rpc MoveIssueToPlanningProject(MoveIssueToPlanningProjectRequest) returns (MoveIssueToPlanningProjectResponse);
+  rpc ResolveIssueHierarchyLocation(ResolveIssueHierarchyLocationRequest) returns (ResolveIssueHierarchyLocationResponse);
 }
 
 message ListProjectsRequest {}
@@ -174,4 +179,115 @@ message Project {
   string organization_name = 7;
   ProjectRole role = 8;
   google.protobuf.Timestamp created_at = 9;
+}
+
+enum PlanningProjectStatus {
+  PLANNING_PROJECT_STATUS_UNSPECIFIED = 0;
+  PLANNING_PROJECT_STATUS_PLANNED = 1;
+  PLANNING_PROJECT_STATUS_ACTIVE = 2;
+  PLANNING_PROJECT_STATUS_COMPLETED = 3;
+  PLANNING_PROJECT_STATUS_CANCELLED = 4;
+}
+
+message PlanningProject {
+  string id = 1;
+  string workspace_id = 2;
+  string workspace_name = 3;
+  string team_id = 4;
+  string team_name = 5;
+  string name = 6;
+  string description = 7;
+  PlanningProjectStatus status = 8;
+  optional string lead_user_id = 9;
+  optional string lead_name = 10;
+  optional string start_date = 11;
+  optional string target_date = 12;
+  optional string icon = 13;
+  optional string color = 14;
+  int32 sort_order = 15;
+  bool is_default = 16;
+  ProjectRole role = 17;
+  google.protobuf.Timestamp created_at = 18;
+  google.protobuf.Timestamp updated_at = 19;
+}
+
+message ListTeamPlanningProjectsRequest {
+  string team_id = 1;
+}
+
+message ListTeamPlanningProjectsResponse {
+  repeated PlanningProject projects = 1;
+}
+
+message CreatePlanningProjectRequest {
+  string team_id = 1;
+  string name = 2;
+  optional string description = 3;
+  optional PlanningProjectStatus status = 4;
+  optional string lead_user_id = 5;
+  optional string start_date = 6;
+  optional string target_date = 7;
+  optional string icon = 8;
+  optional string color = 9;
+  optional int32 sort_order = 10;
+}
+
+message NullableStringUpdate {
+  oneof update {
+    string value = 1;
+    google.protobuf.Empty clear = 2;
+  }
+}
+
+message UpdatePlanningProjectRequest {
+  string project_id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  optional PlanningProjectStatus status = 4;
+  NullableStringUpdate lead_user_id = 5;
+  NullableStringUpdate start_date = 6;
+  NullableStringUpdate target_date = 7;
+  NullableStringUpdate icon = 8;
+  NullableStringUpdate color = 9;
+  optional int32 sort_order = 10;
+}
+
+message CreatePlanningProjectResponse {
+  PlanningProject project = 1;
+}
+
+message UpdatePlanningProjectResponse {
+  PlanningProject project = 1;
+}
+
+message MoveIssueToPlanningProjectRequest {
+  string source_project_id = 1;
+  string run_id = 2;
+  string target_project_id = 3;
+}
+
+message MoveIssueToPlanningProjectResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_MOVED = 1;
+    OUTCOME_SAME_PROJECT = 2;
+  }
+  Outcome outcome = 1;
+  string issue_id = 2;
+  string workspace_id = 3;
+  string team_id = 4;
+  string project_id = 5;
+}
+
+message ResolveIssueHierarchyLocationRequest {
+  string source_team_id = 1;
+  string run_id = 2;
+}
+
+message ResolveIssueHierarchyLocationResponse {
+  string run_id = 1;
+  string workspace_id = 2;
+  string team_id = 3;
+  string project_id = 4;
+  string project_name = 5;
 }

@@ -2211,7 +2211,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         { provider: "claude" as const },
       ]) {
         await expect(updateSkill(change)).rejects.toThrow(
-          "cannot change body or execution settings while queued or running direct Agent work",
+          "cannot change body or execution settings while queued or running",
         );
       }
 
@@ -2226,7 +2226,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         { effort: "high" as const },
       ]) {
         await expect(updateSkill(change)).rejects.toThrow(
-          "cannot change body or execution settings while queued or running direct Agent work",
+          "cannot change body or execution settings while queued or running",
         );
       }
 

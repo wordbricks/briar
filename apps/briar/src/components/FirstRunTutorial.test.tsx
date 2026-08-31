@@ -61,4 +61,26 @@ describe("FirstRunTutorial", () => {
 
     await cleanup();
   });
+
+  it("can start directly in the collaborator flow for invited roles", async () => {
+    const { cleanup, root } = mountTutorial();
+    await renderReactTestRoot(
+      root,
+      <FirstRunTutorial
+        initialPhase="collaborator-demo"
+        onCollaboratorComplete={() => undefined}
+        onDeveloperSelect={() => undefined}
+        open
+      />,
+    );
+
+    expect(document.body.textContent).toContain(
+      "팀의 작업을 검토하는 흐름을 살펴보세요",
+    );
+    expect(document.body.textContent).not.toContain(
+      "Briar를 어떻게 사용하고 싶으세요?",
+    );
+
+    await cleanup();
+  });
 });

@@ -169,7 +169,7 @@ describe("organization channels", () => {
       .run();
     await db
       .prepare(
-        `insert into briar_projects (
+        `insert into briar_teams (
            id, owner_user_id, name, agent_token_hash, organization_id,
            created_at, updated_at
          ) values (?, ?, 'Project', ?, ?, ?, ?)`,
@@ -192,7 +192,7 @@ describe("organization channels", () => {
     ).bind(deviceId, sha256Hex(contextWorkerToken), at(0)).run();
     await db.batch([
       db.prepare(
-        `insert into briar_projects (
+        `insert into briar_teams (
            id, owner_user_id, name, agent_token_hash, organization_id,
            created_at, updated_at
          ) values (?, ?, 'Other Project', ?, ?, ?, ?)`,

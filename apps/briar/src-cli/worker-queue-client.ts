@@ -77,6 +77,9 @@ export const workClaimIdentityToProto = (
 
 export type WorkerQueueClient = Client<typeof WorkerQueueService>;
 
+export const channelReplyClaimValidationError =
+  "Channel reply claim response validation failed. Update the Briar Worker and retry.";
+
 export function createWorkerQueueClient(
   apiUrl: string,
   token: string,
@@ -92,14 +95,70 @@ export function createWorkerQueueClient(
 export function createWorkerQueueOperations(client: WorkerQueueClient) {
   return {
     claimWork: async (input: {
+      organizationId: string;
       projectId: string;
       workerId: string;
       claimedBy: string;
       repliesOnly: boolean;
     }) => {
       const response = await client.claimWork(input);
+      let work: ClaimedWork | null = null;
+      if (response.work) {
+        try {
+          work = claimedWorkFromProto(response.work);
+        } catch (cause) {
+          const raw = response.work.work;
+          if (raw.case !== "channelReply") throw cause;
+          const scope = raw.value.scope?.scope;
+          const organizationId = scope?.case === "organization"
+            ? scope.value.organizationId
+            : scope?.case === "project"
+            ? scope.value.organizationId
+            : "";
+          if (
+            organizationId !== input.organizationId ||
+            !raw.value.workId ||
+            !raw.value.runId ||
+            !raw.value.claimToken
+          ) {
+            throw new Error(
+              `${channelReplyClaimValidationError} Failure was not reported because claim credentials are invalid.`,
+              { cause },
+            );
+          }
+          try {
+            await client.completeChannelReply({
+              requestId: crypto.randomUUID(),
+              projectId: input.projectId,
+              workerId: input.workerId,
+              work: {
+                workId: raw.value.workId,
+                runId: raw.value.runId,
+                claimToken: raw.value.claimToken,
+                work: {
+                  case: "channelReply",
+                  value: { organizationId },
+                },
+              },
+              outcome: {
+                case: "failure",
+                value: { error: channelReplyClaimValidationError },
+              },
+            }, { signal: AbortSignal.timeout(10_000) });
+          } catch {
+            throw new Error(
+              `${channelReplyClaimValidationError} Could not confirm failure reporting for reply ${raw.value.workId}.`,
+              { cause },
+            );
+          }
+          throw new Error(
+            `${channelReplyClaimValidationError} Reported failure for reply ${raw.value.workId}.`,
+            { cause },
+          );
+        }
+      }
       return {
-        work: response.work ? claimedWorkFromProto(response.work) : null,
+        work,
         retryAfterMs: response.retryAfterMs,
       };
     },

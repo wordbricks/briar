@@ -43,6 +43,21 @@ public protocol BriarAPI_ProjectServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
     func `updateProjectExecutionWorkerPolicy`(request: BriarAPI_UpdateProjectExecutionWorkerPolicyRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateProjectExecutionWorkerPolicyResponse>
+
+    @available(iOS 13, *)
+    func `listTeamPlanningProjects`(request: BriarAPI_ListTeamPlanningProjectsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListTeamPlanningProjectsResponse>
+
+    @available(iOS 13, *)
+    func `createPlanningProject`(request: BriarAPI_CreatePlanningProjectRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreatePlanningProjectResponse>
+
+    @available(iOS 13, *)
+    func `updatePlanningProject`(request: BriarAPI_UpdatePlanningProjectRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdatePlanningProjectResponse>
+
+    @available(iOS 13, *)
+    func `moveIssueToPlanningProject`(request: BriarAPI_MoveIssueToPlanningProjectRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_MoveIssueToPlanningProjectResponse>
+
+    @available(iOS 13, *)
+    func `resolveIssueHierarchyLocation`(request: BriarAPI_ResolveIssueHierarchyLocationRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ResolveIssueHierarchyLocationResponse>
 }
 
 /// Concrete implementation of `BriarAPI_ProjectServiceClientInterface`.
@@ -108,6 +123,31 @@ public final class BriarAPI_ProjectServiceClient: BriarAPI_ProjectServiceClientI
         return await self.client.unary(path: "/briar.app.v1.ProjectService/UpdateProjectExecutionWorkerPolicy", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
+    @available(iOS 13, *)
+    public func `listTeamPlanningProjects`(request: BriarAPI_ListTeamPlanningProjectsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListTeamPlanningProjectsResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/ListTeamPlanningProjects", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `createPlanningProject`(request: BriarAPI_CreatePlanningProjectRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreatePlanningProjectResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/CreatePlanningProject", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `updatePlanningProject`(request: BriarAPI_UpdatePlanningProjectRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdatePlanningProjectResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/UpdatePlanningProject", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `moveIssueToPlanningProject`(request: BriarAPI_MoveIssueToPlanningProjectRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_MoveIssueToPlanningProjectResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/MoveIssueToPlanningProject", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `resolveIssueHierarchyLocation`(request: BriarAPI_ResolveIssueHierarchyLocationRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ResolveIssueHierarchyLocationResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ProjectService/ResolveIssueHierarchyLocation", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
     public enum Metadata {
         public enum Methods {
             public static let listProjects = Connect.MethodSpec(name: "ListProjects", service: "briar.app.v1.ProjectService", type: .unary)
@@ -121,6 +161,11 @@ public final class BriarAPI_ProjectServiceClient: BriarAPI_ProjectServiceClientI
             public static let updateCheckpointPolicy = Connect.MethodSpec(name: "UpdateCheckpointPolicy", service: "briar.app.v1.ProjectService", type: .unary)
             public static let getProjectExecutionWorkerPolicy = Connect.MethodSpec(name: "GetProjectExecutionWorkerPolicy", service: "briar.app.v1.ProjectService", type: .unary)
             public static let updateProjectExecutionWorkerPolicy = Connect.MethodSpec(name: "UpdateProjectExecutionWorkerPolicy", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let listTeamPlanningProjects = Connect.MethodSpec(name: "ListTeamPlanningProjects", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let createPlanningProject = Connect.MethodSpec(name: "CreatePlanningProject", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let updatePlanningProject = Connect.MethodSpec(name: "UpdatePlanningProject", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let moveIssueToPlanningProject = Connect.MethodSpec(name: "MoveIssueToPlanningProject", service: "briar.app.v1.ProjectService", type: .unary)
+            public static let resolveIssueHierarchyLocation = Connect.MethodSpec(name: "ResolveIssueHierarchyLocation", service: "briar.app.v1.ProjectService", type: .unary)
         }
     }
 }

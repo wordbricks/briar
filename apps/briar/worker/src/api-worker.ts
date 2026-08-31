@@ -44,6 +44,7 @@ import {
   json,
 } from "./http-response";
 import { handleAppConnectRequest } from "./app-connect";
+import { scheduleAgentSkillExecutionRealtimeFlush } from "./realtime-scheduling";
 
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 const bearerToken = (request: Request) => {
@@ -314,6 +315,10 @@ export default {
         }),
       );
       return json({ message: "Internal server error" }, 500);
+    } finally {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        scheduleAgentSkillExecutionRealtimeFlush(env, env.DB, ctx);
+      }
     }
   },
 } satisfies ExportedHandler<Env>;

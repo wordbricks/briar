@@ -543,7 +543,7 @@ export async function issueManagedComputerSetupSession(
     );
   }
   const project = await db.prepare(
-    `select id, organization_id from briar_projects where id = ?`,
+    `select id, organization_id from briar_teams where id = ?`,
   ).bind(input.projectId).first<{ id: string; organization_id: string }>();
   if (!project || project.organization_id !== input.organizationId) {
     throw new ManagedComputerServiceError(
@@ -733,7 +733,7 @@ export async function managedComputerSetupContext(
     requirePending: true,
   });
   const project = await db.prepare(
-    `select id, name from briar_projects
+    `select id, name from briar_teams
      where id = ? and organization_id = ?`,
   ).bind(session.project_id, input.organizationId).first<{
     id: string;

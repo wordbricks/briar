@@ -29,7 +29,7 @@ describe("merge queue profile", () => {
          ) values ('queue-org', 'queue-owner', 'owner', ?, ?)`,
       ).bind(observedAt, observedAt),
       ...[firstProject, secondProject].map((projectId, index) => db.prepare(
-        `insert into briar_projects (
+        `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, 'queue-owner', 'queue-org', ?, ?, ?, ?)`,

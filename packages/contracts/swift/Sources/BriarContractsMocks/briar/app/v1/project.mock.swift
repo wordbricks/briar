@@ -43,6 +43,16 @@ open class BriarAPI_ProjectServiceClientMock: BriarAPI_ProjectServiceClientInter
     public var mockAsyncGetProjectExecutionWorkerPolicy = { (_: BriarAPI_GetProjectExecutionWorkerPolicyRequest) -> ResponseMessage<BriarAPI_GetProjectExecutionWorkerPolicyResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `updateProjectExecutionWorkerPolicy()`.
     public var mockAsyncUpdateProjectExecutionWorkerPolicy = { (_: BriarAPI_UpdateProjectExecutionWorkerPolicyRequest) -> ResponseMessage<BriarAPI_UpdateProjectExecutionWorkerPolicyResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `listTeamPlanningProjects()`.
+    public var mockAsyncListTeamPlanningProjects = { (_: BriarAPI_ListTeamPlanningProjectsRequest) -> ResponseMessage<BriarAPI_ListTeamPlanningProjectsResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `createPlanningProject()`.
+    public var mockAsyncCreatePlanningProject = { (_: BriarAPI_CreatePlanningProjectRequest) -> ResponseMessage<BriarAPI_CreatePlanningProjectResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updatePlanningProject()`.
+    public var mockAsyncUpdatePlanningProject = { (_: BriarAPI_UpdatePlanningProjectRequest) -> ResponseMessage<BriarAPI_UpdatePlanningProjectResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `moveIssueToPlanningProject()`.
+    public var mockAsyncMoveIssueToPlanningProject = { (_: BriarAPI_MoveIssueToPlanningProjectRequest) -> ResponseMessage<BriarAPI_MoveIssueToPlanningProjectResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `resolveIssueHierarchyLocation()`.
+    public var mockAsyncResolveIssueHierarchyLocation = { (_: BriarAPI_ResolveIssueHierarchyLocationRequest) -> ResponseMessage<BriarAPI_ResolveIssueHierarchyLocationResponse> in .init(result: .success(.init())) }
 
     public init() {}
 
@@ -88,5 +98,25 @@ open class BriarAPI_ProjectServiceClientMock: BriarAPI_ProjectServiceClientInter
 
     open func `updateProjectExecutionWorkerPolicy`(request: BriarAPI_UpdateProjectExecutionWorkerPolicyRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateProjectExecutionWorkerPolicyResponse> {
         return self.mockAsyncUpdateProjectExecutionWorkerPolicy(request)
+    }
+
+    open func `listTeamPlanningProjects`(request: BriarAPI_ListTeamPlanningProjectsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListTeamPlanningProjectsResponse> {
+        return self.mockAsyncListTeamPlanningProjects(request)
+    }
+
+    open func `createPlanningProject`(request: BriarAPI_CreatePlanningProjectRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreatePlanningProjectResponse> {
+        return self.mockAsyncCreatePlanningProject(request)
+    }
+
+    open func `updatePlanningProject`(request: BriarAPI_UpdatePlanningProjectRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdatePlanningProjectResponse> {
+        return self.mockAsyncUpdatePlanningProject(request)
+    }
+
+    open func `moveIssueToPlanningProject`(request: BriarAPI_MoveIssueToPlanningProjectRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_MoveIssueToPlanningProjectResponse> {
+        return self.mockAsyncMoveIssueToPlanningProject(request)
+    }
+
+    open func `resolveIssueHierarchyLocation`(request: BriarAPI_ResolveIssueHierarchyLocationRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ResolveIssueHierarchyLocationResponse> {
+        return self.mockAsyncResolveIssueHierarchyLocation(request)
     }
 }

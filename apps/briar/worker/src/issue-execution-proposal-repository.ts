@@ -66,7 +66,7 @@ export async function createIssueExecutionProposal(
               run.id, ?, ?, run.id, run.title, run.updated_at,
               job.agent_id, null, null, ?, ?
        from briar_hunt_runs run
-       join briar_projects project on project.id = run.project_id
+       join briar_teams project on project.id = run.project_id
        join briar_issue_agent_reply_jobs job
          on job.project_id = run.project_id and job.run_id = run.id
         and job.trigger_message_id = ? and job.reply_message_id = ?
@@ -189,7 +189,7 @@ export async function reserveIssueExecutionProposalApproval(
          and exists (
            select 1
            from briar_hunt_runs run
-           join briar_projects project on project.id = run.project_id
+           join briar_teams project on project.id = run.project_id
            join briar_organization_members membership
              on membership.organization_id = project.organization_id
             and membership.user_id = ?

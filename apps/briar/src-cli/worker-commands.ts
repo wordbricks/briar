@@ -434,6 +434,7 @@ async function workerCommand() {
   const result = await runWorkerLoop<ClaimedWork>(
     {
       claim: async (_options) => workerQueue.claimWork({
+          organizationId: registered.organizationId,
           projectId: project.id,
           workerId,
           claimedBy: label,

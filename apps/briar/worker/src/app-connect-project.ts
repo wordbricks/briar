@@ -1,8 +1,15 @@
 import {
+  MoveIssueToPlanningProjectResponse_Outcome,
+  PlanningProjectSchema,
+  PlanningProjectStatus,
   ProjectExecutionWorkerPolicy_SelectionMode,
   ProjectService,
   UpdateCheckpointPolicyRequest_Scope,
 } from "@briar/contracts/gen/briar/app/v1/project_pb";
+import type { NullableStringUpdate } from "@briar/contracts/gen/briar/app/v1/project_pb";
+import { ProjectRole } from "@briar/contracts/gen/briar/app/v1/common_pb";
+import { create } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   WorkflowCheckpoint_Position,
   type AutoHuntWorkflow as AutoHuntWorkflowMessage,
@@ -30,6 +37,21 @@ import {
   appProjectSettings,
 } from "./app-connect-mappers";
 import { HttpError } from "./http-response";
+import { hasOrganizationCapability } from "./organization-access";
+import {
+  createPlanningProject,
+  getPlanningProjectForUser,
+  getTeamForUser,
+  listTeamProjects,
+  moveIssueWithinTeam,
+  resolveIssueHierarchyLocation,
+  updatePlanningProject,
+  type PlanningProjectRow,
+} from "./hierarchy-repository";
+import {
+  decodePlanningProjectCreateInput,
+  decodePlanningProjectUpdateInput,
+} from "./hierarchy-request-contract";
 import {
   getProjectExecutionWorkerPolicyApplication,
   ProjectConfigurationApplicationError,
@@ -79,6 +101,13 @@ export type AppConnectProjectServices = {
   readonly getExecutionWorkerPolicy:
     typeof getProjectExecutionWorkerPolicyApplication;
   readonly listProjects: typeof listProjects;
+  readonly listTeamProjects: typeof listTeamProjects;
+  readonly getPlanningProject: typeof getPlanningProjectForUser;
+  readonly getTeam: typeof getTeamForUser;
+  readonly createPlanningProject: typeof createPlanningProject;
+  readonly updatePlanningProject: typeof updatePlanningProject;
+  readonly moveIssueWithinTeam: typeof moveIssueWithinTeam;
+  readonly resolveIssueHierarchyLocation: typeof resolveIssueHierarchyLocation;
   readonly requireSession: typeof requireSession;
   readonly updateIcon: typeof updateProjectIconApplication;
   readonly updateCheckpointPolicy: typeof updateCheckpointPolicyApplication;
@@ -95,6 +124,13 @@ export const appConnectProjectServices: AppConnectProjectServices = {
   deleteProject: deleteProjectApplication,
   getExecutionWorkerPolicy: getProjectExecutionWorkerPolicyApplication,
   listProjects,
+  listTeamProjects,
+  getPlanningProject: getPlanningProjectForUser,
+  getTeam: getTeamForUser,
+  createPlanningProject,
+  updatePlanningProject,
+  moveIssueWithinTeam,
+  resolveIssueHierarchyLocation,
   requireSession,
   updateIcon: updateProjectIconApplication,
   updateCheckpointPolicy: updateCheckpointPolicyApplication,
@@ -106,6 +142,71 @@ export const appConnectProjectServices: AppConnectProjectServices = {
 
 const decodeUuid = decodeRequestSync(UuidString);
 const decodeRevision = decodeRequestSync(NonNegativeSafeInteger);
+
+const planningStatus = {
+  planned: PlanningProjectStatus.PLANNED,
+  active: PlanningProjectStatus.ACTIVE,
+  completed: PlanningProjectStatus.COMPLETED,
+  cancelled: PlanningProjectStatus.CANCELLED,
+} as const;
+
+const planningStatusFromProto = (value: PlanningProjectStatus) => {
+  switch (value) {
+    case PlanningProjectStatus.PLANNED: return "planned" as const;
+    case PlanningProjectStatus.ACTIVE: return "active" as const;
+    case PlanningProjectStatus.COMPLETED: return "completed" as const;
+    case PlanningProjectStatus.CANCELLED: return "cancelled" as const;
+    default: throw new ConnectError("planning project status is invalid", Code.InvalidArgument);
+  }
+};
+
+const role = {
+  owner: ProjectRole.OWNER,
+  "co-owner": ProjectRole.CO_OWNER,
+  developer: ProjectRole.DEVELOPER,
+  editor: ProjectRole.EDITOR,
+  viewer: ProjectRole.VIEWER,
+} as const;
+
+const validTimestamp = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error("Invalid planning project timestamp");
+  return timestampFromDate(date);
+};
+
+const planningProjectMessage = (row: PlanningProjectRow) =>
+  create(PlanningProjectSchema, {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    workspaceName: row.workspace_name,
+    teamId: row.team_id,
+    teamName: row.team_name,
+    name: row.name,
+    description: row.description,
+    status: planningStatus[row.status],
+    leadUserId: row.lead_user_id ?? undefined,
+    leadName: row.lead_name ?? undefined,
+    startDate: row.start_date ?? undefined,
+    targetDate: row.target_date ?? undefined,
+    icon: row.icon ?? undefined,
+    color: row.color ?? undefined,
+    sortOrder: row.sort_order,
+    isDefault: row.is_default !== 0,
+    role: role[row.role],
+    createdAt: validTimestamp(row.created_at),
+    updatedAt: validTimestamp(row.updated_at),
+  });
+
+const nullableUpdate = (value: NullableStringUpdate | undefined) => {
+  if (!value || value.update.case === undefined) return undefined;
+  return value.update.case === "value" ? value.update.value : null;
+};
+
+const requirePlanningWrite = (value: keyof typeof role) => {
+  if (!hasOrganizationCapability(value, "issues:write")) {
+    throw new HttpError(403, "Team project editing permission required");
+  }
+};
 
 const requiredMessage = <A>(value: A | undefined, field: string): A => {
   if (value === undefined) {
@@ -218,6 +319,108 @@ export const createAppProjectService = (
     const session = await services.requireSession(auth, request);
     const rows = await services.listProjects(db, session.user.id);
     return { projects: rows.map(appProject) };
+  },
+
+  listTeamPlanningProjects: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const team = await services.getTeam(db, decodeUuid(input.teamId), session.user.id);
+    if (!team) throw new HttpError(404, "Team not found");
+    const projects = await services.listTeamProjects(db, team.id, session.user.id);
+    return { projects: projects.map(planningProjectMessage) };
+  },
+
+  createPlanningProject: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const team = await services.getTeam(db, decodeUuid(input.teamId), session.user.id);
+    if (!team) throw new HttpError(404, "Team not found");
+    requirePlanningWrite(team.role);
+    const body = decodePlanningProjectCreateInput({
+      name: input.name,
+      description: input.description,
+      status: input.status === undefined ? undefined : planningStatusFromProto(input.status),
+      leadUserId: input.leadUserId,
+      startDate: input.startDate,
+      targetDate: input.targetDate,
+      icon: input.icon,
+      color: input.color,
+      sortOrder: input.sortOrder,
+    });
+    const projectId = await services.createPlanningProject(db, { teamId: team.id, ...body });
+    const project = await services.getPlanningProject(db, projectId, session.user.id);
+    if (!project) throw new Error("Created project is unavailable");
+    return { project: planningProjectMessage(project) };
+  },
+
+  updatePlanningProject: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const project = await services.getPlanningProject(db, decodeUuid(input.projectId), session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    requirePlanningWrite(project.role);
+    const body = decodePlanningProjectUpdateInput({
+      name: input.name,
+      description: input.description,
+      status: input.status === undefined ? undefined : planningStatusFromProto(input.status),
+      leadUserId: nullableUpdate(input.leadUserId),
+      startDate: nullableUpdate(input.startDate),
+      targetDate: nullableUpdate(input.targetDate),
+      icon: nullableUpdate(input.icon),
+      color: nullableUpdate(input.color),
+      sortOrder: input.sortOrder,
+    });
+    if (!(await services.updatePlanningProject(db, project.id, body))) {
+      throw new HttpError(409, "The Team default project must remain available");
+    }
+    const updated = await services.getPlanningProject(db, project.id, session.user.id);
+    if (!updated) throw new HttpError(404, "Project not found");
+    return { project: planningProjectMessage(updated) };
+  },
+
+  moveIssueToPlanningProject: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const source = await services.getPlanningProject(db, decodeUuid(input.sourceProjectId), session.user.id);
+    if (!source) throw new HttpError(404, "Project not found");
+    requirePlanningWrite(source.role);
+    const targetProjectId = decodeUuid(input.targetProjectId);
+    const runId = decodeUuid(input.runId);
+    const outcome = await services.moveIssueWithinTeam(db, {
+      sourceProjectId: source.id,
+      targetProjectId,
+      runId,
+      userId: session.user.id,
+    });
+    if (outcome === "not_found") throw new HttpError(404, "Issue not found");
+    if (outcome === "different_team") {
+      throw new HttpError(409, "Use a Team transfer to move an issue across repository boundaries", "ISSUE_TEAM_TRANSFER_REQUIRED");
+    }
+    const target = await services.getPlanningProject(db, targetProjectId, session.user.id);
+    if (!target) throw new HttpError(404, "Target project not found");
+    return {
+      outcome: outcome === "moved"
+        ? MoveIssueToPlanningProjectResponse_Outcome.MOVED
+        : MoveIssueToPlanningProjectResponse_Outcome.SAME_PROJECT,
+      issueId: runId,
+      workspaceId: target.workspace_id,
+      teamId: target.team_id,
+      projectId: target.id,
+    };
+  },
+
+  resolveIssueHierarchyLocation: async (input) => {
+    const session = await services.requireSession(auth, request);
+    const runId = decodeUuid(input.runId);
+    const location = await services.resolveIssueHierarchyLocation(db, {
+      sourceTeamId: decodeUuid(input.sourceTeamId),
+      runId,
+      userId: session.user.id,
+    });
+    if (!location) throw new HttpError(404, "Issue not found");
+    return {
+      runId,
+      workspaceId: location.workspace_id,
+      teamId: location.team_id,
+      projectId: location.project_id,
+      projectName: location.project_name,
+    };
   },
 
   createProject: async (input) => {

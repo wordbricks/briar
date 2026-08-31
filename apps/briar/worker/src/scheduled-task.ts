@@ -12,7 +12,10 @@ import {
   reconcileDrainingManagedComputers,
   reconcileManagedComputers,
 } from "./managed-computer-reconciliation";
-import { flushOrganizationInboxRealtimeOutbox } from "./realtime-scheduling";
+import {
+  flushAgentSkillExecutionRealtimeOutbox,
+  flushOrganizationInboxRealtimeOutbox,
+} from "./realtime-scheduling";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { cleanupExpiredChannelReplySessions } from "./channels";
 import { maintainUploadCleanup } from "./upload-repository";
@@ -71,7 +74,10 @@ export async function handleScheduledTask(
             observedAt,
           ),
         ]);
-        await flushOrganizationInboxRealtimeOutbox(env, env.DB);
+        await Promise.all([
+          flushOrganizationInboxRealtimeOutbox(env, env.DB),
+          flushAgentSkillExecutionRealtimeOutbox(env, env.DB),
+        ]);
         console.log(JSON.stringify({
           message: "Minute reconciliation completed",
           observedAt,
@@ -145,7 +151,10 @@ export async function handleScheduledTask(
           observedAt,
         ),
       ]);
-      await flushOrganizationInboxRealtimeOutbox(env, env.DB);
+      await Promise.all([
+        flushOrganizationInboxRealtimeOutbox(env, env.DB),
+        flushAgentSkillExecutionRealtimeOutbox(env, env.DB),
+      ]);
       if (dashboardChangePruneFailure !== null) {
         throw dashboardChangePruneFailure.error;
       }

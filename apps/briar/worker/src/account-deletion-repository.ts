@@ -17,7 +17,7 @@ export async function planAccountDeletion(
                from briar_organization_members peer
                where peer.organization_id = organization.id) as member_count,
               exists(
-                select 1 from briar_projects project
+                select 1 from briar_teams project
                 where project.organization_id = organization.id
                   and project.owner_user_id = ?
               ) as owns_project,
@@ -64,7 +64,7 @@ export async function planAccountDeletion(
   const projectResult = await db
     .prepare(
       `select distinct project.id
-       from briar_projects project
+       from briar_teams project
        where project.owner_user_id = ?
           or project.organization_id in (
             select membership.organization_id
@@ -134,7 +134,7 @@ export async function deleteAccountData(
                )
            )
            and not exists (
-             select 1 from briar_projects project
+             select 1 from briar_teams project
              where project.owner_user_id = account.id
                and not exists (
                  select 1
@@ -207,13 +207,13 @@ export async function deleteAccountData(
                      then current_project.id else stored_project.id end,
                 null, ?
          from briar_log_archives archive
-         left join briar_projects stored_project
+         left join briar_teams stored_project
            on stored_project.id = archive.project_id
          left join briar_account_deletion_job_organizations stored_scope
            on stored_scope.job_id = ?
           and stored_scope.organization_id = stored_project.organization_id
          left join briar_hunt_runs run on run.id = archive.run_id
-         left join briar_projects current_project
+         left join briar_teams current_project
            on current_project.id = run.project_id
          left join briar_account_deletion_job_organizations current_scope
            on current_scope.job_id = ?
@@ -235,13 +235,13 @@ export async function deleteAccountData(
          from briar_log_archives archive
          join json_each(archive.related_object_keys_json) related
            on related.type = 'text'
-         left join briar_projects stored_project
+         left join briar_teams stored_project
            on stored_project.id = archive.project_id
          left join briar_account_deletion_job_organizations stored_scope
            on stored_scope.job_id = ?
           and stored_scope.organization_id = stored_project.organization_id
          left join briar_hunt_runs run on run.id = archive.run_id
-         left join briar_projects current_project
+         left join briar_teams current_project
            on current_project.id = run.project_id
          left join briar_account_deletion_job_organizations current_scope
            on current_scope.job_id = ?
@@ -261,13 +261,13 @@ export async function deleteAccountData(
                      then current_project.id else stored_project.id end,
                 null, ?
          from briar_issue_attachments attachment
-         left join briar_projects stored_project
+         left join briar_teams stored_project
            on stored_project.id = attachment.project_id
          left join briar_account_deletion_job_organizations stored_scope
            on stored_scope.job_id = ?
           and stored_scope.organization_id = stored_project.organization_id
          left join briar_hunt_runs run on run.id = attachment.run_id
-         left join briar_projects current_project
+         left join briar_teams current_project
            on current_project.id = run.project_id
          left join briar_account_deletion_job_organizations current_scope
            on current_scope.job_id = ?
@@ -287,13 +287,13 @@ export async function deleteAccountData(
                      then current_project.id else stored_project.id end,
                 null, ?
          from briar_run_evidence_images image
-         left join briar_projects stored_project
+         left join briar_teams stored_project
            on stored_project.id = image.project_id
          left join briar_account_deletion_job_organizations stored_scope
            on stored_scope.job_id = ?
           and stored_scope.organization_id = stored_project.organization_id
          left join briar_hunt_runs run on run.id = image.run_id
-         left join briar_projects current_project
+         left join briar_teams current_project
            on current_project.id = run.project_id
          left join briar_account_deletion_job_organizations current_scope
            on current_scope.job_id = ?

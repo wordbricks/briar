@@ -14,7 +14,7 @@ describe("archive format v2 migration", () => {
     const archiveObjectKey = "logs/v1/archive-cutover.jsonl.gz";
     const relatedObjectKey = "run-evidence/archive-cutover.png";
     await applyD1Migrations(db, {
-      through: "0154_canonical_project_agent_schedule_recurrence.sql",
+      through: "0156_canonical_project_agent_schedule_recurrence.sql",
     });
     await executeD1Sql(db, `
       insert into "user" (
@@ -64,7 +64,7 @@ describe("archive format v2 migration", () => {
     `);
 
     await applyD1Migrations(db, {
-      files: ["0155_archive_format_v2.sql"],
+      files: ["0157_archive_format_v2.sql"],
     });
 
     expect(await db.prepare(

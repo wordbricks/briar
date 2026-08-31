@@ -32,6 +32,10 @@ struct InboxMessage: Identifiable, Equatable, Sendable {
     let kind: InboxMessageKind
     let projectId: UUID
     let projectName: String
+    var workspaceId: UUID? = nil
+    var teamId: UUID? = nil
+    var planningProjectId: UUID? = nil
+    var planningProjectName: String? = nil
     let targetId: String
     let title: String
     var occurredAt: Date

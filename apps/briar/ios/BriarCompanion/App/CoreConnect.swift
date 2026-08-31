@@ -273,6 +273,14 @@ extension DashboardRun {
 
         self.init(
             id: try coreUUID(message.id),
+            workspaceId: message.hasWorkspaceID ? try coreUUID(message.workspaceID) : nil,
+            teamId: message.hasTeamID ? try coreUUID(message.teamID) : nil,
+            projectId: message.hasPlanningProjectID
+                ? try coreUUID(message.planningProjectID)
+                : nil,
+            projectName: message.hasPlanningProjectName
+                ? message.planningProjectName
+                : nil,
             runNumber: try coreSafeInt(message.runNumber),
             currentAttempt: try coreSafeInt(message.currentAttempt),
             currentRevision: try coreSafeInt(message.currentRevision),
@@ -599,6 +607,14 @@ extension InboxMessage {
 
         let projectID = try coreUUID(identity.projectID)
         let occurredAt = try coreDate(identity.occurredAt)
+        let workspaceID = identity.hasWorkspaceID ? try coreUUID(identity.workspaceID) : nil
+        let teamID = identity.hasTeamID ? try coreUUID(identity.teamID) : nil
+        let planningProjectID = identity.hasPlanningProjectID
+            ? try coreUUID(identity.planningProjectID)
+            : nil
+        let planningProjectName = identity.hasPlanningProjectName
+            ? identity.planningProjectName
+            : nil
 
         switch message.content {
         case let .issue(issue):
@@ -608,6 +624,10 @@ extension InboxMessage {
                 kind: .issue,
                 projectId: projectID,
                 projectName: identity.projectName,
+                workspaceId: workspaceID,
+                teamId: teamID,
+                planningProjectId: planningProjectID,
+                planningProjectName: planningProjectName,
                 targetId: identity.targetID,
                 title: identity.title,
                 occurredAt: occurredAt,
@@ -631,6 +651,10 @@ extension InboxMessage {
                 kind: .conversation,
                 projectId: projectID,
                 projectName: identity.projectName,
+                workspaceId: workspaceID,
+                teamId: teamID,
+                planningProjectId: planningProjectID,
+                planningProjectName: planningProjectName,
                 targetId: identity.targetID,
                 title: identity.title,
                 occurredAt: occurredAt,
@@ -655,6 +679,10 @@ extension InboxMessage {
                 kind: .channel,
                 projectId: projectID,
                 projectName: identity.projectName,
+                workspaceId: workspaceID,
+                teamId: teamID,
+                planningProjectId: planningProjectID,
+                planningProjectName: planningProjectName,
                 targetId: identity.targetID,
                 title: "#\(channel.channelName)",
                 occurredAt: occurredAt,
@@ -685,6 +713,10 @@ extension InboxMessage {
                 kind: .session,
                 projectId: projectID,
                 projectName: identity.projectName,
+                workspaceId: workspaceID,
+                teamId: teamID,
+                planningProjectId: planningProjectID,
+                planningProjectName: planningProjectName,
                 targetId: identity.targetID,
                 title: identity.title,
                 occurredAt: occurredAt,

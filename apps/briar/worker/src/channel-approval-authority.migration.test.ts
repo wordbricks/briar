@@ -13,7 +13,7 @@ describe("channel approval authority cutover", () => {
     const db = env.DB;
     const now = "2026-09-01T00:00:00.000Z";
     await applyD1Migrations(db, {
-      through: "0161_canonical_agent_execution_metrics_storage.sql",
+      through: "0163_canonical_agent_execution_metrics_storage.sql",
     });
     await executeD1Sql(db, `
       insert into "user" (
@@ -191,7 +191,7 @@ describe("channel approval authority cutover", () => {
     ]);
 
     await applyD1Migrations(db, {
-      files: ["0163_canonical_hunt_run_execution_policy.sql"],
+      files: ["0165_canonical_hunt_run_execution_policy.sql"],
     });
 
     await expect(db.prepare(

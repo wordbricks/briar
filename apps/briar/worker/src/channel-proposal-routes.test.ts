@@ -174,7 +174,7 @@ describe("channel issue proposal approval route", () => {
       [otherProjectId, otherOrganizationId, "Other Project", "c"],
     ]) {
       await db.prepare(
-        `insert into briar_projects (
+        `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, ?, ?, ?, ?)`,

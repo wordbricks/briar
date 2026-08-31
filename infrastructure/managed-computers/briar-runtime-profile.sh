@@ -6,6 +6,9 @@
 if [ "${HOME:-}" = "/home/briar" ]; then
   export CARGO_HOME=/home/briar/.cargo
   export RUSTUP_HOME=/home/briar/.rustup
+  # gh waits for its browser launcher to exit before completing device auth.
+  # Keep this gh-specific and preserve an explicit user override.
+  export GH_BROWSER="${GH_BROWSER:-/opt/briar/bin/briar-open-browser}"
 else
   export CARGO_HOME=/opt/briar/cargo
   export RUSTUP_HOME=/opt/briar/rustup

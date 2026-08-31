@@ -232,6 +232,15 @@ public nonisolated struct BriarAPI_CreateIssueRequest: Sendable {
   /// for this exact project, client issue, and authenticated user.
   public var attachments: [BriarTypes_UploadReference] = []
 
+  public var planningProjectID: String {
+    get {_planningProjectID ?? String()}
+    set {_planningProjectID = newValue}
+  }
+  /// Returns true if `planningProjectID` has been explicitly set.
+  public var hasPlanningProjectID: Bool {self._planningProjectID != nil}
+  /// Clears the value of `planningProjectID`. Subsequent reads from it will return its default value.
+  public mutating func clearPlanningProjectID() {self._planningProjectID = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -243,6 +252,7 @@ public nonisolated struct BriarAPI_CreateIssueRequest: Sendable {
   fileprivate var _preferredProvider: BriarTypes_AgentProvider? = nil
   fileprivate var _preferredModel: String? = nil
   fileprivate var _preferredEffort: String? = nil
+  fileprivate var _planningProjectID: String? = nil
 }
 
 public nonisolated struct BriarAPI_CreateIssueResponse: Sendable {
@@ -3177,7 +3187,7 @@ nonisolated extension BriarAPI_PrepareIssueAttachmentsResponse: SwiftProtobuf.Me
 
 nonisolated extension BriarAPI_CreateIssueRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateIssueRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{2}\u{2}title\0\u{1}description\0\u{1}priority\0\u{1}difficulty\0\u{3}assignee_user_id\0\u{1}status\0\u{3}preferred_provider\0\u{3}preferred_model\0\u{3}preferred_effort\0\u{3}full_auto\0\u{2}\u{2}checkpoints\0\u{4}\u{2}client_issue_id\0\u{1}attachments\0\u{c}\u{2}\u{1}\u{c}\u{d}\u{1}\u{c}\u{f}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{2}\u{2}title\0\u{1}description\0\u{1}priority\0\u{1}difficulty\0\u{3}assignee_user_id\0\u{1}status\0\u{3}preferred_provider\0\u{3}preferred_model\0\u{3}preferred_effort\0\u{3}full_auto\0\u{2}\u{2}checkpoints\0\u{4}\u{2}client_issue_id\0\u{1}attachments\0\u{3}planning_project_id\0\u{c}\u{2}\u{1}\u{c}\u{d}\u{1}\u{c}\u{f}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3199,6 +3209,7 @@ nonisolated extension BriarAPI_CreateIssueRequest: SwiftProtobuf.Message, SwiftP
       case 14: try { try decoder.decodeRepeatedMessageField(value: &self.checkpoints) }()
       case 16: try { try decoder.decodeSingularStringField(value: &self.clientIssueID) }()
       case 17: try { try decoder.decodeRepeatedMessageField(value: &self.attachments) }()
+      case 18: try { try decoder.decodeSingularStringField(value: &self._planningProjectID) }()
       default: break
       }
     }
@@ -3251,6 +3262,9 @@ nonisolated extension BriarAPI_CreateIssueRequest: SwiftProtobuf.Message, SwiftP
     if !self.attachments.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.attachments, fieldNumber: 17)
     }
+    try { if let v = self._planningProjectID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 18)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -3269,6 +3283,7 @@ nonisolated extension BriarAPI_CreateIssueRequest: SwiftProtobuf.Message, SwiftP
     if lhs.checkpoints != rhs.checkpoints {return false}
     if lhs.clientIssueID != rhs.clientIssueID {return false}
     if lhs.attachments != rhs.attachments {return false}
+    if lhs._planningProjectID != rhs._planningProjectID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

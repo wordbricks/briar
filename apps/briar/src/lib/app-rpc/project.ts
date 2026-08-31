@@ -1,10 +1,15 @@
 import { createClient } from "@connectrpc/connect";
 import {
+  MoveIssueToPlanningProjectResponse_Outcome,
+  PlanningProjectStatus as PlanningProjectStatusMessage,
   ProjectService,
   UpdateCheckpointPolicyRequest_Scope,
+  type PlanningProject as PlanningProjectMessage,
   type Project as ProjectMessage,
 } from "@briar/contracts/gen/briar/app/v1/project_pb";
 import type {
+  PlanningProject,
+  PlanningProjectStatus,
   Project,
   ProjectExecutionWorkerPolicy,
   ProjectSettings,
@@ -48,6 +53,148 @@ export const projectFromMessage = (project: ProjectMessage): Project => ({
   role: projectRoleFromProto(project.role),
   createdAt: requiredTimestamp(project.createdAt, "project.createdAt"),
 });
+
+const planningStatusFromProto = (
+  value: PlanningProjectStatusMessage,
+): PlanningProjectStatus => {
+  switch (value) {
+    case PlanningProjectStatusMessage.PLANNED: return "planned";
+    case PlanningProjectStatusMessage.ACTIVE: return "active";
+    case PlanningProjectStatusMessage.COMPLETED: return "completed";
+    case PlanningProjectStatusMessage.CANCELLED: return "cancelled";
+    default: throw new Error("Planning project status is invalid");
+  }
+};
+
+const planningStatusToProto = (
+  value: PlanningProjectStatus,
+): PlanningProjectStatusMessage => ({
+  planned: PlanningProjectStatusMessage.PLANNED,
+  active: PlanningProjectStatusMessage.ACTIVE,
+  completed: PlanningProjectStatusMessage.COMPLETED,
+  cancelled: PlanningProjectStatusMessage.CANCELLED,
+})[value];
+
+const planningProjectFromMessage = (
+  project: PlanningProjectMessage,
+): PlanningProject => ({
+  id: project.id,
+  workspaceId: project.workspaceId,
+  workspaceName: project.workspaceName,
+  teamId: project.teamId,
+  teamName: project.teamName,
+  name: project.name,
+  description: project.description,
+  status: planningStatusFromProto(project.status),
+  leadUserId: project.leadUserId ?? null,
+  leadName: project.leadName ?? null,
+  startDate: project.startDate ?? null,
+  targetDate: project.targetDate ?? null,
+  icon: project.icon ?? null,
+  color: project.color ?? null,
+  sortOrder: project.sortOrder,
+  isDefault: project.isDefault,
+  role: projectRoleFromProto(project.role),
+  createdAt: requiredTimestamp(project.createdAt, "planningProject.createdAt"),
+  updatedAt: requiredTimestamp(project.updatedAt, "planningProject.updatedAt"),
+});
+
+const nullableUpdate = (value: string | null | undefined) =>
+  value === undefined
+    ? undefined
+    : { update: value === null
+      ? { case: "clear" as const, value: {} }
+      : { case: "value" as const, value } };
+
+export async function loadTeamProjects(token: string, teamId: string) {
+  const response = await requireProjectClient().listTeamPlanningProjects(
+    { teamId },
+    appCallOptions(token),
+  );
+  return response.projects.map(planningProjectFromMessage);
+}
+
+export async function createPlanningProject(
+  token: string,
+  teamId: string,
+  input: {
+    name: string;
+    description?: string;
+    status?: PlanningProjectStatus;
+    leadUserId?: string;
+    startDate?: string;
+    targetDate?: string;
+    icon?: string;
+    color?: string;
+    sortOrder?: number;
+  },
+) {
+  const response = await requireProjectClient().createPlanningProject({
+    teamId,
+    ...input,
+    status: input.status === undefined ? undefined : planningStatusToProto(input.status),
+  }, appCallOptions(token));
+  return planningProjectFromMessage(requiredMessage(response.project, "createPlanningProject.project"));
+}
+
+export async function updatePlanningProject(
+  token: string,
+  projectId: string,
+  input: Partial<{
+    name: string;
+    description: string;
+    status: PlanningProjectStatus;
+    leadUserId: string | null;
+    startDate: string | null;
+    targetDate: string | null;
+    icon: string | null;
+    color: string | null;
+    sortOrder: number;
+  }>,
+) {
+  const response = await requireProjectClient().updatePlanningProject({
+    projectId,
+    name: input.name,
+    description: input.description,
+    status: input.status === undefined ? undefined : planningStatusToProto(input.status),
+    leadUserId: nullableUpdate(input.leadUserId),
+    startDate: nullableUpdate(input.startDate),
+    targetDate: nullableUpdate(input.targetDate),
+    icon: nullableUpdate(input.icon),
+    color: nullableUpdate(input.color),
+    sortOrder: input.sortOrder,
+  }, appCallOptions(token));
+  return planningProjectFromMessage(requiredMessage(response.project, "updatePlanningProject.project"));
+}
+
+export async function moveIssueToPlanningProject(
+  token: string,
+  sourceProjectId: string,
+  runId: string,
+  targetProjectId: string,
+) {
+  const response = await requireProjectClient().moveIssueToPlanningProject(
+    { sourceProjectId, runId, targetProjectId },
+    appCallOptions(token),
+  );
+  const outcome = response.outcome === MoveIssueToPlanningProjectResponse_Outcome.MOVED
+    ? "moved" as const
+    : response.outcome === MoveIssueToPlanningProjectResponse_Outcome.SAME_PROJECT
+    ? "same_project" as const
+    : (() => { throw new Error("Issue project move outcome is invalid"); })();
+  return { ...response, outcome };
+}
+
+export async function resolveIssueHierarchyLocation(
+  token: string,
+  sourceTeamId: string,
+  runId: string,
+) {
+  return requireProjectClient().resolveIssueHierarchyLocation(
+    { sourceTeamId, runId },
+    appCallOptions(token),
+  );
+}
 
 export async function listProjects(
   token: string,

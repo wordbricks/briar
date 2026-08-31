@@ -14,7 +14,9 @@ final class IssueMutationStore: ObservableObject {
 
     private let preparedUploadClient: any PreparedUploadClientProtocol
     private let issueService: any BriarAPI_IssueServiceClientInterface
+    private let projectService: any BriarAPI_ProjectServiceClientInterface
     private let projectID: UUID
+    private let planningProjectID: UUID?
     private let requestID: @Sendable () -> UUID
     private let attachmentReference: @Sendable () -> String
     private var pendingRequestIDs: [String: UUID] = [:]
@@ -22,7 +24,9 @@ final class IssueMutationStore: ObservableObject {
     init(
         preparedUploadClient: any PreparedUploadClientProtocol,
         issueService: any BriarAPI_IssueServiceClientInterface,
+        projectService: any BriarAPI_ProjectServiceClientInterface,
         projectID: UUID,
+        planningProjectID: UUID? = nil,
         requestID: @escaping @Sendable () -> UUID = UUID.init,
         attachmentReference: @escaping @Sendable () -> String = {
             UUID().uuidString.lowercased()
@@ -30,7 +34,9 @@ final class IssueMutationStore: ObservableObject {
     ) {
         self.preparedUploadClient = preparedUploadClient
         self.issueService = issueService
+        self.projectService = projectService
         self.projectID = projectID
+        self.planningProjectID = planningProjectID
         self.requestID = requestID
         self.attachmentReference = attachmentReference
     }
@@ -94,13 +100,17 @@ final class IssueMutationStore: ObservableObject {
             } else if !clientIDs.isEmpty {
                 throw MobileAPIError.invalidRequest
             }
-            let response = try await issueService.createIssue(
-                request: issueCreateRequest(
+            var request = try issueCreateRequest(
                     projectID: projectID,
                     clientIssueID: clientIssueID,
                     draft: normalizedDraft,
                     attachments: uploadReferences
-                ),
+                )
+            if let planningProjectID {
+                request.planningProjectID = coreUUIDString(planningProjectID)
+            }
+            let response = try await issueService.createIssue(
+                request: request,
                 headers: [:]
             ).briarValue()
             guard try issueUUID(response.runID) == clientIssueID else {
@@ -242,6 +252,29 @@ final class IssueMutationStore: ObservableObject {
             else { throw MobileAPIError.invalidResponse }
             switch message.outcome {
             case .transferred, .alreadyTransferred:
+                break
+            case .unspecified, .UNRECOGNIZED:
+                throw MobileAPIError.invalidResponse
+            }
+        }
+    }
+
+    func moveIssueProject(
+        runID: UUID,
+        sourceProjectID: UUID,
+        targetProjectID: UUID
+    ) async throws {
+        try await perform("move-project-\(runID)") {
+            var request = BriarAPI_MoveIssueToPlanningProjectRequest()
+            request.sourceProjectID = coreUUIDString(sourceProjectID)
+            request.runID = coreUUIDString(runID)
+            request.targetProjectID = coreUUIDString(targetProjectID)
+            let response = try await projectService.moveIssueToPlanningProject(
+                request: request,
+                headers: [:]
+            ).briarValue()
+            switch response.outcome {
+            case .moved, .sameProject:
                 break
             case .unspecified, .UNRECOGNIZED:
                 throw MobileAPIError.invalidResponse

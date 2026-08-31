@@ -33,7 +33,7 @@ describe("workflow checkpoint storage migration", () => {
     }]);
 
     await applyD1Migrations(db, {
-      through: "0157_canonical_channel_message_blocks.sql",
+      through: "0159_canonical_channel_message_blocks.sql",
     });
     await executeD1Sql(db, `
       insert into "user" (
@@ -103,7 +103,7 @@ describe("workflow checkpoint storage migration", () => {
        set mandatory_checkpoints_json = ? where project_id = ?`,
     ).bind(legacyProjectCheckpoint, "checkpoint-project").run();
     await expect(applyD1Migrations(db, {
-      files: ["0158_canonical_workflow_checkpoint_storage.sql"],
+      files: ["0160_canonical_workflow_checkpoint_storage.sql"],
     })).rejects.toThrow(/canonical shape/iu);
 
     await db.prepare(
@@ -118,14 +118,14 @@ describe("workflow checkpoint storage migration", () => {
       `update briar_hunt_runs set issue_checkpoints_json = ? where id = ?`,
     ).bind(legacyIssueCheckpoint, runId).run();
     await expect(applyD1Migrations(db, {
-      files: ["0158_canonical_workflow_checkpoint_storage.sql"],
+      files: ["0160_canonical_workflow_checkpoint_storage.sql"],
     })).rejects.toThrow(/canonical shape/iu);
 
     await db.prepare(
       `update briar_hunt_runs set issue_checkpoints_json = ? where id = ?`,
     ).bind(issueCheckpoint, runId).run();
     await applyD1Migrations(db, {
-      files: ["0158_canonical_workflow_checkpoint_storage.sql"],
+      files: ["0160_canonical_workflow_checkpoint_storage.sql"],
     });
 
     expect((await db.prepare(

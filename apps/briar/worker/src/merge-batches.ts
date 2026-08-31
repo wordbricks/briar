@@ -219,7 +219,7 @@ const currentReadyCandidate = (
       and run.commit_sha = ${candidate}.frozen_head_sha
       and exists (
         select 1
-        from briar_projects project
+        from briar_teams project
         join briar_github_connections connection
           on connection.organization_id = project.organization_id
          and connection.installation_id = link.installation_id
@@ -729,7 +729,7 @@ export async function registerReadyMergeCandidates(
        and run.commit_sha = link.head_sha
        and exists (
          select 1
-         from briar_projects project
+         from briar_teams project
          join briar_github_connections connection
            on connection.organization_id = project.organization_id
           and connection.installation_id = link.installation_id

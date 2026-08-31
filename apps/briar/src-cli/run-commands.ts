@@ -12,6 +12,8 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   CancelRunResponseSchema,
   CreateIssueResponseSchema,
+  UpdateIssueResponseSchema,
+  type UpdateIssueResponse,
   IssueService,
   ListRunEvidenceResponseSchema,
   RunEvidence_Status,
@@ -20,7 +22,9 @@ import {
   RetryRunResponseSchema,
   SetIssueDependencyResponseSchema,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
-import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
+import { IssueDifficulty, RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
+import { DashboardService } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+import { ProjectService } from "@briar/contracts/gen/briar/app/v1/project_pb";
 import {
   RecordRunEvidenceRequestSchema,
   RecordRunEvidenceResponseSchema,
@@ -41,9 +45,11 @@ import {
 } from "./github-pr";
 import {
   decodeCreateIssueInput,
+  decodeIssueUpdateChanges,
   decodeUuid,
   decodeWorkflowStageId,
 } from "./command-contract";
+import type { Config, ProjectConfig } from "./config-contract";
 import {
   executionToken,
   values,
@@ -74,6 +80,26 @@ async function optionalText(valueFlag: string, fileFlag: string) {
   const path = value(fileFlag);
   if (path) return readFile(resolve(path), "utf8");
   return value(valueFlag) ?? null;
+}
+
+export async function resolveIssueCreationProjectId(input: {
+  configuredProjectId?: string;
+  loadProjects: () => Promise<Array<{ id: string; isDefault: boolean }>>;
+}) {
+  const projects = await input.loadProjects();
+  if (
+    input.configuredProjectId &&
+    !projects.some((candidate) => candidate.id === input.configuredProjectId)
+  ) {
+    throw new Error("선택한 Project가 현재 Team에 속하지 않습니다.");
+  }
+  const projectId = input.configuredProjectId ??
+    projects.find((candidate) => candidate.isDefault)?.id ??
+    (projects.length === 1 ? projects[0]?.id : undefined);
+  if (!projectId) {
+    throw new Error("--project <id>를 지정하거나 Team의 기본 Project를 설정하세요.");
+  }
+  return projectId;
 }
 
 const jsonObject = (value: string, label: string): JsonObject => {
@@ -136,6 +162,16 @@ async function createIssueCommand() {
   const config = await loadConfig();
   if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
   const project = await currentProject(config);
+  const projectClient = createAuthenticatedConnectClient(
+    ProjectService,
+    config.apiUrl,
+    config.userToken,
+  );
+  const planningProjectId = await resolveIssueCreationProjectId({
+    configuredProjectId: value("--project")?.trim(),
+    loadProjects: async () =>
+      (await projectClient.listTeamPlanningProjects({ teamId: project.id })).projects,
+  });
   const priorityValue = value("--priority");
   const input = decodeCreateIssueInput({
     title: required("--title"),
@@ -149,7 +185,7 @@ async function createIssueCommand() {
     config.userToken,
   ).createIssue(
     {
-      projectId: project.id,
+      projectId: planningProjectId,
       title: input.title,
       description: input.description ?? undefined,
       priority: input.priority ?? undefined,
@@ -159,6 +195,158 @@ async function createIssueCommand() {
     },
   );
   console.log(toJsonString(CreateIssueResponseSchema, result));
+}
+
+export type IssueUpdateCommandInput = {
+  runId: string;
+  title?: string;
+  description?: string;
+  descriptionFile?: string;
+  clearDescription: boolean;
+  priority?: number;
+  clearPriority: boolean;
+  difficulty?: string;
+  clearDifficulty: boolean;
+  assigneeUserId?: string;
+  clearAssignee: boolean;
+};
+
+type IssueUpdateState = {
+  title: string;
+  description: string | null;
+  priority: number | null;
+  difficulty: "easy" | "normal" | "hard" | null;
+  assigneeUserId: string | null;
+};
+
+export type IssueUpdateCommandDependencies = {
+  loadConfig: () => Promise<Config>;
+  currentProject: (config: Config) => Promise<ProjectConfig>;
+  loadRun: (config: Config, project: ProjectConfig, runId: string) => Promise<IssueUpdateState | undefined>;
+  updateRun: (
+    config: Config,
+    project: ProjectConfig,
+    runId: string,
+    input: IssueUpdateState,
+  ) => Promise<UpdateIssueResponse>;
+  readFile: (path: string, encoding: "utf8") => Promise<string>;
+  writeLine: (line: string) => void;
+};
+
+const difficultyFromProto = (value: IssueDifficulty) => {
+  switch (value) {
+    case IssueDifficulty.EASY: return "easy" as const;
+    case IssueDifficulty.NORMAL: return "normal" as const;
+    case IssueDifficulty.HARD: return "hard" as const;
+    default: return null;
+  }
+};
+
+const difficultyToProto = (value: IssueUpdateState["difficulty"]) => {
+  switch (value) {
+    case "easy": return IssueDifficulty.EASY;
+    case "normal": return IssueDifficulty.NORMAL;
+    case "hard": return IssueDifficulty.HARD;
+    case null: return undefined;
+  }
+};
+
+const defaultIssueUpdateCommandDependencies: IssueUpdateCommandDependencies = {
+  loadConfig,
+  currentProject,
+  loadRun: async (config, project, runId) => {
+    if (!config.userToken) return undefined;
+    const response = await createAuthenticatedConnectClient(
+      DashboardService,
+      config.apiUrl,
+      config.userToken,
+    ).getDashboard({ projectId: project.id });
+    const run = response.runs.find((candidate) => candidate.id === runId);
+    return run && {
+      title: run.title,
+      description: run.issueDescription ?? null,
+      priority: run.priority ?? null,
+      difficulty: difficultyFromProto(run.difficulty ?? IssueDifficulty.UNSPECIFIED),
+      assigneeUserId: run.assigneeUserId ?? null,
+    };
+  },
+  updateRun: async (config, project, runId, input) => {
+    if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+    return createAuthenticatedConnectClient(
+      IssueService,
+      config.apiUrl,
+      config.userToken,
+    ).updateIssue({
+      projectId: project.id,
+      runId,
+      title: input.title,
+      description: input.description ?? undefined,
+      priority: input.priority ?? undefined,
+      difficulty: difficultyToProto(input.difficulty),
+      assigneeUpdate: input.assigneeUserId === null
+        ? { case: "clearAssignee", value: {} }
+        : { case: "assigneeUserId", value: input.assigneeUserId },
+      requestId: crypto.randomUUID(),
+      attachments: [],
+    });
+  },
+  readFile,
+  writeLine: (line) => console.log(line),
+};
+
+function assertExclusiveIssueUpdateFlags(
+  selected: boolean,
+  cleared: boolean,
+  selectedFlags: string,
+  clearFlag: string,
+) {
+  if (selected && cleared) {
+    throw new Error(`${selectedFlags} cannot be combined with ${clearFlag}`);
+  }
+}
+
+async function updateIssueCommand(
+  command: IssueUpdateCommandInput,
+  dependencies: IssueUpdateCommandDependencies = defaultIssueUpdateCommandDependencies,
+) {
+  const runId = decodeUuid(command.runId);
+  if (command.description !== undefined && command.descriptionFile !== undefined) {
+    throw new Error("Use only one of --description and --description-file");
+  }
+  assertExclusiveIssueUpdateFlags(
+    command.description !== undefined || command.descriptionFile !== undefined,
+    command.clearDescription,
+    "--description or --description-file",
+    "--clear-description",
+  );
+  assertExclusiveIssueUpdateFlags(command.priority !== undefined, command.clearPriority, "--priority", "--clear-priority");
+  assertExclusiveIssueUpdateFlags(command.difficulty !== undefined, command.clearDifficulty, "--difficulty", "--clear-difficulty");
+  assertExclusiveIssueUpdateFlags(command.assigneeUserId !== undefined, command.clearAssignee, "--assignee-user-id", "--clear-assignee");
+
+  const changes = decodeIssueUpdateChanges({
+    ...(command.title === undefined ? undefined : { title: command.title }),
+    ...(command.clearDescription
+      ? { description: null }
+      : command.descriptionFile !== undefined
+      ? { description: await dependencies.readFile(resolve(command.descriptionFile), "utf8") }
+      : command.description === undefined ? undefined : { description: command.description }),
+    ...(command.clearPriority ? { priority: null } : command.priority === undefined ? undefined : { priority: command.priority }),
+    ...(command.clearDifficulty ? { difficulty: null } : command.difficulty === undefined ? undefined : { difficulty: command.difficulty }),
+    ...(command.clearAssignee ? { assigneeUserId: null } : command.assigneeUserId === undefined ? undefined : { assigneeUserId: command.assigneeUserId }),
+  });
+  const config = await dependencies.loadConfig();
+  if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+  const project = await dependencies.currentProject(config);
+  const current = await dependencies.loadRun(config, project, runId);
+  if (!current) throw new Error(`이슈를 찾지 못했습니다: ${runId}`);
+  const result = await dependencies.updateRun(config, project, runId, {
+    title: changes.title ?? current.title,
+    description: changes.description === undefined ? current.description : changes.description,
+    priority: changes.priority === undefined ? current.priority : changes.priority,
+    difficulty: changes.difficulty === undefined ? current.difficulty : changes.difficulty,
+    assigneeUserId: changes.assigneeUserId === undefined ? current.assigneeUserId : changes.assigneeUserId,
+  });
+  dependencies.writeLine(toJsonString(UpdateIssueResponseSchema, result));
 }
 
 async function changeIssueDependencyCommand(action: "add" | "remove") {
@@ -624,6 +812,7 @@ async function transitionWorkflowStage(action: "start" | "complete") {
 export {
   optionalText,
   createIssueCommand,
+  updateIssueCommand,
   changeIssueDependencyCommand,
   channelMessagesUsage,
   listChannelMessagesCommand,

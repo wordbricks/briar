@@ -262,6 +262,7 @@ for (const required of [
   "RUSTUP_HOME=/home/briar/.rustup",
   "BRIAR_CI_SERIAL_CONTEXTS=true",
   "VITEST_MAX_WORKERS=2",
+  'GH_BROWSER="${GH_BROWSER:-/opt/briar/bin/briar-open-browser}"',
   "/opt/briar/bin",
 ]) {
   if (!profile.includes(required)) fail(`runtime profile omits ${required}`);
@@ -391,6 +392,8 @@ if (!verifier.includes("command -v xfdesktop >/dev/null")) {
 }
 for (const required of [
   "test -x /opt/briar/bin/briar-open-browser",
+  "sudo -u briar -H bash -lc 'printf %s \"$GH_BROWSER\"'",
+  "GH_BROWSER=/opt/briar/bin/briar-open-browser",
 ]) {
   if (!verifier.includes(required)) {
     fail(`image verifier omits browser bridge check: ${required}`);
@@ -487,6 +490,12 @@ for (const unitName of [
   const unit = await text(join(image, unitName));
   if (unit.includes("[Install]")) {
     fail(`${unitName} must be started through briar-managed-computer.target`);
+  }
+  if (
+    unit.includes("User=briar\n") &&
+    !unit.includes("Environment=GH_BROWSER=/opt/briar/bin/briar-open-browser")
+  ) {
+    fail(`${unitName} must detach GitHub CLI browser launches`);
   }
 }
 

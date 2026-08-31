@@ -16513,6 +16513,66 @@ pub type OwnedUpdateProjectExecutionWorkerPolicyResponseView = ::buffa::view::Ow
         'static,
     >,
 >;
+///Shorthand for `OwnedView<ListTeamPlanningProjectsRequestView<'static>>`.
+pub type OwnedListTeamPlanningProjectsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListTeamPlanningProjectsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListTeamPlanningProjectsResponseView<'static>>`.
+pub type OwnedListTeamPlanningProjectsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListTeamPlanningProjectsResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreatePlanningProjectRequestView<'static>>`.
+pub type OwnedCreatePlanningProjectRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreatePlanningProjectRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreatePlanningProjectResponseView<'static>>`.
+pub type OwnedCreatePlanningProjectResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreatePlanningProjectResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdatePlanningProjectRequestView<'static>>`.
+pub type OwnedUpdatePlanningProjectRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdatePlanningProjectRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdatePlanningProjectResponseView<'static>>`.
+pub type OwnedUpdatePlanningProjectResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdatePlanningProjectResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<MoveIssueToPlanningProjectRequestView<'static>>`.
+pub type OwnedMoveIssueToPlanningProjectRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::MoveIssueToPlanningProjectRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<MoveIssueToPlanningProjectResponseView<'static>>`.
+pub type OwnedMoveIssueToPlanningProjectResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::MoveIssueToPlanningProjectResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ResolveIssueHierarchyLocationRequestView<'static>>`.
+pub type OwnedResolveIssueHierarchyLocationRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ResolveIssueHierarchyLocationRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ResolveIssueHierarchyLocationResponseView<'static>>`.
+pub type OwnedResolveIssueHierarchyLocationResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ResolveIssueHierarchyLocationResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListProjectsResponse>
 for crate::proto::briar::app::v1::__buffa::view::ListProjectsResponseView<'_> {
     fn encode(
@@ -16927,6 +16987,204 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ListTeamPlanningProjectsResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::ListTeamPlanningProjectsResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ListTeamPlanningProjectsResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListTeamPlanningProjectsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreatePlanningProjectResponse>
+for crate::proto::briar::app::v1::__buffa::view::CreatePlanningProjectResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreatePlanningProjectResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreatePlanningProjectResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdatePlanningProjectResponse>
+for crate::proto::briar::app::v1::__buffa::view::UpdatePlanningProjectResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdatePlanningProjectResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdatePlanningProjectResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::MoveIssueToPlanningProjectResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::MoveIssueToPlanningProjectResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::MoveIssueToPlanningProjectResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::MoveIssueToPlanningProjectResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ResolveIssueHierarchyLocationResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::ResolveIssueHierarchyLocationResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ResolveIssueHierarchyLocationResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ResolveIssueHierarchyLocationResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 /// Full service name for this service.
 pub const PROJECT_SERVICE_SERVICE_NAME: &str = "briar.app.v1.ProjectService";
 /// Static [`Spec`](::connectrpc::Spec) for the `ListProjects` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
@@ -16992,6 +17250,36 @@ pub const PROJECT_SERVICE_GET_PROJECT_EXECUTION_WORKER_POLICY_SPEC: ::connectrpc
 /// Static [`Spec`](::connectrpc::Spec) for the `UpdateProjectExecutionWorkerPolicy` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const PROJECT_SERVICE_UPDATE_PROJECT_EXECUTION_WORKER_POLICY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.ProjectService/UpdateProjectExecutionWorkerPolicy",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ListTeamPlanningProjects` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const PROJECT_SERVICE_LIST_TEAM_PLANNING_PROJECTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ProjectService/ListTeamPlanningProjects",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CreatePlanningProject` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const PROJECT_SERVICE_CREATE_PLANNING_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ProjectService/CreatePlanningProject",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdatePlanningProject` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const PROJECT_SERVICE_UPDATE_PLANNING_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ProjectService/UpdatePlanningProject",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `MoveIssueToPlanningProject` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const PROJECT_SERVICE_MOVE_ISSUE_TO_PLANNING_PROJECT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ProjectService/MoveIssueToPlanningProject",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ResolveIssueHierarchyLocation` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const PROJECT_SERVICE_RESOLVE_ISSUE_HIERARCHY_LOCATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ProjectService/ResolveIssueHierarchyLocation",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -17296,6 +17584,121 @@ pub trait ProjectService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::UpdateProjectExecutionWorkerPolicyResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ListTeamPlanningProjects RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_team_planning_projects<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ListTeamPlanningProjectsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ListTeamPlanningProjectsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the CreatePlanningProject RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_planning_project<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::CreatePlanningProjectRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::CreatePlanningProjectResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UpdatePlanningProject RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_planning_project<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdatePlanningProjectRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdatePlanningProjectResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the MoveIssueToPlanningProject RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn move_issue_to_planning_project<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::MoveIssueToPlanningProjectRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::MoveIssueToPlanningProjectResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ResolveIssueHierarchyLocation RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn resolve_issue_hierarchy_location<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ResolveIssueHierarchyLocationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ResolveIssueHierarchyLocationResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -17650,6 +18053,151 @@ impl<S: ProjectService> ProjectServiceExt for S {
                 },
             )
             .with_spec(PROJECT_SERVICE_UPDATE_PROJECT_EXECUTION_WORKER_POLICY_SPEC)
+            .route_view(
+                PROJECT_SERVICE_SERVICE_NAME,
+                "ListTeamPlanningProjects",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ListTeamPlanningProjectsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ListTeamPlanningProjectsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_team_planning_projects(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ListTeamPlanningProjectsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(PROJECT_SERVICE_LIST_TEAM_PLANNING_PROJECTS_SPEC)
+            .route_view(
+                PROJECT_SERVICE_SERVICE_NAME,
+                "CreatePlanningProject",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::CreatePlanningProjectRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::CreatePlanningProjectRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_planning_project(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::CreatePlanningProjectResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(PROJECT_SERVICE_CREATE_PLANNING_PROJECT_SPEC)
+            .route_view(
+                PROJECT_SERVICE_SERVICE_NAME,
+                "UpdatePlanningProject",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdatePlanningProjectRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdatePlanningProjectRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_planning_project(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdatePlanningProjectResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(PROJECT_SERVICE_UPDATE_PLANNING_PROJECT_SPEC)
+            .route_view(
+                PROJECT_SERVICE_SERVICE_NAME,
+                "MoveIssueToPlanningProject",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::MoveIssueToPlanningProjectRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::MoveIssueToPlanningProjectRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.move_issue_to_planning_project(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::MoveIssueToPlanningProjectResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(PROJECT_SERVICE_MOVE_ISSUE_TO_PLANNING_PROJECT_SPEC)
+            .route_view(
+                PROJECT_SERVICE_SERVICE_NAME,
+                "ResolveIssueHierarchyLocation",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ResolveIssueHierarchyLocationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ResolveIssueHierarchyLocationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.resolve_issue_hierarchy_location(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ResolveIssueHierarchyLocationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(PROJECT_SERVICE_RESOLVE_ISSUE_HIERARCHY_LOCATION_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -17772,6 +18320,36 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
                         .with_spec(
                             PROJECT_SERVICE_UPDATE_PROJECT_EXECUTION_WORKER_POLICY_SPEC,
                         ),
+                )
+            }
+            "ListTeamPlanningProjects" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(PROJECT_SERVICE_LIST_TEAM_PLANNING_PROJECTS_SPEC),
+                )
+            }
+            "CreatePlanningProject" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(PROJECT_SERVICE_CREATE_PLANNING_PROJECT_SPEC),
+                )
+            }
+            "UpdatePlanningProject" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(PROJECT_SERVICE_UPDATE_PLANNING_PROJECT_SPEC),
+                )
+            }
+            "MoveIssueToPlanningProject" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(PROJECT_SERVICE_MOVE_ISSUE_TO_PLANNING_PROJECT_SPEC),
+                )
+            }
+            "ResolveIssueHierarchyLocation" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(PROJECT_SERVICE_RESOLVE_ISSUE_HIERARCHY_LOCATION_SPEC),
                 )
             }
             _ => None,
@@ -18028,6 +18606,116 @@ impl<T: ProjectService> ::connectrpc::Dispatcher for ProjectServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::UpdateProjectExecutionWorkerPolicyResponse,
+                        >(format)
+                })
+            }
+            "ListTeamPlanningProjects" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ListTeamPlanningProjectsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ListTeamPlanningProjectsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ListTeamPlanningProjectsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_team_planning_projects(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ListTeamPlanningProjectsResponse,
+                        >(format)
+                })
+            }
+            "CreatePlanningProject" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::CreatePlanningProjectRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::CreatePlanningProjectRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::CreatePlanningProjectRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_planning_project(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::CreatePlanningProjectResponse,
+                        >(format)
+                })
+            }
+            "UpdatePlanningProject" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdatePlanningProjectRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdatePlanningProjectRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdatePlanningProjectRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_planning_project(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdatePlanningProjectResponse,
+                        >(format)
+                })
+            }
+            "MoveIssueToPlanningProject" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::MoveIssueToPlanningProjectRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::MoveIssueToPlanningProjectRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::MoveIssueToPlanningProjectRequest,
+                    >::from_parts(&req, &body);
+                    svc.move_issue_to_planning_project(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::MoveIssueToPlanningProjectResponse,
+                        >(format)
+                })
+            }
+            "ResolveIssueHierarchyLocation" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ResolveIssueHierarchyLocationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ResolveIssueHierarchyLocationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ResolveIssueHierarchyLocationRequest,
+                    >::from_parts(&req, &body);
+                    svc.resolve_issue_hierarchy_location(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ResolveIssueHierarchyLocationResponse,
                         >(format)
                 })
             }
@@ -18650,6 +19338,231 @@ where
                 &self.transport,
                 &self.config,
                 PROJECT_SERVICE_UPDATE_PROJECT_EXECUTION_WORKER_POLICY_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListTeamPlanningProjects RPC. Sends a request to /briar.app.v1.ProjectService/ListTeamPlanningProjects.
+    pub async fn list_team_planning_projects(
+        &self,
+        request: crate::proto::briar::app::v1::ListTeamPlanningProjectsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListTeamPlanningProjectsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_team_planning_projects_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListTeamPlanningProjects RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_team_planning_projects_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ListTeamPlanningProjectsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListTeamPlanningProjectsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                PROJECT_SERVICE_LIST_TEAM_PLANNING_PROJECTS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CreatePlanningProject RPC. Sends a request to /briar.app.v1.ProjectService/CreatePlanningProject.
+    pub async fn create_planning_project(
+        &self,
+        request: crate::proto::briar::app::v1::CreatePlanningProjectRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreatePlanningProjectResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_planning_project_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreatePlanningProject RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_planning_project_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::CreatePlanningProjectRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreatePlanningProjectResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                PROJECT_SERVICE_CREATE_PLANNING_PROJECT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdatePlanningProject RPC. Sends a request to /briar.app.v1.ProjectService/UpdatePlanningProject.
+    pub async fn update_planning_project(
+        &self,
+        request: crate::proto::briar::app::v1::UpdatePlanningProjectRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdatePlanningProjectResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_planning_project_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdatePlanningProject RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_planning_project_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdatePlanningProjectRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdatePlanningProjectResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                PROJECT_SERVICE_UPDATE_PLANNING_PROJECT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the MoveIssueToPlanningProject RPC. Sends a request to /briar.app.v1.ProjectService/MoveIssueToPlanningProject.
+    pub async fn move_issue_to_planning_project(
+        &self,
+        request: crate::proto::briar::app::v1::MoveIssueToPlanningProjectRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::MoveIssueToPlanningProjectResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.move_issue_to_planning_project_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the MoveIssueToPlanningProject RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn move_issue_to_planning_project_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::MoveIssueToPlanningProjectRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::MoveIssueToPlanningProjectResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                PROJECT_SERVICE_MOVE_ISSUE_TO_PLANNING_PROJECT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ResolveIssueHierarchyLocation RPC. Sends a request to /briar.app.v1.ProjectService/ResolveIssueHierarchyLocation.
+    pub async fn resolve_issue_hierarchy_location(
+        &self,
+        request: crate::proto::briar::app::v1::ResolveIssueHierarchyLocationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ResolveIssueHierarchyLocationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.resolve_issue_hierarchy_location_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ResolveIssueHierarchyLocation RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn resolve_issue_hierarchy_location_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ResolveIssueHierarchyLocationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ResolveIssueHierarchyLocationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                PROJECT_SERVICE_RESOLVE_ISSUE_HIERARCHY_LOCATION_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

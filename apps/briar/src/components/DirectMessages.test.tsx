@@ -38,6 +38,7 @@ describe("DirectMessages", () => {
           activeChannelId={null}
           channels={[]}
           currentUserId="user-1"
+          isSidebarOpen
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
           organizationId="org-1"
@@ -61,6 +62,31 @@ describe("DirectMessages", () => {
     expect(
       container.querySelector<HTMLButtonElement>(".dm-start-button")?.disabled,
     ).toBe(false);
+
+    await cleanup();
+  });
+
+  it("keeps the DM toolbar clear of window navigation when the sidebar is closed", async () => {
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <DirectMessages
+          activeChannelId={null}
+          channels={[]}
+          currentUserId="user-1"
+          isSidebarOpen={false}
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          token="token"
+        />
+      </I18nProvider>,
+    );
+
+    expect(
+      container.querySelector(".dm-list-toolbar")?.className,
+    ).toContain("pl-[var(--window-navigation-content-inset)]");
 
     await cleanup();
   });

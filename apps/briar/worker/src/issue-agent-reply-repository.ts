@@ -224,7 +224,7 @@ export async function claimNextIssueAgentReply(
            job.skill_id = job.selected_skill_id_snapshot
            and exists (
              select 1
-             from briar_projects project
+             from briar_teams project
              join briar_project_agents selected_agent
                on selected_agent.id = coalesce(job.agent_id, run.agent_id)
               and selected_agent.project_id = run.project_id

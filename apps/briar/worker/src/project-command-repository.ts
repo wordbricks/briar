@@ -65,7 +65,7 @@ export async function createProject(
   await db.batch([
         db
           .prepare(
-            `insert into briar_projects (
+            `insert into briar_teams (
                id, owner_user_id, organization_id, name, agent_token_hash,
                created_at, updated_at
              ) values (?, ?, ?, ?, ?, ?, ?)`,
@@ -132,7 +132,7 @@ export async function getProject(
               project.organization_id,
               organization.name as organization_name,
               membership.role as member_role, project.created_at
-       from briar_projects project
+       from briar_teams project
        join briar_organizations organization on organization.id = project.organization_id
        join briar_organization_members membership
          on membership.organization_id = project.organization_id
@@ -164,7 +164,7 @@ export async function getProject(
                 project.organization_id,
                 organization.name as organization_name,
                 membership.role as member_role, project.created_at
-         from briar_projects project
+         from briar_teams project
          join briar_organizations organization
            on organization.id = project.organization_id
          join briar_organization_members membership
@@ -185,7 +185,7 @@ export async function updateProjectIcon(
   const updatedAt = new Date().toISOString();
   const result = await db
     .prepare(
-      `update briar_projects
+      `update briar_teams
        set icon_data_url_browser = ?, icon_data_url = null, updated_at = ?
        where id = ?`,
     )
@@ -202,7 +202,7 @@ export async function updateProjectIssueKeyPrefix(
   const updatedAt = new Date().toISOString();
   const result = await db
     .prepare(
-      `update briar_projects
+      `update briar_teams
        set issue_key_prefix = ?, updated_at = ?
        where id = ?`,
     )
@@ -219,7 +219,7 @@ export async function updateProjectScheduleTabEnabled(
   const updatedAt = new Date().toISOString();
   const result = await db
     .prepare(
-      `update briar_projects
+      `update briar_teams
        set schedule_tab_enabled = ?, updated_at = ?
        where id = ?`,
     )
@@ -236,7 +236,7 @@ export async function deleteProject(
 ) {
   const authorizedProject = `exists (
     select 1
-    from briar_projects target
+    from briar_teams target
     join briar_organization_members membership
       on membership.organization_id = target.organization_id
     where target.id = ? and membership.user_id = ?
@@ -356,7 +356,7 @@ export async function deleteProject(
       .bind(projectId, observedAt, projectId, projectId, userId),
     db
       .prepare(
-        `delete from briar_projects
+        `delete from briar_teams
          where id = ? and organization_id in (
            select organization_id from briar_organization_members
            where user_id = ? and role in ('owner', 'co-owner')

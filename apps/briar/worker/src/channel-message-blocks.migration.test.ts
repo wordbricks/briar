@@ -6,7 +6,7 @@ describe("channel message block cutover", () => {
   it("keeps imported message bodies and removes the legacy block shape", async () => {
     const db = env.DB;
     await applyD1Migrations(db, {
-      through: "0156_remove_issue_proposal_status.sql",
+      through: "0158_remove_issue_proposal_status.sql",
     });
 
     const historical = await db.prepare(
@@ -16,7 +16,7 @@ describe("channel message block cutover", () => {
     expect(historical).not.toBeNull();
 
     await applyD1Migrations(db, {
-      files: ["0157_canonical_channel_message_blocks.sql"],
+      files: ["0159_canonical_channel_message_blocks.sql"],
     });
 
     expect(await db.prepare(

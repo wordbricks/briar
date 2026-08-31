@@ -82,6 +82,10 @@ message InboxMessageIdentity {
   string title = 5;
   google.protobuf.Timestamp occurred_at = 6;
   string version = 7;
+  optional string workspace_id = 8;
+  optional string team_id = 9;
+  optional string planning_project_id = 10;
+  optional string planning_project_name = 11;
 }
 
 message InboxIssueMessage {

@@ -25,6 +25,7 @@ struct CreateIssueSheet: View {
         providers: [AgentProvider] = [],
         capabilities: AgentProviderCapabilityCatalog = AgentProviderCapabilityCatalog(workers: []),
         persistence: IssueDraftPersistence = IssueDraftPersistence(),
+        defaultAssigneeUserId: String? = nil,
         refresh: @escaping () async -> Void
     ) {
         self.mutations = mutations
@@ -35,7 +36,11 @@ struct CreateIssueSheet: View {
         self.capabilities = capabilities
         self.persistence = persistence
         self.refresh = refresh
-        _draft = State(initialValue: persistence.load())
+        var loaded = persistence.load()
+        if loaded.assigneeUserId == nil, let defaultAssigneeUserId {
+            loaded.assigneeUserId = defaultAssigneeUserId
+        }
+        _draft = State(initialValue: loaded)
     }
 
     var body: some View {

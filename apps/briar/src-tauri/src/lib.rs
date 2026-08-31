@@ -31,6 +31,7 @@ use std::{
 use tauri::{webview::Color, WebviewUrl, WebviewWindowBuilder};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+#[cfg(target_os = "macos")]
 use tauri_plugin_opener::OpenerExt;
 
 const SESSION_FILE_NAME: &str = "session.json";

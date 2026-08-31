@@ -108,7 +108,7 @@ async function githubPullRequestLinksForEvent(
        from briar_run_pull_requests link
        join briar_hunt_runs run
          on run.id = link.run_id and run.project_id = link.project_id
-       join briar_projects project on project.id = link.project_id
+       join briar_teams project on project.id = link.project_id
        join briar_github_pull_requests snapshot
          on snapshot.repository_id = link.repository_id
         and snapshot.pull_request_number = link.pull_request_number

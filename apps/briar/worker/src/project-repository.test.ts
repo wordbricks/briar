@@ -42,7 +42,7 @@ describe("organization and project repositories", () => {
       ) values (
         '${organizationId}', 'member', 'developer', '${now}', '${now}'
       );
-      insert into briar_projects (
+      insert into briar_teams (
         id, owner_user_id, organization_id, name, agent_token_hash,
         created_at, updated_at
       ) values (

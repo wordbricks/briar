@@ -178,6 +178,10 @@ message DashboardRun {
   optional google.protobuf.Timestamp lease_expires_at = 65;
   uint32 claim_attempts = 66;
   optional string agent_id = 67;
+  optional string workspace_id = 68;
+  optional string team_id = 69;
+  optional string planning_project_id = 70;
+  optional string planning_project_name = 71;
 }
 
 message TrackerReference {

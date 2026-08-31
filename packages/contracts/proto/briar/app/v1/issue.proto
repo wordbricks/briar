@@ -123,6 +123,7 @@ message CreateIssueRequest {
   // Uploaded bytes must have been prepared by PrepareCreateIssueAttachments
   // for this exact project, client issue, and authenticated user.
   repeated briar.types.v1.UploadReference attachments = 17;
+  optional string planning_project_id = 18;
 }
 
 message CreateIssueResponse {

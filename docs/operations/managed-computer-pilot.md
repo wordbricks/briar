@@ -8,6 +8,8 @@
 - Enrollment은 nonce와 더불어 AWS가 서명한 **원본 EC2 instance identity document**를 검증한다. 파싱한 JSON을 다시 직렬화하지 않아 공백 하나가 바뀌어도 서명 검증이 실패한다.
 - 인바운드 보안 그룹 규칙과 SSH 키는 없다. 고객 화면은 EC2가 Briar에 먼저 연결하는 HTTPS/WSS 443 outbound 경로만 사용한다. SSM Session Manager는 운영 장애 대응에만 사용한다.
 - 로컬 TigerVNC는 `briar` 사용자로 `127.0.0.1:5901`에만 바인딩한다. 브라우저는 EC2 주소를 받지 않으며, 화면·키 입력·비밀번호·세션 토큰을 D1 또는 로그에 저장하지 않는다.
+- 컴퓨터 소유자의 데스크톱과 모든 프로젝트 Worker는 같은 `briar` 계정으로 실행하며, `sudo -n`으로 비밀번호 없이 이 컴퓨터의 관리자 권한을 사용할 수 있다. Worker가 실행하는 저장소 코드도 시스템 파일·패키지·서비스와 이 컴퓨터에 저장된 자격 증명을 수정하거나 삭제할 수 있다. 서로 신뢰하지 않는 프로젝트를 한 컴퓨터에 연결하지 않는다.
+- 관리자 권한은 해당 EC2의 운영체제 안에서만 부여한다. 인바운드·SSH·IMDSv2·EBS 설정이나 instance role의 AWS 권한은 확대하지 않으며, Parameter Store 조회 거부를 유지한다.
 - 파일럿 신청을 꺼도 생성 중·사용 중인 컴퓨터의 Workflow, 만료, drain, 중지 및 종료 처리는 계속된다.
 - 사용자가 컴퓨터 은퇴를 요청하면 새 작업을 즉시 차단하고 응답 후 중지를 시도한다. 활성 실행 lease가 없으면 EC2를 바로 중지하며, lease가 남아 있거나 AWS 호출이 실패하면 `draining` 상태를 유지한 채 기존 1분 Cron Trigger에서 다시 시도한다. 6시간 reconciliation은 만료·종료·고아 탐지 등 전체 수명주기 점검에 계속 사용한다.
 
@@ -19,9 +21,16 @@
 
 1. `/opt/briar/bin/briar` CLI와 여섯 provider runner bundle. `/opt/briar/bin`에는 버전이 고정된 Bun·Node.js·Rust(`rustfmt`, `clippy`)·`cargo-audit`·`gitleaks`, Codex·Claude·Cursor Agent·Grok·Antigravity·OpenCode CLI와 `agent-browser`를 설치한다. OpenRouter는 같은 OpenCode 실행파일을 사용한다. 로그인 terminal과 managed Worker 모두 이 경로와 같은 `CARGO_HOME`·`RUSTUP_HOME`을 사용한다.
 2. 승인 시점의 AWS Systems Manager Agent(`amazon-ssm-agent`). 버전과 설치 파일 SHA-256은 `image-lock.env`에 함께 고정한다.
-3. 비특권 `briar` 사용자와 XFCE, 실제 Google Chrome, TigerVNC, D-Bus, C/C++ build toolchain과 Noto CJK 글꼴. GitHub CLI는 기본 이미지 요구사항이 아니다. XFCE Terminal은 Korean glyph를 포함하는 `Noto Sans Mono CJK KR`을 기본으로 사용한다. `remote-desktop-packages.txt`의 각 Debian 패키지는 승인된 Debian 13 snapshot에서 `resolve-remote-desktop-packages`로 정확한 `package=version` lock을 만든 후 설치한다.
+3. sudo 관리자 권한이 있는 `briar` 사용자와 XFCE, 실제 Google Chrome, TigerVNC, D-Bus, C/C++ build toolchain과 Noto CJK 글꼴. GitHub CLI는 기본 이미지 요구사항이 아니다. XFCE Terminal은 Korean glyph를 포함하는 `Noto Sans Mono CJK KR`을 기본으로 사용한다. `remote-desktop-packages.txt`의 각 Debian 패키지는 승인된 Debian 13 snapshot에서 `resolve-remote-desktop-packages`로 정확한 `package=version` lock을 만든 후 설치한다.
 4. `briar-managed-computer.target`과 health timer를 설치하고 부팅 대상으로 활성화한다. target이 enrollment, signed runtime updater, Worker supervisor, loopback 원격 데스크톱과 outbound 원격 세션 서비스를 순서대로 묶는다. 개별 서비스는 target이 관리하므로 각각을 별도 multi-user 부팅 링크로 활성화하지 않는다. Worker supervisor는 `/var/lib/briar/worker-credential.json`의 machine credential을 값으로 복사하지 않고 파일에서 읽으며, 설정된 각 프로젝트에 Worker 프로세스를 하나씩 유지한다.
 5. `briar managed-computer setup`이 소유자의 사용자 세션과 이미 등록된 machine credential을 짧게 연결한다. 저장소와 provider가 준비되고 heartbeat 건강 검사를 통과하기 전에는 Worker가 `acceptingWork=false`, 동시 실행 수 1을 보고한다.
+
+관리 사용자 shell과 데스크톱·Worker·remote-session agent 서비스는
+`GH_BROWSER=/opt/briar/bin/briar-open-browser`를 기본값으로 제공한다. 사용자가
+GitHub CLI를 나중에 설치해도 `gh auth login --web`이 Chrome 종료를 기다리지
+않도록 브라우저를 별도로 실행한다. 전역 `BROWSER`와 다른 provider의 인증 방식은
+변경하지 않으며, shell에서 명시한 `GH_BROWSER`는 유지한다. 이 설정은 GitHub CLI
+설치나 인증을 대신하지 않는다. AMI에는 `~/.config/gh`와 GitHub credential을 넣지 않는다.
 
 `image.pkr.hcl`은 공식 Debian 13 amd64 EBS AMI를 명시적인 ID로 받아 SSM communicator로만 빌드한다. 빌더에는 public IP와 SSH key가 없고, IMDSv2와 암호화된 gp3 root volume을 강제한다. 다음 검사는 실제 AWS 리소스를 만들지 않는다.
 
@@ -51,9 +60,10 @@ mise exec -- bun run managed-computer:image:build
 AMI는 Briar CLI, provider runner, 원격 세션 agent와 기본 Skill을
 `/opt/briar/releases/<version>`에 설치하고 `/opt/briar/current`를 현재 버전으로
 연결한다. `briar-managed-runtime-updater.service`는 root로 실행되지만 Production
-minisign 공개키로 검증된 `linux-x86_64` 런타임 번들만 설치할 수 있다. 일반
-Worker는 `/opt`에 쓸 수 없으며 서버가 보낸 request ID, 목표 버전, Worker ID만
-`/run/briar-runtime-updater`에 전달한다.
+minisign 공개키로 검증된 `linux-x86_64` 런타임 번들만 자동 설치한다. 이 업데이트
+경로에서 Worker는 서버가 보낸 request ID, 목표 버전, Worker ID만
+`/run/briar-runtime-updater`에 전달한다. 소유자와 Worker의 명시적인 sudo 작업은
+별개로 `/opt`를 포함한 시스템 파일을 변경할 수 있다.
 
 조직 관리자나 Worker 소유자가 원격 업데이트를 요청하면 기존 Worker update
 프로토콜이 새 claim을 중단하고 실행 중인 작업을 durable queue로 인계한다. 모든
@@ -92,6 +102,29 @@ journal에 남기고 다음 주기에 다시 시도한다. credential 값·키 �
 프로세스·소켓 부팅 복구 계층이다.
 
 ## 2. AWS 스택
+
+### 기존 컴퓨터의 관리자 권한 적용
+
+신규 AMI는 `/etc/sudoers.d/briar-local-admin`을 root 소유·0440 권한으로 설치한다.
+데스크톱, Worker, remote-session agent 서비스는 `briar`로 실행하지만 sudo를 막는
+`NoNewPrivileges`, 읽기 전용 mount와 syscall 제한을 적용하지 않는다. enrollment,
+runtime updater, health 서비스의 기존 제한은 유지한다. 세 사용자 서비스는 시작할 때
+`verify-managed-admin`으로 비대화형 sudo와 시스템 디렉터리 쓰기를 실제 확인한다.
+
+기존 컴퓨터는 새 AMI만 배포해서 바뀌지 않는다. SSM으로 진행 중인 작업이 없는지
+확인한 뒤 sudoers 파일, `verify-managed-admin`, 세 사용자 서비스 unit을 같은 병합
+커밋에서 설치한다. 기존 파일을 백업하고 `/usr/sbin/visudo --check`와 `systemd-analyze verify`를
+통과시킨 뒤 daemon-reload하고 해당 서비스만 재시작한다. 적용 중 health timer를
+잠깐 중지했다면 되살리고, 하위 서비스 중지로 함께 내려갈 수 있는
+`briar-managed-computer.target`도 다시 start한 뒤 전체 상태를 검사한다. 재시작 중
+원격 화면은 잠깐 끊긴다. 기존 프로세스의 `NoNewPrivileges`는 실행 중에 해제할 수 없어 재시작이 필요하다.
+인스턴스 재부팅이나 교체는 필요하지 않으며, 은퇴 후 중지된 컴퓨터는 이 작업 때문에
+다시 시작하지 않는다.
+
+적용 후 사용자 터미널과 Worker 서비스의 실행 환경에서 `sudo -n id -u`가 `0`인지,
+패키지 설치가 가능한지, SSM·원격 연결·Worker heartbeat가 유지되는지 확인한다.
+운영 중인 컴퓨터에는 인증 파일이 없는지 검사하는 `verify-managed-image` 전체를
+실행하지 않고 `verify-managed-admin`을 `briar`로 실행한다.
 
 네트워크 스택과 컴퓨터 스택은 저장소의 CloudFormation 템플릿으로 순서대로 적용한다. 두 템플릿 모두 계정·리전별 값을 파라미터로 받으며, AWS 콘솔에 수동으로 리소스를 만들거나 템플릿의 실제 값을 코드에 하드코딩하지 않는다.
 
@@ -139,6 +172,17 @@ export PRIVATE_SUBNET_ID="$(aws cloudformation describe-stacks \
 ### 2.2 관리 컴퓨터 Launch Template
 
 전용 IAM principal을 먼저 만들고, `infrastructure/managed-computers/cloudformation.yaml`을 적용한다. 이 스택은 policy를 만들지만 principal에 자동 연결하지 않는다.
+
+컴퓨터의 instance role은 SSM 연결을 위해 `AmazonSSMManagedInstanceCore`를 유지하되,
+inline policy `DenyParameterStoreReads`로 `ssm:GetParameter*`를 명시적으로 거부한다.
+이 거부는 단일·복수 파라미터 조회, 경로별 조회와 버전 이력 조회에 모두 적용된다.
+컴퓨터에 필요한 자격 증명은 Briar의 enrollment와 프로젝트별 인증 경로로 전달하며,
+계정의 Parameter Store에서 읽지 않는다.
+
+이 IAM 역할을 공유하는 기존 컴퓨터에도 정책 변경이 적용된다. 역할 정책만 수정할 때는
+AMI 재빌드나 컴퓨터 재부팅이 필요하지 않다. Change Set에서 역할의 정책만 변경되고
+리소스 교체가 없는지 확인한 뒤 적용한다. 적용 후 파라미터 읽기 거부와 SSM 연결 유지,
+실행 중인 컴퓨터의 Briar 서비스 상태를 확인한다.
 
 ```bash
 export COMPUTER_STACK=briar-managed-computer
@@ -269,6 +313,9 @@ setup agent는 고정된 provider 명령만 pseudo-terminal에서 실행한다. 
 5. SSM이 Online인 실제 인스턴스만 enrollment에 성공하고, nonce 만료·원본 document 변조·다른 instance identity·다른 조직 ID는 거절된다.
 6. 인스턴스에서 `/opt/briar/bin/verify-remote-desktop`을 실행한다. 관리 컴퓨터 target과 health timer가 enable·active이고, 5901 포트가 loopback에만 열리며 데스크톱·세션 에이전트가 `briar` 사용자로 실행되고 package lock checksum이 일치해야 한다. 인스턴스를 한 번 재부팅한 뒤 target이 모든 하위 서비스를 올리고 health timer의 첫 실행이 성공하는지도 확인한다.
 7. `sudo -u briar -H bash -lc 'command -v bun node cargo rustc cargo-audit gitleaks codex claude cursor-agent grok agy opencode agent-browser'`에서 모든 실행파일이 `/opt/briar/bin`으로 해석되는지 확인한다. GitHub CLI는 설치되지 않아도 된다. 버전은 `/opt/briar/image-manifest.json`과 같아야 하며 provider는 아직 인증되지 않은 상태여야 한다.
+   GitHub CLI를 시험 설치했다면 Chrome이 없는 상태와 이미 열린 상태에서 모두
+   브라우저 실행 명령이 즉시 반환하고 Chrome이 계속 살아 있는지 확인한다.
+   실제 device auth에서는 Chrome 창을 닫지 않고 CLI 인증이 완료되어야 한다.
 8. 빈 테스트 저장소를 새 worktree로 clone한 뒤 `bun run ci:local`을 실행한다. `bun install --frozen-lockfile`로 `node_modules`를 bootstrap하고 C linker, Rust, `cargo-audit`, `gitleaks` 누락 없이 완료되는지 확인한다. `node_modules`나 사용자 저장소를 AMI 자체에 미리 넣지 않는다.
 9. 원격 Terminal과 Chrome에서 한글 안내 문구와 한글 파일명이 네모 상자 없이 보이는지 확인하고 `fc-match ':lang=ko'`가 Noto CJK KR 글꼴을 고르는지 확인한다.
 10. `aws ec2 describe-security-groups --group-ids <SecurityGroupId>`에서 `IpPermissions=[]`, `aws ec2 describe-instances --instance-ids <id>`에서 public IP 없음과 정확한 AMI ID를 독립적으로 확인한다. 원격 화면 서비스 때문에 SSH/VNC/RDP ingress를 추가하지 않는다.

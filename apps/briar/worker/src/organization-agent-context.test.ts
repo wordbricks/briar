@@ -63,7 +63,7 @@ const insertProject = async (input: {
   createdAt: string;
 }) => {
   await db.prepare(
-    `insert into briar_projects (
+    `insert into briar_teams (
        id, owner_user_id, organization_id, name, agent_token_hash,
        issue_key_prefix, created_at, updated_at
      ) values (?, ?, ?, ?, ?, 'CTX', ?, ?)`,

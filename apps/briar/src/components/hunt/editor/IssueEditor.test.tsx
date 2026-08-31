@@ -14,7 +14,8 @@ import {
   useAppKeyboardCommandScope,
   useAppKeyboardCommandState,
 } from "@/hooks/appKeyboardCommands";
-import type { ExecutionWorker, HuntRun, IssueMessage, IssueMessageSendResult, ProjectAgent, RunEvidence, UpdateIssueInput } from "@/types";
+import type { CreateIssueInput, ExecutionWorker, HuntRun, IssueMessage, IssueMessageSendResult, ProjectAgent, RunEvidence, UpdateIssueInput } from "@/types";
+import { createIssueDraftStorageKey, saveCreateIssueDraft } from "@/lib/create-issue-draft";
 import { HuntDashboard } from "@/components/hunt/HuntDashboard";
 import { IssueAgentActivityPanel } from "@/components/hunt/detail/IssueAgentActivityPanel";
 import { RunPage } from "@/components/hunt/detail/RunPage";
@@ -658,6 +659,142 @@ describe("IssueEditor", () => {
     });
     expect(updated!.description).not.toContain("briar-attachment://");
     expect(updated!.keptAttachmentIds).toEqual([]);
+    await cleanup();
+  });
+  it("defaults assignee to current user (creator) when creating a new issue", async () => {
+    window.localStorage.removeItem(createIssueDraftStorageKey);
+    let createdInput: CreateIssueInput | undefined;
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <CreateIssueDialog
+        currentUserId="user-1"
+        isSubmitting={false}
+        members={[{
+          userId: "user-1",
+          name: "Creator User",
+          email: "creator@example.com",
+          image: null,
+          role: "developer",
+          createdAt: "2026-07-01T00:00:00.000Z",
+        }, {
+          userId: "user-2",
+          name: "Other User",
+          email: "other@example.com",
+          image: null,
+          role: "developer",
+          createdAt: "2026-07-01T00:00:00.000Z",
+        }]}
+        onClose={() => undefined}
+        onCreate={async (_projectId, input) => {
+          createdInput = input;
+        }}
+        projects={[demoDashboard.project]}
+      />,
+    );
+    const titleInput = container.querySelector<HTMLInputElement>(".issue-title-input");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(titleInput, "새 이슈");
+      titleInput?.dispatchEvent(new Event("input", { bubbles: true }));
+      container.querySelector<HTMLFormElement>(".issue-dialog")?.requestSubmit();
+    });
+    expect(createdInput).toBeDefined();
+    expect(createdInput?.assigneeUserId).toBe("user-1");
+    window.localStorage.removeItem(createIssueDraftStorageKey);
+    await cleanup();
+  });
+  it("allows unassigning the issue before submitting", async () => {
+    window.localStorage.removeItem(createIssueDraftStorageKey);
+    let createdInput: CreateIssueInput | undefined;
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <CreateIssueDialog
+        currentUserId="user-1"
+        isSubmitting={false}
+        members={[{
+          userId: "user-1",
+          name: "Creator User",
+          email: "creator@example.com",
+          image: null,
+          role: "developer",
+          createdAt: "2026-07-01T00:00:00.000Z",
+        }]}
+        onClose={() => undefined}
+        onCreate={async (_projectId, input) => {
+          createdInput = input;
+        }}
+        projects={[demoDashboard.project]}
+      />,
+    );
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".issue-assignee-select .select-menu-trigger")?.click();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[role="option"][data-value=""]')?.click();
+    });
+    const titleInput = container.querySelector<HTMLInputElement>(".issue-title-input");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(titleInput, "미배정 이슈");
+      titleInput?.dispatchEvent(new Event("input", { bubbles: true }));
+      container.querySelector<HTMLFormElement>(".issue-dialog")?.requestSubmit();
+    });
+    expect(createdInput).toBeDefined();
+    expect(createdInput?.assigneeUserId).toBeNull();
+    window.localStorage.removeItem(createIssueDraftStorageKey);
+    await cleanup();
+  });
+  it("respects assignee from a saved draft", async () => {
+    saveCreateIssueDraft({
+      title: "임시 저장 이슈",
+      description: "",
+      status: "queued",
+      priority: "2",
+      projectId: demoDashboard.project.id,
+      assigneeUserId: "user-2",
+    });
+    let createdInput: CreateIssueInput | undefined;
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <CreateIssueDialog
+        currentUserId="user-1"
+        isSubmitting={false}
+        members={[{
+          userId: "user-1",
+          name: "Creator User",
+          email: "creator@example.com",
+          image: null,
+          role: "developer",
+          createdAt: "2026-07-01T00:00:00.000Z",
+        }, {
+          userId: "user-2",
+          name: "Other User",
+          email: "other@example.com",
+          image: null,
+          role: "developer",
+          createdAt: "2026-07-01T00:00:00.000Z",
+        }]}
+        onClose={() => undefined}
+        onCreate={async (_projectId, input) => {
+          createdInput = input;
+        }}
+        projects={[demoDashboard.project]}
+      />,
+    );
+    const titleInput = container.querySelector<HTMLInputElement>(".issue-title-input");
+    await act(async () => {
+      container.querySelector<HTMLFormElement>(".issue-dialog")?.requestSubmit();
+    });
+    expect(createdInput).toBeDefined();
+    expect(createdInput?.assigneeUserId).toBe("user-2");
+    window.localStorage.removeItem(createIssueDraftStorageKey);
     await cleanup();
   });
 });

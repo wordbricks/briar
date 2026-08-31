@@ -28,7 +28,7 @@ const inboxFeedMessageLimit = 2_000;
 type InboxFeedProject = Pick<
   ProjectRow,
   "id" | "name" | "issue_key_prefix"
->;
+> & Partial<Pick<ProjectRow, "organization_id">>;
 
 type InboxFeedRun = Pick<
   HuntRunRow,
@@ -45,7 +45,13 @@ type InboxFeedRun = Pick<
   | "current_revision"
   | "last_event_at"
   | "event_count"
->;
+> & Partial<Pick<
+  HuntRunRow,
+  | "workspace_id"
+  | "team_id"
+  | "planning_project_id"
+  | "planning_project_name"
+>>;
 
 type InboxFeedIssueNotification = Pick<
   IssueConversationNotificationRow,
@@ -94,6 +100,10 @@ export type InboxFeedMessage = {
   kind: "issue" | "conversation" | "channel" | "session";
   projectId: string;
   projectName: string;
+  workspaceId?: string;
+  teamId?: string;
+  planningProjectId?: string | null;
+  planningProjectName?: string | null;
   targetId: string;
   title: string;
   occurredAt: string;
@@ -214,6 +224,10 @@ export function buildInboxFeedMessages(
         kind: "issue" as const,
         projectId: project.id,
         projectName: project.name,
+        workspaceId: run.workspace_id ?? project.organization_id ?? project.id,
+        teamId: run.team_id ?? project.id,
+        planningProjectId: run.planning_project_id ?? null,
+        planningProjectName: run.planning_project_name ?? null,
         targetId: run.id,
         title: run.title,
         occurredAt: run.last_event_at,
@@ -232,11 +246,16 @@ export function buildInboxFeedMessages(
 
     for (const notification of conversationNotifications) {
       const runNumber = runNumbers.get(notification.run_id);
+      const run = runs.find((candidate) => candidate.id === notification.run_id);
       const message = {
         id: `conversation:${notification.id}`,
         kind: "conversation" as const,
         projectId: project.id,
         projectName: project.name,
+        workspaceId: project.organization_id ?? project.id,
+        teamId: project.id,
+        planningProjectId: run?.planning_project_id ?? null,
+        planningProjectName: run?.planning_project_name ?? null,
         targetId: notification.run_id,
         messageId: notification.id,
         rootMessageId: notification.root_message_id,
@@ -281,6 +300,10 @@ export function buildInboxFeedMessages(
       kind: "session",
       projectId: session.project.id,
       projectName: session.project.name,
+      workspaceId: session.project.organization_id ?? session.project.id,
+      teamId: session.project.id,
+      planningProjectId: null,
+      planningProjectName: null,
       targetId: session.id,
       title:
         session.request?.trim() ||
@@ -312,6 +335,10 @@ export function buildInboxFeedMessages(
         kind: "channel",
         projectId: channelProject.id,
         projectName: channelProject.name,
+        workspaceId: channelProject.organization_id ?? channelProject.id,
+        teamId: channelProject.id,
+        planningProjectId: null,
+        planningProjectName: null,
         targetId: notification.channel_id,
         channelId: notification.channel_id,
         channelName: notification.channel_name,

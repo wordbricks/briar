@@ -56,6 +56,7 @@ type Candidate =
     };
 
 type DirectMessagesProps = {
+  isSidebarOpen: boolean;
   organizationId: string;
   organizationName?: string;
   token: string;
@@ -147,6 +148,7 @@ const formatConversationTime = (value: string, localeTag: string) => {
 };
 
 export function DirectMessages({
+  isSidebarOpen,
   organizationId,
   organizationName,
   token,
@@ -321,7 +323,12 @@ export function DirectMessages({
           showMainOnMobile && "max-[760px]:hidden",
         )}
       >
-        <div className="dm-list-toolbar flex h-[52px] shrink-0 items-center gap-[7px] px-3 pb-1.5 pt-2.5">
+        <div
+          className={cn(
+            "dm-list-toolbar flex h-[52px] shrink-0 items-center gap-[7px] px-3 pb-1.5 pt-2.5",
+            !isSidebarOpen && "pl-[var(--window-navigation-content-inset)]",
+          )}
+        >
           <label className="dm-search flex h-8 min-w-0 flex-1 items-center gap-[7px] rounded-lg border border-transparent bg-foreground/5 px-[9px] text-muted-foreground transition-[border-color,background-color,box-shadow] focus-within:border-ring/55 focus-within:bg-card focus-within:ring-2 focus-within:ring-ring/20">
             <Search aria-hidden="true" size={15} />
             <input

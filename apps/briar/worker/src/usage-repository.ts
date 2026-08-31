@@ -132,7 +132,7 @@ export async function listOrganizationUsageRuns(
               end as execution_model,
               run.started_at, run.updated_at, run.completed_at
        from briar_hunt_runs run
-       join briar_projects project on project.id = run.project_id
+       join briar_teams project on project.id = run.project_id
        where project.organization_id = ?
          and (
            unixepoch(coalesce(

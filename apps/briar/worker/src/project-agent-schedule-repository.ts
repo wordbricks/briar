@@ -456,7 +456,7 @@ export async function listClaimableProjectAgentScheduleProjectIds(
   const result = await db
     .prepare(
       `select project.id
-       from briar_projects project
+       from briar_teams project
        join briar_organization_members membership
          on membership.organization_id = project.organization_id
         and membership.user_id = ?

@@ -155,7 +155,7 @@ describe("D1 to R2 log archives", () => {
        insert into briar_organization_members (
          organization_id, user_id, role, created_at, updated_at
        ) values ('${projectId}', 'owner', 'owner', '${oldTime}', '${oldTime}');
-       insert into briar_projects (
+       insert into briar_teams (
          id, owner_user_id, organization_id, name, agent_token_hash,
          created_at, updated_at
        ) values (
@@ -763,7 +763,7 @@ describe("D1 to R2 log archives", () => {
       `${historicalArchiveId}.jsonl.gz`;
     await executeD1Sql(
       db,
-      `insert into briar_projects (
+      `insert into briar_teams (
          id, owner_user_id, organization_id, name, agent_token_hash,
          created_at, updated_at
        ) values (
