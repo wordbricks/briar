@@ -244,8 +244,6 @@ public nonisolated struct BriarTypes_WorkerRuntimeAdvertisement: Sendable {
 
   public var agentProvider: BriarTypes_AgentProvider = .unspecified
 
-  public var providers: [BriarTypes_AgentProvider] = []
-
   public var providerHealth: [BriarTypes_AgentProviderHealth] = []
 
   public var capabilities: BriarTypes_WorkerCapabilities {
@@ -625,7 +623,7 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
 
 nonisolated extension BriarTypes_WorkerRuntimeAdvertisement: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WorkerRuntimeAdvertisement"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}agent_provider\0\u{1}providers\0\u{3}provider_health\0\u{1}capabilities\0\u{1}versions\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}agent_provider\0\u{4}\u{2}provider_health\0\u{1}capabilities\0\u{1}versions\0\u{b}providers\0\u{c}\u{2}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -634,7 +632,6 @@ nonisolated extension BriarTypes_WorkerRuntimeAdvertisement: SwiftProtobuf.Messa
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularEnumField(value: &self.agentProvider) }()
-      case 2: try { try decoder.decodeRepeatedEnumField(value: &self.providers) }()
       case 3: try { try decoder.decodeRepeatedMessageField(value: &self.providerHealth) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._capabilities) }()
       case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.versions) }()
@@ -651,9 +648,6 @@ nonisolated extension BriarTypes_WorkerRuntimeAdvertisement: SwiftProtobuf.Messa
     if self.agentProvider != .unspecified {
       try visitor.visitSingularEnumField(value: self.agentProvider, fieldNumber: 1)
     }
-    if !self.providers.isEmpty {
-      try visitor.visitPackedEnumField(value: self.providers, fieldNumber: 2)
-    }
     if !self.providerHealth.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.providerHealth, fieldNumber: 3)
     }
@@ -668,7 +662,6 @@ nonisolated extension BriarTypes_WorkerRuntimeAdvertisement: SwiftProtobuf.Messa
 
   public static func ==(lhs: BriarTypes_WorkerRuntimeAdvertisement, rhs: BriarTypes_WorkerRuntimeAdvertisement) -> Bool {
     if lhs.agentProvider != rhs.agentProvider {return false}
-    if lhs.providers != rhs.providers {return false}
     if lhs.providerHealth != rhs.providerHealth {return false}
     if lhs._capabilities != rhs._capabilities {return false}
     if lhs.versions != rhs.versions {return false}

@@ -8819,13 +8819,6 @@ pub struct WorkerRuntimeAdvertisement {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub agent_provider: ::buffa::EnumValue<AgentProvider>,
-    /// Field 2: `providers`
-    #[serde(
-        rename = "providers",
-        with = "::buffa::json_helpers::repeated_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
-    )]
-    pub providers: ::buffa::alloc::vec::Vec<::buffa::EnumValue<AgentProvider>>,
     /// Field 3: `provider_health`
     #[serde(
         rename = "providerHealth",
@@ -8861,7 +8854,6 @@ impl ::core::fmt::Debug for WorkerRuntimeAdvertisement {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("WorkerRuntimeAdvertisement")
             .field("agent_provider", &self.agent_provider)
-            .field("providers", &self.providers)
             .field("provider_health", &self.provider_health)
             .field("capabilities", &self.capabilities)
             .field("versions", &self.versions)
@@ -8901,14 +8893,6 @@ impl ::buffa::Message for WorkerRuntimeAdvertisement {
                 size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
             }
         }
-        if !self.providers.is_empty() {
-            let payload: u64 = self
-                .providers
-                .iter()
-                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
-                .sum::<u64>();
-            size += 1u64 + ::buffa::encoding::varint_len(payload) as u64 + payload;
-        }
         for v in &self.provider_health {
             let __slot = __cache.reserve();
             let inner_size = v.compute_size(__cache);
@@ -8945,17 +8929,6 @@ impl ::buffa::Message for WorkerRuntimeAdvertisement {
             let val = self.agent_provider.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(1u32, val, buf);
-            }
-        }
-        if !self.providers.is_empty() {
-            let payload: u64 = self
-                .providers
-                .iter()
-                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
-                .sum::<u64>();
-            ::buffa::types::put_len_delimited_header(2u32, payload, buf);
-            for v in &self.providers {
-                ::buffa::types::encode_int32(v.to_i32(), buf);
             }
         }
         for v in &self.provider_health {
@@ -9001,44 +8974,6 @@ impl ::buffa::Message for WorkerRuntimeAdvertisement {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
-            2u32 => {
-                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
-                    let len = ::buffa::encoding::decode_varint(buf)?;
-                    let len = usize::try_from(len)
-                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
-                    if buf.remaining() < len {
-                        return ::core::result::Result::Err(
-                            ::buffa::DecodeError::UnexpectedEof,
-                        );
-                    }
-                    self.providers.reserve(len);
-                    let mut limited = buf.take(len);
-                    while limited.has_remaining() {
-                        self.providers
-                            .push(
-                                ::buffa::EnumValue::from(
-                                    ::buffa::types::decode_int32_packed(&mut limited)?,
-                                ),
-                            );
-                    }
-                    let leftover = limited.remaining();
-                    if leftover > 0 {
-                        limited.advance(leftover);
-                    }
-                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
-                    self.providers
-                        .push(
-                            ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
-                        );
-                } else {
-                    return ::core::result::Result::Err(
-                        ::buffa::encoding::wire_type_mismatch(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        ),
-                    );
-                }
-            }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -9082,7 +9017,6 @@ impl ::buffa::Message for WorkerRuntimeAdvertisement {
     }
     fn clear(&mut self) {
         self.agent_provider = ::buffa::EnumValue::from(0);
-        self.providers.clear();
         self.provider_health.clear();
         self.capabilities = ::buffa::MessageField::none();
         self.versions.clear();
@@ -23848,11 +23782,6 @@ pub mod __buffa {
         pub struct WorkerRuntimeAdvertisementView<'a> {
             /// Field 1: `agent_provider`
             pub agent_provider: ::buffa::EnumValue<super::super::AgentProvider>,
-            /// Field 2: `providers`
-            pub providers: ::buffa::RepeatedView<
-                'a,
-                ::buffa::EnumValue<super::super::AgentProvider>,
-            >,
             /// Field 3: `provider_health`
             pub provider_health: ::buffa::RepeatedView<
                 'a,
@@ -23930,39 +23859,6 @@ pub mod __buffa {
                                     )?,
                                 );
                             }
-                        }
-                    }
-                    2u32 => {
-                        if tag.wire_type()
-                            == ::buffa::encoding::WireType::LengthDelimited
-                        {
-                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
-                            view.providers
-                                .reserve(::buffa::encoding::count_varints(payload));
-                            let mut pcur: &[u8] = payload;
-                            while !pcur.is_empty() {
-                                view.providers
-                                    .push(
-                                        ::buffa::EnumValue::from(
-                                            ::buffa::types::decode_int32_packed(&mut pcur)?,
-                                        ),
-                                    );
-                            }
-                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
-                        {
-                            view.providers
-                                .push(
-                                    ::buffa::EnumValue::from(
-                                        ::buffa::types::decode_int32(&mut cur)?,
-                                    ),
-                                );
-                        } else {
-                            return Err(
-                                ::buffa::encoding::wire_type_mismatch(
-                                    tag,
-                                    ::buffa::encoding::WireType::LengthDelimited,
-                                ),
-                            );
                         }
                     }
                     3u32 => {
@@ -24058,7 +23954,6 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::WorkerRuntimeAdvertisement {
                     agent_provider: self.agent_provider,
-                    providers: self.providers.to_vec(),
                     provider_health: self
                         .provider_health
                         .iter()
@@ -24097,16 +23992,6 @@ pub mod __buffa {
                     if val != 0 {
                         size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
                     }
-                }
-                if !self.providers.is_empty() {
-                    let payload: u64 = self
-                        .providers
-                        .iter()
-                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
-                        .sum::<u64>();
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(payload) as u64
-                            + payload;
                 }
                 for v in &self.provider_health {
                     let __slot = __cache.reserve();
@@ -24148,17 +24033,6 @@ pub mod __buffa {
                     let val = self.agent_provider.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(1u32, val, buf);
-                    }
-                }
-                if !self.providers.is_empty() {
-                    let payload: u64 = self
-                        .providers
-                        .iter()
-                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
-                        .sum::<u64>();
-                    ::buffa::types::put_len_delimited_header(2u32, payload, buf);
-                    for v in &self.providers {
-                        ::buffa::types::encode_int32(v.to_i32(), buf);
                     }
                 }
                 for v in &self.provider_health {
@@ -24225,13 +24099,6 @@ pub mod __buffa {
                     &self.agent_provider,
                 ) {
                     __map.serialize_entry("agentProvider", &self.agent_provider)?;
-                }
-                if !self.providers.is_empty() {
-                    __map
-                        .serialize_entry(
-                            "providers",
-                            &::buffa::json_helpers::EnumSeqJson(&self.providers),
-                        )?;
                 }
                 if !self.provider_health.is_empty() {
                     __map.serialize_entry("providerHealth", &*self.provider_health)?;
@@ -24369,16 +24236,6 @@ pub mod __buffa {
                 &self,
             ) -> ::buffa::EnumValue<super::super::AgentProvider> {
                 self.0.reborrow().agent_provider
-            }
-            /// Field 2: `providers`
-            #[must_use]
-            pub fn providers(
-                &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                ::buffa::EnumValue<super::super::AgentProvider>,
-            > {
-                &self.0.reborrow().providers
             }
             /// Field 3: `provider_health`
             #[must_use]

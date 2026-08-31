@@ -61,7 +61,8 @@ message WorkerCapabilities {
 
 message WorkerRuntimeAdvertisement {
   AgentProvider agent_provider = 1;
-  repeated AgentProvider providers = 2;
+  reserved 2;
+  reserved "providers";
   repeated AgentProviderHealth provider_health = 3;
   WorkerCapabilities capabilities = 4;
   map<string, string> versions = 5;
