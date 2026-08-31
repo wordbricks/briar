@@ -356,7 +356,7 @@ async function runClaimedIssueInRuntime(
         diagnosticContext: {
           runId: issue.runId,
           workId: issue.runId,
-          executionId: issue.executionId ?? null,
+          executionId: issue.executionId,
           attempt: issue.currentAttempt,
           workType: "issue",
           turnNumber,

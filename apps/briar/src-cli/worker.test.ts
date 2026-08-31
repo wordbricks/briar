@@ -792,12 +792,6 @@ describe("worker identity", () => {
     );
     expect(first).not.toBe(second);
     expect(first).not.toBe(join(configDirectory, "worker-sessions", "run-42"));
-    expect(issueWorkerSessionDirectory(configDirectory, {
-      runId: "run-42",
-      claimAttempts: 3,
-    })).toBe(
-      join(configDirectory, "worker-sessions", "run-42--claim-3"),
-    );
   });
 
   it("creates an opaque random device identity for local persistence", () => {

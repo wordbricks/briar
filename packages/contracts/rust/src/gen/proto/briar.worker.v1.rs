@@ -3816,9 +3816,10 @@ pub struct ReportIssueExecutionTelemetryRequest {
     #[serde(
         rename = "executionId",
         alias = "execution_id",
-        skip_serializing_if = "::core::option::Option::is_none"
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub execution_id: ::core::option::Option<::buffa::alloc::string::String>,
+    pub execution_id: ::buffa::alloc::string::String,
     /// Field 4: `agent_provider`
     #[serde(
         rename = "agentProvider",
@@ -3881,18 +3882,6 @@ impl ReportIssueExecutionTelemetryRequest {
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.ReportIssueExecutionTelemetryRequest";
 }
-impl ReportIssueExecutionTelemetryRequest {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::execution_id`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_execution_id(
-        mut self,
-        value: impl Into<::buffa::alloc::string::String>,
-    ) -> Self {
-        self.execution_id = Some(value.into());
-        self
-    }
-}
 ::buffa::impl_default_instance!(ReportIssueExecutionTelemetryRequest);
 impl ::buffa::MessageName for ReportIssueExecutionTelemetryRequest {
     const PACKAGE: &'static str = "briar.worker.v1";
@@ -3924,8 +3913,8 @@ impl ::buffa::Message for ReportIssueExecutionTelemetryRequest {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        if let Some(ref v) = self.execution_id {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        if !self.execution_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.execution_id) as u64;
         }
         {
             let val = self.agent_provider.to_i32();
@@ -3978,8 +3967,8 @@ impl ::buffa::Message for ReportIssueExecutionTelemetryRequest {
             );
             self.work.write_to(__cache, buf);
         }
-        if let Some(ref v) = self.execution_id {
-            ::buffa::types::put_string_field(3u32, v, buf);
+        if !self.execution_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.execution_id, buf);
         }
         {
             let val = self.agent_provider.to_i32();
@@ -4047,12 +4036,7 @@ impl ::buffa::Message for ReportIssueExecutionTelemetryRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(
-                    self
-                        .execution_id
-                        .get_or_insert_with(::buffa::alloc::string::String::new),
-                    buf,
-                )?;
+                ::buffa::types::merge_string(&mut self.execution_id, buf)?;
             }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -4108,7 +4092,7 @@ impl ::buffa::Message for ReportIssueExecutionTelemetryRequest {
     fn clear(&mut self) {
         self.project_id.clear();
         self.work = ::buffa::MessageField::none();
-        self.execution_id = ::core::option::Option::None;
+        self.execution_id.clear();
         self.agent_provider = ::buffa::EnumValue::from(0);
         self.execution_metrics = ::buffa::MessageField::none();
         self.usage_observations.clear();
@@ -26746,9 +26730,10 @@ pub struct ClaimedIssuePayload {
     #[serde(
         rename = "executionId",
         alias = "execution_id",
-        skip_serializing_if = "::core::option::Option::is_none"
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub execution_id: ::core::option::Option<::buffa::alloc::string::String>,
+    pub execution_id: ::buffa::alloc::string::String,
     /// Field 2: `run_id`
     #[serde(
         rename = "runId",
@@ -26986,16 +26971,6 @@ impl ClaimedIssuePayload {
 impl ClaimedIssuePayload {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
-    ///Sets [`Self::execution_id`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_execution_id(
-        mut self,
-        value: impl Into<::buffa::alloc::string::String>,
-    ) -> Self {
-        self.execution_id = Some(value.into());
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
     ///Sets [`Self::description`] to `Some(value)`, consuming and returning `self`.
     pub fn with_description(
         mut self,
@@ -27072,8 +27047,8 @@ impl ::buffa::Message for ClaimedIssuePayload {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if let Some(ref v) = self.execution_id {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        if !self.execution_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.execution_id) as u64;
         }
         if !self.run_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.run_id) as u64;
@@ -27205,8 +27180,8 @@ impl ::buffa::Message for ClaimedIssuePayload {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if let Some(ref v) = self.execution_id {
-            ::buffa::types::put_string_field(1u32, v, buf);
+        if !self.execution_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.execution_id, buf);
         }
         if !self.run_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.run_id, buf);
@@ -27341,12 +27316,7 @@ impl ::buffa::Message for ClaimedIssuePayload {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(
-                    self
-                        .execution_id
-                        .get_or_insert_with(::buffa::alloc::string::String::new),
-                    buf,
-                )?;
+                ::buffa::types::merge_string(&mut self.execution_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -27586,7 +27556,7 @@ impl ::buffa::Message for ClaimedIssuePayload {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.execution_id = ::core::option::Option::None;
+        self.execution_id.clear();
         self.run_id.clear();
         self.run_number = 0u32;
         self.current_attempt = 0u32;
@@ -46110,7 +46080,7 @@ pub mod __buffa {
                 super::super::__buffa::view::WorkClaimIdentityView<'a>,
             >,
             /// Field 3: `execution_id`
-            pub execution_id: ::core::option::Option<&'a str>,
+            pub execution_id: &'a str,
             /// Field 4: `agent_provider`
             pub agent_provider: ::buffa::EnumValue<
                 super::super::super::super::types::v1::AgentProvider,
@@ -46207,7 +46177,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.execution_id = Some(::buffa::types::borrow_str(&mut cur)?);
+                        view.execution_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -46322,7 +46292,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    execution_id: self.execution_id.map(|s| s.to_string()),
+                    execution_id: self.execution_id.to_string(),
                     agent_provider: self.agent_provider,
                     execution_metrics: match self.execution_metrics.as_option() {
                         Some(v) => {
@@ -46374,8 +46344,11 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
-                if let Some(ref v) = self.execution_id {
-                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                if !self.execution_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.execution_id)
+                                as u64;
                 }
                 {
                     let val = self.agent_provider.to_i32();
@@ -46429,8 +46402,8 @@ pub mod __buffa {
                     );
                     self.work.write_to(__cache, buf);
                 }
-                if let Some(ref v) = self.execution_id {
-                    ::buffa::types::put_string_field(3u32, v, buf);
+                if !self.execution_id.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.execution_id, buf);
                 }
                 {
                     let val = self.agent_provider.to_i32();
@@ -46492,8 +46465,8 @@ pub mod __buffa {
                         __map.serialize_entry("work", __v)?;
                     }
                 }
-                if let ::core::option::Option::Some(__v) = self.execution_id {
-                    __map.serialize_entry("executionId", __v)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.execution_id) {
+                    __map.serialize_entry("executionId", self.execution_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
                     &self.agent_provider,
@@ -46635,7 +46608,7 @@ pub mod __buffa {
             }
             /// Field 3: `execution_id`
             #[must_use]
-            pub fn execution_id(&self) -> ::core::option::Option<&'_ str> {
+            pub fn execution_id(&self) -> &'_ str {
                 self.0.reborrow().execution_id
             }
             /// Field 4: `agent_provider`
@@ -82716,7 +82689,7 @@ pub mod __buffa {
         #[derive(Clone, Debug, Default)]
         pub struct ClaimedIssuePayloadView<'a> {
             /// Field 1: `execution_id`
-            pub execution_id: ::core::option::Option<&'a str>,
+            pub execution_id: &'a str,
             /// Field 2: `run_id`
             pub run_id: &'a str,
             /// Field 3: `run_number`
@@ -82823,7 +82796,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.execution_id = Some(::buffa::types::borrow_str(&mut cur)?);
+                        view.execution_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -83169,7 +83142,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ClaimedIssuePayload {
-                    execution_id: self.execution_id.map(|s| s.to_string()),
+                    execution_id: self.execution_id.to_string(),
                     run_id: self.run_id.to_string(),
                     run_number: self.run_number,
                     current_attempt: self.current_attempt,
@@ -83270,8 +83243,11 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if let Some(ref v) = self.execution_id {
-                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                if !self.execution_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.execution_id)
+                                as u64;
                 }
                 if !self.run_id.is_empty() {
                     size
@@ -83422,8 +83398,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if let Some(ref v) = self.execution_id {
-                    ::buffa::types::put_string_field(1u32, v, buf);
+                if !self.execution_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.execution_id, buf);
                 }
                 if !self.run_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.run_id, buf);
@@ -83561,8 +83537,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if let ::core::option::Option::Some(__v) = self.execution_id {
-                    __map.serialize_entry("executionId", __v)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.execution_id) {
+                    __map.serialize_entry("executionId", self.execution_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.run_id) {
                     __map.serialize_entry("runId", self.run_id)?;
@@ -83781,7 +83757,7 @@ pub mod __buffa {
             }
             /// Field 1: `execution_id`
             #[must_use]
-            pub fn execution_id(&self) -> ::core::option::Option<&'_ str> {
+            pub fn execution_id(&self) -> &'_ str {
                 self.0.reborrow().execution_id
             }
             /// Field 2: `run_id`

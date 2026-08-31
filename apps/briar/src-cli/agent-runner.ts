@@ -457,20 +457,15 @@ export async function runProjectAgentTaskCompletionFlow<TPayload, TResult>(
   return completeWithRetry(() => input.completeSuccess(payload));
 }
 
-// Older servers used one durable transcript session per run. New claims use an
-// execution-scoped session so transfer resets cannot collide across projects.
-// Each claim also keeps its own sequence range for rolling compatibility.
 // A claim may now contain several provider turns. Keep a wide range so long
 // transcripts can continue without colliding with the next claim attempt.
 const detachedTranscriptClaimStride = 1_000_000;
 
 export function detachedTranscriptSessionId(
   runId: string,
-  executionId?: string | null,
+  executionId: string,
 ) {
-  return executionId
-    ? `detached-${runId}-${executionId}`
-    : `detached-${runId}`;
+  return `detached-${runId}-${executionId}`;
 }
 
 export function detachedTranscriptSequence(

@@ -337,7 +337,7 @@ export const workerIssueClaimMessage = (
   value: AwaitedClaim<typeof claimNextQueueWork>,
 ): ClaimedIssue => create(ClaimedIssueSchema, {
       payload: create(ClaimedIssuePayloadSchema, {
-        executionId: value.executionId ?? undefined,
+        executionId: requiredString(value.executionId, "issue.executionId"),
         runId: value.runId,
         runNumber: value.runNumber,
         currentAttempt: value.currentAttempt,

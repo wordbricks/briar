@@ -135,7 +135,7 @@ message AppendTranscriptEventsResponse {
 message ReportIssueExecutionTelemetryRequest {
   string project_id = 1;
   WorkClaimIdentity work = 2;
-  optional string execution_id = 3;
+  string execution_id = 3;
   briar.types.v1.AgentProvider agent_provider = 4;
   briar.types.v1.AgentExecutionMetrics execution_metrics = 5;
   repeated briar.types.v1.AgentUsageObservation usage_observations = 6;
@@ -878,7 +878,7 @@ enum AutoHuntSource {
 // CLI ProtoJSON output. Attachments are wrapped separately because local
 // allocation adds a downloaded path or error to each attachment.
 message ClaimedIssuePayload {
-  optional string execution_id = 1;
+  string execution_id = 1;
   string run_id = 2;
   uint32 run_number = 3;
   uint32 current_attempt = 4;

@@ -200,22 +200,15 @@ export function workerExecutionPath(
   return [localBin, ...paths].join(delimiter);
 }
 
-/**
- * Issue executions must never share a runtime directory. Keep the execution
- * identity in the leaf name instead of nesting it below the legacy run-id
- * directory: a still-running older CLI may recursively remove that legacy
- * directory during cleanup.
- */
+/** Issue executions must never share a runtime directory. */
 export function issueWorkerSessionDirectory(
   configDirectory: string,
-  issue: Pick<ClaimedIssue, "runId" | "executionId"> & { claimAttempts: number },
+  issue: Pick<ClaimedIssue, "runId"> & { executionId: string },
 ): string {
-  const executionIdentity = issue.executionId ??
-    `claim-${issue.claimAttempts}`;
   return join(
     configDirectory,
     "worker-sessions",
-    `${issue.runId}--${executionIdentity}`,
+    `${issue.runId}--${issue.executionId}`,
   );
 }
 

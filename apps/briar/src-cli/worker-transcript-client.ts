@@ -313,12 +313,8 @@ export const issueExecutionTelemetryRequest = (
     executionId: input.work.executionId,
     agentProvider: agentProviderToProto(input.agentProvider),
     executionMetrics: executionMetricsToProto(input.executionMetrics),
-    usageObservations: input.work.executionId
-      ? input.usageObservations.map(usageObservationToProto)
-      : [],
-    costObservations: input.work.executionId
-      ? input.costObservations.map(costObservationToProto)
-      : [],
+    usageObservations: input.usageObservations.map(usageObservationToProto),
+    costObservations: input.costObservations.map(costObservationToProto),
   });
 
 export async function reportIssueExecutionTelemetry(
