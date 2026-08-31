@@ -233,3 +233,35 @@ fn preserves_workspace_allocation_failure_as_claimed_work() {
         Some("worktree creation failed")
     );
 }
+
+#[test]
+fn maps_generated_run_evidence_and_rejects_a_mismatched_run() {
+    let response: app_proto::ListRunEvidenceResponse = serde_json::from_value(serde_json::json!({
+        "runId": "515b7a2c-8918-5a8f-a292-f0b95090281c",
+        "evidence": [{
+            "key": "local-tests",
+            "attempt": 2,
+            "revision": 3,
+            "stage": "local_qa",
+            "type": "test",
+            "status": "STATUS_PASSED",
+            "detail": "Rust checks passed",
+            "actor": "briar-auto-hunt-runtime",
+            "observedAt": "2026-08-31T01:02:03Z",
+            "recordedAt": "2026-08-31T01:02:04Z",
+            "canonical": true,
+            "requiredRevision": 3
+        }]
+    }))
+    .expect("generated evidence ProtoJSON should decode");
+
+    let mapped = run_evidence_result(response.clone(), "515b7a2c-8918-5a8f-a292-f0b95090281c")
+        .expect("matching evidence should map");
+    assert_eq!(mapped.len(), 1);
+    assert_eq!(mapped[0]["key"], "local-tests");
+    assert_eq!(mapped[0]["status"], "passed");
+    assert_eq!(mapped[0]["requiredRevision"], 3);
+    assert_eq!(mapped[0]["canonical"], true);
+
+    assert!(run_evidence_result(response, "different-run").is_err());
+}

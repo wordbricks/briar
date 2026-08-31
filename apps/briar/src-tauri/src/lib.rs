@@ -102,6 +102,7 @@ mod project_config;
 mod project_execution;
 mod repository;
 mod settings;
+mod worker_connect;
 
 use agent_cli::*;
 use app_state::*;

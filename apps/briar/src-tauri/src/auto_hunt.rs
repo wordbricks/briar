@@ -1,8 +1,12 @@
 use super::*;
-use briar_contracts::proto::briar::{
-    app::v1 as app_proto, local::v1 as local_proto, types::v1 as types_proto,
-    worker::v1 as worker_proto,
+use briar_contracts::{
+    connect::briar::worker::v1::WorkerExecutionServiceClient,
+    proto::briar::{
+        app::v1 as app_proto, local::v1 as local_proto, types::v1 as types_proto,
+        worker::v1 as worker_proto,
+    },
 };
+use connectrpc::client::HttpClient;
 use tauri_specta::Event as _;
 
 #[derive(Debug)]
@@ -480,37 +484,24 @@ fn run_evidence_result(
 }
 
 pub(super) struct AutoHuntEvidenceCapture<'a> {
-    pub(super) runner: &'a dyn host::CommandRunner,
-    pub(super) cli_environment: &'a agent::AutoHuntCliEnvironment,
+    pub(super) client: &'a WorkerExecutionServiceClient<HttpClient>,
+    pub(super) project_id: &'a str,
     pub(super) store: &'a auto_hunt_dispatch::AutoHuntDispatchStore,
     pub(super) app: &'a tauri::AppHandle,
     pub(super) dispatch_group_id: &'a str,
 }
 
 impl AutoHuntEvidenceCapture<'_> {
-    fn capture(
-        &self,
-        workspace: &Path,
-        run_id: &str,
-        worker_session_id: &str,
-    ) -> Vec<serde_json::Value> {
-        let result = self
-            .cli_environment
-            .run_briar(
-                self.runner,
-                workspace,
-                ["run", "evidence", "list", "--run", run_id],
-            )
-            .and_then(|output| {
-                if !output.success() {
-                    return Err(output.failure_message());
-                }
-                let response = serde_json::from_str::<app_proto::ListRunEvidenceResponse>(
-                    output.stdout.trim(),
-                )
-                .map_err(|error| format!("run evidence ProtoJSON을 읽지 못했습니다: {error}"))?;
-                run_evidence_result(response, run_id)
-            });
+    fn capture(&self, run_id: &str, worker_session_id: &str) -> Vec<serde_json::Value> {
+        let result = tauri::async_runtime::block_on(self.client.list_run_evidence(
+            app_proto::ListRunEvidenceRequest {
+                project_id: self.project_id.to_string(),
+                run_id: run_id.to_string(),
+                ..Default::default()
+            },
+        ))
+        .map_err(|error| format!("run evidence Connect 조회에 실패했습니다: {error}"))
+        .and_then(|response| run_evidence_result(response.into_owned(), run_id));
         match result {
             Ok(evidence) => {
                 for item in &evidence {
@@ -729,6 +720,16 @@ pub(super) async fn start_project_auto_hunt(
         ensure_agent_session_running(&cancellation_signal)?;
         let (runner, workspace) =
             connected_project_runtime(&config_path, &project_id, &home)?;
+        let agent_token = read_cli_config(&config_path)?
+            .projects
+            .into_iter()
+            .find(|project| project.id == project_id)
+            .map(|project| project.agent_token)
+            .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
+        let (worker_transport, worker_config) =
+            worker_connect::authenticated_worker_connect(&request.api_url, &agent_token)?;
+        let worker_execution_client =
+            WorkerExecutionServiceClient::new(worker_transport, worker_config);
         let settings = project_llm_settings_from(&config_path, &project_id)?;
         let provider = request.agent_provider;
         if !app_provider_settings_from(&config_path)?.is_enabled(provider) {
@@ -978,17 +979,13 @@ pub(super) async fn start_project_auto_hunt(
                     first_conversation_id.get_or_insert_with(|| response.conversation_id.clone());
                     first_workspace.get_or_insert_with(|| response.workspace_root.clone());
                     let evidence = AutoHuntEvidenceCapture {
-                        runner: runner.as_ref(),
-                        cli_environment: &cli_environment,
+                        client: &worker_execution_client,
+                        project_id: &project_id,
                         store: &dispatch_store,
                         app: &dispatch_app,
                         dispatch_group_id: &request.session_id,
                     }
-                    .capture(
-                        &worker_workspace,
-                        &issue.run_id,
-                        &worker_session_id,
-                    );
+                    .capture(&issue.run_id, &worker_session_id);
                     workers.push(agent::ProjectAutoHuntWorkerResponse {
                         session_id: worker_session_id.clone(),
                         run_id: issue.run_id.clone(),
@@ -1058,17 +1055,13 @@ pub(super) async fn start_project_auto_hunt(
                         None => error,
                     };
                     let evidence = AutoHuntEvidenceCapture {
-                        runner: runner.as_ref(),
-                        cli_environment: &cli_environment,
+                        client: &worker_execution_client,
+                        project_id: &project_id,
                         store: &dispatch_store,
                         app: &dispatch_app,
                         dispatch_group_id: &request.session_id,
                     }
-                    .capture(
-                        &worker_workspace,
-                        &issue.run_id,
-                        &worker_session_id,
-                    );
+                    .capture(&issue.run_id, &worker_session_id);
                     issue_results.push(agent::ProjectAutoHuntIssueResult {
                         source_key: issue.source_key.clone(),
                         title: issue.title.clone(),
