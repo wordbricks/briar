@@ -195,6 +195,8 @@ describe("LinearImportService", () => {
         createdAt: observedAt,
         state: { id: "started-state", name: "Started", type: "started" },
         team: { id: "team-1", key: "CORE", name: "Core" },
+        parentId: null,
+        relations: [],
       }],
       truncated: false,
     });

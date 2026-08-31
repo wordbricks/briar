@@ -132,12 +132,40 @@ export const linearImportResultFromProto = (
   if (response.imported + response.skipped + response.failed !== response.total) {
     throw new Error("Linear import result counts are inconsistent");
   }
+  const relations = requiredMessage(response.relations, "linearImport.relations");
+  const hierarchy = requiredMessage(relations.hierarchy, "linearImport.relations.hierarchy");
+  const related = requiredMessage(relations.related, "linearImport.relations.related");
+  const dependencies = requiredMessage(relations.dependencies, "linearImport.relations.dependencies");
+  const unsupported = requiredMessage(relations.unsupported, "linearImport.relations.unsupported");
   return {
     imported: response.imported,
     skipped: response.skipped,
     failed: response.failed,
     total: response.total,
     truncated: response.truncated,
+    relations: {
+      hierarchy: {
+        linked: hierarchy.linked,
+        skipped: hierarchy.skipped,
+        outsideScope: hierarchy.outsideScope,
+        cycles: hierarchy.cycles,
+      },
+      related: {
+        linked: related.linked,
+        skipped: related.skipped,
+        outsideScope: related.outsideScope,
+      },
+      dependencies: {
+        linked: dependencies.linked,
+        skipped: dependencies.skipped,
+        outsideScope: dependencies.outsideScope,
+        cycles: dependencies.cycles,
+      },
+      unsupported: {
+        duplicate: unsupported.duplicate,
+        similar: unsupported.similar,
+      },
+    },
   };
 };
 

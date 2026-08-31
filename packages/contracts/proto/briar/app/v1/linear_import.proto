@@ -82,4 +82,24 @@ message ImportLinearIssuesResponse {
   uint32 failed = 3;
   uint32 total = 4;
   bool truncated = 5;
+  LinearImportRelations relations = 6;
+}
+
+message LinearImportRelationCounter {
+  uint32 linked = 1;
+  uint32 skipped = 2;
+  uint32 outside_scope = 3;
+  uint32 cycles = 4;
+}
+
+message LinearImportUnsupportedRelations {
+  uint32 duplicate = 1;
+  uint32 similar = 2;
+}
+
+message LinearImportRelations {
+  LinearImportRelationCounter hierarchy = 1;
+  LinearImportRelationCounter related = 2;
+  LinearImportRelationCounter dependencies = 3;
+  LinearImportUnsupportedRelations unsupported = 4;
 }

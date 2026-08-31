@@ -29,6 +29,8 @@ service IssueService {
   rpc UpdateIssuePreferences(UpdateIssuePreferencesRequest) returns (UpdateIssuePreferencesResponse);
   rpc UpdateIssueCheckpoints(UpdateIssueCheckpointsRequest) returns (UpdateIssueCheckpointsResponse);
   rpc SetIssueDependency(SetIssueDependencyRequest) returns (SetIssueDependencyResponse);
+  rpc SetIssueParent(SetIssueParentRequest) returns (SetIssueParentResponse);
+  rpc SetRelatedIssue(SetRelatedIssueRequest) returns (SetRelatedIssueResponse);
   rpc MoveRun(MoveRunRequest) returns (MoveRunResponse);
   // Shared intentionally with WorkerExecutionService so run control has one DTO.
   // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
@@ -124,6 +126,7 @@ message CreateIssueRequest {
   // for this exact project, client issue, and authenticated user.
   repeated briar.types.v1.UploadReference attachments = 17;
   optional string planning_project_id = 18;
+  optional string parent_run_id = 19;
 }
 
 message CreateIssueResponse {
@@ -135,6 +138,7 @@ message CreateIssueResponse {
   optional string assignee_user_id = 6;
   string created_by_user_id = 7;
   optional IssueDifficulty difficulty = 8;
+  optional string parent_run_id = 9;
 }
 
 message UpdateIssueRequest {
@@ -268,6 +272,49 @@ message SetIssueDependencyResponse {
 
   string prerequisite_run_id = 1;
   string dependent_run_id = 2;
+  Outcome outcome = 3;
+}
+
+message SetIssueParentRequest {
+  string project_id = 1;
+  string child_run_id = 2;
+  // Absence removes the current parent.
+  optional string parent_run_id = 3;
+}
+
+message SetIssueParentResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_CREATED = 1;
+    OUTCOME_UPDATED = 2;
+    OUTCOME_ALREADY_EXISTS = 3;
+    OUTCOME_REMOVED = 4;
+    OUTCOME_ALREADY_REMOVED = 5;
+  }
+
+  string child_run_id = 1;
+  optional string parent_run_id = 2;
+  Outcome outcome = 3;
+}
+
+message SetRelatedIssueRequest {
+  string project_id = 1;
+  string run_id = 2;
+  string related_run_id = 3;
+  bool enabled = 4;
+}
+
+message SetRelatedIssueResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_CREATED = 1;
+    OUTCOME_ALREADY_EXISTS = 2;
+    OUTCOME_REMOVED = 3;
+    OUTCOME_ALREADY_REMOVED = 4;
+  }
+
+  string run_id = 1;
+  string related_run_id = 2;
   Outcome outcome = 3;
 }
 

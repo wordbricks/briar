@@ -54,6 +54,40 @@ export const transferredIssueRelationStatements = (
       ),
     db
       .prepare(
+        `delete from briar_issue_parent_links
+         where project_id = ?
+           and (parent_run_id = ? or child_run_id = ?)
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+    db
+      .prepare(
+        `delete from briar_issue_relations
+         where project_id = ?
+           and (first_run_id = ? or second_run_id = ?)
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+    db
+      .prepare(
         `update briar_issue_attachments
          set project_id = ?
          where project_id = ? and run_id = ?

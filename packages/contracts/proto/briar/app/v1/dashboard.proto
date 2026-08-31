@@ -182,6 +182,9 @@ message DashboardRun {
   optional string team_id = 69;
   optional string planning_project_id = 70;
   optional string planning_project_name = 71;
+  optional IssueDependencyReference parent = 72;
+  repeated IssueDependencyReference sub_issues = 73;
+  repeated IssueDependencyReference related_issues = 74;
 }
 
 message TrackerReference {

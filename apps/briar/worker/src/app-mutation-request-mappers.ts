@@ -126,6 +126,9 @@ export const createIssueApplicationRequest = (
   priority: request.priority ?? null,
   difficulty: appIssueDifficulty(request.difficulty),
   assigneeUserId: request.assigneeUserId ?? null,
+  parentRunId: request.parentRunId === undefined
+    ? null
+    : canonicalAppUuid(request.parentRunId),
   status: appRunStatus(request.status),
   preferredProvider: request.preferredProvider === undefined
     ? null

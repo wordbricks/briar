@@ -536,6 +536,13 @@ export const appChannelNotification = (
 
 type DashboardRunJson = ReturnType<typeof dashboardRunJson>;
 
+const appIssueDependencyReference = (
+  dependency: DashboardRunJson["prerequisites"][number],
+) => create(IssueDependencyReferenceSchema, {
+  ...dependency,
+  status: runStatus[dependency.status],
+});
+
 export const appDashboardRun = (run: DashboardRunJson) =>
   create(DashboardRunSchema, {
     id: run.id,
@@ -601,18 +608,13 @@ export const appDashboardRun = (run: DashboardRunJson) =>
         url: attachment.url,
       })
     ),
-    prerequisites: run.prerequisites.map((dependency) =>
-      create(IssueDependencyReferenceSchema, {
-        ...dependency,
-        status: runStatus[dependency.status],
-      })
-    ),
-    dependents: run.dependents.map((dependency) =>
-      create(IssueDependencyReferenceSchema, {
-        ...dependency,
-        status: runStatus[dependency.status],
-      })
-    ),
+    parent: run.parent
+      ? appIssueDependencyReference(run.parent)
+      : undefined,
+    subIssues: run.subIssues.map(appIssueDependencyReference),
+    relatedIssues: run.relatedIssues.map(appIssueDependencyReference),
+    prerequisites: run.prerequisites.map(appIssueDependencyReference),
+    dependents: run.dependents.map(appIssueDependencyReference),
     executionReadiness: run.executionReadiness === "ready"
       ? DashboardRun_ExecutionReadiness.READY
       : DashboardRun_ExecutionReadiness.WAITING,

@@ -96,8 +96,9 @@ describe("app Issue Connect adapter", () => {
       stage: "queued",
       assigneeUserId: null,
       createdByUserId: userId,
-      difficulty: "normal",
-      attachments: [],
+        difficulty: "normal",
+        parentRunId: null,
+        attachments: [],
     });
     const { client, flushBackgroundTasks } = createIssueClient({ createIssue });
 

@@ -503,6 +503,12 @@ export function LinearIssueImport({
               {t("settings.linearImportTruncated")}
             </p>
           ) : null}
+          <ul className="grid gap-1 text-2xs text-muted-foreground">
+            <li>{t("settings.linearImportHierarchyResult", result.relations.hierarchy)}</li>
+            <li>{t("settings.linearImportRelatedResult", result.relations.related)}</li>
+            <li>{t("settings.linearImportDependenciesResult", result.relations.dependencies)}</li>
+            <li>{t("settings.linearImportUnsupportedResult", result.relations.unsupported)}</li>
+          </ul>
           <footer className="flex justify-end max-[760px]:[&>button]:w-full">
             <Button onClick={reset} type="button">
               <RefreshCw size={14} />

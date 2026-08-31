@@ -75,6 +75,7 @@ export const IssueCreateMutationReceiptResponse = strictSchema(Schema.Struct({
   assigneeUserId: Schema.NullOr(storedText(1, 200)),
   createdByUserId: storedText(1, 200),
   difficulty: Schema.NullOr(Schema.Literals(issueDifficulties)),
+  parentRunId: Schema.NullOr(StoredIdentifier),
   attachments: issueMutationAttachments,
 }));
 export type IssueCreateMutationReceiptResponse =

@@ -15,6 +15,8 @@ import type {
   HuntRunRow,
   IssueAttachmentRow,
   IssueDependencyRow,
+  IssueHierarchyRow,
+  IssueRelationRow,
   IssueResultReviewRow,
 } from "./db";
 import { runIsFullAuto } from "./hunt-run-codec";
@@ -75,6 +77,8 @@ export function dashboardRunJson(
   attachments: IssueAttachmentRow[],
   prerequisites: IssueDependencyRow[] = [],
   dependents: IssueDependencyRow[] = [],
+  hierarchy: IssueHierarchyRow[] = [],
+  relations: IssueRelationRow[] = [],
   resultReviews: IssueResultReviewRow[] = [],
 ) {
   const status = run.paused_at ? ("paused" as const) : run.status;
@@ -90,6 +94,8 @@ export function dashboardRunJson(
   const waitingOnPrerequisiteCount = prerequisites.filter(
     (dependency) => dependency.prerequisite_status !== "completed",
   ).length;
+  const parent = hierarchy.find((link) => link.child_run_id === run.id);
+  const subIssues = hierarchy.filter((link) => link.parent_run_id === run.id);
   const waitingCheckpoint = run.waiting_checkpoint_key
     ? workflow.execution.checkpoints.find(
         (checkpoint) => checkpoint.key === run.waiting_checkpoint_key,
@@ -174,6 +180,44 @@ export function dashboardRunJson(
     issueDescription: run.issue_description,
     relatedMessage,
     attachments: attachments.map(issueAttachmentJson),
+    parent: parent
+      ? {
+          id: parent.parent_run_id,
+          runNumber: parent.parent_run_number,
+          title: parent.parent_title,
+          status: dependencyStatus(
+            parent.parent_status,
+            parent.parent_paused_at,
+          ),
+        }
+      : null,
+    subIssues: subIssues.map((link) => ({
+      id: link.child_run_id,
+      runNumber: link.child_run_number,
+      title: link.child_title,
+      status: dependencyStatus(link.child_status, link.child_paused_at),
+    })),
+    relatedIssues: relations.map((relation) =>
+      relation.first_run_id === run.id
+        ? {
+            id: relation.second_run_id,
+            runNumber: relation.second_run_number,
+            title: relation.second_title,
+            status: dependencyStatus(
+              relation.second_status,
+              relation.second_paused_at,
+            ),
+          }
+        : {
+            id: relation.first_run_id,
+            runNumber: relation.first_run_number,
+            title: relation.first_title,
+            status: dependencyStatus(
+              relation.first_status,
+              relation.first_paused_at,
+            ),
+          },
+    ),
     prerequisites: prerequisites.map((dependency) => ({
       id: dependency.prerequisite_run_id,
       runNumber: dependency.prerequisite_run_number,

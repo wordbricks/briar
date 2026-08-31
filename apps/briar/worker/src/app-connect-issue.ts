@@ -8,6 +8,8 @@ import {
 } from "@connectrpc/connect";
 import {
   IssueService,
+  SetIssueParentResponse_Outcome,
+  SetRelatedIssueResponse_Outcome,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
@@ -67,6 +69,8 @@ import {
   createProjectIssue,
   deleteProjectIssue,
   setProjectIssueDependency,
+  setProjectIssueParent,
+  setProjectRelatedIssue,
   setProjectIssueSubscription,
   updateProjectIssue,
   updateProjectIssueCheckpoints,
@@ -138,6 +142,8 @@ export type AppConnectIssueServices = {
   readonly requireSession: typeof requireSession;
   readonly resumeRun: typeof resumeProjectIssueRun;
   readonly setDependency: typeof setProjectIssueDependency;
+  readonly setParent: typeof setProjectIssueParent;
+  readonly setRelated: typeof setProjectRelatedIssue;
   readonly setSubscription: typeof setProjectIssueSubscription;
   readonly syncMessages: typeof syncProjectIssueMessages;
   readonly transferIssue: typeof transferProjectIssue;
@@ -171,6 +177,8 @@ export const appConnectIssueServices: AppConnectIssueServices = {
   requireSession,
   resumeRun: resumeProjectIssueRun,
   setDependency: setProjectIssueDependency,
+  setParent: setProjectIssueParent,
+  setRelated: setProjectRelatedIssue,
   setSubscription: setProjectIssueSubscription,
   syncMessages: syncProjectIssueMessages,
   transferIssue: transferProjectIssue,
@@ -207,6 +215,30 @@ const preparedIssueAttachmentsResponse = (
 const optionalProviderBody = (provider: AgentProvider) => {
   const value = appAgentProviderFromProto(provider);
   return value === undefined ? {} : { provider: value };
+};
+
+const parentOutcome = (
+  outcome: "created" | "updated" | "already_exists" | "removed" |
+    "already_removed",
+) => {
+  switch (outcome) {
+    case "created": return SetIssueParentResponse_Outcome.CREATED;
+    case "updated": return SetIssueParentResponse_Outcome.UPDATED;
+    case "already_exists": return SetIssueParentResponse_Outcome.ALREADY_EXISTS;
+    case "removed": return SetIssueParentResponse_Outcome.REMOVED;
+    case "already_removed": return SetIssueParentResponse_Outcome.ALREADY_REMOVED;
+  }
+};
+
+const relatedOutcome = (
+  outcome: "created" | "already_exists" | "removed" | "already_removed",
+) => {
+  switch (outcome) {
+    case "created": return SetRelatedIssueResponse_Outcome.CREATED;
+    case "already_exists": return SetRelatedIssueResponse_Outcome.ALREADY_EXISTS;
+    case "removed": return SetRelatedIssueResponse_Outcome.REMOVED;
+    case "already_removed": return SetRelatedIssueResponse_Outcome.ALREADY_REMOVED;
+  }
 };
 
 const mutated = async <A>(
@@ -403,6 +435,48 @@ export const createAppIssueService = (
       })
     );
     return appSetIssueDependencyResponse(result);
+  },
+
+  setIssueParent: async (request) => {
+    const projectId = canonicalUuid(request.projectId);
+    const childRunId = canonicalUuid(request.childRunId);
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await mutated(input, [projectId], () =>
+      services.setParent({
+        db: input.db,
+        projectId,
+        childRunId,
+        parentRunId: request.parentRunId === undefined
+          ? null
+          : canonicalUuid(request.parentRunId),
+        userId: session.user.id,
+      })
+    );
+    return create(IssueService.method.setIssueParent.output, {
+      childRunId: result.childRunId,
+      parentRunId: result.parentRunId ?? undefined,
+      outcome: parentOutcome(result.outcome),
+    });
+  },
+
+  setRelatedIssue: async (request) => {
+    const projectId = canonicalUuid(request.projectId);
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await mutated(input, [projectId], () =>
+      services.setRelated({
+        db: input.db,
+        projectId,
+        runId: canonicalUuid(request.runId),
+        relatedRunId: canonicalUuid(request.relatedRunId),
+        enabled: request.enabled,
+        userId: session.user.id,
+      })
+    );
+    return create(IssueService.method.setRelatedIssue.output, {
+      runId: result.runId,
+      relatedRunId: result.relatedRunId,
+      outcome: relatedOutcome(result.outcome),
+    });
   },
 
   moveRun: async (request) => {

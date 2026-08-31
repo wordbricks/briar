@@ -12,7 +12,8 @@ func issueCreateRequest(
     projectID: UUID,
     clientIssueID: UUID,
     draft: IssueDraft,
-    attachments: [BriarTypes_UploadReference]
+    attachments: [BriarTypes_UploadReference],
+    parentRunID: UUID? = nil
 ) throws -> BriarAPI_CreateIssueRequest {
     var request = BriarAPI_CreateIssueRequest()
     request.projectID = issueUUIDString(projectID)
@@ -35,6 +36,7 @@ func issueCreateRequest(
     request.fullAuto = draft.fullAuto
     request.clientIssueID = issueUUIDString(clientIssueID)
     request.attachments = attachments
+    if let parentRunID { request.parentRunID = issueUUIDString(parentRunID) }
     return request
 }
 

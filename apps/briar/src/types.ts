@@ -54,6 +54,7 @@ export type CreateIssueInput = {
   priority: number | null;
   difficulty: IssueDifficulty | null;
   assigneeUserId?: string | null;
+  parentRunId?: string | null;
   status: "backlog" | "queued";
   attachments: File[];
   attachmentReferences?: string[];
@@ -353,6 +354,9 @@ export type HuntRun = {
   issueDescription: string | null;
   relatedMessage?: RelatedMessageReference | null;
   attachments: IssueAttachment[];
+  parent?: IssueDependencyReference | null;
+  subIssues?: IssueDependencyReference[];
+  relatedIssues?: IssueDependencyReference[];
   prerequisites?: IssueDependencyReference[];
   dependents?: IssueDependencyReference[];
   executionReadiness?: "ready" | "waiting";

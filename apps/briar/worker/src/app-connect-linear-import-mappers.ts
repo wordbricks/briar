@@ -2,6 +2,9 @@ import { create } from "@bufbuild/protobuf";
 import {
   ConnectLinearImportResponseSchema,
   ImportLinearIssuesResponseSchema,
+  LinearImportRelationCounterSchema,
+  LinearImportRelationsSchema,
+  LinearImportUnsupportedRelationsSchema,
   LinearImportViewerSchema,
   LinearTeamSchema,
   LinearWorkflowStateSchema,
@@ -68,6 +71,12 @@ export const appLinearImportResult = (result: {
   readonly skipped: number;
   readonly total: number;
   readonly truncated: boolean;
+  readonly relations: {
+    readonly hierarchy: { readonly linked: number; readonly skipped: number; readonly outsideScope: number; readonly cycles: number };
+    readonly related: { readonly linked: number; readonly skipped: number; readonly outsideScope: number };
+    readonly dependencies: { readonly linked: number; readonly skipped: number; readonly outsideScope: number; readonly cycles: number };
+    readonly unsupported: { readonly duplicate: number; readonly similar: number };
+  };
 }) => {
   const imported = uint32(result.imported, "imported");
   const skipped = uint32(result.skipped, "skipped");
@@ -82,5 +91,28 @@ export const appLinearImportResult = (result: {
     failed,
     total,
     truncated: result.truncated,
+    relations: create(LinearImportRelationsSchema, {
+      hierarchy: create(LinearImportRelationCounterSchema, {
+        linked: uint32(result.relations.hierarchy.linked, "relations.hierarchy.linked"),
+        skipped: uint32(result.relations.hierarchy.skipped, "relations.hierarchy.skipped"),
+        outsideScope: uint32(result.relations.hierarchy.outsideScope, "relations.hierarchy.outside_scope"),
+        cycles: uint32(result.relations.hierarchy.cycles, "relations.hierarchy.cycles"),
+      }),
+      related: create(LinearImportRelationCounterSchema, {
+        linked: uint32(result.relations.related.linked, "relations.related.linked"),
+        skipped: uint32(result.relations.related.skipped, "relations.related.skipped"),
+        outsideScope: uint32(result.relations.related.outsideScope, "relations.related.outside_scope"),
+      }),
+      dependencies: create(LinearImportRelationCounterSchema, {
+        linked: uint32(result.relations.dependencies.linked, "relations.dependencies.linked"),
+        skipped: uint32(result.relations.dependencies.skipped, "relations.dependencies.skipped"),
+        outsideScope: uint32(result.relations.dependencies.outsideScope, "relations.dependencies.outside_scope"),
+        cycles: uint32(result.relations.dependencies.cycles, "relations.dependencies.cycles"),
+      }),
+      unsupported: create(LinearImportUnsupportedRelationsSchema, {
+        duplicate: uint32(result.relations.unsupported.duplicate, "relations.unsupported.duplicate"),
+        similar: uint32(result.relations.unsupported.similar, "relations.unsupported.similar"),
+      }),
+    }),
   });
 };

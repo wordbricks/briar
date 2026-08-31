@@ -12,6 +12,8 @@ import {
   RetryRunResponse_Outcome as ProtoRetryOutcome,
   RunEvidence_Status as ProtoRunEvidenceStatus,
   SetIssueDependencyResponse_Outcome as ProtoDependencyOutcome,
+  SetIssueParentResponse_Outcome as ProtoParentOutcome,
+  SetRelatedIssueResponse_Outcome as ProtoRelatedOutcome,
   TransferIssueResponse_Outcome as ProtoTransferOutcome,
   UnassignRunResponse_Outcome as ProtoUnassignOutcome,
   type CreateIssueMessageResponse as CreateIssueMessageResponseMessage,
@@ -238,6 +240,7 @@ export const createIssueRequestFromInput = (
   checkpoints: (input.checkpoints ?? []).map(workflowCheckpointToProto),
   clientIssueId: mutation.clientIssueId,
   attachments: mutation.attachmentIds.map((uploadId) => ({ uploadId })),
+  parentRunId: input.parentRunId ?? undefined,
 });
 
 export type CreateIssueResult = {
@@ -248,6 +251,7 @@ export type CreateIssueResult = {
   assigneeUserId: string | null;
   createdByUserId: string;
   difficulty: CreateIssueInput["difficulty"];
+  parentRunId: string | null;
   attachments: UpdateIssueResult["attachments"];
 };
 
@@ -269,6 +273,7 @@ const createIssueResultFromMessage = (
     assigneeUserId: response.assigneeUserId ?? null,
     createdByUserId: response.createdByUserId,
     difficulty: issueDifficultyFromProto(response.difficulty),
+    parentRunId: response.parentRunId ?? null,
     attachments: response.attachments.map(issueAttachmentFromProto),
   };
 };
@@ -589,6 +594,83 @@ export async function removeIssueDependency(
     response.outcome !== ProtoDependencyOutcome.ALREADY_REMOVED
   ) {
     throw new Error(`Unknown removed issue dependency outcome: ${response.outcome}`);
+  }
+}
+
+export async function setIssueParent(
+  token: string,
+  projectId: string,
+  childRunId: string,
+  parentRunId: string,
+) {
+  const response = await requireIssueClient().setIssueParent(
+    { projectId, childRunId, parentRunId },
+    appCallOptions(token),
+  );
+  switch (response.outcome) {
+    case ProtoParentOutcome.CREATED:
+      return { ...response, outcome: "created" as const };
+    case ProtoParentOutcome.UPDATED:
+      return { ...response, outcome: "updated" as const };
+    case ProtoParentOutcome.ALREADY_EXISTS:
+      return { ...response, outcome: "already_exists" as const };
+    default:
+      throw new Error(`Unknown set parent outcome: ${response.outcome}`);
+  }
+}
+
+export async function removeIssueParent(
+  token: string,
+  projectId: string,
+  childRunId: string,
+) {
+  const response = await requireIssueClient().setIssueParent(
+    { projectId, childRunId },
+    appCallOptions(token),
+  );
+  if (
+    response.outcome !== ProtoParentOutcome.REMOVED
+    && response.outcome !== ProtoParentOutcome.ALREADY_REMOVED
+  ) {
+    throw new Error(`Unknown remove parent outcome: ${response.outcome}`);
+  }
+}
+
+export async function addRelatedIssue(
+  token: string,
+  projectId: string,
+  runId: string,
+  relatedRunId: string,
+) {
+  const response = await requireIssueClient().setRelatedIssue(
+    { projectId, runId, relatedRunId, enabled: true },
+    appCallOptions(token),
+  );
+  switch (response.outcome) {
+    case ProtoRelatedOutcome.CREATED:
+      return { ...response, outcome: "created" as const };
+    case ProtoRelatedOutcome.ALREADY_EXISTS:
+      return { ...response, outcome: "already_exists" as const };
+    default:
+      throw new Error(`Unknown add related issue outcome: ${response.outcome}`);
+  }
+}
+
+export async function removeRelatedIssue(
+  token: string,
+  projectId: string,
+  runId: string,
+  relatedRunId: string,
+) {
+  const response = await requireIssueClient().setRelatedIssue(
+    { projectId, runId, relatedRunId, enabled: false },
+    appCallOptions(token),
+  );
+  if (
+    response.outcome !== ProtoRelatedOutcome.REMOVED
+    && response.outcome !== ProtoRelatedOutcome.ALREADY_REMOVED
+  ) {
+    throw new Error(`Unknown remove related issue outcome: ${response.outcome}`);
   }
 }
 

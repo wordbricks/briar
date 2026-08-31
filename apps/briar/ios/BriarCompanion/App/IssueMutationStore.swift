@@ -46,7 +46,8 @@ final class IssueMutationStore: ObservableObject {
     func createIssue(
         draft: IssueDraft,
         attachments: [PendingIssueAttachment],
-        attachmentReferences: [String]? = nil
+        attachmentReferences: [String]? = nil,
+        parentRunId: UUID? = nil
     ) async throws {
         try await perform("create") {
             let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -104,7 +105,8 @@ final class IssueMutationStore: ObservableObject {
                     projectID: projectID,
                     clientIssueID: clientIssueID,
                     draft: normalizedDraft,
-                    attachments: uploadReferences
+                    attachments: uploadReferences,
+                    parentRunID: parentRunId
                 )
             if let planningProjectID {
                 request.planningProjectID = coreUUIDString(planningProjectID)
@@ -318,6 +320,45 @@ final class IssueMutationStore: ObservableObject {
                 request: request,
                 headers: [:]
             ).briarValue()
+        }
+    }
+
+    func setParent(runID: UUID, parentID: UUID?) async throws {
+        try await perform("parent-\(runID)") {
+            var request = BriarAPI_SetIssueParentRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.childRunID = coreUUIDString(runID)
+            if let parentID { request.parentRunID = coreUUIDString(parentID) }
+            let response = try await issueService.setIssueParent(
+                request: request,
+                headers: [:]
+            ).briarValue()
+            switch response.outcome {
+            case .created, .updated, .alreadyExists, .removed, .alreadyRemoved:
+                break
+            case .unspecified, .UNRECOGNIZED:
+                throw MobileAPIError.invalidResponse
+            }
+        }
+    }
+
+    func setRelated(runID: UUID, relatedID: UUID, enabled: Bool) async throws {
+        try await perform("related-\(runID)-\(relatedID)") {
+            var request = BriarAPI_SetRelatedIssueRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.runID = coreUUIDString(runID)
+            request.relatedRunID = coreUUIDString(relatedID)
+            request.enabled = enabled
+            let response = try await issueService.setRelatedIssue(
+                request: request,
+                headers: [:]
+            ).briarValue()
+            switch response.outcome {
+            case .created, .alreadyExists, .removed, .alreadyRemoved:
+                break
+            case .unspecified, .UNRECOGNIZED:
+                throw MobileAPIError.invalidResponse
+            }
         }
     }
 

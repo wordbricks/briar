@@ -5563,6 +5563,22 @@ pub type OwnedSetIssueDependencyRequestView = ::buffa::view::OwnedView<
 pub type OwnedSetIssueDependencyResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::SetIssueDependencyResponseView<'static>,
 >;
+///Shorthand for `OwnedView<SetIssueParentRequestView<'static>>`.
+pub type OwnedSetIssueParentRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::SetIssueParentRequestView<'static>,
+>;
+///Shorthand for `OwnedView<SetIssueParentResponseView<'static>>`.
+pub type OwnedSetIssueParentResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::SetIssueParentResponseView<'static>,
+>;
+///Shorthand for `OwnedView<SetRelatedIssueRequestView<'static>>`.
+pub type OwnedSetRelatedIssueRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::SetRelatedIssueRequestView<'static>,
+>;
+///Shorthand for `OwnedView<SetRelatedIssueResponseView<'static>>`.
+pub type OwnedSetRelatedIssueResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::SetRelatedIssueResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<MoveRunRequestView<'static>>`.
 pub type OwnedMoveRunRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::MoveRunRequestView<'static>,
@@ -6053,6 +6069,74 @@ for crate::proto::briar::app::v1::__buffa::view::SetIssueDependencyResponseView<
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::SetIssueDependencyResponse>
 for ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::SetIssueDependencyResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::SetIssueParentResponse>
+for crate::proto::briar::app::v1::__buffa::view::SetIssueParentResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::SetIssueParentResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::SetIssueParentResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::SetRelatedIssueResponse>
+for crate::proto::briar::app::v1::__buffa::view::SetRelatedIssueResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::SetRelatedIssueResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::SetRelatedIssueResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -6851,6 +6935,18 @@ pub const ISSUE_SERVICE_SET_ISSUE_DEPENDENCY_SPEC: ::connectrpc::Spec = ::connec
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `SetIssueParent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ISSUE_SERVICE_SET_ISSUE_PARENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.IssueService/SetIssueParent",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `SetRelatedIssue` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ISSUE_SERVICE_SET_RELATED_ISSUE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.IssueService/SetRelatedIssue",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `MoveRun` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const ISSUE_SERVICE_MOVE_RUN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.IssueService/MoveRun",
@@ -7259,6 +7355,52 @@ pub trait IssueService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::SetIssueDependencyResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the SetIssueParent RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn set_issue_parent<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::SetIssueParentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::SetIssueParentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the SetRelatedIssue RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn set_related_issue<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::SetRelatedIssueRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::SetRelatedIssueResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -8073,6 +8215,64 @@ impl<S: IssueService> IssueServiceExt for S {
             .with_spec(ISSUE_SERVICE_SET_ISSUE_DEPENDENCY_SPEC)
             .route_view(
                 ISSUE_SERVICE_SERVICE_NAME,
+                "SetIssueParent",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::SetIssueParentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::SetIssueParentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.set_issue_parent(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::SetIssueParentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ISSUE_SERVICE_SET_ISSUE_PARENT_SPEC)
+            .route_view(
+                ISSUE_SERVICE_SERVICE_NAME,
+                "SetRelatedIssue",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::SetRelatedIssueRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::SetRelatedIssueRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.set_related_issue(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::SetRelatedIssueResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ISSUE_SERVICE_SET_RELATED_ISSUE_SPEC)
+            .route_view(
+                ISSUE_SERVICE_SERVICE_NAME,
                 "MoveRun",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -8794,6 +8994,18 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
                         .with_spec(ISSUE_SERVICE_SET_ISSUE_DEPENDENCY_SPEC),
                 )
             }
+            "SetIssueParent" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ISSUE_SERVICE_SET_ISSUE_PARENT_SPEC),
+                )
+            }
+            "SetRelatedIssue" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ISSUE_SERVICE_SET_RELATED_ISSUE_SPEC),
+                )
+            }
             "MoveRun" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -9154,6 +9366,50 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::SetIssueDependencyResponse,
+                        >(format)
+                })
+            }
+            "SetIssueParent" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::SetIssueParentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::SetIssueParentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::SetIssueParentRequest,
+                    >::from_parts(&req, &body);
+                    svc.set_issue_parent(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::SetIssueParentResponse,
+                        >(format)
+                })
+            }
+            "SetRelatedIssue" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::SetRelatedIssueRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::SetRelatedIssueRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::SetRelatedIssueRequest,
+                    >::from_parts(&req, &body);
+                    svc.set_related_issue(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::SetRelatedIssueResponse,
                         >(format)
                 })
             }
@@ -10189,6 +10445,96 @@ where
                 &self.transport,
                 &self.config,
                 ISSUE_SERVICE_SET_ISSUE_DEPENDENCY_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SetIssueParent RPC. Sends a request to /briar.app.v1.IssueService/SetIssueParent.
+    pub async fn set_issue_parent(
+        &self,
+        request: crate::proto::briar::app::v1::SetIssueParentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::SetIssueParentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.set_issue_parent_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SetIssueParent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn set_issue_parent_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::SetIssueParentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::SetIssueParentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ISSUE_SERVICE_SET_ISSUE_PARENT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SetRelatedIssue RPC. Sends a request to /briar.app.v1.IssueService/SetRelatedIssue.
+    pub async fn set_related_issue(
+        &self,
+        request: crate::proto::briar::app::v1::SetRelatedIssueRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::SetRelatedIssueResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.set_related_issue_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SetRelatedIssue RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn set_related_issue_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::SetRelatedIssueRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::SetRelatedIssueResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ISSUE_SERVICE_SET_RELATED_ISSUE_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

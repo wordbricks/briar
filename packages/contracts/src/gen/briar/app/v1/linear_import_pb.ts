@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/app/v1/linear_import.proto.
  */
 export const file_briar_app_v1_linear_import: GenFile = /*@__PURE__*/
-  fileDesc("CiBicmlhci9hcHAvdjEvbGluZWFyX2ltcG9ydC5wcm90bxIMYnJpYXIuYXBwLnYxIlsKEkxpbmVhckltcG9ydFZpZXdlchIMCgRuYW1lGAEgASgJEhIKBWVtYWlsGAIgASgJSACIAQESGQoRb3JnYW5pemF0aW9uX25hbWUYAyABKAlCCAoGX2VtYWlsIjMKCkxpbmVhclRlYW0SCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRILCgNrZXkYAyABKAkilAEKE0xpbmVhcldvcmtmbG93U3RhdGUSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIMCgR0eXBlGAMgASgJEg0KBWNvbG9yGAQgASgJEhAKCHBvc2l0aW9uGAUgASgBEg8KB3RlYW1faWQYBiABKAkSEAoIdGVhbV9rZXkYByABKAkSEQoJdGVhbV9uYW1lGAggASgJIkEKGkNvbm5lY3RMaW5lYXJJbXBvcnRSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSDwoHYXBpX2tleRgCIAEoCSJ4ChtDb25uZWN0TGluZWFySW1wb3J0UmVzcG9uc2USMAoGdmlld2VyGAEgASgLMiAuYnJpYXIuYXBwLnYxLkxpbmVhckltcG9ydFZpZXdlchInCgV0ZWFtcxgCIAMoCzIYLmJyaWFyLmFwcC52MS5MaW5lYXJUZWFtIlYKHUxpc3RMaW5lYXJJbXBvcnRTdGF0ZXNSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSDwoHYXBpX2tleRgCIAEoCRIQCgh0ZWFtX2lkcxgDIAMoCSJTCh5MaXN0TGluZWFySW1wb3J0U3RhdGVzUmVzcG9uc2USMQoGc3RhdGVzGAEgAygLMiEuYnJpYXIuYXBwLnYxLkxpbmVhcldvcmtmbG93U3RhdGUifAoTTGluZWFyU3RhdHVzTWFwcGluZxIQCghzdGF0ZV9pZBgBIAEoCRIpCgZzdGF0dXMYAiABKA4yFy5icmlhci5hcHAudjEuUnVuU3RhdHVzSAASGwoRd29ya2Zsb3dfc3RhZ2VfaWQYAyABKAlIAEILCglwbGFjZW1lbnQijgEKGUltcG9ydExpbmVhcklzc3Vlc1JlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCRIPCgdhcGlfa2V5GAIgASgJEhAKCHRlYW1faWRzGAMgAygJEjoKD3N0YXR1c19tYXBwaW5ncxgEIAMoCzIhLmJyaWFyLmFwcC52MS5MaW5lYXJTdGF0dXNNYXBwaW5nInEKGkltcG9ydExpbmVhcklzc3Vlc1Jlc3BvbnNlEhAKCGltcG9ydGVkGAEgASgNEg8KB3NraXBwZWQYAiABKA0SDgoGZmFpbGVkGAMgASgNEg0KBXRvdGFsGAQgASgNEhEKCXRydW5jYXRlZBgFIAEoCDLfAgoTTGluZWFySW1wb3J0U2VydmljZRJqChNDb25uZWN0TGluZWFySW1wb3J0EiguYnJpYXIuYXBwLnYxLkNvbm5lY3RMaW5lYXJJbXBvcnRSZXF1ZXN0GikuYnJpYXIuYXBwLnYxLkNvbm5lY3RMaW5lYXJJbXBvcnRSZXNwb25zZRJzChZMaXN0TGluZWFySW1wb3J0U3RhdGVzEisuYnJpYXIuYXBwLnYxLkxpc3RMaW5lYXJJbXBvcnRTdGF0ZXNSZXF1ZXN0GiwuYnJpYXIuYXBwLnYxLkxpc3RMaW5lYXJJbXBvcnRTdGF0ZXNSZXNwb25zZRJnChJJbXBvcnRMaW5lYXJJc3N1ZXMSJy5icmlhci5hcHAudjEuSW1wb3J0TGluZWFySXNzdWVzUmVxdWVzdBooLmJyaWFyLmFwcC52MS5JbXBvcnRMaW5lYXJJc3N1ZXNSZXNwb25zZUIMugIJQnJpYXJBUElfYgZwcm90bzM", [file_briar_app_v1_common]);
+  fileDesc("CiBicmlhci9hcHAvdjEvbGluZWFyX2ltcG9ydC5wcm90bxIMYnJpYXIuYXBwLnYxIlsKEkxpbmVhckltcG9ydFZpZXdlchIMCgRuYW1lGAEgASgJEhIKBWVtYWlsGAIgASgJSACIAQESGQoRb3JnYW5pemF0aW9uX25hbWUYAyABKAlCCAoGX2VtYWlsIjMKCkxpbmVhclRlYW0SCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRILCgNrZXkYAyABKAkilAEKE0xpbmVhcldvcmtmbG93U3RhdGUSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIMCgR0eXBlGAMgASgJEg0KBWNvbG9yGAQgASgJEhAKCHBvc2l0aW9uGAUgASgBEg8KB3RlYW1faWQYBiABKAkSEAoIdGVhbV9rZXkYByABKAkSEQoJdGVhbV9uYW1lGAggASgJIkEKGkNvbm5lY3RMaW5lYXJJbXBvcnRSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSDwoHYXBpX2tleRgCIAEoCSJ4ChtDb25uZWN0TGluZWFySW1wb3J0UmVzcG9uc2USMAoGdmlld2VyGAEgASgLMiAuYnJpYXIuYXBwLnYxLkxpbmVhckltcG9ydFZpZXdlchInCgV0ZWFtcxgCIAMoCzIYLmJyaWFyLmFwcC52MS5MaW5lYXJUZWFtIlYKHUxpc3RMaW5lYXJJbXBvcnRTdGF0ZXNSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSDwoHYXBpX2tleRgCIAEoCRIQCgh0ZWFtX2lkcxgDIAMoCSJTCh5MaXN0TGluZWFySW1wb3J0U3RhdGVzUmVzcG9uc2USMQoGc3RhdGVzGAEgAygLMiEuYnJpYXIuYXBwLnYxLkxpbmVhcldvcmtmbG93U3RhdGUifAoTTGluZWFyU3RhdHVzTWFwcGluZxIQCghzdGF0ZV9pZBgBIAEoCRIpCgZzdGF0dXMYAiABKA4yFy5icmlhci5hcHAudjEuUnVuU3RhdHVzSAASGwoRd29ya2Zsb3dfc3RhZ2VfaWQYAyABKAlIAEILCglwbGFjZW1lbnQijgEKGUltcG9ydExpbmVhcklzc3Vlc1JlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCRIPCgdhcGlfa2V5GAIgASgJEhAKCHRlYW1faWRzGAMgAygJEjoKD3N0YXR1c19tYXBwaW5ncxgEIAMoCzIhLmJyaWFyLmFwcC52MS5MaW5lYXJTdGF0dXNNYXBwaW5nIqkBChpJbXBvcnRMaW5lYXJJc3N1ZXNSZXNwb25zZRIQCghpbXBvcnRlZBgBIAEoDRIPCgdza2lwcGVkGAIgASgNEg4KBmZhaWxlZBgDIAEoDRINCgV0b3RhbBgEIAEoDRIRCgl0cnVuY2F0ZWQYBSABKAgSNgoJcmVsYXRpb25zGAYgASgLMiMuYnJpYXIuYXBwLnYxLkxpbmVhckltcG9ydFJlbGF0aW9ucyJlChtMaW5lYXJJbXBvcnRSZWxhdGlvbkNvdW50ZXISDgoGbGlua2VkGAEgASgNEg8KB3NraXBwZWQYAiABKA0SFQoNb3V0c2lkZV9zY29wZRgDIAEoDRIOCgZjeWNsZXMYBCABKA0iRgogTGluZWFySW1wb3J0VW5zdXBwb3J0ZWRSZWxhdGlvbnMSEQoJZHVwbGljYXRlGAEgASgNEg8KB3NpbWlsYXIYAiABKA0ilwIKFUxpbmVhckltcG9ydFJlbGF0aW9ucxI8CgloaWVyYXJjaHkYASABKAsyKS5icmlhci5hcHAudjEuTGluZWFySW1wb3J0UmVsYXRpb25Db3VudGVyEjoKB3JlbGF0ZWQYAiABKAsyKS5icmlhci5hcHAudjEuTGluZWFySW1wb3J0UmVsYXRpb25Db3VudGVyEj8KDGRlcGVuZGVuY2llcxgDIAEoCzIpLmJyaWFyLmFwcC52MS5MaW5lYXJJbXBvcnRSZWxhdGlvbkNvdW50ZXISQwoLdW5zdXBwb3J0ZWQYBCABKAsyLi5icmlhci5hcHAudjEuTGluZWFySW1wb3J0VW5zdXBwb3J0ZWRSZWxhdGlvbnMy3wIKE0xpbmVhckltcG9ydFNlcnZpY2USagoTQ29ubmVjdExpbmVhckltcG9ydBIoLmJyaWFyLmFwcC52MS5Db25uZWN0TGluZWFySW1wb3J0UmVxdWVzdBopLmJyaWFyLmFwcC52MS5Db25uZWN0TGluZWFySW1wb3J0UmVzcG9uc2UScwoWTGlzdExpbmVhckltcG9ydFN0YXRlcxIrLmJyaWFyLmFwcC52MS5MaXN0TGluZWFySW1wb3J0U3RhdGVzUmVxdWVzdBosLmJyaWFyLmFwcC52MS5MaXN0TGluZWFySW1wb3J0U3RhdGVzUmVzcG9uc2USZwoSSW1wb3J0TGluZWFySXNzdWVzEicuYnJpYXIuYXBwLnYxLkltcG9ydExpbmVhcklzc3Vlc1JlcXVlc3QaKC5icmlhci5hcHAudjEuSW1wb3J0TGluZWFySXNzdWVzUmVzcG9uc2VCDLoCCUJyaWFyQVBJX2IGcHJvdG8z", [file_briar_app_v1_common]);
 
 /**
  * @generated from message briar.app.v1.LinearImportViewer
@@ -305,6 +305,11 @@ export type ImportLinearIssuesResponse = Message<"briar.app.v1.ImportLinearIssue
    * @generated from field: bool truncated = 5;
    */
   truncated: boolean;
+
+  /**
+   * @generated from field: briar.app.v1.LinearImportRelations relations = 6;
+   */
+  relations?: LinearImportRelations | undefined;
 };
 
 /**
@@ -313,6 +318,92 @@ export type ImportLinearIssuesResponse = Message<"briar.app.v1.ImportLinearIssue
  */
 export const ImportLinearIssuesResponseSchema: GenMessage<ImportLinearIssuesResponse> = /*@__PURE__*/
   messageDesc(file_briar_app_v1_linear_import, 9);
+
+/**
+ * @generated from message briar.app.v1.LinearImportRelationCounter
+ */
+export type LinearImportRelationCounter = Message<"briar.app.v1.LinearImportRelationCounter"> & {
+  /**
+   * @generated from field: uint32 linked = 1;
+   */
+  linked: number;
+
+  /**
+   * @generated from field: uint32 skipped = 2;
+   */
+  skipped: number;
+
+  /**
+   * @generated from field: uint32 outside_scope = 3;
+   */
+  outsideScope: number;
+
+  /**
+   * @generated from field: uint32 cycles = 4;
+   */
+  cycles: number;
+};
+
+/**
+ * Describes the message briar.app.v1.LinearImportRelationCounter.
+ * Use `create(LinearImportRelationCounterSchema)` to create a new message.
+ */
+export const LinearImportRelationCounterSchema: GenMessage<LinearImportRelationCounter> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_linear_import, 10);
+
+/**
+ * @generated from message briar.app.v1.LinearImportUnsupportedRelations
+ */
+export type LinearImportUnsupportedRelations = Message<"briar.app.v1.LinearImportUnsupportedRelations"> & {
+  /**
+   * @generated from field: uint32 duplicate = 1;
+   */
+  duplicate: number;
+
+  /**
+   * @generated from field: uint32 similar = 2;
+   */
+  similar: number;
+};
+
+/**
+ * Describes the message briar.app.v1.LinearImportUnsupportedRelations.
+ * Use `create(LinearImportUnsupportedRelationsSchema)` to create a new message.
+ */
+export const LinearImportUnsupportedRelationsSchema: GenMessage<LinearImportUnsupportedRelations> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_linear_import, 11);
+
+/**
+ * @generated from message briar.app.v1.LinearImportRelations
+ */
+export type LinearImportRelations = Message<"briar.app.v1.LinearImportRelations"> & {
+  /**
+   * @generated from field: briar.app.v1.LinearImportRelationCounter hierarchy = 1;
+   */
+  hierarchy?: LinearImportRelationCounter | undefined;
+
+  /**
+   * @generated from field: briar.app.v1.LinearImportRelationCounter related = 2;
+   */
+  related?: LinearImportRelationCounter | undefined;
+
+  /**
+   * @generated from field: briar.app.v1.LinearImportRelationCounter dependencies = 3;
+   */
+  dependencies?: LinearImportRelationCounter | undefined;
+
+  /**
+   * @generated from field: briar.app.v1.LinearImportUnsupportedRelations unsupported = 4;
+   */
+  unsupported?: LinearImportUnsupportedRelations | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.LinearImportRelations.
+ * Use `create(LinearImportRelationsSchema)` to create a new message.
+ */
+export const LinearImportRelationsSchema: GenMessage<LinearImportRelations> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_linear_import, 12);
 
 /**
  * LinearImportService owns the authenticated one-time import control plane.

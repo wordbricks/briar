@@ -48,6 +48,26 @@ export type LinearImportResult = {
   failed: number;
   total: number;
   truncated: boolean;
+  relations: {
+    hierarchy: {
+      linked: number;
+      skipped: number;
+      outsideScope: number;
+      cycles: number;
+    };
+    related: {
+      linked: number;
+      skipped: number;
+      outsideScope: number;
+    };
+    dependencies: {
+      linked: number;
+      skipped: number;
+      outsideScope: number;
+      cycles: number;
+    };
+    unsupported: { duplicate: number; similar: number };
+  };
 };
 
 export function placementKey(placement: LinearImportPlacement): string {

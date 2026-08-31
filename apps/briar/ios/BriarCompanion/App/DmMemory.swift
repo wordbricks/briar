@@ -247,9 +247,9 @@ struct DmMemoryView: View {
                 }
                 if let page = store.page {
                     Section(text("설정", "Settings")) {
-                        if page.spaces.count > 1 {
+                        if page.spaces.count > 1, page.hasSelectedSpaceID {
                             Picker(text("기억 공간", "Memory space"), selection: Binding(
-                                get: { page.selectedSpaceID ?? "" },
+                                get: { page.selectedSpaceID },
                                 set: { value in Task { await store.load(spaceID: value) } }
                             )) {
                                 ForEach(page.spaces, id: \.id) { space in
@@ -302,7 +302,7 @@ struct DmMemoryView: View {
                                 }
                             }
                         }
-                        if page.nextCursor != nil {
+                        if page.hasNextCursor {
                             Button(text("더 보기", "Load more")) { Task { await store.load(more: true) } }
                         }
                         if store.writable {

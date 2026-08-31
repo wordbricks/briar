@@ -241,6 +241,15 @@ public nonisolated struct BriarAPI_CreateIssueRequest: Sendable {
   /// Clears the value of `planningProjectID`. Subsequent reads from it will return its default value.
   public mutating func clearPlanningProjectID() {self._planningProjectID = nil}
 
+  public var parentRunID: String {
+    get {_parentRunID ?? String()}
+    set {_parentRunID = newValue}
+  }
+  /// Returns true if `parentRunID` has been explicitly set.
+  public var hasParentRunID: Bool {self._parentRunID != nil}
+  /// Clears the value of `parentRunID`. Subsequent reads from it will return its default value.
+  public mutating func clearParentRunID() {self._parentRunID = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -253,6 +262,7 @@ public nonisolated struct BriarAPI_CreateIssueRequest: Sendable {
   fileprivate var _preferredModel: String? = nil
   fileprivate var _preferredEffort: String? = nil
   fileprivate var _planningProjectID: String? = nil
+  fileprivate var _parentRunID: String? = nil
 }
 
 public nonisolated struct BriarAPI_CreateIssueResponse: Sendable {
@@ -290,12 +300,22 @@ public nonisolated struct BriarAPI_CreateIssueResponse: Sendable {
   /// Clears the value of `difficulty`. Subsequent reads from it will return its default value.
   public mutating func clearDifficulty() {self._difficulty = nil}
 
+  public var parentRunID: String {
+    get {_parentRunID ?? String()}
+    set {_parentRunID = newValue}
+  }
+  /// Returns true if `parentRunID` has been explicitly set.
+  public var hasParentRunID: Bool {self._parentRunID != nil}
+  /// Clears the value of `parentRunID`. Subsequent reads from it will return its default value.
+  public mutating func clearParentRunID() {self._parentRunID = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _assigneeUserID: String? = nil
   fileprivate var _difficulty: BriarAPI_IssueDifficulty? = nil
+  fileprivate var _parentRunID: String? = nil
 }
 
 public nonisolated struct BriarAPI_UpdateIssueRequest: Sendable {
@@ -780,6 +800,187 @@ public nonisolated struct BriarAPI_SetIssueDependencyResponse: Sendable {
 
     // The compiler won't synthesize support with the UNRECOGNIZED case.
     public static let allCases: [BriarAPI_SetIssueDependencyResponse.Outcome] = [
+      .unspecified,
+      .created,
+      .alreadyExists,
+      .removed,
+      .alreadyRemoved,
+    ]
+
+  }
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_SetIssueParentRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var childRunID: String = String()
+
+  /// Absence removes the current parent.
+  public var parentRunID: String {
+    get {_parentRunID ?? String()}
+    set {_parentRunID = newValue}
+  }
+  /// Returns true if `parentRunID` has been explicitly set.
+  public var hasParentRunID: Bool {self._parentRunID != nil}
+  /// Clears the value of `parentRunID`. Subsequent reads from it will return its default value.
+  public mutating func clearParentRunID() {self._parentRunID = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _parentRunID: String? = nil
+}
+
+public nonisolated struct BriarAPI_SetIssueParentResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var childRunID: String = String()
+
+  public var parentRunID: String {
+    get {_parentRunID ?? String()}
+    set {_parentRunID = newValue}
+  }
+  /// Returns true if `parentRunID` has been explicitly set.
+  public var hasParentRunID: Bool {self._parentRunID != nil}
+  /// Clears the value of `parentRunID`. Subsequent reads from it will return its default value.
+  public mutating func clearParentRunID() {self._parentRunID = nil}
+
+  public var outcome: BriarAPI_SetIssueParentResponse.Outcome = .unspecified
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum Outcome: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+    case unspecified // = 0
+    case created // = 1
+    case updated // = 2
+    case alreadyExists // = 3
+    case removed // = 4
+    case alreadyRemoved // = 5
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .created
+      case 2: self = .updated
+      case 3: self = .alreadyExists
+      case 4: self = .removed
+      case 5: self = .alreadyRemoved
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .created: return 1
+      case .updated: return 2
+      case .alreadyExists: return 3
+      case .removed: return 4
+      case .alreadyRemoved: return 5
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [BriarAPI_SetIssueParentResponse.Outcome] = [
+      .unspecified,
+      .created,
+      .updated,
+      .alreadyExists,
+      .removed,
+      .alreadyRemoved,
+    ]
+
+  }
+
+  public init() {}
+
+  fileprivate var _parentRunID: String? = nil
+}
+
+public nonisolated struct BriarAPI_SetRelatedIssueRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var runID: String = String()
+
+  public var relatedRunID: String = String()
+
+  public var enabled: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_SetRelatedIssueResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var runID: String = String()
+
+  public var relatedRunID: String = String()
+
+  public var outcome: BriarAPI_SetRelatedIssueResponse.Outcome = .unspecified
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum Outcome: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+    case unspecified // = 0
+    case created // = 1
+    case alreadyExists // = 2
+    case removed // = 3
+    case alreadyRemoved // = 4
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .created
+      case 2: self = .alreadyExists
+      case 3: self = .removed
+      case 4: self = .alreadyRemoved
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .created: return 1
+      case .alreadyExists: return 2
+      case .removed: return 3
+      case .alreadyRemoved: return 4
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [BriarAPI_SetRelatedIssueResponse.Outcome] = [
       .unspecified,
       .created,
       .alreadyExists,
@@ -3187,7 +3388,7 @@ nonisolated extension BriarAPI_PrepareIssueAttachmentsResponse: SwiftProtobuf.Me
 
 nonisolated extension BriarAPI_CreateIssueRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateIssueRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{2}\u{2}title\0\u{1}description\0\u{1}priority\0\u{1}difficulty\0\u{3}assignee_user_id\0\u{1}status\0\u{3}preferred_provider\0\u{3}preferred_model\0\u{3}preferred_effort\0\u{3}full_auto\0\u{2}\u{2}checkpoints\0\u{4}\u{2}client_issue_id\0\u{1}attachments\0\u{3}planning_project_id\0\u{c}\u{2}\u{1}\u{c}\u{d}\u{1}\u{c}\u{f}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{2}\u{2}title\0\u{1}description\0\u{1}priority\0\u{1}difficulty\0\u{3}assignee_user_id\0\u{1}status\0\u{3}preferred_provider\0\u{3}preferred_model\0\u{3}preferred_effort\0\u{3}full_auto\0\u{2}\u{2}checkpoints\0\u{4}\u{2}client_issue_id\0\u{1}attachments\0\u{3}planning_project_id\0\u{3}parent_run_id\0\u{c}\u{2}\u{1}\u{c}\u{d}\u{1}\u{c}\u{f}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3210,6 +3411,7 @@ nonisolated extension BriarAPI_CreateIssueRequest: SwiftProtobuf.Message, SwiftP
       case 16: try { try decoder.decodeSingularStringField(value: &self.clientIssueID) }()
       case 17: try { try decoder.decodeRepeatedMessageField(value: &self.attachments) }()
       case 18: try { try decoder.decodeSingularStringField(value: &self._planningProjectID) }()
+      case 19: try { try decoder.decodeSingularStringField(value: &self._parentRunID) }()
       default: break
       }
     }
@@ -3265,6 +3467,9 @@ nonisolated extension BriarAPI_CreateIssueRequest: SwiftProtobuf.Message, SwiftP
     try { if let v = self._planningProjectID {
       try visitor.visitSingularStringField(value: v, fieldNumber: 18)
     } }()
+    try { if let v = self._parentRunID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 19)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -3284,6 +3489,7 @@ nonisolated extension BriarAPI_CreateIssueRequest: SwiftProtobuf.Message, SwiftP
     if lhs.clientIssueID != rhs.clientIssueID {return false}
     if lhs.attachments != rhs.attachments {return false}
     if lhs._planningProjectID != rhs._planningProjectID {return false}
+    if lhs._parentRunID != rhs._parentRunID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3291,7 +3497,7 @@ nonisolated extension BriarAPI_CreateIssueRequest: SwiftProtobuf.Message, SwiftP
 
 nonisolated extension BriarAPI_CreateIssueResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateIssueResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}run_id\0\u{3}source_key\0\u{1}status\0\u{1}stage\0\u{1}attachments\0\u{3}assignee_user_id\0\u{3}created_by_user_id\0\u{1}difficulty\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}run_id\0\u{3}source_key\0\u{1}status\0\u{1}stage\0\u{1}attachments\0\u{3}assignee_user_id\0\u{3}created_by_user_id\0\u{1}difficulty\0\u{3}parent_run_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3307,6 +3513,7 @@ nonisolated extension BriarAPI_CreateIssueResponse: SwiftProtobuf.Message, Swift
       case 6: try { try decoder.decodeSingularStringField(value: &self._assigneeUserID) }()
       case 7: try { try decoder.decodeSingularStringField(value: &self.createdByUserID) }()
       case 8: try { try decoder.decodeSingularEnumField(value: &self._difficulty) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self._parentRunID) }()
       default: break
       }
     }
@@ -3341,6 +3548,9 @@ nonisolated extension BriarAPI_CreateIssueResponse: SwiftProtobuf.Message, Swift
     try { if let v = self._difficulty {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 8)
     } }()
+    try { if let v = self._parentRunID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 9)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -3353,6 +3563,7 @@ nonisolated extension BriarAPI_CreateIssueResponse: SwiftProtobuf.Message, Swift
     if lhs._assigneeUserID != rhs._assigneeUserID {return false}
     if lhs.createdByUserID != rhs.createdByUserID {return false}
     if lhs._difficulty != rhs._difficulty {return false}
+    if lhs._parentRunID != rhs._parentRunID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4071,6 +4282,187 @@ nonisolated extension BriarAPI_SetIssueDependencyResponse: SwiftProtobuf.Message
 }
 
 nonisolated extension BriarAPI_SetIssueDependencyResponse.Outcome: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0OUTCOME_UNSPECIFIED\0\u{1}OUTCOME_CREATED\0\u{1}OUTCOME_ALREADY_EXISTS\0\u{1}OUTCOME_REMOVED\0\u{1}OUTCOME_ALREADY_REMOVED\0")
+}
+
+nonisolated extension BriarAPI_SetIssueParentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SetIssueParentRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}child_run_id\0\u{3}parent_run_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.childRunID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._parentRunID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    if !self.childRunID.isEmpty {
+      try visitor.visitSingularStringField(value: self.childRunID, fieldNumber: 2)
+    }
+    try { if let v = self._parentRunID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_SetIssueParentRequest, rhs: BriarAPI_SetIssueParentRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.childRunID != rhs.childRunID {return false}
+    if lhs._parentRunID != rhs._parentRunID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_SetIssueParentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SetIssueParentResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}child_run_id\0\u{3}parent_run_id\0\u{1}outcome\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.childRunID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._parentRunID) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.outcome) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.childRunID.isEmpty {
+      try visitor.visitSingularStringField(value: self.childRunID, fieldNumber: 1)
+    }
+    try { if let v = self._parentRunID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    if self.outcome != .unspecified {
+      try visitor.visitSingularEnumField(value: self.outcome, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_SetIssueParentResponse, rhs: BriarAPI_SetIssueParentResponse) -> Bool {
+    if lhs.childRunID != rhs.childRunID {return false}
+    if lhs._parentRunID != rhs._parentRunID {return false}
+    if lhs.outcome != rhs.outcome {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_SetIssueParentResponse.Outcome: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0OUTCOME_UNSPECIFIED\0\u{1}OUTCOME_CREATED\0\u{1}OUTCOME_UPDATED\0\u{1}OUTCOME_ALREADY_EXISTS\0\u{1}OUTCOME_REMOVED\0\u{1}OUTCOME_ALREADY_REMOVED\0")
+}
+
+nonisolated extension BriarAPI_SetRelatedIssueRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SetRelatedIssueRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}related_run_id\0\u{1}enabled\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.relatedRunID) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    if !self.runID.isEmpty {
+      try visitor.visitSingularStringField(value: self.runID, fieldNumber: 2)
+    }
+    if !self.relatedRunID.isEmpty {
+      try visitor.visitSingularStringField(value: self.relatedRunID, fieldNumber: 3)
+    }
+    if self.enabled != false {
+      try visitor.visitSingularBoolField(value: self.enabled, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_SetRelatedIssueRequest, rhs: BriarAPI_SetRelatedIssueRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.runID != rhs.runID {return false}
+    if lhs.relatedRunID != rhs.relatedRunID {return false}
+    if lhs.enabled != rhs.enabled {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_SetRelatedIssueResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SetRelatedIssueResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}run_id\0\u{3}related_run_id\0\u{1}outcome\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.runID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.relatedRunID) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.outcome) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.runID.isEmpty {
+      try visitor.visitSingularStringField(value: self.runID, fieldNumber: 1)
+    }
+    if !self.relatedRunID.isEmpty {
+      try visitor.visitSingularStringField(value: self.relatedRunID, fieldNumber: 2)
+    }
+    if self.outcome != .unspecified {
+      try visitor.visitSingularEnumField(value: self.outcome, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_SetRelatedIssueResponse, rhs: BriarAPI_SetRelatedIssueResponse) -> Bool {
+    if lhs.runID != rhs.runID {return false}
+    if lhs.relatedRunID != rhs.relatedRunID {return false}
+    if lhs.outcome != rhs.outcome {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_SetRelatedIssueResponse.Outcome: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0OUTCOME_UNSPECIFIED\0\u{1}OUTCOME_CREATED\0\u{1}OUTCOME_ALREADY_EXISTS\0\u{1}OUTCOME_REMOVED\0\u{1}OUTCOME_ALREADY_REMOVED\0")
 }
 

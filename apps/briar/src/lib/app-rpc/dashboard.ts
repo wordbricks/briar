@@ -190,6 +190,26 @@ const dashboardRunFromProto = (run: DashboardRunMessage): HuntRun => ({
     ? null
     : relatedMessageFromProto(run.relatedMessage),
   attachments: run.attachments.map(issueAttachmentFromProto),
+  parent: run.parent === undefined
+    ? null
+    : {
+        id: run.parent.id,
+        runNumber: run.parent.runNumber,
+        title: run.parent.title,
+        status: runStatusFromProto(run.parent.status),
+      },
+  subIssues: run.subIssues.map((relation) => ({
+    id: relation.id,
+    runNumber: relation.runNumber,
+    title: relation.title,
+    status: runStatusFromProto(relation.status),
+  })),
+  relatedIssues: run.relatedIssues.map((relation) => ({
+    id: relation.id,
+    runNumber: relation.runNumber,
+    title: relation.title,
+    status: runStatusFromProto(relation.status),
+  })),
   prerequisites: run.prerequisites.map((dependency) => ({
     id: dependency.id,
     runNumber: dependency.runNumber,

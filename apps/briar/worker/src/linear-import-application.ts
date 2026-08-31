@@ -215,6 +215,8 @@ export async function importLinearIssuesApplication(
         state: issue.state?.name ?? null,
       },
       sourceCreatedAt: issue.createdAt,
+      parentIssueId: issue.parentId,
+      relations: issue.relations,
     };
   });
   const result = await services.importLinearHuntRuns(

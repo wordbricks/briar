@@ -3502,6 +3502,14 @@ export function App({
         currentUserId={briar.user?.id ?? null}
         onAddDependency={(prerequisiteRunId) =>
           briar.addIssueDependency(inboxDetailRun.id, prerequisiteRunId)}
+        onAddRelated={(relatedRunId) =>
+          briar.addRelatedIssue(inboxDetailRun.id, relatedRunId)}
+        onLinkSubIssue={(childRunId) =>
+          briar.setIssueParent(childRunId, inboxDetailRun.id)}
+        onSetParent={(parentRunId) =>
+          briar.setIssueParent(inboxDetailRun.id, parentRunId)}
+        onUnlinkSubIssue={(childRunId) =>
+          briar.setIssueParent(childRunId, null)}
         onAcceptIssueAction={(proposal) =>
           briar.acceptConversationIssueAction(inboxDetailRun.id, proposal)}
         onAcceptIssueExecution={(proposal, input) =>
@@ -3563,6 +3571,8 @@ export function App({
         }}
         onRemoveDependency={(prerequisiteRunId) =>
           briar.removeIssueDependency(inboxDetailRun.id, prerequisiteRunId)}
+        onRemoveRelated={(relatedRunId) =>
+          briar.removeRelatedIssue(inboxDetailRun.id, relatedRunId)}
         onRetry={() => briar.retryRun(inboxDetailRun.id)}
         onRework={(input) => briar.reworkRun(inboxDetailRun.id, input)}
         onResume={() => briar.resumeRun(inboxDetailRun.id)}
@@ -4431,10 +4441,13 @@ export function App({
             }}
             onMoveIssueProject={briar.moveIssueProject}
             onAddIssueDependency={briar.addIssueDependency}
+            onAddRelatedIssue={briar.addRelatedIssue}
             onAcceptIssueAction={briar.acceptConversationIssueAction}
             onAcceptIssueExecution={briar.acceptConversationIssueExecution}
             onAcceptSkillExecution={briar.acceptConversationSkillExecution}
             onRemoveIssueDependency={briar.removeIssueDependency}
+            onRemoveRelatedIssue={briar.removeRelatedIssue}
+            onSetIssueParent={briar.setIssueParent}
             onRelatedMessageOpen={(relatedMessage) => {
               setPendingBriarLink({ kind: "channel", ...relatedMessage });
             }}
@@ -4788,10 +4801,13 @@ export function App({
             onTransferIssue={briar.transferIssue}
             onMoveIssueProject={briar.moveIssueProject}
             onAddIssueDependency={briar.addIssueDependency}
+            onAddRelatedIssue={briar.addRelatedIssue}
             onAcceptIssueAction={briar.acceptConversationIssueAction}
             onAcceptIssueExecution={briar.acceptConversationIssueExecution}
             onAcceptSkillExecution={briar.acceptConversationSkillExecution}
             onRemoveIssueDependency={briar.removeIssueDependency}
+            onRemoveRelatedIssue={briar.removeRelatedIssue}
+            onSetIssueParent={briar.setIssueParent}
             onRelatedMessageOpen={(relatedMessage) => {
               setPendingBriarLink({ kind: "channel", ...relatedMessage });
             }}

@@ -52,6 +52,13 @@ import { listProjectMembers } from "./organization-repository";
 import { schedulePostCommitCleanup } from "./post-commit-cleanup";
 import { decodeIssueCheckpointsInput } from "./run-request-contract";
 import { getPlanningProjectForUser } from "./hierarchy-repository";
+import {
+  createIssueParentStatement,
+  createIssueRelation,
+  deleteIssueParent,
+  deleteIssueRelation,
+  setIssueParent,
+} from "./issue-relation-repository";
 
 async function requireIssueAssigneeMembership(
   db: D1Database,
@@ -143,6 +150,7 @@ export async function createProjectIssue(
     description: issue.description ?? null,
     priority: issue.priority ?? null,
     assigneeUserId: issue.assigneeUserId ?? null,
+    parentRunId: issue.parentRunId ?? null,
     preferredProvider: issue.preferredProvider ?? null,
     preferredModel: issue.preferredModel ?? null,
     preferredEffort: issue.preferredEffort ?? null,
@@ -195,6 +203,19 @@ export async function createProjectIssue(
     project.id,
     canonicalIssue.assigneeUserId,
   );
+  if (canonicalIssue.parentRunId === input.clientIssueId) {
+    throw new HttpError(409, "An issue cannot be its own parent");
+  }
+  if (
+    canonicalIssue.parentRunId !== null
+    && !await getHuntRunForProject(
+      input.db,
+      project.id,
+      canonicalIssue.parentRunId,
+    )
+  ) {
+    throw new HttpError(404, "Parent issue not found");
+  }
   const referencedAttachmentIds = issueAttachmentReferences(
     canonicalIssue.description,
   );
@@ -236,6 +257,7 @@ export async function createProjectIssue(
     assigneeUserId: canonicalIssue.assigneeUserId,
     createdByUserId: input.userId,
     difficulty: canonicalIssue.difficulty,
+    parentRunId: canonicalIssue.parentRunId,
     attachments: attachmentRows.map(issueAttachmentJson),
   });
   try {
@@ -297,6 +319,15 @@ export async function createProjectIssue(
                  returning id`,
               ).bind(planningProject.id, input.clientIssueId, project.id),
             ]
+          : []),
+        ...(canonicalIssue.parentRunId
+          ? [createIssueParentStatement(input.db, {
+              projectId: project.id,
+              childRunId: input.clientIssueId,
+              parentRunId: canonicalIssue.parentRunId,
+              createdByUserId: input.userId,
+              createdAt: recordedAt,
+            })]
           : []),
         issueCreateMutationReceiptStatement(input.db, {
           clientIssueId: input.clientIssueId,
@@ -712,6 +743,84 @@ export async function setProjectIssueDependency(
     dependentRunId: input.dependentRunId,
     outcome,
   };
+}
+
+export async function setProjectIssueParent(
+  input: IssueCoreApplicationInput & {
+    childRunId: string;
+    parentRunId: string | null;
+  },
+) {
+  const project = await requireIssueProject(
+    input,
+    "issues:write",
+    "Issue editing permission required",
+  );
+  if (input.parentRunId === null) {
+    const deleted = await deleteIssueParent(input.db, project.id, input.childRunId);
+    return {
+      childRunId: input.childRunId,
+      parentRunId: null,
+      outcome: deleted ? "removed" as const : "already_removed" as const,
+    };
+  }
+  const outcome = await setIssueParent(input.db, project.id, {
+    childRunId: input.childRunId,
+    parentRunId: input.parentRunId,
+    createdByUserId: input.userId,
+    createdAt: new Date().toISOString(),
+  });
+  if (outcome === "not_found") {
+    throw new HttpError(404, "Parent or child issue not found");
+  }
+  if (outcome === "cycle") {
+    throw new HttpError(409, "Parent issue would create a hierarchy cycle");
+  }
+  return {
+    childRunId: input.childRunId,
+    parentRunId: input.parentRunId,
+    outcome,
+  };
+}
+
+export async function setProjectRelatedIssue(
+  input: IssueCoreApplicationInput & {
+    runId: string;
+    relatedRunId: string;
+    enabled: boolean;
+  },
+) {
+  const project = await requireIssueProject(
+    input,
+    "issues:write",
+    "Issue editing permission required",
+  );
+  if (!input.enabled) {
+    const deleted = await deleteIssueRelation(
+      input.db,
+      project.id,
+      input.runId,
+      input.relatedRunId,
+    );
+    return {
+      runId: input.runId,
+      relatedRunId: input.relatedRunId,
+      outcome: deleted ? "removed" as const : "already_removed" as const,
+    };
+  }
+  const outcome = await createIssueRelation(input.db, project.id, {
+    runId: input.runId,
+    relatedRunId: input.relatedRunId,
+    createdByUserId: input.userId,
+    createdAt: new Date().toISOString(),
+  });
+  if (outcome === "not_found") {
+    throw new HttpError(404, "Related issue not found");
+  }
+  if (outcome === "ineligible") {
+    throw new HttpError(409, "An issue cannot be related to itself");
+  }
+  return { runId: input.runId, relatedRunId: input.relatedRunId, outcome };
 }
 
 export async function updateProjectIssuePreferences(

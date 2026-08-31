@@ -41,6 +41,10 @@ open class BriarAPI_IssueServiceClientMock: BriarAPI_IssueServiceClientInterface
     public var mockAsyncUpdateIssueCheckpoints = { (_: BriarAPI_UpdateIssueCheckpointsRequest) -> ResponseMessage<BriarAPI_UpdateIssueCheckpointsResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `setIssueDependency()`.
     public var mockAsyncSetIssueDependency = { (_: BriarAPI_SetIssueDependencyRequest) -> ResponseMessage<BriarAPI_SetIssueDependencyResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `setIssueParent()`.
+    public var mockAsyncSetIssueParent = { (_: BriarAPI_SetIssueParentRequest) -> ResponseMessage<BriarAPI_SetIssueParentResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `setRelatedIssue()`.
+    public var mockAsyncSetRelatedIssue = { (_: BriarAPI_SetRelatedIssueRequest) -> ResponseMessage<BriarAPI_SetRelatedIssueResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `moveRun()`.
     public var mockAsyncMoveRun = { (_: BriarAPI_MoveRunRequest) -> ResponseMessage<BriarAPI_MoveRunResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `retryRun()`.
@@ -124,6 +128,14 @@ open class BriarAPI_IssueServiceClientMock: BriarAPI_IssueServiceClientInterface
 
     open func `setIssueDependency`(request: BriarAPI_SetIssueDependencyRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SetIssueDependencyResponse> {
         return self.mockAsyncSetIssueDependency(request)
+    }
+
+    open func `setIssueParent`(request: BriarAPI_SetIssueParentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SetIssueParentResponse> {
+        return self.mockAsyncSetIssueParent(request)
+    }
+
+    open func `setRelatedIssue`(request: BriarAPI_SetRelatedIssueRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SetRelatedIssueResponse> {
+        return self.mockAsyncSetRelatedIssue(request)
     }
 
     open func `moveRun`(request: BriarAPI_MoveRunRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_MoveRunResponse> {

@@ -210,24 +210,133 @@ public nonisolated struct BriarAPI_ImportLinearIssuesRequest: Sendable {
   public init() {}
 }
 
-public nonisolated struct BriarAPI_ImportLinearIssuesResponse: Sendable {
+public nonisolated struct BriarAPI_ImportLinearIssuesResponse: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var imported: UInt32 = 0
+  public var imported: UInt32 {
+    get {_storage._imported}
+    set {_uniqueStorage()._imported = newValue}
+  }
 
-  public var skipped: UInt32 = 0
+  public var skipped: UInt32 {
+    get {_storage._skipped}
+    set {_uniqueStorage()._skipped = newValue}
+  }
 
-  public var failed: UInt32 = 0
+  public var failed: UInt32 {
+    get {_storage._failed}
+    set {_uniqueStorage()._failed = newValue}
+  }
 
-  public var total: UInt32 = 0
+  public var total: UInt32 {
+    get {_storage._total}
+    set {_uniqueStorage()._total = newValue}
+  }
 
-  public var truncated: Bool = false
+  public var truncated: Bool {
+    get {_storage._truncated}
+    set {_uniqueStorage()._truncated = newValue}
+  }
+
+  public var relations: BriarAPI_LinearImportRelations {
+    get {_storage._relations ?? BriarAPI_LinearImportRelations()}
+    set {_uniqueStorage()._relations = newValue}
+  }
+  /// Returns true if `relations` has been explicitly set.
+  public var hasRelations: Bool {_storage._relations != nil}
+  /// Clears the value of `relations`. Subsequent reads from it will return its default value.
+  public mutating func clearRelations() {_uniqueStorage()._relations = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public nonisolated struct BriarAPI_LinearImportRelationCounter: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var linked: UInt32 = 0
+
+  public var skipped: UInt32 = 0
+
+  public var outsideScope: UInt32 = 0
+
+  public var cycles: UInt32 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_LinearImportUnsupportedRelations: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var duplicate: UInt32 = 0
+
+  public var similar: UInt32 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_LinearImportRelations: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var hierarchy: BriarAPI_LinearImportRelationCounter {
+    get {_hierarchy ?? BriarAPI_LinearImportRelationCounter()}
+    set {_hierarchy = newValue}
+  }
+  /// Returns true if `hierarchy` has been explicitly set.
+  public var hasHierarchy: Bool {self._hierarchy != nil}
+  /// Clears the value of `hierarchy`. Subsequent reads from it will return its default value.
+  public mutating func clearHierarchy() {self._hierarchy = nil}
+
+  public var related: BriarAPI_LinearImportRelationCounter {
+    get {_related ?? BriarAPI_LinearImportRelationCounter()}
+    set {_related = newValue}
+  }
+  /// Returns true if `related` has been explicitly set.
+  public var hasRelated: Bool {self._related != nil}
+  /// Clears the value of `related`. Subsequent reads from it will return its default value.
+  public mutating func clearRelated() {self._related = nil}
+
+  public var dependencies: BriarAPI_LinearImportRelationCounter {
+    get {_dependencies ?? BriarAPI_LinearImportRelationCounter()}
+    set {_dependencies = newValue}
+  }
+  /// Returns true if `dependencies` has been explicitly set.
+  public var hasDependencies: Bool {self._dependencies != nil}
+  /// Clears the value of `dependencies`. Subsequent reads from it will return its default value.
+  public mutating func clearDependencies() {self._dependencies = nil}
+
+  public var unsupported: BriarAPI_LinearImportUnsupportedRelations {
+    get {_unsupported ?? BriarAPI_LinearImportUnsupportedRelations()}
+    set {_unsupported = newValue}
+  }
+  /// Returns true if `unsupported` has been explicitly set.
+  public var hasUnsupported: Bool {self._unsupported != nil}
+  /// Clears the value of `unsupported`. Subsequent reads from it will return its default value.
+  public mutating func clearUnsupported() {self._unsupported = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _hierarchy: BriarAPI_LinearImportRelationCounter? = nil
+  fileprivate var _related: BriarAPI_LinearImportRelationCounter? = nil
+  fileprivate var _dependencies: BriarAPI_LinearImportRelationCounter? = nil
+  fileprivate var _unsupported: BriarAPI_LinearImportUnsupportedRelations? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -636,7 +745,112 @@ nonisolated extension BriarAPI_ImportLinearIssuesRequest: SwiftProtobuf.Message,
 
 nonisolated extension BriarAPI_ImportLinearIssuesResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ImportLinearIssuesResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}imported\0\u{1}skipped\0\u{1}failed\0\u{1}total\0\u{1}truncated\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}imported\0\u{1}skipped\0\u{1}failed\0\u{1}total\0\u{1}truncated\0\u{1}relations\0")
+
+  fileprivate class _StorageClass {
+    var _imported: UInt32 = 0
+    var _skipped: UInt32 = 0
+    var _failed: UInt32 = 0
+    var _total: UInt32 = 0
+    var _truncated: Bool = false
+    var _relations: BriarAPI_LinearImportRelations? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _imported = source._imported
+      _skipped = source._skipped
+      _failed = source._failed
+      _total = source._total
+      _truncated = source._truncated
+      _relations = source._relations
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularUInt32Field(value: &_storage._imported) }()
+        case 2: try { try decoder.decodeSingularUInt32Field(value: &_storage._skipped) }()
+        case 3: try { try decoder.decodeSingularUInt32Field(value: &_storage._failed) }()
+        case 4: try { try decoder.decodeSingularUInt32Field(value: &_storage._total) }()
+        case 5: try { try decoder.decodeSingularBoolField(value: &_storage._truncated) }()
+        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._relations) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._imported != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._imported, fieldNumber: 1)
+      }
+      if _storage._skipped != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._skipped, fieldNumber: 2)
+      }
+      if _storage._failed != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._failed, fieldNumber: 3)
+      }
+      if _storage._total != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._total, fieldNumber: 4)
+      }
+      if _storage._truncated != false {
+        try visitor.visitSingularBoolField(value: _storage._truncated, fieldNumber: 5)
+      }
+      try { if let v = _storage._relations {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+      } }()
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ImportLinearIssuesResponse, rhs: BriarAPI_ImportLinearIssuesResponse) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._imported != rhs_storage._imported {return false}
+        if _storage._skipped != rhs_storage._skipped {return false}
+        if _storage._failed != rhs_storage._failed {return false}
+        if _storage._total != rhs_storage._total {return false}
+        if _storage._truncated != rhs_storage._truncated {return false}
+        if _storage._relations != rhs_storage._relations {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_LinearImportRelationCounter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LinearImportRelationCounter"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}linked\0\u{1}skipped\0\u{3}outside_scope\0\u{1}cycles\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -644,41 +858,120 @@ nonisolated extension BriarAPI_ImportLinearIssuesResponse: SwiftProtobuf.Message
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt32Field(value: &self.imported) }()
+      case 1: try { try decoder.decodeSingularUInt32Field(value: &self.linked) }()
       case 2: try { try decoder.decodeSingularUInt32Field(value: &self.skipped) }()
-      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.failed) }()
-      case 4: try { try decoder.decodeSingularUInt32Field(value: &self.total) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self.truncated) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.outsideScope) }()
+      case 4: try { try decoder.decodeSingularUInt32Field(value: &self.cycles) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.imported != 0 {
-      try visitor.visitSingularUInt32Field(value: self.imported, fieldNumber: 1)
+    if self.linked != 0 {
+      try visitor.visitSingularUInt32Field(value: self.linked, fieldNumber: 1)
     }
     if self.skipped != 0 {
       try visitor.visitSingularUInt32Field(value: self.skipped, fieldNumber: 2)
     }
-    if self.failed != 0 {
-      try visitor.visitSingularUInt32Field(value: self.failed, fieldNumber: 3)
+    if self.outsideScope != 0 {
+      try visitor.visitSingularUInt32Field(value: self.outsideScope, fieldNumber: 3)
     }
-    if self.total != 0 {
-      try visitor.visitSingularUInt32Field(value: self.total, fieldNumber: 4)
-    }
-    if self.truncated != false {
-      try visitor.visitSingularBoolField(value: self.truncated, fieldNumber: 5)
+    if self.cycles != 0 {
+      try visitor.visitSingularUInt32Field(value: self.cycles, fieldNumber: 4)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_ImportLinearIssuesResponse, rhs: BriarAPI_ImportLinearIssuesResponse) -> Bool {
-    if lhs.imported != rhs.imported {return false}
+  public static func ==(lhs: BriarAPI_LinearImportRelationCounter, rhs: BriarAPI_LinearImportRelationCounter) -> Bool {
+    if lhs.linked != rhs.linked {return false}
     if lhs.skipped != rhs.skipped {return false}
-    if lhs.failed != rhs.failed {return false}
-    if lhs.total != rhs.total {return false}
-    if lhs.truncated != rhs.truncated {return false}
+    if lhs.outsideScope != rhs.outsideScope {return false}
+    if lhs.cycles != rhs.cycles {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_LinearImportUnsupportedRelations: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LinearImportUnsupportedRelations"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}duplicate\0\u{1}similar\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt32Field(value: &self.duplicate) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.similar) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.duplicate != 0 {
+      try visitor.visitSingularUInt32Field(value: self.duplicate, fieldNumber: 1)
+    }
+    if self.similar != 0 {
+      try visitor.visitSingularUInt32Field(value: self.similar, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_LinearImportUnsupportedRelations, rhs: BriarAPI_LinearImportUnsupportedRelations) -> Bool {
+    if lhs.duplicate != rhs.duplicate {return false}
+    if lhs.similar != rhs.similar {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_LinearImportRelations: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LinearImportRelations"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}hierarchy\0\u{1}related\0\u{1}dependencies\0\u{1}unsupported\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._hierarchy) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._related) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._dependencies) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._unsupported) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._hierarchy {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._related {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._dependencies {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._unsupported {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_LinearImportRelations, rhs: BriarAPI_LinearImportRelations) -> Bool {
+    if lhs._hierarchy != rhs._hierarchy {return false}
+    if lhs._related != rhs._related {return false}
+    if lhs._dependencies != rhs._dependencies {return false}
+    if lhs._unsupported != rhs._unsupported {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

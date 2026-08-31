@@ -251,6 +251,7 @@ export const appCreateIssueResponse = (result: CreateIssueResult) =>
     assigneeUserId: result.assigneeUserId ?? undefined,
     createdByUserId: result.createdByUserId,
     difficulty: appDifficulty(result.difficulty),
+    parentRunId: result.parentRunId ?? undefined,
   });
 
 export const appUpdateIssueResponse = (result: UpdateIssueResult) =>

@@ -55,6 +55,9 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let issueDescription: String?
     let relatedMessage: RelatedMessageReference?
     let attachments: [IssueAttachment]?
+    let parent: IssueDependencyReference?
+    let subIssues: [IssueDependencyReference]?
+    let relatedIssues: [IssueDependencyReference]?
     let prerequisites: [IssueDependencyReference]?
     let dependents: [IssueDependencyReference]?
     let executionReadiness: String?
@@ -113,6 +116,9 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         issueDescription: String? = nil,
         relatedMessage: RelatedMessageReference? = nil,
         attachments: [IssueAttachment]? = nil,
+        parent: IssueDependencyReference? = nil,
+        subIssues: [IssueDependencyReference]? = nil,
+        relatedIssues: [IssueDependencyReference]? = nil,
         prerequisites: [IssueDependencyReference]? = nil,
         dependents: [IssueDependencyReference]? = nil,
         executionReadiness: String? = nil,
@@ -170,6 +176,9 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.issueDescription = issueDescription
         self.relatedMessage = relatedMessage
         self.attachments = attachments
+        self.parent = parent
+        self.subIssues = subIssues
+        self.relatedIssues = relatedIssues
         self.prerequisites = prerequisites
         self.dependents = dependents
         self.executionReadiness = executionReadiness

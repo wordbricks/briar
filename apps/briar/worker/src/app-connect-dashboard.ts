@@ -24,11 +24,17 @@ import {
   listIssueConversationNotifications,
   listIssueDependencies,
   listIssueDependenciesByRunIds,
+  listIssueHierarchy,
+  listIssueHierarchyByRunIds,
+  listIssueRelations,
+  listIssueRelationsByRunIds,
   listIssueResultReviews,
   listIssueResultReviewsByRunIds,
   resolveHuntEventActorNames,
   type IssueAttachmentRow,
   type IssueDependencyRow,
+  type IssueHierarchyRow,
+  type IssueRelationRow,
   type IssueResultReviewRow,
 } from "./db";
 import { HttpError } from "./http-response";
@@ -82,6 +88,8 @@ type RunRelations = {
   readonly attachmentsByRun: Map<string, IssueAttachmentRow[]>;
   readonly prerequisitesByRun: Map<string, IssueDependencyRow[]>;
   readonly dependentsByRun: Map<string, IssueDependencyRow[]>;
+  readonly hierarchyByRun: Map<string, IssueHierarchyRow[]>;
+  readonly relatedByRun: Map<string, IssueRelationRow[]>;
   readonly resultReviewsByRun: Map<string, IssueResultReviewRow[]>;
 };
 
@@ -93,12 +101,16 @@ export const dashboardListPatch = <Input, Output>(
 function indexRunRelations(
   attachments: readonly IssueAttachmentRow[],
   dependencies: readonly IssueDependencyRow[],
+  hierarchy: readonly IssueHierarchyRow[],
+  related: readonly IssueRelationRow[],
   resultReviews: readonly IssueResultReviewRow[],
   runIds?: ReadonlySet<string>,
 ): RunRelations {
   const attachmentsByRun = new Map<string, IssueAttachmentRow[]>();
   const prerequisitesByRun = new Map<string, IssueDependencyRow[]>();
   const dependentsByRun = new Map<string, IssueDependencyRow[]>();
+  const hierarchyByRun = new Map<string, IssueHierarchyRow[]>();
+  const relatedByRun = new Map<string, IssueRelationRow[]>();
   const resultReviewsByRun = new Map<string, IssueResultReviewRow[]>();
   for (const attachment of attachments) {
     if (runIds && !runIds.has(attachment.run_id)) continue;
@@ -118,6 +130,22 @@ function indexRunRelations(
       dependentsByRun.set(dependency.prerequisite_run_id, rows);
     }
   }
+  for (const link of hierarchy) {
+    for (const runId of [link.parent_run_id, link.child_run_id]) {
+      if (runIds && !runIds.has(runId)) continue;
+      const rows = hierarchyByRun.get(runId) ?? [];
+      rows.push(link);
+      hierarchyByRun.set(runId, rows);
+    }
+  }
+  for (const relation of related) {
+    for (const runId of [relation.first_run_id, relation.second_run_id]) {
+      if (runIds && !runIds.has(runId)) continue;
+      const rows = relatedByRun.get(runId) ?? [];
+      rows.push(relation);
+      relatedByRun.set(runId, rows);
+    }
+  }
   for (const review of resultReviews) {
     if (runIds && !runIds.has(review.run_id)) continue;
     const rows = resultReviewsByRun.get(review.run_id) ?? [];
@@ -128,6 +156,8 @@ function indexRunRelations(
     attachmentsByRun,
     prerequisitesByRun,
     dependentsByRun,
+    hierarchyByRun,
+    relatedByRun,
     resultReviewsByRun,
   };
 }
@@ -140,6 +170,8 @@ const runJsonWithRelations = (
   relations.attachmentsByRun.get(run.id) ?? [],
   relations.prerequisitesByRun.get(run.id) ?? [],
   relations.dependentsByRun.get(run.id) ?? [],
+  relations.hierarchyByRun.get(run.id) ?? [],
+  relations.relatedByRun.get(run.id) ?? [],
   relations.resultReviewsByRun.get(run.id) ?? [],
 );
 
@@ -162,6 +194,8 @@ export const createAppDashboardService = (
       checkpointPolicy,
       attachments,
       dependencies,
+      hierarchy,
+      related,
       resultReviews,
       workers,
       organizationProviders,
@@ -175,6 +209,8 @@ export const createAppDashboardService = (
       loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
       listIssueAttachments(db, project.id),
       listIssueDependencies(db, project.id),
+      listIssueHierarchy(db, project.id),
+      listIssueRelations(db, project.id),
       listIssueResultReviews(db, project.id),
       listExecutionWorkers(db, project.id, observedAt),
       listOrganizationExecutionProviders(db, project.organization_id),
@@ -190,6 +226,8 @@ export const createAppDashboardService = (
     const relations = indexRunRelations(
       attachments,
       dependencies,
+      hierarchy,
+      related,
       resultReviews,
     );
     return {
@@ -273,6 +311,8 @@ export const createAppDashboardService = (
       dashboardRows,
       attachments,
       dependencies,
+      hierarchy,
+      related,
       resultReviews,
       workers,
       organizationProviders,
@@ -280,6 +320,8 @@ export const createAppDashboardService = (
       listDashboardRunsByIds(db, project.id, changedRunIdList),
       listIssueAttachmentsByRunIds(db, project.id, changedRunIdList),
       listIssueDependenciesByRunIds(db, project.id, changedRunIdList),
+      listIssueHierarchyByRunIds(db, project.id, changedRunIdList),
+      listIssueRelationsByRunIds(db, project.id, changedRunIdList),
       listIssueResultReviewsByRunIds(db, project.id, changedRunIdList),
       listExecutionWorkers(db, project.id, observedAt),
       listOrganizationExecutionProviders(db, project.organization_id),
@@ -287,6 +329,8 @@ export const createAppDashboardService = (
     const relations = indexRunRelations(
       attachments,
       dependencies,
+      hierarchy,
+      related,
       resultReviews,
       changedRunIds,
     );

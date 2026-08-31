@@ -321,6 +321,15 @@ extension DashboardRun {
                 ? try .init(connectMessage: message.relatedMessage)
                 : nil,
             attachments: try message.attachments.map(IssueAttachment.init(connectMessage:)),
+            parent: message.hasParent
+                ? try .init(connectMessage: message.parent)
+                : nil,
+            subIssues: try message.subIssues.map(
+                IssueDependencyReference.init(connectMessage:)
+            ),
+            relatedIssues: try message.relatedIssues.map(
+                IssueDependencyReference.init(connectMessage:)
+            ),
             prerequisites: try message.prerequisites.map(
                 IssueDependencyReference.init(connectMessage:)
             ),

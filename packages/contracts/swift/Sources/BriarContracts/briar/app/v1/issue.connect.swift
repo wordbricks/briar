@@ -48,6 +48,12 @@ public protocol BriarAPI_IssueServiceClientInterface: Sendable {
     func `setIssueDependency`(request: BriarAPI_SetIssueDependencyRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_SetIssueDependencyResponse>
 
     @available(iOS 13, *)
+    func `setIssueParent`(request: BriarAPI_SetIssueParentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_SetIssueParentResponse>
+
+    @available(iOS 13, *)
+    func `setRelatedIssue`(request: BriarAPI_SetRelatedIssueRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_SetRelatedIssueResponse>
+
+    @available(iOS 13, *)
     func `moveRun`(request: BriarAPI_MoveRunRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_MoveRunResponse>
 
     /// Shared intentionally with WorkerExecutionService so run control has one DTO.
@@ -180,6 +186,16 @@ public final class BriarAPI_IssueServiceClient: BriarAPI_IssueServiceClientInter
     }
 
     @available(iOS 13, *)
+    public func `setIssueParent`(request: BriarAPI_SetIssueParentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SetIssueParentResponse> {
+        return await self.client.unary(path: "/briar.app.v1.IssueService/SetIssueParent", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `setRelatedIssue`(request: BriarAPI_SetRelatedIssueRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SetRelatedIssueResponse> {
+        return await self.client.unary(path: "/briar.app.v1.IssueService/SetRelatedIssue", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
     public func `moveRun`(request: BriarAPI_MoveRunRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_MoveRunResponse> {
         return await self.client.unary(path: "/briar.app.v1.IssueService/MoveRun", idempotencyLevel: .unknown, request: request, headers: headers)
     }
@@ -296,6 +312,8 @@ public final class BriarAPI_IssueServiceClient: BriarAPI_IssueServiceClientInter
             public static let updateIssuePreferences = Connect.MethodSpec(name: "UpdateIssuePreferences", service: "briar.app.v1.IssueService", type: .unary)
             public static let updateIssueCheckpoints = Connect.MethodSpec(name: "UpdateIssueCheckpoints", service: "briar.app.v1.IssueService", type: .unary)
             public static let setIssueDependency = Connect.MethodSpec(name: "SetIssueDependency", service: "briar.app.v1.IssueService", type: .unary)
+            public static let setIssueParent = Connect.MethodSpec(name: "SetIssueParent", service: "briar.app.v1.IssueService", type: .unary)
+            public static let setRelatedIssue = Connect.MethodSpec(name: "SetRelatedIssue", service: "briar.app.v1.IssueService", type: .unary)
             public static let moveRun = Connect.MethodSpec(name: "MoveRun", service: "briar.app.v1.IssueService", type: .unary)
             public static let retryRun = Connect.MethodSpec(name: "RetryRun", service: "briar.app.v1.IssueService", type: .unary)
             public static let cancelRun = Connect.MethodSpec(name: "CancelRun", service: "briar.app.v1.IssueService", type: .unary)
