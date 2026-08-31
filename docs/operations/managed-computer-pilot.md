@@ -8,6 +8,8 @@
 - Enrollment은 nonce와 더불어 AWS가 서명한 **원본 EC2 instance identity document**를 검증한다. 파싱한 JSON을 다시 직렬화하지 않아 공백 하나가 바뀌어도 서명 검증이 실패한다.
 - 인바운드 보안 그룹 규칙과 SSH 키는 없다. 고객 화면은 EC2가 Briar에 먼저 연결하는 HTTPS/WSS 443 outbound 경로만 사용한다. SSM Session Manager는 운영 장애 대응에만 사용한다.
 - 로컬 TigerVNC는 `briar` 사용자로 `127.0.0.1:5901`에만 바인딩한다. 브라우저는 EC2 주소를 받지 않으며, 화면·키 입력·비밀번호·세션 토큰을 D1 또는 로그에 저장하지 않는다.
+- 컴퓨터 소유자의 데스크톱과 모든 프로젝트 Worker는 같은 `briar` 계정으로 실행하며, `sudo -n`으로 비밀번호 없이 이 컴퓨터의 관리자 권한을 사용할 수 있다. Worker가 실행하는 저장소 코드도 시스템 파일·패키지·서비스와 이 컴퓨터에 저장된 자격 증명을 수정하거나 삭제할 수 있다. 서로 신뢰하지 않는 프로젝트를 한 컴퓨터에 연결하지 않는다.
+- 관리자 권한은 해당 EC2의 운영체제 안에서만 부여한다. 인바운드·SSH·IMDSv2·EBS 설정이나 instance role의 AWS 권한은 확대하지 않으며, Parameter Store 조회 거부를 유지한다.
 - 파일럿 신청을 꺼도 생성 중·사용 중인 컴퓨터의 Workflow, 만료, drain, 중지 및 종료 처리는 계속된다.
 - 사용자가 컴퓨터 은퇴를 요청하면 새 작업을 즉시 차단하고 응답 후 중지를 시도한다. 활성 실행 lease가 없으면 EC2를 바로 중지하며, lease가 남아 있거나 AWS 호출이 실패하면 `draining` 상태를 유지한 채 기존 1분 Cron Trigger에서 다시 시도한다. 6시간 reconciliation은 만료·종료·고아 탐지 등 전체 수명주기 점검에 계속 사용한다.
 
@@ -92,6 +94,27 @@ journal에 남기고 다음 주기에 다시 시도한다. credential 값·키 �
 프로세스·소켓 부팅 복구 계층이다.
 
 ## 2. AWS 스택
+
+### 기존 컴퓨터의 관리자 권한 적용
+
+신규 AMI는 `/etc/sudoers.d/briar-local-admin`을 root 소유·0440 권한으로 설치한다.
+데스크톱, Worker, remote-session agent 서비스는 `briar`로 실행하지만 sudo를 막는
+`NoNewPrivileges`, 읽기 전용 mount와 syscall 제한을 적용하지 않는다. enrollment,
+runtime updater, health 서비스의 기존 제한은 유지한다. 세 사용자 서비스는 시작할 때
+`verify-managed-admin`으로 비대화형 sudo와 시스템 디렉터리 쓰기를 실제 확인한다.
+
+기존 컴퓨터는 새 AMI만 배포해서 바뀌지 않는다. SSM으로 진행 중인 작업이 없는지
+확인한 뒤 sudoers 파일, `verify-managed-admin`, 세 사용자 서비스 unit을 같은 병합
+커밋에서 설치한다. 기존 파일을 백업하고 `visudo --check`와 `systemd-analyze verify`를
+통과시킨 뒤 daemon-reload하고 해당 서비스만 재시작한다. 재시작 중 원격 화면은 잠깐
+끊긴다. 기존 프로세스의 `NoNewPrivileges`는 실행 중에 해제할 수 없어 재시작이 필요하다.
+인스턴스 재부팅이나 교체는 필요하지 않으며, 은퇴 후 중지된 컴퓨터는 이 작업 때문에
+다시 시작하지 않는다.
+
+적용 후 사용자 터미널과 Worker 서비스의 실행 환경에서 `sudo -n id -u`가 `0`인지,
+패키지 설치가 가능한지, SSM·원격 연결·Worker heartbeat가 유지되는지 확인한다.
+운영 중인 컴퓨터에는 인증 파일이 없는지 검사하는 `verify-managed-image` 전체를
+실행하지 않고 `verify-managed-admin`을 `briar`로 실행한다.
 
 네트워크 스택과 컴퓨터 스택은 저장소의 CloudFormation 템플릿으로 순서대로 적용한다. 두 템플릿 모두 계정·리전별 값을 파라미터로 받으며, AWS 콘솔에 수동으로 리소스를 만들거나 템플릿의 실제 값을 코드에 하드코딩하지 않는다.
 

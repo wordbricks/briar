@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$(id -un)" != "briar" ]]; then
+  echo "verify-managed-admin must run as the briar user" >&2
+  exit 1
+fi
+
+# Run inside the desktop/Worker service so inherited no_new_privs flags and
+# read-only mounts cannot silently prevent package installation via sudo.
+sudo -n -- /bin/sh -eu -c '
+  test "$(id -u)" = "0"
+  probe=""
+  trap '\''test -z "$probe" || rm -f -- "$probe"'\'' EXIT
+  for directory in /etc /usr/local /var/lib/dpkg; do
+    probe="$(mktemp "$directory/.briar-admin-check.XXXXXX")"
+    rm -f -- "$probe"
+    probe=""
+  done
+'
+
+echo "managed computer administrator verification passed"

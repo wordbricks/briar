@@ -14,11 +14,9 @@ Environment=BRIAR_REMOTE_DISPLAY_PORT=5901
 Environment=BRIAR_REMOTE_DISPLAY_GEOMETRY=1280x720
 Environment=BRIAR_REMOTE_DISPLAY_STARTUP_TIMEOUT_SECONDS=120
 WorkingDirectory=/home/briar
+ExecStartPre=/opt/briar/bin/verify-managed-admin
 ExecStart=/opt/briar/bin/briar-remote-desktop
 Restart=always
 RestartSec=2
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=/home/briar /tmp
+# Desktop terminals must inherit the owner's ability to use sudo.
+NoNewPrivileges=false

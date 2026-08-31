@@ -31,6 +31,7 @@ install -d -m 0755 \
 for file in \
   assert-debian-13-x86_64 \
   briar \
+  briar-local-admin.sudoers \
   briar-managed-computer-health \
   briar-managed-computer-health.service \
   briar-managed-computer-health.timer \
@@ -55,6 +56,7 @@ for file in \
   remote-desktop-packages.txt \
   resolve-remote-desktop-packages \
   runtime-updater.pub \
+  verify-managed-admin \
   verify-managed-image \
   verify-remote-desktop \
   xfce4-helpers.rc \
@@ -69,7 +71,7 @@ for executable in \
   briar-remote-desktop \
   configure-debian-snapshot install-image-runtime install-remote-desktop \
   prepare-image-for-capture resolve-remote-desktop-packages \
-  verify-managed-image verify-remote-desktop; do
+  verify-managed-admin verify-managed-image verify-remote-desktop; do
   chmod 0755 "$output/$executable"
 done
 

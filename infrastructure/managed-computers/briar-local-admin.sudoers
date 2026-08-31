@@ -1,0 +1,3 @@
+# The owner and project Workers share the briar account on this computer.
+# AWS permissions remain limited by the instance role, independently of sudo.
+briar ALL=(ALL:ALL) NOPASSWD: ALL

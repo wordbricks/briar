@@ -19,21 +19,11 @@ Environment=BUN_INSTALL_CACHE_DIR=/home/briar/.cache/bun
 Environment=BRIAR_CI_SERIAL_CONTEXTS=true
 Environment=VITEST_MAX_WORKERS=2
 Environment=PATH=/opt/briar/bin:/opt/briar/provider/node_modules/.bin:/home/briar/.cargo/bin:/home/briar/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStartPre=/opt/briar/bin/verify-managed-admin
 ExecStart=/opt/briar/bin/briar managed-computer worker-supervisor
 Restart=always
 RestartSec=10
 TimeoutStopSec=30
 UMask=0077
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectHome=read-only
-ProtectSystem=strict
-ReadOnlyPaths=/var/lib/briar
-ReadWritePaths=/home/briar
-ProtectKernelLogs=true
-ProtectKernelModules=true
-ProtectKernelTunables=true
-ProtectControlGroups=true
-RestrictSUIDSGID=true
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-LockPersonality=true
+# The owner authorizes Workers to administer this computer through sudo.
+NoNewPrivileges=false
