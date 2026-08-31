@@ -28,4 +28,15 @@ describe("HTML artifact responses", () => {
       expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
     }
   });
+
+  it("forces SVG issue attachments into a scriptless sandbox", () => {
+    const response = issueAttachmentResponse({
+      filename: "diagram.svg",
+      content_type: "image/svg+xml",
+      byte_size: 15,
+    }, object, null);
+
+    expect(response.headers.get("Content-Security-Policy")).toBe("sandbox");
+    expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+  });
 });

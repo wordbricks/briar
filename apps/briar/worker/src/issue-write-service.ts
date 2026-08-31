@@ -9,11 +9,9 @@ import {
   listIssueAttachments,
   recordHuntEvent,
   rollbackNewAppIssue,
-  updateIssueWithAttachmentMetadata,
 } from "./db";
-import { HttpError } from "./http-response";
 import { deleteUnreferencedUploadedIssueObjects } from "./issue-attachment-service";
-import type { IssueInput, IssueUpdateInput } from "./issue-request-contract";
+import type { IssueInput } from "./issue-request-contract";
 import type { ProjectRow } from "./project-repository";
 import type { IssueDifficulty } from "../../src/lib/issue-difficulty";
 
@@ -173,92 +171,6 @@ export async function createIssueWithAttachments(input: {
           }),
         );
       }
-    }
-    throw error;
-  }
-}
-
-export async function updateIssueWithAttachments(input: {
-  db: D1Database;
-  attachmentsBucket: R2Bucket;
-  project: Pick<ProjectRow, "id">;
-  runId: string;
-  issue: IssueUpdateInput;
-  attachments: File[];
-  attachmentReferences?: string[];
-  keptAttachmentIds?: string[];
-  updatedAt: string;
-}) {
-  const existing = await listIssueAttachments(
-    input.db,
-    input.project.id,
-    input.runId,
-  );
-  const keptIds =
-    input.keptAttachmentIds === undefined
-      ? new Set(existing.map((attachment) => attachment.id))
-      : new Set(input.keptAttachmentIds);
-  const removed = existing.filter(
-    (attachment) => !keptIds.has(attachment.id),
-  );
-  const storedAttachments = prepareStoredAttachments(
-    input.attachments,
-    () => {
-      const id = crypto.randomUUID();
-      return {
-        id,
-        object_key: `issue-attachments/${input.project.id}/${input.runId}/${id}`,
-      };
-    },
-  );
-  const uploadedKeys: string[] = [];
-  let phase = "upload_attachments";
-  const issueDescription = canonicalizeIssueAttachmentReferences(
-    input.issue.description,
-    input.attachmentReferences ?? [],
-    storedAttachments.map((attachment) => attachment.id),
-  );
-  try {
-    await uploadStoredAttachments(
-      input.attachmentsBucket,
-      storedAttachments,
-      uploadedKeys,
-      (attachment) => ({
-        attachmentId: attachment.id,
-        projectId: input.project.id,
-      }),
-    );
-    const updated = await updateIssueWithAttachmentMetadata(
-      input.db,
-      input.project.id,
-      input.runId,
-      {
-        title: input.issue.title,
-        description: issueDescription ?? null,
-        priority: input.issue.priority ?? null,
-        difficulty: input.issue.difficulty,
-        assigneeUserId: input.issue.assigneeUserId,
-        updatedAt: input.updatedAt,
-        attachments: storedAttachments.map(
-          ({ file: _file, ...attachment }) => attachment,
-        ),
-        removedAttachmentIds: removed.map((attachment) => attachment.id),
-      },
-    );
-    if (!updated) throw new HttpError(404, "Run not found");
-    if (updated.deletedObjectKeys.length > 0) {
-      await input.attachmentsBucket
-        .delete(updated.deletedObjectKeys)
-        .catch(() => undefined);
-    }
-    return updated.run;
-  } catch (error) {
-    if (uploadedKeys.length > 0) {
-      await deleteUnreferencedUploadedIssueObjects(
-        input.db,
-        input.attachmentsBucket,
-        uploadedKeys,
-      ).catch(() => undefined);
     }
     throw error;
   }

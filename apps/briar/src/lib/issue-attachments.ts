@@ -16,7 +16,6 @@ export const issueAttachmentAccept = "image/*,video/*";
 export const maxIssueAttachmentCount = 5;
 export const maxIssueAttachmentBytes = 20 * 1024 * 1024;
 export const maxIssueAttachmentTotalBytes = 25 * 1024 * 1024;
-export const maxIssueMultipartBytes = maxIssueAttachmentTotalBytes + 1024 * 1024;
 
 const allowedMimeTypes = new Set<string>(issueAttachmentMimeTypes);
 

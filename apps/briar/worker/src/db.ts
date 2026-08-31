@@ -143,7 +143,6 @@ export {
   createIssueAttachments,
   deleteIssueAttachments,
   issueAttachmentObjectKeysInUse,
-  updateIssueWithAttachmentMetadata,
   listIssueAttachments,
   listIssueAttachmentsByRunIds,
   getIssueAttachment,
