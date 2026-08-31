@@ -29,6 +29,7 @@ import {
   createIsolatedTestDatabase,
   type IsolatedTestDatabase,
 } from "./test-helpers/d1";
+import { requireConnectHandlerForRequest } from "./test-helpers/connect";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const projectId = "22222222-2222-4222-8222-222222222222";
@@ -160,11 +161,11 @@ describe("LinearImportService", () => {
           auth: {} as BriarAuth,
           db,
         }, services());
-        const handler = router.handlers.find((candidate) =>
-          candidate.requestPath === new URL(request.url).pathname
+        const handler = requireConnectHandlerForRequest(
+          router.handlers,
+          request,
         );
-        expect(handler).toBeDefined();
-        const response = await createFetchHandler(handler!)(request);
+        const response = await createFetchHandler(handler)(request);
         responseBodies.push(await response.clone().text());
         return response;
       },

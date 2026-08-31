@@ -236,30 +236,35 @@ fn preserves_workspace_allocation_failure_as_claimed_work() {
 
 #[test]
 fn maps_generated_run_evidence_and_rejects_a_mismatched_run() {
-    let response: app_proto::ListRunEvidenceResponse = serde_json::from_value(serde_json::json!({
-        "runId": "515b7a2c-8918-5a8f-a292-f0b95090281c",
-        "evidence": [{
-            "key": "local-tests",
-            "attempt": 2,
-            "revision": 3,
-            "stage": "local_qa",
-            "type": "test",
-            "status": "STATUS_PASSED",
-            "detail": "Rust checks passed",
-            "actor": "briar-auto-hunt-runtime",
-            "observedAt": "2026-08-31T01:02:03Z",
-            "recordedAt": "2026-08-31T01:02:04Z",
-            "canonical": true,
-            "requiredRevision": 3
-        }]
-    }))
-    .expect("generated evidence ProtoJSON should decode");
+    let mut evidence = app_proto::RunEvidence {
+        key: "local-tests".to_string(),
+        attempt: 2,
+        revision: 3,
+        stage: "local_qa".to_string(),
+        r#type: "test".to_string(),
+        status: app_proto::run_evidence::Status::Passed.into(),
+        detail: Some("Rust checks passed".to_string()),
+        actor: "briar-auto-hunt-runtime".to_string(),
+        canonical: true,
+        required_revision: 3,
+        ..Default::default()
+    };
+    evidence.observed_at.get_or_insert_default().seconds = 1;
+    evidence.recorded_at.get_or_insert_default().seconds = 2;
+    let response = app_proto::ListRunEvidenceResponse {
+        run_id: "515b7a2c-8918-5a8f-a292-f0b95090281c".to_string(),
+        evidence: vec![evidence],
+        attempt: 2,
+        revision: 3,
+        ..Default::default()
+    };
 
     let mapped = run_evidence_result(response.clone(), "515b7a2c-8918-5a8f-a292-f0b95090281c")
         .expect("matching evidence should map");
     assert_eq!(mapped.len(), 1);
     assert_eq!(mapped[0]["key"], "local-tests");
     assert_eq!(mapped[0]["status"], "passed");
+    assert_eq!(mapped[0]["revision"], 3);
     assert_eq!(mapped[0]["requiredRevision"], 3);
     assert_eq!(mapped[0]["canonical"], true);
 

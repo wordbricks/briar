@@ -1,5 +1,9 @@
+import type { DescMethod } from "@bufbuild/protobuf";
 import { createConnectRouter } from "@connectrpc/connect";
-import { createFetchHandler } from "@connectrpc/connect/protocol";
+import {
+  createFetchHandler,
+  createMethodUrl,
+} from "@connectrpc/connect/protocol";
 import {
   IssueService,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
@@ -12,6 +16,7 @@ import {
   type AppConnectIssueServices,
   registerAppIssueService,
 } from "./app-connect-issue";
+import { requireConnectHandler } from "./test-helpers/connect";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const runId = "22222222-2222-4222-8222-222222222222";
@@ -22,9 +27,9 @@ const agentId = "66666666-6666-4666-8666-666666666666";
 const attachmentId = "77777777-7777-4777-8777-777777777777";
 const userId = "88888888-8888-4888-8888-888888888888";
 
-const issueConnectRequest = (method: string, body: unknown) =>
+const issueConnectRequest = (method: DescMethod, body: unknown) =>
   new Request(
-    `https://api.example.test/briar.app.v1.IssueService/${method}`,
+    createMethodUrl("https://api.example.test", method),
     {
       method: "POST",
       headers: {
@@ -56,7 +61,7 @@ const authenticatedSession = {
 };
 
 const invokeIssueRpc = async (
-  method: string,
+  method: DescMethod,
   body: unknown,
   overrides: Partial<AppConnectIssueServices>,
 ) => {
@@ -84,11 +89,8 @@ const invokeIssueRpc = async (
       ...overrides,
     },
   );
-  const handler = router.handlers.find((candidate) =>
-    candidate.requestPath === `/briar.app.v1.IssueService/${method}`
-  );
-  expect(handler).toBeDefined();
-  return createFetchHandler(handler!)(request);
+  const handler = requireConnectHandler(router.handlers, method);
+  return createFetchHandler(handler)(request);
 };
 
 describe("app Issue Connect adapter", () => {
@@ -105,7 +107,7 @@ describe("app Issue Connect adapter", () => {
       attachments: [],
     });
 
-    const response = await invokeIssueRpc("CreateIssue", {
+    const response = await invokeIssueRpc(IssueService.method.createIssue, {
       projectId,
       title: "Preserve wire input",
       status: "RUN_STATUS_BACKLOG",
@@ -153,7 +155,7 @@ describe("app Issue Connect adapter", () => {
       }],
     });
 
-    const cleared = await invokeIssueRpc("UpdateIssue", {
+    const cleared = await invokeIssueRpc(IssueService.method.updateIssue, {
       projectId,
       runId,
       title: "Updated issue",
@@ -171,7 +173,7 @@ describe("app Issue Connect adapter", () => {
       attachments: [{ id: attachmentId, byteSize: "12" }],
     });
 
-    const unchanged = await invokeIssueRpc("UpdateIssue", {
+    const unchanged = await invokeIssueRpc(IssueService.method.updateIssue, {
       projectId,
       runId,
       title: "Updated issue",
@@ -238,11 +240,15 @@ describe("app Issue Connect adapter", () => {
       snapshot as Awaited<ReturnType<AppConnectIssueServices["listMessages"]>>,
     );
 
-    const response = await invokeIssueRpc("SyncIssueMessages", {
-      projectId,
-      runId,
-      cursor: "41",
-    }, { syncMessages, listMessages });
+    const response = await invokeIssueRpc(
+      IssueService.method.syncIssueMessages,
+      {
+        projectId,
+        runId,
+        cursor: "41",
+      },
+      { syncMessages, listMessages },
+    );
 
     expect(response.status).toBe(200);
     expect(syncMessages).toHaveBeenCalledWith(expect.objectContaining({
@@ -293,11 +299,15 @@ describe("app Issue Connect adapter", () => {
       resultRunId: runId,
     } as never);
 
-    const accepted = await invokeIssueRpc("AcceptIssueActionProposal", {
-      projectId,
-      runId,
-      proposalId,
-    }, { acceptActionProposal });
+    const accepted = await invokeIssueRpc(
+      IssueService.method.acceptIssueActionProposal,
+      {
+        projectId,
+        runId,
+        proposalId,
+      },
+      { acceptActionProposal },
+    );
 
     expect(accepted.status).toBe(200);
     const acceptedBody = await accepted.json();
@@ -327,11 +337,15 @@ describe("app Issue Connect adapter", () => {
       outcome: "accepted",
       resultRunId: runId,
     } as never);
-    const invalid = await invokeIssueRpc("AcceptIssueActionProposal", {
-      projectId,
-      runId,
-      proposalId,
-    }, { acceptActionProposal });
+    const invalid = await invokeIssueRpc(
+      IssueService.method.acceptIssueActionProposal,
+      {
+        projectId,
+        runId,
+        proposalId,
+      },
+      { acceptActionProposal },
+    );
 
     expect(invalid.status).toBe(500);
     expect(await invalid.json()).toMatchObject({ code: "internal" });

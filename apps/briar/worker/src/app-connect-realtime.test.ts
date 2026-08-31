@@ -1,5 +1,11 @@
 import { createConnectRouter } from "@connectrpc/connect";
-import { createFetchHandler } from "@connectrpc/connect/protocol";
+import {
+  createFetchHandler,
+  createMethodUrl,
+} from "@connectrpc/connect/protocol";
+import {
+  RealtimeService,
+} from "@briar/contracts/gen/briar/app/v1/realtime_control_pb";
 import { describe, expect, it, vi } from "vitest";
 import type { BriarAuth } from "./auth";
 import { connectErrorInterceptor } from "./app-connect-errors";
@@ -7,6 +13,7 @@ import {
   type AppConnectRealtimeServices,
   registerAppRealtimeService,
 } from "./app-connect-realtime";
+import { requireConnectHandler } from "./test-helpers/connect";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const projectId = "22222222-2222-4222-8222-222222222222";
@@ -15,7 +22,10 @@ const channelId = "44444444-4444-4444-8444-444444444444";
 const userId = "55555555-5555-4555-8555-555555555555";
 
 const request = (body: unknown) => new Request(
-  "https://api.example.test/briar.app.v1.RealtimeService/CreateRealtimeTicket",
+  createMethodUrl(
+    "https://api.example.test",
+    RealtimeService.method.createRealtimeTicket,
+  ),
   {
     method: "POST",
     headers: {
@@ -44,12 +54,11 @@ const invoke = async (
     db: {} as D1Database,
     signingSecret: "signing-secret",
   }, services);
-  const handler = router.handlers.find((candidate) =>
-    candidate.requestPath ===
-      "/briar.app.v1.RealtimeService/CreateRealtimeTicket"
+  const handler = requireConnectHandler(
+    router.handlers,
+    RealtimeService.method.createRealtimeTicket,
   );
-  expect(handler).toBeDefined();
-  return createFetchHandler(handler!)(connectRequest);
+  return createFetchHandler(handler)(connectRequest);
 };
 
 const authenticatedSession = {

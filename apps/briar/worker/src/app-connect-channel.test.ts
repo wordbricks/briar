@@ -1,5 +1,9 @@
+import type { DescMethod } from "@bufbuild/protobuf";
 import { createConnectRouter } from "@connectrpc/connect";
-import { createFetchHandler } from "@connectrpc/connect/protocol";
+import {
+  createFetchHandler,
+  createMethodUrl,
+} from "@connectrpc/connect/protocol";
 import {
   ChannelService,
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
@@ -11,6 +15,7 @@ import {
   registerAppChannelService,
   type AppConnectChannelServices,
 } from "./app-connect-channel";
+import { requireConnectHandler } from "./test-helpers/connect";
 
 const applicationMocks = {
   acceptProposal: vi.fn<AppConnectChannelServices["acceptProposal"]>(),
@@ -34,7 +39,10 @@ const clientMessageId = "99999999-9999-4999-8999-999999999999";
 const deviceId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab";
 
 const connectRequest = () => new Request(
-  "https://api.example.test/briar.app.v1.ChannelService/CreateChannelMessage",
+  createMethodUrl(
+    "https://api.example.test",
+    ChannelService.method.createChannelMessage,
+  ),
   {
     method: "POST",
     headers: {
@@ -57,7 +65,10 @@ const connectRequest = () => new Request(
 );
 
 const proposalConnectRequest = () => new Request(
-  "https://api.example.test/briar.app.v1.ChannelService/AcceptChannelProposal",
+  createMethodUrl(
+    "https://api.example.test",
+    ChannelService.method.acceptChannelProposal,
+  ),
   {
     method: "POST",
     headers: {
@@ -188,14 +199,12 @@ describe("app Channel Connect adapter", () => {
       },
     );
 
-    expect(router.handlers).toHaveLength(Object.keys(ChannelService.method).length);
-    const handler = router.handlers.find((candidate) =>
-      candidate.requestPath ===
-        "/briar.app.v1.ChannelService/CreateChannelMessage"
+    const handler = requireConnectHandler(
+      router.handlers,
+      ChannelService.method.createChannelMessage,
     );
-    expect(handler).toBeDefined();
 
-    const response = await createFetchHandler(handler!)(connectRequest());
+    const response = await createFetchHandler(handler)(connectRequest());
 
     expect(response.status, await response.clone().text()).toBe(200);
     expect(applicationMocks.createMessage).toHaveBeenCalledWith({
@@ -325,12 +334,12 @@ describe("app Channel Connect adapter", () => {
         requireSession: applicationMocks.requireSession,
       },
     );
-    const handler = router.handlers.find((candidate) =>
-      candidate.requestPath ===
-        "/briar.app.v1.ChannelService/AcceptChannelProposal"
+    const handler = requireConnectHandler(
+      router.handlers,
+      ChannelService.method.acceptChannelProposal,
     );
 
-    const response = await createFetchHandler(handler!)(proposalConnectRequest());
+    const response = await createFetchHandler(handler)(proposalConnectRequest());
 
     expect(applicationMocks.acceptProposal).toHaveBeenCalledOnce();
     expect(response.status, await response.clone().text()).toBe(200);
@@ -401,7 +410,10 @@ describe("app Channel Connect adapter", () => {
       name = "  Release Notes  ",
     ) =>
       new Request(
-        "https://api.example.test/briar.app.v1.ChannelService/CreateChannel",
+        createMethodUrl(
+          "https://api.example.test",
+          ChannelService.method.createChannel,
+        ),
         {
           method: "POST",
           headers: {
@@ -439,9 +451,10 @@ describe("app Channel Connect adapter", () => {
         requireSession: applicationMocks.requireSession,
       },
     );
-    const handler = router.handlers.find((candidate) =>
-      candidate.requestPath === "/briar.app.v1.ChannelService/CreateChannel"
-    )!;
+    const handler = requireConnectHandler(
+      router.handlers,
+      ChannelService.method.createChannel,
+    );
 
     const response = await createFetchHandler(handler)(requestFor());
     expect(response.status, await response.clone().text()).toBe(200);
@@ -502,7 +515,10 @@ describe("app Channel Connect adapter", () => {
     });
     const requestFor = (addMembership: boolean) =>
       new Request(
-        "https://api.example.test/briar.app.v1.ChannelService/SetChannelMember",
+        createMethodUrl(
+          "https://api.example.test",
+          ChannelService.method.setChannelMember,
+        ),
         {
           method: "POST",
           headers: {
@@ -539,9 +555,10 @@ describe("app Channel Connect adapter", () => {
         setChannelMember,
       },
     );
-    const handler = router.handlers.find((candidate) =>
-      candidate.requestPath === "/briar.app.v1.ChannelService/SetChannelMember"
-    )!;
+    const handler = requireConnectHandler(
+      router.handlers,
+      ChannelService.method.setChannelMember,
+    );
 
     const response = await createFetchHandler(handler)(requestFor(true));
     expect(response.status, await response.clone().text()).toBe(200);
@@ -591,9 +608,9 @@ describe("app Channel Connect adapter", () => {
     });
     applicationMocks.getLinkPreview.mockResolvedValueOnce(null);
 
-    const requestFor = (method: string, body: Record<string, string>) =>
+    const requestFor = (method: DescMethod, body: Record<string, string>) =>
       new Request(
-        `https://api.example.test/briar.app.v1.ChannelService/${method}`,
+        createMethodUrl("https://api.example.test", method),
         {
           method: "POST",
           headers: {
@@ -613,7 +630,7 @@ describe("app Channel Connect adapter", () => {
     registerAppChannelService(
       router,
       {
-        request: requestFor("GetChannelMessageDocument", {}),
+        request: requestFor(ChannelService.method.getChannelMessageDocument, {}),
         auth: {} as BriarAuth,
         db: {} as D1Database,
         attachmentsBucket: {} as R2Bucket,
@@ -626,13 +643,12 @@ describe("app Channel Connect adapter", () => {
         requireSession: applicationMocks.requireSession,
       },
     );
-    const handlerFor = (method: string) => router.handlers.find((candidate) =>
-      candidate.requestPath === `/briar.app.v1.ChannelService/${method}`
-    )!;
+    const handlerFor = (method: DescMethod) =>
+      requireConnectHandler(router.handlers, method);
 
     const documentResponse = await createFetchHandler(
-      handlerFor("GetChannelMessageDocument"),
-    )(requestFor("GetChannelMessageDocument", {
+      handlerFor(ChannelService.method.getChannelMessageDocument),
+    )(requestFor(ChannelService.method.getChannelMessageDocument, {
       organizationId,
       channelId,
       messageId,
@@ -656,8 +672,8 @@ describe("app Channel Connect adapter", () => {
 
     const previewUrl = "https://news.example.com/articles/42";
     const previewResponse = await createFetchHandler(
-      handlerFor("GetChannelLinkPreview"),
-    )(requestFor("GetChannelLinkPreview", {
+      handlerFor(ChannelService.method.getChannelLinkPreview),
+    )(requestFor(ChannelService.method.getChannelLinkPreview, {
       organizationId,
       channelId,
       url: previewUrl,

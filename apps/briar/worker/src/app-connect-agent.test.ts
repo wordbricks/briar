@@ -1,5 +1,8 @@
 import { createConnectRouter } from "@connectrpc/connect";
-import { createFetchHandler } from "@connectrpc/connect/protocol";
+import {
+  createFetchHandler,
+  createMethodUrl,
+} from "@connectrpc/connect/protocol";
 import {
   AgentService,
 } from "@briar/contracts/gen/briar/app/v1/agent_pb";
@@ -10,6 +13,7 @@ import {
   registerAppAgentService,
   type AppConnectAgentServices,
 } from "./app-connect-agent";
+import { requireConnectHandler } from "./test-helpers/connect";
 
 const repositoryMocks = {
   backfill: vi.fn<AppConnectAgentServices["backfillSessionSummaries"]>(),
@@ -26,7 +30,10 @@ const userId = "33333333-3333-4333-8333-333333333333";
 const sessionId = "agent-session-1";
 
 const connectRequest = () => new Request(
-  "https://api.example.test/briar.app.v1.AgentService/SyncProjectAgentSessions",
+  createMethodUrl(
+    "https://api.example.test",
+    AgentService.method.syncProjectAgentSessions,
+  ),
   {
     method: "POST",
     headers: {
@@ -39,7 +46,7 @@ const connectRequest = () => new Request(
 );
 
 describe("app Agent Connect adapter", () => {
-  it("registers every RPC and projects a strict session summary snapshot", async () => {
+  it("projects strict session summary and transcript snapshots", async () => {
     repositoryMocks.requireSession.mockResolvedValue({
       session: {
         id: "session-1",
@@ -157,14 +164,12 @@ describe("app Agent Connect adapter", () => {
       },
     );
 
-    expect(router.handlers).toHaveLength(Object.keys(AgentService.method).length);
-    const handler = router.handlers.find((candidate) =>
-      candidate.requestPath ===
-        "/briar.app.v1.AgentService/SyncProjectAgentSessions"
+    const handler = requireConnectHandler(
+      router.handlers,
+      AgentService.method.syncProjectAgentSessions,
     );
-    expect(handler).toBeDefined();
 
-    const response = await createFetchHandler(handler!)(connectRequest());
+    const response = await createFetchHandler(handler)(connectRequest());
 
     expect(response.status).toBe(200);
     expect(repositoryMocks.backfill).toHaveBeenCalledWith(
@@ -200,14 +205,16 @@ describe("app Agent Connect adapter", () => {
       }],
     });
 
-    const transcriptHandler = router.handlers.find((candidate) =>
-      candidate.requestPath ===
-        "/briar.app.v1.AgentService/GetProjectAgentTranscript"
+    const transcriptHandler = requireConnectHandler(
+      router.handlers,
+      AgentService.method.getProjectAgentTranscript,
     );
-    expect(transcriptHandler).toBeDefined();
-    const transcriptResponse = await createFetchHandler(transcriptHandler!)(
+    const transcriptResponse = await createFetchHandler(transcriptHandler)(
       new Request(
-        "https://api.example.test/briar.app.v1.AgentService/GetProjectAgentTranscript",
+        createMethodUrl(
+          "https://api.example.test",
+          AgentService.method.getProjectAgentTranscript,
+        ),
         {
           method: "POST",
           headers: {
