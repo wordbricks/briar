@@ -1879,15 +1879,18 @@ mod tests {
             "command": {
                 "name": "usage",
                 "data": {
-                    "groups": {
-                        "Gemini Models": {
-                            "gemini-5h": {
-                                "window": "5h",
-                                "remaining_fraction": 0.5,
-                                "reset_time": "2026-08-18T12:00:00Z"
-                            }
+                    "groups": [
+                        {
+                            "name": "Gemini Models",
+                            "buckets": [
+                                {
+                                    "window": "5h",
+                                    "remaining_fraction": 0.5,
+                                    "reset_time": "2026-08-18T12:00:00Z"
+                                }
+                            ]
                         }
-                    }
+                    ]
                 }
             }
         });
