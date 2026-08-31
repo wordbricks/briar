@@ -1,4 +1,3 @@
-import * as Option from "effect/Option";
 import type {
   HuntEventRow,
   IssueMessageRow,
@@ -25,7 +24,8 @@ import {
   decodeArchivedWorkLogEntry,
   decodeArchiveLine,
   decodeArchiveManifest,
-  decodeRelatedArchiveObjectKeysOption,
+  decodeRelatedArchiveObjectKeys,
+  encodeRelatedArchiveObjectKeys,
   type ArchiveKind,
   type ExecutionAuditArchiveRow,
 } from "./archive-contract";
@@ -714,7 +714,7 @@ const insertArchiveMetadata = async (
       serialized.expiresAt,
       status === "failed" ? 1 : 0,
       error,
-      JSON.stringify(candidate.relatedObjectKeys),
+      encodeRelatedArchiveObjectKeys(candidate.relatedObjectKeys),
       candidate.kind,
       candidate.runId,
       candidate.runId,
@@ -1374,10 +1374,9 @@ export async function listArchiveObjectsForDeletion(
   const attachments: string[] = [];
   for (const row of result.results ?? []) {
     archives.push(row.object_key);
-    const parsed = decodeRelatedArchiveObjectKeysOption(
-      JSON.parse(row.related_object_keys_json),
+    attachments.push(
+      ...decodeRelatedArchiveObjectKeys(row.related_object_keys_json),
     );
-    if (Option.isSome(parsed)) attachments.push(...parsed.value);
   }
   return { archives, attachments };
 }
@@ -1617,12 +1616,12 @@ export async function expireArchives(
     .all<ArchiveMetadataRow>();
   let deleted = 0;
   for (const archive of result.results ?? []) {
-    const related = decodeRelatedArchiveObjectKeysOption(
-      JSON.parse(archive.related_object_keys_json),
+    const related = decodeRelatedArchiveObjectKeys(
+      archive.related_object_keys_json,
     );
     await archivesBucket.delete(archive.object_key);
-    if (Option.isSome(related) && related.value.length > 0) {
-      await attachmentsBucket.delete(related.value);
+    if (related.length > 0) {
+      await attachmentsBucket.delete(related);
     }
     if (archive.archive_kind === "project_agent_sessions") {
       await db.batch([

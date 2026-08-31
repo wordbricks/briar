@@ -1,27 +1,13 @@
-import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 import {
   archiveFormatVersion,
   decodeArchiveManifest,
-  decodeRelatedArchiveObjectKeysOption,
 } from "./archive-contract";
 
 const archiveId = "a".repeat(64);
 
 describe("archive Effect contracts", () => {
-  it("returns mutable related-object key arrays and ignores malformed metadata", () => {
-    const decoded = decodeRelatedArchiveObjectKeysOption(["one"]);
-    expect(Option.isSome(decoded)).toBe(true);
-    if (Option.isSome(decoded)) {
-      decoded.value.push("two");
-      expect(decoded.value).toEqual(["one", "two"]);
-    }
-
-    expect(Option.isNone(decodeRelatedArchiveObjectKeysOption(["one", 2])))
-      .toBe(true);
-  });
-
   it("rejects non-positive or non-finite manifest row counts", () => {
     const manifest = {
       recordType: "manifest",

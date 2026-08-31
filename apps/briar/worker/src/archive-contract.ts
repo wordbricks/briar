@@ -249,7 +249,13 @@ export const ArchivedExecutionAudit = Schema.Struct({
 });
 
 export const RelatedArchiveObjectKeys = Schema.mutable(
-  Schema.Array(Schema.String),
+  Schema.Array(
+    Schema.Trimmed.check(Schema.isLengthBetween(1, 1_024)),
+  ),
+);
+
+const StoredRelatedArchiveObjectKeys = Schema.fromJsonString(
+  RelatedArchiveObjectKeys,
 );
 
 const decodeArchiveSync = <S extends Schema.ConstraintDecoder<unknown>>(
@@ -283,7 +289,11 @@ export const decodeArchivedExecutionAudit:
   (input: unknown) => ExecutionAuditArchiveRow =
     decodeArchiveSync(ArchivedExecutionAudit);
 
-export const decodeRelatedArchiveObjectKeysOption = Schema.decodeUnknownOption(
-  RelatedArchiveObjectKeys,
+export const decodeRelatedArchiveObjectKeys = Schema.decodeUnknownSync(
+  StoredRelatedArchiveObjectKeys,
+  strictSchemaOptions,
+);
+export const encodeRelatedArchiveObjectKeys = Schema.encodeSync(
+  StoredRelatedArchiveObjectKeys,
   strictSchemaOptions,
 );
