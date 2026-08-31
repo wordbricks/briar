@@ -60,7 +60,7 @@ command -v node >/dev/null
 command -v cc >/dev/null
 command -v make >/dev/null
 command -v minisign >/dev/null
-visudo --check
+/usr/sbin/visudo --check
 test "$(stat --format='%U:%G:%a' /etc/sudoers.d/briar-local-admin)" = \
   "root:root:440"
 sudo -u briar -H /opt/briar/bin/verify-managed-admin

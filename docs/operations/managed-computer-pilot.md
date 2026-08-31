@@ -53,9 +53,10 @@ mise exec -- bun run managed-computer:image:build
 AMI는 Briar CLI, provider runner, 원격 세션 agent와 기본 Skill을
 `/opt/briar/releases/<version>`에 설치하고 `/opt/briar/current`를 현재 버전으로
 연결한다. `briar-managed-runtime-updater.service`는 root로 실행되지만 Production
-minisign 공개키로 검증된 `linux-x86_64` 런타임 번들만 설치할 수 있다. 일반
-Worker는 `/opt`에 쓸 수 없으며 서버가 보낸 request ID, 목표 버전, Worker ID만
-`/run/briar-runtime-updater`에 전달한다.
+minisign 공개키로 검증된 `linux-x86_64` 런타임 번들만 자동 설치한다. 이 업데이트
+경로에서 Worker는 서버가 보낸 request ID, 목표 버전, Worker ID만
+`/run/briar-runtime-updater`에 전달한다. 소유자와 Worker의 명시적인 sudo 작업은
+별개로 `/opt`를 포함한 시스템 파일을 변경할 수 있다.
 
 조직 관리자나 Worker 소유자가 원격 업데이트를 요청하면 기존 Worker update
 프로토콜이 새 claim을 중단하고 실행 중인 작업을 durable queue로 인계한다. 모든
@@ -106,8 +107,10 @@ runtime updater, health 서비스의 기존 제한은 유지한다. 세 사용�
 기존 컴퓨터는 새 AMI만 배포해서 바뀌지 않는다. SSM으로 진행 중인 작업이 없는지
 확인한 뒤 sudoers 파일, `verify-managed-admin`, 세 사용자 서비스 unit을 같은 병합
 커밋에서 설치한다. 기존 파일을 백업하고 `visudo --check`와 `systemd-analyze verify`를
-통과시킨 뒤 daemon-reload하고 해당 서비스만 재시작한다. 재시작 중 원격 화면은 잠깐
-끊긴다. 기존 프로세스의 `NoNewPrivileges`는 실행 중에 해제할 수 없어 재시작이 필요하다.
+통과시킨 뒤 daemon-reload하고 해당 서비스만 재시작한다. 적용 중 health timer를
+잠깐 중지했다면 되살리고, 하위 서비스 중지로 함께 내려갈 수 있는
+`briar-managed-computer.target`도 다시 start한 뒤 전체 상태를 검사한다. 재시작 중
+원격 화면은 잠깐 끊긴다. 기존 프로세스의 `NoNewPrivileges`는 실행 중에 해제할 수 없어 재시작이 필요하다.
 인스턴스 재부팅이나 교체는 필요하지 않으며, 은퇴 후 중지된 컴퓨터는 이 작업 때문에
 다시 시작하지 않는다.
 
