@@ -24,7 +24,7 @@ import {
   scheduleChannelRealtimePublish,
 } from "./realtime-scheduling";
 import {
-  executionWorkerProviders,
+  executionWorkerRuntime,
   leaseExpiryFrom,
   workerStateAt,
 } from "./workers";
@@ -77,8 +77,8 @@ export async function claimNextChannelReplyWork(
   ) {
     throw new HttpError(409, "Worker is not ready to claim replies");
   }
-  const providers = executionWorkerProviders(binding);
-  if (providers.length === 0) {
+  const runtime = executionWorkerRuntime(binding);
+  if (runtime.providers.length === 0) {
     throw new HttpError(409, "Worker has no available reply provider");
   }
   const claimToken = `briar_channel_claim_${
@@ -88,9 +88,7 @@ export async function claimNextChannelReplyWork(
   const job = await claimNextChannelAgentReply(db, input.organizationId, {
     deviceId: principal.deviceId,
     workerId: binding.id,
-    providers,
-    workerAgentProvider: binding.agent_provider,
-    workerCapabilitiesJson: binding.capabilities_json,
+    runtime,
     claimTokenHash,
     claimedAt: observedAt,
     leaseExpiresAt: leaseExpiryFrom(observedAt),

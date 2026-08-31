@@ -16,7 +16,6 @@ const protoAgentProvider = {
 
 export type WorkerRuntimeInput = {
   readonly agentProvider: AgentProvider;
-  readonly providers: readonly AgentProvider[];
   readonly providerHealth: Readonly<Record<AgentProvider, {
     readonly installed: boolean;
     readonly authenticated: boolean;
@@ -42,7 +41,6 @@ export type WorkerRuntimeInput = {
 export const workerRuntimeToProto = (input: WorkerRuntimeInput) =>
   create(WorkerRuntimeAdvertisementSchema, {
     agentProvider: protoAgentProvider[input.agentProvider],
-    providers: input.providers.map((provider) => protoAgentProvider[provider]),
     providerHealth: agentProviders.map((provider) => ({
       provider: protoAgentProvider[provider],
       installed: input.providerHealth[provider].installed,

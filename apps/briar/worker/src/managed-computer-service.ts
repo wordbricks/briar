@@ -37,10 +37,8 @@ import {
   recordManagedComputerAuditEvent,
 } from "./managed-computer-repository";
 import { decodeInstanceIdentityDocument } from "./managed-computer-request-contract";
-import type { AgentProviderCapabilityCatalog } from "../../src/lib/agent-provider-contract";
-import type { AgentProvider } from "../../src/lib/agent-provider";
-import type { ProviderHealthMap } from "./workers";
 import { workerJson } from "./worker-json";
+import type { WorkerRuntimeMetadata } from "./worker-runtime-mappers";
 import { getProjectSettings } from "./project-settings-repository";
 import { settingsJson } from "./project-settings-json";
 
@@ -628,13 +626,7 @@ export async function bindManagedComputerSetup(
     organizationId: string;
     deviceId: string;
     setupToken: string;
-    worker: {
-      agentProvider: AgentProvider;
-      providers: AgentProvider[];
-      providerHealth: ProviderHealthMap;
-      providerCapabilities: AgentProviderCapabilityCatalog;
-      versions: Record<string, string>;
-    };
+    worker: WorkerRuntimeMetadata;
     observedAt: string;
   },
 ) {
@@ -659,7 +651,7 @@ export async function bindManagedComputerSetup(
     managedComputerId: computer.id,
     organizationId: input.organizationId,
     deviceId: input.deviceId,
-    ...input.worker,
+    runtime: input.worker,
     observedAt: input.observedAt,
   });
   if (!result) {

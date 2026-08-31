@@ -118,7 +118,6 @@ export async function claimNextProjectAgentTaskWork(input: {
     const claimToken = `briar_agent_task_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
     const job = await claimNextProjectAgentTask(db, input.projectId, {
       workerId: authenticatedWorker.binding.id,
-      agentProviders: providers,
       claimTokenHash: await sha256(claimToken),
       claimedAt: observedAt,
       leaseExpiresAt: leaseExpiryFrom(observedAt),

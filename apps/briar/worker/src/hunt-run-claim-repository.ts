@@ -6,7 +6,6 @@ import {
 import { type HuntEventInput } from "./hunt-event-model";
 import { HuntClaimError } from "./hunt-run-errors";
 import { type HuntRunRow } from "./hunt-run-model";
-import { type ProjectAgentProvider } from "./project-agent-model";
 
 export async function claimNextQueuedHuntRun(
   db: D1Database,
@@ -19,14 +18,9 @@ export async function claimNextQueuedHuntRun(
     runId?: string;
     workerId?: string;
     workerDeviceId?: string;
-    agentProvider?: ProjectAgentProvider;
-    agentProviders?: ProjectAgentProvider[];
     detachedOnly?: boolean;
   },
 ) {
-  const allowedProviders =
-    input.agentProviders ??
-    (input.agentProvider ? [input.agentProvider] : undefined);
   const executionId = crypto.randomUUID();
   const claimStatement = db
     .prepare(
@@ -107,146 +101,30 @@ export async function claimNextQueuedHuntRun(
              )
            )
            and (
-             ? = 0
-             or (
-               ? = 1
-               and coalesce(
-                 requested_agent_provider,
-                 preferred_agent_provider,
-                 (
-                   select skill.provider
-                   from briar_agent_skills skill
-                   where skill.agent_id = briar_hunt_runs.agent_id
-                     and skill.kind = 'issue_processing'
-                   order by skill.position, skill.created_at, skill.id
-                   limit 1
-                 ),
-                 (
-                   select agent.provider from briar_project_agents agent
-                   where agent.id = briar_hunt_runs.agent_id
-                     and agent.project_id = briar_hunt_runs.project_id
+             ? is null
+             or exists (
+               select 1
+               from briar_execution_worker_healthy_providers healthy
+               where healthy.worker_id = ?
+                 and healthy.provider = coalesce(
+                   requested_agent_provider,
+                   preferred_agent_provider,
+                   (
+                     select skill.provider
+                     from briar_agent_skills skill
+                     where skill.agent_id = briar_hunt_runs.agent_id
+                       and skill.kind = 'issue_processing'
+                     order by skill.position, skill.created_at, skill.id
+                     limit 1
+                   ),
+                   (
+                     select agent.provider
+                     from briar_project_agents agent
+                     where agent.id = briar_hunt_runs.agent_id
+                       and agent.project_id = briar_hunt_runs.project_id
+                   ),
+                   healthy.agent_provider
                  )
-               ) = 'codex'
-             )
-             or (
-               ? = 1
-               and coalesce(
-                 requested_agent_provider,
-                 preferred_agent_provider,
-                 (
-                   select skill.provider
-                   from briar_agent_skills skill
-                   where skill.agent_id = briar_hunt_runs.agent_id
-                     and skill.kind = 'issue_processing'
-                   order by skill.position, skill.created_at, skill.id
-                   limit 1
-                 ),
-                 (
-                   select agent.provider from briar_project_agents agent
-                   where agent.id = briar_hunt_runs.agent_id
-                     and agent.project_id = briar_hunt_runs.project_id
-                 )
-               ) = 'claude'
-             )
-             or (
-               ? = 1
-               and coalesce(
-                 requested_agent_provider,
-                 preferred_agent_provider,
-                 (
-                   select skill.provider
-                   from briar_agent_skills skill
-                   where skill.agent_id = briar_hunt_runs.agent_id
-                     and skill.kind = 'issue_processing'
-                   order by skill.position, skill.created_at, skill.id
-                   limit 1
-                 ),
-                 (
-                   select agent.provider from briar_project_agents agent
-                   where agent.id = briar_hunt_runs.agent_id
-                     and agent.project_id = briar_hunt_runs.project_id
-                 )
-               ) = 'cursor'
-             )
-             or (
-               ? = 1
-               and coalesce(
-                 requested_agent_provider,
-                 preferred_agent_provider,
-                 (
-                   select skill.provider
-                   from briar_agent_skills skill
-                   where skill.agent_id = briar_hunt_runs.agent_id
-                     and skill.kind = 'issue_processing'
-                   order by skill.position, skill.created_at, skill.id
-                   limit 1
-                 ),
-                 (
-                   select agent.provider from briar_project_agents agent
-                   where agent.id = briar_hunt_runs.agent_id
-                     and agent.project_id = briar_hunt_runs.project_id
-                 )
-               ) = 'grok'
-             )
-             or (
-               ? = 1
-               and coalesce(
-                 requested_agent_provider,
-                 preferred_agent_provider,
-                 (
-                   select skill.provider
-                   from briar_agent_skills skill
-                   where skill.agent_id = briar_hunt_runs.agent_id
-                     and skill.kind = 'issue_processing'
-                   order by skill.position, skill.created_at, skill.id
-                   limit 1
-                 ),
-                 (
-                   select agent.provider from briar_project_agents agent
-                   where agent.id = briar_hunt_runs.agent_id
-                     and agent.project_id = briar_hunt_runs.project_id
-                 )
-               ) = 'agy'
-             )
-             or (
-               ? = 1
-               and coalesce(
-                 requested_agent_provider,
-                 preferred_agent_provider,
-                 (
-                   select skill.provider
-                   from briar_agent_skills skill
-                   where skill.agent_id = briar_hunt_runs.agent_id
-                     and skill.kind = 'issue_processing'
-                   order by skill.position, skill.created_at, skill.id
-                   limit 1
-                 ),
-                 (
-                   select agent.provider from briar_project_agents agent
-                   where agent.id = briar_hunt_runs.agent_id
-                     and agent.project_id = briar_hunt_runs.project_id
-                 )
-               ) = 'opencode'
-             )
-             or (
-               ? = 1
-               and coalesce(
-                 requested_agent_provider,
-                 preferred_agent_provider,
-                 (
-                   select skill.provider
-                   from briar_agent_skills skill
-                   where skill.agent_id = briar_hunt_runs.agent_id
-                     and skill.kind = 'issue_processing'
-                   order by skill.position, skill.created_at, skill.id
-                   limit 1
-                 ),
-                 (
-                   select agent.provider from briar_project_agents agent
-                   where agent.id = briar_hunt_runs.agent_id
-                     and agent.project_id = briar_hunt_runs.project_id
-                 )
-               ) = 'openrouter'
              )
            )
            and (
@@ -317,14 +195,8 @@ export async function claimNextQueuedHuntRun(
       input.workerId ?? null,
       input.workerId ?? null,
       input.workerId ?? null,
-      allowedProviders ? 1 : 0,
-      allowedProviders?.includes("codex") ? 1 : 0,
-      allowedProviders?.includes("claude") ? 1 : 0,
-      allowedProviders?.includes("cursor") ? 1 : 0,
-      allowedProviders?.includes("grok") ? 1 : 0,
-      allowedProviders?.includes("agy") ? 1 : 0,
-      allowedProviders?.includes("opencode") ? 1 : 0,
-      allowedProviders?.includes("openrouter") ? 1 : 0,
+      input.workerId ?? null,
+      input.workerId ?? null,
       input.workerDeviceId ?? null,
       input.workerDeviceId ?? null,
       input.claimedAt,

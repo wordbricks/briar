@@ -94,7 +94,6 @@ const isRetryableWorkerCompletionError = (error: unknown) =>
 
 const workerRuntime = (input: {
   agentProvider: WorkerRuntimeInput["agentProvider"];
-  providers: WorkerRuntimeInput["providers"];
   providerHealth: WorkerRuntimeInput["providerHealth"];
   providerCapabilities: WorkerRuntimeInput["providerCapabilities"];
   worktrees: boolean;
@@ -148,7 +147,6 @@ async function workerRegisterCommand() {
         deviceIdentity,
         runtime: workerRuntime({
           agentProvider: provider,
-          providers,
           providerHealth,
           providerCapabilities,
           worktrees: true,
@@ -177,7 +175,6 @@ async function workerRegisterCommand() {
     deviceIdentity,
     runtime: workerRuntime({
       agentProvider: provider,
-      providers,
       providerHealth,
       providerCapabilities,
       worktrees: true,
@@ -410,7 +407,6 @@ async function workerCommand() {
         agentProvider: providers.includes(configuredProvider)
           ? configuredProvider
           : (providers[0] ?? configuredProvider),
-        providers,
         providerHealth,
         providerCapabilities,
         worktrees: true,
@@ -576,7 +572,6 @@ async function workerCommand() {
             agentProvider: providers.includes(configuredProvider)
               ? configuredProvider
               : (providers[0] ?? configuredProvider),
-            providers,
             providerHealth,
             providerCapabilities,
             worktrees: worktreesEnabled(project),
@@ -645,7 +640,6 @@ async function workerCommand() {
                   agentProvider: providers.includes(configuredProvider)
                     ? configuredProvider
                     : (providers[0] ?? configuredProvider),
-                  providers,
                   providerHealth,
                   providerCapabilities,
                   worktrees: worktreesEnabled(project),

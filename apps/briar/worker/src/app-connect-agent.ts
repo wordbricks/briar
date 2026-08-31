@@ -1779,8 +1779,7 @@ export const createAppAgentService = (
       .bind(input.workerId, project.id, project.organization_id)
       .first<{
         id: string;
-        agent_provider: DomainAgentProvider;
-        capabilities_json: string;
+        runtime_proto_json: string;
         state: "online" | "stale" | "disabled";
         accepting_work: number;
         readiness_state: "ready" | "busy" | "needs_attention";

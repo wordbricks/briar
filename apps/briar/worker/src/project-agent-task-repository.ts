@@ -123,13 +123,11 @@ export async function claimNextProjectAgentTask(
   projectId: string,
   input: {
     workerId: string;
-    agentProviders: ProjectAgentProvider[];
     claimTokenHash: string;
     claimedAt: string;
     leaseExpiresAt: string;
   },
 ) {
-  const providerPlaceholders = input.agentProviders.map(() => "?").join(", ");
   // Migration 0092 is a deployment prerequisite, so this hot path never
   // probes schema metadata or drops the approval guard.
   const skillExecutionEligibility = `and (
@@ -163,7 +161,12 @@ export async function claimNextProjectAgentTask(
           and skill.id = job.skill_id
          where job.project_id = ?
            and job.preferred_worker_id = ?
-           and skill.provider in (${providerPlaceholders})
+           and exists (
+             select 1
+             from briar_execution_worker_healthy_providers healthy
+             where healthy.worker_id = ?
+               and healthy.provider = skill.provider
+           )
            ${skillExecutionEligibility}
            and exists (
              select 1
@@ -223,7 +226,7 @@ export async function claimNextProjectAgentTask(
       input.claimedAt,
       projectId,
       input.workerId,
-      ...input.agentProviders,
+      input.workerId,
       input.workerId,
       input.claimedAt,
       input.claimedAt,

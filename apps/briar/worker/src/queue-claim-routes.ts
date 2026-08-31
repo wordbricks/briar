@@ -17,7 +17,6 @@ import { latestExecutionWorkerUpdateHandoff } from "./worker-update-repository";
 import { claimWorkflowContext } from "./workflow-resume";
 import {
   auditExecutionEvent,
-  executionWorkerProviders,
   leaseExpiryFrom,
   reapStalledHuntRuns,
   workerStateAt,
@@ -65,9 +64,6 @@ export async function claimNextQueueWork(input: {
       runId: input.runId,
       workerId: authenticatedWorkerId,
       workerDeviceId: authenticatedWorker?.principal.deviceId,
-      agentProviders: authenticatedWorker
-        ? executionWorkerProviders(authenticatedWorker.binding)
-        : undefined,
       detachedOnly: Boolean(authenticatedWorkerId),
     });
     if (!run && input.runId) {

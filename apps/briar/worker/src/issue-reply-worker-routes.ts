@@ -24,7 +24,7 @@ import {
 import { type AuthenticatedWorkerProject } from "./worker-route-auth";
 import { latestExecutionWorkerUpdateHandoff } from "./worker-update-repository";
 import {
-  executionWorkerProviders,
+  executionWorkerRuntime,
   leaseExpiryFrom,
   WORKER_STALE_AFTER_MS,
   workerStateAt,
@@ -55,11 +55,10 @@ export async function claimNextIssueReplyWork(input: {
     ) {
       throw new HttpError(409, "Worker is not ready to claim replies");
     }
-    const providers = executionWorkerProviders(authenticatedWorker.binding);
-    const defaultProvider = providers.includes(
-      authenticatedWorker.binding.agent_provider,
-    )
-      ? authenticatedWorker.binding.agent_provider
+    const runtime = executionWorkerRuntime(authenticatedWorker.binding);
+    const providers = runtime.providers;
+    const defaultProvider = providers.includes(runtime.agentProvider)
+      ? runtime.agentProvider
       : providers[0];
     if (!defaultProvider) {
       throw new HttpError(409, "Worker has no available reply provider");
@@ -68,7 +67,6 @@ export async function claimNextIssueReplyWork(input: {
     const job = await claimNextIssueAgentReply(db, input.projectId, {
       workerId: authenticatedWorker.binding.id,
       agentProvider: defaultProvider,
-      agentProviders: providers,
       claimTokenHash: await sha256(claimToken),
       claimedAt: observedAt,
       leaseExpiresAt: leaseExpiryFrom(observedAt),

@@ -7,7 +7,6 @@
  * limiting concurrency — see docs/plans/detached-execution-workers.md.
  */
 
-import * as Option from "effect/Option";
 import {
   isWorkerEmoji,
   isWorkerLogoDataUrl,
@@ -18,15 +17,11 @@ import {
 } from "../../src/lib/semantic-version";
 import {
   agentProviderSupportsSelection,
-  decodeAgentProviderCapabilityCatalogOption,
   mergeAgentProviderCapabilityAdvertisements,
   type AgentProviderCapabilityCatalog,
   type ModelEffort,
 } from "../../src/lib/agent-provider-contract";
-import {
-  agentProviders,
-  type AgentProvider,
-} from "../../src/lib/agent-provider";
+import type { AgentProvider } from "../../src/lib/agent-provider";
 import { isChannelApprovedIssue } from "./db";
 import {
   executionWorkerHandoffExists,
@@ -52,6 +47,10 @@ import {
   type D1MutationMetrics,
   type WorkerHardDeleteContext,
 } from "./worker-lifecycle-repository";
+import {
+  type WorkerRuntimeMetadata,
+  workerRuntimeMetadataFromStoredProtoJson,
+} from "./worker-runtime-mappers";
 
 export type ExecutionWorkerState = "online" | "stale" | "disabled";
 export type ExecutionWorkerReadiness = "ready" | "busy" | "needs_attention";
@@ -72,13 +71,11 @@ export type ExecutionWorkerRow = {
   device_id: string;
   label: string;
   host_fingerprint: string;
-  agent_provider: AgentProvider;
-  versions_json: string;
+  runtime_proto_json: string;
   state: ExecutionWorkerState;
   accepting_work: number;
   readiness_state: ExecutionWorkerReadiness;
   readiness_detail: string | null;
-  capabilities_json: string;
   last_heartbeat_at: string;
   created_at: string;
   updated_at: string;
@@ -709,89 +706,49 @@ export class WorkerConflictError extends Error {}
 export class TranscriptLimitError extends Error {}
 
 export function executionWorkerProviders(
-  worker: Pick<ExecutionWorkerRow, "agent_provider" | "capabilities_json">,
+  worker: Pick<ExecutionWorkerRow, "runtime_proto_json">,
 ): AgentProvider[] {
-  try {
-    const capabilities = JSON.parse(worker.capabilities_json) as {
-      providerHealth?: unknown;
-    };
-    if (
-      capabilities.providerHealth &&
-      typeof capabilities.providerHealth === "object" &&
-      !Array.isArray(capabilities.providerHealth)
-    ) {
-      const providerHealth = capabilities.providerHealth as Record<
-        string,
-        unknown
-      >;
-      return agentProviders.filter((provider) =>
-        Boolean(
-          providerHealth[provider] &&
-            typeof providerHealth[provider] === "object" &&
-            (providerHealth[provider] as { healthy?: unknown }).healthy === true,
-        ),
-      );
-    }
-  } catch {
-    // Invalid or legacy capability payloads are not safe dispatch targets.
-  }
-  return [];
+  return executionWorkerRuntime(worker).providers;
 }
 
+export const executionWorkerRuntime = (
+  worker: Pick<ExecutionWorkerRow, "runtime_proto_json">,
+) => workerRuntimeMetadataFromStoredProtoJson(worker.runtime_proto_json);
+
 export function executionWorkerSupportsSelection(
-  worker: Pick<ExecutionWorkerRow, "agent_provider" | "capabilities_json">,
+  worker: Pick<ExecutionWorkerRow, "runtime_proto_json">,
   provider: AgentProvider,
   model: string | null,
   effort: string | null,
 ) {
-  if (!executionWorkerProviders(worker).includes(provider)) return false;
-  return executionWorkerAdvertisesSelection(worker, provider, model, effort);
+  const runtime = executionWorkerRuntime(worker);
+  if (!runtime.providers.includes(provider)) return false;
+  return agentProviderSupportsSelection(
+    runtime.providerCapabilities[provider],
+    model,
+    effort,
+  );
 }
 
 function executionWorkerAdvertisesSelection(
-  worker: Pick<ExecutionWorkerRow, "capabilities_json">,
+  worker: Pick<ExecutionWorkerRow, "runtime_proto_json">,
   provider: AgentProvider,
   model: string | null,
   effort: string | null,
 ) {
-  try {
-    const capabilities = JSON.parse(worker.capabilities_json) as {
-      providerCapabilities?: unknown;
-    };
-    const parsed = decodeAgentProviderCapabilityCatalogOption(
-      capabilities.providerCapabilities,
-    );
-    return Option.isSome(parsed) &&
-      agentProviderSupportsSelection(parsed.value[provider], model, effort);
-  } catch {
-    return false;
-  }
+  return agentProviderSupportsSelection(
+    executionWorkerRuntime(worker).providerCapabilities[provider],
+    model,
+    effort,
+  );
 }
 
 function executionWorkerProviderUsageExhausted(
-  worker: Pick<ExecutionWorkerRow, "capabilities_json">,
+  worker: Pick<ExecutionWorkerRow, "runtime_proto_json">,
   provider: AgentProvider,
 ) {
-  try {
-    const capabilities = JSON.parse(worker.capabilities_json) as {
-      providerHealth?: unknown;
-    };
-    if (
-      !capabilities.providerHealth ||
-      typeof capabilities.providerHealth !== "object" ||
-      Array.isArray(capabilities.providerHealth)
-    ) return false;
-    const health = (capabilities.providerHealth as Record<string, unknown>)[
-      provider
-    ];
-    return Boolean(
-      health && typeof health === "object" && !Array.isArray(health) &&
-        ((health as { reason?: unknown }).reason === "usage_exhausted" ||
-          (health as { usageExhausted?: unknown }).usageExhausted === true),
-    );
-  } catch {
-    return false;
-  }
+  return executionWorkerRuntime(worker).providerHealth[provider]
+    ?.usageExhausted === true;
 }
 
 export function projectExecutionWorkerCapabilityCatalog(
@@ -806,19 +763,13 @@ export function projectExecutionWorkerCapabilityCatalog(
     (policy.selectionMode !== "allowlist" || allowedWorkerIds.has(worker.id))
   );
   const advertisements = eligibleWorkers.flatMap((worker) => {
-    const providers = executionWorkerProviders(worker);
+    const runtime = executionWorkerRuntime(worker);
+    const providers = runtime.providers;
     if (providers.length === 0) return [];
-    try {
-      const capabilities = JSON.parse(worker.capabilities_json) as {
-        providerCapabilities?: unknown;
-      };
-      return [{
-        providers,
-        providerCapabilities: capabilities.providerCapabilities,
-      }];
-    } catch {
-      return [];
-    }
+    return [{
+      providers,
+      providerCapabilities: runtime.providerCapabilities,
+    }];
   });
   return {
     capabilities: mergeAgentProviderCapabilityAdvertisements(advertisements),
@@ -851,7 +802,7 @@ export async function channelReplyWorkerAvailability(
 ) {
   const result = await db
     .prepare(
-      `select worker.agent_provider, worker.capabilities_json,
+      `select worker.runtime_proto_json,
               worker.state as worker_state,
               worker.accepting_work, worker.readiness_state,
               worker.last_heartbeat_at as worker_last_heartbeat_at,
@@ -897,8 +848,7 @@ export async function channelReplyWorkerAvailability(
       input.projectId,
     )
     .all<{
-      agent_provider: AgentProvider;
-      capabilities_json: string;
+      runtime_proto_json: string;
       worker_state: ExecutionWorkerState;
       accepting_work: number;
       readiness_state: ExecutionWorkerReadiness;
@@ -1060,9 +1010,7 @@ export async function registerExecutionWorker(
     deviceIdentityHash: string;
     credentialTokenHash: string;
     label: string;
-    agentProvider: AgentProvider;
-    capabilities: Record<string, unknown>;
-    versions: Record<string, string>;
+    runtime: WorkerRuntimeMetadata;
     maxConcurrentSessions?: number;
     observedAt: string;
     id: string;
@@ -1096,8 +1044,6 @@ export async function registerExecutionWorker(
     throw new WorkerConflictError("Worker project must belong to its organization");
   }
 
-  const versions = JSON.stringify(input.versions);
-  const capabilities = JSON.stringify(input.capabilities);
   await db
     .prepare(
       `insert into briar_execution_worker_devices (
@@ -1145,16 +1091,13 @@ export async function registerExecutionWorker(
     db
       .prepare(
         `insert into briar_execution_workers (
-           id, project_id, device_id, label, host_fingerprint, agent_provider,
-           versions_json, capabilities_json, state, last_heartbeat_at, created_at,
-           updated_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, 'online', ?, ?, ?)
+           id, project_id, device_id, label, host_fingerprint,
+           runtime_proto_json, state, last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?, 'online', ?, ?, ?)
          on conflict (project_id, device_id) do update set
            label = excluded.label,
            host_fingerprint = excluded.host_fingerprint,
-           agent_provider = excluded.agent_provider,
-           versions_json = excluded.versions_json,
-           capabilities_json = excluded.capabilities_json,
+           runtime_proto_json = excluded.runtime_proto_json,
            state = 'online',
            last_heartbeat_at = excluded.last_heartbeat_at,
            updated_at = excluded.updated_at`,
@@ -1165,9 +1108,7 @@ export async function registerExecutionWorker(
         device.id,
         label,
         input.deviceIdentityHash,
-        input.agentProvider,
-        versions,
-        capabilities,
+        input.runtime.runtimeProtoJson,
         input.observedAt,
         input.observedAt,
         input.observedAt,
@@ -1215,9 +1156,7 @@ export async function bindExecutionWorkerProject(
     organizationId: string;
     ownerUserId: string;
     deviceIdentityHash: string;
-    agentProvider: AgentProvider;
-    capabilities: Record<string, unknown>;
-    versions: Record<string, string>;
+    runtime: WorkerRuntimeMetadata;
     observedAt: string;
   },
 ) {
@@ -1252,16 +1191,13 @@ export async function bindExecutionWorkerProject(
   await db
     .prepare(
       `insert into briar_execution_workers (
-         id, project_id, device_id, label, host_fingerprint, agent_provider,
-         versions_json, capabilities_json, state, last_heartbeat_at, created_at,
-         updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, 'online', ?, ?, ?)
+         id, project_id, device_id, label, host_fingerprint,
+         runtime_proto_json, state, last_heartbeat_at, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, 'online', ?, ?, ?)
        on conflict (project_id, device_id) do update set
          label = excluded.label,
          host_fingerprint = excluded.host_fingerprint,
-         agent_provider = excluded.agent_provider,
-         versions_json = excluded.versions_json,
-         capabilities_json = excluded.capabilities_json,
+         runtime_proto_json = excluded.runtime_proto_json,
          state = 'online',
          last_heartbeat_at = excluded.last_heartbeat_at,
          updated_at = excluded.updated_at`,
@@ -1272,9 +1208,7 @@ export async function bindExecutionWorkerProject(
       device.id,
       device.label,
       input.deviceIdentityHash,
-      input.agentProvider,
-      JSON.stringify(input.versions),
-      JSON.stringify(input.capabilities),
+      input.runtime.runtimeProtoJson,
       input.observedAt,
       input.observedAt,
       input.observedAt,
@@ -1296,11 +1230,10 @@ export async function recordWorkerHeartbeat(
   input: {
     workerId: string;
     knownBinding?: ExecutionWorkerRow;
-    versions: Record<string, string>;
+    runtime: WorkerRuntimeMetadata;
     acceptingWork?: boolean;
     readinessState?: ExecutionWorkerReadiness;
     readinessDetail?: string | null;
-    capabilities: Record<string, unknown>;
     observedAt: string;
   },
 ) {
@@ -1336,7 +1269,7 @@ export async function recordWorkerHeartbeat(
         `update briar_execution_workers
          set last_heartbeat_at = ?,
              updated_at = ?,
-             versions_json = ?,
+             runtime_proto_json = ?,
              accepting_work = case when exists (
                select 1 from briar_managed_computers computer
                where computer.briar_device_id = ?
@@ -1353,7 +1286,6 @@ export async function recordWorkerHeartbeat(
                  and computer.state not in ('needs_setup', 'ready')
              ) then 'Managed computer is not accepting new work.'
                when ? is null then readiness_detail else ? end,
-             capabilities_json = ?,
              state = case when state = 'disabled' then 'disabled' else 'online' end
          where id = ? and project_id = ?
          returning *`,
@@ -1361,7 +1293,7 @@ export async function recordWorkerHeartbeat(
       .bind(
         input.observedAt,
         input.observedAt,
-        JSON.stringify(input.versions),
+        input.runtime.runtimeProtoJson,
         binding.device_id,
         input.acceptingWork === undefined ? null : input.acceptingWork ? 1 : 0,
         binding.device_id,
@@ -1369,7 +1301,6 @@ export async function recordWorkerHeartbeat(
         binding.device_id,
         input.readinessDetail === undefined ? null : 1,
         input.readinessDetail ?? null,
-        JSON.stringify(input.capabilities),
         input.workerId,
         projectId,
       ),
@@ -1982,8 +1913,7 @@ export async function listOrganizationExecutionWorkers(
               device.max_concurrent_sessions, device.last_heartbeat_at,
               device.created_at, worker.id as worker_id,
               worker.project_id, project.name as project_name,
-              worker.agent_provider, worker.capabilities_json,
-              worker.versions_json,
+              worker.runtime_proto_json,
               worker.state as worker_state,
               worker.accepting_work, worker.readiness_state,
               worker.readiness_detail, worker.last_heartbeat_at as worker_heartbeat_at,
@@ -2045,9 +1975,7 @@ export async function listOrganizationExecutionWorkers(
       worker_id: string | null;
       project_id: string | null;
       project_name: string | null;
-      agent_provider: AgentProvider | null;
-      capabilities_json: string | null;
-      versions_json: string | null;
+      runtime_proto_json: string | null;
       worker_state: ExecutionWorkerState | null;
       accepting_work: number | null;
       readiness_state: ExecutionWorkerReadiness | null;
@@ -2081,37 +2009,26 @@ export async function listOrganizationExecutionWorkers(
         bindings: [],
       } satisfies OrganizationExecutionWorker);
     workers.set(row.device_id, device);
-    if (Object.keys(device.versions).length === 0 && row.versions_json) {
-      try {
-        device.versions = JSON.parse(row.versions_json) as Record<string, string>;
-      } catch {
-        device.versions = {};
-      }
-    }
-    if (row.capabilities_json) {
-      try {
-        const capabilities = JSON.parse(row.capabilities_json) as {
-          remoteUpdates?: { supported?: unknown; protocol?: unknown };
-        };
-        device.remoteUpdateSupported ||=
-          capabilities.remoteUpdates?.supported === true &&
-          capabilities.remoteUpdates.protocol === 1;
-      } catch {
-        // Ignore malformed legacy capabilities.
-      }
-    }
     if (
       !row.worker_id ||
       !row.project_id ||
       !row.project_name ||
-      !row.agent_provider ||
-      !row.capabilities_json ||
+      !row.runtime_proto_json ||
       !row.worker_state ||
       !row.readiness_state ||
       !row.worker_heartbeat_at
     ) {
       continue;
     }
+    const runtime = workerRuntimeMetadataFromStoredProtoJson(
+      row.runtime_proto_json,
+    );
+    if (Object.keys(device.versions).length === 0) {
+      device.versions = runtime.versions;
+    }
+    const remoteUpdates = runtime.proto.capabilities?.remoteUpdates;
+    device.remoteUpdateSupported ||=
+      remoteUpdates?.supported === true && remoteUpdates.protocol === 1;
     const state = workerStateAt(
       row.worker_heartbeat_at,
       observedAt,
@@ -2121,11 +2038,8 @@ export async function listOrganizationExecutionWorkers(
       id: row.worker_id,
       projectId: row.project_id,
       projectName: row.project_name,
-      agentProvider: row.agent_provider,
-      providers: executionWorkerProviders({
-        agent_provider: row.agent_provider,
-        capabilities_json: row.capabilities_json,
-      }),
+      agentProvider: runtime.agentProvider,
+      providers: runtime.providers,
       state,
       acceptingWork: row.accepting_work !== 0,
       readiness:
@@ -2150,7 +2064,7 @@ export async function listOrganizationExecutionProviders(
 ): Promise<AgentProvider[]> {
   const result = await db
     .prepare(
-      `select worker.agent_provider, worker.capabilities_json
+      `select worker.runtime_proto_json
        from briar_execution_worker_devices device
        join "user" owner on owner.id = device.owner_user_id
        left join briar_execution_workers worker
@@ -2160,17 +2074,15 @@ export async function listOrganizationExecutionProviders(
        order by device.last_heartbeat_at desc, device.id, project.created_at`,
     )
     .bind(organizationId)
-    .all<{
-      agent_provider: AgentProvider | null;
-      capabilities_json: string | null;
-    }>();
+    .all<{ runtime_proto_json: string | null }>();
   const providers = new Set<AgentProvider>();
   for (const row of result.results ?? []) {
-    if (!row.agent_provider || !row.capabilities_json) continue;
-    for (const provider of executionWorkerProviders({
-      agent_provider: row.agent_provider,
-      capabilities_json: row.capabilities_json,
-    })) {
+    if (!row.runtime_proto_json) continue;
+    for (
+      const provider of workerRuntimeMetadataFromStoredProtoJson(
+        row.runtime_proto_json,
+      ).providers
+    ) {
       providers.add(provider);
     }
   }
@@ -2524,7 +2436,7 @@ export async function assertExecutionSelectionAvailable(
   if (input.workerId) {
     const worker = await db
       .prepare(
-        `select worker.agent_provider, worker.capabilities_json, worker.state,
+        `select worker.runtime_proto_json, worker.state,
                 worker.accepting_work, worker.readiness_state,
                 worker.last_heartbeat_at
          from briar_execution_workers worker
@@ -2534,8 +2446,7 @@ export async function assertExecutionSelectionAvailable(
       )
       .bind(input.workerId, projectId, organizationId)
       .first<{
-        agent_provider: AgentProvider;
-        capabilities_json: string;
+        runtime_proto_json: string;
         state: ExecutionWorkerState;
         accepting_work: number;
         readiness_state: ExecutionWorkerReadiness;
@@ -2576,7 +2487,7 @@ export async function assertExecutionSelectionAvailable(
 
   const eligible = await db
     .prepare(
-      `select worker.id, worker.agent_provider, worker.capabilities_json,
+      `select worker.id, worker.runtime_proto_json,
               worker.state, worker.last_heartbeat_at
        from briar_execution_workers worker
        join briar_execution_worker_devices device on device.id = worker.device_id
@@ -2584,13 +2495,12 @@ export async function assertExecutionSelectionAvailable(
          and worker.state != 'disabled'
          and worker.accepting_work = 1
          and worker.readiness_state != 'needs_attention'
-         and coalesce(
-           json_extract(
-             worker.capabilities_json,
-             '$.providerHealth.' || ? || '.healthy'
-           ),
-           0
-         ) = 1
+         and exists (
+           select 1
+           from briar_execution_worker_healthy_providers healthy
+           where healthy.worker_id = worker.id
+             and healthy.provider = ?
+         )
          and (
            not exists (
              select 1 from briar_project_execution_worker_policies policy
@@ -2610,8 +2520,7 @@ export async function assertExecutionSelectionAvailable(
     .all<Pick<
       ExecutionWorkerRow,
       | "id"
-      | "agent_provider"
-      | "capabilities_json"
+      | "runtime_proto_json"
       | "state"
       | "last_heartbeat_at"
     >>();

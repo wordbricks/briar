@@ -4,14 +4,8 @@ import type {
   ManagedComputerSetupSessionRow,
   ManagedComputerState,
 } from "./managed-computer-model";
-import type {
-  AgentProviderCapabilityCatalog,
-} from "../../src/lib/agent-provider-contract";
-import type { AgentProvider } from "../../src/lib/agent-provider";
-import type {
-  ExecutionWorkerRow,
-  ProviderHealthMap,
-} from "./workers";
+import type { ExecutionWorkerRow } from "./workers";
+import type { WorkerRuntimeMetadata } from "./worker-runtime-mappers";
 
 const activeStates: readonly ManagedComputerState[] = [
   "requested",
@@ -850,30 +844,20 @@ export async function bindManagedComputerSetupSession(
     managedComputerId: string;
     organizationId: string;
     deviceId: string;
-    agentProvider: AgentProvider;
-    providers: AgentProvider[];
-    providerHealth: ProviderHealthMap;
-    providerCapabilities: AgentProviderCapabilityCatalog;
-    versions: Record<string, string>;
+    runtime: WorkerRuntimeMetadata;
     observedAt: string;
   },
 ) {
-  const capabilitiesJson = JSON.stringify({
-    providers: input.providers,
-    providerHealth: input.providerHealth,
-    providerCapabilities: input.providerCapabilities,
-  });
-  const versionsJson = JSON.stringify(input.versions);
   await db.batch([
     db.prepare(
       `insert into briar_execution_workers (
-         id, project_id, device_id, label, host_fingerprint, agent_provider,
-         versions_json, capabilities_json, state, accepting_work,
+         id, project_id, device_id, label, host_fingerprint,
+         runtime_proto_json, state, accepting_work,
          readiness_state, readiness_detail, last_heartbeat_at, created_at,
          updated_at
        )
        select ?, setup.project_id, device.id, device.label,
-              device.device_identity_hash, ?, ?, ?, 'online', 0,
+              device.device_identity_hash, ?, 'online', 0,
               'needs_attention', 'Managed computer worker has not reported readiness',
               ?, ?, ?
        from briar_managed_computer_setup_sessions setup
@@ -891,9 +875,7 @@ export async function bindManagedComputerSetupSession(
          and device.state != 'disabled'
          and project.organization_id = setup.organization_id
        on conflict (project_id, device_id) do update set
-         agent_provider = excluded.agent_provider,
-         versions_json = excluded.versions_json,
-         capabilities_json = excluded.capabilities_json,
+         runtime_proto_json = excluded.runtime_proto_json,
          state = 'online',
          accepting_work = 0,
          readiness_state = 'needs_attention',
@@ -901,9 +883,7 @@ export async function bindManagedComputerSetupSession(
          updated_at = excluded.updated_at`,
     ).bind(
       input.setupSessionId,
-      input.agentProvider,
-      versionsJson,
-      capabilitiesJson,
+      input.runtime.runtimeProtoJson,
       input.observedAt,
       input.observedAt,
       input.observedAt,

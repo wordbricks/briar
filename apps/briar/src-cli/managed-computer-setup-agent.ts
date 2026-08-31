@@ -60,7 +60,6 @@ import { discoverWorkerProviderCapabilities } from "./provider-capabilities";
 import {
   claudeAuthenticated,
   grokAuthenticated,
-  healthyWorkerProviders,
   inspectWorkerProviderHealth,
   opencodeAuthenticated,
 } from "./provider-health";
@@ -693,7 +692,6 @@ export async function runManagedComputerGuidedSetup(
     setupToken: input.setupToken,
     runtime: workerRuntimeToProto({
       agentProvider: input.provider,
-      providers: healthyWorkerProviders(providerHealth),
       providerHealth,
       providerCapabilities,
       versions: { briar: cliVersion },

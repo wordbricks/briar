@@ -191,7 +191,7 @@ export async function heartbeatWorkerApplication(input: {
   const worker = await recordWorkerHeartbeat(input.db, binding.project_id, {
     workerId: input.workerId,
     knownBinding: binding,
-    versions: input.runtime.versions,
+    runtime: input.runtime,
     acceptingWork: updateIsPending ? false : input.acceptingWork,
     readinessState: updateFailed
       ? "needs_attention"
@@ -203,7 +203,6 @@ export async function heartbeatWorkerApplication(input: {
       : updateIsPending
         ? "계획된 업데이트 handoff를 진행 중입니다."
         : input.readinessDetail ?? null,
-    capabilities: input.runtime.capabilities,
     observedAt: input.observedAt,
   });
   if (

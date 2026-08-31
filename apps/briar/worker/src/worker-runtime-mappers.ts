@@ -1,5 +1,9 @@
+import { fromJsonString, toJsonString } from "@bufbuild/protobuf";
 import { AgentProvider as ProtoAgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
-import type { WorkerRuntimeAdvertisement } from "@briar/contracts/gen/briar/types/v1/worker_pb";
+import {
+  type WorkerRuntimeAdvertisement,
+  WorkerRuntimeAdvertisementSchema,
+} from "@briar/contracts/gen/briar/types/v1/worker_pb";
 import {
   decodeAgentProviderCapabilityCatalog,
   type AgentEffortCapability,
@@ -17,6 +21,8 @@ export class WorkerRuntimeValidationError extends Error {
     this.name = "WorkerRuntimeValidationError";
   }
 }
+
+export const MAX_STORED_WORKER_RUNTIME_BYTES = 1_048_576;
 
 const invalid = (message: string): never => {
   throw new WorkerRuntimeValidationError(message);
@@ -147,11 +153,6 @@ export const workerRuntimeMetadataFromProto = (
 ) => {
   if (!runtime) return invalid("Worker runtime advertisement is required");
   const agentProvider = workerAgentProviderFromProto(runtime.agentProvider);
-  const providers = runtime.providers.map(workerAgentProviderFromProto);
-  if (new Set(providers).size !== providers.length) {
-    invalid("Worker providers must be unique");
-  }
-  if (providers.length > 7) invalid("Worker has too many providers");
   const versions = { ...runtime.versions };
   for (const [key, value] of Object.entries(versions)) {
     if (key.length > 64 || value.length > 64) {
@@ -162,35 +163,31 @@ export const workerRuntimeMetadataFromProto = (
     invalid("Worker capabilities are required");
   const capabilityCatalog = providerCapabilities(capabilities);
   const health = providerHealth(runtime);
-  const capabilityJson = {
-    providers,
-    providerHealth: health,
-    providerCapabilities: capabilityCatalog,
-    worktrees: capabilities.worktrees,
-    workflowRequirements: capabilities.workflowRequirements.map(
-      (requirement) => ({
-        id: requirement.id,
-        healthy: requirement.healthy,
-        detail: requirement.detail ?? null,
-      }),
-    ),
-    ...(capabilities.remoteUpdates
-      ? {
-          remoteUpdates: {
-            supported: capabilities.remoteUpdates.supported,
-            ...(capabilities.remoteUpdates.protocol !== undefined
-              ? { protocol: capabilities.remoteUpdates.protocol }
-              : {}),
-          },
-        }
-      : {}),
-  };
+  const providers = agentProviders.filter((provider) =>
+    health[provider]?.healthy === true
+  );
+  const runtimeProtoJson = toJsonString(
+    WorkerRuntimeAdvertisementSchema,
+    runtime,
+  );
+  if (
+    new TextEncoder().encode(runtimeProtoJson).byteLength >
+      MAX_STORED_WORKER_RUNTIME_BYTES
+  ) {
+    invalid("Worker runtime advertisement is too large");
+  }
   return {
+    proto: runtime,
+    runtimeProtoJson,
     agentProvider,
     providers,
     providerHealth: health,
     providerCapabilities: capabilityCatalog,
     versions,
-    capabilities: capabilityJson,
   };
 };
+
+export const workerRuntimeMetadataFromStoredProtoJson = (value: string) =>
+  workerRuntimeMetadataFromProto(
+    fromJsonString(WorkerRuntimeAdvertisementSchema, value),
+  );

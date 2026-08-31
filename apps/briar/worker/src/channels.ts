@@ -25,6 +25,7 @@ import {
   type DirectMessageParticipant,
 } from "../../src/lib/channels-contract";
 import { agentReplyDisplayParentMessageId } from "../../src/lib/issue-reply-decision";
+import { agentProviderSupportsSelection } from "../../src/lib/agent-provider-contract";
 import { isWorkerEmoji } from "../../src/lib/worker-icon-validation";
 import type { AgentSkillEffort, AgentSkillKind } from "./agent-skills";
 import type {
@@ -33,9 +34,9 @@ import type {
 } from "./db";
 import {
   channelReplyWorkerAvailability,
-  executionWorkerSupportsSelection,
   hasAvailableChannelReplyWorker,
 } from "./workers";
+import type { WorkerRuntimeMetadata } from "./worker-runtime-mappers";
 import {
   consumeReplyAttachmentStatements,
   replyAttachmentAvailabilityGuard,
@@ -3071,9 +3072,7 @@ export async function claimNextChannelAgentReply(
   input: {
     deviceId: string;
     workerId: string;
-    providers: AgentProvider[];
-    workerAgentProvider: AgentProvider;
-    workerCapabilitiesJson: string;
+    runtime: WorkerRuntimeMetadata;
     claimTokenHash: string;
     claimedAt: string;
     leaseExpiresAt: string;
@@ -3296,13 +3295,12 @@ export async function claimNextChannelAgentReply(
        )
        and ${liveChannelReplyRuntime("job")}
        and ${liveSkillSnapshot("job")}
-       and ((job.agent_provider = 'codex' and ? = 1)
-         or (job.agent_provider = 'claude' and ? = 1)
-         or (job.agent_provider = 'cursor' and ? = 1)
-         or (job.agent_provider = 'grok' and ? = 1)
-         or (job.agent_provider = 'agy' and ? = 1)
-         or (job.agent_provider = 'opencode' and ? = 1)
-         or (job.agent_provider = 'openrouter' and ? = 1))
+       and exists (
+         select 1
+         from briar_execution_worker_healthy_providers healthy
+         where healthy.worker_id = ?
+           and healthy.provider = job.agent_provider
+       )
        and exists (
          select 1 from briar_execution_workers binding
          where binding.id = ? and binding.device_id = ?
@@ -3328,13 +3326,7 @@ export async function claimNextChannelAgentReply(
     MAX_REPLY_ATTEMPTS,
     input.claimedAt,
     input.claimedAt,
-    input.providers.includes("codex") ? 1 : 0,
-    input.providers.includes("claude") ? 1 : 0,
-    input.providers.includes("cursor") ? 1 : 0,
-    input.providers.includes("grok") ? 1 : 0,
-    input.providers.includes("agy") ? 1 : 0,
-    input.providers.includes("opencode") ? 1 : 0,
-    input.providers.includes("openrouter") ? 1 : 0,
+    input.workerId,
     input.workerId,
     input.deviceId,
   ).all<ChannelReplyJobRow & {
@@ -3354,12 +3346,8 @@ export async function claimNextChannelAgentReply(
   const preferredAvailability = new Map<string, boolean>();
   for (const candidate of candidates.results) {
     if (!candidate.agent_provider) continue;
-    const supportsSelection = executionWorkerSupportsSelection(
-      {
-        agent_provider: input.workerAgentProvider,
-        capabilities_json: input.workerCapabilitiesJson,
-      },
-      candidate.agent_provider,
+    const supportsSelection = agentProviderSupportsSelection(
+      input.runtime.providerCapabilities[candidate.agent_provider],
       candidate.runtime_model,
       candidate.runtime_effort,
     );

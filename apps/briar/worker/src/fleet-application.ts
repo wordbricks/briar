@@ -114,10 +114,8 @@ export async function registerProjectExecutionWorkerApplication(input: {
     label: input.label,
     deviceIdentityHash: await sha256(input.deviceIdentity),
     credentialTokenHash: await sha256(workerToken),
-    agentProvider: input.runtime.agentProvider,
-    capabilities: input.runtime.capabilities,
+    runtime: input.runtime,
     maxConcurrentSessions: input.maxConcurrentSessions,
-    versions: input.runtime.versions,
     observedAt: input.observedAt,
   });
   return {
@@ -141,9 +139,7 @@ export async function bindProjectExecutionWorkerApplication(input: {
     organizationId: project.organization_id,
     ownerUserId: input.userId,
     deviceIdentityHash: await sha256(input.deviceIdentity),
-    agentProvider: input.runtime.agentProvider,
-    capabilities: input.runtime.capabilities,
-    versions: input.runtime.versions,
+    runtime: input.runtime,
     observedAt: input.observedAt,
   });
   return { ...binding, organizationId: project.organization_id };

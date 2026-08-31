@@ -23,7 +23,6 @@ import {
 } from "./managed-computer-credential";
 import { discoverWorkerProviderCapabilities } from "./provider-capabilities";
 import {
-  healthyWorkerProviders,
   inspectWorkerProviderHealth,
 } from "./provider-health";
 import {
@@ -245,7 +244,6 @@ export async function managedComputerSetupCommand() {
     setupToken: setup.setupToken,
     runtime: workerRuntimeToProto({
       agentProvider: provider,
-      providers: healthyWorkerProviders(providerHealth),
       providerHealth,
       providerCapabilities,
       versions: { briar: cliVersion },

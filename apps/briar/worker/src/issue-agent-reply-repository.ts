@@ -210,16 +210,12 @@ export async function claimNextIssueAgentReply(
   input: {
     workerId: string;
     agentProvider: ProjectAgentProvider;
-    agentProviders: ProjectAgentProvider[];
     claimTokenHash: string;
     claimedAt: string;
     leaseExpiresAt: string;
     staleBefore: string;
   },
 ) {
-  const skillProviderPlaceholders = input.agentProviders
-    .map(() => "?")
-    .join(", ");
   // Migration 0092 is a deployment prerequisite, so every claim enforces the
   // saved-Skill snapshot without a runtime compatibility branch.
   const selectedSkillGuard = `and (
@@ -241,7 +237,12 @@ export async function claimNextIssueAgentReply(
               and trigger.project_id = job.project_id
               and trigger.run_id = job.run_id
              where project.id = run.project_id
-               and selected_skill.provider in (${skillProviderPlaceholders})
+               and exists (
+                 select 1
+                 from briar_execution_worker_healthy_providers healthy
+                 where healthy.worker_id = ?
+                   and healthy.provider = selected_skill.provider
+               )
                and selected_agent.name = job.selected_agent_name_snapshot
                and selected_agent.responsibility =
                  job.selected_agent_responsibility_snapshot
@@ -276,15 +277,12 @@ export async function claimNextIssueAgentReply(
     .prepare(
       `update briar_issue_agent_reply_jobs
        set status = 'running', claimed_worker_id = ?,
-           agent_provider = case
-             when preferred_provider = 'codex' and ? = 1 then 'codex'
-             when preferred_provider = 'claude' and ? = 1 then 'claude'
-             when preferred_provider = 'cursor' and ? = 1 then 'cursor'
-             when preferred_provider = 'grok' and ? = 1 then 'grok'
-             when preferred_provider = 'agy' and ? = 1 then 'agy'
-             when preferred_provider = 'opencode' and ? = 1 then 'opencode'
-             when preferred_provider = 'openrouter' and ? = 1 then 'openrouter'
-             else ?
+           agent_provider = case when exists (
+             select 1
+             from briar_execution_worker_healthy_providers healthy
+             where healthy.worker_id = ?
+               and healthy.provider = preferred_provider
+           ) then preferred_provider else ?
            end,
            claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
            attempts = attempts + case when planned_update_resume = 1 then 0 else 1 end,
@@ -356,13 +354,7 @@ export async function claimNextIssueAgentReply(
     )
     .bind(
       input.workerId,
-      input.agentProviders.includes("codex") ? 1 : 0,
-      input.agentProviders.includes("claude") ? 1 : 0,
-      input.agentProviders.includes("cursor") ? 1 : 0,
-      input.agentProviders.includes("grok") ? 1 : 0,
-      input.agentProviders.includes("agy") ? 1 : 0,
-      input.agentProviders.includes("opencode") ? 1 : 0,
-      input.agentProviders.includes("openrouter") ? 1 : 0,
+      input.workerId,
       input.agentProvider,
       input.claimTokenHash,
       input.claimedAt,
@@ -374,7 +366,7 @@ export async function claimNextIssueAgentReply(
       input.workerId,
       input.workerId,
       input.staleBefore,
-      ...input.agentProviders,
+      input.workerId,
     )
     .first<IssueAgentReplyJobRow>();
 }
