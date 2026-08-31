@@ -6,8 +6,10 @@ import {
 } from "../../src/lib/channel-agent-activity";
 import { getDashboardSyncCursor } from "./dashboard-change-repository";
 import {
+  acknowledgeAgentSkillExecutionRealtimeOutbox,
   acknowledgeOrganizationInboxRealtimeOutbox,
   getProjectAgentSessionSyncCursor,
+  listAgentSkillExecutionRealtimeOutbox,
   listOrganizationInboxRealtimeOutbox,
   type IssueAgentReplyJobRow,
 } from "./db";
@@ -160,6 +162,62 @@ export function scheduleInboxRealtimeFlush(
   const flush = flushOrganizationInboxRealtimeOutbox(env, db).catch((error) => {
     console.error(JSON.stringify({
       message: "Inbox realtime outbox flush failed",
+      error: error instanceof Error ? error.message : String(error),
+    }));
+  });
+  if (context) context.waitUntil(flush);
+  else void flush;
+}
+
+export async function flushAgentSkillExecutionRealtimeOutbox(
+  env: Env,
+  db: D1Database,
+) {
+  if (!env.CHANNEL_REALTIME) return;
+  const pending = await listAgentSkillExecutionRealtimeOutbox(db);
+  for (const row of pending) {
+    try {
+      if (row.source_kind === "channel" && row.channel_cursor !== null) {
+        await publishChannelRealtime(
+          env,
+          row.organization_id,
+          row.channel_cursor,
+        );
+      } else if (row.source_kind === "issue" && row.project_cursor !== null) {
+        await publishProjectRealtime(
+          env,
+          row.organization_id,
+          row.project_id,
+          row.project_cursor,
+        );
+      }
+      await publishProjectAgentSessionRealtime(
+        env,
+        row.organization_id,
+        row.project_id,
+        row.session_version,
+      );
+      await acknowledgeAgentSkillExecutionRealtimeOutbox(db, row);
+    } catch (error) {
+      console.error(JSON.stringify({
+        message: "Agent Skill execution realtime publish failed",
+        taskId: row.task_id,
+        projectId: row.project_id,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    }
+  }
+}
+
+export function scheduleAgentSkillExecutionRealtimeFlush(
+  env: Env,
+  db: D1Database,
+  context?: ExecutionContext,
+) {
+  if (!env.CHANNEL_REALTIME) return;
+  const flush = flushAgentSkillExecutionRealtimeOutbox(env, db).catch((error) => {
+    console.error(JSON.stringify({
+      message: "Agent Skill execution realtime outbox flush failed",
       error: error instanceof Error ? error.message : String(error),
     }));
   });

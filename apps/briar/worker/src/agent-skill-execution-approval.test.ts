@@ -22,7 +22,9 @@ import {
   createProjectAgent,
   enqueueIssueAgentReply,
   getProjectAgentSession,
+  listChannelConversationNotifications,
   listIssueAgentSkillExecutionProposals,
+  listProjectAgentSessionSummaries,
   reapProjectAgentTaskJobs,
   recordHuntEvent,
   type AgentSkillExecutionProposalRow,
@@ -30,6 +32,7 @@ import {
 } from "./db";
 import { archiveCompletedLogs, type ArchiveBucket } from "./archive";
 import apiWorker from "./index";
+import { flushAgentSkillExecutionRealtimeOutbox } from "./realtime-scheduling";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import {
   bindExecutionWorkerProject,
@@ -498,6 +501,89 @@ describe("conversational Agent Skill execution approval", () => {
         "content-type": "application/json",
       },
       body: JSON.stringify({ workerId: selectedWorkerId }),
+    },
+  ), env());
+
+  const seedChannelProposal = async () => {
+    const agent = await createAgent();
+    await addChannelAgent(db, {
+      channelId,
+      agentId: agent.id,
+      addedByUserId: ownerId,
+      createdAt: new Date().toISOString(),
+    });
+    const request = `Run the channel Skill for request ${sequence + 1}.`;
+    const triggerMessageId = nextId(0xb3000000);
+    await createChannelMessage(db, {
+      id: triggerMessageId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: request,
+      mentionedUserIds: [],
+      mentionedAgentIds: [agent.id],
+      createdAt: new Date().toISOString(),
+    });
+    const [queued] = await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId,
+      triggerMessageId,
+      parentMessageId: triggerMessageId,
+      agents: [{
+        id: agent.id,
+        projectId,
+        skillId: agent.skills[0].id,
+        provider: "codex",
+      }],
+      createdAt: new Date().toISOString(),
+    });
+    const claimHash = sha256(`channel-reply-${queued.id}`);
+    const claimed = await claimNextChannelAgentReply(db, organizationId, {
+      deviceId: workerDeviceId,
+      workerId,
+      providers: ["codex"],
+      supportsOrganizationAgentContext: true,
+      claimTokenHash: claimHash,
+      claimedAt: new Date().toISOString(),
+      leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+    });
+    expect(claimed?.id).toBe(queued.id);
+    expect(await completeChannelReply(db, claimed!, {
+      jobId: claimed!.id,
+      deviceId: workerDeviceId,
+      workerId,
+      claimTokenHash: claimHash,
+      body: "The saved Skill requires explicit approval.",
+      document: null,
+      issueProposal: null,
+      executionProposal: null,
+      skillExecutionProposal: true,
+      delegation: null,
+      agentName: agent.name,
+      agentProvider: "codex",
+      completedAt: new Date().toISOString(),
+    })).not.toBeNull();
+    const proposal = await db.prepare(
+      `select * from briar_agent_skill_execution_proposals
+       where source_kind = 'channel' and source_reply_job_id = ?`,
+    ).bind(queued.id).first<AgentSkillExecutionProposalRow>();
+    expect(proposal?.status).toBe("pending");
+    return { agent, proposal: proposal!, triggerMessageId };
+  };
+
+  const acceptChannel = (proposalId: string) => apiWorker.fetch(new Request(
+    `https://briar.example/organizations/${organizationId}/channels/${channelId}` +
+      `/skill-execution-proposals/${proposalId}/accept`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${ownerToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ workerId }),
     },
   ), env());
 
@@ -1117,6 +1203,14 @@ describe("conversational Agent Skill execution approval", () => {
       reply_message_id: accepted.proposal.resultMessageId,
       approved_skill_execution_proposal_id: proposal!.id,
     });
+    await db.prepare(
+      `update briar_agent_skills
+       set name = 'Renamed conversation Skill',
+           description = 'Renamed while approved work remains queued.',
+           position = 4,
+           updated_at = ?
+       where id = ?`,
+    ).bind(new Date().toISOString(), agent.skills[0].id).run();
     const continuedClaimResponse = await apiWorker.fetch(new Request(
       "https://briar.example/channel-reply-claims",
       {
@@ -1631,6 +1725,301 @@ describe("conversational Agent Skill execution approval", () => {
         "Worker lease expired after repeated attempts.",
       ),
     });
+  }, 60_000);
+
+  it("keeps approved work alive across metadata saves and rejects runtime edits", async () => {
+    const seeded = await seedIssueProposal();
+    const accepted = await acceptIssue(seeded.runId, seeded.proposal.id);
+    const taskId = ((await accepted.json()) as {
+      proposal: { resultSessionId: string };
+    }).proposal.resultSessionId;
+    const originalSkill = seeded.agent.skills[0];
+    const harmlessSkill = {
+      id: originalSkill.id,
+      name: "Renamed release Skill",
+      description: "Use this renamed Skill for approved releases.",
+      body: originalSkill.body,
+      provider: originalSkill.provider,
+      model: originalSkill.model,
+      effort: originalSkill.effort,
+      kind: originalSkill.kind,
+      executionMode: originalSkill.execution_mode,
+      approvalPolicy: originalSkill.approval_policy,
+      position: 4,
+    };
+    const agentInput = (skill: typeof harmlessSkill) => ({
+      name: seeded.agent.name,
+      description: seeded.agent.description,
+      provider: seeded.agent.provider,
+      model: seeded.agent.model,
+      effort: seeded.agent.effort,
+      responsibility: seeded.agent.responsibility,
+      skills: [skill],
+      calendarColor: seeded.agent.calendar_color,
+    });
+    const saveAgent = (skill: typeof harmlessSkill) => apiWorker.fetch(
+      new Request(
+        `https://briar.example/projects/${projectId}/agents/${seeded.agent.id}`,
+        {
+          method: "PUT",
+          headers: {
+            authorization: `Bearer ${ownerToken}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(agentInput(skill)),
+        },
+      ),
+      env(),
+    );
+
+    expect((await saveAgent(harmlessSkill)).status).toBe(200);
+    await expect(db.prepare(
+      `select status, error from briar_project_agent_task_jobs where id = ?`,
+    ).bind(taskId).first()).resolves.toEqual({ status: "queued", error: null });
+
+    for (const runtimeChange of [
+      { body: "Changed while queued." },
+      { provider: "claude" as const },
+      { model: "changed-model" },
+    ]) {
+      const response = await saveAgent({ ...harmlessSkill, ...runtimeChange });
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({
+        message: expect.stringContaining(
+          "cannot change body or execution settings",
+        ),
+      });
+    }
+    await expect(db.prepare(
+      `select status, error from briar_project_agent_task_jobs where id = ?`,
+    ).bind(taskId).first()).resolves.toEqual({ status: "queued", error: null });
+
+    const claimToken = "briar_agent_task_claim_runtime_guard";
+    expect(await claimNextProjectAgentTask(db, projectId, {
+      workerId,
+      agentProviders: ["codex"],
+      claimTokenHash: sha256(claimToken),
+      claimedAt: new Date().toISOString(),
+      leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+    })).toMatchObject({ id: taskId });
+    for (const runtimeChange of [
+      { effort: "medium" as const },
+      { executionMode: "conversation" as const },
+      { approvalPolicy: "invoke_is_consent" as const },
+    ]) {
+      expect((await saveAgent({ ...harmlessSkill, ...runtimeChange })).status)
+        .toBe(409);
+    }
+    await expect(db.prepare(
+      `select status, error from briar_project_agent_task_jobs where id = ?`,
+    ).bind(taskId).first()).resolves.toEqual({ status: "running", error: null });
+    expect((await completeTask(taskId, claimToken, {
+      summary: "Runtime guard regression completed.",
+      conversationId: null,
+    })).status).toBe(200);
+  }, 60_000);
+
+  it("atomically reconciles trigger failures and drains both realtime topics", async () => {
+    await db.prepare(
+      `delete from briar_agent_skill_execution_realtime_outbox`,
+    ).run();
+    const seeded = await seedChannelProposal();
+    const accepted = await acceptChannel(seeded.proposal.id);
+    expect(accepted.status).toBe(200);
+    const taskId = ((await accepted.json()) as {
+      proposal: { resultSessionId: string };
+    }).proposal.resultSessionId;
+    const started = await getProjectAgentSession(db, projectId, taskId);
+    expect(started?.status).toBe("running");
+
+    await db.prepare(
+      `update briar_agent_skills
+       set body = 'Revoked runtime body.',
+           updated_at = '2000-01-01T00:00:00.000Z'
+       where id = ?`,
+    ).bind(seeded.agent.skills[0].id).run();
+
+    const task = await db.prepare(
+      `select status, error, completed_at, updated_at
+       from briar_project_agent_task_jobs where id = ?`,
+    ).bind(taskId).first<{
+      status: string;
+      error: string;
+      completed_at: string;
+      updated_at: string;
+    }>();
+    const session = await getProjectAgentSession(db, projectId, taskId);
+    const [summary] = await listProjectAgentSessionSummaries(
+      db,
+      projectId,
+      [taskId],
+    );
+    const summaryJson = JSON.parse(summary!.summary_json) as {
+      status: string;
+      completedAt: string;
+    };
+    expect(task).toMatchObject({
+      status: "failed",
+      error: "Approved Skill runtime changed before execution.",
+    });
+    expect(task!.completed_at).toBe(task!.updated_at);
+    expect(Date.parse(task!.completed_at)).toBeGreaterThanOrEqual(
+      Date.parse(started!.started_at),
+    );
+    expect(task!.completed_at).not.toBe("2000-01-01T00:00:00.000Z");
+    expect(session).toMatchObject({
+      status: "failed",
+      completed_at: task!.completed_at,
+      updated_at: task!.updated_at,
+    });
+    expect(summaryJson).toEqual({
+      ...summaryJson,
+      status: "failed",
+      completedAt: task!.completed_at,
+    });
+
+    const result = await db.prepare(
+      `select proposal.result_message_id, message.body, message.created_at
+       from briar_agent_skill_execution_proposals proposal
+       join briar_channel_messages message
+         on message.id = proposal.result_message_id
+       where proposal.id = ?`,
+    ).bind(seeded.proposal.id).first<{
+      result_message_id: string;
+      body: string;
+      created_at: string;
+    }>();
+    const root = await getChannelMessage(db, channelId, seeded.triggerMessageId);
+    expect(result?.body).toContain("Approved Skill runtime changed");
+    expect(result?.created_at).toBe(task!.completed_at);
+    expect(Date.parse(result!.created_at)).toBeGreaterThanOrEqual(
+      Date.parse(root!.createdAt),
+    );
+    expect((await getChannelMessage(
+      db,
+      channelId,
+      seeded.proposal.reply_message_id,
+    ))?.skillExecutionProposal).toMatchObject({
+      executionStatus: "failed",
+      resultMessageId: result!.result_message_id,
+    });
+    expect(await listChannelConversationNotifications(
+      db,
+      organizationId,
+      ownerId,
+    )).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: result!.result_message_id }),
+    ]));
+
+    await db.batch([
+      db.prepare(
+        `update briar_project_agent_task_jobs
+         set completed_at = '2000-01-01T00:00:00.000Z',
+             updated_at = '2000-01-01T00:00:00.000Z'
+         where id = ?`,
+      ).bind(taskId),
+      db.prepare(
+        `update briar_project_agent_sessions
+         set completed_at = '2000-01-01T00:00:00.000Z',
+             updated_at = '2000-01-01T00:00:00.000Z',
+             payload_json = json_set(
+               payload_json,
+               '$.completedAt', '2000-01-01T00:00:00.000Z',
+               '$.updatedAt', '2000-01-01T00:00:00.000Z'
+             )
+         where project_id = ? and id = ?`,
+      ).bind(projectId, taskId),
+      db.prepare(
+        `update briar_project_agent_session_summaries
+         set summary_json = json_set(
+               summary_json, '$.status', 'running', '$.completedAt', null
+             ),
+             updated_at = '2000-01-01T00:00:00.000Z'
+         where project_id = ? and session_id = ?`,
+      ).bind(projectId, taskId),
+      db.prepare(
+        `update briar_channel_messages
+         set created_at = '2000-01-01T00:00:00.000Z',
+             updated_at = '2000-01-01T00:00:00.000Z'
+         where id = ?`,
+      ).bind(result!.result_message_id),
+      db.prepare(
+        `delete from briar_channel_notification_inbox
+         where message_id = ?`,
+      ).bind(result!.result_message_id),
+      db.prepare(
+        `delete from briar_agent_skill_execution_realtime_outbox
+         where task_id = ?`,
+      ).bind(taskId),
+    ]);
+    await db.prepare(
+      `update briar_project_agent_task_jobs set status = status where id = ?`,
+    ).bind(taskId).run();
+    const repairedTask = await db.prepare(
+      `select completed_at from briar_project_agent_task_jobs where id = ?`,
+    ).bind(taskId).first<{ completed_at: string }>();
+    const [repairedSummary] = await listProjectAgentSessionSummaries(
+      db,
+      projectId,
+      [taskId],
+    );
+    const repairedMessage = await db.prepare(
+      `select created_at from briar_channel_messages where id = ?`,
+    ).bind(result!.result_message_id).first<{ created_at: string }>();
+    expect(Date.parse(repairedTask!.completed_at)).toBeGreaterThanOrEqual(
+      Date.parse(started!.started_at),
+    );
+    expect(JSON.parse(repairedSummary!.summary_json)).toMatchObject({
+      status: "failed",
+      completedAt: repairedTask!.completed_at,
+    });
+    expect(repairedMessage?.created_at).toBe(repairedTask!.completed_at);
+    expect(await listChannelConversationNotifications(
+      db,
+      organizationId,
+      ownerId,
+    )).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: result!.result_message_id }),
+    ]));
+
+    const outbox = await db.prepare(
+      `select source_kind, channel_cursor, session_version
+       from briar_agent_skill_execution_realtime_outbox where task_id = ?`,
+    ).bind(taskId).first<{
+      source_kind: string;
+      channel_cursor: number;
+      session_version: number;
+    }>();
+    expect(outbox).toMatchObject({
+      source_kind: "channel",
+      channel_cursor: expect.any(Number),
+      session_version: expect.any(Number),
+    });
+
+    const published: unknown[] = [];
+    const realtimeEnv = {
+      CHANNEL_REALTIME: {
+        getByName: () => ({
+          fetch: async (_url: string, init: RequestInit) => {
+            published.push(JSON.parse(String(init.body)));
+            return new Response(null, { status: 204 });
+          },
+        }),
+      },
+    } as unknown as Env;
+    await flushAgentSkillExecutionRealtimeOutbox(realtimeEnv, db);
+    expect(published).toEqual([
+      { topic: "channels", cursor: outbox!.channel_cursor },
+      {
+        topic: "project-session",
+        projectId,
+        version: outbox!.session_version,
+      },
+    ]);
+    await expect(db.prepare(
+      `select 1 from briar_agent_skill_execution_realtime_outbox
+       where task_id = ?`,
+    ).bind(taskId).first()).resolves.toBeNull();
   }, 60_000);
 
   it("reconciles permanent Agent, Skill, Worker, and policy revocation", async () => {
