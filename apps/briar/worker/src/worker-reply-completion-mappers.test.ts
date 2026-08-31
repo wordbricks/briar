@@ -1,11 +1,18 @@
-import { create } from "@bufbuild/protobuf";
+import {
+  create,
+  fromBinary,
+  toBinary,
+} from "@bufbuild/protobuf";
 import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   ChannelReplyClaimIdentitySchema,
+  ChannelReplyArtifactsActionSchema,
+  ChannelReplySuccessSchema,
   type CompleteIssueReplyRequest,
   CompleteChannelReplyRequestSchema,
   CompleteIssueReplyRequestSchema,
   IssueReplyClaimIdentitySchema,
+  IssueReplySuccessSchema,
   WorkClaimIdentitySchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { describe, expect, it } from "vitest";
@@ -132,6 +139,84 @@ describe("reply completion protobuf mapping", () => {
     } as unknown as CompleteIssueReplyRequest;
     expect(() => completeIssueReplyInputFromProto(unknown)).toThrow(
       "Issue reply outcome is required",
+    );
+  });
+
+  it("rejects future nested oneof variants decoded from protobuf binary", () => {
+    const issueSuccess = fromBinary(
+      IssueReplySuccessSchema,
+      new Uint8Array([
+        ...toBinary(
+          IssueReplySuccessSchema,
+          create(IssueReplySuccessSchema, { body: "Done." }),
+        ),
+        0x7a,
+        0x00,
+      ]),
+    );
+    const issueRequest = fromBinary(
+      CompleteIssueReplyRequestSchema,
+      toBinary(
+        CompleteIssueReplyRequestSchema,
+        create(CompleteIssueReplyRequestSchema, {
+          requestId,
+          projectId,
+          workerId: "worker-1",
+          work: issueWork(),
+          outcome: { case: "success", value: issueSuccess },
+        }),
+      ),
+    );
+    expect(issueRequest.outcome.case).toBe("success");
+    if (issueRequest.outcome.case !== "success") throw new Error("unreachable");
+    expect(issueRequest.outcome.value.action.case).toBeUndefined();
+    expect(() => completeIssueReplyInputFromProto(issueRequest)).toThrow(
+      "Issue reply request contains unknown protobuf fields",
+    );
+
+    const artifacts = fromBinary(
+      ChannelReplyArtifactsActionSchema,
+      new Uint8Array([
+        ...toBinary(
+          ChannelReplyArtifactsActionSchema,
+          create(ChannelReplyArtifactsActionSchema),
+        ),
+        0x6a,
+        0x00,
+      ]),
+    );
+    const channelRequest = fromBinary(
+      CompleteChannelReplyRequestSchema,
+      toBinary(
+        CompleteChannelReplyRequestSchema,
+        create(CompleteChannelReplyRequestSchema, {
+          requestId,
+          projectId,
+          workerId: "worker-1",
+          work: channelWork(),
+          outcome: {
+            case: "success",
+            value: create(ChannelReplySuccessSchema, {
+              body: "Done.",
+              action: { case: "artifacts", value: artifacts },
+            }),
+          },
+        }),
+      ),
+    );
+    expect(channelRequest.outcome.case).toBe("success");
+    if (channelRequest.outcome.case !== "success") {
+      throw new Error("unreachable");
+    }
+    expect(channelRequest.outcome.value.action.case).toBe("artifacts");
+    if (channelRequest.outcome.value.action.case !== "artifacts") {
+      throw new Error("unreachable");
+    }
+    expect(
+      channelRequest.outcome.value.action.value.proposal.case,
+    ).toBeUndefined();
+    expect(() => completeChannelReplyInputFromProto(channelRequest)).toThrow(
+      "Channel reply request contains unknown protobuf fields",
     );
   });
 });

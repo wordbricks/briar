@@ -36,6 +36,33 @@ export class ReplyCompletionMappingError extends Error {
   }
 }
 
+const rejectUnknownWireFields = (value: unknown, label: string) => {
+  const visited = new Set<object>();
+  const visit = (candidate: unknown): void => {
+    if (
+      candidate === null || typeof candidate !== "object" ||
+      candidate instanceof Uint8Array || visited.has(candidate)
+    ) {
+      return;
+    }
+    visited.add(candidate);
+    const unknownFields = (candidate as {
+      readonly $unknown?: readonly unknown[];
+    }).$unknown;
+    if (unknownFields && unknownFields.length > 0) {
+      throw new ReplyCompletionMappingError(
+        `${label} contains unknown protobuf fields`,
+      );
+    }
+    if (Array.isArray(candidate)) {
+      candidate.forEach(visit);
+      return;
+    }
+    Object.values(candidate).forEach(visit);
+  };
+  visit(value);
+};
+
 const mapping = <Value>(operation: () => Value, message: string) => {
   try {
     return operation();
@@ -275,6 +302,7 @@ export type IssueReplyCompletionInput = {
 export function completeIssueReplyInputFromProto(
   request: CompleteIssueReplyRequest,
 ): IssueReplyCompletionInput {
+  rejectUnknownWireFields(request, "Issue reply request");
   const claim = replyWireClaim(request.work, "issue") as
     IssueReplyCompletionInput["claim"];
   const normalizedProjectId = projectId(request.projectId);
@@ -376,6 +404,7 @@ export type ChannelReplyCompletionInput = {
 export function completeChannelReplyInputFromProto(
   request: CompleteChannelReplyRequest,
 ): ChannelReplyCompletionInput {
+  rejectUnknownWireFields(request, "Channel reply request");
   const claim = replyWireClaim(request.work, "channel") as
     ChannelReplyCompletionInput["claim"];
   const normalizedProjectId = projectId(request.projectId);
