@@ -988,53 +988,33 @@ fn parse_agy_cli_quota(value: &Value) -> Result<ProviderUsage, String> {
         ));
     }
 
-    let groups = value.pointer("/command/data/groups").ok_or_else(|| {
-        "올바르지 않은 CLI quota 형식입니다: groups가 누락되었습니다.".to_string()
-    })?;
-
-    // Antigravity CLI 1.1.15 changed groups and buckets from name-keyed
-    // objects to arrays. Accept both layouts so older installations continue
-    // to work while current releases can report quota.
-    let gemini_buckets: Vec<&Value> = match groups {
-        Value::Object(groups) => groups
-            .iter()
-            .find(|(name, _)| name.eq_ignore_ascii_case("gemini models"))
-            .and_then(|(_, group)| group.as_object())
-            .map(|buckets| buckets.values().collect())
-            .ok_or_else(|| "quota에서 Gemini Models 그룹을 찾을 수 없습니다.".to_string())?,
-        Value::Array(groups) => groups
-            .iter()
-            .find(|group| {
-                group
-                    .get("name")
-                    .and_then(Value::as_str)
-                    .is_some_and(|name| name.eq_ignore_ascii_case("gemini models"))
-            })
-            .and_then(|group| group.get("buckets"))
-            .and_then(Value::as_array)
-            .map(|buckets| buckets.iter().collect())
-            .ok_or_else(|| "quota에서 Gemini Models 그룹을 찾을 수 없습니다.".to_string())?,
-        _ => {
-            return Err(
-                "올바르지 않은 CLI quota 형식입니다: groups 형식이 잘못되었습니다.".to_string(),
-            );
-        }
-    };
+    let groups = value
+        .pointer("/command/data/groups")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            "올바르지 않은 CLI quota 형식입니다: groups 형식이 잘못되었습니다.".to_string()
+        })?;
+    let gemini_buckets = groups
+        .iter()
+        .find(|group| {
+            group
+                .get("name")
+                .and_then(Value::as_str)
+                .is_some_and(|name| name.eq_ignore_ascii_case("gemini models"))
+        })
+        .and_then(|group| group.get("buckets"))
+        .and_then(Value::as_array)
+        .ok_or_else(|| "quota에서 Gemini Models 그룹을 찾을 수 없습니다.".to_string())?;
 
     let mut session = None;
     let mut weekly = None;
 
     for bucket_val in gemini_buckets {
-        let remaining_fraction = bucket_val
-            .get("remaining_fraction")
-            .or_else(|| bucket_val.get("remainingFraction"))
-            .and_then(Value::as_f64);
+        let remaining_fraction = bucket_val.get("remaining_fraction").and_then(Value::as_f64);
 
         let window = bucket_val.get("window").and_then(Value::as_str);
 
-        let reset_val = bucket_val
-            .get("reset_time")
-            .or_else(|| bucket_val.get("resetTime"));
+        let reset_val = bucket_val.get("reset_time");
 
         if let (Some(rem), Some(win)) = (remaining_fraction, window) {
             let used_percent = clamp_percent((1.0 - rem) * 100.0);
@@ -1764,52 +1744,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_agy_cli_quota_success() {
-        let output = json!({
-            "command": {
-                "name": "usage",
-                "data": {
-                    "groups": {
-                        "Gemini Models": {
-                            "gemini-weekly": {
-                                "window": "weekly",
-                                "remaining_fraction": 0.8,
-                                "reset_time": "2026-08-18T12:00:00Z"
-                            },
-                            "gemini-5h": {
-                                "window": "5h",
-                                "remaining_fraction": 0.25,
-                                "reset_time": 1800000000000u64
-                            }
-                        },
-                        "Claude and GPT models": {
-                            "claude-weekly": {
-                                "window": "weekly",
-                                "remaining_fraction": 0.5,
-                                "reset_time": "2026-08-18T13:00:00Z"
-                            }
-                        }
-                    }
-                }
-            }
-        });
-        let usage = parse_agy_cli_quota(&output).unwrap();
-        assert_eq!(usage.status, ProviderUsageStatus::Ok);
-        assert!(usage.authenticated);
-
-        let session = usage.session.unwrap();
-        assert_eq!(session.window_minutes, 300);
-        assert!((session.used_percent - 75.0).abs() < 0.0001);
-        assert_eq!(session.resets_at, Some(1800000000000u64));
-
-        let weekly = usage.weekly.unwrap();
-        assert_eq!(weekly.window_minutes, 10080);
-        assert!((weekly.used_percent - 20.0).abs() < 0.0001);
-        assert_eq!(weekly.resets_at, parse_iso_millis("2026-08-18T12:00:00Z"));
-    }
-
-    #[test]
-    fn parses_agy_cli_quota_from_v1_1_15_array_layout() {
+    fn parses_agy_cli_quota() {
         let output = json!({
             "command": {
                 "name": "usage",
@@ -1863,14 +1798,17 @@ mod tests {
             "command": {
                 "name": "usage",
                 "data": {
-                    "groups": {
-                        "Claude and GPT models": {
-                            "claude-weekly": {
-                                "window": "weekly",
-                                "remaining_fraction": 0.5
-                            }
+                    "groups": [
+                        {
+                            "name": "Claude and GPT models",
+                            "buckets": [
+                                {
+                                    "window": "weekly",
+                                    "remaining_fraction": 0.5
+                                }
+                            ]
                         }
-                    }
+                    ]
                 }
             }
         });
@@ -1880,7 +1818,7 @@ mod tests {
             "command": {
                 "name": "not-usage",
                 "data": {
-                    "groups": {}
+                    "groups": []
                 }
             }
         });
@@ -1890,16 +1828,19 @@ mod tests {
             "command": {
                 "name": "usage",
                 "data": {
-                    "groups": {
-                        "Gemini Models": {
-                            "gemini-weekly": {
-                                "window": "weekly"
-                            },
-                            "gemini-5h": {
-                                "remaining_fraction": 0.25
-                            }
+                    "groups": [
+                        {
+                            "name": "Gemini Models",
+                            "buckets": [
+                                {
+                                    "window": "weekly"
+                                },
+                                {
+                                    "remaining_fraction": 0.25
+                                }
+                            ]
                         }
-                    }
+                    ]
                 }
             }
         });

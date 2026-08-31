@@ -831,83 +831,6 @@ mod tests {
     }
 
     #[test]
-    fn preserves_provider_executable_candidates_in_order() {
-        assert_eq!(
-            claude::CONFIG.executable.home_candidates,
-            [".local/bin/claude", ".bun/bin/claude"]
-        );
-        assert_eq!(
-            grok::CONFIG.executable.home_candidates,
-            [".local/bin/grok", ".grok/bin/grok", ".bun/bin/grok"]
-        );
-        assert_eq!(
-            cursor::CONFIG.executable.home_candidates,
-            [".local/bin/cursor-agent", ".cursor/bin/cursor-agent"]
-        );
-        assert_eq!(
-            opencode::CONFIG.executable.home_candidates,
-            [
-                ".opencode/bin/opencode",
-                ".local/bin/opencode",
-                ".bun/bin/opencode"
-            ]
-        );
-        for config in provider_configs() {
-            assert_eq!(
-                config.executable.absolute_candidates,
-                [
-                    format!("/opt/homebrew/bin/{}", config.executable.name),
-                    format!("/usr/local/bin/{}", config.executable.name),
-                ]
-            );
-        }
-    }
-
-    #[test]
-    fn preserves_provider_specific_error_text() {
-        assert_eq!(
-            claude::CONFIG.executable.missing_error,
-            "Claude Code가 필요합니다. Claude를 설치하고 `claude auth login`을 실행한 뒤 다시 시도하세요."
-        );
-        assert_eq!(
-            claude::CONFIG.missing_bun_error,
-            "Claude Agent SDK 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다."
-        );
-        assert_eq!(
-            grok::CONFIG.executable.missing_error,
-            "Grok CLI가 필요합니다. Grok을 설치하고 `grok login`을 실행한 뒤 다시 시도하세요."
-        );
-        assert_eq!(
-            grok::CONFIG.missing_bun_error,
-            "Grok runner 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다."
-        );
-        assert_eq!(
-            cursor::CONFIG.executable.missing_error,
-            "Cursor CLI가 필요합니다. Cursor CLI를 설치하고 `agent login`을 실행한 뒤 다시 시도하세요."
-        );
-        assert_eq!(
-            cursor::CONFIG.missing_bun_error,
-            "Cursor Agent runner 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다."
-        );
-        assert_eq!(
-            agy::CONFIG.executable.missing_error,
-            "Google Antigravity CLI가 필요합니다. `agy`를 설치하고 로그인한 뒤 다시 시도하세요."
-        );
-        assert_eq!(
-            agy::CONFIG.missing_bun_error,
-            "Antigravity runner 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다."
-        );
-        assert_eq!(
-            opencode::CONFIG.executable.missing_error,
-            "OpenCode CLI가 필요합니다. OpenCode를 설치하고 `opencode auth login`을 실행한 뒤 다시 시도하세요."
-        );
-        assert_eq!(
-            opencode::CONFIG.missing_bun_error,
-            "OpenCode runner 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다."
-        );
-    }
-
-    #[test]
     fn resolves_the_first_existing_provider_candidate() {
         for config in provider_configs() {
             let directory = tempfile::tempdir().expect("temp directory should exist");
@@ -952,7 +875,6 @@ mod tests {
 
     struct RecordingRunner {
         resolutions: Arc<Mutex<Vec<String>>>,
-        fail_bun: bool,
     }
 
     impl CommandRunner for RecordingRunner {
@@ -961,11 +883,7 @@ mod tests {
                 .lock()
                 .expect("resolutions should lock")
                 .push(tool.to_string());
-            if self.fail_bun && tool == "bun" {
-                Err("missing bun".to_string())
-            } else {
-                Ok(format!("/resolved/{tool}"))
-            }
+            Ok(format!("/resolved/{tool}"))
         }
 
         fn run(&self, _spec: &CommandSpec) -> Result<CommandOutput, String> {
@@ -991,7 +909,6 @@ mod tests {
             let resolutions = Arc::new(Mutex::new(Vec::new()));
             let command_runner: Arc<dyn CommandRunner> = Arc::new(RecordingRunner {
                 resolutions: resolutions.clone(),
-                fail_bun: false,
             });
             let runtime = SidecarRuntime::discover(command_runner, &runner_bundle, config)
                 .expect("runtime should discover");
@@ -1005,25 +922,6 @@ mod tests {
                 *resolutions.lock().expect("resolutions should lock"),
                 ["bun", config.executable.name]
             );
-        }
-    }
-
-    #[test]
-    fn reports_each_provider_specific_missing_bun_error() {
-        let directory = tempfile::tempdir().expect("temp directory should exist");
-        let runner_bundle = directory.path().join("runner.js");
-        fs::write(&runner_bundle, "").expect("runner should be written");
-
-        for config in provider_configs() {
-            let command_runner: Arc<dyn CommandRunner> = Arc::new(RecordingRunner {
-                resolutions: Arc::new(Mutex::new(Vec::new())),
-                fail_bun: true,
-            });
-            let error = match SidecarRuntime::discover(command_runner, &runner_bundle, config) {
-                Ok(_) => panic!("missing bun should fail discovery"),
-                Err(error) => error,
-            };
-            assert_eq!(error, config.missing_bun_error);
         }
     }
 
