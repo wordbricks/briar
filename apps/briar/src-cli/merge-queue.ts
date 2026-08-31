@@ -3,7 +3,13 @@ import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fromJsonString } from "@bufbuild/protobuf";
 import type { Client } from "@connectrpc/connect";
+import {
+  GitHubPullRequestState,
+  GitHubPullRequestSchema,
+  type GitHubPullRequest,
+} from "@briar/contracts/gen/briar/app/v1/github_pb";
 import {
   MergeBatchValidationFailureCode,
   WorkerQueueService,
@@ -106,37 +112,6 @@ const GitObjectId = Schema.String.check(
   Schema.isPattern(/^[0-9a-f]{40}$/u),
 );
 const PositiveInteger = Schema.Int.check(Schema.isGreaterThan(0));
-const GraphQlError = Schema.Struct({ message: Schema.String });
-const GraphQlErrors = Schema.optional(Schema.mutable(Schema.Array(GraphQlError)));
-
-const PullRequestSchema = Schema.Struct({
-  id: Schema.NonEmptyString,
-  databaseId: PositiveInteger,
-  number: PositiveInteger,
-  state: Schema.String,
-  isDraft: Schema.Boolean,
-  headRefOid: GitObjectId,
-  baseRefName: Schema.String,
-  baseRefOid: GitObjectId,
-});
-
-const RepositoryIdentity = {
-  databaseId: PositiveInteger,
-  nameWithOwner: Schema.NonEmptyString,
-} as const;
-
-const PullRequestQueryResponse = Schema.Struct({
-  data: Schema.NullOr(Schema.Struct({
-    repository: Schema.NullOr(Schema.Struct({
-      ...RepositoryIdentity,
-      pullRequest: Schema.NullOr(PullRequestSchema),
-    })),
-  })),
-  errors: GraphQlErrors,
-});
-const decodePullRequestQueryResponse = Schema.decodeUnknownSync(
-  PullRequestQueryResponse,
-);
 
 const RepositoryMergeMethodsResponse = Schema.Struct({
   allow_merge_commit: Schema.Boolean,
@@ -156,39 +131,6 @@ const decodePullRequestMergeResponse = Schema.decodeUnknownSync(
   PullRequestMergeResponse,
 );
 
-const PULL_REQUEST_QUERY = `query BriarMergePullRequest(
-  $owner: String!, $name: String!, $number: Int!
-) {
-  repository(owner: $owner, name: $name) {
-    databaseId
-    nameWithOwner
-    pullRequest(number: $number) {
-      id
-      databaseId
-      number
-      state
-      isDraft
-      headRefOid
-      baseRefName
-      baseRefOid
-    }
-  }
-}`;
-
-type GraphQlVariable = readonly [string, string | number | boolean | null];
-
-function repositoryTarget(repository: string) {
-  const match = repository.match(
-    /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/u,
-  );
-  if (!match) {
-    throw new MergeQueueAuthorityError(
-      "Merge batch repository must be an exact owner/name",
-    );
-  }
-  return { owner: match[1], name: match[2] };
-}
-
 function commandFailure(name: string, result: MergeQueueCommandResult): never {
   throw new MergeQueueInfrastructureError(
     `${name} failed: ${result.stderr.trim() || `exit ${result.exitCode}`}`,
@@ -197,63 +139,38 @@ function commandFailure(name: string, result: MergeQueueCommandResult): never {
 
 const briarGithubCommand = () => ["briar", "github"];
 
-function runGraphQl<T>(
+function readPullRequest(
   repositoryPath: string,
-  query: string,
-  variables: readonly GraphQlVariable[],
-  decode: (input: unknown) => T,
+  pullRequestNumber: number,
   run: MergeQueueCommandRunner,
   name: string,
-): T {
-  const variableObject = Object.fromEntries(
-    variables.filter((entry) => entry[1] !== null),
-  );
+): GitHubPullRequest {
   const command = [
     ...briarGithubCommand(),
-    "graphql",
-    "--query",
-    query,
-    "--variables-json",
-    JSON.stringify(variableObject),
+    "pr",
+    "view",
+    "--number",
+    String(pullRequestNumber),
   ];
   const result = run(command, localOptions(repositoryPath));
   if (result.exitCode !== 0) commandFailure(name, result);
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(result.stdout);
+    return fromJsonString(GitHubPullRequestSchema, result.stdout);
   } catch (cause) {
     throw new MergeQueueInfrastructureError(
-      `${name} returned invalid JSON`,
+      `${name} returned invalid GitHubPullRequest ProtoJSON`,
       { cause },
     );
   }
-  try {
-    return decode(parsed);
-  } catch (cause) {
-    throw new MergeQueueInfrastructureError(
-      `${name} returned an invalid response`,
-      { cause },
-    );
-  }
-}
-
-function assertNoGraphQlErrors(
-  errors: readonly { readonly message: string }[] | undefined,
-  name: string,
-) {
-  if (!errors || errors.length === 0) return;
-  throw new MergeQueueInfrastructureError(
-    `${name} was rejected: ${errors.map((error) => error.message).join("; ").slice(0, 1_000)}`,
-  );
 }
 
 function assertRepositoryIdentity(
-  repository: { readonly databaseId: number; readonly nameWithOwner: string },
+  pullRequest: Pick<GitHubPullRequest, "repositoryId" | "repository">,
   claim: Pick<ClaimedMergeBatch, "repository" | "repositoryId">,
 ) {
   if (
-    repository.databaseId !== claim.repositoryId ||
-    repository.nameWithOwner.toLowerCase() !== claim.repository.toLowerCase()
+    pullRequest.repositoryId !== BigInt(claim.repositoryId) ||
+    pullRequest.repository.toLowerCase() !== claim.repository.toLowerCase()
   ) {
     throw new MergeQueueAuthorityError(
       "GitHub repository identity does not match the sealed merge batch",
@@ -264,17 +181,18 @@ function assertRepositoryIdentity(
 type MergeBatchMember = ClaimedMergeBatch["members"][number];
 
 function assertPullRequestIdentity(
-  pullRequest: typeof PullRequestSchema.Type,
+  pullRequest: GitHubPullRequest,
   member: MergeBatchMember,
 ) {
   if (
-    pullRequest.id !== member.pullRequestNodeId ||
-    pullRequest.databaseId !== member.pullRequestId ||
-    pullRequest.number !== member.pullRequestNumber ||
-    pullRequest.headRefOid !== member.headSha ||
-    pullRequest.baseRefName !== "main" ||
-    pullRequest.state !== "OPEN" ||
-    pullRequest.isDraft
+    pullRequest.pullRequestNodeId !== member.pullRequestNodeId ||
+    pullRequest.pullRequestId !== BigInt(member.pullRequestId) ||
+    pullRequest.pullRequestNumber !== BigInt(member.pullRequestNumber) ||
+    pullRequest.headSha !== member.headSha ||
+    pullRequest.baseRef !== "main" ||
+    pullRequest.state !== GitHubPullRequestState.OPEN ||
+    pullRequest.draft ||
+    pullRequest.merged
   ) {
     throw new MergeQueueAuthorityError(
       `Pull request #${member.pullRequestNumber} no longer matches its sealed OPEN, non-draft identity`,
@@ -288,29 +206,13 @@ function inspectPullRequest(
   repositoryPath: string,
   run: MergeQueueCommandRunner,
 ) {
-  const target = repositoryTarget(claim.repository);
-  const response = runGraphQl(
+  const pullRequest = readPullRequest(
     repositoryPath,
-    PULL_REQUEST_QUERY,
-    [
-      ["owner", target.owner],
-      ["name", target.name],
-      ["number", member.pullRequestNumber],
-    ],
-    decodePullRequestQueryResponse,
+    member.pullRequestNumber,
     run,
     `GitHub pull request #${member.pullRequestNumber} readback`,
   );
-  assertNoGraphQlErrors(response.errors,
-    `GitHub pull request #${member.pullRequestNumber} readback`);
-  const repository = response.data?.repository;
-  const pullRequest = repository?.pullRequest;
-  if (!repository || !pullRequest) {
-    throw new MergeQueueAuthorityError(
-      `Pull request #${member.pullRequestNumber} does not exist`,
-    );
-  }
-  assertRepositoryIdentity(repository, claim);
+  assertRepositoryIdentity(pullRequest, claim);
   assertPullRequestIdentity(pullRequest, member);
   return pullRequest;
 }

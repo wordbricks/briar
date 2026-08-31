@@ -241,17 +241,6 @@ export async function getProjectGithubRepository(
   return repository;
 }
 
-export async function projectGithubGraphql(
-  env: Pick<Env, "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY">,
-  identity: ProjectGithubIdentity,
-  input: { query: string; variables: Record<string, string | number | boolean> },
-) {
-  return projectGithubRequest(env, identity, "/graphql", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-}
-
 const pullRequestJson = (
   identity: ProjectGithubIdentity,
   input: typeof GitHubPullRequestResponse.Type,

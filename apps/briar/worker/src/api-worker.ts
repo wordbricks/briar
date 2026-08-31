@@ -14,7 +14,6 @@ import { handleChannelMessageRoute } from "./channel-message-routes";
 import { handleChannelReplyResultRoute } from "./channel-reply-result-routes";
 import { handleManagedComputerRoute } from "./managed-computer-routes";
 import { handleProjectAgentRoute } from "./project-agent-routes";
-import { handleProjectGithubRoute } from "./project-github-routes";
 import { handlePublicRoute } from "./public-routes";
 import { handleIncomingChannelWebhookRoute } from "./incoming-channel-webhook";
 import { handleRealtimeRoute } from "./realtime-routes";
@@ -184,15 +183,6 @@ async function route(
     context,
   });
   if (channelMessageResponse !== undefined) return channelMessageResponse;
-
-  const projectGithubResponse = await handleProjectGithubRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-  });
-  if (projectGithubResponse !== undefined) return projectGithubResponse;
 
   const projectAgentResponse = await handleProjectAgentRoute({
     request,

@@ -20,7 +20,6 @@ import {
   executionToken,
   has,
   loadConfig,
-  request,
   required,
   value,
 } from "./command-support";
@@ -41,9 +40,7 @@ async function projectGithubContext() {
   const project = await currentProject(config);
   const token = executionToken(project);
   return {
-    apiUrl: config.apiUrl,
     projectId: project.id,
-    token,
     client: createAuthenticatedConnectClient(
       ProjectGitHubService,
       config.apiUrl,
@@ -186,30 +183,6 @@ export async function githubRepositoryCommand() {
     ProjectGitHubRepositorySchema,
     requiredMessage(response.repository, "getProjectGitHubRepository.repository"),
   ));
-}
-
-export async function githubGraphqlCommand() {
-  const github = await projectGithubContext();
-  const variablesJson = value("--variables-json") ?? "{}";
-  let variables: unknown;
-  try {
-    variables = JSON.parse(variablesJson);
-  } catch {
-    throw new Error("--variables-json must be valid JSON");
-  }
-  if (!variables || Array.isArray(variables) || typeof variables !== "object") {
-    throw new Error("--variables-json must be a JSON object");
-  }
-  const result = await request<unknown>(
-    github.apiUrl,
-    `/projects/${github.projectId}/github/graphql`,
-    github.token,
-    {
-      method: "POST",
-      body: JSON.stringify({ query: required("--query"), variables }),
-    },
-  );
-  console.log(JSON.stringify(result));
 }
 
 const credentialInput = async () => {

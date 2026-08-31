@@ -1,3 +1,8 @@
+import { create, toJsonString } from "@bufbuild/protobuf";
+import {
+  GitHubPullRequestSchema,
+  GitHubPullRequestState,
+} from "@briar/contracts/gen/briar/app/v1/github_pb";
 import { describe, expect, it } from "vitest";
 import {
   executeClaimedMergeBatch,
@@ -99,24 +104,23 @@ function claimFixture(
 }
 
 function pullRequestResponse() {
-  return JSON.stringify({
-    data: {
-      repository: {
-        databaseId: 701,
-        nameWithOwner: "wordbricks/briar",
-        pullRequest: {
-          id: "PR_kwDOBriar42",
-          databaseId: 501,
-          number: 42,
-          state: "OPEN",
-          isDraft: false,
-          headRefOid: headSha,
-          baseRefName: "main",
-          baseRefOid: liveBaseSha,
-        },
-      },
-    },
-  });
+  return toJsonString(
+    GitHubPullRequestSchema,
+    create(GitHubPullRequestSchema, {
+      repositoryId: 701n,
+      repository: "wordbricks/briar",
+      pullRequestId: 501n,
+      pullRequestNodeId: "PR_kwDOBriar42",
+      pullRequestNumber: 42n,
+      url: "https://github.com/wordbricks/briar/pull/42",
+      state: GitHubPullRequestState.OPEN,
+      draft: false,
+      merged: false,
+      headSha,
+      baseSha: liveBaseSha,
+      baseRef: "main",
+    }),
+  );
 }
 
 const successful = (stdout = "{}") => ({ exitCode: 0, stdout, stderr: "" });
@@ -283,7 +287,10 @@ describe("local provider-independent merge-queue worker", () => {
     let mainSha = liveBaseSha;
     const run: MergeQueueCommandRunner = (command) => {
       commands.push([...command]);
-      if (command[1] === "github" && command.includes("graphql")) {
+      if (
+        command[1] === "github" && command[2] === "pr" &&
+        command[3] === "view"
+      ) {
         return successful(pullRequestResponse());
       }
       if (command[1] === "github" && command[2] === "repository") {

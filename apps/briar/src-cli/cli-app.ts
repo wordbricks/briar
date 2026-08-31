@@ -65,7 +65,6 @@ import {
 import {
   githubCommitStatusCommand,
   githubCredentialCommand,
-  githubGraphqlCommand,
   githubPullRequestCreateCommand,
   githubPullRequestEditCommand,
   githubPullRequestMergeCommand,
@@ -653,15 +652,6 @@ const githubCommand = Command.make("github").pipe(
       githubRepositoryCommand,
       "Inspect the project's authoritative GitHub repository",
     ),
-    leaf(
-      "graphql",
-      {
-        ...requiredStrings("query"),
-        ...optionalStrings("variables-json"),
-      },
-      githubGraphqlCommand,
-      "Run a project-scoped GitHub GraphQL request",
-    ).pipe(Command.unlisted),
     Command.make(
       "credential",
       { operation: Argument.string("operation") },
