@@ -369,7 +369,6 @@ describe("conversational issue execution approval", () => {
     try {
       const shared = {
         db,
-        attachmentsBucket: attachments,
         archivesBucket: attachments,
         projectId: projectAId,
         conversationRunId: call.runId,

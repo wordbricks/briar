@@ -11,12 +11,12 @@ import {
 } from "./db";
 import { HttpError, json } from "./http-response";
 import { integrationHtml as html } from "./integration-http";
-import { createIssueWithAttachments } from "./issue-write-service";
 import {
   listOrganizationProjects,
   type ProjectRow,
 } from "./project-repository";
 import { flushOrganizationInboxRealtimeOutbox } from "./realtime-scheduling";
+import { createIssueFromServerFilesApplication } from "./server-issue-create-application";
 import {
   buildSlackCreateIssueModal,
   buildSlackIssueCreatedMessage,
@@ -164,6 +164,7 @@ async function processSlackCreateIssueSubmission(
   env: Env,
   submission: SlackCreateIssueSubmission,
   project: ProjectRow,
+  installedByUserId: string,
   token: string,
 ) {
   const now = new Date();
@@ -183,33 +184,37 @@ async function processSlackCreateIssueSubmission(
       submission.fileIds,
     );
     const sourceKey = `slack-create:${submission.teamId}:${submission.viewId}`;
-    const created = await createIssueWithAttachments({
+    const created = await createIssueFromServerFilesApplication({
       db: env.DB,
       attachmentsBucket: env.ATTACHMENTS,
-      project,
-      issue: {
+      signingSecret: env.BETTER_AUTH_SECRET,
+      projectId: project.id,
+      userId: installedByUserId,
+      sourceKey,
+      request: {
         title: submission.title,
         description: submission.description,
         priority: null,
         status: "queued",
         checkpoints: [],
       },
-      attachments,
-      sourceKey,
-      actor: `slack:${submission.userId}`,
-      detail:
-        submission.source === "shortcut"
-          ? "Slack Briar shortcut으로 생성된 이슈가 처리를 기다리고 있습니다."
-          : "Slack /create 명령으로 생성된 이슈가 처리를 기다리고 있습니다.",
-      context: {
-        origin:
+      files: attachments,
+      attribution: {
+        actor: `slack:${submission.userId}`,
+        detail:
           submission.source === "shortcut"
-            ? "slack-shortcut"
-            : "slack-command",
-        slackTeamId: submission.teamId,
-        slackChannelId: submission.channelId,
-        slackUserId: submission.userId,
-        slackViewId: submission.viewId,
+            ? "Slack Briar shortcut으로 생성된 이슈가 처리를 기다리고 있습니다."
+            : "Slack /create 명령으로 생성된 이슈가 처리를 기다리고 있습니다.",
+        context: {
+          origin:
+            submission.source === "shortcut"
+              ? "slack-shortcut"
+              : "slack-command",
+          slackTeamId: submission.teamId,
+          slackChannelId: submission.channelId,
+          slackUserId: submission.userId,
+          slackViewId: submission.viewId,
+        },
       },
     });
     await completeSlackEvent(
@@ -383,6 +388,7 @@ async function handleSlackInteractionRequest(
     env,
     submission,
     project,
+    installation.installed_by_user_id,
     token,
   ).finally(() =>
     flushOrganizationInboxRealtimeOutbox(env, env.DB).catch((error) => {

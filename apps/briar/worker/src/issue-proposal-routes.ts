@@ -34,7 +34,7 @@ import {
   decodeIssueCreateProposalAction,
   decodeIssueUpdateProposalAction,
 } from "./issue-request-contract";
-import { createIssueWithAttachments } from "./issue-write-service";
+import { createProjectIssue } from "./issue-core-routes";
 import { newConversationProposalIssueSourceKey } from "./proposal-issue-source";
 import { decodeRequestSync } from "./request-schema";
 import { dispatchHuntRun, WorkerConflictError } from "./workers";
@@ -45,7 +45,6 @@ const decodeChannelExecutionProposalAcceptInput = decodeRequestSync(
 
 type IssueProposalApplicationInput = {
   db: D1Database;
-  attachmentsBucket: R2Bucket;
   archivesBucket: R2Bucket;
   projectId: string;
   conversationRunId: string;
@@ -241,32 +240,35 @@ export async function acceptProjectIssueActionProposal(
       "ISSUE_ACTION_PROPOSAL_CONFLICT",
     );
   }
-  if (!reservation.issue_source_key) {
+  if (
+    !reservation.issue_source_key ||
+    !reservation.approval_reserved_by_user_id
+  ) {
     throw new HttpError(
       409,
       "This issue proposal has no approval identity",
       "ISSUE_ACTION_PROPOSAL_CONFLICT",
     );
   }
-  let created: Awaited<ReturnType<typeof createIssueWithAttachments>>;
+  let created: Awaited<ReturnType<typeof createProjectIssue>>;
   try {
-    created = await createIssueWithAttachments({
+    created = await createProjectIssue({
       db: input.db,
-      attachmentsBucket: input.attachmentsBucket,
-      project,
-      issue: approvedIssueCreation(action.issue),
-      attachments: [],
-      sourceKey: reservation.issue_source_key,
-      actor: "briar-conversation",
-      detail: "대화창에서 사용자가 승인한 제안으로 생성된 이슈입니다.",
-      context: {
-        origin: "briar-conversation",
-        proposalId: proposal.id,
-        conversationRunId: proposal.conversation_run_id,
+      projectId: project.id,
+      userId: reservation.approval_reserved_by_user_id,
+      clientIssueId: proposal.id,
+      request: approvedIssueCreation(action.issue),
+      attachmentIds: [],
+      attribution: {
+        sourceKey: reservation.issue_source_key,
+        actor: "briar-conversation",
+        detail: "대화창에서 사용자가 승인한 제안으로 생성된 이슈입니다.",
+        context: {
+          origin: "briar-conversation",
+          proposalId: proposal.id,
+          conversationRunId: proposal.conversation_run_id,
+        },
       },
-      issueId: proposal.id,
-      createdByUserId: reservation.approval_reserved_by_user_id,
-      occurredAt: proposal.created_at,
     });
   } catch (error) {
     if (

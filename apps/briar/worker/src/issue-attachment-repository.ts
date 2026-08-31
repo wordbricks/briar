@@ -56,22 +56,6 @@ export async function createIssueAttachments(
   }
 }
 
-export async function issueAttachmentObjectKeysInUse(
-  db: D1Database,
-  objectKeys: string[],
-) {
-  if (objectKeys.length === 0) return new Set<string>();
-  const placeholders = objectKeys.map(() => "?").join(",");
-  const result = await db
-    .prepare(
-      `select object_key from briar_issue_attachments
-       where object_key in (${placeholders})`,
-    )
-    .bind(...objectKeys)
-    .all<{ object_key: string }>();
-  return new Set((result.results ?? []).map((row) => row.object_key));
-}
-
 export async function listIssueAttachments(
   db: D1Database,
   projectId: string,

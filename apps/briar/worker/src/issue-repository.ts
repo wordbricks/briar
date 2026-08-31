@@ -18,23 +18,6 @@ import {
 } from "./project-agent-model";
 import type { IssueDifficulty } from "../../src/lib/issue-difficulty";
 
-export async function rollbackNewAppIssue(
-  db: D1Database,
-  projectId: string,
-  runId: string,
-) {
-  const result = await db
-    .prepare(
-      `delete from briar_hunt_runs
-       where id = ? and project_id = ? and source = 'issue'
-         and status = 'queued' and claim_attempts = 0
-         and event_count = 1`,
-    )
-    .bind(runId, projectId)
-    .run();
-  return result.meta.changes > 0;
-}
-
 export async function updateIssue(
   db: D1Database,
   projectId: string,

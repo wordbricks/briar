@@ -723,7 +723,6 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.acceptReworkProposal({
         db: input.db,
-        attachmentsBucket: input.env.ATTACHMENTS,
         archivesBucket: input.env.ARCHIVES,
         projectId: canonicalUuid(request.projectId),
         conversationRunId: canonicalUuid(request.runId),
@@ -739,7 +738,6 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.acceptActionProposal({
         db: input.db,
-        attachmentsBucket: input.env.ATTACHMENTS,
         archivesBucket: input.env.ARCHIVES,
         projectId: canonicalUuid(request.projectId),
         conversationRunId: canonicalUuid(request.runId),
@@ -759,7 +757,6 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.acceptExecutionProposal({
         db: input.db,
-        attachmentsBucket: input.env.ATTACHMENTS,
         archivesBucket: input.env.ARCHIVES,
         projectId: canonicalUuid(request.projectId),
         conversationRunId: canonicalUuid(request.conversationRunId),
@@ -781,7 +778,6 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.acceptSkillExecutionProposal({
         db: input.db,
-        attachmentsBucket: input.env.ATTACHMENTS,
         archivesBucket: input.env.ARCHIVES,
         projectId: canonicalUuid(request.projectId),
         conversationRunId: canonicalUuid(request.conversationRunId),

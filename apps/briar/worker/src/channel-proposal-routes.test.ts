@@ -962,7 +962,6 @@ describe("channel issue proposal approval route", () => {
     const response = await invokeIssueApplication(ownerToken, (userId) =>
       acceptProjectIssueActionProposal({
         db,
-        attachmentsBucket: attachments,
         archivesBucket: attachments,
         projectId: projectAId,
         conversationRunId,
@@ -1107,7 +1106,6 @@ describe("channel issue proposal approval route", () => {
     const accepted = await invokeIssueApplication(ownerToken, (userId) =>
       acceptProjectIssueActionProposal({
         db,
-        attachmentsBucket: attachments,
         archivesBucket: attachments,
         projectId: projectAId,
         conversationRunId,

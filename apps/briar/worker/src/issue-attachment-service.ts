@@ -4,7 +4,6 @@ import {
 } from "../../src/lib/agent-reply-attachments";
 import { contentDisposition } from "./attachment-storage";
 import {
-  issueAttachmentObjectKeysInUse,
   type IssueAttachmentRow,
 } from "./db";
 import { corsHeaders } from "./http-response";
@@ -35,15 +34,4 @@ export function issueAttachmentResponse(
     );
   }
   return new Response(body, { headers });
-}
-
-export async function deleteUnreferencedUploadedIssueObjects(
-  db: D1Database,
-  attachmentsBucket: R2Bucket,
-  objectKeys: string[],
-) {
-  if (objectKeys.length === 0) return;
-  const inUse = await issueAttachmentObjectKeysInUse(db, objectKeys);
-  const deletable = objectKeys.filter((objectKey) => !inUse.has(objectKey));
-  if (deletable.length > 0) await attachmentsBucket.delete(deletable);
 }

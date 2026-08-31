@@ -141,7 +141,6 @@ export type { IssueAgentReplyJobRow } from "./issue-agent-reply-repository";
 
 export {
   createIssueAttachments,
-  issueAttachmentObjectKeysInUse,
   listIssueAttachments,
   listIssueAttachmentsByRunIds,
   getIssueAttachment,
@@ -200,7 +199,6 @@ export type {
 } from "./issue-notification-repository";
 
 export {
-  rollbackNewAppIssue,
   updateIssue,
   updateIssueExecutionPreferences,
   updateIssueCheckpoints,
