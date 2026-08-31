@@ -88,6 +88,7 @@ import {
   prepareProjectRepository,
   pickGitRepository,
   preflightLocalProjectConnection,
+  prepareConfiguredProjectRepository,
   repairAutoHunt,
   resolveProjectConnectionWorkflow,
   updateLocalProjectVelenOrg,
@@ -1926,19 +1927,18 @@ export function useBriar(options: UseBriarOptions = {}) {
         ? dashboard
         : await loadDashboard(token, projectId);
       const settings = projectDashboard.settings;
-      if (!settings.githubRepository || !settings.githubRepositoryId) {
-        throw new Error(
-          "조직의 GitHub App에서 프로젝트 저장소를 먼저 선택해 주세요.",
+      const { credential, prepared } =
+        await prepareConfiguredProjectRepository(
+          settings,
+          () => createProjectGithubCredential(token, projectId),
+          (projectCredential) =>
+            prepareProjectRepository(projectId, projectCredential),
         );
-      }
-      const credential = await createProjectGithubCredential(token, projectId);
-      const prepared = await prepareProjectRepository(projectId, credential);
-      if (
-        prepared.repositoryId !== settings.githubRepositoryId ||
-        prepared.repository.toLowerCase() !== settings.githubRepository.toLowerCase()
-      ) {
-        throw new Error("준비한 저장소가 프로젝트의 GitHub 저장소와 일치하지 않습니다.");
-      }
+      const connectedSettings = {
+        ...settings,
+        githubRepositoryId: credential.repository.id,
+        githubRepository: credential.repository.fullName,
+      };
       const agentToken = (await createAgentToken(token, projectId)).agentToken;
       await connectLocalProject({
         projectId,
@@ -1950,8 +1950,8 @@ export function useBriar(options: UseBriarOptions = {}) {
           linearEnabled: settings.linear.enabled,
           linearSource: settings.linear.source,
           linearTeam: settings.linear.teamKey,
-          githubRepositoryId: settings.githubRepositoryId,
-          githubRepository: settings.githubRepository,
+          githubRepositoryId: connectedSettings.githubRepositoryId,
+          githubRepository: connectedSettings.githubRepository,
           workflow: settings.workflow,
         },
       });
@@ -1970,7 +1970,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       setProjectReadiness((current) => ({ ...current, [projectId]: readiness }));
       setDashboard((current) =>
         current?.project.id === projectId
-          ? { ...current, settings: projectDashboard.settings }
+          ? { ...current, settings: connectedSettings }
           : current
       );
       return { prepared, readiness };
