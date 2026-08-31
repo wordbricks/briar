@@ -12,6 +12,82 @@ import { ProjectOnboarding } from "./ProjectOnboarding";
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 describe("ProjectOnboarding", () => {
+  it("starts invited development roles with required personal agent setup", async () => {
+    const { cleanup, container, root } = createReactTestRoot();
+
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ProjectOnboarding
+          connection={{
+            agentToken: null,
+            kind: "reconnect",
+            project: {
+              id: "project-1",
+              name: "Briar",
+              organizationId: "organization-1",
+              organizationName: "Wordbricks",
+              role: "developer",
+              createdAt: "2026-08-31T00:00:00.000Z",
+            },
+            workflow: repositoryWorkflowBootstrap,
+          }}
+          error={null}
+          includeDeveloperTools
+          loading={false}
+          onAnalyzeRequirements={async () => ({
+            requirements: [],
+            workflow: repositoryWorkflowBootstrap,
+          })}
+          onCancel={() => undefined}
+          onConnect={async () => ({
+            repositoryPath: "/repo",
+            workflow: repositoryWorkflowBootstrap,
+          })}
+          onCreate={async () => ({ project: { id: "project-1" } })}
+          onFinish={() => undefined}
+          onInspectLovableRepository={async () => ({
+            compatible: false,
+            issues: [],
+            packageManager: null,
+            scripts: [],
+            stack: null,
+          })}
+          onPreflight={async () => ({
+            repositoryPath: "/repo",
+            repositoryRemote: "git@github.com:wordbricks/briar.git",
+            provider: "codex",
+          })}
+          onPrepareGithubRepository={async () => ({
+            completedSteps: ["clone"],
+            repository: "wordbricks/briar",
+            repositoryId: 123456789,
+            repositoryPath: "/repo",
+            reused: false,
+          })}
+          onRepositoryInspect={async () => demoRepositoryReadiness}
+          onResolveGithubRepository={async (repository) => repository}
+          onRepositorySelect={async () => "/repo"}
+          onReviseWorkflow={async () => repositoryWorkflowBootstrap}
+          requireDeveloperAgent
+          startWithDeveloperTools
+        />
+      </I18nProvider>,
+    );
+
+    expect(container.querySelector(".developer-tools-setup")).not.toBeNull();
+    expect(container.textContent).toContain(
+      "at least one development agent",
+    );
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        ".developer-tools-continue",
+      )?.disabled,
+    ).toBe(true);
+
+    await cleanup();
+  });
+
   it("does not create a project when Escape cancels an in-flight preflight", async () => {
     const pendingPreflight = Promise.withResolvers<{
       repositoryPath: string;

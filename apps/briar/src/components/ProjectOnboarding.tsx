@@ -136,6 +136,8 @@ type Props = {
     repositoryPath: string,
     workflow: LocalAutoHuntConfig["workflow"],
   ) => Promise<RepositoryReadiness>;
+  requireDeveloperAgent?: boolean;
+  startWithDeveloperTools?: boolean;
 };
 
 type OnboardingPhase =
@@ -335,10 +337,16 @@ export function ProjectOnboarding({
   onRepositorySelect,
   onReviseWorkflow,
   onResolveGithubRepository,
+  requireDeveloperAgent = false,
+  startWithDeveloperTools = false,
 }: Props) {
   const { t } = useI18n();
   const [phase, setPhase] = useState<OnboardingPhase>(
-    connection ? "repository" : "choose-method",
+    startWithDeveloperTools
+      ? "developer-tools"
+      : connection
+        ? "repository"
+        : "choose-method",
   );
   const [name, setName] = useState(connection?.project.name ?? "");
   const [repositoryPath, setRepositoryPath] = useState("");
@@ -786,7 +794,9 @@ export function ProjectOnboarding({
         ? includeDeveloperTools ? 3 : 2
         : includeDeveloperTools ? 4 : 3;
   const backAction = phase === "developer-tools"
-    ? () => setPhase("choose-method")
+    ? startWithDeveloperTools
+      ? null
+      : () => setPhase("choose-method")
     : phase === "repository" && !connection
       ? includeDeveloperTools
         ? () => setPhase("developer-tools")
@@ -1088,7 +1098,10 @@ export function ProjectOnboarding({
             ) : null}
 
             {phase === "developer-tools" ? (
-              <DeveloperToolsSetup onContinue={() => setPhase("repository")} />
+              <DeveloperToolsSetup
+                onContinue={() => setPhase("repository")}
+                requireAgent={requireDeveloperAgent}
+              />
             ) : null}
 
             {phase === "repository" ? (
