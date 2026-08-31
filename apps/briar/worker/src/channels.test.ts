@@ -1568,7 +1568,6 @@ describe("organization channels", () => {
     expect(claimPayload).toMatchObject({
       workId: jobs[0].id,
       organizationContext: {
-        schemaVersion: 1,
         snapshotAt: claimPayload!.claimedAt,
       },
       snapshot: { projectTargets: [] },
@@ -1614,7 +1613,7 @@ describe("organization channels", () => {
         observedAt: claimPayload!.claimedAt!,
         ...overrides,
       });
-    // Claim-time capability gating is repeated for every context page.
+    // Claim-time capability gating is repeated for every context request.
     await db.prepare(
       `update briar_execution_workers set capabilities_json = ? where id = ?`,
     ).bind(
@@ -1645,33 +1644,6 @@ describe("organization channels", () => {
     await expect(contextClaim({
       observedAt: claimPayload!.leaseExpiresAt ?? undefined,
     })).resolves.toBeNull();
-
-    const contextResponse = await apiWorker.fetch(
-      new Request(
-        `https://briar-api.example/organizations/${organizationId}/channel-reply-claims/${claimed!.id}/organization-context/projects?workerId=${otherWorkerId}&limit=1`,
-        {
-          headers: {
-            authorization: `Bearer ${contextWorkerToken}`,
-            [channelReplyClaimTokenHeader]: claimPayload!.claimToken,
-          },
-        },
-      ),
-      apiEnv,
-    );
-    expect(contextResponse.status).toBe(200);
-    expect(contextResponse.headers.get("Cache-Control")).toBe(
-      "private, no-store",
-    );
-    await expect(contextResponse.json()).resolves.toMatchObject({
-      schemaVersion: 1,
-      organizationId,
-      workId: claimed!.id,
-      resource: "projects",
-      snapshotAt: claimPayload!.claimedAt,
-      total: 2,
-      items: [{ id: projectId }],
-      complete: false,
-    });
 
     const manifestUrl =
       `https://briar-api.example/organizations/${organizationId}/channel-reply-claims/${claimed!.id}/organization-context/manifest?workerId=${otherWorkerId}`;

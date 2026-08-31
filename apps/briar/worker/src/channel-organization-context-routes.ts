@@ -1,14 +1,9 @@
 import { channelReplyClaimTokenHeader } from "../../src/lib/channels-contract";
 import {
-  decodeOrganizationAgentContextAgentsPage,
-  decodeOrganizationAgentContextIssuePullRequestsPage,
-  decodeOrganizationAgentContextIssuesPage,
+  decodeOrganizationAgentContextClaimQuery,
   decodeOrganizationAgentContextLookupInput,
   decodeOrganizationAgentContextLookupResponse,
   decodeOrganizationAgentContextManifest,
-  decodeOrganizationAgentContextProjectsPage,
-  decodeOrganizationAgentContextQuery,
-  decodeOrganizationAgentContextSessionsPage,
 } from "../../src/lib/organization-agent-context-contract";
 import {
   getActiveOrganizationChannelReplyContextClaim,
@@ -21,11 +16,6 @@ import {
   privateNoStoreJson,
 } from "./http-response";
 import {
-  listOrganizationAgentContextAgentsPage,
-  listOrganizationAgentContextIssuePullRequestsPage,
-  listOrganizationAgentContextIssuesPage,
-  listOrganizationAgentContextProjectsPage,
-  listOrganizationAgentContextSessionsPage,
   lookupOrganizationAgentContext,
   organizationAgentContextManifest,
   organizationAgentContextMaxEncodedPageBytes,
@@ -88,7 +78,7 @@ export async function handleChannelOrganizationContextRoute(
   if (organizationContextManifestMatch && request.method === "GET") {
     const organizationId = organizationContextManifestMatch[1];
     const workId = organizationContextManifestMatch[2];
-    const query = decodeOrganizationAgentContextQuery(
+    const query = decodeOrganizationAgentContextClaimQuery(
       Object.fromEntries(new URL(request.url).searchParams),
     );
     const job = await requireActiveOrganizationContextClaim({
@@ -159,97 +149,6 @@ export async function handleChannelOrganizationContextRoute(
       throw new OrganizationAgentContextPageTooLargeError();
     }
     return privateNoStoreJson(response);
-  }
-
-  const organizationContextMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channel-reply-claims\/([0-9a-f-]+)\/organization-context\/projects(?:\/([0-9a-f-]+)\/(agents|issues|issue-pull-requests|agent-sessions))?$/u,
-  );
-  if (organizationContextMatch && request.method === "GET") {
-    const organizationId = organizationContextMatch[1];
-    const workId = organizationContextMatch[2];
-    const projectId = organizationContextMatch[3] ?? null;
-    const resource = organizationContextMatch[4] ?? "projects";
-    const query = decodeOrganizationAgentContextQuery(
-      Object.fromEntries(new URL(request.url).searchParams),
-    );
-    const job = await requireActiveOrganizationContextClaim({
-      db,
-      request,
-      organizationId,
-      workId,
-      workerId: query.workerId,
-    });
-
-    if (resource === "projects") {
-      const page = await listOrganizationAgentContextProjectsPage(db, {
-        organizationId,
-        workId,
-        snapshotAt: job.claimed_at,
-        limit: query.limit,
-        cursor: query.cursor,
-      });
-      return privateNoStoreJson(
-        decodeOrganizationAgentContextProjectsPage(page),
-      );
-    }
-
-    if (!projectId) throw new HttpError(404, "Project not found");
-    const project = await getOrganizationProject(db, organizationId, projectId);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (resource === "agents") {
-      const page = await listOrganizationAgentContextAgentsPage(db, {
-        organizationId,
-        workId,
-        projectId,
-        snapshotAt: job.claimed_at,
-        limit: query.limit,
-        cursor: query.cursor,
-      });
-      return privateNoStoreJson(
-        decodeOrganizationAgentContextAgentsPage(page),
-      );
-    }
-    if (resource === "issues") {
-      const page = await listOrganizationAgentContextIssuesPage(db, {
-        organizationId,
-        workId,
-        projectId,
-        snapshotAt: job.claimed_at,
-        limit: query.limit,
-        cursor: query.cursor,
-      });
-      return privateNoStoreJson(
-        decodeOrganizationAgentContextIssuesPage(page),
-      );
-    }
-    if (resource === "issue-pull-requests") {
-      const page = await listOrganizationAgentContextIssuePullRequestsPage(db, {
-        organizationId,
-        workId,
-        projectId,
-        snapshotAt: job.claimed_at,
-        limit: query.limit,
-        cursor: query.cursor,
-      });
-      return privateNoStoreJson(
-        decodeOrganizationAgentContextIssuePullRequestsPage(page),
-      );
-    }
-    const page = await listOrganizationAgentContextSessionsPage(
-      db,
-      env.ARCHIVES,
-      {
-        organizationId,
-        workId,
-        projectId,
-        snapshotAt: job.claimed_at,
-        limit: query.limit,
-        cursor: query.cursor,
-      },
-    );
-    return privateNoStoreJson(
-      decodeOrganizationAgentContextSessionsPage(page),
-    );
   }
 
   return undefined;

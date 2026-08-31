@@ -1,24 +1,14 @@
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  decodeOrganizationAgentContextAgentsPage,
-  decodeOrganizationAgentContextIssuePullRequestsPage,
-  decodeOrganizationAgentContextIssuesPage,
   decodeOrganizationAgentContextLookupResponse,
   decodeOrganizationAgentContextManifest,
-  decodeOrganizationAgentContextProjectsPage,
-  decodeOrganizationAgentContextSessionsPage,
 } from "../../src/lib/organization-agent-context-contract";
 import {
   type ArchiveBucket,
   archiveCompletedLogs,
 } from "./archive";
 import {
-  listOrganizationAgentContextAgentsPage,
-  listOrganizationAgentContextIssuePullRequestsPage,
-  listOrganizationAgentContextIssuesPage,
-  listOrganizationAgentContextProjectsPage,
-  listOrganizationAgentContextSessionsPage,
   lookupOrganizationAgentContext,
   organizationAgentContextManifest,
   OrganizationAgentContextCursorError,
@@ -432,251 +422,7 @@ afterAll(async () => {
   await miniflare.dispose();
 });
 
-describe("Organization Agent context pages", () => {
-  it("applies the keyset indexes added by migration 0088", async () => {
-    const result = await db.prepare(
-      `select name from sqlite_master
-       where type = 'index' and name in (
-         'briar_projects_organization_context_idx',
-         'briar_hunt_runs_project_run_number_idx',
-         'briar_log_archives_project_sessions_idx',
-         'briar_project_agent_session_context_visible_idx'
-       ) order by name`,
-    ).all<{ name: string }>();
-
-    expect(result.results.map((row) => row.name)).toEqual([
-      "briar_hunt_runs_project_run_number_idx",
-      "briar_log_archives_project_sessions_idx",
-      "briar_project_agent_session_context_visible_idx",
-      "briar_projects_organization_context_idx",
-    ]);
-  });
-
-  it("paginates projects with a stable tie-breaker and isolates the organization snapshot", async () => {
-    const first = await listOrganizationAgentContextProjectsPage(db, {
-      organizationId,
-      workId,
-      snapshotAt,
-      limit: 1,
-    });
-    expect(() => decodeOrganizationAgentContextProjectsPage(first))
-      .not.toThrow();
-    expect(first).toMatchObject({ total: 2, complete: false });
-    expect(first.items.map((item) => item.id)).toEqual([projectId]);
-
-    const second = await listOrganizationAgentContextProjectsPage(db, {
-      organizationId,
-      workId,
-      snapshotAt,
-      limit: 1,
-      cursor: first.nextCursor,
-    });
-    expect(() => decodeOrganizationAgentContextProjectsPage(second))
-      .not.toThrow();
-    expect(second).toMatchObject({ total: 2, complete: true });
-    expect(second.items.map((item) => item.id)).toEqual([secondProjectId]);
-    expect([
-      ...first.items.map((item) => item.id),
-      ...second.items.map((item) => item.id),
-    ]).not.toContain(futureProjectId);
-    expect(JSON.stringify([first, second])).not.toContain(otherProjectId);
-
-    const otherOrganization = await listOrganizationAgentContextProjectsPage(
-      db,
-      {
-        organizationId: otherOrganizationId,
-        workId,
-        snapshotAt,
-      },
-    );
-    expect(otherOrganization.items.map((item) => item.id)).toEqual([
-      otherProjectId,
-    ]);
-  });
-
-  it("paginates Project Agents separately without crossing project scope", async () => {
-    const page = await listOrganizationAgentContextAgentsPage(db, {
-      organizationId,
-      projectId,
-      workId,
-      snapshotAt,
-      limit: 1,
-    });
-    expect(() => decodeOrganizationAgentContextAgentsPage(page))
-      .not.toThrow();
-    expect(page).toMatchObject({
-      resource: "agents",
-      projectId,
-      total: 1,
-      complete: true,
-    });
-    expect(page.items[0]).toMatchObject({
-      id: agentId,
-      name: "Context Agent",
-      skills: [{ id: skillId, name: "Inspect" }],
-    });
-
-    const otherProject = await listOrganizationAgentContextAgentsPage(db, {
-      organizationId,
-      projectId: secondProjectId,
-      workId,
-      snapshotAt,
-    });
-    expect(otherProject).toMatchObject({ total: 0, items: [] });
-  });
-
-  it("paginates issues by run number and returns only safe, snapshot-scoped fields", async () => {
-    const first = await listOrganizationAgentContextIssuesPage(db, {
-      organizationId,
-      projectId,
-      workId,
-      snapshotAt,
-      limit: 1,
-    });
-    const second = await listOrganizationAgentContextIssuesPage(db, {
-      organizationId,
-      projectId,
-      workId,
-      snapshotAt,
-      limit: 1,
-      cursor: first.nextCursor,
-    });
-
-    expect(() => decodeOrganizationAgentContextIssuesPage(first))
-      .not.toThrow();
-    expect(() => decodeOrganizationAgentContextIssuesPage(second))
-      .not.toThrow();
-    expect(first).toMatchObject({ total: 2, complete: false });
-    expect(second).toMatchObject({ total: 2, complete: true });
-    expect([...first.items, ...second.items].map((item) => item.runNumber))
-      .toEqual([10, 20]);
-    expect(first.items[0]).toMatchObject({
-      sourceCreatedAt: currentDataAt,
-      tracker: { provider: "github", issueId: null },
-      structuredResult: { summary: "Implemented safely." },
-      eventCountStable: true,
-    });
-    expect(first.items[0]).not.toHaveProperty("claimTokenHash");
-    expect(first.items[0]).not.toHaveProperty("context");
-
-    const wrongOrganization = await listOrganizationAgentContextIssuesPage(
-      db,
-      {
-        organizationId: otherOrganizationId,
-        projectId,
-        workId,
-        snapshotAt,
-      },
-    );
-    expect(wrongOrganization).toMatchObject({ total: 0, items: [] });
-    const secondProject = await listOrganizationAgentContextIssuesPage(db, {
-      organizationId,
-      projectId: secondProjectId,
-      workId,
-      snapshotAt,
-    });
-    expect(secondProject.items.map((item) => item.runNumber)).toEqual([50]);
-  });
-
-  it("paginates an issue's unbounded pull request links separately", async () => {
-    const items: Array<{ issueId: string; position: number; url: string }> = [];
-    let cursor: string | null = null;
-    do {
-      const page = await listOrganizationAgentContextIssuePullRequestsPage(
-        db,
-        {
-          organizationId,
-          projectId,
-          workId,
-          snapshotAt,
-          limit: 50,
-          cursor,
-        },
-      );
-      expect(() =>
-        decodeOrganizationAgentContextIssuePullRequestsPage(page)
-      ).not.toThrow();
-      expect(page.total).toBe(101);
-      items.push(...page.items);
-      cursor = page.nextCursor;
-    } while (cursor);
-
-    expect(items).toHaveLength(101);
-    expect(items[0]).toMatchObject({
-      issueId: "60000000-0000-4000-8000-000000000010",
-      position: 0,
-      url: "https://github.com/wordbricks/briar/pull/1",
-    });
-    expect(items.at(-1)).toMatchObject({
-      position: 100,
-      url: "https://github.com/wordbricks/briar/pull/101",
-    });
-  });
-
-  it("merges hot and archived sessions, deduplicates by ID, and filters payload keys", async () => {
-    const items: Array<Record<string, unknown>> = [];
-    let cursor: string | null = null;
-    let expectedTotal = 0;
-    do {
-      const page = await listOrganizationAgentContextSessionsPage(
-        db,
-        archives,
-        {
-          organizationId,
-          projectId,
-          workId,
-          snapshotAt,
-          limit: 1,
-          cursor,
-        },
-      );
-      expect(() => decodeOrganizationAgentContextSessionsPage(page))
-        .not.toThrow();
-      expectedTotal = page.total;
-      items.push(...page.items);
-      cursor = page.nextCursor;
-    } while (cursor);
-
-    expect(expectedTotal).toBe(4);
-    expect(items.map((item) => item.id)).toEqual([
-      "archived-only",
-      "duplicate-session",
-      "hot-only",
-      "offset-session",
-    ]);
-    expect(items.map((item) => item.id)).not.toContain("late-backfill");
-    expect(items.filter((item) => item.id === "duplicate-session"))
-      .toHaveLength(1);
-    expect(items.find((item) => item.id === "duplicate-session"))
-      .toMatchObject({ payload: { summary: "Hot version wins" } });
-    for (const item of items) {
-      expect(item.payload).not.toHaveProperty("secretToken");
-    }
-
-    const wrongOrganization = await listOrganizationAgentContextSessionsPage(
-      db,
-      archives,
-      {
-        organizationId: otherOrganizationId,
-        projectId,
-        workId,
-        snapshotAt,
-      },
-    );
-    expect(wrongOrganization).toMatchObject({ total: 0, items: [] });
-    const wrongProject = await listOrganizationAgentContextSessionsPage(
-      db,
-      archives,
-      {
-        organizationId,
-        projectId: secondProjectId,
-        workId,
-        snapshotAt,
-      },
-    );
-    expect(wrongProject).toMatchObject({ total: 0, items: [] });
-  });
-
+describe("Organization Agent context lookup", () => {
   it("builds a revision manifest without embedding settings or retained payloads", async () => {
     const manifest = await organizationAgentContextManifest(db, {
       organizationId,
@@ -790,159 +536,73 @@ describe("Organization Agent context pages", () => {
     ]);
   });
 
-  it("rejects malformed, cross-claim, cross-resource, and cross-project cursors", async () => {
-    const projectPage = await listOrganizationAgentContextProjectsPage(db, {
+
+  it("rejects malformed cursors and cursors from another lookup scope", async () => {
+    const first = await lookupOrganizationAgentContext(db, archives, {
       organizationId,
       workId,
       snapshotAt,
-      limit: 1,
+      requests: [{
+        resource: "issues",
+        projectId,
+        detail: "summary",
+        limit: 1,
+        cursor: null,
+      }],
     });
-    const issuePage = await listOrganizationAgentContextIssuesPage(db, {
-      organizationId,
-      projectId,
-      workId,
-      snapshotAt,
-      limit: 1,
-    });
-    expect(projectPage.nextCursor).not.toBeNull();
-    expect(issuePage.nextCursor).not.toBeNull();
+    const page = first.results[0].data as { nextCursor: string | null };
+    expect(page.nextCursor).not.toBeNull();
 
-    await expect(
-      listOrganizationAgentContextIssuesPage(db, {
+    const lookupWithCursor = (
+      input: {
+        workId?: string;
+        projectId?: string;
+        resource?: "agents" | "issues";
+        snapshotAt?: string;
+        cursor: string;
+      },
+    ) =>
+      lookupOrganizationAgentContext(db, archives, {
         organizationId,
-        projectId,
-        workId,
-        snapshotAt,
-        cursor: projectPage.nextCursor,
-      }),
-    ).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
-    await expect(
-      listOrganizationAgentContextIssuesPage(db, {
-        organizationId,
-        projectId,
-        workId: otherWorkId,
-        snapshotAt,
-        cursor: issuePage.nextCursor,
-      }),
-    ).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
-    await expect(
-      listOrganizationAgentContextIssuesPage(db, {
-        organizationId,
-        projectId: secondProjectId,
-        workId,
-        snapshotAt,
-        cursor: issuePage.nextCursor,
-      }),
-    ).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
-    await expect(
-      listOrganizationAgentContextIssuesPage(db, {
-        organizationId,
-        projectId,
-        workId,
-        snapshotAt: futureDataAt,
-        cursor: issuePage.nextCursor,
-      }),
-    ).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
-    await expect(
-      listOrganizationAgentContextProjectsPage(db, {
-        organizationId,
-        workId,
-        snapshotAt,
-        cursor: "not!base64",
-      }),
-    ).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
-  });
+        workId: input.workId ?? workId,
+        snapshotAt: input.snapshotAt ?? snapshotAt,
+        requests: [{
+          resource: input.resource ?? "issues",
+          projectId: input.projectId ?? projectId,
+          detail: "summary",
+          limit: 1,
+          cursor: input.cursor,
+        }],
+      });
 
-  it("preserves strict cursor shapes, nonnegative positions, and offset dates", async () => {
-    const offsetSnapshotAt = "2025-05-01T09:00:00+09:00";
-    const projectPage = await listOrganizationAgentContextProjectsPage(db, {
-      organizationId,
-      workId,
-      snapshotAt: offsetSnapshotAt,
-      limit: 1,
-    });
-    expect(projectPage.nextCursor).not.toBeNull();
-    await expect(listOrganizationAgentContextProjectsPage(db, {
-      organizationId,
-      workId,
-      snapshotAt: offsetSnapshotAt,
-      cursor: projectPage.nextCursor,
-    })).resolves.toMatchObject({ complete: true });
+    await expect(lookupWithCursor({
+      cursor: page.nextCursor!,
+      workId: otherWorkId,
+    })).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
+    await expect(lookupWithCursor({
+      cursor: page.nextCursor!,
+      projectId: secondProjectId,
+    })).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
+    await expect(lookupWithCursor({
+      cursor: page.nextCursor!,
+      resource: "agents",
+    })).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
+    await expect(lookupWithCursor({
+      cursor: "not!base64",
+    })).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
 
     const excessPropertyCursor = mutateEncodedCursor(
-      projectPage.nextCursor,
+      page.nextCursor,
       (cursor) => {
         cursor.futureField = true;
       },
     );
-    await expect(listOrganizationAgentContextProjectsPage(db, {
-      organizationId,
-      workId,
-      snapshotAt: offsetSnapshotAt,
+    await expect(lookupWithCursor({
       cursor: excessPropertyCursor,
-    })).rejects.toMatchObject({
-      name: "OrganizationAgentContextCursorError",
-      message: "Invalid organization context cursor",
-    });
-
-    const missingOffsetCursor = mutateEncodedCursor(
-      projectPage.nextCursor,
-      (cursor) => {
-        cursor.snapshotAt = "2025-05-01T09:00:00";
-      },
-    );
-    await expect(listOrganizationAgentContextProjectsPage(db, {
-      organizationId,
-      workId,
-      snapshotAt: "2025-05-01T09:00:00",
-      cursor: missingOffsetCursor,
-    })).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
-
-    const issuePage = await listOrganizationAgentContextIssuesPage(db, {
-      organizationId,
-      projectId,
-      workId,
-      snapshotAt,
-      limit: 1,
-    });
-    const negativePositionCursor = mutateEncodedCursor(
-      issuePage.nextCursor,
-      (cursor) => {
-        cursor.runNumber = -1;
-      },
-    );
-    await expect(listOrganizationAgentContextIssuesPage(db, {
-      organizationId,
-      projectId,
-      workId,
-      snapshotAt,
-      cursor: negativePositionCursor,
-    })).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
-
-    const pullRequestPage =
-      await listOrganizationAgentContextIssuePullRequestsPage(db, {
-        organizationId,
-        projectId,
-        workId,
-        snapshotAt,
-        limit: 1,
-      });
-    const negativePullRequestPositionCursor = mutateEncodedCursor(
-      pullRequestPage.nextCursor,
-      (cursor) => {
-        cursor.position = -1;
-      },
-    );
-    await expect(listOrganizationAgentContextIssuePullRequestsPage(db, {
-      organizationId,
-      projectId,
-      workId,
-      snapshotAt,
-      cursor: negativePullRequestPositionCursor,
     })).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
   });
 
-  it("shrinks encoded pages at item boundaries and rejects one oversized item", async () => {
+  it("fits summary pages to the byte budget and rejects one oversized item", async () => {
     await insertSession({
       id: "large-session-a",
       status: "running",
@@ -955,22 +615,28 @@ describe("Organization Agent context pages", () => {
       summary: "b".repeat(800_000),
       startedAt: currentDataAt,
     });
-    const first = await listOrganizationAgentContextSessionsPage(
-      db,
-      archives,
-      {
-        organizationId,
+    const response = await lookupOrganizationAgentContext(db, archives, {
+      organizationId,
+      workId,
+      snapshotAt,
+      requests: [{
+        resource: "agent-sessions",
         projectId,
-        workId,
-        snapshotAt,
+        detail: "summary",
         limit: 50,
-      },
-    );
+        cursor: null,
+      }],
+    });
+    const page = response.results[0].data as {
+      total: number;
+      complete: boolean;
+      nextCursor: string | null;
+    };
     expect(
-      new TextEncoder().encode(JSON.stringify(first)).byteLength,
+      new TextEncoder().encode(JSON.stringify(page)).byteLength,
     ).toBeLessThanOrEqual(organizationAgentContextMaxEncodedPageBytes);
-    expect(first).toMatchObject({ total: 6, complete: false });
-    expect(first.nextCursor).not.toBeNull();
+    expect(page).toMatchObject({ total: 6, complete: false });
+    expect(page.nextCursor).not.toBeNull();
 
     await insertSession({
       id: "oversized-session",
@@ -980,11 +646,17 @@ describe("Organization Agent context pages", () => {
       startedAt: currentDataAt,
     });
     await expect(
-      listOrganizationAgentContextSessionsPage(db, archives, {
+      lookupOrganizationAgentContext(db, archives, {
         organizationId,
-        projectId: secondProjectId,
         workId,
         snapshotAt,
+        requests: [{
+          resource: "agent-sessions",
+          projectId: secondProjectId,
+          detail: "summary",
+          limit: 25,
+          cursor: null,
+        }],
       }),
     ).rejects.toBeInstanceOf(OrganizationAgentContextPageTooLargeError);
   });

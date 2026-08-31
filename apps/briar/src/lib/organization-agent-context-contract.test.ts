@@ -1,13 +1,10 @@
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 import {
-  decodeOrganizationAgentContextAgentsPage,
+  decodeOrganizationAgentContextClaimQuery,
   decodeOrganizationAgentContextDescriptor,
   decodeOrganizationAgentContextLookupRequest,
   decodeOrganizationAgentContextLookupResult,
-  decodeOrganizationAgentContextProjectsPage,
-  decodeOrganizationAgentContextQuery,
-  decodeOrganizationAgentContextSessionsPage,
   organizationAgentContextCapability,
   OrganizationAgentContextDescriptor,
 } from "./organization-agent-context-contract";
@@ -58,51 +55,14 @@ describe("organization Agent context contract", () => {
     ).toThrow();
   });
 
-  it("normalizes a bounded query limit", () => {
+  it("accepts only the claim identity in manifest queries", () => {
     expect(
-      decodeOrganizationAgentContextQuery({ workerId: "worker-1" }),
-    ).toEqual({ workerId: "worker-1", limit: 25 });
-    expect(
-      decodeOrganizationAgentContextQuery({
-        workerId: "  worker-1  ",
-        limit: null,
-      }),
-    ).toEqual({ workerId: "worker-1", limit: 25 });
-    expect(
-      decodeOrganizationAgentContextQuery({
-        workerId: "worker-1",
-        limit: undefined,
-      }),
-    ).toEqual({ workerId: "worker-1", limit: 25 });
-    expect(
-      decodeOrganizationAgentContextQuery({
-        workerId: "worker-1",
-        limit: "50",
-        cursor: "opaque-cursor",
-      }),
-    ).toEqual({
+      decodeOrganizationAgentContextClaimQuery({ workerId: "  worker-1  " }),
+    ).toEqual({ workerId: "worker-1" });
+    expect(() => decodeOrganizationAgentContextClaimQuery({
       workerId: "worker-1",
-      limit: 50,
-      cursor: "opaque-cursor",
-    });
-    expect(() =>
-      decodeOrganizationAgentContextQuery({
-        workerId: "worker-1",
-        limit: "51",
-      }),
-    ).toThrow();
-    expect(() =>
-      decodeOrganizationAgentContextQuery({
-        workerId: "worker-1",
-        limit: "1.5",
-      }),
-    ).toThrow();
-    expect(() =>
-      decodeOrganizationAgentContextQuery({
-        workerId: "worker-1",
-        limit: " ",
-      }),
-    ).toThrow();
+      cursor: "legacy-cursor",
+    })).toThrow();
   });
 
   it("applies lookup defaults while preserving unknown payload compatibility", () => {
@@ -133,113 +93,4 @@ describe("organization Agent context contract", () => {
     });
   });
 
-  it("requires pagination completion and cursor state to agree", () => {
-    expect(
-      decodeOrganizationAgentContextProjectsPage({
-        schemaVersion: 1,
-        resource: "projects",
-        organizationId: "organization-1",
-        workId: "work-1",
-        projectId: null,
-        snapshotAt,
-        total: 0,
-        items: [],
-        nextCursor: null,
-        complete: true,
-      }),
-    ).toMatchObject({ resource: "projects", complete: true });
-
-    expect(() =>
-      decodeOrganizationAgentContextProjectsPage({
-        schemaVersion: 1,
-        resource: "projects",
-        organizationId: "organization-1",
-        workId: "work-1",
-        projectId: null,
-        snapshotAt,
-        total: 0,
-        items: [],
-        nextCursor: null,
-        complete: false,
-      }),
-    ).toThrow(/complete must be true/u);
-  });
-
-  it("keeps session payloads explicit while rejecting envelope extras", () => {
-    const page = {
-      schemaVersion: 1,
-      resource: "agent-sessions",
-      organizationId: "organization-1",
-      workId: "work-1",
-      projectId: "project-1",
-      snapshotAt,
-      total: 1,
-      items: [{
-        id: "session-1",
-        projectId: "project-1",
-        agentId: null,
-        status: "completed",
-        sessionType: "task",
-        payload: { summary: "Done" },
-        startedAt: snapshotAt,
-        completedAt: snapshotAt,
-        updatedAt: snapshotAt,
-      }],
-      nextCursor: null,
-      complete: true,
-    } as const;
-
-    expect(
-      decodeOrganizationAgentContextSessionsPage(page),
-    ).toMatchObject({ total: 1 });
-    expect(() =>
-      decodeOrganizationAgentContextSessionsPage({
-        ...page,
-        claimToken: "must-not-leak",
-      }),
-    ).toThrow();
-    expect(() =>
-      decodeOrganizationAgentContextSessionsPage({
-        ...page,
-        items: [{
-          ...page.items[0],
-          payload: { summary: "Done", secretToken: "must-not-leak" },
-        }],
-      }),
-    ).toThrow();
-    expect(() =>
-      decodeOrganizationAgentContextSessionsPage({
-        ...page,
-        items: [{ ...page.items[0], projectId: "project-2" }],
-      }),
-    ).toThrow(/item projectId must match/u);
-  });
-
-  it("keeps Project Agents in their own project-scoped collection", () => {
-    expect(
-      decodeOrganizationAgentContextAgentsPage({
-        schemaVersion: 1,
-        resource: "agents",
-        organizationId: "organization-1",
-        workId: "work-1",
-        projectId: "project-1",
-        snapshotAt,
-        total: 1,
-        items: [{
-          id: "agent-1",
-          name: "Builder",
-          description: "Builds and maintains this project.",
-          provider: "codex",
-          model: null,
-          effort: null,
-          responsibility: "Own this project.",
-          skills: [],
-          createdAt: snapshotAt,
-          updatedAt: snapshotAt,
-        }],
-        nextCursor: null,
-        complete: true,
-      }),
-    ).toMatchObject({ resource: "agents", projectId: "project-1" });
-  });
 });
