@@ -1,3 +1,4 @@
+import { matchChannelReplyAttachmentPath } from "../../src/lib/channel-reply-attachment-path";
 import { channelReplyClaimTokenHeader } from "../../src/lib/channels-contract";
 import { channelAttachmentResponse } from "./channel-attachment-response";
 import { getClaimedChannelReplyAttachment } from "./channels";
@@ -15,9 +16,7 @@ export type ChannelReplyResultRouteInput = {
 export async function handleChannelReplyResultRoute(
   input: ChannelReplyResultRouteInput,
 ): Promise<Response | undefined> {
-  const match = input.url.pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channel-reply-claims\/([0-9a-f-]+)\/attachments\/([0-9a-f-]+)$/u,
-  );
+  const match = matchChannelReplyAttachmentPath(input.url.pathname);
   if (
     !match ||
     (input.request.method !== "GET" && input.request.method !== "HEAD")
@@ -27,7 +26,7 @@ export async function handleChannelReplyResultRoute(
   const principal = await requireWorkerOrganization(
     input.db,
     input.request,
-    match[1],
+    match.organizationId,
   );
   const claimToken = input.request.headers
     .get(channelReplyClaimTokenHeader)
@@ -39,11 +38,11 @@ export async function handleChannelReplyResultRoute(
     throw new HttpError(401, "Channel reply claim token required");
   }
   const attachment = await getClaimedChannelReplyAttachment(input.db, {
-    organizationId: match[1],
-    jobId: match[2],
+    organizationId: match.organizationId,
+    jobId: match.workId,
     deviceId: principal.deviceId,
     claimTokenHash: await sha256(claimToken),
-    attachmentId: match[3],
+    attachmentId: match.attachmentId,
     observedAt: new Date().toISOString(),
   });
   if (!attachment) throw new HttpError(404, "Attachment not found");

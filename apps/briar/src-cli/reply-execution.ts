@@ -706,8 +706,7 @@ async function runClaimedChannelReply(
       organizationId: reply.organizationId,
       workId: reply.workId,
       claimToken: reply.claimToken,
-      triggerMessageId: reply.triggerMessageId,
-      snapshot: reply.snapshot,
+      triggerAttachments: reply.triggerAttachments,
       workspacePath,
     });
     const agent = detachedReplyAgent({

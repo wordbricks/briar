@@ -1,3 +1,4 @@
+import { channelReplyAttachmentPath } from "../../src/lib/channel-reply-attachment-path";
 import { channelReplyContextMessageJson } from "../../src/lib/channels-contract";
 import { agentReplyDisplayParentMessageId } from "../../src/lib/issue-reply-decision";
 import {
@@ -381,6 +382,19 @@ export async function claimNextChannelReplyWork(
           : null,
         delegation,
         delegationTargets,
+        triggerAttachments: (triggerMessage?.attachments ?? []).map(
+          (attachment) => ({
+            id: attachment.id,
+            filename: attachment.filename,
+            contentType: attachment.contentType,
+            byteSize: attachment.byteSize,
+            url: channelReplyAttachmentPath({
+              organizationId: job.organization_id,
+              workId: job.id,
+              attachmentId: attachment.id,
+            }),
+          }),
+        ),
         snapshot: {
           channel: {
             id: channel.id,

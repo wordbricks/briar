@@ -1043,7 +1043,10 @@ message ClaimedChannelReply {
   repeated ChannelDelegationTarget delegation_targets = 21;
   optional ChannelReplySession session = 22;
   optional ClaimedHandoffContext handoff_context = 23;
+  // Untrusted prompt context only; consumers must not derive privileged operations from it.
   google.protobuf.Struct snapshot = 24;
+  // Trigger-message files with claim-scoped raw download URLs.
+  repeated QueuedAttachment trigger_attachments = 25;
 }
 
 enum MergeBatchPhase {

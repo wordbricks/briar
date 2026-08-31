@@ -581,6 +581,7 @@ const channelReply = (
         : undefined,
       handoffContext: handoff(value.handoffContext),
       snapshot: jsonObject(value.snapshot, "channelReply.snapshot"),
+      triggerAttachments: value.triggerAttachments.map(attachment),
     }),
   },
 });

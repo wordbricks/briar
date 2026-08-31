@@ -31224,6 +31224,8 @@ pub struct ClaimedChannelReply {
         ClaimedHandoffContext,
         ::buffa::Inline<ClaimedHandoffContext>,
     >,
+    /// Untrusted prompt context only; consumers must not derive privileged operations from it.
+    ///
     /// Field 24: `snapshot`
     #[serde(
         rename = "snapshot",
@@ -31233,6 +31235,16 @@ pub struct ClaimedChannelReply {
         ::buffa_types::google::protobuf::Struct,
         ::buffa::Inline<::buffa_types::google::protobuf::Struct>,
     >,
+    /// Trigger-message files with claim-scoped raw download URLs.
+    ///
+    /// Field 25: `trigger_attachments`
+    #[serde(
+        rename = "triggerAttachments",
+        alias = "trigger_attachments",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub trigger_attachments: ::buffa::alloc::vec::Vec<QueuedAttachment>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -31267,6 +31279,7 @@ impl ::core::fmt::Debug for ClaimedChannelReply {
             .field("session", &self.session)
             .field("handoff_context", &self.handoff_context)
             .field("snapshot", &self.snapshot)
+            .field("trigger_attachments", &self.trigger_attachments)
             .finish()
     }
 }
@@ -31464,6 +31477,14 @@ impl ::buffa::Message for ClaimedChannelReply {
                 += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        for v in &self.trigger_attachments {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -31613,6 +31634,14 @@ impl ::buffa::Message for ClaimedChannelReply {
                 buf,
             );
             self.snapshot.write_to(__cache, buf);
+        }
+        for v in &self.trigger_attachments {
+            ::buffa::types::put_len_delimited_header(
+                25u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -31856,6 +31885,18 @@ impl ::buffa::Message for ClaimedChannelReply {
                     ctx,
                 )?;
             }
+            25u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.trigger_attachments.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -31888,6 +31929,7 @@ impl ::buffa::Message for ClaimedChannelReply {
         self.session = ::buffa::MessageField::none();
         self.handoff_context = ::buffa::MessageField::none();
         self.snapshot = ::buffa::MessageField::none();
+        self.trigger_attachments.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -89913,9 +89955,18 @@ pub mod __buffa {
             pub handoff_context: ::buffa::MessageFieldView<
                 super::super::__buffa::view::ClaimedHandoffContextView<'a>,
             >,
+            /// Untrusted prompt context only; consumers must not derive privileged operations from it.
+            ///
             /// Field 24: `snapshot`
             pub snapshot: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::StructView<'a>,
+            >,
+            /// Trigger-message files with claim-scoped raw download URLs.
+            ///
+            /// Field 25: `trigger_attachments`
+            pub trigger_attachments: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::QueuedAttachmentView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -90350,6 +90401,26 @@ pub mod __buffa {
                                 )?,
                             );
                     }
+                    25u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::QueuedAttachmentView,
+                            >(),
+                        )?;
+                        view.trigger_attachments
+                            .push(
+                                <super::super::__buffa::view::QueuedAttachmentView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -90509,6 +90580,11 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    trigger_attachments: self
+                        .trigger_attachments
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -90686,6 +90762,14 @@ pub mod __buffa {
                         += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                for v in &self.trigger_attachments {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -90841,6 +90925,14 @@ pub mod __buffa {
                     );
                     self.snapshot.write_to(__cache, buf);
                 }
+                for v in &self.trigger_attachments {
+                    ::buffa::types::put_len_delimited_header(
+                        25u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -90990,6 +91082,13 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("snapshot", __v)?;
                     }
+                }
+                if !self.trigger_attachments.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "triggerAttachments",
+                            &*self.trigger_attachments,
+                        )?;
                 }
                 __map.end()
             }
@@ -91254,6 +91353,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().handoff_context
             }
+            /// Untrusted prompt context only; consumers must not derive privileged operations from it.
+            ///
             /// Field 24: `snapshot`
             #[must_use]
             pub fn snapshot(
@@ -91262,6 +91363,18 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::StructView<'_>,
             > {
                 &self.0.reborrow().snapshot
+            }
+            /// Trigger-message files with claim-scoped raw download URLs.
+            ///
+            /// Field 25: `trigger_attachments`
+            #[must_use]
+            pub fn trigger_attachments(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::QueuedAttachmentView<'_>,
+            > {
+                &self.0.reborrow().trigger_attachments
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ClaimedChannelReplyView<'static>>>

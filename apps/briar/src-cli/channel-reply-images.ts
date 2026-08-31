@@ -1,82 +1,79 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import * as Schema from "effect/Schema";
+import type { QueuedAttachment } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import { matchChannelReplyAttachmentPath } from "../src/lib/channel-reply-attachment-path";
 import { channelReplyClaimTokenHeader } from "../src/lib/channels-contract";
+import {
+  issueAttachmentMimeTypes,
+  validateIssueAttachments,
+} from "../src/lib/issue-attachments";
 import type { AgentImageAttachment } from "../src-agent/runner-attachments";
 
 export const channelReplyImageDirectoryName = ".briar-channel-images";
 
-const maxChannelReplyImages = 5;
-const maxChannelReplyImageBytes = 20 * 1024 * 1024;
-const maxChannelReplyImageTotalBytes = 25 * 1024 * 1024;
-
-const preserveExcessProperties = {
-  onExcessProperty: "preserve",
-} as const;
-
-const Uuid = Schema.String.check(Schema.isUUID());
-
-const ChannelReplyImage = Schema.Struct({
-  id: Schema.mutableKey(Uuid),
-  filename: Schema.mutableKey(
-    Schema.String.check(Schema.isLengthBetween(1, 255)),
-  ),
-  contentType: Schema.mutableKey(
-    Schema.String.check(
-      Schema.isPattern(/^image\/(?:avif|gif|jpeg|png|webp)$/u),
-    ),
-  ),
-  byteSize: Schema.mutableKey(
-    Schema.Int.check(
-      Schema.isGreaterThan(0),
-      Schema.isLessThanOrEqualTo(maxChannelReplyImageBytes),
-    ),
-  ),
-});
-
-const ChannelReplySnapshotMessage = Schema.Struct({
-  id: Schema.mutableKey(Uuid),
-  attachments: Schema.mutableKey(
-    Schema.mutable(Schema.Array(Schema.Unknown)),
-  ),
-}).annotate({ parseOptions: preserveExcessProperties });
-
-const ChannelReplySnapshot = Schema.Struct({
-  messages: Schema.mutableKey(
-    Schema.mutable(Schema.Array(ChannelReplySnapshotMessage)),
-  ),
-}).annotate({ parseOptions: preserveExcessProperties });
-
-const ChannelReplyImages = Schema.mutable(
-  Schema.Array(ChannelReplyImage),
-).check(Schema.isMaxLength(maxChannelReplyImages));
-
-const decodeChannelReplySnapshot = Schema.decodeUnknownSync(
-  ChannelReplySnapshot,
-);
-const decodeChannelReplyImages = Schema.decodeUnknownSync(ChannelReplyImages);
-
-type ChannelReplyImage = typeof ChannelReplyImage.Type;
 type ChannelReplyImageFetcher = (
   input: string | URL | Request,
   init?: RequestInit,
 ) => Promise<Response>;
 
+const supportedChannelReplyImageTypes = new Set<string>(
+  issueAttachmentMimeTypes.filter(
+    (contentType) => contentType.startsWith("image/") &&
+      contentType !== "image/svg+xml",
+  ),
+);
+
 const imageExtension = (contentType: string) =>
   contentType === "image/jpeg" ? "jpg" : contentType.slice("image/".length);
 
-export function channelReplyImagesForTrigger(
-  snapshot: Record<string, unknown>,
-  triggerMessageId: string,
-): ChannelReplyImage[] {
-  const parsed = decodeChannelReplySnapshot(snapshot);
-  const trigger = parsed.messages.find((message) => message.id === triggerMessageId);
-  const images = decodeChannelReplyImages(trigger?.attachments ?? []);
-  const totalBytes = images.reduce((total, image) => total + image.byteSize, 0);
-  if (totalBytes > maxChannelReplyImageTotalBytes) {
-    throw new Error("Channel reply images exceed the total download limit");
+export function channelReplyImages(
+  triggerAttachments: readonly QueuedAttachment[],
+): QueuedAttachment[] {
+  const unsupported = triggerAttachments.find(
+    (attachment) => !supportedChannelReplyImageTypes.has(attachment.contentType),
+  );
+  if (unsupported) {
+    throw new Error(
+      `Channel reply image type is unsupported: ${unsupported.contentType}`,
+    );
   }
-  return images;
+  const validationError = validateIssueAttachments(
+    triggerAttachments.map((attachment) => ({
+      name: attachment.filename,
+      size: attachment.byteSize,
+      type: attachment.contentType,
+    })),
+  );
+  if (validationError) throw new Error(validationError);
+  return [...triggerAttachments];
+}
+
+function channelReplyImageUrl(input: {
+  apiUrl: string;
+  organizationId: string;
+  workId: string;
+  image: QueuedAttachment;
+}) {
+  const match = matchChannelReplyAttachmentPath(input.image.url);
+  if (
+    !match ||
+    match.organizationId !== input.organizationId ||
+    match.workId !== input.workId ||
+    match.attachmentId !== input.image.id
+  ) {
+    throw new Error("Channel reply image URL is outside the active claim scope");
+  }
+  const apiUrl = new URL(input.apiUrl);
+  const imageUrl = new URL(input.image.url, apiUrl);
+  if (
+    imageUrl.origin !== apiUrl.origin ||
+    imageUrl.pathname !== input.image.url ||
+    imageUrl.search !== "" ||
+    imageUrl.hash !== ""
+  ) {
+    throw new Error("Channel reply image URL is outside the active claim scope");
+  }
+  return imageUrl;
 }
 
 export function channelReplyImageDirectory(workspacePath: string) {
@@ -89,15 +86,11 @@ export async function downloadChannelReplyImages(input: {
   organizationId: string;
   workId: string;
   claimToken: string;
-  triggerMessageId: string;
-  snapshot: Record<string, unknown>;
+  triggerAttachments: readonly QueuedAttachment[];
   workspacePath: string;
   fetcher?: ChannelReplyImageFetcher;
 }) {
-  const images = channelReplyImagesForTrigger(
-    input.snapshot,
-    input.triggerMessageId,
-  );
+  const images = channelReplyImages(input.triggerAttachments);
   const directory = channelReplyImageDirectory(input.workspacePath);
   if (images.length === 0) {
     return {
@@ -113,7 +106,12 @@ export async function downloadChannelReplyImages(input: {
   try {
     for (const image of images) {
       const response = await fetcher(
-        `${input.apiUrl.replace(/\/$/u, "")}/organizations/${input.organizationId}/channel-reply-claims/${input.workId}/attachments/${image.id}`,
+        channelReplyImageUrl({
+          apiUrl: input.apiUrl,
+          organizationId: input.organizationId,
+          workId: input.workId,
+          image,
+        }),
         {
           redirect: "error",
           headers: {

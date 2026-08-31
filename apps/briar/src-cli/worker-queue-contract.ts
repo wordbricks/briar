@@ -538,6 +538,7 @@ const channelReplyFromProto = (
         }
       : null,
     snapshot: required(value.snapshot, "channelReply.snapshot"),
+    triggerAttachments: value.triggerAttachments,
   };
   if (scope.kind === "organization") {
     if (!mapped.organizationContext || mapped.delegation || mapped.skillExecutionTarget) {

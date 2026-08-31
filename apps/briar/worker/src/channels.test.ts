@@ -15,6 +15,7 @@ import {
 import { createMethodUrl } from "@connectrpc/connect/protocol";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { channelReplyAttachmentPath } from "../../src/lib/channel-reply-attachment-path";
 import {
   channelReplyNoAvailableWorkerError,
   channelReplyProviderUsageExhaustedError,
@@ -1437,6 +1438,7 @@ describe("organization channels", () => {
     });
 
     const triggerId = "f0000000-0000-4000-8000-000000000004";
+    const triggerAttachmentId = "f1000000-0000-4000-8000-000000000004";
     await createChannelMessage(db, {
       id: triggerId,
       channelId,
@@ -1448,6 +1450,15 @@ describe("organization channels", () => {
       body: "@Honey write the plan",
       mentionedUserIds: [],
       mentionedAgentIds: [agent!.id],
+      attachments: [{
+        id: triggerAttachmentId,
+        organization_id: organizationId,
+        object_key:
+          `channel-attachments/${organizationId}/${channelId}/${triggerId}/${triggerAttachmentId}`,
+        filename: "private-plan.png",
+        content_type: "image/png",
+        byte_size: 42,
+      }],
       createdAt: at(9),
     });
     const agentReplyId = "f5000000-0000-4000-8000-000000000004";
@@ -1544,6 +1555,17 @@ describe("organization channels", () => {
       organizationContext: {
         snapshotAt: claimPayload!.claimedAt,
       },
+      triggerAttachments: [{
+        id: triggerAttachmentId,
+        filename: "private-plan.png",
+        contentType: "image/png",
+        byteSize: 42,
+        url: channelReplyAttachmentPath({
+          organizationId,
+          workId: jobs[0].id,
+          attachmentId: triggerAttachmentId,
+        }),
+      }],
       snapshot: { projectTargets: [] },
     });
     expect(claimPayload!.snapshot.messages).toHaveLength(2);
