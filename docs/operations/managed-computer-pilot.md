@@ -140,6 +140,17 @@ export PRIVATE_SUBNET_ID="$(aws cloudformation describe-stacks \
 
 전용 IAM principal을 먼저 만들고, `infrastructure/managed-computers/cloudformation.yaml`을 적용한다. 이 스택은 policy를 만들지만 principal에 자동 연결하지 않는다.
 
+컴퓨터의 instance role은 SSM 연결을 위해 `AmazonSSMManagedInstanceCore`를 유지하되,
+inline policy `DenyParameterStoreReads`로 `ssm:GetParameter*`를 명시적으로 거부한다.
+이 거부는 단일·복수 파라미터 조회, 경로별 조회와 버전 이력 조회에 모두 적용된다.
+컴퓨터에 필요한 자격 증명은 Briar의 enrollment와 프로젝트별 인증 경로로 전달하며,
+계정의 Parameter Store에서 읽지 않는다.
+
+이 IAM 역할을 공유하는 기존 컴퓨터에도 정책 변경이 적용된다. 역할 정책만 수정할 때는
+AMI 재빌드나 컴퓨터 재부팅이 필요하지 않다. Change Set에서 역할의 정책만 변경되고
+리소스 교체가 없는지 확인한 뒤 적용한다. 적용 후 파라미터 읽기 거부와 SSM 연결 유지,
+실행 중인 컴퓨터의 Briar 서비스 상태를 확인한다.
+
 ```bash
 export COMPUTER_STACK=briar-managed-computer
 export AMI_ID=<versioned-ami-id>
