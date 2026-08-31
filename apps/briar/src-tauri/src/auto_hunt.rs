@@ -396,17 +396,27 @@ pub(super) fn record_auto_hunt_terminal_event(
 
 fn evidence_status(
     value: buffa::EnumValue<app_proto::run_evidence::Status>,
-) -> Result<&'static str, String> {
+) -> Result<auto_hunt_dispatch::AutoHuntRunEvidenceStatus, String> {
     match value.as_known() {
-        Some(app_proto::run_evidence::Status::Pending) => Ok("pending"),
-        Some(app_proto::run_evidence::Status::Passed) => Ok("passed"),
-        Some(app_proto::run_evidence::Status::Failed) => Ok("failed"),
-        Some(app_proto::run_evidence::Status::Skipped) => Ok("skipped"),
+        Some(app_proto::run_evidence::Status::Pending) => {
+            Ok(auto_hunt_dispatch::AutoHuntRunEvidenceStatus::Pending)
+        }
+        Some(app_proto::run_evidence::Status::Passed) => {
+            Ok(auto_hunt_dispatch::AutoHuntRunEvidenceStatus::Passed)
+        }
+        Some(app_proto::run_evidence::Status::Failed) => {
+            Ok(auto_hunt_dispatch::AutoHuntRunEvidenceStatus::Failed)
+        }
+        Some(app_proto::run_evidence::Status::Skipped) => {
+            Ok(auto_hunt_dispatch::AutoHuntRunEvidenceStatus::Skipped)
+        }
         _ => Err("로컬 run evidence status가 올바르지 않습니다.".to_string()),
     }
 }
 
-fn run_evidence_json(value: app_proto::RunEvidence) -> Result<serde_json::Value, String> {
+fn run_evidence(
+    value: app_proto::RunEvidence,
+) -> Result<auto_hunt_dispatch::AutoHuntRunEvidence, String> {
     let observed_at = value
         .observed_at
         .into_option()
@@ -426,57 +436,55 @@ fn run_evidence_json(value: app_proto::RunEvidence) -> Result<serde_json::Value,
     let images = value
         .images
         .into_iter()
-        .map(|image| {
-            serde_json::json!({
-                "id": image.id,
-                "filename": image.filename,
-                "contentType": image.content_type,
-                "byteSize": image.byte_size,
-                "sha256": image.sha256,
-                "position": image.position,
-                "url": image.url,
-            })
+        .map(|image| auto_hunt_dispatch::AutoHuntRunEvidenceImage {
+            id: image.id,
+            filename: image.filename,
+            content_type: image.content_type,
+            byte_size: image.byte_size,
+            sha256: image.sha256,
+            position: image.position,
+            url: image.url,
         })
-        .collect::<Vec<_>>();
-    Ok(serde_json::json!({
-        "key": value.key,
-        "attempt": value.attempt,
-        "revision": value.revision,
-        "stage": value.stage,
-        "type": value.r#type,
-        "status": evidence_status(value.status)?,
-        "detail": value.detail,
-        "command": value.command,
-        "url": value.url,
-        "metadata": metadata,
-        "actor": value.actor,
-        "observedAt": timestamp_text(
+        .collect();
+    Ok(auto_hunt_dispatch::AutoHuntRunEvidence {
+        key: value.key,
+        attempt: value.attempt,
+        revision: value.revision,
+        stage: value.stage,
+        evidence_type: value.r#type,
+        status: evidence_status(value.status)?,
+        detail: value.detail,
+        command: value.command,
+        url: value.url,
+        metadata,
+        actor: value.actor,
+        observed_at: timestamp_text(
             observed_at.seconds,
             observed_at.nanos,
             "evidence.observedAt",
         )?,
-        "recordedAt": timestamp_text(
+        recorded_at: timestamp_text(
             recorded_at.seconds,
             recorded_at.nanos,
             "evidence.recordedAt",
         )?,
-        "images": images,
-        "requiredRevision": value.required_revision,
-        "canonical": value.canonical,
-    }))
+        images,
+        required_revision: value.required_revision,
+        canonical: value.canonical,
+    })
 }
 
 fn run_evidence_result(
     value: app_proto::ListRunEvidenceResponse,
     expected_run_id: &str,
-) -> Result<Vec<serde_json::Value>, String> {
+) -> Result<Vec<auto_hunt_dispatch::AutoHuntRunEvidence>, String> {
     if value.run_id != expected_run_id {
         return Err(format!(
             "로컬 evidence가 요청한 run {expected_run_id} 대신 {}을 반환했습니다.",
             value.run_id
         ));
     }
-    value.evidence.into_iter().map(run_evidence_json).collect()
+    value.evidence.into_iter().map(run_evidence).collect()
 }
 
 pub(super) struct AutoHuntEvidenceCapture<'a> {
@@ -488,7 +496,11 @@ pub(super) struct AutoHuntEvidenceCapture<'a> {
 }
 
 impl AutoHuntEvidenceCapture<'_> {
-    fn capture(&self, run_id: &str, worker_session_id: &str) -> Vec<serde_json::Value> {
+    fn capture(
+        &self,
+        run_id: &str,
+        worker_session_id: &str,
+    ) -> Vec<auto_hunt_dispatch::AutoHuntRunEvidence> {
         let result = tauri::async_runtime::block_on(self.client.list_run_evidence(
             app_proto::ListRunEvidenceRequest {
                 project_id: self.project_id.to_string(),

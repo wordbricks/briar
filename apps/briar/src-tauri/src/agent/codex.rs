@@ -617,8 +617,7 @@ pub(crate) struct ProjectAutoHuntWorkerResponse {
     pub(crate) workspace_root: Option<String>,
     pub(crate) outcome: String,
     pub(crate) summary: String,
-    #[specta(type = Vec<crate::ipc::JsonValue>)]
-    pub(crate) evidence: Vec<Value>,
+    pub(crate) evidence: Vec<crate::auto_hunt_dispatch::AutoHuntRunEvidence>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2778,11 +2777,24 @@ mod tests {
                 workspace_root: Some("/worktree".to_string()),
                 outcome: "completed".to_string(),
                 summary: "done".to_string(),
-                evidence: vec![json!({
-                    "stage": "local_qa",
-                    "type": "local_ci",
-                    "status": "passed"
-                })],
+                evidence: vec![crate::auto_hunt_dispatch::AutoHuntRunEvidence {
+                    key: "local-ci".to_string(),
+                    attempt: 1,
+                    revision: 1,
+                    stage: "local_qa".to_string(),
+                    evidence_type: "local_ci".to_string(),
+                    status: crate::auto_hunt_dispatch::AutoHuntRunEvidenceStatus::Passed,
+                    detail: None,
+                    command: None,
+                    url: None,
+                    metadata: None,
+                    actor: "test".to_string(),
+                    observed_at: "2026-01-01T00:00:00Z".to_string(),
+                    recorded_at: "2026-01-01T00:00:01Z".to_string(),
+                    images: Vec::new(),
+                    required_revision: 1,
+                    canonical: true,
+                }],
             }],
             &|_, _| false,
         )

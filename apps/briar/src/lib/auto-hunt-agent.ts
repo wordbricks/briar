@@ -4,6 +4,7 @@ import {
   type AgentEvent,
   type AppServerEventRecord_Deserialize,
   type AutoHuntDispatchEvent_Deserialize,
+  type AutoHuntRunEvidence,
 } from "../generated/tauri";
 
 export type AutoHuntAppServerEvent = Omit<
@@ -37,7 +38,7 @@ export type AutoHuntWorkerResult = {
     | "skipped"
     | "cancelled";
   summary: string;
-  evidence: Array<Record<string, unknown>>;
+  evidence: AutoHuntRunEvidence[];
 };
 
 const isTauri = () =>

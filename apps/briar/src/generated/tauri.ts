@@ -273,7 +273,7 @@ export type AutoHuntDispatchEvent_Deserialize = {
 	runId: string | null,
 	status: string,
 	message: string,
-	data?: JsonValue | null,
+	evidence?: AutoHuntRunEvidence | null,
 	occurredAt: string,
 };
 
@@ -285,7 +285,7 @@ export type AutoHuntDispatchEvent_Serialize = {
 	runId: string | null,
 	status: string,
 	message: string,
-	data?: JsonValue | null,
+	evidence?: AutoHuntRunEvidence | null,
 	occurredAt: string,
 };
 
@@ -363,6 +363,37 @@ export type AutoHuntHealth = {
 	requirements: WorkflowRequirementHealth[],
 	issues: string[],
 };
+
+export type AutoHuntRunEvidence = {
+	key: string,
+	attempt: number,
+	revision: number,
+	stage: string,
+	type: string,
+	status: AutoHuntRunEvidenceStatus,
+	detail: string | null,
+	command: string | null,
+	url: string | null,
+	metadata: JsonValue | null,
+	actor: string,
+	observedAt: string,
+	recordedAt: string,
+	images: AutoHuntRunEvidenceImage[],
+	requiredRevision: number,
+	canonical: boolean,
+};
+
+export type AutoHuntRunEvidenceImage = {
+	id: string,
+	filename: string,
+	contentType: string,
+	byteSize: number,
+	sha256: string,
+	position: number,
+	url: string,
+};
+
+export type AutoHuntRunEvidenceStatus = "pending" | "passed" | "failed" | "skipped";
 
 export type AutoHuntWorkerStatus = "allocating" | "running" | "needs_input" | "completed" | "blocked" | "failed" | "cancelled";
 
@@ -643,7 +674,7 @@ export type ProjectAutoHuntWorkerResponse = {
 	workspaceRoot: string | null,
 	outcome: string,
 	summary: string,
-	evidence: JsonValue[],
+	evidence: AutoHuntRunEvidence[],
 };
 
 export type ProjectGithubCredential = {

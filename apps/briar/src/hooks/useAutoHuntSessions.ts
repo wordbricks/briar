@@ -182,10 +182,8 @@ function reconcileDispatch(
     evidence: dispatch.events.flatMap((event) =>
       event.runId === worker.runId &&
         event.type === "worker_evidence" &&
-        event.data &&
-        typeof event.data === "object" &&
-        !Array.isArray(event.data)
-        ? [event.data]
+        event.evidence
+        ? [event.evidence]
         : []
     ),
   }));

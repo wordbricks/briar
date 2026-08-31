@@ -262,11 +262,14 @@ fn maps_generated_run_evidence_and_rejects_a_mismatched_run() {
     let mapped = run_evidence_result(response.clone(), "515b7a2c-8918-5a8f-a292-f0b95090281c")
         .expect("matching evidence should map");
     assert_eq!(mapped.len(), 1);
-    assert_eq!(mapped[0]["key"], "local-tests");
-    assert_eq!(mapped[0]["status"], "passed");
-    assert_eq!(mapped[0]["revision"], 3);
-    assert_eq!(mapped[0]["requiredRevision"], 3);
-    assert_eq!(mapped[0]["canonical"], true);
+    assert_eq!(mapped[0].key, "local-tests");
+    assert_eq!(
+        mapped[0].status,
+        auto_hunt_dispatch::AutoHuntRunEvidenceStatus::Passed
+    );
+    assert_eq!(mapped[0].revision, 3);
+    assert_eq!(mapped[0].required_revision, 3);
+    assert!(mapped[0].canonical);
 
     assert!(run_evidence_result(response, "different-run").is_err());
 }
