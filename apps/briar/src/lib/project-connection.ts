@@ -116,6 +116,32 @@ export type PreparedProjectRepository = {
   completedSteps: string[];
 };
 
+export async function prepareConfiguredProjectRepository(
+  settings: Pick<ProjectSettings, "githubRepository" | "githubRepositoryId">,
+  createCredential: () => Promise<ProjectGithubCredential>,
+  prepareRepository: (
+    credential: ProjectGithubCredential,
+  ) => Promise<PreparedProjectRepository>,
+) {
+  if (!settings.githubRepository) {
+    throw new Error(
+      "조직의 GitHub App에서 프로젝트 저장소를 먼저 선택해 주세요.",
+    );
+  }
+
+  const credential = await createCredential();
+  const prepared = await prepareRepository(credential);
+  if (
+    prepared.repositoryId !== credential.repository.id ||
+    prepared.repository.toLowerCase() !==
+      credential.repository.fullName.toLowerCase()
+  ) {
+    throw new Error("준비한 저장소가 프로젝트의 GitHub 저장소와 일치하지 않습니다.");
+  }
+
+  return { credential, prepared };
+}
+
 export type ConnectedLocalProject = {
   repositoryPath: string;
   workflow: AutoHuntWorkflow;
