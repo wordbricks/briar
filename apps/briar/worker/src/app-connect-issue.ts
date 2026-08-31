@@ -666,8 +666,6 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.updateMessage({
         db: input.db,
-        archivesBucket: input.env.ARCHIVES,
-        attachmentsBucket: input.env.ATTACHMENTS,
         projectId: canonicalUuid(request.projectId),
         runId: canonicalUuid(request.runId),
         messageId: canonicalUuid(request.messageId),
@@ -686,8 +684,6 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.deleteMessage({
         db: input.db,
-        archivesBucket: input.env.ARCHIVES,
-        attachmentsBucket: input.env.ATTACHMENTS,
         projectId: canonicalUuid(request.projectId),
         runId: canonicalUuid(request.runId),
         messageId: canonicalUuid(request.messageId),

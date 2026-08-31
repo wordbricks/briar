@@ -32,10 +32,7 @@ import {
 } from "./http-response";
 import { sha256 } from "./crypto-digest";
 import { hasOrganizationCapability } from "./organization-access";
-import {
-  issueAttachmentResponse,
-  removeOrphanedIssueAttachments,
-} from "./issue-attachment-service";
+import { issueAttachmentResponse } from "./issue-attachment-service";
 import {
   issueAgentReplyJson,
   issueMessageJson,
@@ -479,8 +476,6 @@ export async function createProjectIssueMessage(
 
 export async function updateProjectIssueMessage(
   input: IssueConversationApplicationInput & {
-    archivesBucket: R2Bucket;
-    attachmentsBucket: R2Bucket;
     messageId: string;
     request: unknown;
   },
@@ -512,13 +507,6 @@ export async function updateProjectIssueMessage(
     },
   );
   if (!updated) throw new HttpError(404, "Message not found");
-  await removeOrphanedIssueAttachments(
-    input.db,
-    input.archivesBucket,
-    input.attachmentsBucket,
-    project.id,
-    input.runId,
-  );
   const [
     attachments,
     reworkProposals,
@@ -553,8 +541,6 @@ export async function updateProjectIssueMessage(
 
 export async function deleteProjectIssueMessage(
   input: IssueConversationApplicationInput & {
-    archivesBucket: R2Bucket;
-    attachmentsBucket: R2Bucket;
     messageId: string;
   },
 ) {
@@ -579,13 +565,6 @@ export async function deleteProjectIssueMessage(
     message.id,
   );
   if (!deleted) throw new HttpError(404, "Message not found");
-  await removeOrphanedIssueAttachments(
-    input.db,
-    input.archivesBucket,
-    input.attachmentsBucket,
-    project.id,
-    input.runId,
-  );
   return { deleted: true as const };
 }
 

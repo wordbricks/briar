@@ -56,37 +56,6 @@ export async function createIssueAttachments(
   }
 }
 
-export async function deleteIssueAttachments(
-  db: D1Database,
-  projectId: string,
-  runId: string,
-  attachmentIds: string[],
-) {
-  if (attachmentIds.length === 0) return [];
-  const results = await db.batch(
-    attachmentIds.map((attachmentId) =>
-      db
-        .prepare(
-          `delete from briar_issue_attachments
-           where project_id = ? and run_id = ? and id = ?
-             and exists (
-               select 1 from briar_hunt_runs run
-               where run.id = briar_issue_attachments.run_id
-                 and run.project_id = briar_issue_attachments.project_id
-             )
-           returning object_key`,
-        )
-        .bind(projectId, runId, attachmentId),
-    ),
-  );
-  if (results.some((result) => !result.success)) {
-    throw new Error("Issue attachment metadata could not be removed");
-  }
-  return results.flatMap((result) =>
-    (result.results ?? []).map((row) => (row as { object_key: string }).object_key)
-  );
-}
-
 export async function issueAttachmentObjectKeysInUse(
   db: D1Database,
   objectKeys: string[],

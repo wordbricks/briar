@@ -141,7 +141,6 @@ export type { IssueAgentReplyJobRow } from "./issue-agent-reply-repository";
 
 export {
   createIssueAttachments,
-  deleteIssueAttachments,
   issueAttachmentObjectKeysInUse,
   listIssueAttachments,
   listIssueAttachmentsByRunIds,

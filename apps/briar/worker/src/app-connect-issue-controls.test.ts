@@ -256,7 +256,7 @@ describe("IssueService controls", () => {
     ).toBe(Code.FailedPrecondition);
   });
 
-  it("keeps message ownership and orphan cleanup inside the application boundary", async () => {
+  it("keeps message ownership and run attachment lifecycle inside the application boundary", async () => {
     const developer = client(tokens.developer);
     expect(
       await errorCode(
@@ -279,16 +279,19 @@ describe("IssueService controls", () => {
           projectId,
           runId: messageRunId,
           messageId,
-          body: "Attachment removed",
+          body: "Inline reference removed",
         },
         options(tokens.owner),
       ),
     ).resolves.toMatchObject({
-      message: { id: messageId, body: "Attachment removed" },
+      message: { id: messageId, body: "Inline reference removed" },
     });
     await expect(listIssueAttachments(db, projectId, messageRunId)).resolves
-      .toEqual([]);
-    expect(deleteAttachmentObjects).toHaveBeenCalledWith([attachmentObjectKey]);
+      .toEqual([expect.objectContaining({
+        id: attachmentId,
+        object_key: attachmentObjectKey,
+      })]);
+    expect(deleteAttachmentObjects).not.toHaveBeenCalled();
 
     await expect(
       owner.deleteIssueMessage(
@@ -298,5 +301,11 @@ describe("IssueService controls", () => {
     ).resolves.toMatchObject({ deleted: true });
     await expect(getIssueMessage(db, projectId, messageRunId, messageId))
       .resolves.toBeNull();
+    await expect(listIssueAttachments(db, projectId, messageRunId)).resolves
+      .toEqual([expect.objectContaining({
+        id: attachmentId,
+        object_key: attachmentObjectKey,
+      })]);
+    expect(deleteAttachmentObjects).not.toHaveBeenCalled();
   });
 });
