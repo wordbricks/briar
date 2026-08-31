@@ -1,7 +1,6 @@
 import BriarContracts
 import Connect
 import Foundation
-import SwiftProtobuf
 
 enum MobileAPIContract {
     static let iOSClientID = "briar-mobile"
@@ -10,16 +9,6 @@ enum MobileAPIContract {
     enum Endpoint {
         static let deviceCode = "/api/auth/device/code"
         static let deviceToken = "/api/auth/device/token"
-
-        /// Multipart issue creation remains HTTP because Connect requests do not carry file bytes.
-        static func issues(projectID: UUID) -> String {
-            "/projects/\(projectID.uuidString.lowercased())/issues"
-        }
-
-        /// Multipart issue messages remain HTTP because Connect requests do not carry file bytes.
-        static func runMessages(projectID: UUID, runID: UUID) -> String {
-            "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/messages"
-        }
     }
 }
 
@@ -253,17 +242,6 @@ protocol MobileHTTPClientProtocol: Sendable {
         as responseType: Response.Type
     ) async throws -> Response
 
-    func upload<
-        UploadRequest: SwiftProtobuf.Message & Sendable,
-        Response: SwiftProtobuf.Message & Sendable
-    >(
-        _ path: String,
-        request: UploadRequest,
-        files: [MultipartFile],
-        token: String,
-        as responseType: Response.Type
-    ) async throws -> Response
-
     func download(_ path: String, token: String, to destination: URL) async throws -> URL
 }
 
@@ -317,19 +295,6 @@ extension MobileHTTPClientProtocol {
         throw MobileAPIError.invalidRequest
     }
 
-    func upload<
-        UploadRequest: SwiftProtobuf.Message & Sendable,
-        Response: SwiftProtobuf.Message & Sendable
-    >(
-        _ path: String,
-        request: UploadRequest,
-        files: [MultipartFile],
-        token: String,
-        as responseType: Response.Type
-    ) async throws -> Response {
-        throw MobileAPIError.invalidRequest
-    }
-
     func download(_ path: String, token: String, to destination: URL) async throws -> URL {
         throw MobileAPIError.invalidDownload
     }
@@ -377,44 +342,6 @@ struct MobileHTTPClient: MobileHTTPClientProtocol, PreparedUploadClientProtocol,
         let (data, response) = try await session.data(for: request)
         try validate(response: response, data: data)
         return data
-    }
-
-    func upload<
-        UploadRequest: SwiftProtobuf.Message & Sendable,
-        Response: SwiftProtobuf.Message & Sendable
-    >(
-        _ path: String,
-        request protobufRequest: UploadRequest,
-        files: [MultipartFile],
-        token: String,
-        as responseType: Response.Type = Response.self
-    ) async throws -> Response {
-        guard let url = endpointURL(path) else { throw MobileAPIError.invalidRequest }
-        let boundary = "BriarBoundary-\(UUID().uuidString)"
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/protobuf", forHTTPHeaderField: "Accept")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try MultipartEncoder.encode(
-            request: protobufRequest,
-            files: files,
-            boundary: boundary
-        )
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response, data: data)
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.value(forHTTPHeaderField: "Content-Type")?
-                .lowercased()
-                .hasPrefix("application/protobuf") == true
-        else {
-            throw MobileAPIError.invalidResponse
-        }
-        do {
-            return try responseType.init(serializedBytes: data)
-        } catch {
-            throw MobileAPIError.invalidResponse
-        }
     }
 
     func putPreparedUpload(
@@ -514,55 +441,6 @@ private struct APIErrorResponse: Decodable {
         case error
         case message
         case errorDescription = "error_description"
-    }
-}
-
-struct MultipartFile: Sendable {
-    let fieldName: String
-    let filename: String
-    let contentType: String
-    let data: Data
-}
-
-private enum MultipartEncoder {
-    static func encode<Request: SwiftProtobuf.Message>(
-        request: Request,
-        files: [MultipartFile],
-        boundary: String
-    ) throws -> Data {
-        var data = Data()
-        let protobufPart = MultipartFile(
-            fieldName: "request",
-            filename: "request.pb",
-            contentType: "application/protobuf",
-            data: try request.serializedData()
-        )
-        for file in [protobufPart] + files {
-            data.append("--\(boundary)\r\n")
-            data.append("Content-Disposition: form-data; name=\"\(quoted(file.fieldName))\"; filename=\"\(quoted(file.filename))\"\r\n")
-            let contentType = file.contentType.contains("\r") || file.contentType.contains("\n")
-                ? "application/octet-stream"
-                : file.contentType
-            data.append("Content-Type: \(contentType)\r\n\r\n")
-            data.append(file.data)
-            data.append("\r\n")
-        }
-        data.append("--\(boundary)--\r\n")
-        return data
-    }
-
-    private static func quoted(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-            .replacingOccurrences(of: "\r", with: "_")
-            .replacingOccurrences(of: "\n", with: "_")
-    }
-}
-
-private extension Data {
-    mutating func append(_ string: String) {
-        append(Data(string.utf8))
     }
 }
 

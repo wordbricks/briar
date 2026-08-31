@@ -559,10 +559,9 @@ struct TaskListView: View {
         self.onSkillSessionMaterialized = onSkillSessionMaterialized
         self.onSkillSessionOpen = onSkillSessionOpen
         _mutations = StateObject(wrappedValue: IssueMutationStore(
-            api: api,
+            preparedUploadClient: services.preparedUploadClient,
             issueService: services.issue,
-            projectID: project.id,
-            token: token
+            projectID: project.id
         ))
     }
 
@@ -1298,10 +1297,9 @@ struct RunDetailView: View {
             realtime: realtimeClient
         ))
         _mutations = StateObject(wrappedValue: IssueMutationStore(
-            api: api,
+            preparedUploadClient: services.preparedUploadClient,
             issueService: services.issue,
-            projectID: projectID,
-            token: token
+            projectID: projectID
         ))
         _localStatus = State(initialValue: run.status)
         _localWorkflowStage = State(initialValue: run.workflowStage)

@@ -78,6 +78,17 @@ enum PreparedUploadPipeline {
             )
         }
     }
+
+    static func references(uploadIDs: [String]) throws -> [BriarTypes_UploadReference] {
+        guard Set(uploadIDs).count == uploadIDs.count,
+              uploadIDs.allSatisfy({ !$0.isEmpty })
+        else { throw MobileAPIError.invalidResponse }
+        return uploadIDs.map { uploadID in
+            var reference = BriarTypes_UploadReference()
+            reference.uploadID = uploadID
+            return reference
+        }
+    }
 }
 
 enum PhotoAttachmentImportPolicy: Sendable {
@@ -238,7 +249,6 @@ enum PhotoAttachmentImporter {
 struct AttachmentMessagePayload: Sendable {
     let body: String
     let references: [String]
-    let files: [MultipartFile]
 
     init(
         body: String,
@@ -257,14 +267,6 @@ struct AttachmentMessagePayload: Sendable {
             Self.markdown(reference: reference, filename: attachment.filename)
         }.joined(separator: "\n\n")
         self.body = [body, markdown].filter { !$0.isEmpty }.joined(separator: "\n\n")
-        files = attachments.map {
-            MultipartFile(
-                fieldName: "attachments",
-                filename: $0.filename,
-                contentType: $0.contentType,
-                data: $0.data
-            )
-        }
     }
 
     static func markdown(reference: String, filename: String) -> String {

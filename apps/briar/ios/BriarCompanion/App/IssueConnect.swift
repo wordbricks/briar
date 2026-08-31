@@ -10,8 +10,9 @@ enum IssueAssigneeUpdate: Equatable, Sendable {
 
 func issueCreateRequest(
     projectID: UUID,
+    clientIssueID: UUID,
     draft: IssueDraft,
-    attachmentReferences: [String]
+    attachments: [BriarTypes_UploadReference]
 ) throws -> BriarAPI_CreateIssueRequest {
     var request = BriarAPI_CreateIssueRequest()
     request.projectID = issueUUIDString(projectID)
@@ -32,16 +33,18 @@ func issueCreateRequest(
     if let model = draft.preferredModel { request.preferredModel = model }
     if let effort = draft.preferredEffort { request.preferredEffort = effort.rawValue }
     request.fullAuto = draft.fullAuto
-    request.attachmentReferences = attachmentReferences
+    request.clientIssueID = issueUUIDString(clientIssueID)
+    request.attachments = attachments
     return request
 }
 
 func issueUpdateRequest(
     projectID: UUID,
     runID: UUID,
+    requestID: UUID,
     draft: IssueDraft,
     assigneeUpdate: IssueAssigneeUpdate,
-    attachmentReferences: [String],
+    attachments: [BriarTypes_UploadReference],
     keptAttachmentIDs: [UUID]?
 ) throws -> BriarAPI_UpdateIssueRequest {
     var request = BriarAPI_UpdateIssueRequest()
@@ -64,7 +67,8 @@ func issueUpdateRequest(
     case .clear:
         request.clearAssignee_p = BriarAPI_UpdateIssueRequest.ClearAssignee()
     }
-    request.attachmentReferences = attachmentReferences
+    request.requestID = issueUUIDString(requestID)
+    request.attachments = attachments
     if let keptAttachmentIDs {
         var patch = BriarAPI_UpdateIssueRequest.KeptAttachmentIdsPatch()
         patch.values = keptAttachmentIDs.map(issueUUIDString)

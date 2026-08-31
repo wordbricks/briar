@@ -12,28 +12,25 @@ final class IssueMutationStore: ObservableObject {
     @Published private(set) var activeActions: Set<String> = []
     @Published private(set) var errorMessage: String?
 
-    private let api: any MobileHTTPClientProtocol
+    private let preparedUploadClient: any PreparedUploadClientProtocol
     private let issueService: any BriarAPI_IssueServiceClientInterface
     private let projectID: UUID
-    private let token: String
     private let requestID: @Sendable () -> UUID
     private let attachmentReference: @Sendable () -> String
     private var pendingRequestIDs: [String: UUID] = [:]
 
     init(
-        api: any MobileHTTPClientProtocol,
+        preparedUploadClient: any PreparedUploadClientProtocol,
         issueService: any BriarAPI_IssueServiceClientInterface,
         projectID: UUID,
-        token: String,
         requestID: @escaping @Sendable () -> UUID = UUID.init,
         attachmentReference: @escaping @Sendable () -> String = {
             UUID().uuidString.lowercased()
         }
     ) {
-        self.api = api
+        self.preparedUploadClient = preparedUploadClient
         self.issueService = issueService
         self.projectID = projectID
-        self.token = token
         self.requestID = requestID
         self.attachmentReference = attachmentReference
     }
@@ -42,7 +39,8 @@ final class IssueMutationStore: ObservableObject {
 
     func createIssue(
         draft: IssueDraft,
-        attachments: [PendingIssueAttachment]
+        attachments: [PendingIssueAttachment],
+        attachmentReferences: [String]? = nil
     ) async throws {
         try await perform("create") {
             let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -60,39 +58,68 @@ final class IssueMutationStore: ObservableObject {
                     draft.preferredModel != nil
                 ? draft.preferredEffort
                 : nil
-            if attachments.isEmpty {
-                _ = try await issueService.createIssue(
-                    request: issueCreateRequest(
-                        projectID: projectID,
-                        draft: normalizedDraft,
-                        attachmentReferences: []
-                    ),
+            let mutationKey = "create"
+            let clientIssueID = idempotencyID(for: mutationKey)
+            let clientIDs = attachmentReferences ?? attachments.map { coreUUIDString($0.id) }
+            var uploadReferences: [BriarTypes_UploadReference] = []
+            var preparationKey: String?
+            if !attachments.isEmpty {
+                let key = "prepare-create-\(clientIssueID)"
+                preparationKey = key
+                var prepareRequest = BriarAPI_PrepareCreateIssueAttachmentsRequest()
+                prepareRequest.preparationRequestID = coreUUIDString(idempotencyID(for: key))
+                prepareRequest.projectID = coreUUIDString(projectID)
+                prepareRequest.clientIssueID = coreUUIDString(clientIssueID)
+                prepareRequest.attachments = try PreparedUploadPipeline.metadata(
+                    attachments: attachments,
+                    clientIDs: clientIDs
+                )
+                let prepared = try await issueService.prepareCreateIssueAttachments(
+                    request: prepareRequest,
                     headers: [:]
                 ).briarValue()
-                return
+                let uploadIDs = try await PreparedUploadPipeline.upload(
+                    attachments: attachments,
+                    clientIDs: clientIDs,
+                    preparedUploads: prepared.uploads,
+                    using: preparedUploadClient
+                )
+                normalizedDraft.description = try PreparedUploadPipeline
+                    .replacingAttachmentReferences(
+                        in: normalizedDraft.description,
+                        clientIDs: clientIDs,
+                        uploadIDs: uploadIDs
+                    )
+                uploadReferences = try PreparedUploadPipeline.references(uploadIDs: uploadIDs)
+            } else if !clientIDs.isEmpty {
+                throw MobileAPIError.invalidRequest
             }
-            let _: BriarAPI_CreateIssueResponse = try await api.upload(
-                MobileAPIContract.Endpoint.issues(projectID: projectID),
+            let response = try await issueService.createIssue(
                 request: issueCreateRequest(
                     projectID: projectID,
+                    clientIssueID: clientIssueID,
                     draft: normalizedDraft,
-                    attachmentReferences: []
+                    attachments: uploadReferences
                 ),
-                files: attachments.map {
-                    MultipartFile(
-                        fieldName: "attachments",
-                        filename: $0.filename,
-                        contentType: $0.contentType,
-                        data: $0.data
-                    )
-                },
-                token: token,
-                as: BriarAPI_CreateIssueResponse.self
-            )
+                headers: [:]
+            ).briarValue()
+            guard try issueUUID(response.runID) == clientIssueID else {
+                throw MobileAPIError.invalidResponse
+            }
+            pendingRequestIDs.removeValue(forKey: mutationKey)
+            if let preparationKey {
+                pendingRequestIDs.removeValue(forKey: preparationKey)
+            }
         }
     }
 
-    func updateIssue(runID: UUID, draft: IssueDraft) async throws {
+    func updateIssue(
+        runID: UUID,
+        draft: IssueDraft,
+        attachments: [PendingIssueAttachment] = [],
+        attachmentReferences: [String]? = nil,
+        keptAttachmentIDs: [UUID]? = nil
+    ) async throws {
         try await perform("update-\(runID)") {
             let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
             if let titleError = IssueTitleLimits.validationError(for: title) {
@@ -102,20 +129,65 @@ final class IssueMutationStore: ObservableObject {
             var normalizedDraft = draft
             normalizedDraft.title = title
             normalizedDraft.description = description
+            if let message = PendingIssueAttachment.validationMessage(for: attachments) {
+                throw IssueMutationError.attachment(message)
+            }
+            let mutationKey = "update-\(runID)"
+            let mutationRequestID = idempotencyID(for: mutationKey)
+            let clientIDs = attachmentReferences ?? attachments.map { coreUUIDString($0.id) }
+            var uploadReferences: [BriarTypes_UploadReference] = []
+            var preparationKey: String?
+            if !attachments.isEmpty {
+                let key = "prepare-update-\(mutationRequestID)"
+                preparationKey = key
+                var prepareRequest = BriarAPI_PrepareUpdateIssueAttachmentsRequest()
+                prepareRequest.preparationRequestID = coreUUIDString(idempotencyID(for: key))
+                prepareRequest.projectID = coreUUIDString(projectID)
+                prepareRequest.runID = coreUUIDString(runID)
+                prepareRequest.requestID = coreUUIDString(mutationRequestID)
+                prepareRequest.attachments = try PreparedUploadPipeline.metadata(
+                    attachments: attachments,
+                    clientIDs: clientIDs
+                )
+                let prepared = try await issueService.prepareUpdateIssueAttachments(
+                    request: prepareRequest,
+                    headers: [:]
+                ).briarValue()
+                let uploadIDs = try await PreparedUploadPipeline.upload(
+                    attachments: attachments,
+                    clientIDs: clientIDs,
+                    preparedUploads: prepared.uploads,
+                    using: preparedUploadClient
+                )
+                normalizedDraft.description = try PreparedUploadPipeline
+                    .replacingAttachmentReferences(
+                        in: normalizedDraft.description,
+                        clientIDs: clientIDs,
+                        uploadIDs: uploadIDs
+                    )
+                uploadReferences = try PreparedUploadPipeline.references(uploadIDs: uploadIDs)
+            } else if !clientIDs.isEmpty {
+                throw MobileAPIError.invalidRequest
+            }
             let response = await issueService.updateIssue(
                 request: try issueUpdateRequest(
                     projectID: projectID,
                     runID: runID,
+                    requestID: mutationRequestID,
                     draft: normalizedDraft,
                     assigneeUpdate: draft.assigneeUserId.map(IssueAssigneeUpdate.assign) ?? .clear,
-                    attachmentReferences: [],
-                    keptAttachmentIDs: nil
+                    attachments: uploadReferences,
+                    keptAttachmentIDs: keptAttachmentIDs
                 ),
                 headers: [:]
             )
             let message = try response.briarValue()
             guard try issueUUID(message.runID) == runID else {
                 throw MobileAPIError.invalidResponse
+            }
+            pendingRequestIDs.removeValue(forKey: mutationKey)
+            if let preparationKey {
+                pendingRequestIDs.removeValue(forKey: preparationKey)
             }
         }
     }
@@ -477,53 +549,62 @@ final class IssueMutationStore: ObservableObject {
                 }
                 return id
             }
-            let resolvedClientMessageID = clientMessageID ?? UUID()
-            let wireResponse: BriarAPI_CreateIssueMessageResponse
-            if attachments.isEmpty {
-                var request = BriarAPI_CreateIssueMessageRequest()
-                request.projectID = coreUUIDString(projectID)
-                request.runID = coreUUIDString(runID)
-                request.clientMessageID = coreUUIDString(resolvedClientMessageID)
-                request.body = trimmed
-                if let parentMessageID {
-                    request.parentMessageID = coreUUIDString(parentMessageID)
-                }
-                request.mentionedUserIds = uniqueMentionedUserIds
-                request.mentionedAgentIds = mentionedAgentUUIDs.map(coreUUIDString)
-                request.attachmentReferences = attachmentReferences ?? []
-                wireResponse = try await issueService.createIssueMessage(
-                    request: request,
-                    headers: [:]
-                ).briarValue()
-            } else {
-                let payload = try AttachmentMessagePayload(
+            let generatedMessageKey = "message-id-\(runID)"
+            let resolvedClientMessageID = clientMessageID ?? idempotencyID(
+                for: generatedMessageKey
+            )
+            let payload = attachments.isEmpty
+                ? nil
+                : try AttachmentMessagePayload(
                     body: trimmed,
                     attachments: attachments,
                     references: attachmentReferences,
                     referenceGenerator: attachmentReference
                 )
-                var request = BriarAPI_CreateIssueMessageRequest()
-                request.projectID = coreUUIDString(projectID)
-                request.runID = coreUUIDString(runID)
-                request.clientMessageID = coreUUIDString(resolvedClientMessageID)
-                request.body = payload.body
-                if let parentMessageID {
-                    request.parentMessageID = coreUUIDString(parentMessageID)
-                }
-                request.mentionedUserIds = uniqueMentionedUserIds
-                request.mentionedAgentIds = mentionedAgentUUIDs.map(coreUUIDString)
-                request.attachmentReferences = payload.references
-                wireResponse = try await api.upload(
-                    MobileAPIContract.Endpoint.runMessages(
-                        projectID: projectID,
-                        runID: runID
-                    ),
-                    request: request,
-                    files: payload.files,
-                    token: token,
-                    as: BriarAPI_CreateIssueMessageResponse.self
-                )
+            var request = BriarAPI_CreateIssueMessageRequest()
+            request.projectID = coreUUIDString(projectID)
+            request.runID = coreUUIDString(runID)
+            request.clientMessageID = coreUUIDString(resolvedClientMessageID)
+            request.body = payload?.body ?? trimmed
+            if let parentMessageID {
+                request.parentMessageID = coreUUIDString(parentMessageID)
             }
+            request.mentionedUserIds = uniqueMentionedUserIds
+            request.mentionedAgentIds = mentionedAgentUUIDs.map(coreUUIDString)
+            var preparationKey: String?
+            if let payload {
+                let key = "prepare-message-\(resolvedClientMessageID)"
+                preparationKey = key
+                var prepareRequest = BriarAPI_PrepareIssueMessageAttachmentsRequest()
+                prepareRequest.preparationRequestID = coreUUIDString(idempotencyID(for: key))
+                prepareRequest.projectID = coreUUIDString(projectID)
+                prepareRequest.runID = coreUUIDString(runID)
+                prepareRequest.clientMessageID = coreUUIDString(resolvedClientMessageID)
+                prepareRequest.attachments = try PreparedUploadPipeline.metadata(
+                    attachments: attachments,
+                    clientIDs: payload.references
+                )
+                let prepared = try await issueService.prepareIssueMessageAttachments(
+                    request: prepareRequest,
+                    headers: [:]
+                ).briarValue()
+                let uploadIDs = try await PreparedUploadPipeline.upload(
+                    attachments: attachments,
+                    clientIDs: payload.references,
+                    preparedUploads: prepared.uploads,
+                    using: preparedUploadClient
+                )
+                request.body = try PreparedUploadPipeline.replacingAttachmentReferences(
+                    in: request.body,
+                    clientIDs: payload.references,
+                    uploadIDs: uploadIDs
+                )
+                request.attachments = try PreparedUploadPipeline.references(uploadIDs: uploadIDs)
+            }
+            let wireResponse = try await issueService.createIssueMessage(
+                request: request,
+                headers: [:]
+            ).briarValue()
             guard wireResponse.hasMessage else { throw MobileAPIError.invalidResponse }
             let createdMessage = try IssueMessage(connectMessage: wireResponse.message)
             let createdAgentReply = wireResponse.hasAgentReply
@@ -532,6 +613,12 @@ final class IssueMutationStore: ObservableObject {
             let createdAgentReplies = try wireResponse.agentReplies.map(
                 IssueAgentReplyJob.init(connectMessage:)
             )
+            if clientMessageID == nil {
+                pendingRequestIDs.removeValue(forKey: generatedMessageKey)
+            }
+            if let preparationKey {
+                pendingRequestIDs.removeValue(forKey: preparationKey)
+            }
             onCreated?(createdMessage)
             let initialReplies = createdAgentReplies.isEmpty
                 ? createdAgentReply.map { [$0] } ?? []

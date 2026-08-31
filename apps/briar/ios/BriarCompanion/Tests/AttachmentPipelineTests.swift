@@ -91,10 +91,6 @@ final class AttachmentPipelineTests: XCTestCase {
                 #"![line\\\[a\] next final\].png](briar-attachment://fixed-ref)"#
         )
         XCTAssertEqual(payload.references, ["fixed-ref"])
-        XCTAssertEqual(payload.files.map(\.fieldName), ["attachments"])
-        XCTAssertEqual(payload.files.map(\.filename), [attachment.filename])
-        XCTAssertEqual(payload.files.map(\.contentType), ["image/png"])
-        XCTAssertEqual(payload.files.first?.data, attachment.data)
     }
 
     func testMessagePayloadReusesProvidedReferencesForOptimisticPreview() throws {

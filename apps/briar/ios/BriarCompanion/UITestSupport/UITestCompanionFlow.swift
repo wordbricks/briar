@@ -314,7 +314,8 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
             issue: IssueServiceMock(scenario: scenario),
             channel: ChannelServiceMock(scenario: scenario),
             agent: AgentServiceMock(),
-            realtime: BriarAPI_RealtimeServiceClientMock()
+            realtime: BriarAPI_RealtimeServiceClientMock(),
+            preparedUploadClient: UITestPreparedUploadClient()
         )
     }
 
@@ -825,7 +826,7 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
         _ request: BriarAPI_CreateIssueRequest
     ) -> BriarAPI_CreateIssueResponse {
         var response = BriarAPI_CreateIssueResponse()
-        response.runID = "77777777-7777-4777-8777-777777777777"
+        response.runID = request.clientIssueID
         response.sourceKey = "briar-issue:ui-test"
         response.status = .queued
         response.stage = "queued"
@@ -1734,4 +1735,13 @@ private final class UITestAPIClient: MobileHTTPClientProtocol,
         )],
         nextCursor: nil
     )
+}
+
+private struct UITestPreparedUploadClient: PreparedUploadClientProtocol {
+    func putPreparedUpload(
+        _: URL,
+        capability _: String,
+        contentType _: String,
+        data _: Data
+    ) async throws {}
 }
