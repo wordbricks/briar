@@ -82,6 +82,8 @@ describe("project Agent templates", () => {
         provider: "claude",
         model: "claude-sonnet-4-6",
         effort: "high",
+        executionMode: "task",
+        approvalPolicy: "explicit",
         position: 0,
       },
     ]);

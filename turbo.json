@@ -136,7 +136,6 @@
       "passThroughEnv": ["CLOUDFLARE_*", "WRANGLER_*"]
     },
     "test:d1:migrations": { "cache": false },
-    "test:d1:integration": { "cache": false },
     "secrets:verify-encrypted": { "cache": false },
     "secrets:check": { "cache": false },
     "worker:dev": {
