@@ -38,7 +38,7 @@ export function EditIssueDialog({
   const [difficulty, setDifficulty] = useState<IssueDifficulty | null>(run.difficulty);
   const [assigneeUserId, setAssigneeUserId] = useState(run.assigneeUserId ?? "");
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [keptAttachmentIds, setKeptAttachmentIds] = useState<string[]>(() => (run.attachments ?? []).map(attachment => attachment.id));
+  const [keptAttachmentIds, setKeptAttachmentIds] = useState<string[]>(() => run.attachments.map(attachment => attachment.id));
   const titleMaxLength = issueTitleInputMaxLength(title, locale);
   const titleLength = issueTitleLength(title);
   const titleTooLong = Boolean(title.trim()) && !isIssueTitleWithinLimit(title);
@@ -56,7 +56,7 @@ export function EditIssueDialog({
     isSubmitting,
     setDescription
   });
-  const existingAttachments = run.attachments ?? [];
+  const existingAttachments = run.attachments;
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !isSubmitting) onClose();

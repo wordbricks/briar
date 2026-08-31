@@ -225,8 +225,8 @@ export function buildCurrentInboxMessages(
     const issueKeyPrefix = dashboard.project.issueKeyPrefix;
     for (const run of dashboard.runs) {
       if (!inboxIssueNotifyingStatuses.has(run.status)) continue;
-      if (currentUserId !== undefined && run.subscribers !== undefined) {
-        const subscription = run.subscribers?.find(
+      if (currentUserId !== undefined) {
+        const subscription = run.subscribers.find(
           (subscriber) => subscriber.userId === currentUserId,
         );
         if (
@@ -266,9 +266,9 @@ export function buildCurrentInboxMessages(
       );
       if (
         currentUserId !== undefined &&
-        notificationRun?.subscribers !== undefined
+        notificationRun !== undefined
       ) {
-        const subscription = notificationRun?.subscribers?.find(
+        const subscription = notificationRun.subscribers.find(
           (subscriber) => subscriber.userId === currentUserId,
         );
         if (

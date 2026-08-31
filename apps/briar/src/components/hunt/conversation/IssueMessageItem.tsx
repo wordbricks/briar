@@ -86,8 +86,8 @@ export function IssueMessageItem({
     t
   } = useI18n();
   const remarkPlugins = useMemo(() => [remarkIssueMentions(mentionHandles)], [mentionHandles]);
-  const messageAttachmentsRef = useRef(message.attachments ?? []);
-  messageAttachmentsRef.current = message.attachments ?? [];
+  const messageAttachmentsRef = useRef(message.attachments);
+  messageAttachmentsRef.current = message.attachments;
   const renderMessageMarkdownImage = useCallback(({
     alt,
     src

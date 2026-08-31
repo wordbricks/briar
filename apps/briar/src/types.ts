@@ -141,14 +141,14 @@ export type IssueMessage = {
   runId: string;
   parentMessageId: string | null;
   body: string;
-  attachments?: IssueAttachment[];
+  attachments: IssueAttachment[];
   author: IssueMessageAuthor;
   replyCount: number;
-  proposedAction?: IssueProposedAction | null;
+  proposedAction: IssueProposedAction | null;
   /** A separate approval boundary for execution, including create-then-execute. */
-  executionProposal?: IssueExecutionProposal | null;
+  executionProposal: IssueExecutionProposal | null;
   /** A separate approval boundary for a matched saved Project Agent Skill. */
-  skillExecutionProposal?: AgentSkillExecutionProposal | null;
+  skillExecutionProposal: AgentSkillExecutionProposal | null;
   /** Client-only state while a newly sent message awaits its server response. */
   optimistic?: boolean;
   createdAt: string;
@@ -342,7 +342,7 @@ export type HuntRun = {
   difficulty: IssueDifficulty | null;
   assigneeUserId?: string | null;
   createdByUserId?: string | null;
-  subscribers?: IssueSubscriber[];
+  subscribers: IssueSubscriber[];
   repository: string;
   branch: string | null;
   commitSha: string | null;

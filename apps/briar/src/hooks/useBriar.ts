@@ -245,6 +245,7 @@ const initialDemoIssueMessages = {
       runId: "demo-1",
       parentMessageId: null,
       body: "이벤트 스트림에서 빠지는 상태가 없는지 같이 확인해 주세요.",
+      attachments: [],
       author: {
         id: demoUser.id,
         name: demoUser.name,
@@ -252,6 +253,9 @@ const initialDemoIssueMessages = {
         provider: null,
       },
       replyCount: 1,
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
       createdAt: demoMessageTime,
       updatedAt: demoMessageTime,
     },
@@ -260,6 +264,7 @@ const initialDemoIssueMessages = {
       runId: "demo-1",
       parentMessageId: "demo-message-1",
       body: "완료·실패·중단 상태까지 회귀 테스트에 포함했습니다.",
+      attachments: [],
       author: {
         id: null,
         name: "Briar · Codex",
@@ -267,6 +272,9 @@ const initialDemoIssueMessages = {
         provider: "codex",
       },
       replyCount: 0,
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
       createdAt: demoReplyTime,
       updatedAt: demoReplyTime,
     },
@@ -2589,6 +2597,10 @@ export function useBriar(options: UseBriarOptions = {}) {
             priority: input.priority,
             difficulty: input.difficulty,
             assigneeUserId: input.assigneeUserId ?? null,
+            subscribers: [{
+              userId: demoUser.id,
+              subscribedAt: occurredAt,
+            }],
             preferredProvider: input.preferredProvider ?? null,
             preferredModel: input.preferredModel ?? null,
             preferredEffort: input.preferredEffort ?? null,
@@ -2709,12 +2721,12 @@ export function useBriar(options: UseBriarOptions = {}) {
                               : input.assigneeUserId,
                           attachments: [
                             ...(input.keptAttachmentIds
-                              ? (run.attachments ?? []).filter((attachment) =>
+                              ? run.attachments.filter((attachment) =>
                                   input.keptAttachmentIds?.includes(
                                     attachment.id,
                                   ),
                                 )
-                              : run.attachments ?? []),
+                              : run.attachments),
                             ...addedAttachments,
                           ],
                           updatedAt,
@@ -3293,6 +3305,9 @@ export function useBriar(options: UseBriarOptions = {}) {
             provider: null,
           },
           replyCount: 0,
+          proposedAction: null,
+          executionProposal: null,
+          skillExecutionProposal: null,
           createdAt,
           updatedAt: createdAt,
         });
@@ -3468,8 +3483,7 @@ export function useBriar(options: UseBriarOptions = {}) {
                 proposedAction: result.proposal,
                 executionProposal:
                   materializedExecutionProposal ??
-                  message.executionProposal ??
-                  null,
+                  message.executionProposal,
               }
             : message,
         ),

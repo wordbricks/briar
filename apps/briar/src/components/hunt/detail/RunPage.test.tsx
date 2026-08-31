@@ -41,6 +41,18 @@ const dashboardProps = {
     throw new Error("not implemented in this test");
   }
 };
+const emptyIssueMessageContract: Pick<
+  IssueMessage,
+  | "attachments"
+  | "proposedAction"
+  | "executionProposal"
+  | "skillExecutionProposal"
+> = {
+  attachments: [],
+  proposedAction: null,
+  executionProposal: null,
+  skillExecutionProposal: null,
+};
 const dashboardAgent: ProjectAgent = {
   id: "agent-1",
   projectId: demoDashboard.project.id,
@@ -936,6 +948,7 @@ describe("RunPage", () => {
   it("requires the user to accept a Project Agent rework proposal before revision", async () => {
     const proposalId = "abababab-abab-4bab-8bab-abababababab";
     const message: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
       runId: demoDashboard.runs[1].id,
       parentMessageId: null,
@@ -1010,6 +1023,7 @@ describe("RunPage", () => {
   it("requires acceptance before a Project Agent-created issue is persisted", async () => {
     const createdRunId = "30303030-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     const message: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "10101010-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       runId: demoDashboard.runs[1].id,
       parentMessageId: null,
@@ -1132,6 +1146,7 @@ describe("RunPage", () => {
       delegatedByAgentName: null
     };
     const message: IssueMessage = {
+      ...emptyIssueMessageContract,
       id: "10101010-cccc-4ccc-8ccc-cccccccccccc",
       runId: conversationRun.id,
       parentMessageId: null,
@@ -1168,6 +1183,7 @@ describe("RunPage", () => {
       resultRunId: targetRun.id
     };
     const materializedMessage: IssueMessage = {
+      ...emptyIssueMessageContract,
       ...message,
       proposedAction: acceptedCreate,
       executionProposal

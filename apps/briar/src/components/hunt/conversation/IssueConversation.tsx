@@ -106,11 +106,11 @@ export function IssueConversation({
     error: string | null;
   }>>({});
   const [activeProfile, setActiveProfile] = useState<ProfileTarget | null>(null);
-  const subscriberMembers = useMemo(() => (run.subscribers ?? []).flatMap(subscriber => {
+  const subscriberMembers = useMemo(() => run.subscribers.flatMap(subscriber => {
     const member = mentionMembers.find(candidate => candidate.userId === subscriber.userId);
     return member ? [member] : [];
   }), [mentionMembers, run.subscribers]);
-  const backendSubscribed = Boolean(currentUserId && (run.assigneeUserId === currentUserId || (run.subscribers ?? []).some(subscriber => subscriber.userId === currentUserId)));
+  const backendSubscribed = Boolean(currentUserId && (run.assigneeUserId === currentUserId || run.subscribers.some(subscriber => subscriber.userId === currentUserId)));
   const assigneeSubscriptionRequired = Boolean(currentUserId && run.assigneeUserId === currentUserId);
   const [subscriptionOverride, setSubscriptionOverride] = useState<boolean | null>(null);
   const [subscriptionPending, setSubscriptionPending] = useState(false);
@@ -530,6 +530,9 @@ export function IssueConversation({
         provider: null
       },
       replyCount: 0,
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
       optimistic: true,
       createdAt,
       updatedAt: createdAt

@@ -42,6 +42,7 @@ const message = (
   runId: "run-1",
   parentMessageId: null,
   body: "Deploy",
+  attachments: [],
   author: { id: null, name: "Agent", image: null, provider: "codex" },
   replyCount: 0,
   proposedAction: null,
