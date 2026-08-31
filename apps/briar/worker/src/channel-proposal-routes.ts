@@ -16,9 +16,6 @@ import {
   decodeChannelProposalAcceptInput,
 } from "./channel-route-decoders";
 import {
-  channelExecutionProposalTablesAvailable,
-  channelIssueBatchProposalTablesAvailable,
-  channelSkillExecutionProposalTablesAvailable,
   getChannelActionProposal,
   declineChannelActionProposal,
   getChannelAgentSkillExecutionProposal,
@@ -369,13 +366,6 @@ export async function acceptOrganizationChannelExecutionProposal(
     input.channelId,
     input.userId,
   );
-  if (!(await channelExecutionProposalTablesAvailable(input.db))) {
-    throw new HttpError(
-      503,
-      "Issue execution approval is not available during this upgrade",
-      "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
-    );
-  }
   const proposal = await getChannelExecutionProposal(input.db, {
     organizationId: channel.organization_id,
     channelId: channel.id,
@@ -412,13 +402,6 @@ export async function acceptOrganizationChannelSkillExecutionProposal(
     input.channelId,
     input.userId,
   );
-  if (!(await channelSkillExecutionProposalTablesAvailable(input.db))) {
-    throw new HttpError(
-      503,
-      "Agent Skill execution approval is not available during this upgrade",
-      "AGENT_SKILL_EXECUTION_APPROVAL_UNAVAILABLE",
-    );
-  }
   const loadProposal = () => getChannelAgentSkillExecutionProposal(input.db, {
     organizationId: channel.organization_id,
     channelId: channel.id,
@@ -496,30 +479,10 @@ export async function acceptOrganizationChannelProposal(
   if (batchPayload && request.execution) {
     throw new HttpError(400, "Issue batches cannot be executed on creation");
   }
-  if (
-    batchPayload &&
-    !(await channelIssueBatchProposalTablesAvailable(input.db))
-  ) {
-    throw new HttpError(
-      503,
-      "Issue batch approval is not available during this upgrade",
-      "ISSUE_BATCH_APPROVAL_UNAVAILABLE",
-    );
-  }
   if (request.execution && proposal.execute_after_create !== 1) {
     throw new HttpError(
       400,
       "Execution settings require a create-and-execute proposal",
-    );
-  }
-  if (
-    request.execution &&
-    !(await channelExecutionProposalTablesAvailable(input.db))
-  ) {
-    throw new HttpError(
-      503,
-      "Issue execution approval is not available during this upgrade",
-      "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
     );
   }
   const targetProjectId = resolveChannelProposalTargetProjectId({

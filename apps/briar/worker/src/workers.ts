@@ -2288,13 +2288,6 @@ export async function updateProjectExecutionWorkerPolicy(
       "The default Worker must be in the allowlist",
     );
   }
-  const skillExecutionApprovalsAvailable = Boolean(await db
-    .prepare(
-      `select 1 as available
-       from pragma_table_info('briar_project_agent_task_jobs')
-       where name = 'skill_execution_proposal_id'`,
-    )
-    .first<{ available: number }>());
   await db.batch([
     db
       .prepare(
@@ -2331,33 +2324,31 @@ export async function updateProjectExecutionWorkerPolicy(
         )
         .bind(projectId, workerId, input.observedAt),
     ),
-    ...(skillExecutionApprovalsAvailable
-      ? [db
-          .prepare(
-            `update briar_project_agent_task_jobs
-             set status = 'failed',
-                 error = 'Approved Worker was removed from the project allowlist.',
-                 claim_token_hash = null, claimed_worker_id = null,
-                 claimed_at = null, lease_expires_at = null,
-                 completed_at = ?, updated_at = ?
-             where project_id = ? and status in ('queued', 'running')
-               and skill_execution_proposal_id is not null
-               and ? = 'allowlist'
-               and not exists (
-                 select 1
-                 from briar_project_execution_worker_allowlist allowed
-                 where allowed.project_id = briar_project_agent_task_jobs.project_id
-                   and allowed.worker_id =
-                     briar_project_agent_task_jobs.preferred_worker_id
-               )`,
-          )
-          .bind(
-            input.observedAt,
-            input.observedAt,
-            projectId,
-            input.selectionMode,
-          )]
-      : []),
+    db
+      .prepare(
+        `update briar_project_agent_task_jobs
+         set status = 'failed',
+             error = 'Approved Worker was removed from the project allowlist.',
+             claim_token_hash = null, claimed_worker_id = null,
+             claimed_at = null, lease_expires_at = null,
+             completed_at = ?, updated_at = ?
+         where project_id = ? and status in ('queued', 'running')
+           and skill_execution_proposal_id is not null
+           and ? = 'allowlist'
+           and not exists (
+             select 1
+             from briar_project_execution_worker_allowlist allowed
+             where allowed.project_id = briar_project_agent_task_jobs.project_id
+               and allowed.worker_id =
+                 briar_project_agent_task_jobs.preferred_worker_id
+           )`,
+      )
+      .bind(
+        input.observedAt,
+        input.observedAt,
+        projectId,
+        input.selectionMode,
+      ),
   ]);
   return getProjectExecutionWorkerPolicy(db, projectId);
 }
@@ -3015,14 +3006,8 @@ export async function unassignHuntRun(
     return { runId: input.runId, outcome: "not_assigned" as const };
   }
   const channelApproved = await isChannelApprovedIssue(db, run);
-  const executionApprovalTable = await db
-    .prepare(
-      `select 1 as available from sqlite_master
-       where type = 'table' and name = 'briar_issue_execution_proposals'`,
-    )
-    .first<{ available: number }>();
   const conversationalExecutionApproved = Boolean(
-    executionApprovalTable && run.dispatch_request_id && await db
+    run.dispatch_request_id && await db
       .prepare(
         `select 1 as approved
          where exists (

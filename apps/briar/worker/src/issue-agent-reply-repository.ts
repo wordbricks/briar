@@ -4,7 +4,6 @@ import {
   type ReplyCompletionCommit,
 } from "./reply-completion-repository";
 
-import { agentSkillExecutionApprovalTablesAvailable } from "./execution-approval-schema-repository";
 import {
   type ModelEffort,
   type ProjectAgentProvider,
@@ -63,8 +62,6 @@ export async function enqueueIssueAgentReply(
     createdAt: string;
   },
 ) {
-  const skillExecutionAvailable =
-    await agentSkillExecutionApprovalTablesAvailable(db);
   const targetAgentId = input.agentId ?? null;
   const preferredWorkerRequirement = input.requiresPreferredWorker === undefined
     ? null
@@ -100,8 +97,7 @@ export async function enqueueIssueAgentReply(
        )`;
   await db
     .prepare(
-      skillExecutionAvailable
-        ? `insert into briar_issue_agent_reply_jobs (
+      `insert into briar_issue_agent_reply_jobs (
          id, project_id, run_id, trigger_message_id, parent_message_id,
          reply_message_id, agent_id, requires_preferred_worker,
          agent_name_snapshot, agent_responsibility_snapshot,
@@ -145,87 +141,22 @@ export async function enqueueIssueAgentReply(
          on selected_skill.id = ? and selected_skill.agent_id = agent.id
        where run.id = ? and run.project_id = ?
          and (? is null or selected_skill.id is not null)
-       on conflict (project_id, trigger_message_id, agent_id) do nothing`
-        : `insert into briar_issue_agent_reply_jobs (
-         id, project_id, run_id, trigger_message_id, parent_message_id,
-         reply_message_id, agent_id, requires_preferred_worker,
-         agent_name_snapshot, agent_responsibility_snapshot,
-         preferred_worker_id, preferred_provider,
-         created_at, updated_at
-       )
-       select ?, run.project_id, run.id, trigger.id, parent.id, ?,
-              agent.id,
-              coalesce(?, case when run.worker_id is null then 0 else 1 end),
-              agent.name, agent.responsibility,
-              run.worker_id,
-              ${targetAgentId
-                ? `coalesce(
-                     (
-                       select skill.provider
-                       from briar_agent_skills skill
-                       where skill.agent_id = agent.id
-                         and skill.kind = 'issue_processing'
-                       order by skill.position, skill.created_at, skill.id
-                       limit 1
-                     ),
-                     agent.provider,
-                     run.requested_agent_provider
-                   )`
-                : `coalesce(
-                     run.requested_agent_provider,
-                     (
-                       select skill.provider
-                       from briar_agent_skills skill
-                       where skill.agent_id = agent.id
-                         and skill.kind = 'issue_processing'
-                       order by skill.position, skill.created_at, skill.id
-                       limit 1
-                     ),
-                     agent.provider
-                   )`},
-              ?, ?
-       from briar_hunt_runs run
-       join briar_issue_messages trigger
-         on trigger.id = ? and trigger.project_id = run.project_id
-        and trigger.run_id = run.id
-       join briar_issue_messages parent
-         on parent.id = ? and parent.project_id = run.project_id
-        and parent.run_id = run.id
-       left join briar_project_agents agent
-         on agent.id = coalesce(?, run.agent_id)
-        and agent.project_id = run.project_id
-       where run.id = ? and run.project_id = ?
        on conflict (project_id, trigger_message_id, agent_id) do nothing`,
     )
-    .bind(...(
-      skillExecutionAvailable
-        ? [
-            input.id,
-            input.replyMessageId,
-            preferredWorkerRequirement,
-            input.createdAt,
-            input.createdAt,
-            input.triggerMessageId,
-            input.parentMessageId,
-            targetAgentId,
-            input.skillId ?? null,
-            input.runId,
-            input.projectId,
-            input.skillId ?? null,
-          ]
-        : [
-            input.id,
-            input.replyMessageId,
-            preferredWorkerRequirement,
-            input.createdAt,
-            input.createdAt,
-            input.triggerMessageId,
-            input.parentMessageId,
-            targetAgentId,
-            input.runId,
-            input.projectId,
-          ]
-    ))
+    .bind(
+      input.id,
+      input.replyMessageId,
+      preferredWorkerRequirement,
+      input.createdAt,
+      input.createdAt,
+      input.triggerMessageId,
+      input.parentMessageId,
+      targetAgentId,
+      input.skillId ?? null,
+      input.runId,
+      input.projectId,
+      input.skillId ?? null,
+    )
     .run();
   return getIssueAgentReplyJob(
     db,

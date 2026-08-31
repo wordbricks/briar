@@ -2756,68 +2756,6 @@ describe("D1 migrations", () => {
         orphanProposalId,
         "Orphaned deleted channel proposal",
       );
-      const fallbackTransferId = await seedProposal("000000000012");
-      const fallbackTransferRunId = await legacyRun(
-        fallbackTransferId,
-        "Pre-migration fallback transfer",
-      );
-      await db.prepare(
-        `update briar_channel_action_proposals
-         set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
-             result_run_id = ?, updated_at = ? where id = ?`,
-      ).bind(
-        approverId,
-        now,
-        fallbackTransferRunId,
-        now,
-        fallbackTransferId,
-      ).run();
-      const fallbackDispatchedAt = "2026-08-10T00:00:55.000Z";
-      await db.prepare(
-        `update briar_hunt_runs
-         set status = 'queued', stage = 'queued', workflow_stage = null,
-             requested_agent_provider = 'codex', requested_by_user_id = ?,
-             dispatch_mode = 'any', dispatch_request_id = ?,
-             dispatched_at = ?, last_event_at = ?, updated_at = ?
-         where id = ?`,
-      ).bind(
-        approverId,
-        `dispatch:${fallbackTransferId}`,
-        fallbackDispatchedAt,
-        fallbackDispatchedAt,
-        fallbackDispatchedAt,
-        fallbackTransferRunId,
-      ).run();
-      await db.prepare(
-        `insert into briar_execution_audit_events (
-           id, organization_id, project_id, run_id, worker_id, agent_id,
-           actor_user_id, actor_device_id, action, request_id, detail_json,
-           occurred_at
-         ) values (?, ?, ?, ?, null, null, ?, null, 'dispatched', ?, '{}', ?)`,
-      ).bind(
-        `audit:${fallbackTransferId}`,
-        organizationId,
-        projectId,
-        fallbackTransferRunId,
-        approverId,
-        `dispatch:${fallbackTransferId}`,
-        fallbackDispatchedAt,
-      ).run();
-      await expect(transferIssue(db, {
-        sourceProjectId: projectId,
-        targetProjectId,
-        targetProjectName: "Transfer Target",
-        runId: fallbackTransferRunId,
-        observedAt: "2026-08-10T00:00:56.000Z",
-      })).resolves.toBe("transferred");
-      await expect(db.prepare(
-        `select project_id, status, dispatch_request_id
-         from briar_hunt_runs where id = ?`,
-      ).bind(fallbackTransferRunId).first()).resolves.toEqual({
-        project_id: targetProjectId,
-        status: "backlog",
-        dispatch_request_id: null,
-      });
       const preemptedId = await seedProposal("000000000008");
       const preemptedRunId = await legacyRun(
         preemptedId,

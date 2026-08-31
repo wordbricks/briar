@@ -122,7 +122,6 @@ import {
 } from "./realtime-scheduling";
 import { requireSession } from "./session-auth";
 import { UuidString } from "./schema-codecs";
-import { agentSkillExecutionApprovalTablesAvailable } from "./execution-approval-schema-repository";
 import {
   executionWorkerProviders,
   isExecutionWorkerAllowedForProject,
@@ -1626,10 +1625,7 @@ export const createAppAgentService = (
     ) {
       throw new HttpError(403, "Development management permission required");
     }
-    if (
-      (await agentSkillExecutionApprovalTablesAvailable(db)) &&
-      (await projectAgentSessionIsApprovalOwned(db, project.id, sessionId))
-    ) {
+    if (await projectAgentSessionIsApprovalOwned(db, project.id, sessionId)) {
       throw new HttpError(
         409,
         "Approved Agent Skill execution sessions are updated by their assigned Worker",

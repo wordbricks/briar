@@ -24,11 +24,6 @@ export { pruneExpiredDashboardChanges } from "./dashboard-maintenance-repository
 export type { DashboardChangePruneResult } from "./dashboard-maintenance-repository";
 
 export {
-  issueExecutionApprovalTablesAvailable,
-  agentSkillExecutionApprovalTablesAvailable,
-} from "./execution-approval-schema-repository";
-
-export {
   createGithubOAuthState,
   consumeGithubInstallState,
   consumeGithubOAuthState,

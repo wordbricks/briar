@@ -5,7 +5,6 @@ import {
   type AgentSkillRow,
 } from "./agent-skills";
 
-import { agentSkillExecutionApprovalTablesAvailable } from "./execution-approval-schema-repository";
 import {
   type ClaimedProjectAgentTaskRow,
   type ProjectAgentProvider,
@@ -394,18 +393,13 @@ export async function completeProjectAgentTaskWithReceipt(
     error?: string;
   },
 ) {
-  const approvalColumnsAvailable =
-    await agentSkillExecutionApprovalTablesAvailable(db);
-  const resultProjection = approvalColumnsAvailable
-    ? `result_summary = ?, result_conversation_id = ?,`
-    : "";
   const completionStatement = (receiptId: string | null) => db
     .prepare(
       `update briar_project_agent_task_jobs as task
        set status = case when ? is null then 'completed' else
          case when attempts >= 3 then 'failed' else 'queued' end end,
            error = ?,
-           ${resultProjection}
+           result_summary = ?, result_conversation_id = ?,
            claim_token_hash = null, claimed_worker_id = null,
            claimed_at = null, lease_expires_at = null,
            completed_at = case when ? is null then ? else
@@ -429,9 +423,8 @@ export async function completeProjectAgentTaskWithReceipt(
     .bind(
       input.error ?? null,
       input.error ?? null,
-      ...(approvalColumnsAvailable
-        ? [input.summary ?? null, input.conversationId ?? null]
-        : []),
+      input.summary ?? null,
+      input.conversationId ?? null,
       input.error ?? null,
       input.updatedAt,
       input.updatedAt,
@@ -442,11 +435,6 @@ export async function completeProjectAgentTaskWithReceipt(
       input.claimTokenHash,
       ...(receiptId ? [receiptId] : []),
     );
-  if (!approvalColumnsAvailable) {
-    const job = await completionStatement(null).first<ProjectAgentTaskJobRow>();
-    return job ? { job, receipt: null, replayed: false } : null;
-  }
-
   const summary = input.summary ?? null;
   const conversationId = input.conversationId ?? null;
   const error = input.error ?? null;

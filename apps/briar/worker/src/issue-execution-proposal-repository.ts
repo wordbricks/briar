@@ -1,4 +1,3 @@
-import { issueExecutionApprovalTablesAvailable } from "./execution-approval-schema-repository";
 import {
   type ModelEffort,
   type ProjectAgentProvider,
@@ -104,7 +103,6 @@ export async function listIssueExecutionProposals(
   projectId: string,
   conversationRunId: string,
 ) {
-  if (!(await issueExecutionApprovalTablesAvailable(db))) return [];
   const rows = await db
     .prepare(
       `select proposal.*

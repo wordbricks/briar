@@ -5,7 +5,6 @@ import {
 } from "../../src/lib/auto-hunt-contract";
 
 import {
-  channelApprovalTablesAvailable,
   isChannelApprovedIssue,
 } from "./channel-issue-approval-repository";
 import {
@@ -47,7 +46,6 @@ const channelIssueTransferRecovery = async (
     run: Pick<HuntRunRow, "id" | "source_key">;
   },
 ) => {
-  if (!(await channelApprovalTablesAvailable(db))) return null;
   const approval = await db
     .prepare(
       `select approval.project_id
@@ -167,14 +165,8 @@ export async function transferIssue(
     .first<{ archiving: number }>();
   if (verifiedArchive) return "archive_in_progress";
   const channelApprovedIssue = await isChannelApprovedIssue(db, run);
-  const executionProposalTable = await db
-    .prepare(
-      `select 1 as available from sqlite_master
-       where type = 'table' and name = 'briar_issue_execution_proposals'`,
-    )
-    .first<{ available: number }>();
   const conversationalExecutionApproved = Boolean(
-    executionProposalTable && run.dispatch_request_id && await db
+    run.dispatch_request_id && await db
       .prepare(
         `select 1 as approved
          where exists (

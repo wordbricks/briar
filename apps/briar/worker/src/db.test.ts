@@ -941,6 +941,49 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
        );
        alter table briar_project_agent_task_jobs
          add column skill_execution_proposal_id text;
+       alter table briar_project_agent_task_jobs add column result_summary text;
+       alter table briar_project_agent_task_jobs
+         add column result_conversation_id text;
+       alter table briar_issue_action_proposals
+         add column execute_after_create integer not null default 0;
+       alter table briar_issue_action_proposals
+         add column execution_proposal_id text;
+       alter table briar_channel_action_proposals
+         add column execute_after_create integer not null default 0;
+       alter table briar_channel_action_proposals
+         add column execution_proposal_id text;
+       create table briar_channel_issue_approval_audit (
+         run_id text,
+         issue_source_key text,
+         project_id text,
+         result_verification text not null
+       );
+       create table briar_issue_execution_proposals (
+         target_run_id text not null,
+         project_id text not null,
+         dispatch_request_id text
+       );
+       create table briar_issue_execution_approval_audit (
+         run_id text not null,
+         project_id text not null,
+         dispatch_request_id text not null
+       );
+       create table briar_project_agent_task_completion_receipts (
+         id text primary key not null,
+         organization_id text not null,
+         project_id text not null,
+         task_id text not null,
+         skill_execution_proposal_id text,
+         worker_id text not null,
+         claim_token_hash text not null,
+         outcome_status text not null,
+         summary text,
+         conversation_id text,
+         error text,
+         completed_at text not null,
+         created_at text not null,
+         unique (project_id, task_id, worker_id, claim_token_hash)
+       );
        create table briar_agent_skill_execution_approval_audit (
          proposal_id text primary key not null,
          project_id text not null,
@@ -1046,10 +1089,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0138_project_members.sql"), "utf8"),
     );
-    // The compact lifecycle schema intentionally skips the approval tables
-    // required by production migration 0140. Keep the shared Agent Skill
-    // helpers on their current schema without pulling those unrelated tables
-    // into this suite.
+    // Keep the compact lifecycle fixture aligned with the current saved-Skill
+    // policy columns used by shared Agent Skill helpers.
     await executeSql(
       db,
       `alter table briar_agent_skills add column execution_mode text not null
@@ -1066,9 +1107,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
-    // The compact lifecycle schema predates channel thread subscriptions and
-    // issue execution approvals. Supply the empty channel tables referenced by
-    // the production role migration's membership foreign keys and triggers.
+    // Supply the channel sync tables referenced by the production role
+    // migration's membership foreign keys and triggers.
     await executeSql(
       db,
       `create table briar_channel_sync_state (
@@ -1127,6 +1167,26 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
        alter table briar_issue_agent_reply_jobs add column agent_name_snapshot text;
        alter table briar_issue_agent_reply_jobs
          add column agent_responsibility_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_skill_id_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_agent_name_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_agent_responsibility_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_skill_name_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_skill_instructions_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_skill_kind_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_skill_provider_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_skill_model_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_skill_effort_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column skill_execution_request_snapshot text;
        create unique index briar_issue_agent_reply_jobs_agent_test_idx
          on briar_issue_agent_reply_jobs (project_id, trigger_message_id, agent_id);`,
     );

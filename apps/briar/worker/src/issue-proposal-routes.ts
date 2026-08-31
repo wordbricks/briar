@@ -7,7 +7,6 @@ import {
   acceptIssueCreateProposal,
   acceptIssueReworkProposal,
   acceptIssueUpdateProposal,
-  agentSkillExecutionApprovalTablesAvailable,
   getHuntRunForProject,
   getIssueActionProposal,
   getIssueAgentSkillExecutionProposal,
@@ -15,7 +14,6 @@ import {
   getIssueReworkProposal,
   getProject,
   HuntTransitionError,
-  issueExecutionApprovalTablesAvailable,
   listIssueExecutionProposals,
   reserveIssueCreateProposalApproval,
   reserveIssueExecutionProposalApproval,
@@ -335,13 +333,6 @@ export async function acceptProjectIssueSkillExecutionProposal(
     "issues:execute",
     "Issue execution permission required",
   );
-  if (!(await agentSkillExecutionApprovalTablesAvailable(input.db))) {
-    throw new HttpError(
-      503,
-      "Agent Skill execution approval is not available during this upgrade",
-      "AGENT_SKILL_EXECUTION_APPROVAL_UNAVAILABLE",
-    );
-  }
   const loadProposal = () => getIssueAgentSkillExecutionProposal(
     input.db,
     project.id,
@@ -376,13 +367,6 @@ export async function acceptProjectIssueExecutionProposal(
     "issues:execute",
     "Issue execution permission required",
   );
-  if (!(await issueExecutionApprovalTablesAvailable(input.db))) {
-    throw new HttpError(
-      503,
-      "Issue execution approval is not available during this upgrade",
-      "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
-    );
-  }
   const proposal = await getIssueExecutionProposal(
     input.db,
     project.id,

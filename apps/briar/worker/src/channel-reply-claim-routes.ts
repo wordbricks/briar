@@ -6,7 +6,6 @@ import {
   hydrateAgentSkills,
 } from "./agent-skills";
 import {
-  channelExecutionProposalTablesAvailable,
   claimNextChannelAgentReply,
   failChannelReply,
   getChannelAgentReplyJob,
@@ -227,8 +226,7 @@ export async function claimNextChannelReplyWork(
     if (job.project_id !== null && !project) {
       throw new HttpError(409, "Reply job lost its project context");
     }
-    const executionTargets = job.project_id &&
-        await channelExecutionProposalTablesAvailable(db)
+    const executionTargets = job.project_id
       ? await snapshotChannelReplyExecutionTargets(db, {
           jobId: job.id,
           deviceId: principal.deviceId,

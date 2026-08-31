@@ -332,6 +332,22 @@ describe("detached execution workers", () => {
          add column skill_execution_proposal_id text;
        create unique index briar_issue_agent_reply_jobs_agent_test_idx
          on briar_issue_agent_reply_jobs (project_id, trigger_message_id, agent_id);
+       create table briar_channel_issue_approval_audit (
+         run_id text,
+         issue_source_key text,
+         project_id text,
+         result_verification text not null
+       );
+       create table briar_issue_execution_proposals (
+         target_run_id text not null,
+         project_id text not null,
+         dispatch_request_id text
+       );
+       create table briar_issue_execution_approval_audit (
+         run_id text not null,
+         project_id text not null,
+         dispatch_request_id text not null
+       );
        create table briar_channel_thread_subscriptions (
          root_message_id text not null
            references briar_channel_messages (id) on delete cascade,

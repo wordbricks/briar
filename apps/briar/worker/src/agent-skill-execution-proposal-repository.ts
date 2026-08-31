@@ -4,7 +4,6 @@ import type {
   AgentSkillExecutionMode,
 } from "../../src/lib/channels-contract";
 
-import { agentSkillExecutionApprovalTablesAvailable } from "./execution-approval-schema-repository";
 import {
   type ModelEffort,
   type ProjectAgentProvider,
@@ -96,7 +95,6 @@ export async function listIssueAgentSkillExecutionProposals(
   projectId: string,
   conversationRunId: string,
 ) {
-  if (!(await agentSkillExecutionApprovalTablesAvailable(db))) return [];
   const rows = await db
     .prepare(
       `select proposal.*,

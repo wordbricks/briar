@@ -1,7 +1,3 @@
-import {
-  agentSkillExecutionApprovalTablesAvailable,
-  issueExecutionApprovalTablesAvailable,
-} from "./execution-approval-schema-repository";
 import { type IssueAttachmentInput } from "./issue-attachment-repository";
 import { type IssueAgentReplyJobRow } from "./issue-agent-reply-repository";
 import {
@@ -52,24 +48,6 @@ export async function completeIssueAgentReplyOutput(
     commit?: ReplyCompletionCommit;
   },
 ) {
-  const executionApprovalsAvailable =
-    await issueExecutionApprovalTablesAvailable(db);
-  const skillExecutionApprovalsAvailable =
-    await agentSkillExecutionApprovalTablesAvailable(db);
-  if (
-    !executionApprovalsAvailable &&
-    (input.output.executionProposal ||
-      (input.output.proposedAction?.type === "request_issue_create" &&
-        input.output.proposedAction.executeAfterCreate))
-  ) {
-    throw new Error("issue execution approval schema is unavailable");
-  }
-  if (
-    input.output.skillExecutionProposal &&
-    !skillExecutionApprovalsAvailable
-  ) {
-    throw new Error("Agent Skill execution approval schema is unavailable");
-  }
   if (
     input.output.skillExecutionProposal &&
     (input.output.executionProposal || input.output.proposedAction)
@@ -101,8 +79,7 @@ export async function completeIssueAgentReplyOutput(
   const consentTaskSessionId = input.output.skillExecutionProposal
     ? crypto.randomUUID()
     : null;
-  const staleExecutionGuard = executionApprovalsAvailable
-    ? `and not exists (
+  const staleExecutionGuard = `and not exists (
          select 1 from briar_issue_execution_proposals stale_execution
          where stale_execution.reply_message_id = job.reply_message_id
             or (
@@ -110,10 +87,8 @@ export async function completeIssueAgentReplyOutput(
               and stale_execution.trigger_message_id = job.trigger_message_id
               and stale_execution.source_kind = 'issue'
             )
-       )`
-    : "";
-  const staleSkillExecutionGuard = skillExecutionApprovalsAvailable
-    ? `and not exists (
+       )`;
+  const staleSkillExecutionGuard = `and not exists (
          select 1
          from briar_agent_skill_execution_proposals stale_skill_execution
          where stale_skill_execution.reply_message_id = job.reply_message_id
@@ -123,8 +98,7 @@ export async function completeIssueAgentReplyOutput(
                 job.trigger_message_id
               and stale_skill_execution.source_kind = 'issue'
             )
-       )`
-    : "";
+       )`;
   const attachmentGuard = input.commit
     ? replyAttachmentAvailabilityGuard(input.commit)
     : { sql: "", bindings: [] as unknown[] };
@@ -355,8 +329,7 @@ export async function completeIssueAgentReplyOutput(
         : { issue: action.issue },
     );
     statements.push(db.prepare(
-      executionApprovalsAvailable
-        ? `insert into briar_issue_action_proposals (
+      `insert into briar_issue_action_proposals (
              id, project_id, conversation_run_id, trigger_message_id,
              reply_message_id, action_type, payload_json,
              expected_run_updated_at, execute_after_create,
@@ -370,46 +343,20 @@ export async function completeIssueAgentReplyOutput(
            from briar_issue_agent_reply_jobs job
            join briar_hunt_runs run
              on run.id = job.run_id and run.project_id = job.project_id
-           where ${completedClaim("job")}`
-        : `insert into briar_issue_action_proposals (
-             id, project_id, conversation_run_id, trigger_message_id,
-             reply_message_id, action_type, payload_json,
-             expected_run_updated_at, created_at, updated_at
-           )
-           select ?, job.project_id, run.id, job.trigger_message_id,
-                  job.reply_message_id, ?, ?,
-                  case when ? = 'request_issue_update'
-                    then run.updated_at else null end,
-                  ?, ?
-           from briar_issue_agent_reply_jobs job
-           join briar_hunt_runs run
-             on run.id = job.run_id and run.project_id = job.project_id
            where ${completedClaim("job")}`,
-    ).bind(...(
-      executionApprovalsAvailable
-        ? [
-            actionProposalId,
-            action.type,
-            payloadJson,
-            action.type,
-            action.type === "request_issue_create" && action.executeAfterCreate
-              ? 1
-              : 0,
-            createExecutionProposalId,
-            input.completedAt,
-            input.completedAt,
-            ...claimBindings,
-          ]
-        : [
-            actionProposalId,
-            action.type,
-            payloadJson,
-            action.type,
-            input.completedAt,
-            input.completedAt,
-            ...claimBindings,
-          ]
-    )));
+    ).bind(
+      actionProposalId,
+      action.type,
+      payloadJson,
+      action.type,
+      action.type === "request_issue_create" && action.executeAfterCreate
+        ? 1
+        : 0,
+      createExecutionProposalId,
+      input.completedAt,
+      input.completedAt,
+      ...claimBindings,
+    ));
   }
 
   if (input.output.executionProposal) {
