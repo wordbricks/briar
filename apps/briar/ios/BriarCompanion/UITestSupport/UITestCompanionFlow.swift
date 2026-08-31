@@ -1345,6 +1345,12 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             message.parentMessageID = parentID.uuidString.lowercased()
         }
         message.body = value.body
+        message.memoryCitations = value.memoryCitations.map { reference in
+            var item = BriarAPI_DmMemoryReference()
+            item.documentID = reference.documentId.uuidString.lowercased()
+            item.version = UInt32(clamping: reference.version)
+            return item
+        }
         message.author = channelAuthorMessage(value.author)
         message.mentionedUserIds = value.mentionedUserIds
         message.mentionedAgentIds = value.mentionedAgentIds.map { $0.uuidString.lowercased() }
