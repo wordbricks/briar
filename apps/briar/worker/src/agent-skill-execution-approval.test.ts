@@ -34,7 +34,10 @@ import {
   acceptOrganizationChannelSkillExecutionProposal,
 } from "./channel-proposal-routes";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
-import { workerCapabilitiesFixture } from "./test-helpers/worker-runtime";
+import {
+  workerCapabilitiesFixture,
+  workerClaimRuntimeFixture,
+} from "./test-helpers/worker-runtime";
 import {
   bindExecutionWorkerProject,
   countExecutionWorkerDeviceSessions,
@@ -874,7 +877,11 @@ describe("conversational Agent Skill execution approval", () => {
     const claimed = await claimNextChannelAgentReply(db, organizationId, {
       deviceId: workerDeviceId,
       workerId,
-      providers: ["codex"],
+      ...workerClaimRuntimeFixture({
+        agentProvider: "codex",
+        providers: ["codex"],
+        providerCapabilities,
+      }),
       claimTokenHash: claimHash,
       claimedAt: new Date().toISOString(),
       leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
@@ -1034,7 +1041,11 @@ describe("conversational Agent Skill execution approval", () => {
     const sourceClaim = await claimNextChannelAgentReply(db, organizationId, {
       deviceId: workerDeviceId,
       workerId,
-      providers: ["codex"],
+      ...workerClaimRuntimeFixture({
+        agentProvider: "codex",
+        providers: ["codex"],
+        providerCapabilities,
+      }),
       claimTokenHash: sourceClaimHash,
       claimedAt: new Date().toISOString(),
       leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),

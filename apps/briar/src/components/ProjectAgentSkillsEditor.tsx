@@ -38,8 +38,8 @@ export function projectAgentSkillInputs(
       model: skill.model,
       effort: skill.effort,
       kind: skill.kind,
-      executionMode: skill.executionMode ?? "task",
-      approvalPolicy: skill.approvalPolicy ?? "explicit",
+      executionMode: skill.executionMode,
+      approvalPolicy: skill.approvalPolicy,
       position,
     };
     return skill.id ? { id: skill.id, ...input } : input;
@@ -342,7 +342,7 @@ export function ProjectAgentSkillsEditor({
                           { label: t("agents.skillExecutionModeConversation"), value: "conversation" },
                           { label: t("agents.skillExecutionModeTask"), value: "task" },
                         ]}
-                        value={skill.executionMode ?? "task"}
+                        value={skill.executionMode}
                       />
                     </div>
                     <div className="grid min-w-0 gap-2">
@@ -359,7 +359,7 @@ export function ProjectAgentSkillsEditor({
                           { label: t("agents.skillApprovalInvokeIsConsent"), value: "invoke_is_consent" },
                           { label: t("agents.skillApprovalExplicit"), value: "explicit" },
                         ]}
-                        value={skill.approvalPolicy ?? "explicit"}
+                        value={skill.approvalPolicy}
                       />
                     </div>
                   </div>

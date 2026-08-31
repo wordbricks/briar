@@ -53,6 +53,8 @@ const agent = {
       model: "gpt-5",
       effort: "high" as const,
       kind: "issue_processing" as const,
+      executionMode: "task" as const,
+      approvalPolicy: "explicit" as const,
       position: 0,
     },
     {
@@ -64,6 +66,8 @@ const agent = {
       model: "claude-sonnet",
       effort: "medium" as const,
       kind: "custom" as const,
+      executionMode: "task" as const,
+      approvalPolicy: "explicit" as const,
       position: 1,
     },
   ],
@@ -964,12 +968,6 @@ describe("detached Agent runner", () => {
       executionProposal: null,
       skillExecutionProposal: null,
     });
-    expect(parseDetachedIssueReplyResult("plain fallback")).toEqual({
-      reply: "plain fallback",
-      proposedAction: null,
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
   });
 
   it("parses issue edit and creation proposals without applying them", () => {
@@ -1047,12 +1045,9 @@ describe("detached Agent runner", () => {
     expect(() => parseDetachedJsonResult(`Wrapped [${valid}]`)).toThrow(
       "exactly one JSON object",
     );
-    expect(parseDetachedIssueReplyResult(multiple)).toEqual({
-      reply: multiple,
-      proposedAction: null,
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
+    expect(() => parseDetachedIssueReplyResult(multiple)).toThrow(
+      "exactly one JSON object",
+    );
 
     const invalid = JSON.stringify({
       reply: "범위를 벗어난 우선순위입니다.",
@@ -1063,12 +1058,9 @@ describe("detached Agent runner", () => {
       executionProposal: null,
       skillExecutionProposal: null,
     });
-    expect(parseDetachedIssueReplyResult(invalid)).toEqual({
-      reply: invalid,
-      proposedAction: null,
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
+    expect(() => parseDetachedIssueReplyResult(invalid)).toThrow(
+      "Issue update priority is invalid",
+    );
   });
 
   it("parses standalone and create-then-execute approval intents", () => {
@@ -1124,12 +1116,8 @@ describe("detached Agent runner", () => {
         },
       },
     ]) {
-      expect(parseDetachedIssueReplyResult(JSON.stringify(proposed))).toEqual({
-        reply: JSON.stringify(proposed),
-        proposedAction: null,
-        executionProposal: null,
-        skillExecutionProposal: null,
-      });
+      expect(() => parseDetachedIssueReplyResult(JSON.stringify(proposed)))
+        .toThrow();
     }
   });
 
@@ -1144,12 +1132,9 @@ describe("detached Agent runner", () => {
       JSON.stringify(marker),
       { allowSkillExecutionProposal: true },
     )).toEqual(marker);
-    expect(parseDetachedIssueReplyResult(JSON.stringify(marker))).toEqual({
-      reply: JSON.stringify(marker),
-      proposedAction: null,
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
+    expect(() => parseDetachedIssueReplyResult(JSON.stringify(marker))).toThrow(
+      "Agent Skill execution target is not authorized",
+    );
 
     for (const invalid of [
       {
@@ -1171,15 +1156,12 @@ describe("detached Agent runner", () => {
         },
       },
     ]) {
-      expect(parseDetachedIssueReplyResult(
-        JSON.stringify(invalid),
-        { allowSkillExecutionProposal: true },
-      )).toEqual({
-        reply: JSON.stringify(invalid),
-        proposedAction: null,
-        executionProposal: null,
-        skillExecutionProposal: null,
-      });
+      expect(() =>
+        parseDetachedIssueReplyResult(
+          JSON.stringify(invalid),
+          { allowSkillExecutionProposal: true },
+        )
+      ).toThrow();
     }
   });
 

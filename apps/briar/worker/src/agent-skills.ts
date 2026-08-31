@@ -23,8 +23,8 @@ export type AgentSkillInput = {
   model: string | null;
   effort: AgentSkillEffort | null;
   kind: AgentSkillKind;
-  executionMode?: AgentSkillExecutionMode;
-  approvalPolicy?: AgentSkillApprovalPolicy;
+  executionMode: AgentSkillExecutionMode;
+  approvalPolicy: AgentSkillApprovalPolicy;
   position: number;
 };
 
@@ -44,18 +44,6 @@ export type AgentSkillRow = {
   position: number;
   created_at: string;
   updated_at: string;
-};
-
-export type AgentSkillFallback = {
-  name: string;
-  description: string;
-  body: string;
-  provider: AgentSkillProvider;
-  model: string | null;
-  effort: AgentSkillEffort | null;
-  kind?: AgentSkillKind;
-  executionMode?: AgentSkillExecutionMode;
-  approvalPolicy?: AgentSkillApprovalPolicy;
 };
 
 export class AgentSkillConflictError extends Error {
@@ -78,21 +66,15 @@ export function agentSkillConflictMessage(error: unknown): string | null {
 
 export function normalizedAgentSkillRows(
   agentId: string,
-  input: readonly AgentSkillInput[] | undefined,
-  fallback: AgentSkillFallback,
+  input: readonly AgentSkillInput[],
   observedAt: string,
 ): AgentSkillRow[] {
-  const requested: readonly AgentSkillInput[] = input ?? [{
-    ...fallback,
-    kind: fallback.kind ?? "custom",
-    position: 0,
-  }];
-  if (requested.length > agentSkillsMaxCount) {
+  if (input.length > agentSkillsMaxCount) {
     throw new Error(`An Agent can have at most ${agentSkillsMaxCount} Skills`);
   }
   const names = new Set<string>();
   const ids = new Set<string>();
-  return requested.map((skill, index) => {
+  return input.map((skill) => {
     const normalizedName = skill.name.trim();
     const normalizedDescription = skill.description.trim();
     const normalizedBody = skill.body.trim();
@@ -133,10 +115,10 @@ export function normalizedAgentSkillRows(
       model: normalizedModel,
       effort: skill.effort,
       kind: skill.kind,
-      execution_mode: skill.executionMode ?? "task",
-      approval_policy: skill.approvalPolicy ?? "explicit",
+      execution_mode: skill.executionMode,
+      approval_policy: skill.approvalPolicy,
       is_default: 0,
-      position: skill.position ?? index,
+      position: skill.position,
       created_at: observedAt,
       updated_at: observedAt,
     };

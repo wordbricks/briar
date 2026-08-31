@@ -50,6 +50,7 @@ import {
   createIsolatedTestDatabase,
   type IsolatedTestDatabase,
 } from "./test-helpers/d1";
+import { workerClaimRuntimeFixture } from "./test-helpers/worker-runtime";
 
 const organizationId = "a9000000-0000-4000-8000-000000000001";
 const projectId = "b9000000-0000-4000-8000-000000000001";
@@ -307,10 +308,9 @@ describe("reply completion application", () => {
     const claimed = await claimNextChannelAgentReply(db, organizationId, {
       deviceId,
       workerId,
-      providers: ["codex"],
-      workerAgentProvider: "codex",
-      workerCapabilitiesJson: JSON.stringify({
-        providerHealth: { codex: { healthy: true } },
+      ...workerClaimRuntimeFixture({
+        agentProvider: "codex",
+        providers: ["codex"],
       }),
       claimTokenHash: await sha256(claimToken),
       claimedAt: at(100 + sequence),

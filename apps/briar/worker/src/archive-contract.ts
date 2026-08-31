@@ -12,7 +12,10 @@ import type {
   AgentTranscriptSegmentRow,
   AgentWorkLogEntryRow,
 } from "./agent-worklog";
-import { PositiveSafeInteger, schemaDecodeOptions } from "./schema-codecs";
+import {
+  PositiveSafeInteger,
+  strictSchemaOptions,
+} from "./schema-codecs";
 
 export const archiveFormatVersion = 2;
 
@@ -251,7 +254,7 @@ export const RelatedArchiveObjectKeys = Schema.mutable(
 
 const decodeArchiveSync = <S extends Schema.ConstraintDecoder<unknown>>(
   schema: S,
-) => Schema.decodeUnknownSync(schema, schemaDecodeOptions);
+) => Schema.decodeUnknownSync(schema, strictSchemaOptions);
 
 export const decodeArchiveManifest = decodeArchiveSync(ArchiveManifest);
 export const decodeArchiveLine = decodeArchiveSync(ArchiveLine);
@@ -282,5 +285,5 @@ export const decodeArchivedExecutionAudit:
 
 export const decodeRelatedArchiveObjectKeysOption = Schema.decodeUnknownOption(
   RelatedArchiveObjectKeys,
-  schemaDecodeOptions,
+  strictSchemaOptions,
 );

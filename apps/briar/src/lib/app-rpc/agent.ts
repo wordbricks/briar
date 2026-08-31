@@ -401,8 +401,8 @@ const projectAgentSkillToMessage = (skill: {
   readonly model: string | null;
   readonly effort: string | null;
   readonly kind: ProjectAgentSkillKind;
-  readonly executionMode?: ProjectAgentSkillExecutionMode;
-  readonly approvalPolicy?: ProjectAgentSkillApprovalPolicy;
+  readonly executionMode: ProjectAgentSkillExecutionMode;
+  readonly approvalPolicy: ProjectAgentSkillApprovalPolicy;
   readonly position: number;
 }) => ({
   id: skill.id,
@@ -413,12 +413,8 @@ const projectAgentSkillToMessage = (skill: {
   model: skill.model ?? undefined,
   effort: skill.effort ?? undefined,
   kind: skillKindToProto[skill.kind],
-  executionMode:
-    skill.executionMode === undefined ? undefined : skillExecutionModeToProto[skill.executionMode],
-  approvalPolicy:
-    skill.approvalPolicy === undefined
-      ? undefined
-      : skillApprovalPolicyToProto[skill.approvalPolicy],
+  executionMode: skillExecutionModeToProto[skill.executionMode],
+  approvalPolicy: skillApprovalPolicyToProto[skill.approvalPolicy],
   position: skill.position,
 });
 

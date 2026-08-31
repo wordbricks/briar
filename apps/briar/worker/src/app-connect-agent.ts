@@ -52,7 +52,6 @@ import { getAgentSkill } from "./agent-skills";
 import type { AgentWorkLogEntryRow } from "./agent-worklog";
 import { getProjectAgentTranscriptApplication } from "./agent-transcript-application";
 import {
-  backfillArchivedProjectAgentSessionSummaries,
   getArchivedProjectAgentSession,
   listArchivedProjectAgentSessions,
 } from "./archive";
@@ -143,8 +142,6 @@ export type AppConnectAgentInput = {
 export type AppConnectAgentServices = {
   readonly requireSession: typeof requireSession;
   readonly getProject: typeof getProject;
-  readonly backfillSessionSummaries:
-    typeof backfillArchivedProjectAgentSessionSummaries;
   readonly getSessionCursor: typeof getProjectAgentSessionSyncCursor;
   readonly listSessionSummaries: typeof listProjectAgentSessionSummaries;
   readonly getTranscript: typeof getProjectAgentTranscriptApplication;
@@ -153,7 +150,6 @@ export type AppConnectAgentServices = {
 const appConnectAgentServices: AppConnectAgentServices = {
   requireSession,
   getProject,
-  backfillSessionSummaries: backfillArchivedProjectAgentSessionSummaries,
   getSessionCursor: getProjectAgentSessionSyncCursor,
   listSessionSummaries: listProjectAgentSessionSummaries,
   getTranscript: getProjectAgentTranscriptApplication,
@@ -290,10 +286,8 @@ const domainSkillKind = (value: AgentSkillKind) => {
   }
 };
 
-const domainExecutionMode = (value: AgentSkillExecutionMode | undefined) => {
+const domainExecutionMode = (value: AgentSkillExecutionMode) => {
   switch (value) {
-    case undefined:
-      return undefined;
     case AgentSkillExecutionMode.CONVERSATION:
       return "conversation" as const;
     case AgentSkillExecutionMode.TASK:
@@ -306,10 +300,8 @@ const domainExecutionMode = (value: AgentSkillExecutionMode | undefined) => {
   }
 };
 
-const domainApprovalPolicy = (value: AgentSkillApprovalPolicy | undefined) => {
+const domainApprovalPolicy = (value: AgentSkillApprovalPolicy) => {
   switch (value) {
-    case undefined:
-      return undefined;
     case AgentSkillApprovalPolicy.INVOKE_IS_CONSENT:
       return "invoke_is_consent" as const;
     case AgentSkillApprovalPolicy.EXPLICIT:
@@ -1495,7 +1487,6 @@ export const createAppAgentService = (
       services.getProject,
     );
     if (input.cursor === undefined) {
-      await services.backfillSessionSummaries(db, env.ARCHIVES, project.id);
       const [cursor, summaries] = await Promise.all([
         services.getSessionCursor(db, project.id),
         services.listSessionSummaries(db, project.id),

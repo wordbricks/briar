@@ -42,16 +42,10 @@ describe("issue reply agent attachments", () => {
     });
   });
 
-  it("keeps legacy plain-text issue replies compatible", () => {
-    expect(parseIssueReplyAgentResult("An ordinary answer.")).toEqual({
-      result: {
-        reply: "An ordinary answer.",
-        proposedAction: null,
-        executionProposal: null,
-        skillExecutionProposal: null,
-      },
-      attachmentPaths: [],
-    });
+  it("rejects non-structured issue replies", () => {
+    expect(() => parseIssueReplyAgentResult("An ordinary answer.")).toThrow(
+      "exactly one JSON object",
+    );
   });
 
   it("reads validated workspace images and HTML artifacts", async () => {

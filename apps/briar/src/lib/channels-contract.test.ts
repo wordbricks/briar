@@ -40,6 +40,8 @@ describe("Agent input limits", () => {
     model: null,
     effort: null,
     kind: "custom" as const,
+    executionMode: "task" as const,
+    approvalPolicy: "explicit" as const,
     position: index,
   });
 
@@ -80,31 +82,6 @@ describe("Agent input limits", () => {
     })).toBe(false);
   });
 
-  it("derives a missing Skill description and defaults execution policy", () => {
-    expect(decode(channelAgentSkillInputSchema, {
-      name: "Release",
-      body: "Publish and verify the release.",
-      provider: "codex",
-      model: null,
-      effort: null,
-      kind: "custom",
-      position: 0,
-    })).toMatchObject({
-      name: "Release",
-      description: "Publish and verify the release.",
-      body: "Publish and verify the release.",
-      executionMode: "task",
-      approvalPolicy: "explicit",
-    });
-    expect(decode(channelAgentSkillInputSchema, {
-      ...skill(0),
-      executionMode: "conversation",
-      approvalPolicy: "invoke_is_consent",
-    })).toMatchObject({
-      executionMode: "conversation",
-      approvalPolicy: "invoke_is_consent",
-    });
-  });
 });
 
 describe("channel message contract", () => {

@@ -123,15 +123,6 @@ export async function createOrganizationAgent(
   const skillRows = normalizedAgentSkillRows(
     input.id,
     input.skills ?? [],
-    {
-      name: input.name,
-      description: input.description?.trim() || input.responsibility.slice(0, 1000),
-      body: input.responsibility,
-      provider: input.provider,
-      model: input.model,
-      effort: input.effort,
-      kind: "custom",
-    },
     input.createdAt,
   );
   await db.batch([
@@ -181,15 +172,6 @@ export async function updateOrganizationAgent(
   const skillRows = normalizedAgentSkillRows(
     input.agentId,
     input.skills,
-    {
-      name: input.name,
-      description: input.description?.trim() || input.responsibility.slice(0, 1000),
-      body: input.responsibility,
-      provider: input.provider,
-      model: input.model,
-      effort: input.effort,
-      kind: "custom",
-    },
     input.updatedAt,
   );
   await assertAgentSkillReplacementAllowed(db, input.agentId, skillRows);

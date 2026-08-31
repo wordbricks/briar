@@ -15,21 +15,20 @@ import {
 const skill = (
   input: Partial<AgentSkillRow> & Pick<AgentSkillRow, "id" | "name">,
 ): AgentSkillRow => ({
-  id: input.id,
-  agent_id: input.agent_id ?? "agent-1",
-  name: input.name,
-  description: input.description ?? `Use for ${input.name} requests.`,
-  body: input.body ?? `${input.name} body`,
-  provider: input.provider ?? "codex",
-  model: input.model ?? null,
-  effort: input.effort ?? null,
-  kind: input.kind ?? "custom",
-  execution_mode: input.execution_mode ?? "task",
-  approval_policy: input.approval_policy ?? "explicit",
-  is_default: input.is_default ?? 0,
-  position: input.position ?? 0,
+  agent_id: "agent-1",
+  description: `Use for ${input.name} requests.`,
+  body: `${input.name} body`,
+  provider: "codex",
+  model: null,
+  effort: null,
+  kind: "custom",
+  execution_mode: "task",
+  approval_policy: "explicit",
+  is_default: 0,
+  position: 0,
   created_at: "2026-08-09T00:00:00.000Z",
   updated_at: "2026-08-09T00:00:00.000Z",
+  ...input,
 });
 
 describe("Agent Skills", () => {
@@ -69,47 +68,6 @@ describe("Agent Skills", () => {
 });
 
 describe("Agent Skill normalization", () => {
-  const fallback = {
-    name: "Developer",
-    description: "Use for project work.",
-    body: "Handle project work.",
-    provider: "codex" as const,
-    model: null,
-    effort: null,
-    kind: "custom" as const,
-  };
-
-  it("defaults existing Skills and preserves explicit execution settings", () => {
-    expect(normalizedAgentSkillRows(
-      "agent-1",
-      [{
-        ...fallback,
-        kind: "custom",
-        position: 0,
-      }],
-      fallback,
-      "2026-08-10T00:00:00.000Z",
-    )[0]).toMatchObject({
-      execution_mode: "task",
-      approval_policy: "explicit",
-    });
-    expect(normalizedAgentSkillRows(
-      "agent-1",
-      [{
-        ...fallback,
-        kind: "custom",
-        executionMode: "conversation",
-        approvalPolicy: "invoke_is_consent",
-        position: 0,
-      }],
-      fallback,
-      "2026-08-10T00:00:00.000Z",
-    )[0]).toMatchObject({
-      execution_mode: "conversation",
-      approval_policy: "invoke_is_consent",
-    });
-  });
-
   it("rejects a sixth Skill and document fields above their limits", () => {
     const input = (index: number) => ({
       name: `Skill ${index}`,
@@ -119,13 +77,14 @@ describe("Agent Skill normalization", () => {
       model: null,
       effort: null,
       kind: "custom" as const,
+      executionMode: "task" as const,
+      approvalPolicy: "explicit" as const,
       position: index,
     });
 
     expect(() => normalizedAgentSkillRows(
       "agent-1",
       Array.from({ length: agentSkillsMaxCount + 1 }, (_, index) => input(index)),
-      fallback,
       "2026-08-10T00:00:00.000Z",
     )).toThrow("at most 5 Skills");
     expect(() => normalizedAgentSkillRows(
@@ -134,7 +93,6 @@ describe("Agent Skill normalization", () => {
         ...input(0),
         body: "x".repeat(agentSkillBodyMaxLength + 1),
       }],
-      fallback,
       "2026-08-10T00:00:00.000Z",
     )).toThrow("must contain 1 to 20000 characters");
     expect(() => normalizedAgentSkillRows(
@@ -143,7 +101,6 @@ describe("Agent Skill normalization", () => {
         ...input(0),
         description: "x".repeat(agentSkillDescriptionMaxLength + 1),
       }],
-      fallback,
       "2026-08-10T00:00:00.000Z",
     )).toThrow("must contain 1 to 1000 characters");
   });

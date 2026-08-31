@@ -93,6 +93,7 @@ import {
 } from "./organization-channel-routes";
 import { channelReplyWorkerAvailability } from "./workers";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
+import { workerClaimRuntimeFixture } from "./test-helpers/worker-runtime";
 import { requireWorkerProjectBinding } from "./worker-route-auth";
 
 const organizationId = "a0000000-0000-4000-8000-000000000001";
@@ -1352,7 +1353,10 @@ describe("organization channels", () => {
     const claimed = await claimNextChannelAgentReply(db, organizationId, {
       deviceId,
       workerId: otherWorkerId,
-      providers: ["grok"],
+      ...workerClaimRuntimeFixture({
+        agentProvider: "grok",
+        providers: ["grok"],
+      }),
       claimTokenHash,
       claimedAt: at(9),
       leaseExpiresAt: at(19),
@@ -1434,6 +1438,8 @@ describe("organization channels", () => {
           model: null,
           effort: null,
           kind: "custom",
+          executionMode: "task",
+          approvalPolicy: "explicit",
           position: 0,
         },
         {
@@ -1445,6 +1451,8 @@ describe("organization channels", () => {
           model: null,
           effort: "high",
           kind: "custom",
+          executionMode: "task",
+          approvalPolicy: "explicit",
           position: 1,
         },
       ],
@@ -1532,7 +1540,10 @@ describe("organization channels", () => {
       claimNextChannelAgentReply(db, organizationId, {
         deviceId,
         workerId: otherWorkerId,
-        providers: ["claude"],
+        ...workerClaimRuntimeFixture({
+          agentProvider: "claude",
+          providers: ["claude"],
+        }),
         claimTokenHash: "0".repeat(64),
         claimedAt: at(9),
         leaseExpiresAt: at(19),
@@ -1920,7 +1931,10 @@ describe("organization channels", () => {
     const claimed = await claimNextChannelAgentReply(db, organizationId, {
       deviceId,
       workerId: otherWorkerId,
-      providers: ["claude"],
+      ...workerClaimRuntimeFixture({
+        agentProvider: "claude",
+        providers: ["claude"],
+      }),
       claimTokenHash: "7".repeat(64),
       claimedAt: at(72),
       leaseExpiresAt: at(82),
@@ -2050,7 +2064,10 @@ describe("organization channels", () => {
       await claimNextChannelAgentReply(db, organizationId, {
         deviceId,
         workerId: otherWorkerId,
-        providers: ["claude"],
+        ...workerClaimRuntimeFixture({
+          agentProvider: "claude",
+          providers: ["claude"],
+        }),
         claimTokenHash: "2".repeat(64),
         claimedAt: at(14),
         leaseExpiresAt: at(24),
@@ -2061,7 +2078,10 @@ describe("organization channels", () => {
     const claimed = await claimNextChannelAgentReply(db, organizationId, {
       deviceId,
       workerId: boundWorkerId,
-      providers: ["claude"],
+      ...workerClaimRuntimeFixture({
+        agentProvider: "claude",
+        providers: ["claude"],
+      }),
       claimTokenHash: "2".repeat(64),
       claimedAt: at(15),
       leaseExpiresAt: at(25),
@@ -2267,8 +2287,9 @@ describe("organization channels", () => {
     const fallbackWorkerId = "d0000000-0000-4000-8000-000000000109";
     const observedAt = new Date().toISOString();
     const leaseExpiresAt = new Date(Date.parse(observedAt) + 60_000).toISOString();
-    const capabilities = JSON.stringify({
-      providerHealth: { claude: { healthy: true } },
+    const claimRuntime = workerClaimRuntimeFixture({
+      agentProvider: "claude",
+      providers: ["claude"],
       providerCapabilities: {
         ...emptyAgentProviderCapabilityCatalog(),
         claude: {
@@ -2283,6 +2304,7 @@ describe("organization channels", () => {
         },
       },
     });
+    const capabilities = claimRuntime.workerCapabilitiesJson;
     // The preceding lease lifecycle test intentionally leaves its historical
     // job queued. Close that fixture so this test observes only its own job.
     await db.prepare(
@@ -2396,9 +2418,7 @@ describe("organization channels", () => {
     } = {}) => claimNextChannelAgentReply(db, organizationId, {
       deviceId: overrides.deviceId ?? fallbackDeviceId,
       workerId: overrides.workerId ?? fallbackWorkerId,
-      providers: ["claude"],
-      workerAgentProvider: "claude",
-      workerCapabilitiesJson: capabilities,
+      ...claimRuntime,
       claimTokenHash: overrides.claimTokenHash ?? "1".repeat(64),
       claimedAt: observedAt,
       leaseExpiresAt,
@@ -2523,8 +2543,9 @@ describe("organization channels", () => {
     const startedAt = new Date().toISOString();
     const time = (minutes: number) =>
       new Date(Date.parse(startedAt) + minutes * 60_000).toISOString();
-    const capabilities = JSON.stringify({
-      providerHealth: { claude: { healthy: true } },
+    const claimRuntime = workerClaimRuntimeFixture({
+      agentProvider: "claude",
+      providers: ["claude"],
       providerCapabilities: {
         ...emptyAgentProviderCapabilityCatalog(),
         claude: {
@@ -2535,6 +2556,7 @@ describe("organization channels", () => {
         },
       },
     });
+    const capabilities = claimRuntime.workerCapabilitiesJson;
     await db.prepare(
       `update briar_channel_agent_reply_jobs
        set status = 'failed', completed_at = ?, updated_at = ?
@@ -2672,9 +2694,7 @@ describe("organization channels", () => {
     ) => claimNextChannelAgentReply(db, organizationId, {
       deviceId: device,
       workerId,
-      providers: ["claude"],
-      workerAgentProvider: "claude",
-      workerCapabilitiesJson: capabilities,
+      ...claimRuntime,
       claimTokenHash,
       claimedAt,
       leaseExpiresAt: new Date(Date.parse(claimedAt) + 15 * 60_000).toISOString(),
@@ -3125,7 +3145,10 @@ describe("organization channels", () => {
       await claimNextChannelAgentReply(db, organizationId, {
         deviceId,
         workerId: otherWorkerId,
-        providers: ["grok"],
+        ...workerClaimRuntimeFixture({
+          agentProvider: "grok",
+          providers: ["grok"],
+        }),
         claimTokenHash: "3".repeat(64),
         claimedAt: at(19),
         leaseExpiresAt: at(29),
@@ -3140,9 +3163,11 @@ describe("organization channels", () => {
     const fallbackDeviceId = "c0000000-0000-4000-8000-000000000111";
     const fallbackWorkerId = "d0000000-0000-4000-8000-000000000111";
     const observedAt = new Date().toISOString();
-    const capabilities = JSON.stringify({
-      providerHealth: { claude: { healthy: true } },
+    const claimRuntime = workerClaimRuntimeFixture({
+      agentProvider: "claude",
+      providers: ["claude"],
     });
+    const capabilities = claimRuntime.workerCapabilitiesJson;
     await createChannel(db, {
       id: channelId,
       organizationId,
@@ -3250,9 +3275,7 @@ describe("organization channels", () => {
     const claimed = await claimNextChannelAgentReply(db, organizationId, {
       deviceId: fallbackDeviceId,
       workerId: fallbackWorkerId,
-      providers: ["claude"],
-      workerAgentProvider: "claude",
-      workerCapabilitiesJson: capabilities,
+      ...claimRuntime,
       claimTokenHash: "5".repeat(64),
       claimedAt: observedAt,
       leaseExpiresAt: new Date(Date.parse(observedAt) + 60_000).toISOString(),

@@ -1337,51 +1337,6 @@ export async function getArchivedProjectAgentSession(
   );
 }
 
-/**
- * Migration 0093 can project hot rows in SQL, but historical archive payloads
- * only exist in R2. Read each missing legacy object once and persist its small
- * D1 catalog entry so every later list/delta request remains R2-free.
- */
-export async function backfillArchivedProjectAgentSessionSummaries(
-  db: D1Database,
-  bucket: ArchiveBucket,
-  projectId: string,
-) {
-  const result = await db
-    .prepare(
-      `select archive.*
-       from briar_log_archives archive
-       where archive.project_id = ?
-         and archive.archive_kind = 'project_agent_sessions'
-         and archive.status in ('verified', 'complete')
-         and not exists (
-           select 1 from briar_project_agent_session_summaries summary
-           where summary.project_id = archive.project_id
-             and summary.session_id = archive.scope_id
-         )
-       order by archive.period_end desc, archive.id
-       limit 200`,
-    )
-    .bind(projectId)
-    .all<ArchiveMetadataRow>();
-  for (let offset = 0; offset < result.results.length; offset += 8) {
-    const archived = await Promise.all(
-      result.results
-        .slice(offset, offset + 8)
-        .map(async (metadata) =>
-          restoreArchivedProjectAgentSessionRequester(
-            db,
-            await readArchivedProjectAgentSession(bucket, metadata),
-          )
-        ),
-    );
-    for (const session of archived) {
-      await upsertProjectAgentSessionSummary(db, session, true);
-    }
-  }
-  return result.results.length;
-}
-
 export async function getArchivedEvidenceImage(
   db: D1Database,
   bucket: ArchiveBucket,

@@ -340,8 +340,8 @@ const channelAgentSkillInputSourceSchema = strict(Schema.Struct({
   ),
   effort: nullableDefault(ModelEffort),
   kind: defaulted(ChannelAgentSkillKindSchema, "custom"),
-  executionMode: defaulted(AgentSkillExecutionModeSchema, "task"),
-  approvalPolicy: defaulted(AgentSkillApprovalPolicySchema, "explicit"),
+  executionMode: AgentSkillExecutionModeSchema,
+  approvalPolicy: AgentSkillApprovalPolicySchema,
   position: defaulted(between(0, 999), 0),
 }));
 

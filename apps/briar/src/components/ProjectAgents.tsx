@@ -1337,8 +1337,6 @@ function localProjectAgentSkills(
       ...input,
       id: input.id ?? crypto.randomUUID(),
       agentId,
-      executionMode: input.executionMode ?? "task",
-      approvalPolicy: input.approvalPolicy ?? "explicit",
       position,
       createdAt: current?.createdAt ?? updatedAt,
       updatedAt,

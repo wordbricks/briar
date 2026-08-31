@@ -106,15 +106,6 @@ export async function createProjectAgent(
   const skillRows = normalizedAgentSkillRows(
     agent.id,
     input.skills ?? [],
-    {
-      name: input.name,
-      description: input.description?.trim() || input.responsibility.slice(0, 1000),
-      body: input.responsibility,
-      provider: input.provider,
-      model: input.model,
-      effort: input.effort,
-      kind: "custom",
-    },
     createdAt,
   );
   await db.batch([
@@ -209,15 +200,6 @@ export async function updateProjectAgent(
   const skillRows = normalizedAgentSkillRows(
     agentId,
     input.skills,
-    {
-      name: input.name,
-      description: input.description?.trim() || input.responsibility.slice(0, 1000),
-      body: input.responsibility,
-      provider: input.provider,
-      model: input.model,
-      effort: input.effort,
-      kind: "custom",
-    },
     updatedAt,
   );
   await assertAgentSkillReplacementAllowed(db, agentId, skillRows);

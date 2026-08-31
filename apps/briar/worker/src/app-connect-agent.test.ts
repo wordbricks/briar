@@ -16,7 +16,6 @@ import {
 import { requireConnectHandler } from "./test-helpers/connect";
 
 const repositoryMocks = {
-  backfill: vi.fn<AppConnectAgentServices["backfillSessionSummaries"]>(),
   getProject: vi.fn<AppConnectAgentServices["getProject"]>(),
   getCursor: vi.fn<AppConnectAgentServices["getSessionCursor"]>(),
   getTranscript: vi.fn<AppConnectAgentServices["getTranscript"]>(),
@@ -157,7 +156,6 @@ describe("app Agent Connect adapter", () => {
       {
         requireSession: repositoryMocks.requireSession,
         getProject: repositoryMocks.getProject,
-        backfillSessionSummaries: repositoryMocks.backfill,
         getSessionCursor: repositoryMocks.getCursor,
         getTranscript: repositoryMocks.getTranscript,
         listSessionSummaries: repositoryMocks.listSummaries,
@@ -172,11 +170,6 @@ describe("app Agent Connect adapter", () => {
     const response = await createFetchHandler(handler)(connectRequest());
 
     expect(response.status).toBe(200);
-    expect(repositoryMocks.backfill).toHaveBeenCalledWith(
-      {},
-      {},
-      projectId,
-    );
     expect(await response.json()).toEqual({
       cursor: "17",
       reset: true,

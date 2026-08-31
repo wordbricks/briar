@@ -1,6 +1,11 @@
 import { Code, createClient, ConnectError } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
-import { AgentService } from "@briar/contracts/gen/briar/app/v1/agent_pb";
+import {
+  AgentService,
+  AgentSkillApprovalPolicy,
+  AgentSkillExecutionMode,
+  AgentSkillKind,
+} from "@briar/contracts/gen/briar/app/v1/agent_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -149,6 +154,44 @@ describe("AgentService mutations", () => {
         .catch((cause: unknown) => cause);
       expect(error).toBeInstanceOf(ConnectError);
       expect((error as ConnectError).code).toBe(Code.PermissionDenied);
+    }
+  });
+
+  it("rejects unspecified Skill execution contracts", async () => {
+    const validSkill = {
+      name: "Issue processing",
+      description: "Use for queued project issues.",
+      body: "Process queued issues.",
+      provider: AgentProvider.CODEX,
+      kind: AgentSkillKind.ISSUE_PROCESSING,
+      executionMode: AgentSkillExecutionMode.TASK,
+      approvalPolicy: AgentSkillApprovalPolicy.EXPLICIT,
+      position: 0,
+    };
+    const malformedSkills = [
+      {
+        ...validSkill,
+        executionMode: AgentSkillExecutionMode.UNSPECIFIED,
+      },
+      {
+        ...validSkill,
+        approvalPolicy: AgentSkillApprovalPolicy.UNSPECIFIED,
+      },
+    ];
+
+    for (const [index, skill] of malformedSkills.entries()) {
+      const error = await client(tokens.owner)
+        .createProjectAgent(
+          {
+            ...createInput,
+            name: `Invalid Skill Agent ${index}`,
+            skills: [skill],
+          },
+          options(tokens.owner),
+        )
+        .catch((cause: unknown) => cause);
+      expect(error).toBeInstanceOf(ConnectError);
+      expect((error as ConnectError).code).toBe(Code.InvalidArgument);
     }
   });
 

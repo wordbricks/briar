@@ -206,6 +206,8 @@ describe("Organization Agent channel delegation", () => {
         model: null,
         effort: null,
         kind: "custom",
+        executionMode: "task",
+        approvalPolicy: "explicit",
         position: 0,
       }],
     });

@@ -25610,22 +25610,18 @@ pub struct ProjectAgentSkillInput {
     #[serde(
         rename = "executionMode",
         alias = "execution_mode",
-        with = "::buffa::json_helpers::opt_enum",
-        skip_serializing_if = "::core::option::Option::is_none"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub execution_mode: ::core::option::Option<
-        ::buffa::EnumValue<AgentSkillExecutionMode>,
-    >,
+    pub execution_mode: ::buffa::EnumValue<AgentSkillExecutionMode>,
     /// Field 10: `approval_policy`
     #[serde(
         rename = "approvalPolicy",
         alias = "approval_policy",
-        with = "::buffa::json_helpers::opt_enum",
-        skip_serializing_if = "::core::option::Option::is_none"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub approval_policy: ::core::option::Option<
-        ::buffa::EnumValue<AgentSkillApprovalPolicy>,
-    >,
+    pub approval_policy: ::buffa::EnumValue<AgentSkillApprovalPolicy>,
     /// Field 11: `position`
     #[serde(
         rename = "position",
@@ -25689,26 +25685,6 @@ impl ProjectAgentSkillInput {
         self.effort = Some(value.into());
         self
     }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::execution_mode`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_execution_mode(
-        mut self,
-        value: impl Into<::buffa::EnumValue<AgentSkillExecutionMode>>,
-    ) -> Self {
-        self.execution_mode = Some(value.into());
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::approval_policy`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_approval_policy(
-        mut self,
-        value: impl Into<::buffa::EnumValue<AgentSkillApprovalPolicy>>,
-    ) -> Self {
-        self.approval_policy = Some(value.into());
-        self
-    }
 }
 ::buffa::impl_default_instance!(ProjectAgentSkillInput);
 impl ::buffa::MessageName for ProjectAgentSkillInput {
@@ -25760,11 +25736,17 @@ impl ::buffa::Message for ProjectAgentSkillInput {
                 size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
             }
         }
-        if let Some(ref v) = self.execution_mode {
-            size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+        {
+            let val = self.execution_mode.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
         }
-        if let Some(ref v) = self.approval_policy {
-            size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+        {
+            let val = self.approval_policy.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
         }
         if self.position != 0u32 {
             size += 1u64 + ::buffa::types::uint32_encoded_len(self.position) as u64;
@@ -25809,11 +25791,17 @@ impl ::buffa::Message for ProjectAgentSkillInput {
                 ::buffa::types::put_int32_field(8u32, val, buf);
             }
         }
-        if let Some(ref v) = self.execution_mode {
-            ::buffa::types::put_int32_field(9u32, v.to_i32(), buf);
+        {
+            let val = self.execution_mode.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(9u32, val, buf);
+            }
         }
-        if let Some(ref v) = self.approval_policy {
-            ::buffa::types::put_int32_field(10u32, v.to_i32(), buf);
+        {
+            let val = self.approval_policy.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(10u32, val, buf);
+            }
         }
         if self.position != 0u32 {
             ::buffa::types::put_uint32_field(11u32, self.position, buf);
@@ -25903,8 +25891,8 @@ impl ::buffa::Message for ProjectAgentSkillInput {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.execution_mode = ::core::option::Option::Some(
-                    ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                self.execution_mode = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
                 );
             }
             10u32 => {
@@ -25912,8 +25900,8 @@ impl ::buffa::Message for ProjectAgentSkillInput {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.approval_policy = ::core::option::Option::Some(
-                    ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                self.approval_policy = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
                 );
             }
             11u32 => {
@@ -25939,8 +25927,8 @@ impl ::buffa::Message for ProjectAgentSkillInput {
         self.model = ::core::option::Option::None;
         self.effort = ::core::option::Option::None;
         self.kind = ::buffa::EnumValue::from(0);
-        self.execution_mode = ::core::option::Option::None;
-        self.approval_policy = ::core::option::Option::None;
+        self.execution_mode = ::buffa::EnumValue::from(0);
+        self.approval_policy = ::buffa::EnumValue::from(0);
         self.position = 0u32;
         self.__buffa_unknown_fields.clear();
     }
@@ -160018,12 +160006,12 @@ pub mod __buffa {
             /// Field 8: `kind`
             pub kind: ::buffa::EnumValue<super::super::AgentSkillKind>,
             /// Field 9: `execution_mode`
-            pub execution_mode: ::core::option::Option<
-                ::buffa::EnumValue<super::super::AgentSkillExecutionMode>,
+            pub execution_mode: ::buffa::EnumValue<
+                super::super::AgentSkillExecutionMode,
             >,
             /// Field 10: `approval_policy`
-            pub approval_policy: ::core::option::Option<
-                ::buffa::EnumValue<super::super::AgentSkillApprovalPolicy>,
+            pub approval_policy: ::buffa::EnumValue<
+                super::super::AgentSkillApprovalPolicy,
             >,
             /// Field 11: `position`
             pub position: u32,
@@ -160126,10 +160114,8 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.execution_mode = Some(
-                            ::buffa::EnumValue::from(
-                                ::buffa::types::decode_int32(&mut cur)?,
-                            ),
+                        view.execution_mode = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
                     10u32 => {
@@ -160137,10 +160123,8 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.approval_policy = Some(
-                            ::buffa::EnumValue::from(
-                                ::buffa::types::decode_int32(&mut cur)?,
-                            ),
+                        view.approval_policy = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
                     11u32 => {
@@ -160237,11 +160221,17 @@ pub mod __buffa {
                         size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
                     }
                 }
-                if let Some(ref v) = self.execution_mode {
-                    size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+                {
+                    let val = self.execution_mode.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
                 }
-                if let Some(ref v) = self.approval_policy {
-                    size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+                {
+                    let val = self.approval_policy.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
                 }
                 if self.position != 0u32 {
                     size
@@ -160289,11 +160279,17 @@ pub mod __buffa {
                         ::buffa::types::put_int32_field(8u32, val, buf);
                     }
                 }
-                if let Some(ref v) = self.execution_mode {
-                    ::buffa::types::put_int32_field(9u32, v.to_i32(), buf);
+                {
+                    let val = self.execution_mode.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(9u32, val, buf);
+                    }
                 }
-                if let Some(ref v) = self.approval_policy {
-                    ::buffa::types::put_int32_field(10u32, v.to_i32(), buf);
+                {
+                    let val = self.approval_policy.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(10u32, val, buf);
+                    }
                 }
                 if self.position != 0u32 {
                     ::buffa::types::put_uint32_field(11u32, self.position, buf);
@@ -160345,11 +160341,15 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.kind) {
                     __map.serialize_entry("kind", &self.kind)?;
                 }
-                if let ::core::option::Option::Some(ref __v) = self.execution_mode {
-                    __map.serialize_entry("executionMode", __v)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.execution_mode,
+                ) {
+                    __map.serialize_entry("executionMode", &self.execution_mode)?;
                 }
-                if let ::core::option::Option::Some(ref __v) = self.approval_policy {
-                    __map.serialize_entry("approvalPolicy", __v)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.approval_policy,
+                ) {
+                    __map.serialize_entry("approvalPolicy", &self.approval_policy)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u32(&self.position) {
                     __map
@@ -160501,18 +160501,14 @@ pub mod __buffa {
             #[must_use]
             pub fn execution_mode(
                 &self,
-            ) -> ::core::option::Option<
-                ::buffa::EnumValue<super::super::AgentSkillExecutionMode>,
-            > {
+            ) -> ::buffa::EnumValue<super::super::AgentSkillExecutionMode> {
                 self.0.reborrow().execution_mode
             }
             /// Field 10: `approval_policy`
             #[must_use]
             pub fn approval_policy(
                 &self,
-            ) -> ::core::option::Option<
-                ::buffa::EnumValue<super::super::AgentSkillApprovalPolicy>,
-            > {
+            ) -> ::buffa::EnumValue<super::super::AgentSkillApprovalPolicy> {
                 self.0.reborrow().approval_policy
             }
             /// Field 11: `position`

@@ -50,3 +50,14 @@ export const workerRuntimeFixture = (
 export const workerCapabilitiesFixture = (
   input: WorkerRuntimeFixtureInput = {},
 ) => workerRuntimeMetadataFromProto(workerRuntimeFixture(input)).capabilities;
+
+export const workerClaimRuntimeFixture = (
+  input: WorkerRuntimeFixtureInput = {},
+) => {
+  const runtime = workerRuntimeMetadataFromProto(workerRuntimeFixture(input));
+  return {
+    providers: runtime.providers,
+    workerAgentProvider: runtime.agentProvider,
+    workerCapabilitiesJson: JSON.stringify(runtime.capabilities),
+  };
+};

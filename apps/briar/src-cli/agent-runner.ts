@@ -497,8 +497,8 @@ export type DetachedAgentSkill = {
   model: string | null;
   effort: DetachedAgentEffort | null;
   kind: "issue_processing" | "custom";
-  executionMode?: "conversation" | "task";
-  approvalPolicy?: "invoke_is_consent" | "explicit";
+  executionMode: "conversation" | "task";
+  approvalPolicy: "invoke_is_consent" | "explicit";
   position: number;
 };
 
@@ -593,7 +593,7 @@ export function detachedAgentContext(
           labels.length > 0 ? ` (${labels.join(", ")})` : ""
         }`,
         `- Kind: ${skill.kind}`,
-        `- Execution: provider=${skill.provider}, model=${skill.model ?? "provider default"}, effort=${skill.effort ?? "provider default"}, mode=${skill.executionMode ?? "task"}, approval=${skill.approvalPolicy ?? "explicit"}`,
+        `- Execution: provider=${skill.provider}, model=${skill.model ?? "provider default"}, effort=${skill.effort ?? "provider default"}, mode=${skill.executionMode}, approval=${skill.approvalPolicy}`,
         catalogEntry
           ? `- Discovery description: ${catalogEntry.description}`
           : `- Discovery description: ${skill.description}`,
@@ -969,153 +969,144 @@ export function parseDetachedIssueReplyResult(
   text: string,
   options: { allowSkillExecutionProposal?: boolean } = {},
 ): DetachedIssueReplyResult {
-  try {
-    const parsed = parseDetachedJsonResult(text);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new Error("Issue reply result must be an object");
+  const parsed = parseDetachedJsonResult(text);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Issue reply result must be an object");
+  }
+  const record = parsed as Record<string, unknown>;
+  const reply = typeof record.reply === "string" ? record.reply.trim() : "";
+  if (!reply) throw new Error("Issue reply result is missing reply");
+  if (record.proposedAction === null || record.proposedAction === undefined) {
+    const executionProposal = parseDetachedIssueExecutionProposal(
+      record.executionProposal,
+    );
+    const skillExecutionProposal = parseDetachedAgentSkillExecutionProposal(
+      record.skillExecutionProposal,
+    );
+    if (executionProposal && skillExecutionProposal) {
+      throw new Error("Agent Skill execution cannot be combined with issue execution");
     }
-    const record = parsed as Record<string, unknown>;
-    const reply = typeof record.reply === "string" ? record.reply.trim() : "";
-    if (!reply) throw new Error("Issue reply result is missing reply");
-    if (record.proposedAction === null || record.proposedAction === undefined) {
-      const executionProposal = parseDetachedIssueExecutionProposal(
-        record.executionProposal,
-      );
-      const skillExecutionProposal = parseDetachedAgentSkillExecutionProposal(
-        record.skillExecutionProposal,
-      );
-      if (executionProposal && skillExecutionProposal) {
-        throw new Error("Agent Skill execution cannot be combined with issue execution");
-      }
-      if (skillExecutionProposal && !options.allowSkillExecutionProposal) {
-        throw new Error("Agent Skill execution target is not authorized");
-      }
-      return {
-        reply,
-        proposedAction: null,
-        executionProposal,
-        skillExecutionProposal,
-      };
-    }
-    if (
-      typeof record.proposedAction !== "object" ||
-      Array.isArray(record.proposedAction)
-    ) {
-      throw new Error("Issue reply proposedAction is invalid");
-    }
-    const action = record.proposedAction as Record<string, unknown>;
-    if (
-      parseDetachedIssueExecutionProposal(record.executionProposal) ||
-      parseDetachedAgentSkillExecutionProposal(record.skillExecutionProposal)
-    ) {
-      throw new Error("Use executeAfterCreate instead of two proposals");
-    }
-    if (action.type === "request_issue_update") {
-      if (!action.changes || typeof action.changes !== "object" ||
-          Array.isArray(action.changes)) {
-        throw new Error("Issue update changes are invalid");
-      }
-      const rawChanges = action.changes as Record<string, unknown>;
-      const changes: Extract<
-        DetachedIssueProposedAction,
-        { type: "request_issue_update" }
-      >["changes"] = {};
-      if (Object.prototype.hasOwnProperty.call(rawChanges, "title")) {
-        if (typeof rawChanges.title !== "string" || !rawChanges.title.trim()) {
-          throw new Error("Issue update title is invalid");
-        }
-        changes.title = rawChanges.title.trim();
-      }
-      if (Object.prototype.hasOwnProperty.call(rawChanges, "description")) {
-        if (rawChanges.description !== null &&
-            typeof rawChanges.description !== "string") {
-          throw new Error("Issue update description is invalid");
-        }
-        changes.description = typeof rawChanges.description === "string"
-          ? rawChanges.description.trim()
-          : null;
-      }
-      if (Object.prototype.hasOwnProperty.call(rawChanges, "priority")) {
-        if (rawChanges.priority !== null &&
-            (!Number.isInteger(rawChanges.priority) ||
-              Number(rawChanges.priority) < 1 || Number(rawChanges.priority) > 4)) {
-          throw new Error("Issue update priority is invalid");
-        }
-        changes.priority = rawChanges.priority === null
-          ? null
-          : Number(rawChanges.priority);
-      }
-      if (Object.keys(changes).length === 0) {
-        throw new Error("Issue update has no changes");
-      }
-      return {
-        reply,
-        proposedAction: { type: action.type, changes },
-        executionProposal: null,
-        skillExecutionProposal: null,
-      };
-    }
-    if (action.type === "request_issue_create") {
-      if (!action.issue || typeof action.issue !== "object" ||
-          Array.isArray(action.issue)) {
-        throw new Error("New issue is invalid");
-      }
-      const issue = action.issue as Record<string, unknown>;
-      const title = typeof issue.title === "string" ? issue.title.trim() : "";
-      const description = issue.description === null
-        ? null
-        : typeof issue.description === "string"
-          ? issue.description.trim()
-          : undefined;
-      const priority = issue.priority === null
-        ? null
-        : Number.isInteger(issue.priority) && Number(issue.priority) >= 1 &&
-            Number(issue.priority) <= 4
-          ? Number(issue.priority)
-          : undefined;
-      if (!title || description === undefined || priority === undefined ||
-          issue.status !== "backlog") {
-        throw new Error("New issue proposal is incomplete");
-      }
-      return {
-        reply,
-        proposedAction: {
-          type: action.type,
-          issue: { title, description, priority, status: issue.status },
-          executeAfterCreate: action.executeAfterCreate === true,
-        },
-        executionProposal: null,
-        skillExecutionProposal: null,
-      };
-    }
-    const workflowStage =
-      typeof action.workflowStage === "string" ? action.workflowStage.trim() : "";
-    const reason = typeof action.reason === "string" ? action.reason.trim() : "";
-    if (
-      action.type !== "request_issue_rework" ||
-      !workflowStage ||
-      !reason
-    ) {
-      throw new Error("Issue reply proposedAction is incomplete");
+    if (skillExecutionProposal && !options.allowSkillExecutionProposal) {
+      throw new Error("Agent Skill execution target is not authorized");
     }
     return {
       reply,
-      proposedAction: {
-        type: "request_issue_rework",
-        workflowStage,
-        reason,
-      },
-      executionProposal: null,
-      skillExecutionProposal: null,
-    };
-  } catch {
-    return {
-      reply: text.trim(),
       proposedAction: null,
+      executionProposal,
+      skillExecutionProposal,
+    };
+  }
+  if (
+    typeof record.proposedAction !== "object" ||
+    Array.isArray(record.proposedAction)
+  ) {
+    throw new Error("Issue reply proposedAction is invalid");
+  }
+  const action = record.proposedAction as Record<string, unknown>;
+  if (
+    parseDetachedIssueExecutionProposal(record.executionProposal) ||
+    parseDetachedAgentSkillExecutionProposal(record.skillExecutionProposal)
+  ) {
+    throw new Error("Use executeAfterCreate instead of two proposals");
+  }
+  if (action.type === "request_issue_update") {
+    if (!action.changes || typeof action.changes !== "object" ||
+        Array.isArray(action.changes)) {
+      throw new Error("Issue update changes are invalid");
+    }
+    const rawChanges = action.changes as Record<string, unknown>;
+    const changes: Extract<
+      DetachedIssueProposedAction,
+      { type: "request_issue_update" }
+    >["changes"] = {};
+    if (Object.prototype.hasOwnProperty.call(rawChanges, "title")) {
+      if (typeof rawChanges.title !== "string" || !rawChanges.title.trim()) {
+        throw new Error("Issue update title is invalid");
+      }
+      changes.title = rawChanges.title.trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(rawChanges, "description")) {
+      if (rawChanges.description !== null &&
+          typeof rawChanges.description !== "string") {
+        throw new Error("Issue update description is invalid");
+      }
+      changes.description = typeof rawChanges.description === "string"
+        ? rawChanges.description.trim()
+        : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(rawChanges, "priority")) {
+      if (rawChanges.priority !== null &&
+          (!Number.isInteger(rawChanges.priority) ||
+            Number(rawChanges.priority) < 1 || Number(rawChanges.priority) > 4)) {
+        throw new Error("Issue update priority is invalid");
+      }
+      changes.priority = rawChanges.priority === null
+        ? null
+        : Number(rawChanges.priority);
+    }
+    if (Object.keys(changes).length === 0) {
+      throw new Error("Issue update has no changes");
+    }
+    return {
+      reply,
+      proposedAction: { type: action.type, changes },
       executionProposal: null,
       skillExecutionProposal: null,
     };
   }
+  if (action.type === "request_issue_create") {
+    if (!action.issue || typeof action.issue !== "object" ||
+        Array.isArray(action.issue)) {
+      throw new Error("New issue is invalid");
+    }
+    const issue = action.issue as Record<string, unknown>;
+    const title = typeof issue.title === "string" ? issue.title.trim() : "";
+    const description = issue.description === null
+      ? null
+      : typeof issue.description === "string"
+        ? issue.description.trim()
+        : undefined;
+    const priority = issue.priority === null
+      ? null
+      : Number.isInteger(issue.priority) && Number(issue.priority) >= 1 &&
+          Number(issue.priority) <= 4
+        ? Number(issue.priority)
+        : undefined;
+    if (!title || description === undefined || priority === undefined ||
+        issue.status !== "backlog") {
+      throw new Error("New issue proposal is incomplete");
+    }
+    return {
+      reply,
+      proposedAction: {
+        type: action.type,
+        issue: { title, description, priority, status: issue.status },
+        executeAfterCreate: action.executeAfterCreate === true,
+      },
+      executionProposal: null,
+      skillExecutionProposal: null,
+    };
+  }
+  const workflowStage =
+    typeof action.workflowStage === "string" ? action.workflowStage.trim() : "";
+  const reason = typeof action.reason === "string" ? action.reason.trim() : "";
+  if (
+    action.type !== "request_issue_rework" ||
+    !workflowStage ||
+    !reason
+  ) {
+    throw new Error("Issue reply proposedAction is incomplete");
+  }
+  return {
+    reply,
+    proposedAction: {
+      type: "request_issue_rework",
+      workflowStage,
+      reason,
+    },
+    executionProposal: null,
+    skillExecutionProposal: null,
+  };
 }
 
 function parseDetachedIssueExecutionProposal(value: unknown) {

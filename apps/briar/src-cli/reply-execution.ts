@@ -381,9 +381,9 @@ async function runClaimedIssueReply(
         issue.skillExecutionTarget.skillId !== agent.activeSkill?.id ||
         issue.skillExecutionTarget.skillName !== agent.activeSkill?.name ||
         issue.skillExecutionTarget.executionMode !==
-          (agent.activeSkill?.executionMode ?? "task") ||
+          agent.activeSkill?.executionMode ||
         issue.skillExecutionTarget.approvalPolicy !==
-          (agent.activeSkill?.approvalPolicy ?? "explicit") ||
+          agent.activeSkill?.approvalPolicy ||
         issue.skillExecutionTarget.request !== trigger.body)
     ) {
       throw new Error(

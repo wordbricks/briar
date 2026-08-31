@@ -575,34 +575,41 @@ const channelExecutionProposalJson = (
 
 const channelSkillExecutionProposalJson = (
   row: ChannelMessageRow,
-): ChannelSkillExecutionProposal | null => row.skill_execution_proposal_id
-  ? {
-      id: row.skill_execution_proposal_id,
-      type: "request_agent_skill_execute",
-      status: row.skill_execution_status ?? "pending",
-      projectId: row.skill_execution_project_id ?? "",
-      agentId: row.skill_execution_agent_id ?? "",
-      agentName: row.skill_execution_agent_name ?? "",
-      skillId: row.skill_execution_skill_id ?? "",
-      skillName: row.skill_execution_skill_name ?? "",
-      provider: row.skill_execution_provider ?? "codex",
-      model: row.skill_execution_model,
-      effort: row.skill_execution_effort,
-      executionMode: row.skill_execution_execution_mode ?? "task",
-      approvalPolicy: row.skill_execution_approval_policy ?? "explicit",
-      executionStatus: row.skill_execution_execution_status ?? "waiting",
-      request: row.skill_execution_request ?? "",
-      delegatedByAgentId: row.skill_execution_delegated_by_agent_id,
-      delegatedByAgentName: row.skill_execution_delegated_by_agent_name,
-      requestedWorkerId: row.skill_execution_requested_worker_id,
-      requestedWorkerLabel: row.skill_execution_requested_worker_label,
-      resultSessionId: row.skill_execution_result_session_id,
-      resultMessageId: row.skill_execution_result_message_id,
-      error: row.skill_execution_error,
-      createdAt: row.skill_execution_created_at ?? row.created_at,
-      acceptedAt: row.skill_execution_accepted_at,
-    }
-  : null;
+): ChannelSkillExecutionProposal | null => {
+  if (!row.skill_execution_proposal_id) return null;
+  if (
+    row.skill_execution_execution_mode === null ||
+    row.skill_execution_approval_policy === null
+  ) {
+    throw new Error("Agent Skill execution contract is missing");
+  }
+  return {
+    id: row.skill_execution_proposal_id,
+    type: "request_agent_skill_execute",
+    status: row.skill_execution_status ?? "pending",
+    projectId: row.skill_execution_project_id ?? "",
+    agentId: row.skill_execution_agent_id ?? "",
+    agentName: row.skill_execution_agent_name ?? "",
+    skillId: row.skill_execution_skill_id ?? "",
+    skillName: row.skill_execution_skill_name ?? "",
+    provider: row.skill_execution_provider ?? "codex",
+    model: row.skill_execution_model,
+    effort: row.skill_execution_effort,
+    executionMode: row.skill_execution_execution_mode,
+    approvalPolicy: row.skill_execution_approval_policy,
+    executionStatus: row.skill_execution_execution_status ?? "waiting",
+    request: row.skill_execution_request ?? "",
+    delegatedByAgentId: row.skill_execution_delegated_by_agent_id,
+    delegatedByAgentName: row.skill_execution_delegated_by_agent_name,
+    requestedWorkerId: row.skill_execution_requested_worker_id,
+    requestedWorkerLabel: row.skill_execution_requested_worker_label,
+    resultSessionId: row.skill_execution_result_session_id,
+    resultMessageId: row.skill_execution_result_message_id,
+    error: row.skill_execution_error,
+    createdAt: row.skill_execution_created_at ?? row.created_at,
+    acceptedAt: row.skill_execution_accepted_at,
+  };
+};
 
 const channelHasUnreadFromRow = (row: ChannelRow) => Boolean(
   row.last_unread_message_at &&
@@ -3000,8 +3007,8 @@ export async function claimNextChannelAgentReply(
     deviceId: string;
     workerId: string;
     providers: AgentProvider[];
-    workerAgentProvider?: AgentProvider;
-    workerCapabilitiesJson?: string;
+    workerAgentProvider: AgentProvider;
+    workerCapabilitiesJson: string;
     claimTokenHash: string;
     claimedAt: string;
     leaseExpiresAt: string;
@@ -3282,21 +3289,15 @@ export async function claimNextChannelAgentReply(
   const preferredAvailability = new Map<string, boolean>();
   for (const candidate of candidates.results) {
     if (!candidate.agent_provider) continue;
-    const supportsSelection = input.workerCapabilitiesJson &&
-        input.workerAgentProvider
-      ? executionWorkerSupportsSelection(
-          {
-            agent_provider: input.workerAgentProvider,
-            capabilities_json: input.workerCapabilitiesJson,
-          },
-          candidate.agent_provider,
-          candidate.runtime_model,
-          candidate.runtime_effort,
-        )
-      // Direct database callers predate capability snapshots. The production
-      // claim route always supplies them; retain provider-only compatibility
-      // for those internal callers while enforcing exact selection at the API.
-      : input.providers.includes(candidate.agent_provider);
+    const supportsSelection = executionWorkerSupportsSelection(
+      {
+        agent_provider: input.workerAgentProvider,
+        capabilities_json: input.workerCapabilitiesJson,
+      },
+      candidate.agent_provider,
+      candidate.runtime_model,
+      candidate.runtime_effort,
+    );
     if (!supportsSelection) continue;
 
     const sessionExpired = candidate.session_retained_until <= input.claimedAt;

@@ -770,11 +770,11 @@ export type ProjectAgentSkillInput = Pick<
   | "model"
   | "effort"
   | "kind"
+  | "executionMode"
+  | "approvalPolicy"
   | "position"
 > & {
   id?: string;
-  executionMode?: ProjectAgentSkillExecutionMode;
-  approvalPolicy?: ProjectAgentSkillApprovalPolicy;
 };
 
 export type CreateProjectAgentInput = {

@@ -27,6 +27,8 @@ const agent: DetachedAgent = {
       model: "gpt-5",
       effort: "high",
       kind: "custom",
+      executionMode: "task",
+      approvalPolicy: "explicit",
       position: 0,
     },
     {
@@ -38,6 +40,8 @@ const agent: DetachedAgent = {
       model: null,
       effort: null,
       kind: "custom",
+      executionMode: "task",
+      approvalPolicy: "explicit",
       position: 1,
     },
   ],

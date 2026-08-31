@@ -2025,23 +2025,9 @@ public nonisolated struct BriarAPI_ProjectAgentSkillInput: Sendable {
 
   public var kind: BriarAPI_AgentSkillKind = .unspecified
 
-  public var executionMode: BriarAPI_AgentSkillExecutionMode {
-    get {_executionMode ?? .unspecified}
-    set {_executionMode = newValue}
-  }
-  /// Returns true if `executionMode` has been explicitly set.
-  public var hasExecutionMode: Bool {self._executionMode != nil}
-  /// Clears the value of `executionMode`. Subsequent reads from it will return its default value.
-  public mutating func clearExecutionMode() {self._executionMode = nil}
+  public var executionMode: BriarAPI_AgentSkillExecutionMode = .unspecified
 
-  public var approvalPolicy: BriarAPI_AgentSkillApprovalPolicy {
-    get {_approvalPolicy ?? .unspecified}
-    set {_approvalPolicy = newValue}
-  }
-  /// Returns true if `approvalPolicy` has been explicitly set.
-  public var hasApprovalPolicy: Bool {self._approvalPolicy != nil}
-  /// Clears the value of `approvalPolicy`. Subsequent reads from it will return its default value.
-  public mutating func clearApprovalPolicy() {self._approvalPolicy = nil}
+  public var approvalPolicy: BriarAPI_AgentSkillApprovalPolicy = .unspecified
 
   public var position: UInt32 = 0
 
@@ -2052,8 +2038,6 @@ public nonisolated struct BriarAPI_ProjectAgentSkillInput: Sendable {
   fileprivate var _id: String? = nil
   fileprivate var _model: String? = nil
   fileprivate var _effort: String? = nil
-  fileprivate var _executionMode: BriarAPI_AgentSkillExecutionMode? = nil
-  fileprivate var _approvalPolicy: BriarAPI_AgentSkillApprovalPolicy? = nil
 }
 
 public nonisolated struct BriarAPI_CodexPetSelection: Sendable {
@@ -5509,8 +5493,8 @@ nonisolated extension BriarAPI_ProjectAgentSkillInput: SwiftProtobuf.Message, Sw
       case 6: try { try decoder.decodeSingularStringField(value: &self._model) }()
       case 7: try { try decoder.decodeSingularStringField(value: &self._effort) }()
       case 8: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
-      case 9: try { try decoder.decodeSingularEnumField(value: &self._executionMode) }()
-      case 10: try { try decoder.decodeSingularEnumField(value: &self._approvalPolicy) }()
+      case 9: try { try decoder.decodeSingularEnumField(value: &self.executionMode) }()
+      case 10: try { try decoder.decodeSingularEnumField(value: &self.approvalPolicy) }()
       case 11: try { try decoder.decodeSingularUInt32Field(value: &self.position) }()
       default: break
       }
@@ -5546,12 +5530,12 @@ nonisolated extension BriarAPI_ProjectAgentSkillInput: SwiftProtobuf.Message, Sw
     if self.kind != .unspecified {
       try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 8)
     }
-    try { if let v = self._executionMode {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 9)
-    } }()
-    try { if let v = self._approvalPolicy {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 10)
-    } }()
+    if self.executionMode != .unspecified {
+      try visitor.visitSingularEnumField(value: self.executionMode, fieldNumber: 9)
+    }
+    if self.approvalPolicy != .unspecified {
+      try visitor.visitSingularEnumField(value: self.approvalPolicy, fieldNumber: 10)
+    }
     if self.position != 0 {
       try visitor.visitSingularUInt32Field(value: self.position, fieldNumber: 11)
     }
@@ -5567,8 +5551,8 @@ nonisolated extension BriarAPI_ProjectAgentSkillInput: SwiftProtobuf.Message, Sw
     if lhs._model != rhs._model {return false}
     if lhs._effort != rhs._effort {return false}
     if lhs.kind != rhs.kind {return false}
-    if lhs._executionMode != rhs._executionMode {return false}
-    if lhs._approvalPolicy != rhs._approvalPolicy {return false}
+    if lhs.executionMode != rhs.executionMode {return false}
+    if lhs.approvalPolicy != rhs.approvalPolicy {return false}
     if lhs.position != rhs.position {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

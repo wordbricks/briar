@@ -448,6 +448,8 @@ export function projectAgentTemplateSkillInputs(
   return template.skills.map((skill, position) => ({
     ...skill,
     ...runtime,
+    executionMode: "task",
+    approvalPolicy: "explicit",
     position,
   }));
 }
