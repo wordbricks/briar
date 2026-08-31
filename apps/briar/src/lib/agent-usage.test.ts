@@ -87,27 +87,4 @@ describe("agent usage presentation", () => {
     expect(readAgentUsageHistory()[0]?.updatedAt).toBe(62_000);
     clearAgentUsageHistory();
   });
-
-  it("fills missing quota providers when reading older snapshots", () => {
-    clearAgentUsageHistory();
-    window.localStorage.setItem(
-      "briar.agent-usage.history.v1",
-      JSON.stringify([
-        {
-          updatedAt: 70_000,
-          claude: { ...provider, provider: "claude" },
-          codex: provider,
-          grok: { ...provider, provider: "grok" },
-        },
-      ]),
-    );
-
-    const [restored] = readAgentUsageHistory();
-    expect(restored?.agy.provider).toBe("agy");
-    expect(restored?.opencode.provider).toBe("opencode");
-    expect(restored?.openrouter.provider).toBe("openrouter");
-    expect(restored?.cursor.provider).toBe("cursor");
-    expect(restored?.agy.status).toBe("unavailable");
-    clearAgentUsageHistory();
-  });
 });

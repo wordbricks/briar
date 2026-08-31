@@ -124,11 +124,19 @@ function parseUsageSnapshot(value: unknown): AgentUsageSnapshot | null {
   const claude = usageProviderFrom(snapshot.claude, "claude");
   const codex = usageProviderFrom(snapshot.codex, "codex");
   const grok = usageProviderFrom(snapshot.grok, "grok");
+  const agy = usageProviderFrom(snapshot.agy, "agy");
+  const opencode = usageProviderFrom(snapshot.opencode, "opencode");
+  const openrouter = usageProviderFrom(snapshot.openrouter, "openrouter");
+  const cursor = usageProviderFrom(snapshot.cursor, "cursor");
   if (
     typeof snapshot.updatedAt !== "number" ||
     !claude ||
     !codex ||
-    !grok
+    !grok ||
+    !agy ||
+    !opencode ||
+    !openrouter ||
+    !cursor
   ) {
     return null;
   }
@@ -136,13 +144,10 @@ function parseUsageSnapshot(value: unknown): AgentUsageSnapshot | null {
     claude,
     codex,
     grok,
-    agy: usageProviderFrom(snapshot.agy, "agy") ?? emptyUsageProvider("agy"),
-    opencode: usageProviderFrom(snapshot.opencode, "opencode") ??
-      emptyUsageProvider("opencode"),
-    openrouter: usageProviderFrom(snapshot.openrouter, "openrouter") ??
-      emptyUsageProvider("openrouter"),
-    cursor: usageProviderFrom(snapshot.cursor, "cursor") ??
-      emptyUsageProvider("cursor"),
+    agy,
+    opencode,
+    openrouter,
+    cursor,
     updatedAt: snapshot.updatedAt,
   };
 }
