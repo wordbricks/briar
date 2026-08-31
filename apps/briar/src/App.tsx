@@ -4039,6 +4039,7 @@ export function App({
             channelInboxSyncSignal={channelInboxSyncSignal}
             channels={organizationDirectMessages}
             currentUserId={briar.user?.id ?? null}
+            isSidebarOpen={isSidebarOpen}
             key={`desktop-dms:${briar.activeOrganizationId}`}
             onChannelFallback={(channelId) =>
               handleDesktopChannelFallback(channelId, "dms")
@@ -4718,6 +4719,7 @@ export function App({
               channelInboxSyncSignal={channelInboxSyncSignal}
               channels={organizationDirectMessages}
               currentUserId={briar.user?.id ?? null}
+              isSidebarOpen
               onChannelSelect={setActiveChannelId}
               onChannelsChange={setOrganizationChannels}
               onIssueCreated={async (projectId, runId) => {
