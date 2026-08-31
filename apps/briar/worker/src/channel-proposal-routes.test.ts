@@ -1256,7 +1256,6 @@ describe("channel issue proposal approval route", () => {
         conversationRunId,
         issueId: proposalId,
         attachmentCount: 0,
-        fullAuto: false,
       },
       issueCheckpoints: [],
       fullAuto: false,

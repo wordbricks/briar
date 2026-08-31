@@ -146,7 +146,6 @@ export async function materializeChannelIssueBatch(input: {
           batchKey: item.localKey,
           relatedMessage,
           attachmentCount: 0,
-          fullAuto: false,
         }),
         input.proposalCreatedAt,
         input.proposalCreatedAt,

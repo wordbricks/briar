@@ -239,7 +239,8 @@ export async function assertQueuedHuntClaim(
 ) {
   const run = await db
     .prepare(
-      `select stage, status, claim_token_hash, lease_expires_at, context_json,
+      `select stage, status, claim_token_hash, lease_expires_at,
+              requires_claim_token,
               case when claim_token_hash = ? then 1 else 0 end as claim_token_valid
        from briar_hunt_runs
        where project_id = ? and source = ? and source_key = ?
@@ -251,7 +252,7 @@ export async function assertQueuedHuntClaim(
       status: AutoHuntPersistedRunStatus;
       claim_token_hash: string | null;
       lease_expires_at: string | null;
-      context_json: string | null;
+      requires_claim_token: 0 | 1;
       claim_token_valid: number;
     }>();
   if (!run) return;
@@ -261,19 +262,11 @@ export async function assertQueuedHuntClaim(
     }
     return;
   }
-  const context: unknown = run.context_json
-    ? JSON.parse(run.context_json)
-    : null;
-  const appCreated =
-    context !== null &&
-    typeof context === "object" &&
-    !Array.isArray(context) &&
-    (context as Record<string, unknown>).origin === "briar-app";
   if (!run.claim_token_hash) {
     if (claimTokenHash) {
       throw new HuntClaimError("Issue processing claim token is no longer active");
     }
-    if (!appCreated) return;
+    if (run.requires_claim_token !== 1) return;
   }
   if (
     run.claim_token_valid !== 1 ||

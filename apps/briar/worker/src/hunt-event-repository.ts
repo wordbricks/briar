@@ -411,10 +411,11 @@ export async function recordHuntEvent(
            structured_result_json,
            pull_request_urls, target_sha, source_created_at,
            staging_qa_status, production_qa_status, staging_qa_detail,
-           production_qa_detail, context_json, started_at, completed_at,
+           production_qa_detail, context_json, full_auto,
+           requires_claim_token, started_at, completed_at,
            last_event_at, created_at, updated_at,
            preferred_agent_provider, preferred_agent_model, preferred_agent_effort
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(project_id, source, source_key) do nothing`,
       )
       .bind(
@@ -454,6 +455,8 @@ export async function recordHuntEvent(
         normalizedInput.stagingQaDetail,
         normalizedInput.productionQaDetail,
         normalizedInput.context ? stableJson(normalizedInput.context) : null,
+        normalizedInput.fullAuto === true ? 1 : 0,
+        normalizedInput.requiresClaimToken === true ? 1 : 0,
         normalizedInput.occurredAt,
         completedAt,
         normalizedInput.occurredAt,

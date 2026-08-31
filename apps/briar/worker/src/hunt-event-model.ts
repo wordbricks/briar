@@ -71,6 +71,7 @@ export type HuntEventInput = {
   assigneeUserId?: string | null;
   issueCheckpoints?: AutoHuntWorkflowCheckpoint[];
   fullAuto?: boolean;
+  requiresClaimToken?: boolean;
   resultSummary: string | null;
   structuredResult: StructuredAgentResult | null;
   pullRequestUrls: string[];

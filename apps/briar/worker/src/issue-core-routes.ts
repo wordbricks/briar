@@ -149,6 +149,7 @@ export async function createProjectIssue(
     preferredModel: issue.preferredModel ?? null,
     preferredEffort: issue.preferredEffort ?? null,
   };
+  const requiresClaimToken = input.attribution === undefined;
   const attribution = input.attribution ?? {
     sourceKey: `briar-issue:${input.clientIssueId}`,
     actor: "briar-app",
@@ -258,6 +259,7 @@ export async function createProjectIssue(
       assigneeUserId: canonicalIssue.assigneeUserId,
       issueCheckpoints: canonicalIssue.checkpoints,
       fullAuto: canonicalIssue.fullAuto,
+      requiresClaimToken,
       branch: null,
       commitSha: null,
       tracker: null,
@@ -274,7 +276,6 @@ export async function createProjectIssue(
         ...attribution.context,
         issueId: input.clientIssueId,
         attachmentCount: uploads.length,
-        fullAuto: canonicalIssue.fullAuto,
       },
       createdByUserId: input.userId,
       preferredAgentProvider: canonicalIssue.preferredProvider,

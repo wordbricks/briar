@@ -298,7 +298,7 @@ describe("workflow checkpoint policy persistence", () => {
       stage: "pr_open",
       position: "after",
     }];
-    event.context = { origin: "briar-app", fullAuto: true };
+    event.context = { origin: "briar-app" };
 
     const runId = await recordHuntEvent(db, projectId, event);
     const created = await db

@@ -17,6 +17,7 @@ import type {
   IssueDependencyRow,
   IssueResultReviewRow,
 } from "./db";
+import { runIsFullAuto } from "./hunt-run-codec";
 import { issueAttachmentJson } from "./issue-conversation-json";
 
 const parseJsonArray = (value: string) => {
@@ -147,9 +148,7 @@ export function dashboardRunJson(
     issueCheckpoints: decodeAutoHuntWorkflowCheckpointsJson(
       run.issue_checkpoints_json,
     ),
-    fullAuto:
-      context !== null &&
-      (context as Record<string, unknown>).fullAuto === true,
+    fullAuto: runIsFullAuto(run),
     detail: run.detail,
     priority: run.priority,
     difficulty: run.difficulty,

@@ -3252,6 +3252,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         commitSha: null,
         issueDescription: "Created directly in Briar",
         sourceCreatedAt: atMinute(20),
+        requiresClaimToken: true,
         context: {
           origin: "briar-app",
           issueId: "22222222-2222-4222-8222-222222222222",
@@ -5017,7 +5018,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           origin: "briar-conversation",
           proposalId: createProposal!.id,
           conversationRunId: runId,
-          fullAuto: false,
         },
       }),
     );

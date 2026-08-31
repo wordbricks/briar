@@ -137,7 +137,6 @@ async function createApprovedChannelProposalIssue(input: {
       issueId: input.proposalId,
       relatedMessage,
       attachmentCount: 0,
-      fullAuto: false,
     },
     createdByUserId: input.createdByUserId,
     preferredAgentProvider: null,
