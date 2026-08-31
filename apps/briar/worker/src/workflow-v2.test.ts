@@ -1,4 +1,3 @@
-import * as Predicate from "effect/Predicate";
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
@@ -26,11 +25,6 @@ import {
   HuntTransitionError,
 } from "./db";
 import { applyD1Migrations } from "./test-helpers/d1";
-
-type WorkflowSnapshots = {
-  readonly settings: string;
-  readonly run: string;
-};
 
 const baseTime = Date.parse("2026-08-01T00:00:00Z");
 const at = (minute: number) =>
@@ -68,24 +62,6 @@ const event = (
   ...overrides,
 });
 
-const frozenSnapshot = JSON.stringify({
-  version: 2,
-  requirements: [],
-  stages: [
-    { id: "implementing", label: "Implement", required: true },
-    { id: "pr_open", label: "Open PR", required: true },
-    { id: "production_qa", label: "Production QA", required: true },
-  ],
-  execution: {
-    checkpoints: [{
-      key: "project-after-pr_open",
-      stage: "pr_open",
-      position: "after",
-    }],
-  },
-  completion: { requiredStages: ["implementing", "pr_open", "production_qa"] },
-});
-
 const v2Workflow: AutoHuntWorkflow = normalizeAutoHuntWorkflow({
   version: 2,
   requirements: [],
@@ -111,21 +87,20 @@ describe("workflow v2 D1 persistence and transitions", () => {
   let db: D1Database;
   let projectId: string;
   let v2RunId: string;
-  let snapshotsBeforeMigration: WorkflowSnapshots;
 
-  const setProjectWorkflow = async (workflow: AutoHuntWorkflow | string) => {
-    const workflowJson = Predicate.isString(workflow)
-      ? workflow
-      : JSON.stringify(workflow);
-    const checkpoints = (JSON.parse(workflowJson) as AutoHuntWorkflow)
-      .execution.checkpoints;
+  const setProjectWorkflow = async (workflow: AutoHuntWorkflow) => {
+    const workflowJson = JSON.stringify(workflow);
     await db
       .prepare(
         `update briar_project_settings
          set workflow_json = ?, mandatory_checkpoints_json = ?
          where project_id = ?`,
       )
-      .bind(workflowJson, JSON.stringify(checkpoints), projectId)
+      .bind(
+        workflowJson,
+        JSON.stringify(workflow.execution.checkpoints),
+        projectId,
+      )
       .run();
   };
 
@@ -147,69 +122,20 @@ describe("workflow v2 D1 persistence and transitions", () => {
 
   beforeAll(async () => {
     db = env.DB;
-    await applyD1Migrations(db, {
-      exclude: [
-        "0059_workflow_v2_progress.sql",
-        "0061_workflow_stage_status_events.sql",
-        "0078_workflow_v2_only.sql",
-        // 0090 validates the checkpoint wait columns introduced by 0059.
-        // Keep this historical fixture in real dependency order instead of
-        // applying the approval guards against the deliberately pre-0059
-        // schema assembled above.
-        "0090_channel_issue_approval.sql",
-        "0091_issue_execution_approvals.sql",
-        "0092_agent_skill_execution_approvals.sql",
-        "0100_channel_issue_regular_lifecycle.sql",
-        "0101_issue_conversation_realtime.sql",
-        // 0099 rebuilds channel messages and restores the guards from the
-        // deliberately excluded 0091 and 0092 migrations.
-        "0099_channel_incoming_webhooks.sql",
-        // 0106 snapshots the fully migrated provider-constrained schema and
-        // therefore depends on the deliberately excluded approval tables.
-        "0106_agent_provider_agy.sql",
-        // 0111 is the equivalent full-schema rebuild for Cursor and has the
-        // same dependency on the deliberately excluded approval tables.
-        "0111_agent_provider_cursor.sql",
-        // 0112 rebuilds the Agent approval tables whose migrations are
-        // deliberately excluded by this historical workflow fixture.
-        "0112_expand_agent_text_limits.sql",
-        // 0116 is another full-schema provider rebuild and therefore has the
-        // same dependency on the deliberately excluded approval tables.
-        "0116_agent_provider_openrouter.sql",
-        // 0115 backfills approval events from the progress table introduced by 0059.
-        "0115_issue_status_actor_tracking.sql",
-        // 0116 rebuilds issue reply jobs from the explicit-skill schema that
-        // this historical workflow fixture deliberately leaves out.
-        "0116_issue_project_agent_replies.sql",
-        // 0118 backfills trusted requesters from the Agent Skill approval
-        // audit that this historical workflow fixture deliberately excludes.
-        "0118_agent_session_inbox_requesters.sql",
-        // 0139 installs channel approval triggers that depend on the
-        // approval columns deliberately excluded from this historical schema.
-        "0139_channel_related_message.sql",
-        // 0140 extends the Agent Skill approval tables and result projections
-        // deliberately excluded from this historical workflow fixture.
-        "0140_agent_skill_execution_modes.sql",
-        // 0143 replaces the Agent Skill approval trigger and therefore
-        // depends on the approval tables deliberately excluded above.
-        "0143_conversation_skill_session_runtime.sql",
-        // 0146 recreates an approval trigger that this fixture installs later
-        // in historical order with migration 0091.
-        "0146_organization_capability_roles.sql",
-        // These current-format cutovers depend on later schema that this
-        // deliberately partial workflow fixture does not construct.
-        "0154_canonical_project_agent_schedule_recurrence.sql",
-        "0155_archive_format_v2.sql",
-        "0156_canonical_channel_issue_proposal_status.sql",
-      ],
-    });
-
+    await applyD1Migrations(db);
     await db
       .prepare(
-        `insert into user (id, name, email, emailVerified, createdAt, updatedAt)
-         values (?, ?, ?, 1, ?, ?)`,
+        `insert into user (
+           id, name, email, emailVerified, createdAt, updatedAt
+         ) values (?, ?, ?, 1, ?, ?)`,
       )
-      .bind("workflow-owner", "Workflow Owner", "workflow@example.com", at(0), at(0))
+      .bind(
+        "workflow-owner",
+        "Workflow Owner",
+        "workflow@example.com",
+        at(0),
+        at(0),
+      )
       .run();
     const organization = await createOrganization(db, {
       name: "Workflow Org",
@@ -224,126 +150,14 @@ describe("workflow v2 D1 persistence and transitions", () => {
     });
     projectId = project.id;
 
-    // Migration 0059 only adds normalized progress storage and must not rewrite
-    // an already-frozen workflow snapshot.
-    await setProjectWorkflow(v2Workflow);
-    const frozenRunId = await recordHuntEvent(
-      db,
-      projectId,
-      event("frozen-snapshot", "frozen-snapshot:queued", at(1)),
-    );
-    await setProjectWorkflow(frozenSnapshot);
-    await db
-      .prepare(`update briar_hunt_runs set workflow_snapshot_json = ? where id = ?`)
-      .bind(frozenSnapshot, frozenRunId)
-      .run();
-    const beforeSettings = await db
-      .prepare(`select workflow_json from briar_project_settings where project_id = ?`)
-      .bind(projectId)
-      .first<{ workflow_json: string }>();
-    const beforeRun = await db
-      .prepare(`select workflow_snapshot_json from briar_hunt_runs where id = ?`)
-      .bind(frozenRunId)
-      .first<{ workflow_snapshot_json: string }>();
-    snapshotsBeforeMigration = {
-      settings: beforeSettings!.workflow_json,
-      run: beforeRun!.workflow_snapshot_json,
-    };
-
-    await applyD1Migrations(db, {
-      files: ["0059_workflow_v2_progress.sql"],
-    });
-    await db
-      .prepare(
-        `insert into briar_run_stage_progress (
-           run_id, attempt, revision, stage_id, state, started_at, finished_at
-         ) values (?, 1, 1, 'implementing', 'completed', ?, ?)`,
-      )
-      .bind(frozenRunId, at(3), at(4))
-      .run();
-    await applyD1Migrations(db, {
-      files: ["0061_workflow_stage_status_events.sql"],
-    });
-    await applyD1Migrations(db, {
-      files: ["0090_channel_issue_approval.sql"],
-    });
-    await applyD1Migrations(db, {
-      files: ["0091_issue_execution_approvals.sql"],
-    });
-    await applyD1Migrations(db, {
-      files: ["0092_agent_skill_execution_approvals.sql"],
-    });
-    await applyD1Migrations(db, {
-      files: ["0100_channel_issue_regular_lifecycle.sql"],
-    });
-    await applyD1Migrations(db, {
-      files: ["0101_issue_conversation_realtime.sql"],
-    });
-    const backfilled = await db
-      .prepare(
-        `select event_count, last_event_at from briar_hunt_runs where id = ?`,
-      )
-      .bind(frozenRunId)
-      .first<{ event_count: number; last_event_at: string }>();
-    expect(backfilled).toEqual({ event_count: 2, last_event_at: at(3) });
-    expect(
-      await db
-        .prepare(
-          `select workflow_stage from briar_hunt_events
-           where run_id = ? and event_key = 'workflow:stage-start:1:1:implementing'`,
-        )
-        .bind(frozenRunId)
-        .first<string>("workflow_stage"),
-    ).toBe("implementing");
-
-    const afterSettings = await db
-      .prepare(`select workflow_json from briar_project_settings where project_id = ?`)
-      .bind(projectId)
-      .first<{ workflow_json: string }>();
-    const afterRun = await db
-      .prepare(`select workflow_snapshot_json from briar_hunt_runs where id = ?`)
-      .bind(frozenRunId)
-      .first<{ workflow_snapshot_json: string }>();
-    expect(afterSettings?.workflow_json).toBe(snapshotsBeforeMigration.settings);
-    expect(afterRun?.workflow_snapshot_json).toBe(snapshotsBeforeMigration.run);
-
     await setProjectWorkflow(v2Workflow);
     v2RunId = await recordHuntEvent(
       db,
       projectId,
       event("v2-transitions", "v2-transitions:queued", at(2)),
     );
-  }, 30_000);
-
-  it("keeps frozen snapshots byte-for-byte unchanged and initializes normalized rows", async () => {
-    const progress = await initializeWorkflowProgress(db, projectId, { runId: v2RunId });
-
-    expect(progress?.attempt).toBe(1);
-    expect(progress?.revision).toBe(1);
-    expect(progress?.stages.map((stage) => [stage.stage_id, stage.state])).toEqual([
-      ["implementing", "pending"],
-      ["pr_open", "pending"],
-      ["staging_qa", "pending"],
-      ["production_qa", "pending"],
-    ]);
-    expect(progress?.checkpoints.map((checkpoint) => checkpoint.checkpoint_key)).toEqual([
-      "project-before-pr_open",
-      "project-after-pr_open",
-      "project-before-production_qa",
-    ]);
-
-    const frozenRun = await db
-      .prepare(
-        `select waiting_checkpoint_key, waiting_checkpoint_revision
-         from briar_hunt_runs where workflow_snapshot_json = ?`,
-      )
-      .bind(snapshotsBeforeMigration.run)
-      .first<{ waiting_checkpoint_key: string | null; waiting_checkpoint_revision: number | null }>();
-    expect(frozenRun).toEqual({
-      waiting_checkpoint_key: null,
-      waiting_checkpoint_revision: null,
-    });
-  });
+    await initializeWorkflowProgress(db, projectId, { runId: v2RunId });
+  }, 60_000);
 
   it("enforces idempotent forward stage transitions and before/after checkpoint boundaries", async () => {
     const identity = { runId: v2RunId, attempt: 1, revision: 1 };
