@@ -30,6 +30,23 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.175",
+        date: "2026년 8월 31일",
+        title: "이슈 작업을 찾고 관리형 컴퓨터를 더 안전하게 관리합니다",
+        summary:
+          "My Issues 목록과 이슈 수정 CLI를 추가하고, 이슈 기본값·Inbox 작업·관리형 컴퓨터 권한과 실행 환경을 정리했습니다.",
+        items: [
+          "My Issues에서 범위 탭, 검색, 프로젝트·속성 필터, 접을 수 있는 상태 그룹, 행 메타데이터를 사용하고 기존 칸반 보기로 전환할 수 있습니다.",
+          "Briar CLI에서 이슈 제목, 본문, 우선순위, 난이도, 담당자를 수정하거나 해제할 수 있습니다.",
+          "새 이슈의 담당자를 작성자로 기본 지정하고 데스크톱과 iOS 작성 화면에 같은 기본값을 적용합니다.",
+          "데스크톱 Inbox 대화 메시지를 수정하거나 삭제할 수 있습니다.",
+          "이슈 본문 글자 크기를 15px로 맞춰 긴 내용을 읽기 쉽게 했습니다.",
+          "관리형 컴퓨터의 GitHub CLI 브라우저 실행을 서비스에서 분리하고 새 컴퓨터가 업데이트된 검증 이미지와 Launch Template을 사용하도록 했습니다.",
+          "관리형 컴퓨터 owner와 worker가 로컬 관리자 경로를 사용할 수 있게 하면서 EC2 Parameter Store 읽기는 차단했습니다.",
+          "관리형 이미지 검증에서 visudo 경로를 올바르게 찾고 런타임과 브라우저 실행 설정을 일치시켰습니다.",
+        ],
+      },
+      {
         version: "1.2.174",
         date: "2026년 8월 31일",
         title: "조직 생성부터 저장소 연결까지 첫 실행을 한 흐름으로 시작합니다",
@@ -1332,6 +1349,23 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.175",
+        date: "August 31, 2026",
+        title: "Find issue work faster and tighten managed-computer access",
+        summary:
+          "Add a richer My Issues list and an issue-update CLI command while tightening issue defaults, Inbox actions, and managed-computer access.",
+        items: [
+          "Browse My Issues in a grouped list with scope tabs, search, project and property filters, collapsible status groups, row metadata, and a Kanban view.",
+          "Update an issue from the Briar CLI, including its title, description, priority, difficulty, or assignee.",
+          "Assign newly created issues to the creator by default and use the same default in desktop and iOS issue forms.",
+          "Edit or delete Inbox conversation messages from the desktop app.",
+          "Keep issue descriptions readable with a 15px body size.",
+          "Launch GitHub CLI browser sessions independently from managed-computer services and point new computers at the updated verified image and Launch Template.",
+          "Let managed-computer owners and workers use the local admin path without granting access to EC2 Parameter Store.",
+          "Make managed-image checks resolve visudo correctly and keep runtime and browser-launch configuration consistent.",
+        ],
+      },
       {
         version: "1.2.174",
         date: "August 31, 2026",
@@ -2726,7 +2760,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-174">
+          <a href="#v1-2-175">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2748,7 +2782,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.174"
+                      entry.version === "1.2.175"
+                        ? "2026-08-31"
+                        : entry.version === "1.2.174"
                         ? "2026-08-31"
                         : entry.version === "1.2.173"
                         ? "2026-08-30"
