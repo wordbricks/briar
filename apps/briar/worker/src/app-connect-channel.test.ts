@@ -59,7 +59,7 @@ const connectRequest = () => new Request(
       mentionedAgentIds: [agentId],
       skillId,
       preferredDeviceId: deviceId,
-      attachmentReferences: ["existing-image"],
+      attachments: [],
     }),
   },
 );
@@ -212,9 +212,7 @@ describe("app Channel Connect adapter", () => {
       organizationId,
       channelId,
       userId,
-      attachmentsBucket: {},
-      attachments: [],
-      attachmentReferences: ["existing-image"],
+      attachmentIds: [],
       request: {
         body: "Please create the issue",
         clientMessageId,
