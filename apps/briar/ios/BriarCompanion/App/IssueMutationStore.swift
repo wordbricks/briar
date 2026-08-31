@@ -13,6 +13,7 @@ final class IssueMutationStore: ObservableObject {
 
     private let api: any MobileAPIClientProtocol
     private let projectID: UUID
+    private let issueProjectID: UUID?
     private let token: String
     private let requestID: @Sendable () -> UUID
     private let attachmentReference: @Sendable () -> String
@@ -21,6 +22,7 @@ final class IssueMutationStore: ObservableObject {
     init(
         api: any MobileAPIClientProtocol,
         projectID: UUID,
+        issueProjectID: UUID? = nil,
         token: String,
         requestID: @escaping @Sendable () -> UUID = UUID.init,
         attachmentReference: @escaping @Sendable () -> String = {
@@ -29,6 +31,7 @@ final class IssueMutationStore: ObservableObject {
     ) {
         self.api = api
         self.projectID = projectID
+        self.issueProjectID = issueProjectID
         self.token = token
         self.requestID = requestID
         self.attachmentReference = attachmentReference
@@ -49,7 +52,9 @@ final class IssueMutationStore: ObservableObject {
                 throw IssueMutationError.attachment(message)
             }
             let description = draft.description.trimmingCharacters(in: .whitespacesAndNewlines)
-            let path = MobileAPIContract.Endpoint.issues(projectID: projectID)
+            let path = MobileAPIContract.Endpoint.issues(
+                projectID: issueProjectID ?? projectID
+            )
             if attachments.isEmpty {
                 return try await api.send(
                     path,
@@ -162,6 +167,25 @@ final class IssueMutationStore: ObservableObject {
                 token: token,
                 body: TransferIssueRequest(targetProjectId: targetProjectID),
                 as: TransferIssueResponse.self
+            )
+        }
+    }
+
+    func moveIssueProject(
+        runID: UUID,
+        sourceProjectID: UUID,
+        targetProjectID: UUID
+    ) async throws -> IssueProjectMoveResponse {
+        try await perform("move-project-\(runID)") {
+            try await api.send(
+                MobileAPIContract.Endpoint.planningProjectIssue(
+                    projectID: sourceProjectID,
+                    runID: runID
+                ),
+                method: "PATCH",
+                token: token,
+                body: IssueProjectMoveRequest(targetProjectId: targetProjectID),
+                as: IssueProjectMoveResponse.self
             )
         }
     }

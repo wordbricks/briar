@@ -29,6 +29,10 @@ struct IssueSubscriber: Codable, Equatable, Hashable, Sendable {
 
 struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
+    let workspaceId: UUID?
+    let teamId: UUID?
+    let projectId: UUID?
+    let projectName: String?
     let runNumber: Int?
     let currentAttempt: Int?
     let currentRevision: Int?
@@ -83,6 +87,10 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
 
     init(
         id: UUID,
+        workspaceId: UUID? = nil,
+        teamId: UUID? = nil,
+        projectId: UUID? = nil,
+        projectName: String? = nil,
         runNumber: Int? = nil,
         currentAttempt: Int? = nil,
         currentRevision: Int? = nil,
@@ -136,6 +144,10 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         eventCount: Int? = nil
     ) {
         self.id = id
+        self.workspaceId = workspaceId
+        self.teamId = teamId
+        self.projectId = projectId
+        self.projectName = projectName
         self.runNumber = runNumber
         self.currentAttempt = currentAttempt
         self.currentRevision = currentRevision

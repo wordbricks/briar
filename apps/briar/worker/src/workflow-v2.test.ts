@@ -12,7 +12,6 @@ import {
   completeWorkflowStageLifecycle,
   completeWorkflowStage,
   createOrganization,
-  createProject,
   getHuntRunForProject,
   getWorkflowProgress,
   initializeWorkflowProgress,
@@ -201,6 +200,14 @@ describe("workflow v2 D1 persistence and transitions", () => {
         // 0146 recreates an approval trigger that this fixture installs later
         // in historical order with migration 0091.
         "0146_organization_capability_roles.sql",
+        // 0144's decline guard references the approval columns that this
+        // historical fixture deliberately adds later with migration 0090.
+        // Exclude it so 0149's Team table rename does not reparse an
+        // intentionally incomplete trigger.
+        "0144_channel_issue_proposal_declines.sql",
+        // Apply the hierarchy migration only after the deliberately delayed
+        // workflow/approval migrations below have reached their real order.
+        "0149_workspace_team_project_issue_hierarchy.sql",
       ],
     });
 
@@ -216,13 +223,32 @@ describe("workflow v2 D1 persistence and transitions", () => {
       handle: "workflow-org",
       ownerUserId: "workflow-owner",
     });
-    const project = await createProject(db, {
-      ownerUserId: "workflow-owner",
-      organizationId: organization.id,
-      name: "Workflow Project",
-      agentTokenHash: "a".repeat(64),
-    });
-    projectId = project.id;
+    projectId = crypto.randomUUID();
+    await db.batch([
+      db.prepare(
+        `insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        projectId,
+        "workflow-owner",
+        organization.id,
+        "Workflow Project",
+        "a".repeat(64),
+        at(0),
+        at(0),
+      ),
+      db.prepare(
+        `insert into briar_project_settings (
+           project_id, workflow_json, mandatory_checkpoints_json,
+           created_at, updated_at
+         ) values (?, ?, '[]', ?, ?)`,
+      ).bind(projectId, JSON.stringify(v2Workflow), at(0), at(0)),
+    ]);
+    await db.prepare(
+      `create view briar_teams as select * from briar_projects`,
+    ).run();
 
     // Migration 0059 only adds normalized progress storage and must not rewrite
     // an already-frozen workflow snapshot.
@@ -278,6 +304,17 @@ describe("workflow v2 D1 persistence and transitions", () => {
     });
     await applyD1Migrations(db, {
       files: ["0101_issue_conversation_realtime.sql"],
+    });
+    const incompatibleSkillTriggers = await db.prepare(
+      `select name from sqlite_master
+       where type = 'trigger' and sql like '%instructions%'`,
+    ).all<{ name: string }>();
+    for (const trigger of incompatibleSkillTriggers.results) {
+      await db.prepare(`drop trigger "${trigger.name}"`).run();
+    }
+    await db.prepare(`drop view briar_teams`).run();
+    await applyD1Migrations(db, {
+      files: ["0149_workspace_team_project_issue_hierarchy.sql"],
     });
     const backfilled = await db
       .prepare(

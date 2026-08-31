@@ -411,7 +411,21 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         'codex', '{"briar":"1.1.0"}', 'stale', '${atMinute(0)}',
         '${atMinute(0)}', '${atMinute(0)}'
       );
-    `,
+      `,
+    );
+    await executeSql(
+      db,
+      `create view briar_teams as select * from briar_projects;
+       create trigger briar_teams_legacy_insert
+       instead of insert on briar_teams BEGIN
+         insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (
+           new.id, new.owner_user_id, new.organization_id, new.name,
+           new.agent_token_hash, new.created_at, new.updated_at
+         );
+       END;`,
     );
     const migrationRunId = "99999999-9999-4999-8999-999999999999";
     await executeSql(
@@ -1130,6 +1144,43 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          add column agent_responsibility_snapshot text;
        create unique index briar_issue_agent_reply_jobs_agent_test_idx
          on briar_issue_agent_reply_jobs (project_id, trigger_message_id, agent_id);`,
+    );
+    // Current read paths distinguish the execution Team from the lightweight
+    // planning Project. This compact historical fixture intentionally stops
+    // before migration 0149, so model its compatibility contract with each
+    // legacy Project acting as its own General planning Project.
+    await executeSql(
+      db,
+      `alter table briar_projects add column team_id text;
+       update briar_projects set team_id = id;
+       create view briar_planning_projects as
+         select id, team_id, name from briar_projects;
+       alter table briar_hunt_runs add column planning_project_id text;
+       update briar_hunt_runs set planning_project_id = project_id;
+       create trigger briar_projects_legacy_general_after_insert
+       after insert on briar_projects
+       when new.team_id is null
+       BEGIN
+         update briar_projects set team_id = new.id where id = new.id;
+       END;
+       create trigger briar_hunt_runs_legacy_general_after_insert
+       after insert on briar_hunt_runs
+       when new.planning_project_id is null
+       BEGIN
+         update briar_hunt_runs
+         set planning_project_id = new.project_id where id = new.id;
+       END;
+       create trigger briar_hunt_runs_legacy_general_after_transfer
+       after update of project_id on briar_hunt_runs
+       BEGIN
+         update briar_hunt_runs
+         set planning_project_id = new.project_id where id = new.id;
+       END;
+       create trigger briar_teams_legacy_delete
+       instead of delete on briar_teams
+       BEGIN
+         delete from briar_projects where id = old.id;
+       END;`,
     );
   }, 30_000);
 
@@ -3546,7 +3597,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         .first(),
     ).resolves.toBeNull();
     await expect(
-      db.prepare(`select id from briar_projects where id = ?`).bind(project.id).first(),
+      db.prepare(`select id from briar_teams where id = ?`).bind(project.id).first(),
     ).resolves.toBeNull();
     await expect(
       db

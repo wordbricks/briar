@@ -286,7 +286,7 @@ export async function listOrganizationAgentContextProjectsPage(
   const [count, result] = await Promise.all([
     db.prepare(
       `select count(*) as count
-       from briar_projects
+       from briar_teams
        where organization_id = ? and created_at <= ?`,
     ).bind(input.organizationId, input.snapshotAt).first<{ count: number }>(),
     db.prepare(
@@ -295,7 +295,7 @@ export async function listOrganizationAgentContextProjectsPage(
               settings.linear_enabled, settings.linear_source,
               settings.linear_team_key, settings.github_repository,
               settings.workflow_json
-       from briar_projects project
+       from briar_teams project
        left join briar_project_settings settings
          on settings.project_id = project.id
        where project.organization_id = ? and project.created_at <= ?
@@ -380,7 +380,7 @@ export async function listOrganizationAgentContextAgentsPage(
     db.prepare(
       `select count(*) as count
        from briar_project_agents agent
-       join briar_projects project on project.id = agent.project_id
+       join briar_teams project on project.id = agent.project_id
        where agent.organization_id = ? and agent.project_id = ?
          and project.organization_id = ? and agent.created_at <= ?`,
     ).bind(
@@ -397,7 +397,7 @@ export async function listOrganizationAgentContextAgentsPage(
               null as skill_markdown, agent.effort,
               agent.created_at, agent.updated_at
        from briar_project_agents agent
-       join briar_projects project on project.id = agent.project_id
+       join briar_teams project on project.id = agent.project_id
        where agent.organization_id = ? and agent.project_id = ?
          and project.organization_id = ? and agent.created_at <= ?
          and (
@@ -565,7 +565,7 @@ export async function listOrganizationAgentContextIssuesPage(
     db.prepare(
       `select count(*) as count
        from briar_hunt_runs run
-       join briar_projects project on project.id = run.project_id
+       join briar_teams project on project.id = run.project_id
        where run.project_id = ? and project.organization_id = ?
          and run.created_at <= ?`,
     ).bind(
@@ -605,7 +605,7 @@ export async function listOrganizationAgentContextIssuesPage(
                   and archive.status = 'verified'
               ) as event_count_stable
        from briar_hunt_runs run
-       join briar_projects project on project.id = run.project_id
+       join briar_teams project on project.id = run.project_id
        where run.project_id = ? and project.organization_id = ?
          and run.created_at <= ? and run.run_number > ?
        order by run.run_number
@@ -669,7 +669,7 @@ export async function listOrganizationAgentContextIssuePullRequestsPage(
     db.prepare(
       `select coalesce(sum(json_array_length(run.pull_request_urls)), 0) as count
        from briar_hunt_runs run
-       join briar_projects project on project.id = run.project_id
+       join briar_teams project on project.id = run.project_id
        where run.project_id = ? and project.organization_id = ?
          and run.created_at <= ?`,
     ).bind(
@@ -682,7 +682,7 @@ export async function listOrganizationAgentContextIssuePullRequestsPage(
               run.run_number, cast(link.key as integer) as position,
               cast(link.value as text) as url
        from briar_hunt_runs run
-       join briar_projects project on project.id = run.project_id
+       join briar_teams project on project.id = run.project_id
        join json_each(run.pull_request_urls) link
        where run.project_id = ? and project.organization_id = ?
          and run.created_at <= ?
@@ -857,7 +857,7 @@ export async function listOrganizationAgentContextSessionsPage(
      and membership.session_id = session.id
     where session.project_id = ? and membership.visible_at <= ?
       and exists (
-        select 1 from briar_projects project
+        select 1 from briar_teams project
         where project.id = session.project_id and project.organization_id = ?
       )
     union
@@ -871,7 +871,7 @@ export async function listOrganizationAgentContextSessionsPage(
       and archive.status in ('verified', 'complete')
       and membership.visible_at <= ?
       and exists (
-        select 1 from briar_projects project
+        select 1 from briar_teams project
         where project.id = archive.project_id and project.organization_id = ?
       )`;
   const [count, result] = await Promise.all([
@@ -1028,7 +1028,7 @@ export async function organizationAgentContextManifest(
             coalesce(session_stats.archived_session_count, 0)
               as archived_session_count,
             session_stats.revision as session_revision
-     from briar_projects project
+     from briar_teams project
      left join briar_project_settings settings on settings.project_id = project.id
      left join agent_stats on agent_stats.project_id = project.id
      left join issue_stats on issue_stats.project_id = project.id
@@ -1103,7 +1103,7 @@ async function organizationAgentContextProjectSettings(
             settings.linear_enabled, settings.linear_source,
             settings.linear_team_key, settings.github_repository,
             settings.workflow_json
-     from briar_projects project
+     from briar_teams project
      left join briar_project_settings settings on settings.project_id = project.id
      where project.id = ? and project.organization_id = ?
        and project.created_at <= ?`,
@@ -1150,7 +1150,7 @@ async function organizationAgentContextAgentSummaries(
     db.prepare(
       `select count(*) as count
        from briar_project_agents agent
-       join briar_projects project on project.id = agent.project_id
+       join briar_teams project on project.id = agent.project_id
        where agent.project_id = ? and project.organization_id = ?
          and agent.created_at <= ?`,
     ).bind(
@@ -1164,7 +1164,7 @@ async function organizationAgentContextAgentSummaries(
               agent.created_at,
               agent.updated_at
        from briar_project_agents agent
-       join briar_projects project on project.id = agent.project_id
+       join briar_teams project on project.id = agent.project_id
        where agent.project_id = ? and project.organization_id = ?
          and agent.created_at <= ?
          and (? is null or agent.created_at > ?
@@ -1269,7 +1269,7 @@ async function organizationAgentContextAgentDetails(
             null as skill_markdown, agent.effort,
             agent.created_at, agent.updated_at
      from briar_project_agents agent
-     join briar_projects project on project.id = agent.project_id
+     join briar_teams project on project.id = agent.project_id
      where agent.project_id = ? and project.organization_id = ?
        and agent.created_at <= ?
        and agent.id in (${sqlPlaceholders(input.ids)})`,
@@ -1296,7 +1296,7 @@ async function organizationAgentContextSkillDetails(
             skill.updated_at
      from briar_agent_skills skill
      join briar_project_agents agent on agent.id = skill.agent_id
-     join briar_projects project on project.id = agent.project_id
+     join briar_teams project on project.id = agent.project_id
      where agent.project_id = ? and project.organization_id = ?
        and skill.created_at <= ?
        and skill.id in (${sqlPlaceholders(input.ids)})`,
@@ -1350,7 +1350,7 @@ async function organizationAgentContextIssueSummaries(
     db.prepare(
       `select count(*) as count
        from briar_hunt_runs run
-       join briar_projects project on project.id = run.project_id
+       join briar_teams project on project.id = run.project_id
        where run.project_id = ? and project.organization_id = ?
          and run.created_at <= ?`,
     ).bind(
@@ -1365,7 +1365,7 @@ async function organizationAgentContextIssueSummaries(
               run.updated_at, run.completed_at, run.last_event_at,
               json_array_length(run.pull_request_urls) as pull_request_count
        from briar_hunt_runs run
-       join briar_projects project on project.id = run.project_id
+       join briar_teams project on project.id = run.project_id
        where run.project_id = ? and project.organization_id = ?
          and run.created_at <= ? and run.run_number > ?
        order by run.run_number limit ?`,
@@ -1470,7 +1470,7 @@ async function organizationAgentContextIssueDetails(
                 and archive.status = 'verified'
             ) as event_count_stable
      from briar_hunt_runs run
-     join briar_projects project on project.id = run.project_id
+     join briar_teams project on project.id = run.project_id
      where run.project_id = ? and project.organization_id = ?
        and run.created_at <= ?
        and run.id in (${sqlPlaceholders(input.ids)})`,
@@ -1494,7 +1494,7 @@ async function organizationAgentContextIssuePullRequests(
     `select run.id as issue_id, run.project_id, run.run_number,
             cast(link.key as integer) as position, cast(link.value as text) as url
      from briar_hunt_runs run
-     join briar_projects project on project.id = run.project_id
+     join briar_teams project on project.id = run.project_id
      join json_each(run.pull_request_urls) link
      where run.project_id = ? and project.organization_id = ?
        and run.created_at <= ?

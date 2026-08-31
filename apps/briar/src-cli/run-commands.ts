@@ -28,6 +28,7 @@ import {
   type Config,
   type ProjectConfig,
 } from "./config-contract";
+import { HttpRequestError } from "./execution-metrics-upload";
 import {
   executionToken,
   values,
@@ -49,10 +50,61 @@ async function optionalText(valueFlag: string, fileFlag: string) {
   return value(valueFlag) ?? null;
 }
 
+export async function resolveIssueCreationProjectId(input: {
+  configuredProjectId?: string;
+  teamId: string;
+  loadProjects: () => Promise<Array<{ id: string; isDefault: boolean }>>;
+}) {
+  let projects: Array<{ id: string; isDefault: boolean }>;
+  try {
+    projects = await input.loadProjects();
+  } catch (error) {
+    if (
+      !input.configuredProjectId &&
+      error instanceof HttpRequestError &&
+      error.status === 404
+    ) {
+      // A new CLI may briefly talk to a pre-hierarchy Worker during rollout.
+      // The saved legacy Project ID is the promoted Team ID, so its existing
+      // issue-create endpoint remains the only safe compatibility target.
+      return input.teamId;
+    }
+    throw error;
+  }
+  if (
+    input.configuredProjectId &&
+    !projects.some((candidate) => candidate.id === input.configuredProjectId)
+  ) {
+    throw new Error("선택한 Project가 현재 Team에 속하지 않습니다.");
+  }
+  const projectId = input.configuredProjectId ??
+    projects.find((candidate) => candidate.isDefault)?.id ??
+    (projects.length === 1 ? projects[0]?.id : undefined);
+  if (!projectId) {
+    throw new Error(
+      "--project <id>를 지정하거나 Team의 기본 Project를 설정하세요.",
+    );
+  }
+  return projectId;
+}
+
 async function createIssueCommand() {
   const config = await loadConfig();
-  if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+  const userToken = config.userToken;
+  if (!userToken) throw new Error("먼저 `briar login`을 실행하세요.");
   const project = await currentProject(config);
+  const configuredPlanningProjectId = value("--project")?.trim();
+  const planningProjectId = await resolveIssueCreationProjectId({
+    configuredProjectId: configuredPlanningProjectId,
+    teamId: project.id,
+    loadProjects: async () => (await request<{
+      projects: Array<{ id: string; isDefault: boolean }>;
+    }>(
+      config.apiUrl,
+      `/teams/${encodeURIComponent(project.id)}/projects`,
+      userToken,
+    )).projects,
+  });
   const priorityValue = value("--priority");
   const input = decodeCreateIssueInput({
     title: required("--title"),
@@ -68,8 +120,8 @@ async function createIssueCommand() {
     attachments: unknown[];
   }>(
     config.apiUrl,
-    `/projects/${encodeURIComponent(project.id)}/issues`,
-    config.userToken,
+    `/projects/${encodeURIComponent(planningProjectId)}/issues`,
+    userToken,
     { method: "POST", body: JSON.stringify(input) },
   );
   console.log(JSON.stringify(result));

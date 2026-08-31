@@ -106,6 +106,10 @@ export function dashboardRunJson(
   );
   return {
     id: run.id,
+    workspaceId: run.workspace_id ?? null,
+    teamId: run.team_id ?? run.project_id,
+    projectId: run.planning_project_id,
+    projectName: run.planning_project_name ?? null,
     runNumber: run.run_number,
     currentAttempt: run.current_attempt,
     currentRevision: run.current_revision,

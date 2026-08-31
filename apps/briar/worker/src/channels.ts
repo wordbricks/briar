@@ -961,7 +961,7 @@ export async function getProjectAgentChannel(
   return db
     .prepare(
       `${channelSelect}
-       join briar_projects project
+       join briar_teams project
          on project.organization_id = channel.organization_id
        where project.id = ? and channel.id = ?
          and exists (
@@ -986,7 +986,7 @@ export async function getProjectOrganizationChannel(
   return db
     .prepare(
       `${channelSelect}
-       join briar_projects project
+       join briar_teams project
          on project.organization_id = channel.organization_id
        where project.id = ? and channel.id = ?`,
     )
@@ -1002,7 +1002,7 @@ export async function getOrganizationProject(
 ) {
   return db
     .prepare(
-      `select id, name, organization_id from briar_projects
+      `select id, name, organization_id from briar_teams
        where id = ? and organization_id = ?`,
     )
     .bind(projectId, organizationId)
@@ -1332,7 +1332,7 @@ export async function listChannelAgents(db: D1Database, channelId: string) {
        join briar_channels channel
          on channel.id = roster.channel_id
         and channel.organization_id = agent.organization_id
-       left join briar_projects project
+       left join briar_teams project
          on project.id = agent.project_id
         and project.organization_id = agent.organization_id
        where roster.channel_id = ?
@@ -3715,7 +3715,7 @@ export async function getActiveOrganizationChannelReplyContextClaim(
       and binding.device_id = job.claimed_device_id
      join briar_execution_worker_devices device
        on device.id = binding.device_id
-     join briar_projects binding_project
+     join briar_teams binding_project
        on binding_project.id = binding.project_id
      where job.id = ? and job.organization_id = ?
        and job.project_id is null
@@ -5220,7 +5220,7 @@ export async function reserveChannelActionProposalApproval(
            join briar_organization_members membership
              on membership.organization_id = channel.organization_id
             and membership.user_id = ?
-           join briar_projects target_project
+           join briar_teams target_project
              on target_project.id = ?
             and target_project.organization_id = channel.organization_id
            join briar_channel_messages reply
@@ -5459,7 +5459,7 @@ export async function reserveChannelExecutionProposalApproval(
            join briar_organization_members membership
              on membership.organization_id = channel.organization_id
             and membership.user_id = ?
-           join briar_projects project
+           join briar_teams project
              on project.id = briar_issue_execution_proposals.project_id
             and project.organization_id = channel.organization_id
            join briar_hunt_runs run

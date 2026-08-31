@@ -27,6 +27,176 @@ import {
   executeD1Sql,
 } from "./test-helpers/d1";
 
+it("promotes legacy Projects to Teams and backfills General without changing execution identity", async () => {
+  const miniflare = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok') } }",
+    d1Databases: { DB: "workspace-team-project-hierarchy-migration" },
+  });
+  try {
+    const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+    await applyD1Migrations(db, {
+      through: "0148_mobile_push_notifications.sql",
+    });
+    const now = "2026-08-31T00:00:00.000Z";
+    const userId = "hierarchy-owner";
+    const workspaceId = "11111111-1111-4111-8111-111111111111";
+    const teamId = "22222222-2222-4222-8222-222222222222";
+    const runId = "33333333-3333-4333-8333-333333333333";
+    const agentId = "44444444-4444-4444-8444-444444444444";
+    const workflow = JSON.stringify(repositoryWorkflowBootstrap);
+
+    await db.prepare(
+      `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+       values (?, 'Hierarchy Owner', 'hierarchy@example.com', 1, ?, ?)`,
+    ).bind(userId, now, now).run();
+    await db.prepare(
+      `insert into briar_organizations (
+         id, name, handle, created_at, updated_at
+       ) values (?, 'Hierarchy Workspace', 'hierarchy-workspace', ?, ?)`,
+    ).bind(workspaceId, now, now).run();
+    await db.prepare(
+      `insert into briar_organization_members (
+         organization_id, user_id, role, created_at, updated_at
+       ) values (?, ?, 'owner', ?, ?)`,
+    ).bind(workspaceId, userId, now, now).run();
+    await db.prepare(
+      `insert into briar_projects (
+         id, owner_user_id, organization_id, name, agent_token_hash,
+         issue_key_prefix, created_at, updated_at
+       ) values (?, ?, ?, 'Execution Boundary', ?, 'HB', ?, ?)`,
+    ).bind(teamId, userId, workspaceId, "a".repeat(64), now, now).run();
+    await db.prepare(
+      `insert into briar_project_members (
+         project_id, organization_id, user_id, created_at, updated_at
+       ) values (?, ?, ?, ?, ?)`,
+    ).bind(teamId, workspaceId, userId, now, now).run();
+    await db.prepare(
+      `insert into briar_project_settings (
+         project_id, github_repository, github_repository_id,
+         workflow_json, mandatory_checkpoints_json, created_at, updated_at
+       ) values (?, 'wordbricks/briar', 987654, ?, ?, ?, ?)`,
+    ).bind(
+      teamId,
+      workflow,
+      JSON.stringify(repositoryWorkflowBootstrap.execution.checkpoints),
+      now,
+      now,
+    ).run();
+    await db.prepare(
+      `insert into briar_project_agents (
+         id, organization_id, project_id, name, provider, responsibility,
+         created_at, updated_at
+       ) values (?, ?, ?, 'Migration Agent', 'codex', 'Preserve agent', ?, ?)`,
+    ).bind(agentId, workspaceId, teamId, now, now).run();
+    await db.prepare(
+      `insert into briar_project_agent_schedules (
+         id, project_id, agent_id, name, recurrence, time_of_day,
+         day_of_week, time_zone, created_at, updated_at
+       ) values (
+         'hierarchy-schedule', ?, ?, 'Daily', 'daily', '09:00', null,
+         'Asia/Seoul', ?, ?
+       )`,
+    ).bind(teamId, agentId, now, now).run();
+    await db.prepare(
+      `insert into briar_hunt_runs (
+         id, project_id, source, source_key, title, stage, repository, branch,
+         started_at, last_event_at, created_at, updated_at,
+         workflow_snapshot_json, workflow_stage, status, claimed_by, claimed_at
+       ) values (
+         ?, ?, 'issue', 'hierarchy:legacy', 'Preserved issue', 'implementing',
+         'wordbricks/briar', 'briar/preserved', ?, ?, ?, ?, ?,
+         'implementing', 'running', 'worker-before-migration', ?
+       )`,
+    ).bind(runId, teamId, now, now, now, now, workflow, now).run();
+
+    await applyD1Migrations(db, {
+      files: ["0149_workspace_team_project_issue_hierarchy.sql"],
+    });
+
+    await expect(db.prepare(
+      `select id, organization_id, name, issue_key_prefix
+       from briar_teams where id = ?`,
+    ).bind(teamId).first()).resolves.toEqual({
+      id: teamId,
+      organization_id: workspaceId,
+      name: "Execution Boundary",
+      issue_key_prefix: "HB",
+    });
+    await expect(db.prepare(
+      `select id, organization_id, name, issue_key_prefix
+       from briar_projects where id = ?`,
+    ).bind(teamId).first()).resolves.toEqual({
+      id: teamId,
+      organization_id: workspaceId,
+      name: "Execution Boundary",
+      issue_key_prefix: "HB",
+    });
+    const general = await db.prepare(
+      `select id, team_id, name, status, is_default
+       from briar_planning_projects where team_id = ?`,
+    ).bind(teamId).first<{
+      id: string;
+      team_id: string;
+      name: string;
+      status: string;
+      is_default: number;
+    }>();
+    expect(general).toMatchObject({
+      team_id: teamId,
+      name: "General",
+      status: "active",
+      is_default: 1,
+    });
+    await expect(db.prepare(
+      `select id, project_id, team_id, planning_project_id, source_key, repository,
+              branch, claimed_by, claimed_at
+       from briar_hunt_runs where id = ?`,
+    ).bind(runId).first()).resolves.toEqual({
+      id: runId,
+      project_id: teamId,
+      team_id: teamId,
+      planning_project_id: general?.id,
+      source_key: "hierarchy:legacy",
+      repository: "wordbricks/briar",
+      branch: "briar/preserved",
+      claimed_by: "worker-before-migration",
+      claimed_at: now,
+    });
+    await expect(db.prepare(
+      `select github_repository, github_repository_id
+       from briar_project_settings where project_id = ?`,
+    ).bind(teamId).first()).resolves.toEqual({
+      github_repository: "wordbricks/briar",
+      github_repository_id: 987654,
+    });
+    await expect(db.prepare(
+      `select project_id from briar_project_agents where id = ?`,
+    ).bind(agentId).first()).resolves.toEqual({ project_id: teamId });
+    await expect(db.prepare(
+      `select project_id from briar_project_agent_schedules where id = ?`,
+    ).bind("hierarchy-schedule").first()).resolves.toEqual({
+      project_id: teamId,
+    });
+    await db.prepare(
+      `update briar_projects set name = 'Legacy writer rename' where id = ?`,
+    ).bind(teamId).run();
+    await expect(db.prepare(
+      `select name from briar_teams where id = ?`,
+    ).bind(teamId).first()).resolves.toEqual({ name: "Legacy writer rename" });
+    await db.prepare(
+      `update briar_teams set issue_key_prefix = 'NW' where id = ?`,
+    ).bind(teamId).run();
+    await expect(db.prepare(
+      `select issue_key_prefix from briar_projects where id = ?`,
+    ).bind(teamId).first()).resolves.toEqual({ issue_key_prefix: "NW" });
+    await expect(db.prepare("pragma foreign_key_check").all())
+      .resolves.toMatchObject({ results: [] });
+  } finally {
+    await miniflare.dispose();
+  }
+}, 60_000);
+
 it("migrates legacy organization roles without reducing access", async () => {
   const miniflare = new Miniflare({
     modules: true,
@@ -101,6 +271,17 @@ it("migrates legacy organization roles without reducing access", async () => {
       { id: "legacy-admin-invite", role: "co-owner" },
       { id: "legacy-member-invite", role: "developer" },
     ]);
+
+    // The assertions above exercise the historical migration in isolation.
+    // Bring the database to the current schema before invoking current
+    // repository code, whose execution boundary is now named Team.
+    await applyD1Migrations(db, {
+      files: [
+        "0147_project_github_repository_identity.sql",
+        "0148_mobile_push_notifications.sql",
+        "0149_workspace_team_project_issue_hierarchy.sql",
+      ],
+    });
 
     const viewerInvitation = await createOrganizationInvitation(db, {
       id: "viewer-invite",
@@ -858,7 +1039,7 @@ describe("D1 migrations", () => {
          ) values
            ('requester-org', 'requester-owner', 'owner', '${createdAt}', '${createdAt}'),
            ('requester-org', 'requester-member', 'developer', '${createdAt}', '${createdAt}');
-         insert into briar_projects (
+         insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (
@@ -1511,7 +1692,7 @@ describe("D1 migrations", () => {
          ) values (?, ?, 'owner', ?, ?)`,
       ).bind(organizationId, userId, now, now).run();
       await db.prepare(
-        `insert into briar_projects (
+        `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, 'Inbox Project', ?, ?, ?)`,
@@ -1652,6 +1833,12 @@ describe("D1 migrations", () => {
         "d".repeat(64),
         now,
         now,
+      ).run();
+      // Current repositories use the promoted Team name. This test keeps a
+      // deliberately old physical schema, so expose the legacy execution
+      // boundary through the current read surface.
+      await db.prepare(
+        `create view briar_teams as select * from briar_projects`,
       ).run();
       await db.prepare(
         `insert into briar_project_settings (
@@ -1979,6 +2166,17 @@ describe("D1 migrations", () => {
         now,
         now,
       ).run();
+      await executeD1Sql(db, `
+        create view briar_teams as select * from briar_projects;
+        create table briar_issue_key_aliases (
+          team_id text not null,
+          issue_key text not null,
+          run_id text not null,
+          created_at text not null,
+          primary key (team_id, issue_key),
+          unique (run_id, issue_key)
+        );
+      `);
       await db.prepare(
         `insert into briar_project_settings (
            project_id, workflow_json, mandatory_checkpoints_json,

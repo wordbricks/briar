@@ -18,7 +18,9 @@ export type OrganizationStatusTrayRunRow = Pick<
 export async function listDashboardRuns(db: D1Database, projectId: string) {
   const runs = await db
     .prepare(
-      `select run.*,
+      `select run.*, team.organization_id as workspace_id,
+              run.project_id as team_id,
+              planning_project.name as planning_project_name,
               coalesce((
                 select json_group_array(json_object(
                   'userId', subscriber.user_id,
@@ -39,6 +41,10 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
                   and archive.status = 'complete'
               ), 0) as event_count
        from briar_hunt_runs run
+       join briar_teams team on team.id = run.project_id
+       join briar_planning_projects planning_project
+         on planning_project.id = run.planning_project_id
+        and planning_project.team_id = team.id
        where run.project_id = ?
        order by
          case when run.status in ('completed', 'cancelled') then 1 else 0 end,
@@ -59,7 +65,9 @@ export async function listDashboardRunsByIds(
   if (runIds.length === 0) return [];
   const runs = await db
     .prepare(
-      `select run.*,
+      `select run.*, team.organization_id as workspace_id,
+              run.project_id as team_id,
+              planning_project.name as planning_project_name,
               coalesce((
                 select json_group_array(json_object(
                   'userId', subscriber.user_id,
@@ -80,6 +88,10 @@ export async function listDashboardRunsByIds(
                   and archive.status = 'complete'
               ), 0) as event_count
        from briar_hunt_runs run
+       join briar_teams team on team.id = run.project_id
+       join briar_planning_projects planning_project
+         on planning_project.id = run.planning_project_id
+        and planning_project.team_id = team.id
        where run.project_id = ?
          and run.id in (select value from json_each(?))
        order by run.updated_at desc`,
@@ -102,7 +114,7 @@ export async function listOrganizationStatusTrayRuns(
               run.workflow_snapshot_json, run.started_at, run.updated_at,
               run.last_event_at
        from briar_hunt_runs run
-       join briar_projects project on project.id = run.project_id
+       join briar_teams project on project.id = run.project_id
        join briar_organization_members membership
          on membership.organization_id = project.organization_id
         and membership.user_id = ?

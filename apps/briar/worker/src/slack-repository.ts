@@ -212,7 +212,7 @@ const slackInstallationSelect = `
          installation.installed_by_user_id, installation.created_at,
          installation.updated_at
   from briar_slack_installations installation
-  left join briar_projects project on project.id = installation.default_project_id
+  left join briar_teams project on project.id = installation.default_project_id
 `;
 
 export async function getSlackInstallation(
@@ -252,7 +252,7 @@ export async function updateSlackInstallationProject(
        set default_project_id = ?, updated_at = ?
        where organization_id = ? and team_id = ?
          and exists (
-           select 1 from briar_projects
+           select 1 from briar_teams
            where id = ? and organization_id = ?
          )`,
     )

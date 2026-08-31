@@ -14,6 +14,12 @@ import type { IssueDifficulty } from "../../src/lib/issue-difficulty";
 
 export type HuntRunRow = {
   id: string;
+  /** Legacy execution-boundary column; exposed as teamId during cutover. */
+  project_id: string;
+  planning_project_id: string;
+  workspace_id?: string;
+  team_id?: string;
+  planning_project_name?: string;
   run_number: number;
   source: AutoHuntSource;
   source_key: string;

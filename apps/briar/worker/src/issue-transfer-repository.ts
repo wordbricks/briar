@@ -257,6 +257,24 @@ export async function transferIssue(
     ? (targetSettings?.github_repository ?? input.targetProjectName)
     : run.repository;
   const refreshWorkflow = adoptTargetWorkflow ? 1 : 0;
+  const issueKeyAliasesAvailable = Boolean(await db
+    .prepare(
+      `select 1 as available from sqlite_master
+       where type = 'table' and name = 'briar_issue_key_aliases'`,
+    )
+    .first<{ available: number }>());
+  const preserveSourceIssueKey = db.prepare(
+    `insert into briar_issue_key_aliases (
+       team_id, issue_key, run_id, created_at
+     )
+     select source_team.id,
+            source_team.issue_key_prefix || '-' || run.run_number,
+            run.id, ?
+     from briar_hunt_runs run
+     join briar_teams source_team on source_team.id = run.project_id
+     where run.id = ? and run.project_id = ?
+     on conflict(team_id, issue_key) do nothing`,
+  ).bind(input.observedAt, input.runId, input.sourceProjectId);
   // Move the run, every project-scoped child, proposal, and the source
   // dashboard tombstone in one D1 batch transaction. The target-project
   // predicates on each relation also make a raced no-op update harmless.
@@ -328,6 +346,7 @@ export async function transferIssue(
   let transferResults: D1Result<unknown>[];
   try {
     transferResults = await db.batch([
+      ...(issueKeyAliasesAvailable ? [preserveSourceIssueKey] : []),
       moveStatement,
       ...await transferredIssueRelationStatements(db, {
         ...input,
@@ -349,7 +368,7 @@ export async function transferIssue(
     }
     throw error;
   }
-  const movedRun = transferResults[0].results?.[0] as
+  const movedRun = transferResults[issueKeyAliasesAvailable ? 1 : 0].results?.[0] as
     | { id: string }
     | undefined;
 

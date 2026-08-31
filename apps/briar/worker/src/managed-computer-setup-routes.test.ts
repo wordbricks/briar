@@ -61,13 +61,13 @@ describe("managed computer setup routes", () => {
          ) values (?, ?, 'developer', ?, ?)`,
       ).bind(organizationId, memberId, now, now),
       db.prepare(
-        `insert into briar_projects (
+        `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, 'Managed project', ?, ?, ?)`,
       ).bind(projectId, ownerId, organizationId, "a".repeat(64), now, now),
       db.prepare(
-        `insert into briar_projects (
+        `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, 'Second managed project', ?, ?, ?)`,

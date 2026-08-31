@@ -33,7 +33,7 @@ const makeProjectQueries = (sql: SqlClient.SqlClient) => {
                project.organization_id,
                organization.name as organization_name,
                membership.role as member_role, project.created_at
-        from briar_projects project
+        from briar_teams project
         join briar_organizations organization
           on organization.id = project.organization_id
         join briar_organization_members membership
@@ -60,7 +60,7 @@ const makeProjectQueries = (sql: SqlClient.SqlClient) => {
                project.organization_id,
                organization.name as organization_name,
                'viewer' as member_role, project.created_at
-        from briar_projects project
+        from briar_teams project
         join briar_organizations organization
           on organization.id = project.organization_id
         where project.organization_id = ${organizationId}
@@ -82,7 +82,7 @@ const makeProjectQueries = (sql: SqlClient.SqlClient) => {
     Result: InboxProjectRow,
     execute: ({ organizationId, userId }) => sql`
         select project.id, project.name, project.issue_key_prefix
-        from briar_projects project
+        from briar_teams project
         join briar_organization_members membership
           on membership.organization_id = project.organization_id
          and membership.user_id = ${userId}
