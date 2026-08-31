@@ -123,10 +123,10 @@ const successful = (stdout = "{}") => ({ exitCode: 0, stdout, stderr: "" });
 
 function recordingRpc() {
   const calls: Array<{
-    method: keyof MergeBatchRpc["client"];
+    method: keyof MergeBatchRpc;
     request: Record<string, unknown>;
   }> = [];
-  const record = (method: keyof MergeBatchRpc["client"]) =>
+  const record = (method: keyof MergeBatchRpc) =>
     async (request: Record<string, unknown>) => {
       calls.push({ method, request });
       return {};
@@ -139,8 +139,8 @@ function recordingRpc() {
     recordMergeBatchValidation: record("recordMergeBatchValidation"),
     completeMergeBatchPublication: record("completeMergeBatchPublication"),
     blockMergeBatch: record("blockMergeBatch"),
-  } as unknown as MergeBatchRpc["client"];
-  return { rpc: { client, options: {} }, calls };
+  } as unknown as MergeBatchRpc;
+  return { rpc: client, calls };
 }
 
 function recordingLeaseLifecycle() {

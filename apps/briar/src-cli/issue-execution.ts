@@ -412,7 +412,7 @@ async function runClaimedIssueInRuntime(
       await transcriptBatcher.flush();
       conversationId = turn.conversationId;
       if (runnerBlock) {
-        await executionRpc.client.recordRunEvent(
+        await executionRpc.recordRunEvent(
           workerRunEventRequest({
             projectId: project.id,
             target: runEventTarget,
@@ -426,7 +426,6 @@ async function runClaimedIssueInRuntime(
               occurredAt: new Date().toISOString(),
             }),
           }),
-          executionRpc.options,
         );
         return;
       }
@@ -478,7 +477,7 @@ async function runClaimedIssueInRuntime(
   } catch (error) {
     if (!signal.aborted) {
       try {
-        await executionRpc.client.recordRunEvent(
+        await executionRpc.recordRunEvent(
           workerRunEventRequest({
             projectId: project.id,
             target: runEventTarget,
@@ -493,7 +492,6 @@ async function runClaimedIssueInRuntime(
               pullRequestUrls: [],
             },
           }),
-          executionRpc.options,
         );
       } catch {
         // A cancellation or reassignment invalidates the claim before the

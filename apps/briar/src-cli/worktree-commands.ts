@@ -128,11 +128,11 @@ async function claimWork() {
     config.apiUrl,
     agentToken,
   );
-  const result = await executionRpc.client.claimIssue({
+  const result = await executionRpc.claimIssue({
     projectId: project.id,
     runId,
     claimedBy: value("--actor") ?? "briar-workflow",
-  }, executionRpc.options);
+  });
   if (result.issue === undefined) {
     console.log(localClaimResultJson(localNoWorkResult()));
     return;

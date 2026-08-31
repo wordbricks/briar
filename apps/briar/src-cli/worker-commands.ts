@@ -44,7 +44,10 @@ import {
   createWorkerEnrollmentClient,
   type WorkerRuntimeInput,
 } from "./worker-control-client";
-import { createWorkerQueueClient } from "./worker-queue-client";
+import {
+  createWorkerQueueClient,
+  createWorkerQueueOperations,
+} from "./worker-queue-client";
 import type { ClaimedWork } from "./worker-queue-contract";
 import {
   configDirectory,
@@ -428,7 +431,8 @@ async function workerCommand() {
   }
 
   const maxIssues = Number.parseInt(value("--max-issues") ?? "", 10);
-  const workerQueue = createWorkerQueueClient(config.apiUrl, workerToken);
+  const workerQueueClient = createWorkerQueueClient(config.apiUrl, workerToken);
+  const workerQueue = createWorkerQueueOperations(workerQueueClient);
   let lastWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let lastAnalysisWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let lastServerMaintenanceAt = Number.NEGATIVE_INFINITY;
@@ -687,10 +691,7 @@ async function workerCommand() {
             workerId,
             repositoryPath: project.repositoryPath,
             signal,
-            rpc: {
-              client: workerQueue.client,
-              options: workerQueue.options,
-            },
+            rpc: workerQueueClient,
             renewLease: async () => {
               await workerQueue.renewWorkLease({
                 projectId: project.id,

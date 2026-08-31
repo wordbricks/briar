@@ -4,12 +4,14 @@ import {
   ReplyCompletionDisposition,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { describe, expect, it, vi } from "vitest";
-import { createReplyCompletionClient } from "./reply-completion-client";
+import {
+  createReplyCompletionClient,
+  type ReplyCompletionQueueClient,
+} from "./reply-completion-client";
 import type {
   ClaimedChannelReply,
   ClaimedIssueReply,
 } from "./worker-queue-contract";
-import type { createWorkerQueueClient } from "./worker-queue-client";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const workerId = "worker-1";
@@ -58,13 +60,10 @@ describe("generated reply completion client", () => {
       retainedUntil: timestampFromDate(new Date("2026-08-31T16:00:00.000Z")),
     });
     const queue = {
-      client: {
-        prepareReplyAttachmentUploads: prepare,
-        completeIssueReply: completeIssue,
-        completeChannelReply: completeChannel,
-      },
-      options: { headers: { Authorization: "Bearer worker-token" } },
-    } as unknown as ReturnType<typeof createWorkerQueueClient>;
+      prepareReplyAttachmentUploads: prepare,
+      completeIssueReply: completeIssue,
+      completeChannelReply: completeChannel,
+    } as unknown as ReplyCompletionQueueClient;
     const upload = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     const ids = [
       "60000000-0000-4000-8000-000000000001",

@@ -1,7 +1,5 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
-import { createClient } from "@connectrpc/connect";
-import { createConnectTransport } from "@connectrpc/connect-web";
 import {
   DashboardWorker_State,
   type DashboardWorker,
@@ -30,17 +28,9 @@ import {
   type AgentProvider,
 } from "../src/lib/agent-provider";
 import type { AgentProviderCapabilityCatalog } from "../src/lib/agent-provider-contract";
-import type { WorkerLoopUpdateDirective } from "./worker";
+import { createAuthenticatedConnectClient } from "./connect-client";
 import type { WorkerProviderHealthMap } from "./provider-health";
-
-export const workerConnectTransport = (apiUrl: string) => createConnectTransport({
-  baseUrl: apiUrl.replace(/\/+$/u, ""),
-  useBinaryFormat: true,
-});
-
-export const workerConnectOptions = (token: string) => ({
-  headers: { Authorization: `Bearer ${token}` },
-});
+import type { WorkerLoopUpdateDirective } from "./worker";
 
 const protoAgentProvider = {
   codex: ProtoAgentProvider.CODEX,
@@ -231,8 +221,12 @@ const workflowRequirement = (value: {
 };
 
 export function createWorkerEnrollmentClient(apiUrl: string, token: string) {
-  const client = createClient(FleetService, workerConnectTransport(apiUrl));
-  const options = workerConnectOptions(token);
+  const client = createAuthenticatedConnectClient(
+    FleetService,
+    apiUrl,
+    token,
+    { binary: true },
+  );
   return {
     register: async (input: {
       projectId: string;
@@ -247,7 +241,7 @@ export function createWorkerEnrollmentClient(apiUrl: string, token: string) {
         deviceIdentity: input.deviceIdentity,
         runtime: workerRuntimeToProto(input.runtime),
         maxConcurrentSessions: input.maxConcurrentSessions,
-      }, options);
+      });
       return {
         organizationId: response.organizationId,
         deviceId: response.deviceId,
@@ -264,7 +258,7 @@ export function createWorkerEnrollmentClient(apiUrl: string, token: string) {
         projectId: input.projectId,
         deviceIdentity: input.deviceIdentity,
         runtime: workerRuntimeToProto(input.runtime),
-      }, options);
+      });
       return {
         organizationId: response.organizationId,
         deviceId: response.deviceId,
@@ -283,13 +277,17 @@ export function createWorkerEnrollmentClient(apiUrl: string, token: string) {
       reason: input.reason === "managed_deprovision"
         ? UnbindProjectExecutionWorkerRequest_Reason.MANAGED_DEPROVISION
         : UnbindProjectExecutionWorkerRequest_Reason.EXPLICIT_USER_UNLINK,
-    }, options),
+    }),
   };
 }
 
 export function createWorkerControlClient(apiUrl: string, token: string) {
-  const client = createClient(WorkerControlService, workerConnectTransport(apiUrl));
-  const options = workerConnectOptions(token);
+  const client = createAuthenticatedConnectClient(
+    WorkerControlService,
+    apiUrl,
+    token,
+    { binary: true },
+  );
   return {
     heartbeat: async (input: {
       workerId: string;
@@ -311,7 +309,7 @@ export function createWorkerControlClient(apiUrl: string, token: string) {
         acceptingWork: input.acceptingWork,
         readinessState: readiness[input.readinessState],
         readinessDetail: input.readinessDetail ?? undefined,
-      }, options);
+      });
       if (!response.worker) throw new Error("Worker heartbeat omitted worker");
       return {
         maxConcurrentSessions: response.worker.maxConcurrentSessions,
@@ -322,12 +320,12 @@ export function createWorkerControlClient(apiUrl: string, token: string) {
       };
     },
     updateLabel: (workerId: string, label: string) =>
-      client.updateWorkerLabel({ workerId, label }, options),
+      client.updateWorkerLabel({ workerId, label }),
     prepareUpdateHandoff: async (workerId: string, targetVersion: string) => {
       const response = await client.prepareWorkerUpdateHandoff({
         workerId,
         targetVersion,
-      }, options);
+      });
       const update = updateDirective(response.update);
       if (!update) throw new Error("Worker handoff did not return a pending update");
       return { ...response, update };
@@ -336,7 +334,7 @@ export function createWorkerControlClient(apiUrl: string, token: string) {
       const response = await client.getWorkerUpdateHandoff({
         workerId,
         requestId,
-      }, options);
+      });
       return {
         activeWorkCount: response.activeWorkCount,
         ready: response.ready,
@@ -344,6 +342,6 @@ export function createWorkerControlClient(apiUrl: string, token: string) {
       };
     },
     failUpdateHandoff: (workerId: string, requestId: string, error: string) =>
-      client.failWorkerUpdateHandoff({ workerId, requestId, error }, options),
+      client.failWorkerUpdateHandoff({ workerId, requestId, error }),
   };
 }

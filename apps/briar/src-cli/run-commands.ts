@@ -202,7 +202,7 @@ async function listChannelMessagesCommand() {
     config.apiUrl,
     executionToken(project),
   );
-  const result = await executionRpc.client.listProjectChannelMessages({
+  const result = await executionRpc.listProjectChannelMessages({
     projectId: decodeUuid(project.id).toLowerCase(),
     channelId: decodeUuid(required("--channel-id")).toLowerCase(),
     cursor: cursor ? decodeUuid(cursor).toLowerCase() : undefined,
@@ -210,7 +210,7 @@ async function listChannelMessagesCommand() {
       ? decodeUuid(parentMessageId).toLowerCase()
       : undefined,
     limit,
-  }, executionRpc.options);
+  });
   console.log(toJsonString(ListProjectChannelMessagesResponseSchema, result));
 }
 
@@ -329,13 +329,12 @@ async function addRunEvent(forcedStatus?: string) {
     config.apiUrl,
     agentToken,
   );
-  const result = await executionRpc.client.recordRunEvent(
+  const result = await executionRpc.recordRunEvent(
     workerRunEventRequest({
       projectId: project.id,
       target,
       event: input,
     }),
-    executionRpc.options,
   );
   if (project.activeClaim?.runId === result.runId) {
     const terminal = ["completed", "cancelled", "blocked", "failed"].includes(
@@ -466,10 +465,10 @@ async function listCurrentRunEvidence() {
     config.apiUrl,
     executionToken(project),
   );
-  const result = await executionRpc.client.listRunEvidence(
-    { projectId: project.id, runId },
-    executionRpc.options,
-  );
+  const result = await executionRpc.listRunEvidence({
+    projectId: project.id,
+    runId,
+  });
   console.log(toJsonString(ListRunEvidenceResponseSchema, result));
 }
 
@@ -490,8 +489,8 @@ async function recoverRun(action: "retry" | "cancel") {
     reason: value("--reason"),
   };
   const result = action === "retry"
-    ? await executionRpc.client.retryRun(input, executionRpc.options)
-    : await executionRpc.client.cancelRun(input, executionRpc.options);
+    ? await executionRpc.retryRun(input)
+    : await executionRpc.cancelRun(input);
   if (project.activeClaim?.runId === canonicalRunId) {
     // The server released this claim while queueing the new revision. Make the
     // current provider turn stop instead of continuing with a stale token.
@@ -518,13 +517,13 @@ async function reworkRun() {
     config.apiUrl,
     executionToken(project),
   );
-  const result = await executionRpc.client.reworkRun({
+  const result = await executionRpc.reworkRun({
     projectId: project.id,
     runId: canonicalRunId,
     requestId: decodeUuid(value("--request-id") ?? crypto.randomUUID()),
     workflowStage: decodeWorkflowStageId(required("--to")),
     reason: required("--reason"),
-  }, executionRpc.options);
+  });
   if (project.activeClaim?.runId === canonicalRunId) {
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
@@ -546,14 +545,14 @@ async function resumeRun() {
     config.apiUrl,
     executionToken(project),
   );
-  const result = await executionRpc.client.resumeRun({
+  const result = await executionRpc.resumeRun({
     projectId: project.id,
     runId: canonicalRunId,
     requestId: decodeUuid(value("--request-id") ?? crypto.randomUUID()),
     checkpointKey: decodeWorkflowStageId(required("--checkpoint")),
     attempt: positiveIntegerFlag("--attempt"),
     revision: positiveIntegerFlag("--revision"),
-  }, executionRpc.options);
+  });
   if (project.activeClaim?.runId === canonicalRunId) {
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
@@ -588,7 +587,7 @@ async function transitionWorkflowStage(action: "start" | "complete") {
     config.apiUrl,
     executionToken(project),
   );
-  const result = await executionRpc.client.transitionWorkflowStage(
+  const result = await executionRpc.transitionWorkflowStage(
     {
       projectId: project.id,
       work: activeIssueWork(project, canonicalRunId),
@@ -600,7 +599,6 @@ async function transitionWorkflowStage(action: "start" | "complete") {
       attempt: positiveOption("--attempt"),
       revision: positiveOption("--revision"),
     },
-    executionRpc.options,
   );
   if (
     result.outcome === TransitionWorkflowStageResponse_Outcome.PAUSED &&

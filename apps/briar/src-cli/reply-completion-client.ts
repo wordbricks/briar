@@ -14,6 +14,7 @@ import type { DetachedIssueReplyResult } from "./agent-runner";
 import type { ParsedChannelReplyAgentResult } from "./channel-reply-attachments";
 import {
   createWorkerQueueClient,
+  type WorkerQueueClient,
   workClaimIdentityToProto,
 } from "./worker-queue-client";
 import type {
@@ -23,6 +24,12 @@ import type {
 
 type ChannelReplyResult = ParsedChannelReplyAgentResult["result"];
 type CompletionDisposition = "completed" | "requeued" | "failed";
+export type ReplyCompletionQueueClient = Pick<
+  WorkerQueueClient,
+  | "prepareReplyAttachmentUploads"
+  | "completeIssueReply"
+  | "completeChannelReply"
+>;
 
 const retryableCodes = new Set([
   Code.DeadlineExceeded,
@@ -300,7 +307,7 @@ export function createReplyCompletionClient(
   apiUrl: string,
   token: string,
   dependencies: {
-    queue?: ReturnType<typeof createWorkerQueueClient>;
+    queue?: ReplyCompletionQueueClient;
     fetch?: typeof globalThis.fetch;
     randomUUID?: typeof crypto.randomUUID;
   } = {},
@@ -339,8 +346,7 @@ export function createReplyCompletionClient(
       })),
     });
     const prepared = await exactRpc(
-      () => queue.client.prepareReplyAttachmentUploads(request, {
-        ...queue.options,
+      () => queue.prepareReplyAttachmentUploads(request, {
         signal: input.signal,
       }),
       input.signal,
@@ -422,10 +428,7 @@ export function createReplyCompletionClient(
             },
       });
       const response = await exactRpc(
-        () => queue.client.completeIssueReply(request, {
-          ...queue.options,
-          signal: input.signal,
-        }),
+        () => queue.completeIssueReply(request, { signal: input.signal }),
         input.signal,
       );
       return {
@@ -479,10 +482,7 @@ export function createReplyCompletionClient(
             },
       });
       const response = await exactRpc(
-        () => queue.client.completeChannelReply(request, {
-          ...queue.options,
-          signal: input.signal,
-        }),
+        () => queue.completeChannelReply(request, { signal: input.signal }),
         input.signal,
       );
       return {

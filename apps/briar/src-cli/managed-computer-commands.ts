@@ -1,5 +1,8 @@
 import { resolve } from "node:path";
 import {
+  ManagedComputerSetupService,
+} from "@briar/contracts/gen/briar/worker/v1/managed_computer_setup_pb";
+import {
   agentProviders,
   type AgentProvider,
 } from "../src/lib/agent-provider";
@@ -36,7 +39,7 @@ import {
   fetchManagedComputer,
   fetchManagedComputerSetupStatus,
 } from "./app-connect-client";
-import { createManagedComputerSetupClient } from "./managed-computer-setup-client";
+import { createAuthenticatedConnectClient } from "./connect-client";
 import {
   createWorkerControlClient,
   workerRuntimeToProto,
@@ -231,11 +234,13 @@ export async function managedComputerSetupCommand() {
     projectId,
     requestId,
   );
-  const setupRpc = createManagedComputerSetupClient(
+  const setupRpc = createAuthenticatedConnectClient(
+    ManagedComputerSetupService,
     credential.apiOrigin,
     credential.credential,
+    { binary: true },
   );
-  const response = await setupRpc.client.bindManagedComputerSetup({
+  const response = await setupRpc.bindManagedComputerSetup({
     managedComputerId: credential.managedComputerId,
     setupToken: setup.setupToken,
     runtime: workerRuntimeToProto({
@@ -246,7 +251,7 @@ export async function managedComputerSetupCommand() {
       versions: { briar: cliVersion },
       worktrees: true,
     }),
-  }, setupRpc.options);
+  });
   const binding = {
     ...response,
     worker: dashboardWorkerFromProto(

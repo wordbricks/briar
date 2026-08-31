@@ -301,7 +301,7 @@ export function createWorkerTranscriptBatcher(input: {
   });
   return new TranscriptBatcher({
     send: async (events) => {
-      await rpc.client.appendTranscriptEvents(request(events), rpc.options);
+      await rpc.appendTranscriptEvents(request(events));
     },
     measureBytes: (events) =>
       toBinary(AppendTranscriptEventsRequestSchema, request(events)).byteLength,
@@ -409,8 +409,5 @@ export async function reportIssueExecutionTelemetry(
   input: IssueExecutionTelemetryInput & { apiUrl: string; token: string },
 ): Promise<ReportIssueExecutionTelemetryResponse> {
   const rpc = createAuthenticatedWorkerExecutionClient(input.apiUrl, input.token);
-  return rpc.client.reportIssueExecutionTelemetry(
-    issueExecutionTelemetryRequest(input),
-    rpc.options,
-  );
+  return rpc.reportIssueExecutionTelemetry(issueExecutionTelemetryRequest(input));
 }

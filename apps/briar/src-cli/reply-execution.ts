@@ -29,7 +29,10 @@ import { materializeDetachedAgentSkillCatalog } from "./agent-skill-discovery";
 import { ChannelActivityPublisher } from "./channel-activity-publisher";
 import { createReplyActivityClient } from "./reply-activity-client";
 import { createReplyCompletionClient } from "./reply-completion-client";
-import { createWorkerQueueClient } from "./worker-queue-client";
+import {
+  createWorkerQueueClient,
+  createWorkerQueueOperations,
+} from "./worker-queue-client";
 import { createWorkerTranscriptBatcher } from "./worker-transcript-client";
 import {
   workerCliPath,
@@ -624,11 +627,12 @@ async function runClaimedChannelReply(
   let workspaceCleaned = false;
   let lastActivityErrorAt = Number.NEGATIVE_INFINITY;
   const replyActivity = createReplyActivityClient(config.apiUrl);
-  const workerQueue = createWorkerQueueClient(config.apiUrl, workerToken);
+  const workerQueueClient = createWorkerQueueClient(config.apiUrl, workerToken);
+  const workerQueue = createWorkerQueueOperations(workerQueueClient);
   const replyCompletion = createReplyCompletionClient(
     config.apiUrl,
     workerToken,
-    { queue: workerQueue },
+    { queue: workerQueueClient },
   );
   const activityPublisher = new ChannelActivityPublisher({
     credential: reply.activity,

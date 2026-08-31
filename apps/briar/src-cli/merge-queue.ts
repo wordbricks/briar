@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { CallOptions, Client } from "@connectrpc/connect";
+import type { Client } from "@connectrpc/connect";
 import {
   MergeBatchValidationFailureCode,
   WorkerQueueService,
@@ -48,10 +48,7 @@ type MergeBatchReportingClient = Pick<
   | "blockMergeBatch"
 >;
 
-export type MergeBatchRpc = {
-  client: MergeBatchReportingClient;
-  options: CallOptions;
-};
+export type MergeBatchRpc = MergeBatchReportingClient;
 
 export class MergeQueueInfrastructureError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -340,16 +337,13 @@ async function enqueueMember(
     input.runCommand,
   );
   const queueEntryId = `briar:${input.claim.workId}:${member.ordinal}`;
-  await input.rpc.client.recordMergeBatchCandidateEnqueued(
-    {
-      ...commonClaimRequest(input.claim, input.workerId),
-      candidateId: member.id,
-      expectedHeadSha: member.headSha,
-      expectedBaseSha: member.baseSha,
-      queueEntryId,
-    },
-    input.rpc.options,
-  );
+  await input.rpc.recordMergeBatchCandidateEnqueued({
+    ...commonClaimRequest(input.claim, input.workerId),
+    candidateId: member.id,
+    expectedHeadSha: member.headSha,
+    expectedBaseSha: member.baseSha,
+    queueEntryId,
+  });
 }
 
 async function enqueueMergeBatch(input: NormalizedMergeBatchExecutionInput) {
@@ -503,15 +497,12 @@ async function establishTailAuthority(input: NormalizedMergeBatchExecutionInput)
       `${integrationSha}:${integrationRef}`,
     ], 120_000);
   }
-  await input.rpc.client.recordMergeBatchAuthority(
-    {
-      ...commonClaimRequest(input.claim, input.workerId),
-      integrationRef,
-      integrationSha,
-      baseSha,
-    },
-    input.rpc.options,
-  );
+  await input.rpc.recordMergeBatchAuthority({
+    ...commonClaimRequest(input.claim, input.workerId),
+    integrationRef,
+    integrationSha,
+    baseSha,
+  });
 }
 
 function runGitCommand(
@@ -668,23 +659,20 @@ async function validateMergeBatch(input: NormalizedMergeBatchExecutionInput) {
     logSha256: createHash("sha256").update(combinedLog).digest("hex"),
     logTruncated: bounded.truncated,
   }];
-  await input.rpc.client.recordMergeBatchValidation(
-    {
-      ...commonClaimRequest(input.claim, input.workerId),
-      mergeGroupSha: exact.headSha,
-      validationResults: {
-        results: validationResults.map((result) => ({
-          ...result,
-          failureCode: result.failureCode === "ci_failed"
-            ? MergeBatchValidationFailureCode.CI_FAILED
-            : result.failureCode === "output_limit"
-              ? MergeBatchValidationFailureCode.OUTPUT_LIMIT
-              : undefined,
-        })),
-      },
+  await input.rpc.recordMergeBatchValidation({
+    ...commonClaimRequest(input.claim, input.workerId),
+    mergeGroupSha: exact.headSha,
+    validationResults: {
+      results: validationResults.map((result) => ({
+        ...result,
+        failureCode: result.failureCode === "ci_failed"
+          ? MergeBatchValidationFailureCode.CI_FAILED
+          : result.failureCode === "output_limit"
+            ? MergeBatchValidationFailureCode.OUTPUT_LIMIT
+            : undefined,
+      })),
     },
-    input.rpc.options,
-  );
+  });
 }
 
 function assertPublishAuthorityValues(claim: ClaimedMergeBatch) {
@@ -933,25 +921,19 @@ async function publishMergeBatch(input: NormalizedMergeBatchExecutionInput) {
     // can never merge a pull request. Keep the lease live before every status.
     const authority = assertPublishAuthorityValues(input.claim);
     await publishProofStatuses(authority, true);
-    await input.rpc.client.completeMergeBatchPublication(
-      {
-        ...commonClaimRequest(input.claim, input.workerId),
-        mergeGroupSha: authority.mergeGroupSha,
-      },
-      input.rpc.options,
-    );
+    await input.rpc.completeMergeBatchPublication({
+      ...commonClaimRequest(input.claim, input.workerId),
+      mergeGroupSha: authority.mergeGroupSha,
+    });
     return;
   }
   const authority = await reFencePublication(input);
   await publishProofStatuses(authority, false);
   await mergeBatchPullRequests(input, authority);
-  await input.rpc.client.completeMergeBatchPublication(
-    {
-      ...commonClaimRequest(input.claim, input.workerId),
-      mergeGroupSha: authority.mergeGroupSha,
-    },
-    input.rpc.options,
-  );
+  await input.rpc.completeMergeBatchPublication({
+    ...commonClaimRequest(input.claim, input.workerId),
+    mergeGroupSha: authority.mergeGroupSha,
+  });
 }
 
 function blockCode(claim: ClaimedMergeBatch) {
@@ -971,14 +953,11 @@ async function drainMergeBatch(
   input: NormalizedMergeBatchExecutionInput,
   failure?: { code: string; detail: string },
 ) {
-  await input.rpc.client.blockMergeBatch(
-    {
-      ...commonClaimRequest(input.claim, input.workerId),
-      code: failure?.code ?? blockCode(input.claim),
-      detail: (failure?.detail ?? blockDetail(input.claim)).slice(0, 4_000),
-    },
-    input.rpc.options,
-  );
+  await input.rpc.blockMergeBatch({
+    ...commonClaimRequest(input.claim, input.workerId),
+    code: failure?.code ?? blockCode(input.claim),
+    detail: (failure?.detail ?? blockDetail(input.claim)).slice(0, 4_000),
+  });
 }
 
 export type MergeBatchExecutionInput = {

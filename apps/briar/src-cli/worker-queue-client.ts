@@ -1,6 +1,5 @@
-import { createClient } from "@connectrpc/connect";
-import { createConnectTransport } from "@connectrpc/connect-web";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
+import type { Client } from "@connectrpc/connect";
 import {
   HandoffWorkResponse_Outcome,
   WorkerExecutionService,
@@ -17,11 +16,7 @@ import {
   type ClaimedWork,
   type WorkerLeaseRenewal,
 } from "./worker-queue-contract";
-
-const workerConnectTransport = (apiUrl: string) => createConnectTransport({
-  baseUrl: apiUrl.replace(/\/+$/u, ""),
-  useBinaryFormat: true,
-});
+import { createAuthenticatedConnectClient } from "./connect-client";
 
 const requiredIsoTimestamp = (
   value: Parameters<typeof timestampDate>[0] | undefined,
@@ -80,23 +75,29 @@ export const workClaimIdentityToProto = (
             },
 });
 
-export function createWorkerQueueClient(apiUrl: string, token: string) {
-  const client = createClient(
-    WorkerQueueService,
-    workerConnectTransport(apiUrl),
-  );
-  const options = { headers: { Authorization: `Bearer ${token}` } };
+export type WorkerQueueClient = Client<typeof WorkerQueueService>;
 
+export function createWorkerQueueClient(
+  apiUrl: string,
+  token: string,
+): WorkerQueueClient {
+  return createAuthenticatedConnectClient(
+    WorkerQueueService,
+    apiUrl,
+    token,
+    { binary: true },
+  );
+}
+
+export function createWorkerQueueOperations(client: WorkerQueueClient) {
   return {
-    client,
-    options,
     claimWork: async (input: {
       projectId: string;
       workerId: string;
       claimedBy: string;
       repliesOnly: boolean;
     }) => {
-      const response = await client.claimWork(input, options);
+      const response = await client.claimWork(input);
       return {
         work: response.work ? claimedWorkFromProto(response.work) : null,
         retryAfterMs: response.retryAfterMs,
@@ -112,7 +113,7 @@ export function createWorkerQueueClient(apiUrl: string, token: string) {
         projectId: input.projectId,
         workerId: input.workerId,
         work: workClaimIdentityToProto(input.work),
-      }, options);
+      });
       if (
         response.work.case !== input.work.workType &&
         !(input.work.workType === "projectAgentTask" &&
@@ -151,7 +152,7 @@ export function createWorkerQueueClient(apiUrl: string, token: string) {
         workerId: input.workerId,
         work: workClaimIdentityToProto(input.work),
         conversationId: input.conversationId ?? undefined,
-      }, options);
+      });
       return {
         retainedUntil: requiredIsoTimestamp(
           response.retainedUntil,
@@ -176,7 +177,7 @@ export function createWorkerQueueClient(apiUrl: string, token: string) {
           conversationId: input.checkpoint.conversationId ?? undefined,
           workspacePath: input.checkpoint.workspacePath ?? undefined,
         },
-      }, options);
+      });
       if (
         response.outcome !== HandoffWorkResponse_Outcome.RELEASED &&
         response.outcome !== HandoffWorkResponse_Outcome.ALREADY_RELEASED
@@ -198,26 +199,27 @@ export function createWorkerQueueClient(apiUrl: string, token: string) {
         }
         | { case: "failure"; error: string };
       signal?: AbortSignal;
-    }) => client.completeProjectAgentTask({
-      projectId: input.projectId,
-      workerId: input.workerId,
-      work: workClaimIdentityToProto(input.work),
-      result: input.result.case === "success"
-        ? {
-          case: "success",
-          value: {
-            summary: input.result.summary,
-            conversationId: input.result.conversationId ?? undefined,
-          },
-        }
-        : {
-          case: "failure",
-          value: { error: input.result.error },
+    }) =>
+      client.completeProjectAgentTask(
+        {
+          projectId: input.projectId,
+          workerId: input.workerId,
+          work: workClaimIdentityToProto(input.work),
+          result: input.result.case === "success"
+            ? {
+              case: "success",
+              value: {
+                summary: input.result.summary,
+                conversationId: input.result.conversationId ?? undefined,
+              },
+            }
+            : {
+              case: "failure",
+              value: { error: input.result.error },
+            },
         },
-    }, {
-      ...options,
-      signal: input.signal,
-    }),
+        { signal: input.signal },
+      ),
   };
 }
 
@@ -225,11 +227,10 @@ export function createAuthenticatedWorkerExecutionClient(
   apiUrl: string,
   token: string,
 ) {
-  return {
-    client: createClient(
-      WorkerExecutionService,
-      workerConnectTransport(apiUrl),
-    ),
-    options: { headers: { Authorization: `Bearer ${token}` } },
-  };
+  return createAuthenticatedConnectClient(
+    WorkerExecutionService,
+    apiUrl,
+    token,
+    { binary: true },
+  );
 }

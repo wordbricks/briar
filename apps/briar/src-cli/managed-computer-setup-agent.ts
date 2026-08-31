@@ -28,6 +28,7 @@ import {
   ManagedComputerSetupPhase,
   ManagedComputerSetupStateSchema,
   ManagedComputerSetupStateStatus,
+  ManagedComputerSetupService,
   ManagedComputerSetupToAgentSchema,
   type ManagedComputerSetupToController,
   ManagedComputerSetupToControllerSchema,
@@ -53,7 +54,7 @@ import { dashboardWorkerFromProto } from "../src/lib/app-rpc/fleet-mappers";
 import { requiredMessage } from "../src/lib/app-rpc/mappers";
 import { projectSettingsFromProto } from "../src/lib/app-rpc/project-configuration-mappers";
 import { cliVersion, gitValueAt, loadConfig, saveConfig } from "./command-support";
-import { createManagedComputerSetupClient } from "./managed-computer-setup-client";
+import { createAuthenticatedConnectClient } from "./connect-client";
 import type { ManagedComputerRemoteAgentConfig } from "./managed-computer-remote-session-agent";
 import { discoverWorkerProviderCapabilities } from "./provider-capabilities";
 import {
@@ -607,14 +608,16 @@ export async function runManagedComputerGuidedSetup(
   },
   dependencies: GuidedSetupDependencies,
 ) {
-  const setupRpc = createManagedComputerSetupClient(
+  const setupRpc = createAuthenticatedConnectClient(
+    ManagedComputerSetupService,
     config.apiOrigin,
     config.credential,
+    { binary: true },
   );
-  const context = await setupRpc.client.getManagedComputerSetupContext({
+  const context = await setupRpc.getManagedComputerSetupContext({
     managedComputerId: config.managedComputerId,
     setupToken: input.setupToken,
-  }, setupRpc.options);
+  });
   const session = requiredMessage(
     context.session,
     "managedComputerSetupContext.session",
@@ -685,7 +688,7 @@ export async function runManagedComputerGuidedSetup(
   if (!providerHealth[input.provider].healthy) {
     throw new Error(`${input.provider} is authenticated but not ready`);
   }
-  const response = await setupRpc.client.bindManagedComputerSetup({
+  const response = await setupRpc.bindManagedComputerSetup({
     managedComputerId: config.managedComputerId,
     setupToken: input.setupToken,
     runtime: workerRuntimeToProto({
@@ -696,7 +699,7 @@ export async function runManagedComputerGuidedSetup(
       versions: { briar: cliVersion },
       worktrees: true,
     }),
-  }, setupRpc.options);
+  });
   const binding = {
     ...response,
     worker: dashboardWorkerFromProto(requiredMessage(
