@@ -6,8 +6,8 @@ automatic learning or end-to-end recall is complete.
 
 | PR | Scope | State |
 | --- | --- | --- |
-| 1 | Versioned storage, ownership, CRUD/export, desktop/Android/iOS management | In progress on `codex/dm-memory-storage` |
-| 2 | Chunking, durable indexing, Vectorize search, briefs, purge lifecycle | Pending |
+| 1 | Versioned storage, ownership, CRUD/export, desktop/Android/iOS management | [#1497](https://github.com/wordbricks/briar/pull/1497), merged |
+| 2 | Chunking, durable indexing, Vectorize search, briefs, purge lifecycle | In progress on `codex/dm-memory-retrieval` |
 | 3 | Worker capability, DM lookup loop, provider session fencing, citations | Pending |
 | 4 | Durable learning claims, proposals, independent verification, consolidation, evaluations | Pending |
 
@@ -20,6 +20,12 @@ numbers, verified heads, required signoffs and merge commits. Retrieval and
 learning quality targets require measured results, not module existence.
 
 ## Storage PR evidence
+
+- Validated head: `beefc6632d0e519043b23d85993a4127df6fa0b1`. All four required
+  `ci:signoff` contexts passed, including 2,165 app/Worker tests and 94 D1 tests.
+  Merge commit `ecf6eb9c08220da5adeb6df74679b52352b4929d` was verified on `origin/main`.
+- Full `mobile:ci` passed: 20 iPhone UI tests, iPad accessibility/Dynamic Type,
+  native unit tests, Production analysis/build, and the isolated Android APK build.
 
 - Real isolated D1 plus the full API handler: 14 tests covering atomic writes,
   idempotency, competing revisions, source edits, owner isolation, roster changes,
@@ -46,3 +52,34 @@ learning quality targets require measured results, not module existence.
 Index jobs intentionally remain pending until PR 2. Recall and automatic learning
 capabilities are false; automatic-learning opt-in is rejected until PR 4. No
 remote migrations, deployments, or private conversation imports were performed.
+
+## Retrieval preparation
+
+- A four-sentence synthetic Workers AI probe returned four 1,024-dimensional
+  BGE-M3 vectors in 710 ms through a local Worker with a remote AI binding.
+  This verifies the binding and response shape, not retrieval accuracy or p95.
+- The chunk budget uses pinned `js-tiktoken@1.0.21` with `cl100k_base`. It is
+  independent of the embedding model's billing tokenizer. A local workerd probe
+  encoded 61,600 synthetic UTF-8 bytes in 58 ms after 125 ms initialization.
+  Real retrieval evaluation remains a release gate.
+- A separate, temporary Vectorize index held three synthetic vectors. Actual
+  BGE-M3/Vectorize queries selected the English source for the Korean question and
+  the Korean source for the English question. An identical source in another
+  memory space was excluded by the filter. The two queries plus `queryById` took
+  1,724 ms in one observation; this is not a p95 or quality benchmark.
+- The real binding returned string mutation IDs and timestamps, unlike the
+  installed generated declarations. The adapter validates the V2 runtime and
+  decodes its actual response. After deletion, the processed mutation matched
+  the delete receipt and `getByIds` returned no vectors.
+- The temporary index was deleted after confirming vector removal; Cloudflare's
+  read-back returned `vectorize.index.deleted`. No production index was created.
+- Tokenizer initialization is lazy, so ordinary requests do not build its tables.
+  The updated local startup profile measured 117.3 ms active time, with a
+  5,498.54 KiB bundle and 1,323.35 KiB gzip. This is not deployed Cloudflare latency.
+- Pre-commit focused validation: 93 tests across chunking, provider failure
+  classification, real D1 storage/retrieval and scheduled routing; Worker
+  TypeScript and type-aware lint passed. Full signoffs are still pending.
+
+The remaining execution/UI pass must cover owner revision history, visible expiry
+and indexing updates, citations, and the distinction between forgetting a memory
+and deleting its conversation source, on desktop/Android and native iOS.
