@@ -571,17 +571,12 @@ export const agentSkillJson = (skill: AgentSkillRow) => ({
   name: skill.name,
   description: skill.description,
   body: skill.body,
-  // Rolling/native compatibility only. New clients persist description/body.
-  instructions: skill.body,
   provider: skill.provider,
   model: skill.model,
   effort: skill.effort,
   kind: skill.kind,
   executionMode: skill.execution_mode,
   approvalPolicy: skill.approval_policy,
-  // Workers from before explicit Skill selection require this wire field.
-  // It is always false and has no selection or persistence semantics.
-  isDefault: false,
   position: skill.position,
   createdAt: skill.created_at,
   updatedAt: skill.updated_at,
