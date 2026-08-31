@@ -201,7 +201,7 @@ export async function updateProjectAgentApplication(
       designatedWorkerLabel: designatedWorker?.label ?? null,
       description: write.description ?? existing.description,
       responsibility: write.responsibility,
-      skills: write.skills,
+      skills: write.skills ?? [],
       calendarColor: write.calendarColor,
     });
   } catch (error) {

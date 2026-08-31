@@ -1113,7 +1113,7 @@ export const createAppAgentService = (
       description: write.description,
       responsibility: write.responsibility,
       effort: write.effort,
-      skills: write.skills,
+      skills: write.skills ?? [],
       updatedAt: new Date().toISOString(),
     });
     if (!agent) throw new HttpError(404, "Organization agent not found");

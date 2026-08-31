@@ -484,36 +484,6 @@ export function insertAgentSkillStatement(
     );
 }
 
-/**
- * A client from before first-class Skills omits the `skills` field and expects
- * the Agent execution controls to affect the next run. Preserve that behavior
- * only when the Agent has one unambiguous Skill. A multi-Skill roster must
- * never be changed by an implicit selection.
- */
-export function soleAgentSkillRowFromLegacy(
-  skills: readonly AgentSkillRow[],
-  input: {
-    description: string;
-    body: string;
-    provider: AgentSkillProvider;
-    model: string | null;
-    effort: AgentSkillEffort | null;
-    updatedAt: string;
-  },
-) {
-  if (skills.length !== 1) return null;
-  return {
-    ...skills[0],
-    description: input.description.trim(),
-    body: input.body.trim(),
-    provider: input.provider,
-    model: input.model?.trim() || null,
-    effort: input.effort,
-    is_default: 0,
-    updated_at: input.updatedAt,
-  } satisfies AgentSkillRow;
-}
-
 export async function listAgentSkills(
   db: D1Database,
   agentIds: readonly string[],

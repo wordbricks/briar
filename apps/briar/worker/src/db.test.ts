@@ -2778,6 +2778,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           model: null,
           effort: null,
           responsibility: "Must not update another project.",
+          skills: [],
           calendarColor: "#d97706",
         },
       ),
