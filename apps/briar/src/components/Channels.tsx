@@ -130,7 +130,6 @@ import {
   ChannelIssueProposalDetails,
   channelIssueBatchProposalDetails,
   channelIssueProposalDetails,
-  channelIssueProposalIsValid,
   channelIssueProposalRequestsExecution,
 } from "./ChannelIssueProposalDetails";
 import { IssueExecutionApproval } from "./IssueExecutionApproval";
@@ -2937,9 +2936,7 @@ const MessageRow = memo(function MessageRow({
     message.author.type === "user" || message.author.type === "agent"
       ? message.author.image
       : null;
-  const issueProposal = message.proposal?.actionType === "request_issue_create"
-    ? message.proposal
-    : null;
+  const issueProposal = message.proposal;
   const availableProjects = projects.filter(
     (project) =>
       !project.organizationId || project.organizationId === channel.organizationId,
@@ -2955,7 +2952,6 @@ const MessageRow = memo(function MessageRow({
     !channel.defaultProjectId;
   const proposalIssue = channelIssueProposalDetails(issueProposal);
   const proposalBatch = channelIssueBatchProposalDetails(issueProposal);
-  const proposalValid = channelIssueProposalIsValid(issueProposal);
   const requestsExecution = channelIssueProposalRequestsExecution(issueProposal);
   const executionProjectName = message.executionProposal
     ? availableProjects.find(
@@ -3106,7 +3102,7 @@ const MessageRow = memo(function MessageRow({
                   className="channel-proposal-approve-button"
                   disabled={
                     busy || Boolean(channel.archivedAt) ||
-                    !proposalProjectId || !proposalValid
+                    !proposalProjectId
                   }
                   onClick={() => void onAcceptProposal()}
                   type="button"

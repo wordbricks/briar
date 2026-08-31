@@ -65,12 +65,11 @@ final class ChannelsStoreTests: XCTestCase {
         XCTAssertEqual(mapped.id, messageID)
         XCTAssertEqual(mapped.author.type, .agent)
         XCTAssertEqual(mapped.author.provider, "codex")
-        XCTAssertEqual(mapped.proposal?.actionType, .createIssue)
         XCTAssertEqual(mapped.proposal?.status, .accepted)
-        XCTAssertEqual(mapped.proposal?.payload?.batch?.items.first?.key, "ios")
-        XCTAssertEqual(mapped.proposal?.payload?.batch?.items.first?.issue.priority, 1)
+        XCTAssertEqual(mapped.proposal?.payload.batch?.items.first?.key, "ios")
+        XCTAssertEqual(mapped.proposal?.payload.batch?.items.first?.issue.priority, 1)
         XCTAssertEqual(
-            mapped.proposal?.payload?.batch?.dependencies.first?.prerequisiteKey,
+            mapped.proposal?.payload.batch?.dependencies.first?.prerequisiteKey,
             "contract"
         )
         XCTAssertEqual(mapped.proposal?.resultItems.first?.runId, resultRunID)

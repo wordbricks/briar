@@ -104,7 +104,6 @@ describe("Channel domain to protobuf mapping", () => {
       ],
       proposal: {
         id: "66666666-6666-4666-8666-666666666666",
-        actionType: "request_issue_create",
         status: "accepted",
         projectId: "77777777-7777-4777-8777-777777777777",
         payload: {
@@ -148,7 +147,7 @@ describe("Channel domain to protobuf mapping", () => {
     expect(mapped.proposal?.payload.case).toBe("batch");
   });
 
-  it("fails malformed trusted timestamps, enums, and proposal oneofs as Internal", () => {
+  it("fails malformed trusted timestamps and enums as Internal", () => {
     expectInternal(() => appChannelMessage(baseMessage({ createdAt: "invalid" })));
 
     const executionProposal: ChannelExecutionProposal = {
@@ -173,15 +172,5 @@ describe("Channel domain to protobuf mapping", () => {
       appChannelMessage(baseMessage({ executionProposal }))
     );
 
-    expectInternal(() => appChannelMessage(baseMessage({
-      proposal: {
-        id: "66666666-6666-4666-8666-666666666666",
-        actionType: "request_issue_create",
-        status: "pending",
-        projectId: null,
-        payload: {},
-        resultRunId: null,
-      },
-    })));
   });
 });

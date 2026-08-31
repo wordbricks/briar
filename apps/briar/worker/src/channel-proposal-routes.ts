@@ -11,11 +11,10 @@ import {
 import { requireChannelAccess } from "./channel-route-access";
 import {
   decodeChannelExecutionProposalAcceptInput,
-  decodeChannelIssueBatchProposalPayload,
-  decodeChannelIssueProposalPayload,
   decodeChannelProposalAcceptInput,
 } from "./channel-route-decoders";
 import {
+  decodeStoredChannelProposalPayload,
   getChannelActionProposal,
   declineChannelActionProposal,
   getChannelAgentSkillExecutionProposal,
@@ -328,9 +327,6 @@ export async function declineOrganizationChannelProposal(
     input.proposalId,
   );
   if (!proposal) throw new HttpError(404, "Proposal not found");
-  if (proposal.action_type !== "request_issue_create") {
-    throw new HttpError(409, "This proposal cannot be declined");
-  }
   if (proposal.status === "accepted") {
     throw new HttpError(409, "Accepted proposals cannot be declined");
   }
@@ -454,9 +450,6 @@ export async function acceptOrganizationChannelProposal(
     input.proposalId,
   );
   if (!proposal) throw new HttpError(404, "Proposal not found");
-  if (proposal.action_type !== "request_issue_create") {
-    throw new HttpError(409, "This proposal cannot create an issue");
-  }
   if (proposal.status === "declined") {
     throw new HttpError(409, "Declined proposals cannot create an issue");
   }
@@ -468,15 +461,10 @@ export async function acceptOrganizationChannelProposal(
     replyAuthorAgentProjectId: proposal.reply_author_agent_project_id,
   });
   const request = decodeChannelProposalAcceptInput(input.request);
-  const rawProposalPayload: unknown = JSON.parse(proposal.payload_json);
-  // A batch marker is authoritative even if its contents are malformed. It
-  // must never fall through to the single-issue decoder.
-  const isBatchPayload = typeof rawProposalPayload === "object" &&
-    rawProposalPayload !== null && "batch" in rawProposalPayload;
-  const batchPayload = isBatchPayload
-    ? decodeChannelIssueBatchProposalPayload(rawProposalPayload)
-    : null;
-  if (batchPayload && request.execution) {
+  const proposalPayload = decodeStoredChannelProposalPayload(
+    proposal.payload_json,
+  );
+  if ("batch" in proposalPayload && request.execution) {
     throw new HttpError(400, "Issue batches cannot be executed on creation");
   }
   if (request.execution && proposal.execute_after_create !== 1) {
@@ -503,7 +491,8 @@ export async function acceptOrganizationChannelProposal(
   if (!project || project.organization_id !== channel.organization_id) {
     throw new HttpError(404, "Project not found");
   }
-  if (batchPayload) {
+  if ("batch" in proposalPayload) {
+    const batchPayload = proposalPayload;
     const acceptedBatchResponse = async (
       current: NonNullable<Awaited<ReturnType<typeof getChannelActionProposal>>>,
       outcome: "accepted" | "already_accepted",
@@ -651,7 +640,7 @@ export async function acceptOrganizationChannelProposal(
   if (channel.archived_at) {
     throw new HttpError(409, "Channel is archived");
   }
-  const payload = decodeChannelIssueProposalPayload(rawProposalPayload);
+  const payload = proposalPayload;
   const approvedAt = new Date().toISOString();
   if (request.execution) {
     decodeExecutionPreferences({

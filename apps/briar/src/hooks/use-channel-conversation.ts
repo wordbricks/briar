@@ -50,7 +50,6 @@ import {
 import { toggleOptimisticChannelReaction } from "../lib/optimistic-channel-reaction";
 import { channelReplyErrorText } from "../lib/channel-reply-error";
 import {
-  channelIssueProposalIsValid,
   channelIssueProposalRequestsExecution,
 } from "../components/ChannelIssueProposalDetails";
 import type { ChannelSkillCommandTarget } from "./useChannelComposer";
@@ -1404,8 +1403,7 @@ export function useChannelConversation({
       if (
         !activeId ||
         item.channelId !== activeId ||
-        item.proposal?.actionType !== "request_issue_create" ||
-        !channelIssueProposalIsValid(item.proposal)
+        !item.proposal
       ) return t("executionApproval.targetUnavailable");
       const proposalId = item.proposal.id;
       const requestsExecution = channelIssueProposalRequestsExecution(
@@ -1483,8 +1481,7 @@ export function useChannelConversation({
           if (
             latest?.status === "accepted" &&
             latest.projectId &&
-            latest.resultRunId &&
-            channelIssueProposalIsValid(latest)
+            latest.resultRunId
           ) {
             if (hasExecutionFollowUp) {
               if (result.executionProposal) applySuccessfulResponse();
@@ -1534,7 +1531,7 @@ export function useChannelConversation({
       if (
         !activeId ||
         item.channelId !== activeId ||
-        proposal?.actionType !== "request_issue_create" ||
+        !proposal ||
         proposal.status !== "pending"
       ) return;
       const declineContext = captureChannelSurface();

@@ -474,7 +474,6 @@ const channelProposalFromMessage = (
   })();
   return {
     id: value.id,
-    actionType: "request_issue_create",
     status: proposalStatusFromProto(value.status),
     projectId: value.projectId ?? null,
     payload,

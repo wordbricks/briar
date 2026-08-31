@@ -695,7 +695,6 @@ describe("useChannelConversation", () => {
     const proposalMessage = message("proposal", {
       proposal: {
         id: "proposal-1",
-        actionType: "request_issue_create",
         status: "pending",
         projectId: "project-1",
         payload: {
@@ -707,6 +706,7 @@ describe("useChannelConversation", () => {
           executeAfterCreate: false,
         },
         resultRunId: null,
+        resultItems: [],
       },
     });
     api.acceptChannelProposal.mockResolvedValueOnce({
@@ -734,7 +734,6 @@ describe("useChannelConversation", () => {
     const proposalMessage = message("proposal", {
       proposal: {
         id: "proposal-1",
-        actionType: "request_issue_create",
         status: "pending",
         projectId: "project-1",
         payload: {
@@ -746,6 +745,7 @@ describe("useChannelConversation", () => {
           executeAfterCreate: true,
         },
         resultRunId: null,
+        resultItems: [],
       },
     });
     api.declineChannelProposal.mockResolvedValueOnce({ outcome: "declined" });
@@ -771,7 +771,6 @@ describe("useChannelConversation", () => {
     const proposalMessage = message("proposal", {
       proposal: {
         id: "proposal-1",
-        actionType: "request_issue_create",
         status: "pending",
         projectId: "project-1",
         payload: {
@@ -783,6 +782,7 @@ describe("useChannelConversation", () => {
           executeAfterCreate: false,
         },
         resultRunId: null,
+        resultItems: [],
       },
     });
     const pending = deferred<{

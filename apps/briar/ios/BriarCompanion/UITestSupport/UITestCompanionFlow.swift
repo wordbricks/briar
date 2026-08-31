@@ -1259,7 +1259,8 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         case .declined: .declined
         }
         if let projectID = value.projectId { message.projectID = projectID.uuidString.lowercased() }
-        if let batch = value.payload?.batch {
+        switch value.payload {
+        case .batch(let batch):
             var payload = BriarAPI_ChannelIssueBatchProposalPayload()
             payload.items = batch.items.map { item in
                 var result = BriarAPI_ChannelIssueBatchProposalItem()
@@ -1274,10 +1275,10 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
                 return result
             }
             message.payload = .batch(payload)
-        } else if let issue = value.payload?.issue {
+        case .issue(let issue, let executeAfterCreate):
             var payload = BriarAPI_ChannelIssueProposalPayload()
             payload.issue = channelIssueMessage(issue)
-            payload.executeAfterCreate = value.payload?.executeAfterCreate ?? false
+            payload.executeAfterCreate = executeAfterCreate
             message.payload = .issue(payload)
         }
         if let resultRunID = value.resultRunId {
@@ -1633,10 +1634,9 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         )
         let proposal = Proposal(
             id: UUID(uuidString: "18181818-1818-4818-8818-181818181818")!,
-            actionType: .createIssue,
             status: .accepted,
             projectId: projectID,
-            payload: .init(batch: batch, executeAfterCreate: false),
+            payload: .batch(batch),
             resultRunId: UUID(uuidString: "31313131-3131-4131-8131-313131313131")!,
             resultItems: [
                 .init(

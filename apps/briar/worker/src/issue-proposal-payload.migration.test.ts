@@ -136,6 +136,25 @@ describe("issue proposal payload migration", () => {
     await conversationProposal("legacy-conversation", {
       issue: legacyIssue("Legacy conversation issue"),
     });
+    await db.prepare(
+      `insert into briar_channel_action_proposals (
+         id, channel_id, project_id, trigger_message_id, reply_message_id,
+         action_type, payload_json, created_at, updated_at
+       ) values (
+         'legacy-plan', 'proposal-channel', null, 'legacy-plan-trigger',
+         'legacy-plan-reply', 'request_plan_document', '{}', ?, ?
+       )`,
+    ).bind(now, now).run();
+    await db.prepare(
+      `insert into briar_channel_issue_batch_items (
+         organization_id, channel_id, proposal_id, project_id, local_key,
+         position, source_key, run_id, created_at
+       ) values (
+         'proposal-org', 'proposal-channel', 'legacy-plan',
+         'proposal-project', 'orphan', 0, 'legacy-plan:orphan',
+         '00000000-0000-4000-8000-000000000160', ?
+       )`,
+    ).bind(now).run();
 
     await applyD1Migrations(db, {
       files: [
@@ -199,5 +218,43 @@ describe("issue proposal payload migration", () => {
         status: "backlog",
       },
     })).rejects.toThrow(/payload cannot include status/iu);
+
+    await applyD1Migrations(db, {
+      files: ["0160_retire_channel_plan_proposals.sql"],
+    });
+    expect(await db.prepare(
+      `select count(*) as count from briar_channel_action_proposals
+       where id = 'legacy-plan'`,
+    ).first<number>("count")).toBe(0);
+    expect(await db.prepare(
+      `select count(*) as count from briar_channel_issue_batch_items
+       where proposal_id = 'legacy-plan'`,
+    ).first<number>("count")).toBe(0);
+    expect(await db.prepare(
+      `select count(*) as count from briar_channel_changes
+       where entity_type = 'proposal' and entity_id = 'legacy-plan'`,
+    ).first<number>("count")).toBe(0);
+    expect(await db.prepare(
+      `select count(*) as count from briar_channel_action_proposals
+       where id = 'current-channel'`,
+    ).first<number>("count")).toBe(1);
+    await expect(db.prepare(
+      `insert into briar_channel_action_proposals (
+         id, channel_id, project_id, trigger_message_id, reply_message_id,
+         action_type, payload_json, created_at, updated_at
+       ) values (
+         'rejected-plan', 'proposal-channel', null, 'rejected-plan-trigger',
+         'rejected-plan-reply', 'request_plan_document', '{}', ?, ?
+       )`,
+    ).bind(now, now).run()).rejects.toThrow(
+      /channel proposals must create issues/iu,
+    );
+    await expect(db.prepare(
+      `update briar_channel_action_proposals
+       set action_type = 'request_plan_document'
+       where id = 'current-channel'`,
+    ).run()).rejects.toThrow();
+    expect((await db.prepare(`pragma foreign_key_check`).all()).results)
+      .toEqual([]);
   });
 });

@@ -1824,7 +1824,6 @@ describe("organization channels", () => {
       projectId: null,
     });
     expect(reply?.proposal).toMatchObject({
-      actionType: "request_issue_create",
       status: "pending",
       projectId,
     });

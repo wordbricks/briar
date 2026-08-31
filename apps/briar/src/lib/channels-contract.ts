@@ -44,12 +44,6 @@ export type ChannelVisibility = (typeof channelVisibilities)[number];
 export const channelKinds = ["channel", "dm"] as const;
 export type ChannelKind = (typeof channelKinds)[number];
 
-export const channelActionTypes = [
-  "request_issue_create",
-  "request_plan_document",
-] as const;
-export type ChannelActionType = (typeof channelActionTypes)[number];
-
 export const channelReplyStatuses = [
   "queued",
   "running",
@@ -666,19 +660,16 @@ export type ChannelMessageDocumentContent = ChannelMessageDocument & {
 
 export type ChannelMessageProposal = {
   id: string;
-  actionType: ChannelActionType;
   status: "pending" | "accepted" | "declined";
   projectId: string | null;
-  payload: unknown;
+  payload: typeof channelProposalPayloadSchema.Type;
   resultRunId: string | null;
-  /** Present for accepted batch proposals, ordered like the proposed items. */
-  resultItems?: ChannelIssueBatchResultItem[];
+  /** Ordered like the proposed items for an accepted batch; empty otherwise. */
+  resultItems: ChannelIssueBatchResultItem[];
 };
 
-export type ChannelIssueBatchResultItem = {
-  localKey: string;
-  runId: string;
-};
+export type ChannelIssueBatchResultItem =
+  typeof channelIssueBatchResultItemSchema.Type;
 
 export type ChannelExecutionProposal = {
   id: string;
@@ -968,6 +959,14 @@ const channelIssueBatchLocalKeySchema = Schema.String.check(
   ),
 );
 
+export const channelIssueBatchResultItemSchema = strict(Schema.Struct({
+  localKey: Schema.Trimmed.check(
+    Schema.isLengthBetween(1, 64),
+    Schema.isPattern(channelIssueBatchLocalKeyPattern),
+  ),
+  runId: Uuid,
+}));
+
 const channelIssueBatchSchema = strict(Schema.Struct({
   items: mutableArray(strict(Schema.Struct({
     key: channelIssueBatchLocalKeySchema,
@@ -1149,8 +1148,6 @@ export const channelIssueProposalPayloadSchema = strict(Schema.Struct({
   ...channelStoredIssueProposalPayloadSchema.fields,
   executeAfterCreate: Schema.Boolean,
 }));
-export const decodeChannelIssueProposalPayloadOption =
-  Schema.decodeUnknownOption(channelIssueProposalPayloadSchema);
 
 export const channelIssueBatchProposalPayloadSchema = strict(Schema.Struct({
   ...channelStoredIssueBatchProposalPayloadSchema.fields,
@@ -1158,8 +1155,6 @@ export const channelIssueBatchProposalPayloadSchema = strict(Schema.Struct({
 }));
 export type ChannelIssueBatchProposalPayload =
   typeof channelIssueBatchProposalPayloadSchema.Type;
-export const decodeChannelIssueBatchProposalPayloadOption =
-  Schema.decodeUnknownOption(channelIssueBatchProposalPayloadSchema);
 
 export const channelProposalPayloadSchema = Schema.Union([
   channelIssueProposalPayloadSchema,

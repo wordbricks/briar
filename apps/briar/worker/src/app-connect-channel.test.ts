@@ -111,7 +111,6 @@ describe("app Channel Connect adapter", () => {
         document: null,
         proposal: {
           id: proposalId,
-          actionType: "request_issue_create",
           status: "pending",
           projectId,
           payload: {

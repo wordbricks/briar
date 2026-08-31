@@ -232,7 +232,6 @@ describe("Channel Connect DTO mapping", () => {
       attachments: [{ byteSize: 4_294_967_296 }],
       reactions: [{ people: [{ image: null }] }],
       proposal: {
-        actionType: "request_issue_create",
         payload: {
           batch: {
             items: [{

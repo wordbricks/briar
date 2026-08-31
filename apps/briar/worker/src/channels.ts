@@ -3,15 +3,16 @@ import {
   channelReplyAssignedWorkerUnavailableError,
   channelReplyNoAvailableWorkerError,
   type ChannelReplyUnavailableReason,
-  type ChannelActionType,
   type ChannelAgentProvider as AgentProvider,
   type ChannelAgentReply,
   type ChannelExecutionProposal,
+  channelIssueBatchResultItemSchema,
   type ChannelIssueBatchProposalPayload,
   type ChannelKind,
   type ChannelMessage,
   type ChannelMessageBlock,
   channelMessageBlockSchema,
+  channelStoredProposalPayloadSchema,
   type ChannelMessageAttachment,
   type ChannelMessageReaction,
   type ChannelMessageReactionPerson,
@@ -65,6 +66,20 @@ const encodeStoredChannelMessageBlocks = Schema.encodeSync(
   StoredChannelMessageBlocksJson,
   strictStoredChannelMessageBlockOptions,
 );
+const StoredChannelProposalPayloadJson = Schema.fromJsonString(
+  channelStoredProposalPayloadSchema,
+);
+export const decodeStoredChannelProposalPayload = Schema.decodeUnknownSync(
+  StoredChannelProposalPayloadJson,
+  strictStoredChannelMessageBlockOptions,
+);
+const StoredChannelIssueBatchResultItemsJson = Schema.fromJsonString(
+  Schema.mutable(Schema.Array(channelIssueBatchResultItemSchema)),
+);
+const decodeStoredChannelIssueBatchResultItems = Schema.decodeUnknownSync(
+  StoredChannelIssueBatchResultItemsJson,
+  strictStoredChannelMessageBlockOptions,
+);
 
 export type ChannelRow = {
   id: string;
@@ -113,7 +128,6 @@ export type ChannelMessageRow = {
   document_title: string | null;
   document_project_id: string | null;
   proposal_id: string | null;
-  proposal_action_type: ChannelActionType | null;
   proposal_status: "pending" | "accepted" | "declined" | null;
   proposal_project_id: string | null;
   proposal_payload_json: string | null;
@@ -471,7 +485,6 @@ const messageSelect = `
          document.title as document_title,
          document.project_id as document_project_id,
          proposal.id as proposal_id,
-         proposal.action_type as proposal_action_type,
          case
            when proposal.declined_at is not null then 'declined'
            else proposal.status
@@ -739,6 +752,53 @@ export const channelMessageAuthorJson = (
   };
 };
 
+const requiredChannelMessageProposalField = <T>(
+  value: T | null,
+  field: string,
+): T => {
+  if (value === null) {
+    throw new Error(`Channel message proposal ${field} is missing`);
+  }
+  return value;
+};
+
+const channelMessageProposalJson = (
+  row: ChannelMessageRow,
+): ChannelMessage["proposal"] => {
+  if (!row.proposal_id) return null;
+  const storedPayload = decodeStoredChannelProposalPayload(
+    requiredChannelMessageProposalField(
+      row.proposal_payload_json,
+      "payload",
+    ),
+  );
+  const executeAfterCreate = requiredChannelMessageProposalField(
+    row.proposal_execute_after_create,
+    "execution intent",
+  ) === 1;
+  if ("batch" in storedPayload && executeAfterCreate) {
+    throw new Error("Channel issue batch proposal cannot request execution");
+  }
+  return {
+    id: row.proposal_id,
+    status: requiredChannelMessageProposalField(
+      row.proposal_status,
+      "status",
+    ),
+    projectId: row.proposal_project_id,
+    payload: "batch" in storedPayload
+      ? { ...storedPayload, executeAfterCreate: false }
+      : { ...storedPayload, executeAfterCreate },
+    resultRunId: row.proposal_result_run_id,
+    resultItems: decodeStoredChannelIssueBatchResultItems(
+      requiredChannelMessageProposalField(
+        row.proposal_result_items_json,
+        "result items",
+      ),
+    ),
+  };
+};
+
 export const channelMessageJson = (
   row: ChannelMessageRow,
   mentions: { users: string[]; agents: string[] } = { users: [], agents: [] },
@@ -770,22 +830,7 @@ export const channelMessageJson = (
         projectId: row.document_project_id,
       }
     : null,
-  proposal: !row.deleted_at && row.proposal_id
-    ? {
-        id: row.proposal_id,
-        actionType: row.proposal_action_type ?? "request_issue_create",
-        status: row.proposal_status ?? "pending",
-        projectId: row.proposal_project_id,
-        payload: {
-          ...JSON.parse(row.proposal_payload_json ?? "{}"),
-          executeAfterCreate: row.proposal_execute_after_create === 1,
-        },
-        resultRunId: row.proposal_result_run_id,
-        resultItems: row.proposal_result_items_json
-          ? JSON.parse(row.proposal_result_items_json)
-          : undefined,
-    }
-    : null,
+  proposal: row.deleted_at ? null : channelMessageProposalJson(row),
   executionProposal: row.deleted_at ? null : channelExecutionProposalJson(row),
   skillExecutionProposal: row.deleted_at
     ? null
@@ -5049,7 +5094,6 @@ export async function getChannelActionProposal(
       trigger_message_id: string;
       reply_message_id: string;
       reply_parent_message_id: string | null;
-      action_type: ChannelActionType;
       payload_json: string;
       status: "pending" | "accepted";
       accepted_by_user_id: string | null;

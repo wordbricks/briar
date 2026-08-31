@@ -1217,7 +1217,7 @@ final class ChannelsStore: ObservableObject {
         let expectedFocusedThreadParentID = focusedThreadParentID
         let expectedProposalRevision = proposalRevisions[proposalID, default: 0]
         let requestsExecutionFollowUp = latestProposals[proposalID]?
-            .payload?.executeAfterCreate == true
+            .payload.executeAfterCreate == true
         guard execution == nil || requestsExecutionFollowUp else { return nil }
         acceptanceRevision &+= 1
         let expectedAcceptanceRevision = acceptanceRevision
@@ -1249,7 +1249,7 @@ final class ChannelsStore: ObservableObject {
                     expectedFocusedChannelID == focusedChannelID,
                     expectedFocusedThreadParentID == focusedThreadParentID,
                     proposalRevisions[proposalID, default: 0] == expectedProposalRevision,
-                    latestProposals[proposalID]?.payload?.executeAfterCreate == true
+                    latestProposals[proposalID]?.payload.executeAfterCreate == true
                 else { return nil }
                 try validateIssueExecutionSelection(
                     snapshot: preflight,
@@ -1708,7 +1708,7 @@ final class ChannelsStore: ObservableObject {
               approvingSkillExecutionProposalID == nil,
               preparingSkillExecutionProposalID == nil,
               let proposal = latestProposals[proposalID],
-              proposal.payload?.executeAfterCreate == true,
+              proposal.payload.executeAfterCreate,
               proposal.projectId == nil || proposal.projectId == projectID
         else { return nil }
 
@@ -2020,7 +2020,6 @@ final class ChannelsStore: ObservableObject {
         guard let proposal else { return nil }
         return ChannelMessage.Proposal(
             id: proposal.id,
-            actionType: proposal.actionType,
             status: .accepted,
             projectId: response.projectId,
             payload: proposal.payload,
@@ -2035,7 +2034,6 @@ final class ChannelsStore: ObservableObject {
         guard let proposal else { return nil }
         return ChannelMessage.Proposal(
             id: proposal.id,
-            actionType: proposal.actionType,
             status: .declined,
             projectId: proposal.projectId,
             payload: proposal.payload,

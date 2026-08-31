@@ -94,10 +94,6 @@ import type {
   ChannelSummary,
   ChannelThreadSubscriber,
 } from "../../src/lib/channels-contract";
-import {
-  decodeChannelIssueBatchProposalPayload,
-  decodeChannelIssueProposalPayload,
-} from "./channel-route-decoders";
 import { decodeProjectAgentSessionInput } from "./project-request-contract";
 
 const internal = (message: string, cause?: unknown): never => {
@@ -639,11 +635,8 @@ const appAgentSkillExecutionProposal = (
 });
 
 const decodedProposalPayload = (proposal: ChannelMessageProposal) => {
-  if (proposal.actionType !== "request_issue_create") {
-    return internal(`Unsupported channel proposal action: ${proposal.actionType}`);
-  }
-  try {
-    const payload = decodeChannelIssueBatchProposalPayload(proposal.payload);
+  if ("batch" in proposal.payload) {
+    const payload = proposal.payload;
     return {
       case: "batch" as const,
       value: create(ChannelIssueBatchProposalPayloadSchema, {
@@ -662,27 +655,19 @@ const decodedProposalPayload = (proposal: ChannelMessageProposal) => {
         ),
       }),
     };
-  } catch (batchError) {
-    try {
-      const payload = decodeChannelIssueProposalPayload(proposal.payload);
-      return {
-        case: "issue" as const,
-        value: create(ChannelIssueProposalPayloadSchema, {
-          issue: create(ChannelIssueProposalSchema, {
-            title: payload.issue.title,
-            description: payload.issue.description ?? undefined,
-            priority: payload.issue.priority ?? undefined,
-          }),
-          executeAfterCreate: payload.executeAfterCreate,
-        }),
-      };
-    } catch (issueError) {
-      return internal("Invalid channel proposal payload", {
-        batchError,
-        issueError,
-      });
-    }
   }
+  const payload = proposal.payload;
+  return {
+    case: "issue" as const,
+    value: create(ChannelIssueProposalPayloadSchema, {
+      issue: create(ChannelIssueProposalSchema, {
+        title: payload.issue.title,
+        description: payload.issue.description ?? undefined,
+        priority: payload.issue.priority ?? undefined,
+      }),
+      executeAfterCreate: payload.executeAfterCreate,
+    }),
+  };
 };
 
 const appChannelProposal = (proposal: ChannelMessageProposal) =>
@@ -692,7 +677,7 @@ const appChannelProposal = (proposal: ChannelMessageProposal) =>
     projectId: proposal.projectId ?? undefined,
     payload: decodedProposalPayload(proposal),
     resultRunId: proposal.resultRunId ?? undefined,
-    resultItems: (proposal.resultItems ?? []).map((item) =>
+    resultItems: proposal.resultItems.map((item) =>
       create(ChannelIssueBatchResultItemSchema, item)
     ),
   });

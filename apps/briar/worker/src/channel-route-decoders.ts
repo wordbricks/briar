@@ -1,7 +1,5 @@
 import {
   channelExecutionProposalAcceptInputSchema,
-  channelIssueBatchProposalPayloadSchema,
-  channelIssueProposalPayloadSchema,
   channelMessageReactionInputSchema,
   channelProposalAcceptInputSchema,
   channelReadInputSchema,
@@ -18,12 +16,6 @@ export const decodeChannelMessageReactionInput = decodeRequestSync(
 );
 export const decodeChannelProposalAcceptInput = decodeRequestSync(
   channelProposalAcceptInputSchema,
-);
-export const decodeChannelIssueProposalPayload = decodeRequestSync(
-  channelIssueProposalPayloadSchema,
-);
-export const decodeChannelIssueBatchProposalPayload = decodeRequestSync(
-  channelIssueBatchProposalPayloadSchema,
 );
 export const decodeChannelExecutionProposalAcceptInput = decodeRequestSync(
   channelExecutionProposalAcceptInputSchema,

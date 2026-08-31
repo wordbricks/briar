@@ -302,18 +302,17 @@ extension ChannelMessage.Proposal {
         switch message.payload {
         case .issue(let issue):
             guard issue.hasIssue else { throw MobileAPIError.invalidResponse }
-            payload = Payload(
-                issue: try Payload.Issue(connectMessage: issue.issue),
+            payload = .issue(
+                try Payload.Issue(connectMessage: issue.issue),
                 executeAfterCreate: issue.executeAfterCreate
             )
         case .batch(let batch):
-            payload = Payload(batch: try Payload.Batch(connectMessage: batch))
+            payload = .batch(try Payload.Batch(connectMessage: batch))
         case nil:
             throw MobileAPIError.invalidResponse
         }
         self.init(
             id: try channelUUID(message.id),
-            actionType: .createIssue,
             status: status,
             projectId: try channelOptionalUUID(message.projectID, present: message.hasProjectID),
             payload: payload,

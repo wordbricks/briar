@@ -432,7 +432,6 @@ describe("channel issue proposal approval route", () => {
   const seedProposal = async (
     sequence: number,
     options: {
-      actionType?: "request_issue_create" | "request_plan_document";
       projectId?: string | null;
       executeAfterCreate?: boolean;
       payload?: unknown;
@@ -481,7 +480,7 @@ describe("channel issue proposal approval route", () => {
       options.executeAfterCreate ? projectAId : options.projectId ?? null,
       triggerId,
       replyId,
-      options.actionType ?? "request_issue_create",
+      "request_issue_create",
       JSON.stringify(options.payload ?? {
         issue: {
           title: `Approved issue ${sequence}`,
@@ -919,7 +918,7 @@ describe("channel issue proposal approval route", () => {
       },
     });
     const response = await worker.fetch(request(proposalId, projectAId), env());
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(500);
     await expect(db.prepare(
       `select count(*) as count from briar_hunt_runs
        where json_extract(context_json, '$.proposalId') = ?`,
@@ -1877,23 +1876,15 @@ describe("channel issue proposal approval route", () => {
     ).resolves.toMatchObject({ count: 1 });
   });
 
-  it("rejects cross-organization targets and non-issue action types", async () => {
+  it("rejects cross-organization targets", async () => {
     const crossOrganizationProposalId = await seedProposal(5);
-    const wrongActionProposalId = await seedProposal(6, {
-      actionType: "request_plan_document",
-    });
 
     const crossOrganization = await worker.fetch(
       request(crossOrganizationProposalId, otherProjectId),
       env(),
     );
-    const wrongAction = await worker.fetch(
-      request(wrongActionProposalId, projectAId),
-      env(),
-    );
 
     expect(crossOrganization.status).toBe(404);
-    expect(wrongAction.status).toBe(409);
   });
 
   it("creates an issue in only one project when different targets race", async () => {

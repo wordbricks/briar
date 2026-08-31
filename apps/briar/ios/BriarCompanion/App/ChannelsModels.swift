@@ -417,24 +417,21 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
 
     struct Proposal: Hashable, Identifiable, Sendable {
         let id: UUID
-        let actionType: ActionType
         let status: Status
         let projectId: UUID?
-        let payload: Payload?
+        let payload: Payload
         let resultRunId: UUID?
         let resultItems: [ResultItem]
 
         init(
             id: UUID,
-            actionType: ActionType,
             status: Status,
             projectId: UUID?,
-            payload: Payload? = nil,
+            payload: Payload,
             resultRunId: UUID?,
             resultItems: [ResultItem] = []
         ) {
             self.id = id
-            self.actionType = actionType
             self.status = status
             self.projectId = projectId
             self.payload = payload
@@ -447,22 +444,29 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
             let runId: UUID
         }
 
-        struct Payload: Hashable, Sendable {
-            /// Present only for `request_issue_create` proposals.
-            let issue: Issue?
-            /// Present only for an atomic multi-issue backlog proposal.
-            let batch: Batch?
-            /// Whether approval should be followed by a separate execution proposal.
-            let executeAfterCreate: Bool?
+        enum Payload: Hashable, Sendable {
+            case issue(Issue, executeAfterCreate: Bool)
+            case batch(Batch)
 
-            init(
-                issue: Issue? = nil,
-                batch: Batch? = nil,
-                executeAfterCreate: Bool? = nil
-            ) {
-                self.issue = issue
-                self.batch = batch
-                self.executeAfterCreate = executeAfterCreate
+            var issue: Issue? {
+                switch self {
+                case .issue(let issue, _): issue
+                case .batch: nil
+                }
+            }
+
+            var batch: Batch? {
+                switch self {
+                case .issue: nil
+                case .batch(let batch): batch
+                }
+            }
+
+            var executeAfterCreate: Bool {
+                switch self {
+                case .issue(_, let executeAfterCreate): executeAfterCreate
+                case .batch: false
+                }
             }
 
             struct Batch: Hashable, Sendable {
@@ -495,11 +499,6 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
                     self.priority = priority
                 }
             }
-        }
-
-        enum ActionType: String, Codable, Hashable, Sendable {
-            case createIssue = "request_issue_create"
-            case createPlanDocument = "request_plan_document"
         }
 
         enum Status: String, Codable, Hashable, Sendable {

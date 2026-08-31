@@ -100,7 +100,6 @@ import {
   ChannelIssueProposalDetails,
   channelIssueBatchProposalDetails,
   channelIssueProposalDetails,
-  channelIssueProposalIsValid,
   channelIssueProposalRequestsExecution,
 } from "./ChannelIssueProposalDetails";
 import { IssueExecutionApproval } from "./IssueExecutionApproval";
@@ -1354,9 +1353,7 @@ function MessageRow({
     },
     { enabled: showingThreadActions, priority: 200 },
   );
-  const issueProposal = message.proposal?.actionType === "request_issue_create"
-    ? message.proposal
-    : null;
+  const issueProposal = message.proposal;
   const proposalProjectId =
     issueProposal?.projectId ?? channel.defaultProjectId ?? selectedProjectId;
   const needsProject =
@@ -1370,7 +1367,6 @@ function MessageRow({
     : null;
   const proposalIssue = channelIssueProposalDetails(issueProposal);
   const proposalBatch = channelIssueBatchProposalDetails(issueProposal);
-  const proposalValid = channelIssueProposalIsValid(issueProposal);
   const requestsExecution = channelIssueProposalRequestsExecution(issueProposal);
   const executionProjectName = message.executionProposal
     ? projects.find(
@@ -1498,7 +1494,7 @@ function MessageRow({
                   className="channel-proposal-approve-button"
                   disabled={
                     busy || Boolean(channel.archivedAt) ||
-                    !proposalProjectId || !proposalValid
+                    !proposalProjectId
                   }
                   onClick={() => void onAcceptProposal()}
                   type="button"
