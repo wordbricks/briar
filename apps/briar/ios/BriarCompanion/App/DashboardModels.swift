@@ -305,7 +305,7 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
     let label: String
     let icon: Icon?
     let agentProvider: AgentProvider?
-    let providers: [AgentProvider]?
+    let providers: [AgentProvider]
     let capabilities: Capabilities?
     let readiness: String
     let acceptingWork: Bool
@@ -318,7 +318,7 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
         label: String,
         icon: Icon? = nil,
         agentProvider: AgentProvider? = nil,
-        providers: [AgentProvider]? = nil,
+        providers: [AgentProvider],
         capabilities: Capabilities? = nil,
         readiness: String,
         acceptingWork: Bool,

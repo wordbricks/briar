@@ -595,8 +595,7 @@ private struct AgentRunSheet: View {
 
 func workerCanRunAgentSkill(_ worker: DashboardWorker, provider: AgentProvider) -> Bool {
     guard worker.readiness == "available", worker.acceptingWork else { return false }
-    let providers = worker.providers ?? worker.agentProvider.map { [$0] } ?? []
-    return providers.contains(provider)
+    return worker.providers.contains(provider)
 }
 
 struct SessionDetailView: View {

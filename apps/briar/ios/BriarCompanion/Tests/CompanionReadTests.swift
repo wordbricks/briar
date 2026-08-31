@@ -103,6 +103,7 @@ final class CompanionReadTests: XCTestCase {
             id: "worker-assigned",
             label: "Assigned Mac",
             icon: .init(type: .emoji, value: "🍋"),
+            providers: [],
             readiness: "available",
             acceptingWork: true,
             readinessDetail: nil,
@@ -113,6 +114,7 @@ final class CompanionReadTests: XCTestCase {
             id: "worker-requested",
             label: "Requested Mac",
             icon: .init(type: .emoji, value: "🍏"),
+            providers: [],
             readiness: "available",
             acceptingWork: true,
             readinessDetail: nil,
@@ -153,6 +155,7 @@ final class CompanionReadTests: XCTestCase {
         let assignedWorker = DashboardWorker(
             id: "94ba9871-ec10-4752-9e7b-de876b587214",
             label: "Studio Mac",
+            providers: [],
             readiness: "available",
             acceptingWork: true,
             readinessDetail: nil,
@@ -162,6 +165,7 @@ final class CompanionReadTests: XCTestCase {
         let requestedWorker = DashboardWorker(
             id: "worker-requested",
             label: "Laptop Mac",
+            providers: [],
             readiness: "available",
             acceptingWork: true,
             readinessDetail: nil,
@@ -237,18 +241,6 @@ final class CompanionReadTests: XCTestCase {
         )
         XCTAssertFalse(workerCanRunAgentSkill(providerOverride, provider: .codex))
         XCTAssertTrue(workerCanRunAgentSkill(providerOverride, provider: .claude))
-
-        let legacyProvider = DashboardWorker(
-            id: "worker-legacy-provider",
-            label: "Legacy Mac",
-            agentProvider: .codex,
-            readiness: "available",
-            acceptingWork: true,
-            readinessDetail: nil,
-            activeSessions: 0,
-            availableSessions: 1
-        )
-        XCTAssertTrue(workerCanRunAgentSkill(legacyProvider, provider: .codex))
     }
 
     func testHostReadinessLabelsCoverEveryDashboardState() {

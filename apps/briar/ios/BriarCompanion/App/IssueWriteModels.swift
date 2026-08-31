@@ -456,7 +456,7 @@ func eligibleExecutionWorkers(
         worker.readiness != "disabled" &&
             worker.acceptingWork &&
             (policy?.allows(workerID: worker.id) ?? true) &&
-            (worker.providers ?? worker.agentProvider.map { [$0] } ?? []).contains(provider)
+            worker.providers.contains(provider)
     }
 }
 
