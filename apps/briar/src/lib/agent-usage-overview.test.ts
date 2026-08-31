@@ -3,7 +3,6 @@ import type {
   AgentUsageCostRecord,
   AgentUsageEstimatedCostRecord,
   AgentUsageRecord,
-  AgentUsageRun,
   HuntRun,
 } from "../types";
 import type { AgentExecutionMetrics } from "./agent-execution-metrics";
@@ -191,91 +190,6 @@ describe("aggregateAgentUsageOverview", () => {
     expect(new Date(overview.endAt).getHours()).toBe(0);
   });
 
-  it("aggregates tokens, provider-aware cache math, and sorted breakdowns", () => {
-    const overview = aggregateAgentUsageOverview(
-      [
-        huntRun("codex", {
-          preferredProvider: "codex",
-          preferredModel: "gpt-5.6-sol",
-          executionMetrics: metrics({
-            totalTokens: 120,
-            inputTokens: 80,
-            outputTokens: 20,
-            cacheReadTokens: 50,
-            reasoningOutputTokens: 5,
-          }),
-        }),
-        huntRun("claude", {
-          requestedProvider: "claude",
-          requestedModel: "opus",
-          executionMetrics: metrics({
-            inputTokens: 10,
-            outputTokens: 5,
-            cacheReadTokens: 70,
-            cacheWriteTokens: 20,
-            reasoningOutputTokens: 2,
-          }),
-        }),
-        huntRun("unknown", {
-          requestedModel: "must-not-be-attributed",
-          executionMetrics: metrics({
-            totalTokens: 30,
-            inputTokens: 25,
-            outputTokens: 5,
-            cacheReadTokens: 10,
-          }),
-        }),
-        huntRun("unreported-codex", {
-          preferredProvider: "codex",
-        }),
-      ],
-      30,
-      new Date(2026, 7, 9, 8),
-    );
-
-    expect(overview.totals).toEqual({
-      totalTokens: 255,
-      inputTokens: 115,
-      outputTokens: 30,
-      cacheReadTokens: 130,
-      cacheWriteTokens: 20,
-      reasoningTokens: 7,
-      uncachedInputTokens: 55,
-    });
-    expect(overview.observedRuns).toBe(4);
-    expect(overview.reportedRuns).toBe(3);
-    expect(overview.activeDays).toBe(1);
-    expect(
-      overview.providers.map(({ provider, totalTokens, runs }) => ({
-        provider,
-        totalTokens,
-        runs,
-      })),
-    ).toEqual([
-      { provider: "codex", totalTokens: 120, runs: 2 },
-      { provider: "claude", totalTokens: 105, runs: 1 },
-      { provider: "unknown", totalTokens: 30, runs: 1 },
-    ]);
-    expect(
-      overview.models.map(({ provider, model, totalTokens, runs }) => ({
-        provider,
-        model,
-        totalTokens,
-        runs,
-      })),
-    ).toEqual([
-      {
-        provider: "codex",
-        model: "gpt-5.6-sol",
-        totalTokens: 120,
-        runs: 1,
-      },
-      { provider: "claude", model: "opus", totalTokens: 105, runs: 1 },
-      { provider: "unknown", model: null, totalTokens: 30, runs: 1 },
-      { provider: "codex", model: null, totalTokens: 0, runs: 1 },
-    ]);
-  });
-
   it("keeps the model paired with the provider that won attribution", () => {
     const overview = aggregateAgentUsageOverview(
       [
@@ -332,38 +246,6 @@ describe("aggregateAgentUsageOverview", () => {
     expect(overview.reportedRuns).toBe(0);
   });
 
-  it("accepts the lightweight API DTO and its resolved attribution", () => {
-    const usageRun: AgentUsageRun = {
-      id: "usage-run",
-      projectId: "project-1",
-      status: "completed",
-      executionMetrics: metrics({ totalTokens: 42 }),
-      claimedBy: "worker",
-      claimedAt: localInstant(2026, 8, 9),
-      claimAttempts: 1,
-      workerId: "worker-1",
-      preferredProvider: null,
-      preferredModel: null,
-      requestedProvider: null,
-      requestedModel: null,
-      executionProvider: "grok",
-      executionModel: "grok-4.5",
-      startedAt: localInstant(2026, 8, 9),
-      updatedAt: localInstant(2026, 8, 9),
-      completedAt: localInstant(2026, 8, 9),
-    };
-
-    const overview = aggregateAgentUsageOverview(
-      [usageRun],
-      7,
-      new Date(2026, 7, 9, 8),
-    );
-
-    expect(overview.models).toMatchObject([
-      { provider: "grok", model: "grok-4.5", totalTokens: 42, runs: 1 },
-    ]);
-  });
-
   it("prefers ledger rows, preserves actual models, and combines cost sources", () => {
     const first = usageRecord();
     const second = usageRecord({
@@ -404,7 +286,6 @@ describe("aggregateAgentUsageOverview", () => {
       actualModelRuns: 1,
       configuredModelRuns: 0,
       ledgerRuns: 1,
-      legacyRuns: 0,
       usageRecords: 2,
       costs: {
         totalUsdTicks: 300,
@@ -500,11 +381,24 @@ describe("aggregateAgentUsageOverview", () => {
   it("zero-fills every day and every provider in the daily series", () => {
     const overview = aggregateAgentUsageOverview(
       [
-        huntRun("grok", {
-          completedAt: localInstant(2026, 8, 7),
-          preferredProvider: "grok",
-          executionMetrics: metrics({ totalTokens: 42 }),
-        }),
+        {
+          ...huntRun("grok", {
+            completedAt: localInstant(2026, 8, 7),
+            preferredProvider: "grok",
+          }),
+          usageRecords: [usageRecord({
+            agentProvider: "grok",
+            modelProvider: "xai",
+            model: "grok-4.5",
+            uncachedInputTokens: 40,
+            cacheReadTokens: 0,
+            cacheWriteTokens: 0,
+            outputTokens: 2,
+            reasoningOutputTokens: 0,
+            totalTokens: 42,
+            observedAt: localInstant(2026, 8, 7),
+          })],
+        },
       ],
       7,
       new Date(2026, 7, 9, 8),

@@ -333,26 +333,8 @@ export async function getRunCostEstimateApplication(
     ),
     services.loadPricing(),
   ]);
-  const metrics = parseExecutionMetrics(run.execution_metrics_json);
-  const provider = run.preferred_agent_provider ?? run.requested_agent_provider ?? null;
-  const model = run.preferred_agent_provider
-    ? run.preferred_agent_model
-    : run.requested_agent_provider
-      ? run.requested_agent_model
-      : null;
   return estimateRunExecutionCost({
     usageRecords,
     loadedPricing,
-    fallback:
-      metrics && provider
-        ? {
-            agentProvider: provider,
-            model,
-            inputTokens: metrics.inputTokens,
-            cacheReadTokens: metrics.cacheReadTokens,
-            cacheWriteTokens: metrics.cacheWriteTokens,
-            outputTokens: metrics.outputTokens,
-          }
-        : null,
   });
 }

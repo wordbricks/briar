@@ -284,7 +284,6 @@ describe("worker usage pricing", () => {
           knownModels: 2,
         },
       },
-      fallback: null,
     });
 
     expect(estimate).toMatchObject({
@@ -338,7 +337,6 @@ describe("worker usage pricing", () => {
           knownModels: 1,
         },
       },
-      fallback: null,
     });
 
     expect(estimate).toMatchObject({
@@ -376,7 +374,6 @@ describe("worker usage pricing", () => {
             knownModels: 0,
           },
         },
-        fallback: null,
       }),
     ).toMatchObject({
       status: "unavailable",
@@ -385,7 +382,7 @@ describe("worker usage pricing", () => {
     });
   });
 
-  it("uses the execution summary for pre-ledger runs and marks partial coverage", () => {
+  it("marks partial coverage when a ledger model has no rate", () => {
     const table = parseAgentUsageModelRates(pricingDocument);
     const loadedPricing = {
       table,
@@ -398,32 +395,11 @@ describe("worker usage pricing", () => {
     };
     expect(
       estimateRunExecutionCost({
-        usageRecords: [],
-        loadedPricing,
-        fallback: {
-          agentProvider: "opencode",
-          model: "model-a",
-          inputTokens: 100,
-          cacheReadTokens: 20,
-          cacheWriteTokens: 10,
-          outputTokens: 5,
-        },
-      }),
-    ).toMatchObject({
-      status: "estimated",
-      usageRecords: 1,
-      pricedUsageRecords: 1,
-      estimatedUsdTicks: 1_345_000,
-    });
-
-    expect(
-      estimateRunExecutionCost({
         usageRecords: [
           usageRow(),
           usageRow({ usage_key: "usage-b", model: "unknown-model" }),
         ],
         loadedPricing,
-        fallback: null,
       }),
     ).toMatchObject({
       status: "partial",

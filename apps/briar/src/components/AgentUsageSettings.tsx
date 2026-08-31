@@ -113,7 +113,7 @@ function modelSourceLabel(
 ) {
   if (source === "providerReported") return t("usage.modelSourceReported");
   if (source === "providerConfig") return t("usage.modelSourceProviderConfig");
-  if (source === "configuredFallback" || source === "legacyConfigured") {
+  if (source === "configuredFallback") {
     return t("usage.modelSourceConfigured");
   }
   return t("usage.modelSourceUnknown");
@@ -1070,7 +1070,6 @@ export function AgentUsageSettings({
               {usageRunsLoaded
                 ? t("usage.ledgerCoverage", {
                     ledger: overview.ledgerRuns,
-                    legacy: overview.legacyRuns,
                     records: overview.usageRecords,
                   })
                 : unavailableMessage}
