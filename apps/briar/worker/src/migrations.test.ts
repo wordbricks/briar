@@ -541,6 +541,209 @@ async function createPreWebhookChannelMessage(
 }
 
 describe("D1 migrations", () => {
+  it("preserves upload ownership through the transitional schema rebuilds", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-upload-upgrade-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      const now = "2026-08-31T00:00:00.000Z";
+      await applyD1Migrations(db, {
+        through: "0149_reply_completion_receipts.sql",
+      });
+      await executeD1Sql(db, `
+        insert into "user" (
+          id, name, email, emailVerified, createdAt, updatedAt
+        ) values (
+          'upload-migration-user', 'Upload Migration',
+          'upload-migration@example.com', 1, '${now}', '${now}'
+        );
+        insert into briar_organizations (
+          id, name, handle, created_at, updated_at
+        ) values (
+          'upload-migration-org', 'Upload Migration',
+          'upload-migration', '${now}', '${now}'
+        );
+        insert into briar_projects (
+          id, owner_user_id, organization_id, name, agent_token_hash,
+          created_at, updated_at
+        ) values (
+          'upload-migration-project', 'upload-migration-user',
+          'upload-migration-org', 'Upload Migration',
+          '${"a".repeat(64)}', '${now}', '${now}'
+        );
+
+        -- Isolate row ownership migration from the old authorization policy;
+        -- the next migration recreates the production trigger.
+        drop trigger briar_reply_attachment_upload_batch_insert_guard;
+        insert into briar_reply_attachment_upload_batches (
+          request_id, reply_kind, organization_id, project_id, work_id, run_id,
+          worker_id, device_id, claim_token_hash, metadata_hash,
+          attachment_count, creation_nonce, expires_at, created_at
+        ) values (
+          'legacy-reply-batch', 'issue', 'upload-migration-org',
+          'upload-migration-project', 'legacy-work', 'legacy-run',
+          'legacy-worker', 'legacy-device',
+          '${"b".repeat(64)}', '${"c".repeat(64)}', 2,
+          '00000000-0000-4000-8000-000000000001',
+          '2026-09-01T00:00:00.000Z', '${now}'
+        );
+        insert into briar_reply_attachment_uploads (
+          attachment_id, batch_request_id, client_id, filename, content_type,
+          byte_size, sha256, object_key, uploaded_at
+        ) values
+          (
+            'legacy-uploaded', 'legacy-reply-batch', 'uploaded',
+            'uploaded.png', 'image/png', 1, zeroblob(32),
+            'uploads/legacy/uploaded', '${now}'
+          ),
+          (
+            'legacy-unwritten', 'legacy-reply-batch', 'unwritten',
+            'unwritten.png', 'image/png', 1, zeroblob(32),
+            'uploads/legacy/unwritten', null
+          );
+        insert into briar_reply_upload_cleanup_queue (
+          object_key, batch_request_id, queued_at, next_attempt_at
+        ) values (
+          'uploads/legacy/already-queued', 'legacy-reply-batch',
+          '${now}', '${now}'
+        );
+      `);
+
+      await applyD1Migrations(db, {
+        files: ["0150_generic_upload_reservations.sql"],
+      });
+      expect((await db.prepare(
+        `select object_key from briar_upload_cleanup_queue order by object_key`,
+      ).all()).results).toEqual([
+        { object_key: "uploads/legacy/already-queued" },
+        { object_key: "uploads/legacy/unwritten" },
+        { object_key: "uploads/legacy/uploaded" },
+      ]);
+      expect((await db.prepare(
+        `select name from sqlite_master
+         where name like 'briar_reply_attachment_upload%'
+            or name = 'briar_reply_upload_cleanup_queue'
+         order by name`,
+      ).all()).results).toEqual([]);
+
+      await executeD1Sql(db, `
+        -- The following migrations recreate this trigger after copying rows.
+        drop trigger briar_upload_batch_insert_guard;
+        insert into briar_upload_batches (
+          request_id, purpose, organization_id, project_id, work_id, run_id,
+          worker_id, device_id, claim_token_hash, metadata_hash, file_count,
+          creation_nonce, expires_at, created_at
+        ) values (
+          'generic-upload-batch', 'run_evidence', 'upload-migration-org',
+          'upload-migration-project', 'generic-run', 'generic-run',
+          null, null, '${"d".repeat(64)}', '${"e".repeat(64)}', 2,
+          '00000000-0000-4000-8000-000000000002',
+          '2026-09-01T00:00:00.000Z', '${now}'
+        );
+        insert into briar_uploads (
+          upload_id, batch_request_id, client_id, position, filename,
+          content_type, byte_size, sha256, object_key, uploaded_at,
+          consumed_at, consumer_kind, consumer_id
+        ) values
+          (
+            'generic-pending', 'generic-upload-batch', 'pending', 0,
+            'pending.png', 'image/png', 1, zeroblob(32),
+            'uploads/current/pending', '${now}', null, null, null
+          ),
+          (
+            'generic-consumed', 'generic-upload-batch', 'consumed', 1,
+            'consumed.png', 'image/png', 1, zeroblob(32),
+            'uploads/current/consumed', '${now}', '${now}',
+            'run_evidence', 'generic-evidence'
+          );
+      `);
+
+      await applyD1Migrations(db, {
+        files: [
+          "0151_channel_message_uploads.sql",
+          "0152_allow_duplicate_evidence_image_digests.sql",
+          "0153_issue_attachment_uploads.sql",
+        ],
+      });
+      expect(await db.prepare(
+        `select request_id, purpose, organization_id, project_id,
+                channel_id, user_id, work_id, run_id, worker_id, device_id,
+                claim_token_hash, metadata_hash, file_count, creation_nonce,
+                expires_at, created_at
+         from briar_upload_batches
+         where request_id = 'generic-upload-batch'`,
+      ).first()).toEqual({
+        request_id: "generic-upload-batch",
+        purpose: "run_evidence",
+        organization_id: "upload-migration-org",
+        project_id: "upload-migration-project",
+        channel_id: null,
+        user_id: null,
+        work_id: "generic-run",
+        run_id: "generic-run",
+        worker_id: null,
+        device_id: null,
+        claim_token_hash: "d".repeat(64),
+        metadata_hash: "e".repeat(64),
+        file_count: 2,
+        creation_nonce: "00000000-0000-4000-8000-000000000002",
+        expires_at: "2026-09-01T00:00:00.000Z",
+        created_at: now,
+      });
+      expect((await db.prepare(
+        `select upload_id, client_id, position, length(sha256) as digest_size,
+                object_key, uploaded_at, consumed_at, consumer_kind, consumer_id
+         from briar_uploads
+         where batch_request_id = 'generic-upload-batch'
+         order by position`,
+      ).all()).results).toEqual([
+        {
+          upload_id: "generic-pending",
+          client_id: "pending",
+          position: 0,
+          digest_size: 32,
+          object_key: "uploads/current/pending",
+          uploaded_at: now,
+          consumed_at: null,
+          consumer_kind: null,
+          consumer_id: null,
+        },
+        {
+          upload_id: "generic-consumed",
+          client_id: "consumed",
+          position: 1,
+          digest_size: 32,
+          object_key: "uploads/current/consumed",
+          uploaded_at: now,
+          consumed_at: now,
+          consumer_kind: "run_evidence",
+          consumer_id: "generic-evidence",
+        },
+      ]);
+      expect((await db.prepare(
+        `select object_key from briar_upload_cleanup_queue order by object_key`,
+      ).all()).results).toEqual([
+        { object_key: "uploads/legacy/already-queued" },
+        { object_key: "uploads/legacy/unwritten" },
+        { object_key: "uploads/legacy/uploaded" },
+      ]);
+      expect((await db.prepare(`pragma foreign_key_check`).all()).results)
+        .toEqual([]);
+      expect((await db.prepare(
+        `select name from sqlite_master
+         where name like '%_legacy'
+            or name like 'briar_reply_attachment_upload%'
+            or name = 'briar_reply_upload_cleanup_queue'
+         order by name`,
+      ).all()).results).toEqual([]);
+    } finally {
+      await miniflare.dispose();
+    }
+  }, 60_000);
+
   it("adds credential-free Worker lifecycle telemetry", async () => {
     const database = await createIsolatedTestDatabase({
       suite: "worker-lifecycle-telemetry-migration",
