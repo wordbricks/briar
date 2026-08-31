@@ -85,4 +85,4 @@ cd "$mobile_build_root"
 echo "[mobile-ci] Building the retained Tauri Android debug release path."
 bun run android:build:debug
 
-echo "[mobile-ci] All mobile contract and build checks passed."
+echo "[mobile-ci] All generated contract and mobile build checks passed."
