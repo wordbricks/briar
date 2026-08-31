@@ -242,6 +242,36 @@ const baseTime = Date.parse("2026-07-21T00:00:00Z");
 const atMinute = (minute: number) =>
   new Date(baseTime + minute * 60_000).toISOString();
 
+const projectAgentSessionPayload = (input: {
+  id: string;
+  status: "running" | "completed" | "failed" | "interrupted";
+  startedAt: string;
+  completedAt: string | null;
+  events?: Array<{
+    id: string;
+    type: "completed";
+    occurredAt: string;
+  }>;
+}) => ({
+  dispatchGroupId: input.id,
+  agentId: null,
+  sessionType: "task",
+  trigger: "manual",
+  scheduleId: null,
+  scheduleRunId: null,
+  parentSessionId: null,
+  request: "Review the repository",
+  status: input.status,
+  issues: [],
+  startedAt: input.startedAt,
+  completedAt: input.completedAt,
+  conversationId: null,
+  summary: null,
+  error: null,
+  events: input.events ?? [],
+  updatedAt: input.completedAt ?? input.startedAt,
+});
+
 const updateProjectSettings = async (
   db: D1Database,
   targetProjectId: string,
@@ -1360,28 +1390,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ]);
   });
 
-  it("persists skipped project agent session snapshots", async () => {
-    const sessionId = "66666666-6666-4666-8666-666666666666";
-    await upsertProjectAgentSession(db, {
-      project_id: projectId,
-      id: sessionId,
-      agent_id: null,
-      requested_by_user_id: "owner",
-      status: "skipped",
-      session_type: "task",
-      payload_json: JSON.stringify({ status: "skipped" }),
-      started_at: atMinute(2),
-      completed_at: atMinute(3),
-      updated_at: atMinute(3),
-    }, atMinute(3));
-
-    await expect(
-      db.prepare(
-        "select status from briar_project_agent_sessions where project_id = ? and id = ?",
-      ).bind(projectId, sessionId).first<{ status: string }>(),
-    ).resolves.toEqual({ status: "skipped" });
-  });
-
   it("uses the canonical terminal session Inbox version", async () => {
     const sessionId = "55555555-5555-4555-8555-555555555555";
     const completedAt = atMinute(4);
@@ -1392,9 +1400,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       requested_by_user_id: "owner",
       status: "completed",
       session_type: "task",
-      payload_json: JSON.stringify({
+      payload_json: JSON.stringify(projectAgentSessionPayload({
+        id: sessionId,
         status: "completed",
-        issues: [],
         startedAt: atMinute(2),
         completedAt,
         events: [{
@@ -1402,7 +1410,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           type: "completed",
           occurredAt: completedAt,
         }],
-      }),
+      })),
       started_at: atMinute(2),
       completed_at: completedAt,
       updated_at: completedAt,
@@ -1438,12 +1446,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       requested_by_user_id: "owner",
       status: "running" as const,
       session_type: "task" as const,
-      payload_json: JSON.stringify({
+      payload_json: JSON.stringify(projectAgentSessionPayload({
+        id: sessionId,
         status: "running",
-        issues: [],
         startedAt: atMinute(5),
         completedAt: null,
-      }),
+      })),
       started_at: atMinute(5),
       completed_at: null,
       updated_at: atMinute(5),
@@ -1453,12 +1461,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ...row,
       requested_by_user_id: null,
       status: "completed",
-      payload_json: JSON.stringify({
+      payload_json: JSON.stringify(projectAgentSessionPayload({
+        id: sessionId,
         status: "completed",
-        issues: [],
         startedAt: atMinute(5),
         completedAt: atMinute(6),
-      }),
+      })),
       completed_at: atMinute(6),
       updated_at: atMinute(6),
     }, atMinute(6));
@@ -4974,7 +4982,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           title: "Follow-up",
           description: null,
           priority: null,
-          status: "backlog",
         },
       }),
       createdAt: atMinute(87),
