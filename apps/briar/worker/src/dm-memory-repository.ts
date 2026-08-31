@@ -288,7 +288,7 @@ export async function deleteDmMemory(db: D1Database, owner: DmMemoryOwner, docum
     .bind(...ownerBindings(owner), documentId).first<{ space_id: string; status: string }>();
   if (!target) throw new HttpError(404, "Memory not found", "memory_not_found");
   const space = await requireSpace(db, owner, target.space_id);
-  if (target.status === "deleted") return { deleted: true, purgeState: "pending" } as const;
+  if (target.status === "deleted") return { deleted: true, purgeState: await dmMemoryPurgeState(db, documentId) };
   const commitId = crypto.randomUUID();
   const now = new Date().toISOString();
   await db.batch([
@@ -326,6 +326,13 @@ export async function deleteDmMemory(db: D1Database, owner: DmMemoryOwner, docum
   const result = await findCommit(db, space.id, commitId);
   if (!result?.applied) throw new HttpError(409, "Memory changed; retry deletion", "version_conflict");
   return { deleted: true, purgeState: "pending" } as const;
+}
+
+async function dmMemoryPurgeState(db: D1Database, documentId: string): Promise<"pending" | "complete"> {
+  const pending = await db.prepare(`select 1 from briar_dm_memory_vectors where document_id = ? and state <> 'purged'
+    union all select 1 from briar_dm_memory_jobs where document_id = ? and kind = 'delete'
+      and status <> 'succeeded' limit 1`).bind(documentId, documentId).first();
+  return pending ? "pending" : "complete";
 }
 
 export async function* exportDmMemoryEntries(
