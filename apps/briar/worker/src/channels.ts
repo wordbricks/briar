@@ -39,6 +39,12 @@ import {
   replyCompletionReceiptStatement,
   type ReplyCompletionCommit,
 } from "./reply-completion-repository";
+import {
+  channelMessageMutationReceiptStatement,
+  channelMessageUploadAvailabilityGuard,
+  channelMessageUploadConsumeStatements,
+  type ChannelMessageUploadScope,
+} from "./channel-message-upload-repository";
 
 export type ChannelRow = {
   id: string;
@@ -194,6 +200,28 @@ export type ChannelMessageAttachmentInput = Pick<
   ChannelMessageAttachmentRow,
   "id" | "organization_id" | "object_key" | "filename" | "content_type" | "byte_size"
 >;
+
+export type ChannelMessageMutationCommit = ChannelMessageUploadScope & {
+  uploadIds: readonly string[];
+  requestHash: string;
+  committedAt: string;
+};
+
+export type ChannelAgentReplyEnqueueInput = {
+  organizationId: string;
+  channelId: string;
+  triggerMessageId: string;
+  parentMessageId: string;
+  agents: Array<{
+    id: string;
+    projectId: string | null;
+    skillId?: string | null;
+    provider: AgentProvider;
+    unavailableReason?: ChannelReplyUnavailableReason | null;
+  }>;
+  preferredDeviceId?: string | null;
+  createdAt: string;
+};
 
 export type ChannelReplyJobRow = {
   id: string;
@@ -2349,9 +2377,20 @@ export async function createChannelMessage(
     mentionedUserIds: string[];
     mentionedAgentIds: string[];
     attachments?: ChannelMessageAttachmentInput[];
+    mutationCommit?: ChannelMessageMutationCommit;
+    agentReplyEnqueue?: ChannelAgentReplyEnqueueInput;
     createdAt: string;
   },
 ) {
+  const uploadGuard = input.mutationCommit
+    ? channelMessageUploadAvailabilityGuard({
+        ...input.mutationCommit,
+        observedAt: input.mutationCommit.committedAt,
+      })
+    : { sql: "", bindings: [] as unknown[] };
+  const agentReplyStatements = input.agentReplyEnqueue
+    ? await channelAgentReplyEnqueueStatements(db, input.agentReplyEnqueue)
+    : [];
   const statements = [
     db
       .prepare(
@@ -2369,7 +2408,8 @@ export async function createChannelMessage(
                where parent.id = ? and parent.channel_id = ?
                  and parent.parent_message_id is null
              )
-           )`,
+           )
+           ${uploadGuard.sql}`,
       )
       .bind(
         input.id,
@@ -2389,6 +2429,7 @@ export async function createChannelMessage(
         input.parentMessageId,
         input.parentMessageId,
         input.channelId,
+        ...uploadGuard.bindings,
       ),
     ...input.mentionedUserIds.map((userId) =>
       db
@@ -2440,6 +2481,19 @@ export async function createChannelMessage(
           input.channelId,
         ),
     ),
+    ...(input.mutationCommit
+      ? [
+          channelMessageMutationReceiptStatement(db, {
+            ...input.mutationCommit,
+            createdAt: input.mutationCommit.committedAt,
+          }),
+          ...channelMessageUploadConsumeStatements(db, {
+            ...input.mutationCommit,
+            consumedAt: input.mutationCommit.committedAt,
+          }),
+        ]
+      : []),
+    ...agentReplyStatements,
   ];
   await db.batch(statements);
   return getChannelMessage(db, input.channelId, input.id);
@@ -2591,23 +2645,9 @@ export async function getClaimedChannelReplyAttachment(
  * independent replies. Organization agents leave project_id null, which is what
  * makes them claimable by any device in the organization.
  */
-export async function enqueueChannelAgentReplies(
+async function channelAgentReplyEnqueueStatements(
   db: D1Database,
-  input: {
-    organizationId: string;
-    channelId: string;
-    triggerMessageId: string;
-    parentMessageId: string;
-    agents: Array<{
-      id: string;
-      projectId: string | null;
-      skillId?: string | null;
-      provider: AgentProvider;
-      unavailableReason?: ChannelReplyUnavailableReason | null;
-    }>;
-    preferredDeviceId?: string | null;
-    createdAt: string;
-  },
+  input: ChannelAgentReplyEnqueueInput,
 ) {
   if (input.agents.length === 0) return [];
   const retainedUntil = channelReplySessionRetentionUntil(input.createdAt);
@@ -2632,8 +2672,7 @@ export async function enqueueChannelAgentReplies(
        current_skill.model, current_skill.effort,
        case when current_skill.id is null then null else trigger_message.body end`
     : "";
-  await db.batch(
-    input.agents.flatMap((agent) => {
+  return input.agents.flatMap((agent) => {
       const sessionId = crypto.randomUUID();
       return [
         db.prepare(
@@ -2846,17 +2885,16 @@ export async function enqueueChannelAgentReplies(
           agent.id,
         ),
       ];
-    }),
-  );
-  const rows = await db
-    .prepare(
-      `select * from briar_channel_agent_reply_jobs
-       where channel_id = ? and trigger_message_id = ?
-       order by created_at, id`,
-    )
-    .bind(input.channelId, input.triggerMessageId)
-    .all<ChannelReplyJobRow>();
-  return rows.results;
+    });
+}
+
+export async function enqueueChannelAgentReplies(
+  db: D1Database,
+  input: ChannelAgentReplyEnqueueInput,
+) {
+  const statements = await channelAgentReplyEnqueueStatements(db, input);
+  if (statements.length > 0) await db.batch(statements);
+  return listChannelAgentReplies(db, input.channelId, input.triggerMessageId);
 }
 
 export async function listChannelAgentReplies(

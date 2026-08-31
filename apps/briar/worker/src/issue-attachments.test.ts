@@ -4,9 +4,6 @@ import {
   type DescMessage,
 } from "@bufbuild/protobuf";
 import {
-  CreateChannelMessageRequestSchema,
-} from "@briar/contracts/gen/briar/app/v1/channel_pb";
-import {
   IssueDifficulty,
   RunStatus,
 } from "@briar/contracts/gen/briar/app/v1/common_pb";
@@ -17,7 +14,6 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { describe, expect, it } from "vitest";
 import {
-  readChannelMessageRequest,
   readIssueMessageRequest,
   readIssueRequest,
   readIssueUpdateRequest,
@@ -26,8 +22,6 @@ import {
 const projectId = "11111111-1111-4111-8111-111111111111";
 const otherProjectId = "22222222-2222-4222-8222-222222222222";
 const runId = "33333333-3333-4333-8333-333333333333";
-const organizationId = "44444444-4444-4444-8444-444444444444";
-const channelId = "55555555-5555-4555-8555-555555555555";
 const messageId = "66666666-6666-4666-8666-666666666666";
 const parentMessageId = "77777777-7777-4777-8777-777777777777";
 const agentId = "88888888-8888-4888-8888-888888888888";
@@ -58,7 +52,7 @@ const multipartRequest = (form: FormData, method = "POST") =>
   });
 
 describe("protobuf multipart mutation boundary", () => {
-  it("round-trips generated issue, update, issue-message, and channel-message requests", async () => {
+  it("round-trips generated issue, update, and issue-message requests", async () => {
     const createForm = new FormData();
     setProtobufRequest(
       createForm,
@@ -146,32 +140,6 @@ describe("protobuf multipart mutation boundary", () => {
       mentionedAgentIds: [agentId],
     });
 
-    const channelMessageForm = new FormData();
-    setProtobufRequest(
-      channelMessageForm,
-      CreateChannelMessageRequestSchema,
-      create(CreateChannelMessageRequestSchema, {
-        organizationId,
-        channelId,
-        clientMessageId: messageId,
-        body,
-        parentMessageId,
-        mentionedUserIds: ["user-1"],
-        mentionedAgentIds: [agentId],
-        attachmentReferences: [attachmentReference],
-      }),
-    );
-    channelMessageForm.append("attachments", image(), "screen.png");
-    const channelMessage = await readChannelMessageRequest(
-      multipartRequest(channelMessageForm),
-      { organizationId, channelId },
-    );
-    expect(channelMessage.input).toMatchObject({
-      clientMessageId: messageId,
-      parentMessageId,
-      mentionedAgentIds: [agentId],
-    });
-    expect(channelMessage.attachmentReferences).toEqual([attachmentReference]);
   });
 
   it("rejects path identity mismatches before application mutation", async () => {

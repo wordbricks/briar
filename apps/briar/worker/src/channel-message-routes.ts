@@ -1,12 +1,8 @@
 import {
-  CreateChannelMessageResponseSchema,
-} from "@briar/contracts/gen/briar/app/v1/channel_pb";
-import {
-  canonicalizeIssueAttachmentReferences,
   isIssueAttachmentReference,
+  issueAttachmentReferences,
 } from "../../src/lib/issue-markdown";
 import { maxIssueAttachmentCount } from "../../src/lib/issue-attachments";
-import { agentReplyParentMessageId } from "../../src/lib/issue-reply-decision";
 import {
   channelReplyAssignedWorkerUnavailableError,
   channelReplyNoAvailableWorkerError,
@@ -16,10 +12,6 @@ import {
 import { hydrateAgentSkills } from "./agent-skills";
 import { processArchiveCleanupQueue } from "./archive";
 import type { BriarAuth } from "./auth";
-import {
-  prepareStoredAttachments,
-  uploadStoredAttachments,
-} from "./attachment-storage";
 import { channelAttachmentResponse } from "./channel-attachment-response";
 import {
   requireChannelAccess,
@@ -30,12 +22,12 @@ import {
   channelReplyJson,
   createChannelMessage,
   deleteChannelMessage,
-  enqueueChannelAgentReplies,
   getChannelMessage,
   getChannelMessageAttachment,
   getChannelReplySessionForThread,
   isChannelReactionEmoji,
   listChannelAgents,
+  listChannelAgentReplies,
   listChannelMessagePage,
   listChannelRootMessages,
   listChannelThreadMessages,
@@ -45,20 +37,11 @@ import {
   toggleChannelMessageReaction,
   unsubscribeChannelThread,
 } from "./channels";
-import {
-  HttpError,
-  privateNoStoreProtobufResponse,
-} from "./http-response";
-import {
-  appCreateChannelMessageResponse,
-} from "./app-connect-channel-response-mappers";
+import { HttpError } from "./http-response";
 import { getOrganizationRole } from "./organization-repository";
 import {
   decodeProjectChannelMessageQuery,
 } from "./query-contract";
-import {
-  readChannelMessageRequest,
-} from "./request-readers";
 import { requireSession } from "./session-auth";
 import {
   channelReplyWorkerAvailability,
@@ -68,6 +51,11 @@ import { schedulePostCommitCleanup } from "./post-commit-cleanup";
 import {
   decodeChannelMessageApplicationInput,
 } from "./app-mutation-request-mappers";
+import { sha256 } from "./crypto-digest";
+import {
+  findChannelMessageMutationReceipt,
+  resolveChannelMessageUploads,
+} from "./channel-message-upload-repository";
 
 export type ChannelMessageRouteInput = {
   request: Request;
@@ -133,12 +121,47 @@ export async function listOrganizationChannelMessages(
   };
 }
 
+const channelMessageMutationRequestHash = (input: {
+  organizationId: string;
+  channelId: string;
+  userId: string;
+  messageId: string;
+  body: string;
+  parentMessageId: string | null;
+  mentionedUserIds: readonly string[];
+  mentionedAgentIds: readonly string[];
+  skillId: string | null;
+  preferredDeviceId: string | null;
+  attachmentIds: readonly string[];
+}) => sha256(JSON.stringify(input));
+
+const channelMessageMutationConflict = () =>
+  new HttpError(
+    409,
+    "Channel message ID was already used with a different request",
+  );
+
+async function completedChannelMessageMutation(
+  db: D1Database,
+  channelId: string,
+  messageId: string,
+) {
+  const message = await getChannelMessage(db, channelId, messageId);
+  if (!message) {
+    throw new HttpError(409, "Channel message receipt is incomplete");
+  }
+  return {
+    message,
+    agentReplies: (
+      await listChannelAgentReplies(db, channelId, messageId)
+    ).map(channelReplyJson),
+  };
+}
+
 export async function createOrganizationChannelMessage(
   input: ChannelMessageApplicationInput & {
-    attachmentsBucket: R2Bucket;
     request: ReturnType<typeof decodeChannelMessageApplicationInput>;
-    attachments: readonly File[];
-    attachmentReferences: readonly string[];
+    attachmentIds: readonly string[];
   },
 ) {
   const channel = await requireChannelWriteAccess(
@@ -147,16 +170,69 @@ export async function createOrganizationChannelMessage(
     input.channelId,
     input.userId,
   );
+  const request = input.request;
+  if (!request.clientMessageId) {
+    throw new HttpError(400, "Client message ID is required");
+  }
+  const messageId = request.clientMessageId;
+  if (
+    input.attachmentIds.length > maxIssueAttachmentCount ||
+    new Set(input.attachmentIds).size !== input.attachmentIds.length ||
+    !input.attachmentIds.every(isIssueAttachmentReference)
+  ) {
+    throw new HttpError(400, "Attachment IDs are invalid");
+  }
+  const requestHash = await channelMessageMutationRequestHash({
+    organizationId: input.organizationId,
+    channelId: channel.id,
+    userId: input.userId,
+    messageId,
+    body: request.body,
+    parentMessageId: request.parentMessageId,
+    mentionedUserIds: request.mentionedUserIds,
+    mentionedAgentIds: request.mentionedAgentIds,
+    skillId: request.skillId,
+    preferredDeviceId: request.preferredDeviceId,
+    attachmentIds: input.attachmentIds,
+  });
+  const existingReceipt = await findChannelMessageMutationReceipt(
+    input.db,
+    messageId,
+  );
+  if (existingReceipt) {
+    if (
+      existingReceipt.organization_id !== input.organizationId ||
+      existingReceipt.channel_id !== channel.id ||
+      existingReceipt.user_id !== input.userId ||
+      existingReceipt.request_hash !== requestHash
+    ) {
+      throw channelMessageMutationConflict();
+    }
+    return completedChannelMessageMutation(input.db, channel.id, messageId);
+  }
   if (channel.archived_at) {
     throw new HttpError(409, "Channel is archived");
   }
+  const bodyAttachmentIds = issueAttachmentReferences(request.body);
   if (
-    input.attachmentReferences.length > maxIssueAttachmentCount ||
-    !input.attachmentReferences.every(isIssueAttachmentReference)
+    bodyAttachmentIds.size !== input.attachmentIds.length ||
+    !input.attachmentIds.every((id) => bodyAttachmentIds.has(id))
   ) {
-    throw new HttpError(400, "Attachment references are invalid");
+    throw new HttpError(
+      400,
+      "Channel message body must reference exactly the attached uploads",
+    );
   }
-  const request = input.request;
+  if (
+    request.parentMessageId &&
+    (await resolveChannelThreadRootId(
+      input.db,
+      channel.id,
+      request.parentMessageId,
+    )) !== request.parentMessageId
+  ) {
+    throw new HttpError(404, "Thread message not found");
+  }
   if (
     request.preferredDeviceId &&
     !(await userOwnsExecutionWorkerDevice(input.db, {
@@ -218,24 +294,20 @@ export async function createOrganizationChannelMessage(
     }
   }
   const createdAt = new Date().toISOString();
-  const messageId = request.clientMessageId ?? crypto.randomUUID();
-  const storedAttachments = prepareStoredAttachments(input.attachments, () => {
-    const id = crypto.randomUUID();
-    return {
-      id,
-      organization_id: input.organizationId,
-      object_key:
-        `channel-attachments/${input.organizationId}/${channel.id}/${messageId}/${id}`,
-    };
+  const uploads = await resolveChannelMessageUploads(input.db, {
+    organizationId: input.organizationId,
+    channelId: channel.id,
+    userId: input.userId,
+    messageId,
+    uploadIds: input.attachmentIds,
+    observedAt: createdAt,
   });
-  const messageInput = {
-    ...request,
-    body: canonicalizeIssueAttachmentReferences(
-      request.body,
-      input.attachmentReferences,
-      storedAttachments.map((attachment) => attachment.id),
-    ) ?? request.body,
-  };
+  if (!uploads) {
+    throw new HttpError(
+      409,
+      "Channel attachments are unavailable, expired, or already consumed",
+    );
+  }
   const invokedAgents = await Promise.all(
     mentionedAgents.map(async (agent) => {
       const selectedSkill = selectedSkillTarget?.agent.id === agent.id
@@ -243,7 +315,7 @@ export async function createOrganizationChannelMessage(
         : null;
       const retainedSession = await getChannelReplySessionForThread(input.db, {
         channelId: channel.id,
-        threadRootMessageId: messageInput.parentMessageId ?? messageId,
+        threadRootMessageId: request.parentMessageId ?? messageId,
         agentId: agent.id,
       });
       const liveSession = retainedSession && retainedSession.retained_until > createdAt
@@ -281,76 +353,91 @@ export async function createOrganizationChannelMessage(
       return { agent, selectedSkill, replyRuntime, unavailableReason };
     }),
   );
-  const uploadedKeys: string[] = [];
   let message = null;
   try {
-    await uploadStoredAttachments(
-      input.attachmentsBucket,
-      storedAttachments,
-      uploadedKeys,
-      (attachment) => ({
-        attachmentId: attachment.id,
-        channelId: channel.id,
-        messageId,
-        organizationId: input.organizationId,
-      }),
-    );
     message = await createChannelMessage(input.db, {
       id: messageId,
       channelId: channel.id,
-      parentMessageId: messageInput.parentMessageId,
+      parentMessageId: request.parentMessageId,
       authorUserId: input.userId,
       authorAgentId: null,
       authorAgentName: null,
       authorAgentProvider: null,
-      body: messageInput.body,
-      mentionedUserIds: messageInput.mentionedUserIds,
-      mentionedAgentIds: messageInput.mentionedAgentIds,
-      attachments: storedAttachments.map(({ file: _file, ...attachment }) =>
-        attachment
-      ),
+      body: request.body,
+      mentionedUserIds: request.mentionedUserIds,
+      mentionedAgentIds: request.mentionedAgentIds,
+      attachments: uploads.map((upload) => ({
+        id: upload.upload_id,
+        organization_id: upload.organization_id,
+        object_key: upload.object_key,
+        filename: upload.filename,
+        content_type: upload.content_type,
+        byte_size: upload.byte_size,
+      })),
+      mutationCommit: {
+        organizationId: input.organizationId,
+        channelId: channel.id,
+        userId: input.userId,
+        messageId,
+        uploadIds: input.attachmentIds,
+        requestHash,
+        committedAt: createdAt,
+      },
+      agentReplyEnqueue: {
+        organizationId: input.organizationId,
+        channelId: channel.id,
+        triggerMessageId: messageId,
+        parentMessageId: request.parentMessageId ?? messageId,
+        agents: invokedAgents.map(({
+          agent,
+          selectedSkill,
+          replyRuntime,
+          unavailableReason,
+        }) => ({
+          id: agent.id,
+          projectId: agent.project_id,
+          skillId: selectedSkill?.id ?? null,
+          provider: replyRuntime.provider,
+          unavailableReason,
+        })),
+        preferredDeviceId: request.preferredDeviceId,
+        createdAt,
+      },
       createdAt,
     });
     if (!message) throw new HttpError(404, "Thread message not found");
   } catch (error) {
-    if (uploadedKeys.length > 0) {
-      try {
-        await input.attachmentsBucket.delete(uploadedKeys);
-      } catch (cleanupError) {
-        console.error(JSON.stringify({
-          message: "Failed channel upload cleanup",
-          organizationId: input.organizationId,
-          channelId: channel.id,
-          messageId,
-          attachmentCount: uploadedKeys.length,
-          error: cleanupError instanceof Error
-            ? cleanupError.message
-            : String(cleanupError),
-        }));
+    const concurrentReceipt = await findChannelMessageMutationReceipt(
+      input.db,
+      messageId,
+    );
+    if (concurrentReceipt) {
+      if (
+        concurrentReceipt.organization_id === input.organizationId &&
+        concurrentReceipt.channel_id === channel.id &&
+        concurrentReceipt.user_id === input.userId &&
+        concurrentReceipt.request_hash === requestHash
+      ) {
+        return completedChannelMessageMutation(input.db, channel.id, messageId);
       }
+      throw channelMessageMutationConflict();
+    }
+    if (await getChannelMessage(input.db, channel.id, messageId)) {
+      throw channelMessageMutationConflict();
+    }
+    if (input.attachmentIds.length > 0) {
+      throw new HttpError(
+        409,
+        "Channel attachments changed while the message was being created",
+      );
     }
     throw error;
   }
-  const agentReplies = await enqueueChannelAgentReplies(input.db, {
-    organizationId: input.organizationId,
-    channelId: channel.id,
-    triggerMessageId: message.id,
-    parentMessageId: agentReplyParentMessageId(message),
-    agents: invokedAgents.map(({
-      agent,
-      selectedSkill,
-      replyRuntime,
-      unavailableReason,
-    }) => ({
-      id: agent.id,
-      projectId: agent.project_id,
-      skillId: selectedSkill?.id ?? null,
-      provider: replyRuntime.provider,
-      unavailableReason,
-    })),
-    preferredDeviceId: messageInput.preferredDeviceId,
-    createdAt,
-  });
+  const agentReplies = await listChannelAgentReplies(
+    input.db,
+    channel.id,
+    message.id,
+  );
   return {
     message,
     agentReplies: agentReplies.map(channelReplyJson),
@@ -484,9 +571,6 @@ export async function handleChannelMessageRoute(
   const { request, url, auth, db, attachmentsBucket } = routeInput;
   const { pathname } = url;
 
-  const channelMessagesMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages$/u,
-  );
   const channelAttachmentMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/attachments\/([0-9a-f-]+)$/u,
   );
@@ -518,36 +602,5 @@ export async function handleChannelMessageRoute(
     if (!object) throw new HttpError(404, "Attachment not found");
     return channelAttachmentResponse(attachment, object, object.body);
   }
-  if (
-    channelMessagesMatch && request.method === "POST" &&
-    request.headers.get("content-type")?.toLowerCase().startsWith(
-      "multipart/form-data",
-    )
-  ) {
-    const session = await requireSession(auth, request);
-    const parsed = await readChannelMessageRequest(request, {
-      organizationId: channelMessagesMatch[1],
-      channelId: channelMessagesMatch[2],
-    });
-    if (parsed.attachments.length === 0) {
-      throw new HttpError(400, "Channel message upload requires an attachment");
-    }
-    const result = await createOrganizationChannelMessage({
-      db,
-      organizationId: channelMessagesMatch[1],
-      channelId: channelMessagesMatch[2],
-      userId: session.user.id,
-      attachmentsBucket,
-      request: parsed.input,
-      attachments: parsed.attachments,
-      attachmentReferences: parsed.attachmentReferences,
-    });
-    return privateNoStoreProtobufResponse(
-      CreateChannelMessageResponseSchema,
-      appCreateChannelMessageResponse(result),
-      201,
-    );
-  }
-
   return undefined;
 }

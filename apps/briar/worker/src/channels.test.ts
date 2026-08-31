@@ -252,10 +252,11 @@ describe("organization channels", () => {
     organizationId,
     channelId,
     userId,
-    attachmentsBucket: archives,
-    request: decodeChannelMessageApplicationInput(request),
-    attachments: [],
-    attachmentReferences: [],
+    request: decodeChannelMessageApplicationInput({
+      ...request,
+      clientMessageId: request.clientMessageId ?? crypto.randomUUID(),
+    }),
+    attachmentIds: [],
   });
 
   const bindWorkerToProject = async () => {

@@ -3,9 +3,6 @@ import {
   type DescMessage,
 } from "@bufbuild/protobuf";
 import {
-  CreateChannelMessageRequestSchema,
-} from "@briar/contracts/gen/briar/app/v1/channel_pb";
-import {
   CreateIssueMessageRequestSchema,
   CreateIssueRequestSchema,
   UpdateIssueRequestSchema,
@@ -28,7 +25,6 @@ import { HttpError } from "./http-response";
 import { decodeRequestSync } from "./request-schema";
 import {
   canonicalAppUuid,
-  createChannelMessageApplicationRequest,
   createIssueApplicationRequest,
   createIssueMessageApplicationRequest,
   updateIssueApplicationRequest,
@@ -215,60 +211,6 @@ export async function readIssueMessageRequest(
   }
   return {
     input: createIssueMessageApplicationRequest(message),
-    attachments,
-    attachmentReferences,
-  };
-}
-
-export async function readChannelMessageRequest(
-  request: Request,
-  path: { organizationId: string; channelId: string },
-) {
-  const form = await readBoundedMultipartForm(
-    request,
-    maxIssueMultipartBytes,
-    "Channel images exceed the 25MB total limit",
-  );
-  if (!form) {
-    throw new HttpError(415, "Channel message uploads must be multipart");
-  }
-  const attachments = readMultipartFiles(
-    form,
-    "attachments",
-    "Attachments must be files",
-    validateIssueAttachments,
-  );
-  if (attachments.some((attachment) => !attachment.type.startsWith("image/"))) {
-    throw new HttpError(400, "Channel attachments must be images");
-  }
-  const message = await readMultipartProtobuf(
-    form,
-    CreateChannelMessageRequestSchema,
-    "channel message",
-  );
-  requireMultipartIdentity([
-    {
-      actual: message.organizationId,
-      expected: path.organizationId,
-      label: "organization ID",
-    },
-    {
-      actual: message.channelId,
-      expected: path.channelId,
-      label: "channel ID",
-    },
-  ]);
-  const attachmentReferences = validateMultipartAttachmentReferences(
-    message.attachmentReferences,
-    attachments,
-    { required: true, message: "Attachment references are invalid" },
-  );
-  const bodyReferences = issueAttachmentReferences(message.body);
-  if (!attachmentReferences.every((reference) => bodyReferences.has(reference))) {
-    throw new HttpError(400, "Every channel image must be referenced in the body");
-  }
-  return {
-    input: createChannelMessageApplicationRequest(message),
     attachments,
     attachmentReferences,
   };

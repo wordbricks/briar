@@ -1,5 +1,5 @@
 import { create } from "@bufbuild/protobuf";
-import { timestampDate } from "@bufbuild/protobuf/wkt";
+import { timestampDate, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   ChannelService,
   ChannelVisibility as ProtoChannelVisibility,
@@ -7,6 +7,10 @@ import {
   DeclineChannelProposalResponseSchema,
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import {
+  PreparedUploadSchema,
+  UploadReferenceSchema,
+} from "@briar/contracts/gen/briar/types/v1/upload_pb";
 import {
   Code,
   ConnectError,
@@ -103,6 +107,9 @@ import {
   appCreateChannelMessageResponse,
 } from "./app-connect-channel-response-mappers";
 import { schedulePostCommitCleanup } from "./post-commit-cleanup";
+import {
+  prepareChannelMessageAttachmentsApplication,
+} from "./channel-message-upload-application";
 
 export type AppConnectChannelInput = {
   readonly request: Request;
@@ -131,6 +138,8 @@ export type AppConnectChannelServices = {
   readonly rotateChannelWebhook: typeof rotateChannelWebhookApplication;
   readonly revokeChannelWebhook: typeof revokeChannelWebhookApplication;
   readonly createMessage: typeof createOrganizationChannelMessage;
+  readonly prepareMessageAttachments:
+    typeof prepareChannelMessageAttachmentsApplication;
   readonly declineProposal: typeof declineOrganizationChannelProposal;
   readonly deleteMessage: typeof deleteOrganizationChannelMessage;
   readonly getChannel: typeof getOrganizationChannelDetail;
@@ -162,6 +171,7 @@ export const appConnectChannelServices: AppConnectChannelServices = {
   rotateChannelWebhook: rotateChannelWebhookApplication,
   revokeChannelWebhook: revokeChannelWebhookApplication,
   createMessage: createOrganizationChannelMessage,
+  prepareMessageAttachments: prepareChannelMessageAttachmentsApplication,
   declineProposal: declineOrganizationChannelProposal,
   deleteMessage: deleteOrganizationChannelMessage,
   getChannel: getOrganizationChannelDetail,
@@ -612,6 +622,41 @@ const createAppChannelService = (
     });
   },
 
+  prepareChannelMessageAttachments: async (request, context) => {
+    context.responseHeader.set("Cache-Control", "private, no-store");
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.prepareMessageAttachments({
+      db: input.db,
+      signingSecret: input.env.BETTER_AUTH_SECRET,
+      organizationId: canonicalUuid(request.organizationId),
+      channelId: canonicalUuid(request.channelId),
+      userId: session.user.id,
+      messageId: canonicalUuid(request.clientMessageId),
+      requestId: canonicalUuid(request.requestId),
+      attachments: request.attachments,
+    });
+    return create(
+      ChannelService.method.prepareChannelMessageAttachments.output,
+      {
+        replayed: result.replayed,
+        uploads: result.uploads.map((upload) =>
+          create(PreparedUploadSchema, {
+            clientId: upload.clientId,
+            reference: create(UploadReferenceSchema, {
+              uploadId: upload.uploadId,
+            }),
+            uploadUrl: new URL(
+              `/uploads/${encodeURIComponent(upload.uploadId)}`,
+              input.request.url,
+            ).toString(),
+            uploadCapability: upload.uploadCapability,
+            expiresAt: timestampFromDate(new Date(upload.expiresAt)),
+          })
+        ),
+      },
+    );
+  },
+
   createChannelMessage: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.createMessage({
@@ -619,9 +664,9 @@ const createAppChannelService = (
       organizationId: canonicalUuid(request.organizationId),
       channelId: canonicalUuid(request.channelId),
       userId: session.user.id,
-      attachmentsBucket: input.attachmentsBucket,
-      attachments: [],
-      attachmentReferences: request.attachmentReferences,
+      attachmentIds: request.attachments.map((attachment) =>
+        canonicalUuid(attachment.uploadId)
+      ),
       request: createChannelMessageApplicationRequest(request),
     });
     scheduleChannelMutation(input, request.organizationId);
