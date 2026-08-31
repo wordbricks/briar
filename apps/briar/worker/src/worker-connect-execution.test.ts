@@ -304,7 +304,7 @@ describe("WorkerExecutionService execution credential boundary", () => {
     expect(prepareContext.responseHeader.get("cache-control")).toBe(
       "private, no-store",
     );
-    expect(prepared.uploads[0]).toMatchObject({
+    expect(prepared.uploads?.[0]).toMatchObject({
       reference: { uploadId },
       uploadUrl: `https://briar.example/uploads/${uploadId}`,
     });

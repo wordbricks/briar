@@ -247,17 +247,20 @@ describe("organization channels", () => {
     channelId: string,
     request: Parameters<typeof decodeChannelMessageApplicationInput>[0],
     userId = ownerId,
-  ) => createOrganizationChannelMessage({
-    db,
-    organizationId,
-    channelId,
-    userId,
-    request: decodeChannelMessageApplicationInput({
-      ...request,
-      clientMessageId: request.clientMessageId ?? crypto.randomUUID(),
-    }),
-    attachmentIds: [],
-  });
+  ) => {
+    const decoded = decodeChannelMessageApplicationInput(request);
+    return createOrganizationChannelMessage({
+      db,
+      organizationId,
+      channelId,
+      userId,
+      request: {
+        ...decoded,
+        clientMessageId: decoded.clientMessageId ?? crypto.randomUUID(),
+      },
+      attachmentIds: [],
+    });
+  };
 
   const bindWorkerToProject = async () => {
     await db
