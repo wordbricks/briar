@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { encodeAgentExecutionMetricsJson } from "../../src/lib/agent-execution-metrics";
+import { parseExecutionMetrics } from "./agent-result-json";
 import {
   applyD1Migrations,
   executeD1Sql,
@@ -17,13 +18,9 @@ const canonicalMetrics = {
 } as const;
 
 describe("agent execution metrics storage cutover", () => {
-  it("retires corrupt derived metrics and seals future writes", async () => {
+  it("retires old telemetry and leaves field authority with Effect", async () => {
     const db = env.DB;
     const canonicalJson = encodeAgentExecutionMetricsJson(canonicalMetrics);
-    const excessPropertyJson = JSON.stringify({
-      ...canonicalMetrics,
-      requestTraceId: "legacy-trace",
-    });
     await executeD1Sql(db, `
       create table briar_hunt_runs (
         id text primary key not null,
@@ -33,16 +30,12 @@ describe("agent execution metrics storage cutover", () => {
     await db.batch([
       db.prepare(
         `insert into briar_hunt_runs (id, execution_metrics_json)
-         values ('canonical', ?)`,
+         values ('old-canonical', ?)`,
       ).bind(canonicalJson),
       db.prepare(
         `insert into briar_hunt_runs (id, execution_metrics_json)
-         values ('invalid-json', '{not-json')`,
+         values ('old-corrupt', '{not-json')`,
       ),
-      db.prepare(
-        `insert into briar_hunt_runs (id, execution_metrics_json)
-         values ('legacy-shape', ?)`,
-      ).bind(excessPropertyJson),
     ]);
 
     await applyD1Migrations(db, {
@@ -54,27 +47,37 @@ describe("agent execution metrics storage cutover", () => {
        from briar_hunt_runs
        order by id`,
     ).all()).results).toEqual([
-      { id: "canonical", execution_metrics_json: canonicalJson },
-      { id: "invalid-json", execution_metrics_json: null },
-      { id: "legacy-shape", execution_metrics_json: null },
+      { id: "old-canonical", execution_metrics_json: null },
+      { id: "old-corrupt", execution_metrics_json: null },
     ]);
+
+    await db.prepare(
+      `update briar_hunt_runs
+       set execution_metrics_json = ?
+       where id = 'old-canonical'`,
+    ).bind(canonicalJson).run();
+    expect(parseExecutionMetrics(await db.prepare(
+      `select execution_metrics_json from briar_hunt_runs
+       where id = 'old-canonical'`,
+    ).first<string>("execution_metrics_json"))).toEqual(canonicalMetrics);
 
     await expect(db.prepare(
       `update briar_hunt_runs
-       set execution_metrics_json = ?
-       where id = 'invalid-json'`,
-    ).bind(canonicalJson).run()).resolves.toBeDefined();
-    await expect(db.prepare(
-      `update briar_hunt_runs
-       set execution_metrics_json = ?
-       where id = 'canonical'`,
-    ).bind(JSON.stringify({
-      ...canonicalMetrics,
-      durationMs: -1,
-    })).run()).rejects.toThrow(/canonical shape/iu);
+       set execution_metrics_json = '{not-json'
+       where id = 'old-corrupt'`,
+    ).run()).rejects.toThrow(/bounded JSON object/iu);
     await expect(db.prepare(
       `insert into briar_hunt_runs (id, execution_metrics_json)
-       values ('future-corrupt', ?)`,
-    ).bind(excessPropertyJson).run()).rejects.toThrow(/canonical shape/iu);
+       values ('future-oversized', ?)`,
+    ).bind(JSON.stringify({ value: "x".repeat(4_096) })).run())
+      .rejects.toThrow(/bounded JSON object/iu);
+
+    const semanticallyInvalid = JSON.stringify({ durationMs: -1 });
+    await db.prepare(
+      `update briar_hunt_runs
+       set execution_metrics_json = ?
+       where id = 'old-corrupt'`,
+    ).bind(semanticallyInvalid).run();
+    expect(() => parseExecutionMetrics(semanticallyInvalid)).toThrow();
   });
 });

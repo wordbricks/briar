@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { encodeStructuredAgentResultJson } from "../../src/lib/agent-result";
+import { parseStructuredResult } from "./agent-result-json";
 import {
   applyD1Migrations,
   executeD1Sql,
@@ -18,13 +19,9 @@ const canonicalResult = {
 } as const;
 
 describe("structured agent result storage cutover", () => {
-  it("retires corrupt optional metadata and seals both storage boundaries", async () => {
+  it("retires old metadata and leaves field authority with Effect", async () => {
     const db = env.DB;
     const canonicalJson = encodeStructuredAgentResultJson(canonicalResult);
-    const invalidOutcomeJson = JSON.stringify({
-      ...canonicalResult,
-      outcome: "unknown",
-    });
     await executeD1Sql(db, `
       create table briar_hunt_runs (
         id text primary key not null,
@@ -41,18 +38,13 @@ describe("structured agent result storage cutover", () => {
       db.prepare(
         `insert into briar_hunt_runs
            (id, result_summary, structured_result_json)
-         values ('corrupt-hunt', 'Keep hunt summary', '{not-json')`,
-      ),
+         values ('old-hunt', 'Keep hunt summary', ?)`,
+      ).bind(canonicalJson),
       db.prepare(
         `insert into briar_project_agent_schedule_runs
            (id, result_summary, structured_result_json)
-         values ('corrupt-schedule', 'Keep schedule summary', ?)`,
-      ).bind(invalidOutcomeJson),
-      db.prepare(
-        `insert into briar_hunt_runs
-           (id, result_summary, structured_result_json)
-         values ('canonical-hunt', 'Keep canonical summary', ?)`,
-      ).bind(canonicalJson),
+         values ('old-schedule', 'Keep schedule summary', '{not-json')`,
+      ),
     ]);
 
     await applyD1Migrations(db, {
@@ -68,31 +60,45 @@ describe("structured agent result storage cutover", () => {
        order by id`,
     ).all()).results).toEqual([
       {
-        id: "canonical-hunt",
-        result_summary: "Keep canonical summary",
-        structured_result_json: canonicalJson,
-      },
-      {
-        id: "corrupt-hunt",
+        id: "old-hunt",
         result_summary: "Keep hunt summary",
         structured_result_json: null,
       },
       {
-        id: "corrupt-schedule",
+        id: "old-schedule",
         result_summary: "Keep schedule summary",
         structured_result_json: null,
       },
     ]);
 
-    await expect(db.prepare(
+    await db.prepare(
       `update briar_hunt_runs
-       set structured_result_json = '{}'
-       where id = 'corrupt-hunt'`,
-    ).run()).rejects.toThrow(/canonical shape/iu);
+       set structured_result_json = ?
+       where id = 'old-hunt'`,
+    ).bind(canonicalJson).run();
+    expect(parseStructuredResult(await db.prepare(
+      `select structured_result_json from briar_hunt_runs
+       where id = 'old-hunt'`,
+    ).first<string>("structured_result_json"))).toEqual(canonicalResult);
+
+    await expect(db.prepare(
+      `update briar_project_agent_schedule_runs
+       set structured_result_json = '[]'
+       where id = 'old-schedule'`,
+    ).run()).rejects.toThrow(/bounded JSON object/iu);
     await expect(db.prepare(
       `insert into briar_project_agent_schedule_runs
          (id, result_summary, structured_result_json)
-       values ('future-corrupt', 'Must reject', ?)`,
-    ).bind(invalidOutcomeJson).run()).rejects.toThrow(/canonical shape/iu);
+       values ('future-oversized', 'Must reject', ?)`,
+    ).bind(JSON.stringify({ summary: "x".repeat(131_072) })).run())
+      .rejects.toThrow(/bounded JSON object/iu);
+
+    const semanticallyInvalid = JSON.stringify({ outcome: "unknown" });
+    await db.prepare(
+      `update briar_project_agent_schedule_runs
+       set structured_result_json = ?
+       where id = 'old-schedule'`,
+    ).bind(semanticallyInvalid).run();
+    expect(() => parseStructuredResult(semanticallyInvalid)).toThrow();
   });
 });
