@@ -573,6 +573,107 @@ body { overflow: hidden; font-synthesis: none; }
 .my-issues-loading { min-height:260px; display:grid; place-items:center; }
 .my-issues-scroll > .empty-state { flex:1; }
 .my-issues-refresh-button { width:34px; height:34px; }
+.my-issues-reference { min-width:0; min-height:0; height:100%; display:flex; flex-direction:column; background:#fbfbf9; }
+.my-issues-reference.sidebar-closed .my-issues-reference-header { padding-left:var(--window-navigation-content-inset); }
+.my-issues-reference-header { min-height:68px; flex:0 0 68px; padding:0 26px; display:flex; align-items:center; border-bottom:1px solid #e7e7e3; background:#fbfbf9; }
+.my-issues-reference-header h1 { margin:0; color:#2f312d; font-size:23px; font-weight:650; letter-spacing:-.03em; line-height:1.2; }
+.my-issues-reference-scroll { min-height:0; flex:1; overflow:auto; background:#fbfbf9; }
+.my-issues-reference-toolbar { min-height:74px; position:relative; padding:13px 18px; display:flex; align-items:center; justify-content:space-between; gap:18px; border-bottom:1px solid #ededeb; background:#fff; }
+.my-issues-scope-tabs { min-width:0; display:flex; align-items:center; gap:12px; overflow-x:auto; scrollbar-width:none; }
+.my-issues-scope-tabs::-webkit-scrollbar { display:none; }
+.my-issues-scope-tabs button { height:48px; flex:0 0 auto; padding:0 18px; border:1px solid #e3e3e0; border-radius:25px; color:#666861; background:#fff; box-shadow:0 1px 2px rgba(40,41,36,.04); font-size:18px; font-weight:500; cursor:pointer; transition:background-color .14s ease,border-color .14s ease,color .14s ease,box-shadow .14s ease; }
+.my-issues-scope-tabs button:hover { border-color:#d2d1cd; color:#343631; background:#fafaf8; }
+.my-issues-scope-tabs button.active { border-color:#e1e1df; color:#30322e; background:#efefed; box-shadow:inset 0 1px 1px rgba(44,45,40,.03); font-weight:650; }
+.my-issues-scope-tabs button:focus-visible,.my-issues-reference-tool-button:focus-visible,.my-issues-reference-view-switch button:focus-visible,.my-issues-reference-group-toggle:focus-visible,.my-issues-reference-group-add:focus-visible { outline:2px solid #8068ce; outline-offset:2px; }
+.my-issues-reference-tools { min-width:0; display:flex; align-items:center; justify-content:flex-end; gap:12px; }
+.my-issues-reference-tools .issue-property-filter-trigger,
+.my-issues-reference-tools .my-issues-project-filter-trigger { width:42px; height:42px; max-width:none; padding:0; justify-content:center; gap:0; border-color:#e1e1df; border-radius:50%; color:#656861; background:#fff; box-shadow:0 1px 2px rgba(40,41,36,.04); }
+.my-issues-reference-tools .issue-property-filter-trigger:hover,
+.my-issues-reference-tools .issue-property-filter-trigger[data-state="open"],
+.my-issues-reference-tools .my-issues-project-filter-trigger:hover,
+.my-issues-reference-tools .my-issues-project-filter-trigger[data-state="open"] { border-color:#d1c8e9; color:#5d48a8; background:#faf8ff; }
+.my-issues-reference-tools .issue-property-filter-trigger > span,
+.my-issues-reference-tools .issue-property-filter-trigger > svg:last-child,
+.my-issues-reference-tools .my-issues-project-filter-trigger > span,
+.my-issues-reference-tools .my-issues-project-filter-trigger > svg:last-child { display:none; }
+.my-issues-reference-tools .issue-property-filter-trigger strong,
+.my-issues-reference-tools .my-issues-project-filter-trigger strong { position:absolute; min-width:17px; height:17px; margin:0 0 28px 28px; padding:0 4px; font-size:10px; }
+.my-issues-reference-tool-button { width:42px; height:42px; flex:0 0 42px; display:grid; place-items:center; border:1px solid #e1e1df; border-radius:50%; color:#656861; background:#fff; box-shadow:0 1px 2px rgba(40,41,36,.04); cursor:pointer; transition:background-color .14s ease,border-color .14s ease,color .14s ease; }
+.my-issues-reference-tool-button:hover,.my-issues-reference-tool-button.active { border-color:#d1c8e9; color:#5d48a8; background:#faf8ff; }
+.my-issues-reference-view-switch { width:88px; height:42px; flex:0 0 88px; padding:3px; display:flex; align-items:center; gap:2px; border:1px solid #e1e1df; border-radius:22px; background:#fff; box-shadow:0 1px 2px rgba(40,41,36,.04); }
+.my-issues-reference-view-switch button { width:40px; height:34px; display:grid; place-items:center; border:0; border-radius:17px; color:#8a8c85; background:transparent; cursor:pointer; }
+.my-issues-reference-view-switch button:hover { color:#4b4e47; background:#f5f5f2; }
+.my-issues-reference-view-switch button.active { color:#5844a5; background:#eee9ff; }
+.my-issues-reference-retry { margin:0; }
+.my-issues-reference-search { width:1px; height:1px; position:absolute; right:18px; top:67px; z-index:4; overflow:hidden; display:flex; align-items:center; gap:8px; padding:0; border:1px solid transparent; border-radius:10px; color:var(--muted-foreground); background:#fff; opacity:0; pointer-events:none; box-shadow:0 12px 32px rgba(39,40,35,.14); transition:width .14s ease,opacity .14s ease,padding .14s ease; }
+.my-issues-reference-search.is-open { width:250px; height:42px; padding:0 12px; border-color:#deddd9; opacity:1; pointer-events:auto; }
+.my-issues-reference-search input { width:100%; min-width:0; border:0; outline:0; color:#3e403a; background:transparent; font-size:var(--text-xs); }
+.my-issues-reference-list { min-width:720px; padding:0 8px 42px; }
+.my-issues-reference-group { margin:0; }
+.my-issues-reference-group + .my-issues-reference-group { margin-top:0; }
+.my-issues-reference-group-header { min-height:60px; padding:0 17px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-radius:14px; color:#363833; background:#f0f0ee; }
+.my-issues-reference-group-toggle { min-width:0; min-height:44px; padding:0; display:flex; align-items:center; gap:9px; border:0; color:inherit; background:transparent; cursor:pointer; font:inherit; text-align:left; }
+.my-issues-reference-group-toggle > svg { flex:0 0 auto; color:#b0b1ad; }
+.my-issues-reference-group-toggle strong { font-size:20px; font-weight:560; letter-spacing:-.015em; }
+.my-issues-reference-group-toggle > span { color:#999b94; font:500 18px/1 "DM Mono",monospace; }
+.my-issues-reference-group-add { width:32px; height:32px; flex:0 0 32px; display:grid; place-items:center; border:0; border-radius:8px; color:#5e605a; background:transparent; cursor:pointer; }
+.my-issues-reference-group-add:hover:not(:disabled) { background:rgba(81,82,75,.08); }
+.my-issues-reference-group-add:disabled { opacity:.9; cursor:default; }
+.my-issues-reference-group-rows { background:#fff; }
+.my-issues-reference-row { min-width:720px; min-height:72px; padding:0 17px; display:grid; grid-template-columns:30px 138px minmax(220px,1fr) minmax(180px,auto) 90px 20px; align-items:center; gap:11px; border-bottom:1px solid #ededeb; color:#3d403a; background:#fff; cursor:pointer; transition:background-color .13s ease; }
+.my-issues-reference-row:last-child { border-bottom:0; }
+.my-issues-reference-row:hover,.my-issues-reference-row:focus-visible { background:#fcfbff; }
+.my-issues-reference-row:focus-visible { position:relative; z-index:1; outline:2px solid #8068ce; outline-offset:-2px; }
+.my-issues-reference-status { width:25px; height:25px; display:grid; place-items:center; border-radius:7px; color:#92958e; background:#f1f1ef; }
+.my-issues-reference-status.status-blocked,.my-issues-reference-status.status-failed { color:#d65c6d; background:#fff0f2; }
+.my-issues-reference-status.status-paused { color:#b98926; background:#fff7e5; }
+.my-issues-reference-status.status-completed,.my-issues-reference-status.status-cancelled { color:#3c9b77; background:#eaf8f2; }
+.my-issues-reference-status.status-backlog { color:#74776f; background:#f1f1ef; }
+.my-issues-row-loading-dot { width:11px; height:11px; display:block; border:2px dotted #acada8; border-radius:50%; }
+.my-issues-reference-key { min-width:0; display:flex; align-items:center; gap:9px; overflow:hidden; color:#777a73; font:500 16px/1 "DM Mono",monospace; text-overflow:ellipsis; white-space:nowrap; }
+.my-issues-reference-key .issue-list-project-icon { width:17px; height:17px; flex:0 0 17px; }
+.my-issues-reference-copy { min-width:0; display:flex; align-items:center; gap:9px; overflow:hidden; }
+.my-issues-reference-copy strong { min-width:0; overflow:hidden; color:#2e302c; font-size:17px; font-weight:620; letter-spacing:-.015em; text-overflow:ellipsis; white-space:nowrap; }
+.my-issues-reference-kicker { display:none; }
+.my-issues-reference-copy small { display:none; }
+.my-issues-reference-badges { min-width:0; display:flex; align-items:center; justify-content:flex-end; gap:7px; overflow:hidden; }
+.my-issues-reference-badge { max-width:148px; min-height:29px; padding:0 11px; display:inline-flex; align-items:center; gap:6px; overflow:hidden; border:1px solid #e3e3df; border-radius:999px; color:#676a62; background:#fbfbfa; font-size:14px; text-overflow:ellipsis; white-space:nowrap; }
+.my-issues-reference-badge::before { width:8px; height:8px; flex:0 0 8px; border-radius:50%; background:#a5a7a0; content:""; }
+.my-issues-reference-badge.provider { color:#5b4aa5; border-color:#ded6f2; background:#f7f4ff; }
+.my-issues-reference-badge.provider::before { background:#8f5be4; }
+.my-issues-reference-badge.assignee { color:#556b63; border-color:#d8e5df; background:#f4faf7; }
+.my-issues-reference-badge.assignee::before { background:#54a184; }
+.my-issues-reference-badge.source.issue::before { background:#8167d6; }
+.my-issues-reference-badge.source.feedback::before { background:#58a0d1; }
+.my-issues-reference-badge.source.error::before { background:#dd687a; }
+.my-issues-reference-badges .pull-request-icon-link { min-height:29px; height:29px; border-radius:999px; }
+.my-issues-reference-updated { overflow:hidden; color:#858880; font:500 14px/1 "DM Mono",monospace; text-align:right; text-overflow:ellipsis; white-space:nowrap; }
+.my-issues-reference-arrow { color:#b1b3ac; }
+@media (max-width:900px) {
+  .my-issues-reference-toolbar { align-items:flex-start; flex-direction:column; }
+  .my-issues-reference-tools { width:100%; justify-content:flex-end; }
+  .my-issues-reference-row { grid-template-columns:30px 120px minmax(180px,1fr) auto 76px 20px; }
+  .my-issues-reference-badge.assignee { display:none; }
+}
+@media (max-width:620px) {
+  .my-issues-reference-header { min-height:58px; flex-basis:58px; padding:0 16px; }
+  .my-issues-reference-header h1 { font-size:20px; }
+  .my-issues-reference-toolbar { min-height:68px; padding:10px 12px; }
+  .my-issues-scope-tabs { width:100%; gap:6px; }
+  .my-issues-scope-tabs button { height:40px; padding:0 13px; font-size:15px; }
+  .my-issues-reference-tools { gap:7px; }
+  .my-issues-reference-tools .issue-property-filter-trigger,
+  .my-issues-reference-tools .my-issues-project-filter-trigger,
+  .my-issues-reference-tool-button { width:38px; height:38px; }
+  .my-issues-reference-view-switch { width:80px; height:38px; }
+  .my-issues-reference-view-switch button { width:36px; height:30px; }
+  .my-issues-reference-row { min-height:62px; grid-template-columns:26px 105px minmax(170px,1fr) 26px; gap:8px; padding:0 12px; }
+  .my-issues-reference-badges,.my-issues-reference-updated { display:none; }
+  .my-issues-reference-status { width:23px; height:23px; }
+  .my-issues-reference-key { font-size:13px; }
+  .my-issues-reference-copy strong { font-size:15px; }
+  .my-issues-reference-arrow { justify-self:end; }
+}
 .source-filter-group { display:flex; align-items:center; gap:7px; flex:0 0 auto; }
 .source-filter-group > span { color:var(--muted-foreground); font-size:var(--text-2xs); white-space:nowrap; }
 .source-filter { display:flex; gap:2px; }
