@@ -250,12 +250,13 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.createIssue({
         db: input.db,
-        attachmentsBucket: input.env.ATTACHMENTS,
         projectId: canonicalUuid(request.projectId),
         userId: session.user.id,
+        clientIssueId: canonicalUuid(request.clientIssueId),
         request: createIssueApplicationRequest(request),
-        attachments: [],
-        attachmentReferences: request.attachmentReferences,
+        attachmentIds: request.attachments.map((attachment) =>
+          canonicalUuid(attachment.uploadId)
+        ),
       })
     );
     return appCreateIssueResponse(result);
@@ -282,14 +283,15 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.updateIssue({
         db: input.db,
-        attachmentsBucket: input.env.ATTACHMENTS,
         projectId: canonicalUuid(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
+        requestId: canonicalUuid(request.requestId),
         request: updateIssueApplicationRequest(request),
-        attachments: [],
-        attachmentReferences: request.attachmentReferences,
-        keptAttachmentIds: request.keptAttachmentIds?.values,
+        attachmentIds: request.attachments.map((attachment) =>
+          canonicalUuid(attachment.uploadId)
+        ),
+        keptAttachmentIds: request.keptAttachmentIds?.values.map(canonicalUuid),
       })
     );
     return appUpdateIssueResponse(result);
@@ -647,14 +649,13 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.createMessage({
         db: input.db,
-        archivesBucket: input.env.ARCHIVES,
-        attachmentsBucket: input.env.ATTACHMENTS,
         projectId: canonicalUuid(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         request: createIssueMessageApplicationRequest(request),
-        attachments: [],
-        attachmentReferences: request.attachmentReferences,
+        attachmentIds: request.attachments.map((attachment) =>
+          canonicalUuid(attachment.uploadId)
+        ),
       })
     );
     return appCreateIssueMessageResponse(result);

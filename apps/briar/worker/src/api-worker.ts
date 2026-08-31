@@ -9,7 +9,6 @@ import {
 import { requireSession } from "./session-auth";
 import { handleAccountRoute } from "./account-routes";
 import { handleIssueConversationRoute } from "./issue-conversation-routes";
-import { handleIssueCoreRoute } from "./issue-core-routes";
 import { handleChannelMessageRoute } from "./channel-message-routes";
 import { handleChannelReplyResultRoute } from "./channel-reply-result-routes";
 import { handleManagedComputerRoute } from "./managed-computer-routes";
@@ -190,15 +189,6 @@ async function route(
     requireProjectAccess,
   });
   if (runEvidenceResponse !== undefined) return runEvidenceResponse;
-
-  const issueCoreResponse = await handleIssueCoreRoute({
-    request,
-    url,
-    auth,
-    db,
-    attachmentsBucket,
-  });
-  if (issueCoreResponse !== undefined) return issueCoreResponse;
 
   const channelReplyResultResponse = await handleChannelReplyResultRoute({
     request,

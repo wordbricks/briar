@@ -266,6 +266,13 @@ export async function recordHuntEvent(
   db: D1Database,
   projectId: string,
   input: HuntEventInput,
+  options: {
+    newRunId?: string;
+    additionalStatements?: (context: {
+      runId: string;
+      recordedAt: string;
+    }) => readonly D1PreparedStatement[];
+  } = {},
 ) {
   const normalizedInput = {
     ...input,
@@ -362,8 +369,7 @@ export async function recordHuntEvent(
     }
   }
 
-  const runId =
-    existingRun?.id ??
+  const runId = existingRun?.id ?? options.newRunId ??
     (await digestRunId(
       projectId,
       normalizedInput.source,
@@ -637,6 +643,7 @@ export async function recordHuntEvent(
               projectId,
             ),
         ]),
+    ...(options.additionalStatements?.({ runId, recordedAt }) ?? []),
   ]);
 
   if (

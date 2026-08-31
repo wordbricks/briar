@@ -1,192 +1,363 @@
+import { create } from "@bufbuild/protobuf";
+import { UploadFileMetadataSchema } from "@briar/contracts/gen/briar/types/v1/upload_pb";
+import { createHash } from "node:crypto";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
-  create,
-  toBinary,
-  type DescMessage,
-} from "@bufbuild/protobuf";
+  prepareCreateIssueAttachmentsApplication,
+  prepareUpdateIssueAttachmentsApplication,
+} from "./issue-attachment-upload-application";
 import {
-  IssueDifficulty,
-  RunStatus,
-} from "@briar/contracts/gen/briar/app/v1/common_pb";
+  createProjectIssue,
+  updateProjectIssue,
+} from "./issue-core-routes";
+import { getHuntRunForProject, listIssueAttachments } from "./db";
+import { updateIssueMutationStatements } from "./issue-create-update-repository";
 import {
-  CreateIssueMessageRequestSchema,
-  CreateIssueRequestSchema,
-  UpdateIssueRequestSchema,
-} from "@briar/contracts/gen/briar/app/v1/issue_pb";
-import { describe, expect, it } from "vitest";
+  decodeIssueInput,
+  decodeIssueUpdateInput,
+} from "./issue-request-contract";
+import { uploadReservedFileApplication } from "./upload-application";
 import {
-  readIssueMessageRequest,
-  readIssueRequest,
-  readIssueUpdateRequest,
-} from "./request-readers";
+  createIsolatedTestDatabase,
+  type IsolatedTestDatabase,
+} from "./test-helpers/d1";
 
-const projectId = "11111111-1111-4111-8111-111111111111";
-const otherProjectId = "22222222-2222-4222-8222-222222222222";
-const runId = "33333333-3333-4333-8333-333333333333";
-const messageId = "66666666-6666-4666-8666-666666666666";
-const parentMessageId = "77777777-7777-4777-8777-777777777777";
-const agentId = "88888888-8888-4888-8888-888888888888";
-const attachmentReference = "99999999-9999-4999-8999-999999999999";
-const keptAttachmentId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const organizationId = "a7100000-0000-4000-8000-000000000001";
+const projectId = "b7100000-0000-4000-8000-000000000001";
+const ownerId = "issue-attachment-owner";
+const signingSecret = "issue-attachment-upload-secret".repeat(4);
 
-function setProtobufRequest<Desc extends DescMessage>(
-  form: FormData,
-  schema: Desc,
-  message: ReturnType<typeof create<Desc>>,
-) {
-  form.set(
-    "request",
-    new File([toBinary(schema, message)], "request.pb", {
-      type: "application/protobuf",
+const digest = (body: ArrayBuffer) =>
+  Uint8Array.from(createHash("sha256").update(new Uint8Array(body)).digest());
+
+describe("issue create and update attachment mutations", () => {
+  let database: IsolatedTestDatabase;
+  let db: D1Database;
+  const objects = new Map<string, ArrayBuffer>();
+  const bucket = {
+    put: vi.fn(async (key: string, value: ArrayBuffer) => {
+      objects.set(key, value.slice(0));
+      return {};
     }),
-  );
-}
+  } as unknown as R2Bucket;
 
-const image = () =>
-  new File(["image"], "screen.png", { type: "image/png" });
-
-const multipartRequest = (form: FormData, method = "POST") =>
-  new Request("https://briar.example/multipart", {
-    method,
-    headers: { "Content-Length": "8192" },
-    body: form,
-  });
-
-describe("protobuf multipart mutation boundary", () => {
-  it("round-trips generated issue, update, and issue-message requests", async () => {
-    const createForm = new FormData();
-    setProtobufRequest(
-      createForm,
-      CreateIssueRequestSchema,
-      create(CreateIssueRequestSchema, {
-        projectId,
-        title: "Screenshot issue",
-        description: "Please inspect the attachment",
-        priority: 2,
-        difficulty: IssueDifficulty.HARD,
-        status: RunStatus.BACKLOG,
-        attachmentReferences: [attachmentReference],
-      }),
-    );
-    createForm.append("attachments", image(), "screen.png");
-    const created = await readIssueRequest(multipartRequest(createForm), {
-      projectId,
+  beforeAll(async () => {
+    database = await createIsolatedTestDatabase({
+      suite: "issue-attachment-mutations",
     });
-    expect(created).toMatchObject({
-      input: {
-        title: "Screenshot issue",
-        description: "Please inspect the attachment",
-        priority: 2,
-        difficulty: "hard",
-        status: "backlog",
-      },
-      attachmentReferences: [attachmentReference],
-    });
-    expect(created.attachments).toEqual([
-      expect.objectContaining({ name: "screen.png", type: "image/png" }),
+    db = database.db;
+    const now = new Date().toISOString();
+    await db.batch([
+      db.prepare(
+        `insert into "user" (
+           id, name, email, emailVerified, createdAt, updatedAt
+         ) values (?, 'Owner', 'issue-owner@example.com', 1, ?, ?)`,
+      ).bind(ownerId, now, now),
+      db.prepare(
+        `insert into briar_organizations (
+           id, name, handle, created_at, updated_at
+         ) values (?, 'Issue Uploads', 'issue-uploads', ?, ?)`,
+      ).bind(organizationId, now, now),
     ]);
+    await db.batch([
+      db.prepare(
+        `insert into briar_organization_members (
+           organization_id, user_id, role, created_at, updated_at
+         ) values (?, ?, 'owner', ?, ?)`,
+      ).bind(organizationId, ownerId, now, now),
+      db.prepare(
+        `insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (?, ?, ?, 'Issue Project', ?, ?, ?)`,
+      ).bind(projectId, ownerId, organizationId, "a".repeat(64), now, now),
+    ]);
+    await db.prepare(
+      `insert into briar_project_settings (
+         project_id, workflow_json, mandatory_checkpoints_json,
+         created_at, updated_at
+       ) values (?, ?, '[]', ?, ?)`,
+    ).bind(projectId, JSON.stringify({
+      version: 2,
+      requirements: [],
+      stages: [{ id: "implementing", label: "Implement", required: true }],
+      execution: { checkpoints: [] },
+      completion: { requiredStages: ["implementing"] },
+    }), now, now).run();
+  }, 60_000);
 
-    const updateForm = new FormData();
-    setProtobufRequest(
-      updateForm,
-      UpdateIssueRequestSchema,
-      create(UpdateIssueRequestSchema, {
-        projectId,
-        runId,
-        title: "Updated issue",
-        description: "Updated description",
-        difficulty: IssueDifficulty.NORMAL,
-        assigneeUpdate: { case: "assigneeUserId", value: "user-1" },
-        attachmentReferences: [attachmentReference],
-        keptAttachmentIds: { values: [keptAttachmentId] },
-      }),
-    );
-    updateForm.append("attachments", image(), "screen.png");
-    const updated = await readIssueUpdateRequest(
-      multipartRequest(updateForm, "PATCH"),
-      { projectId, runId },
-    );
-    expect(updated.input).toMatchObject({
-      title: "Updated issue",
-      difficulty: "normal",
-      assigneeUserId: "user-1",
+  afterAll(async () => database.dispose());
+
+  const prepareAndUpload = async (input: {
+    purpose: "create" | "update";
+    mutationId: string;
+    runId?: string;
+    filename: string;
+  }) => {
+    const body = new TextEncoder().encode(`bytes:${input.filename}`).buffer;
+    const request = {
+      db,
+      signingSecret,
+      projectId,
+      userId: ownerId,
+      preparationRequestId: crypto.randomUUID(),
+      mutationId: input.mutationId,
+      attachments: [create(UploadFileMetadataSchema, {
+        clientId: crypto.randomUUID(),
+        filename: input.filename,
+        contentType: "image/png",
+        byteSize: BigInt(body.byteLength),
+        sha256: digest(body),
+      })],
+    };
+    const prepared = input.purpose === "create"
+      ? await prepareCreateIssueAttachmentsApplication(request)
+      : await prepareUpdateIssueAttachmentsApplication({
+        ...request,
+        runId: input.runId!,
+      });
+    const upload = prepared.uploads[0]!;
+    await uploadReservedFileApplication({
+      db,
+      bucket,
+      signingSecret,
+      uploadId: upload.uploadId,
+      capability: upload.uploadCapability,
+      contentType: "image/png",
+      body,
     });
-    expect(updated.keptAttachmentIds).toEqual([keptAttachmentId]);
+    return upload.uploadId;
+  };
 
-    const body = `Screenshot\n\n![screen.png](briar-attachment://${attachmentReference})`;
-    const issueMessageForm = new FormData();
-    setProtobufRequest(
-      issueMessageForm,
-      CreateIssueMessageRequestSchema,
-      create(CreateIssueMessageRequestSchema, {
-        projectId,
-        runId,
-        clientMessageId: messageId.toUpperCase(),
-        body,
-        parentMessageId,
-        mentionedUserIds: ["user-1"],
-        mentionedAgentIds: [agentId.toUpperCase()],
-        attachmentReferences: [attachmentReference],
-      }),
-    );
-    issueMessageForm.append("attachments", image(), "screen.png");
-    const issueMessage = await readIssueMessageRequest(
-      multipartRequest(issueMessageForm),
-      { projectId, runId },
-    );
-    expect(issueMessage.input).toMatchObject({
-      clientMessageId: messageId,
-      parentMessageId,
-      mentionedUserIds: ["user-1"],
-      mentionedAgentIds: [agentId],
+  it("creates the canonical run, consumes its upload once, and exactly replays", async () => {
+    const clientIssueId = crypto.randomUUID();
+    const uploadId = await prepareAndUpload({
+      purpose: "create",
+      mutationId: clientIssueId,
+      filename: "create.png",
     });
+    const request = decodeIssueInput({
+      title: "Prepared create",
+      description: `![create](briar-attachment://${uploadId})`,
+      status: "backlog",
+      checkpoints: [],
+      fullAuto: false,
+    });
+    const input = {
+      db,
+      projectId,
+      userId: ownerId,
+      clientIssueId,
+      request,
+      attachmentIds: [uploadId],
+    };
 
+    const created = await createProjectIssue(input);
+    expect(created).toMatchObject({
+      runId: clientIssueId,
+      attachments: [{ id: uploadId }],
+    });
+    await expect(createProjectIssue(input)).resolves.toEqual(created);
+    await expect(createProjectIssue({
+      ...input,
+      request: decodeIssueInput({ ...request, title: "Changed retry" }),
+    })).rejects.toMatchObject({ status: 409 });
+
+    const stored = await db.prepare(
+      `select run.id, upload.consumer_kind, upload.consumer_id
+       from briar_hunt_runs run
+       join briar_uploads upload on upload.upload_id = ?
+       where run.id = ?`,
+    ).bind(uploadId, clientIssueId).first<{
+      id: string;
+      consumer_kind: string;
+      consumer_id: string;
+    }>();
+    expect(stored).toEqual({
+      id: clientIssueId,
+      consumer_kind: "issue_create",
+      consumer_id: clientIssueId,
+    });
   });
 
-  it("rejects path identity mismatches before application mutation", async () => {
-    const form = new FormData();
-    setProtobufRequest(
-      form,
-      CreateIssueRequestSchema,
-      create(CreateIssueRequestSchema, {
-        projectId,
-        title: "Wrong project",
-        status: RunStatus.QUEUED,
+  it("updates an exact attachment snapshot and durably queues removed bytes", async () => {
+    const clientIssueId = crypto.randomUUID();
+    const originalUploadId = await prepareAndUpload({
+      purpose: "create",
+      mutationId: clientIssueId,
+      filename: "original.png",
+    });
+    const created = await createProjectIssue({
+      db,
+      projectId,
+      userId: ownerId,
+      clientIssueId,
+      request: decodeIssueInput({
+        title: "Before update",
+        description: `![original](briar-attachment://${originalUploadId})`,
+        status: "queued",
+        checkpoints: [],
+        fullAuto: false,
       }),
-    );
-    form.append("attachments", image(), "screen.png");
+      attachmentIds: [originalUploadId],
+    });
+    const requestId = crypto.randomUUID();
+    const replacementUploadId = await prepareAndUpload({
+      purpose: "update",
+      mutationId: requestId,
+      runId: created.runId,
+      filename: "replacement.png",
+    });
+    const request = decodeIssueUpdateInput({
+      title: "After update",
+      description: `![replacement](briar-attachment://${replacementUploadId})`,
+      priority: 2,
+      difficulty: "hard",
+      assigneeUserId: null,
+    });
+    const input = {
+      db,
+      projectId,
+      runId: created.runId,
+      userId: ownerId,
+      requestId,
+      request,
+      keptAttachmentIds: [],
+      attachmentIds: [replacementUploadId],
+    };
 
-    await expect(
-      readIssueRequest(multipartRequest(form), { projectId: otherProjectId }),
-    ).rejects.toMatchObject({
-      status: 400,
-      message: "Multipart project ID does not match the request path",
+    const updated = await updateProjectIssue(input);
+    expect(updated).toMatchObject({
+      runId: created.runId,
+      title: "After update",
+      attachments: [{ id: replacementUploadId }],
+    });
+    await expect(updateProjectIssue(input)).resolves.toEqual(updated);
+    await expect(updateProjectIssue({
+      ...input,
+      request: decodeIssueUpdateInput({ ...request, title: "Changed retry" }),
+    })).rejects.toMatchObject({ status: 409 });
+
+    const cleanup = await db.prepare(
+      `select queue.object_key
+       from briar_upload_cleanup_queue queue
+       join briar_uploads upload on upload.object_key = queue.object_key
+       where upload.upload_id = ?`,
+    ).bind(originalUploadId).first<{ object_key: string }>();
+    expect(cleanup?.object_key).toContain(originalUploadId);
+    expect(await db.prepare(
+      `select id from briar_issue_attachments where id = ?`,
+    ).bind(originalUploadId).first()).toBeNull();
+
+    await expect(updateProjectIssue({
+      ...input,
+      requestId: crypto.randomUUID(),
+      attachmentIds: [],
+      keptAttachmentIds: [crypto.randomUUID()],
+    })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("leaves no aggregate when an upload belongs to another mutation", async () => {
+    const reservedFor = crypto.randomUUID();
+    const uploadId = await prepareAndUpload({
+      purpose: "create",
+      mutationId: reservedFor,
+      filename: "scoped.png",
+    });
+    const attemptedId = crypto.randomUUID();
+    await expect(createProjectIssue({
+      db,
+      projectId,
+      userId: ownerId,
+      clientIssueId: attemptedId,
+      request: decodeIssueInput({
+        title: "Wrong scope",
+        description: `![scoped](briar-attachment://${uploadId})`,
+        status: "backlog",
+        checkpoints: [],
+        fullAuto: false,
+      }),
+      attachmentIds: [uploadId],
+    })).rejects.toMatchObject({ status: 409 });
+
+    expect(await db.prepare(
+      `select id from briar_hunt_runs where id = ?`,
+    ).bind(attemptedId).first()).toBeNull();
+    expect(await db.prepare(
+      `select client_issue_id from briar_issue_create_mutation_receipts
+       where client_issue_id = ?`,
+    ).bind(attemptedId).first()).toBeNull();
+    expect(await db.prepare(
+      `select consumed_at from briar_uploads where upload_id = ?`,
+    ).bind(uploadId).first<{ consumed_at: string | null }>()).toEqual({
+      consumed_at: null,
     });
   });
 
-  it("requires the generated protobuf request part and rejects unknown enums", async () => {
-    const missing = new FormData();
-    missing.append("attachments", image(), "screen.png");
-    await expect(
-      readIssueRequest(multipartRequest(missing), { projectId }),
-    ).rejects.toMatchObject({
-      status: 400,
-      message: "Multipart issue protobuf request is required",
+  it("rolls back every update statement when the exact snapshot guard misses", async () => {
+    const clientIssueId = crypto.randomUUID();
+    const uploadId = await prepareAndUpload({
+      purpose: "create",
+      mutationId: clientIssueId,
+      filename: "guarded.png",
+    });
+    await createProjectIssue({
+      db,
+      projectId,
+      userId: ownerId,
+      clientIssueId,
+      request: decodeIssueInput({
+        title: "Guarded original",
+        description: `![guarded](briar-attachment://${uploadId})`,
+        status: "queued",
+        checkpoints: [],
+        fullAuto: false,
+      }),
+      attachmentIds: [uploadId],
+    });
+    const run = (await getHuntRunForProject(db, projectId, clientIssueId))!;
+    const attachments = await listIssueAttachments(db, projectId, clientIssueId);
+    const requestId = crypto.randomUUID();
+    const updatedAt = new Date(Date.parse(run.updated_at) + 1_000).toISOString();
+    const statements = updateIssueMutationStatements(db, {
+      organizationId,
+      projectId,
+      runId: clientIssueId,
+      userId: ownerId,
+      requestId,
+      requestHash: "b".repeat(64),
+      title: "Must roll back",
+      description: null,
+      priority: null,
+      difficulty: null,
+      assigneeUserId: null,
+      previousUpdatedAt: "2000-01-01T00:00:00.000Z",
+      updatedAt,
+      previousAttachmentIds: attachments.map(({ id }) => id),
+      keptAttachments: [],
+      newUploads: [],
+      removedAttachments: attachments,
+      responseJson: JSON.stringify({ runId: clientIssueId }),
     });
 
-    const unknown = new FormData();
-    setProtobufRequest(
-      unknown,
-      CreateIssueRequestSchema,
-      create(CreateIssueRequestSchema, {
-        projectId,
-        title: "Unknown status",
-        status: 99 as RunStatus,
-      }),
-    );
-    unknown.append("attachments", image(), "screen.png");
-    await expect(
-      readIssueRequest(multipartRequest(unknown), { projectId }),
-    ).rejects.toMatchObject({ status: 400, message: "Unknown run status" });
+    await expect(db.batch([
+      statements.update,
+      ...statements.cleanup,
+      ...statements.removals,
+      statements.receipt,
+    ])).rejects.toThrow();
+    expect((await getHuntRunForProject(db, projectId, clientIssueId))?.title)
+      .toBe("Guarded original");
+    expect(await db.prepare(
+      `select id from briar_issue_attachments where id = ?`,
+    ).bind(uploadId).first()).not.toBeNull();
+    expect(await db.prepare(
+      `select object_key from briar_upload_cleanup_queue
+       where batch_request_id = ?`,
+    ).bind(`issue-update:${requestId}`).first()).toBeNull();
+    expect(await db.prepare(
+      `select request_id from briar_issue_update_mutation_receipts
+       where request_id = ?`,
+    ).bind(requestId).first()).toBeNull();
   });
-
 });

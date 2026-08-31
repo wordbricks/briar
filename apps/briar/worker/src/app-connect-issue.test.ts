@@ -116,7 +116,8 @@ describe("app Issue Connect adapter", () => {
         stage: "implement",
         position: "POSITION_AFTER",
       }],
-      attachmentReferences: ["draft-image-1"],
+      clientIssueId: runId,
+      attachments: [{ uploadId: attachmentId.toUpperCase() }],
     }, { createIssue });
 
     expect(response.status).toBe(200);
@@ -124,8 +125,8 @@ describe("app Issue Connect adapter", () => {
     expect(createIssue.mock.calls[0][0]).toMatchObject({
       projectId,
       userId,
-      attachments: [],
-      attachmentReferences: ["draft-image-1"],
+      clientIssueId: runId,
+      attachmentIds: [attachmentId],
       request: {
         status: "backlog",
         checkpoints: [{
@@ -158,15 +159,16 @@ describe("app Issue Connect adapter", () => {
     const cleared = await invokeIssueRpc(IssueService.method.updateIssue, {
       projectId,
       runId,
+      requestId: messageId,
       title: "Updated issue",
       clearAssignee: {},
-      attachmentReferences: [attachmentId],
       keptAttachmentIds: { values: [] },
     }, { updateIssue });
     expect(cleared.status).toBe(200);
     expect(updateIssue.mock.calls[0][0]).toMatchObject({
+      requestId: messageId,
       request: { assigneeUserId: null },
-      attachmentReferences: [attachmentId],
+      attachmentIds: [],
       keptAttachmentIds: [],
     });
     expect(await cleared.json()).toMatchObject({
@@ -176,6 +178,7 @@ describe("app Issue Connect adapter", () => {
     const unchanged = await invokeIssueRpc(IssueService.method.updateIssue, {
       projectId,
       runId,
+      requestId: proposalId,
       title: "Updated issue",
     }, { updateIssue });
     expect(unchanged.status).toBe(200);
