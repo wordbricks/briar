@@ -9,7 +9,7 @@ automatic learning or end-to-end recall is complete.
 | 1 | Versioned storage, ownership, CRUD/export, desktop/Android/iOS management | [#1497](https://github.com/wordbricks/briar/pull/1497), merged |
 | 2 | Chunking, durable indexing, Vectorize search, briefs, purge lifecycle | [#1499](https://github.com/wordbricks/briar/pull/1499), merged |
 | 3 | Worker capability, DM lookup loop, provider session fencing, citations | [#1500](https://github.com/wordbricks/briar/pull/1500), merged |
-| 4 | Durable learning claims, proposals, independent verification, consolidation, evaluations | In progress on `codex/dm-memory-learning` |
+| 4 | Durable learning claims, proposals, independent verification, consolidation, release gates | [#1501](https://github.com/wordbricks/briar/pull/1501), under review |
 
 Keep automatic learning disabled until its runtime, budgets and evaluation pass.
 Do not advertise recall before PR 3 connects the DM execution path. Use synthetic
