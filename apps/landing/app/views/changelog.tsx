@@ -30,6 +30,22 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.176",
+        date: "2026년 8월 31일",
+        title: "팀과 프로젝트 계층을 세우고 이슈 작업 흐름을 더 안정화합니다",
+        summary:
+          "Workspace → Team → Project → Issue 계층을 도입하고, 프로퍼티 편집·채널 Agent 실행·접힌 사이드바의 DM 사용성을 함께 다듬었습니다.",
+        items: [
+          "기존 실행 Project를 Team으로 유지하면서 Team 안에 여러 planning Project를 만들고 모든 이슈를 하나의 Project에 배정할 수 있습니다.",
+          "기존 데이터에는 Team별 General Project와 이슈 관계를 자동으로 채워 새 계층으로 안전하게 이전합니다.",
+          "데스크톱에서 Project를 생성·수정·완료·보관하고 이슈를 같은 Team의 다른 Project로 이동할 수 있습니다.",
+          "이슈 Properties 패널에서 상태, 우선순위, 난이도, 담당자, Project, 프로바이더, 모델, effort를 바로 검색하고 변경할 수 있습니다.",
+          "CLI와 iOS Companion이 새 Team·Project 탐색, 생성, 이동 계약을 지원합니다.",
+          "잘못된 채널 답장 claim을 즉시 실패로 보고해 15분 lease 만료를 기다리지 않고 안전하게 재시도합니다.",
+          "사이드바를 접었을 때 macOS 창 제어 영역과 DM 도구 모음이 겹치지 않도록 여백을 유지합니다.",
+        ],
+      },
+      {
         version: "1.2.175",
         date: "2026년 8월 31일",
         title: "이슈 작업을 찾고 관리형 컴퓨터를 더 안전하게 관리합니다",
@@ -1349,6 +1365,22 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.176",
+        date: "August 31, 2026",
+        title: "Add Team and Project hierarchy and stabilize issue workflows",
+        summary:
+          "Introduce a Workspace → Team → Project → Issue hierarchy while refining property editing, channel Agent execution, and collapsed-sidebar DM usability.",
+        items: [
+          "Keep existing execution Projects as Teams, create multiple planning Projects inside each Team, and assign every issue to exactly one Project.",
+          "Migrate existing data safely by backfilling a General Project and issue relationships for every Team.",
+          "Create, edit, complete, and archive Projects from desktop, then move issues between Projects in the same Team.",
+          "Search and change status, priority, difficulty, assignee, Project, provider, model, and effort directly from the issue Properties panel.",
+          "Support the new Team and Project browsing, creation, and movement contracts in the CLI and iOS Companion.",
+          "Report invalid channel-reply claims immediately so they retry safely without waiting for a 15-minute lease to expire.",
+          "Keep the DM toolbar clear of macOS window controls when the sidebar is collapsed.",
+        ],
+      },
       {
         version: "1.2.175",
         date: "August 31, 2026",
@@ -2760,7 +2792,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-175">
+          <a href="#v1-2-176">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2782,7 +2814,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.175"
+                      entry.version === "1.2.176"
+                        ? "2026-08-31"
+                        : entry.version === "1.2.175"
                         ? "2026-08-31"
                         : entry.version === "1.2.174"
                         ? "2026-08-31"
