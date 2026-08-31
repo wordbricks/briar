@@ -10,6 +10,7 @@ import {
   issueTitleAbsoluteMaxLength,
   issueTitleOverLimitMessage,
 } from "../src/lib/issue-title";
+import { issueDifficulties } from "../src/lib/issue-difficulty";
 import { EvidenceType, WorkflowStageId } from "./config-contract";
 
 const mutableArray = <S extends Schema.Top>(item: S) =>
@@ -91,6 +92,61 @@ export const CreateIssueInput = Schema.Struct({
 });
 export type CreateIssueInput = typeof CreateIssueInput.Type;
 export const decodeCreateIssueInput = Schema.decodeUnknownSync(CreateIssueInput);
+
+const IssueDescription = Schema.NullOr(
+  Schema.Trim.check(Schema.isMaxLength(100_000)),
+);
+const IssuePriority = Schema.NullOr(
+  Schema.Int.check(
+    Schema.isGreaterThanOrEqualTo(1),
+    Schema.isLessThanOrEqualTo(4, { message: "Too big" }),
+  ),
+);
+const IssueDifficulty = Schema.NullOr(Schema.Literals(issueDifficulties));
+const IssueAssigneeUserId = Schema.NullOr(
+  Schema.Trim.check(Schema.isLengthBetween(1, 200)),
+);
+
+export const IssueUpdateChanges = Schema.Struct({
+  title: Schema.optional(IssueTitle),
+  description: Schema.optional(IssueDescription),
+  priority: Schema.optional(IssuePriority),
+  difficulty: Schema.optional(IssueDifficulty),
+  assigneeUserId: Schema.optional(IssueAssigneeUserId),
+}).check(
+  Schema.makeFilter((changes) =>
+    Object.keys(changes).length > 0
+      ? undefined
+      : "At least one issue change is required"
+  ),
+);
+export type IssueUpdateChanges = typeof IssueUpdateChanges.Type;
+export const decodeIssueUpdateChanges = Schema.decodeUnknownSync(
+  IssueUpdateChanges,
+);
+
+export const IssueUpdateInput = Schema.Struct({
+  title: IssueTitle,
+  description: IssueDescription,
+  priority: IssuePriority,
+  difficulty: IssueDifficulty,
+  assigneeUserId: IssueAssigneeUserId,
+});
+export type IssueUpdateInput = typeof IssueUpdateInput.Type;
+export const decodeIssueUpdateInput = Schema.decodeUnknownSync(IssueUpdateInput);
+
+const IssueUpdateDashboardRun = Schema.Struct({
+  id: Uuid,
+  title: IssueTitle,
+  issueDescription: IssueDescription,
+  priority: IssuePriority,
+  difficulty: IssueDifficulty,
+  assigneeUserId: IssueAssigneeUserId,
+});
+const IssueUpdateDashboardRuns = mutableArray(IssueUpdateDashboardRun);
+export const decodeIssueUpdateDashboardRuns = Schema.decodeUnknownSync(
+  IssueUpdateDashboardRuns,
+);
 
 export const ChannelMessagesInput = Schema.Struct({
   channelId: Uuid,
