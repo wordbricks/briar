@@ -13,6 +13,7 @@ import {
   registerAppAgentService,
   type AppConnectAgentServices,
 } from "./app-connect-agent";
+import { encodeStoredProjectAgentSessionSummary } from "./project-request-contract";
 import { requireConnectHandler } from "./test-helpers/connect";
 
 const repositoryMocks = {
@@ -81,7 +82,7 @@ describe("app Agent Connect adapter", () => {
       session_id: sessionId,
       archived: 0,
       updated_at: "2026-08-30T02:03:04.000Z",
-      summary_json: JSON.stringify({
+      summary_json: encodeStoredProjectAgentSessionSummary({
         dispatchGroupId: sessionId,
         agentId,
         agentName: "Planner",
@@ -103,11 +104,12 @@ describe("app Agent Connect adapter", () => {
         }],
         startedAt: "2026-08-30T02:03:00.000Z",
         completedAt: null,
+        summary: null,
+        error: null,
         requestedWorkerId: "worker-1",
         workerId: "worker-1",
         updatedAt: "2026-08-30T02:03:04.000Z",
         requestedByUserId: userId,
-        inboxVersion: "ignored-server-projection",
       }),
     }]);
     repositoryMocks.getTranscript.mockResolvedValue({

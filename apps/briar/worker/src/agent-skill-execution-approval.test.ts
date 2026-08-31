@@ -48,6 +48,8 @@ import {
   registerExecutionWorker,
   updateProjectExecutionWorkerPolicy,
 } from "./workers";
+import { encodeApprovedProjectAgentTaskSession } from "./project-agent-session-materialization";
+import { decodeStoredProjectAgentSessionPayload } from "./project-request-contract";
 
 const organizationId = "91000000-0000-4000-8000-000000000001";
 const projectId = "92000000-0000-4000-8000-000000000001";
@@ -150,6 +152,23 @@ const backlogEvent = (
   stagingQaDetail: null,
   productionQaDetail: null,
   context: null,
+});
+
+const materializedSessionPayloadJson = (input: {
+  proposal: AgentSkillExecutionProposalRow;
+  workerId: string;
+  userId: string;
+  sessionId: string;
+  acceptedAt: string;
+}) => encodeApprovedProjectAgentTaskSession({
+  sessionId: input.sessionId,
+  agentId: input.proposal.agent_id,
+  agentName: input.proposal.agent_name,
+  skillId: input.proposal.skill_id,
+  request: input.proposal.request,
+  workerId: input.workerId,
+  requestedByUserId: input.userId,
+  acceptedAt: input.acceptedAt,
 });
 
 describe("conversational Agent Skill execution approval", () => {
@@ -531,6 +550,14 @@ describe("conversational Agent Skill execution approval", () => {
     return row?.count ?? 0;
   };
 
+  const transientSessionPayload = (proposalId: string) =>
+    db.prepare(
+      `select materialized_session_payload_json
+       from briar_agent_skill_execution_proposals where id = ?`,
+    ).bind(proposalId).first<string | null>(
+      "materialized_session_payload_json",
+    );
+
   it("materializes one exact issue task/session/audit only after approval", async () => {
     const seeded = await seedIssueProposal("issue_processing");
     const before = {
@@ -556,6 +583,8 @@ describe("conversational Agent Skill execution approval", () => {
       sessions: await tableCount("briar_project_agent_sessions"),
       audits: await tableCount("briar_agent_skill_execution_approval_audit"),
     }).toEqual(before);
+    const nonMemberSessionId = crypto.randomUUID();
+    const nonMemberAcceptedAt = new Date().toISOString();
     await expect(acceptAgentSkillExecutionProposal(db, {
       proposalId: seeded.proposal.id,
       sourceKind: "issue",
@@ -566,9 +595,18 @@ describe("conversational Agent Skill execution approval", () => {
       userId: ownerId,
       workerId: nonMemberWorkerId,
       workerLabel: "Skill Worker non-member",
-      resultSessionId: crypto.randomUUID(),
-      acceptedAt: new Date().toISOString(),
+      resultSessionId: nonMemberSessionId,
+      materializedSessionPayloadJson: materializedSessionPayloadJson({
+        proposal: seeded.proposal,
+        workerId: nonMemberWorkerId,
+        userId: ownerId,
+        sessionId: nonMemberSessionId,
+        acceptedAt: nonMemberAcceptedAt,
+      }),
+      acceptedAt: nonMemberAcceptedAt,
     })).rejects.toThrow(/proposal is stale/u);
+    await expect(transientSessionPayload(seeded.proposal.id))
+      .resolves.toBeNull();
 
     const staleDeviceWorker = await acceptIssue(
       seeded.runId,
@@ -581,6 +619,8 @@ describe("conversational Agent Skill execution approval", () => {
       code: "failed_precondition",
       message: "Worker device is not online",
     });
+    const staleSessionId = crypto.randomUUID();
+    const staleAcceptedAt = new Date().toISOString();
     await expect(acceptAgentSkillExecutionProposal(db, {
       proposalId: seeded.proposal.id,
       sourceKind: "issue",
@@ -591,8 +631,15 @@ describe("conversational Agent Skill execution approval", () => {
       userId: ownerId,
       workerId: staleDeviceWorkerId,
       workerLabel: "Stale device Worker",
-      resultSessionId: crypto.randomUUID(),
-      acceptedAt: new Date().toISOString(),
+      resultSessionId: staleSessionId,
+      materializedSessionPayloadJson: materializedSessionPayloadJson({
+        proposal: seeded.proposal,
+        workerId: staleDeviceWorkerId,
+        userId: ownerId,
+        sessionId: staleSessionId,
+        acceptedAt: staleAcceptedAt,
+      }),
+      acceptedAt: staleAcceptedAt,
     })).rejects.toThrow(/proposal is stale/u);
     expect({
       tasks: await tableCount("briar_project_agent_task_jobs"),
@@ -608,6 +655,38 @@ describe("conversational Agent Skill execution approval", () => {
     );
     expect(whitespace.status).toBe(400);
     expect(await tableCount("briar_project_agent_task_jobs")).toBe(0);
+
+    const mismatchedSessionId = crypto.randomUUID();
+    const mismatchedAcceptedAt = new Date().toISOString();
+    const mismatchedPayload = JSON.parse(materializedSessionPayloadJson({
+      proposal: seeded.proposal,
+      workerId,
+      userId: ownerId,
+      sessionId: mismatchedSessionId,
+      acceptedAt: mismatchedAcceptedAt,
+    })) as Record<string, unknown>;
+    mismatchedPayload.workerId = otherWorkerId;
+    await expect(acceptAgentSkillExecutionProposal(db, {
+      proposalId: seeded.proposal.id,
+      sourceKind: "issue",
+      organizationId,
+      projectId,
+      channelId: null,
+      conversationRunId: seeded.runId,
+      userId: ownerId,
+      workerId,
+      workerLabel: "Skill Worker one",
+      resultSessionId: mismatchedSessionId,
+      materializedSessionPayloadJson: JSON.stringify(mismatchedPayload),
+      acceptedAt: mismatchedAcceptedAt,
+    })).rejects.toThrow(/invalid materialized Agent Skill session payload/iu);
+    await expect(transientSessionPayload(seeded.proposal.id))
+      .resolves.toBeNull();
+    expect({
+      tasks: await tableCount("briar_project_agent_task_jobs"),
+      sessions: await tableCount("briar_project_agent_sessions"),
+      audits: await tableCount("briar_agent_skill_execution_approval_audit"),
+    }).toEqual(before);
 
     const accepted = await acceptIssue(seeded.runId, seeded.proposal.id);
     expect(accepted.status).toBe(200);
@@ -636,6 +715,8 @@ describe("conversational Agent Skill execution approval", () => {
     expect(await tableCount("briar_project_agent_task_jobs")).toBe(1);
     expect(await tableCount("briar_project_agent_sessions")).toBe(1);
     expect(await tableCount("briar_agent_skill_execution_approval_audit")).toBe(1);
+    await expect(transientSessionPayload(seeded.proposal.id))
+      .resolves.toBeNull();
     await expect(
       agentClient.getProjectAgentSession(
         {
@@ -719,13 +800,14 @@ describe("conversational Agent Skill execution approval", () => {
       status: "completed",
       requested_by_user_id: ownerId,
     });
-    expect(JSON.parse(session!.payload_json)).toMatchObject({
-      status: "completed",
-      summary: "Release workflow completed.",
-      conversationId: "conversation-approved-task",
-      workerId,
-      requestedByUserId: ownerId,
-    });
+    expect(decodeStoredProjectAgentSessionPayload(session!.payload_json))
+      .toMatchObject({
+        status: "completed",
+        summary: "Release workflow completed.",
+        conversationId: "conversation-approved-task",
+        workerId,
+        requestedByUserId: ownerId,
+      });
     expect(completedBody).toEqual({});
     const publishedIssueResult = await db.prepare(
       `select proposal.result_message_id, message.body
@@ -808,8 +890,8 @@ describe("conversational Agent Skill execution approval", () => {
     });
   }, 60_000);
 
-  it("creates and approves the same canonical card from a channel", async () => {
-    const agent = await createAgent();
+  it("materializes invocation-consent task sessions from a channel", async () => {
+    const agent = await createAgent("custom", "task", "invoke_is_consent");
     await addChannelAgent(db, {
       channelId,
       agentId: agent.id,
@@ -878,39 +960,22 @@ describe("conversational Agent Skill execution approval", () => {
        where source_kind = 'channel' and source_reply_job_id = ?`,
     ).bind(queued.id).first<AgentSkillExecutionProposalRow>();
     expect(proposal).toMatchObject({
-      status: "pending",
+      status: "accepted",
       project_id: projectId,
       agent_id: agent.id,
       skill_id: agent.skills[0].id,
       request,
+      requested_worker_id: workerId,
+      accepted_by_user_id: ownerId,
     });
+    expect(proposal!.result_session_id).not.toBeNull();
+    await expect(transientSessionPayload(proposal!.id)).resolves.toBeNull();
     const message = await getChannelMessage(db, channelId, queued.reply_message_id);
     expect(message?.skillExecutionProposal).toMatchObject({
       id: proposal!.id,
       type: "request_agent_skill_execute",
-      status: "pending",
+      status: "accepted",
       request,
-    });
-
-    const responseBody = await acceptOrganizationChannelSkillExecutionProposal({
-      db,
-      env: env(),
-      organizationId,
-      channelId,
-      proposalId: proposal!.id,
-      userId: ownerId,
-      request: { workerId },
-    });
-    expect(responseBody).toMatchObject({
-      outcome: "accepted",
-      proposal: { id: proposal!.id, requestedWorkerId: workerId },
-      session: {
-        projectId,
-        agentId: agent.id,
-        skillId: agent.skills[0].id,
-        request,
-        workerId,
-      },
     });
     const taskClaimToken = "briar_agent_task_claim_channel_approved_task";
     const taskClaimHash = sha256(taskClaimToken);
@@ -920,7 +985,7 @@ describe("conversational Agent Skill execution approval", () => {
       claimedAt: new Date().toISOString(),
       leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
     });
-    expect(task?.id).toBe(responseBody.proposal.resultSessionId);
+    expect(task?.id).toBe(proposal!.result_session_id);
     expect((await completeTask(task!.id, taskClaimToken, {
       summary: "Channel Skill completed.",
       conversationId: null,

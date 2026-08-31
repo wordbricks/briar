@@ -116,7 +116,10 @@ import { registerExecutionWorker } from "./workers";
 import apiWorker from "./index";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { encryptSlackToken } from "./slack";
-import type { StoredProjectAgentSessionPayload } from "./project-request-contract";
+import {
+  decodeStoredProjectAgentSessionSummary,
+  type StoredProjectAgentSessionPayload,
+} from "./project-request-contract";
 import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
 import { workerRuntimeMetadataFixture } from "./test-helpers/worker-runtime";
 
@@ -1410,10 +1413,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       [sessionId],
       "owner",
     );
-    expect(JSON.parse(summary!.summary_json)).toMatchObject({
+    expect(decodeStoredProjectAgentSessionSummary(summary!.summary_json))
+      .toMatchObject({
       requestedByUserId: "owner",
       status: "completed",
-    });
+      });
   });
 
   it("pins a direct Agent task to the selected Worker through completion", async () => {
