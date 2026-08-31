@@ -21,7 +21,7 @@
 
 1. `/opt/briar/bin/briar` CLI와 여섯 provider runner bundle. `/opt/briar/bin`에는 버전이 고정된 Bun·Node.js·Rust(`rustfmt`, `clippy`)·`cargo-audit`·`gitleaks`, Codex·Claude·Cursor Agent·Grok·Antigravity·OpenCode CLI와 `agent-browser`를 설치한다. OpenRouter는 같은 OpenCode 실행파일을 사용한다. 로그인 terminal과 managed Worker 모두 이 경로와 같은 `CARGO_HOME`·`RUSTUP_HOME`을 사용한다.
 2. 승인 시점의 AWS Systems Manager Agent(`amazon-ssm-agent`). 버전과 설치 파일 SHA-256은 `image-lock.env`에 함께 고정한다.
-3. 비특권 `briar` 사용자와 XFCE, 실제 Google Chrome, TigerVNC, D-Bus, C/C++ build toolchain과 Noto CJK 글꼴. GitHub CLI는 기본 이미지 요구사항이 아니다. XFCE Terminal은 Korean glyph를 포함하는 `Noto Sans Mono CJK KR`을 기본으로 사용한다. `remote-desktop-packages.txt`의 각 Debian 패키지는 승인된 Debian 13 snapshot에서 `resolve-remote-desktop-packages`로 정확한 `package=version` lock을 만든 후 설치한다.
+3. sudo 관리자 권한이 있는 `briar` 사용자와 XFCE, 실제 Google Chrome, TigerVNC, D-Bus, C/C++ build toolchain과 Noto CJK 글꼴. GitHub CLI는 기본 이미지 요구사항이 아니다. XFCE Terminal은 Korean glyph를 포함하는 `Noto Sans Mono CJK KR`을 기본으로 사용한다. `remote-desktop-packages.txt`의 각 Debian 패키지는 승인된 Debian 13 snapshot에서 `resolve-remote-desktop-packages`로 정확한 `package=version` lock을 만든 후 설치한다.
 4. `briar-managed-computer.target`과 health timer를 설치하고 부팅 대상으로 활성화한다. target이 enrollment, signed runtime updater, Worker supervisor, loopback 원격 데스크톱과 outbound 원격 세션 서비스를 순서대로 묶는다. 개별 서비스는 target이 관리하므로 각각을 별도 multi-user 부팅 링크로 활성화하지 않는다. Worker supervisor는 `/var/lib/briar/worker-credential.json`의 machine credential을 값으로 복사하지 않고 파일에서 읽으며, 설정된 각 프로젝트에 Worker 프로세스를 하나씩 유지한다.
 5. `briar managed-computer setup`이 소유자의 사용자 세션과 이미 등록된 machine credential을 짧게 연결한다. 저장소와 provider가 준비되고 heartbeat 건강 검사를 통과하기 전에는 Worker가 `acceptingWork=false`, 동시 실행 수 1을 보고한다.
 
@@ -106,7 +106,7 @@ runtime updater, health 서비스의 기존 제한은 유지한다. 세 사용�
 
 기존 컴퓨터는 새 AMI만 배포해서 바뀌지 않는다. SSM으로 진행 중인 작업이 없는지
 확인한 뒤 sudoers 파일, `verify-managed-admin`, 세 사용자 서비스 unit을 같은 병합
-커밋에서 설치한다. 기존 파일을 백업하고 `visudo --check`와 `systemd-analyze verify`를
+커밋에서 설치한다. 기존 파일을 백업하고 `/usr/sbin/visudo --check`와 `systemd-analyze verify`를
 통과시킨 뒤 daemon-reload하고 해당 서비스만 재시작한다. 적용 중 health timer를
 잠깐 중지했다면 되살리고, 하위 서비스 중지로 함께 내려갈 수 있는
 `briar-managed-computer.target`도 다시 start한 뒤 전체 상태를 검사한다. 재시작 중
