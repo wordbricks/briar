@@ -5471,6 +5471,18 @@ where
     }
 }
 
+///Shorthand for `OwnedView<PrepareCreateIssueAttachmentsRequestView<'static>>`.
+pub type OwnedPrepareCreateIssueAttachmentsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::PrepareCreateIssueAttachmentsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<PrepareIssueAttachmentsResponseView<'static>>`.
+pub type OwnedPrepareIssueAttachmentsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::PrepareIssueAttachmentsResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<CreateIssueRequestView<'static>>`.
 pub type OwnedCreateIssueRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::CreateIssueRequestView<'static>,
@@ -5478,6 +5490,12 @@ pub type OwnedCreateIssueRequestView = ::buffa::view::OwnedView<
 ///Shorthand for `OwnedView<CreateIssueResponseView<'static>>`.
 pub type OwnedCreateIssueResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::CreateIssueResponseView<'static>,
+>;
+///Shorthand for `OwnedView<PrepareUpdateIssueAttachmentsRequestView<'static>>`.
+pub type OwnedPrepareUpdateIssueAttachmentsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::PrepareUpdateIssueAttachmentsRequestView<
+        'static,
+    >,
 >;
 ///Shorthand for `OwnedView<UpdateIssueRequestView<'static>>`.
 pub type OwnedUpdateIssueRequestView = ::buffa::view::OwnedView<
@@ -5635,6 +5653,12 @@ pub type OwnedSyncIssueMessagesRequestView = ::buffa::view::OwnedView<
 pub type OwnedSyncIssueMessagesResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::SyncIssueMessagesResponseView<'static>,
 >;
+///Shorthand for `OwnedView<PrepareIssueMessageAttachmentsRequestView<'static>>`.
+pub type OwnedPrepareIssueMessageAttachmentsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::PrepareIssueMessageAttachmentsRequestView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<CreateIssueMessageRequestView<'static>>`.
 pub type OwnedCreateIssueMessageRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::CreateIssueMessageRequestView<'static>,
@@ -5723,6 +5747,48 @@ pub type OwnedAcceptIssueSkillExecutionProposalResponseView = ::buffa::view::Own
         'static,
     >,
 >;
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::PrepareIssueAttachmentsResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::PrepareIssueAttachmentsResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::PrepareIssueAttachmentsResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::PrepareIssueAttachmentsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateIssueResponse>
 for crate::proto::briar::app::v1::__buffa::view::CreateIssueResponseView<'_> {
     fn encode(
@@ -6725,9 +6791,21 @@ for ::buffa::view::OwnedView<
 }
 /// Full service name for this service.
 pub const ISSUE_SERVICE_SERVICE_NAME: &str = "briar.app.v1.IssueService";
+/// Static [`Spec`](::connectrpc::Spec) for the `PrepareCreateIssueAttachments` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ISSUE_SERVICE_PREPARE_CREATE_ISSUE_ATTACHMENTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.IssueService/PrepareCreateIssueAttachments",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `CreateIssue` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const ISSUE_SERVICE_CREATE_ISSUE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.IssueService/CreateIssue",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `PrepareUpdateIssueAttachments` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ISSUE_SERVICE_PREPARE_UPDATE_ISSUE_ATTACHMENTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.IssueService/PrepareUpdateIssueAttachments",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -6839,6 +6917,12 @@ pub const ISSUE_SERVICE_SYNC_ISSUE_MESSAGES_SPEC: ::connectrpc::Spec = ::connect
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `PrepareIssueMessageAttachments` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ISSUE_SERVICE_PREPARE_ISSUE_MESSAGE_ATTACHMENTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.IssueService/PrepareIssueMessageAttachments",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `CreateIssueMessage` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const ISSUE_SERVICE_CREATE_ISSUE_MESSAGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.IssueService/CreateIssueMessage",
@@ -6944,6 +7028,31 @@ pub const ISSUE_SERVICE_ACCEPT_ISSUE_SKILL_EXECUTION_PROPOSAL_SPEC: ::connectrpc
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait IssueService: Send + Sync + 'static {
+    /// Shared intentionally by the three issue attachment preparation methods.
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+    /// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn prepare_create_issue_attachments<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::PrepareCreateIssueAttachmentsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::PrepareIssueAttachmentsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
     /// Handle the CreateIssue RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -6964,6 +7073,31 @@ pub trait IssueService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::CreateIssueResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Shared intentionally by the three issue attachment preparation methods.
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+    /// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn prepare_update_issue_attachments<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::PrepareUpdateIssueAttachmentsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::PrepareIssueAttachmentsResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -7382,6 +7516,31 @@ pub trait IssueService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// Shared intentionally by the three issue attachment preparation methods.
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+    /// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn prepare_issue_message_attachments<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::PrepareIssueMessageAttachmentsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::PrepareIssueAttachmentsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
     /// Handle the CreateIssueMessage RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -7624,6 +7783,35 @@ impl<S: IssueService> IssueServiceExt for S {
         router
             .route_view(
                 ISSUE_SERVICE_SERVICE_NAME,
+                "PrepareCreateIssueAttachments",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::PrepareCreateIssueAttachmentsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::PrepareCreateIssueAttachmentsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.prepare_create_issue_attachments(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::PrepareIssueAttachmentsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ISSUE_SERVICE_PREPARE_CREATE_ISSUE_ATTACHMENTS_SPEC)
+            .route_view(
+                ISSUE_SERVICE_SERVICE_NAME,
                 "CreateIssue",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -7651,6 +7839,35 @@ impl<S: IssueService> IssueServiceExt for S {
                 },
             )
             .with_spec(ISSUE_SERVICE_CREATE_ISSUE_SPEC)
+            .route_view(
+                ISSUE_SERVICE_SERVICE_NAME,
+                "PrepareUpdateIssueAttachments",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::PrepareUpdateIssueAttachmentsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::PrepareUpdateIssueAttachmentsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.prepare_update_issue_attachments(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::PrepareIssueAttachmentsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ISSUE_SERVICE_PREPARE_UPDATE_ISSUE_ATTACHMENTS_SPEC)
             .route_view(
                 ISSUE_SERVICE_SERVICE_NAME,
                 "UpdateIssue",
@@ -8175,6 +8392,35 @@ impl<S: IssueService> IssueServiceExt for S {
             .with_spec(ISSUE_SERVICE_SYNC_ISSUE_MESSAGES_SPEC)
             .route_view(
                 ISSUE_SERVICE_SERVICE_NAME,
+                "PrepareIssueMessageAttachments",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::PrepareIssueMessageAttachmentsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::PrepareIssueMessageAttachmentsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.prepare_issue_message_attachments(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::PrepareIssueAttachmentsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ISSUE_SERVICE_PREPARE_ISSUE_MESSAGE_ATTACHMENTS_SPEC)
+            .route_view(
+                ISSUE_SERVICE_SERVICE_NAME,
                 "CreateIssueMessage",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -8488,10 +8734,22 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
         let method = path.strip_prefix("briar.app.v1.IssueService/")?;
         match method {
+            "PrepareCreateIssueAttachments" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ISSUE_SERVICE_PREPARE_CREATE_ISSUE_ATTACHMENTS_SPEC),
+                )
+            }
             "CreateIssue" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(ISSUE_SERVICE_CREATE_ISSUE_SPEC),
+                )
+            }
+            "PrepareUpdateIssueAttachments" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ISSUE_SERVICE_PREPARE_UPDATE_ISSUE_ATTACHMENTS_SPEC),
                 )
             }
             "UpdateIssue" => {
@@ -8602,6 +8860,12 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
                         .with_spec(ISSUE_SERVICE_SYNC_ISSUE_MESSAGES_SPEC),
                 )
             }
+            "PrepareIssueMessageAttachments" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ISSUE_SERVICE_PREPARE_ISSUE_MESSAGE_ATTACHMENTS_SPEC),
+                )
+            }
             "CreateIssueMessage" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -8673,6 +8937,28 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
         };
         let _ = (&ctx, &request, &format);
         match method {
+            "PrepareCreateIssueAttachments" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::PrepareCreateIssueAttachmentsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::PrepareCreateIssueAttachmentsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::PrepareCreateIssueAttachmentsRequest,
+                    >::from_parts(&req, &body);
+                    svc.prepare_create_issue_attachments(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::PrepareIssueAttachmentsResponse,
+                        >(format)
+                })
+            }
             "CreateIssue" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -8692,6 +8978,28 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::CreateIssueResponse,
+                        >(format)
+                })
+            }
+            "PrepareUpdateIssueAttachments" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::PrepareUpdateIssueAttachmentsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::PrepareUpdateIssueAttachmentsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::PrepareUpdateIssueAttachmentsRequest,
+                    >::from_parts(&req, &body);
+                    svc.prepare_update_issue_attachments(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::PrepareIssueAttachmentsResponse,
                         >(format)
                 })
             }
@@ -9087,6 +9395,28 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
                         >(format)
                 })
             }
+            "PrepareIssueMessageAttachments" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::PrepareIssueMessageAttachmentsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::PrepareIssueMessageAttachmentsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::PrepareIssueMessageAttachmentsRequest,
+                    >::from_parts(&req, &body);
+                    svc.prepare_issue_message_attachments(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::PrepareIssueAttachmentsResponse,
+                        >(format)
+                })
+            }
             "CreateIssueMessage" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -9352,7 +9682,7 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
 /// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
 ///
 /// let client = IssueServiceClient::new(conn, config);
-/// let response = client.create_issue(request).await?;
+/// let response = client.prepare_create_issue_attachments(request).await?;
 /// ```
 ///
 /// # Example (Connect / HTTP/1.1 or ALPN)
@@ -9364,7 +9694,7 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
 /// let config = ClientConfig::new("http://localhost:8080".parse()?);
 ///
 /// let client = IssueServiceClient::new(http, config);
-/// let response = client.create_issue(request).await?;
+/// let response = client.prepare_create_issue_attachments(request).await?;
 /// ```
 ///
 /// # Working with the response
@@ -9374,7 +9704,7 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.create_issue(request).await?;
+/// let resp = client.prepare_create_issue_attachments(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -9382,7 +9712,7 @@ impl<T: IssueService> ::connectrpc::Dispatcher for IssueServiceServer<T> {
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.create_issue(request).await?.into_owned();
+/// let owned = client.prepare_create_issue_attachments(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -9414,6 +9744,51 @@ where
     /// Get a mutable reference to the client configuration.
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
+    }
+    /// Call the PrepareCreateIssueAttachments RPC. Sends a request to /briar.app.v1.IssueService/PrepareCreateIssueAttachments.
+    pub async fn prepare_create_issue_attachments(
+        &self,
+        request: crate::proto::briar::app::v1::PrepareCreateIssueAttachmentsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::PrepareIssueAttachmentsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.prepare_create_issue_attachments_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the PrepareCreateIssueAttachments RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn prepare_create_issue_attachments_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::PrepareCreateIssueAttachmentsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::PrepareIssueAttachmentsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ISSUE_SERVICE_PREPARE_CREATE_ISSUE_ATTACHMENTS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
     }
     /// Call the CreateIssue RPC. Sends a request to /briar.app.v1.IssueService/CreateIssue.
     pub async fn create_issue(
@@ -9454,6 +9829,51 @@ where
                 &self.transport,
                 &self.config,
                 ISSUE_SERVICE_CREATE_ISSUE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the PrepareUpdateIssueAttachments RPC. Sends a request to /briar.app.v1.IssueService/PrepareUpdateIssueAttachments.
+    pub async fn prepare_update_issue_attachments(
+        &self,
+        request: crate::proto::briar::app::v1::PrepareUpdateIssueAttachmentsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::PrepareIssueAttachmentsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.prepare_update_issue_attachments_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the PrepareUpdateIssueAttachments RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn prepare_update_issue_attachments_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::PrepareUpdateIssueAttachmentsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::PrepareIssueAttachmentsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ISSUE_SERVICE_PREPARE_UPDATE_ISSUE_ATTACHMENTS_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
@@ -10257,6 +10677,51 @@ where
                 &self.transport,
                 &self.config,
                 ISSUE_SERVICE_SYNC_ISSUE_MESSAGES_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the PrepareIssueMessageAttachments RPC. Sends a request to /briar.app.v1.IssueService/PrepareIssueMessageAttachments.
+    pub async fn prepare_issue_message_attachments(
+        &self,
+        request: crate::proto::briar::app::v1::PrepareIssueMessageAttachmentsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::PrepareIssueAttachmentsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.prepare_issue_message_attachments_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the PrepareIssueMessageAttachments RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn prepare_issue_message_attachments_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::PrepareIssueMessageAttachmentsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::PrepareIssueAttachmentsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ISSUE_SERVICE_PREPARE_ISSUE_MESSAGE_ATTACHMENTS_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

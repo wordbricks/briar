@@ -21,8 +21,12 @@ import SwiftProtobuf
 /// `@unchecked Sendable` conformance to simplify testing and mocking.
 @available(iOS 13, *)
 open class BriarAPI_IssueServiceClientMock: BriarAPI_IssueServiceClientInterface, @unchecked Sendable {
+    /// Mocked for async calls to `prepareCreateIssueAttachments()`.
+    public var mockAsyncPrepareCreateIssueAttachments = { (_: BriarAPI_PrepareCreateIssueAttachmentsRequest) -> ResponseMessage<BriarAPI_PrepareIssueAttachmentsResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `createIssue()`.
     public var mockAsyncCreateIssue = { (_: BriarAPI_CreateIssueRequest) -> ResponseMessage<BriarAPI_CreateIssueResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `prepareUpdateIssueAttachments()`.
+    public var mockAsyncPrepareUpdateIssueAttachments = { (_: BriarAPI_PrepareUpdateIssueAttachmentsRequest) -> ResponseMessage<BriarAPI_PrepareIssueAttachmentsResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `updateIssue()`.
     public var mockAsyncUpdateIssue = { (_: BriarAPI_UpdateIssueRequest) -> ResponseMessage<BriarAPI_UpdateIssueResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `deleteIssue()`.
@@ -59,6 +63,8 @@ open class BriarAPI_IssueServiceClientMock: BriarAPI_IssueServiceClientInterface
     public var mockAsyncListIssueMessages = { (_: BriarAPI_ListIssueMessagesRequest) -> ResponseMessage<BriarAPI_ListIssueMessagesResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `syncIssueMessages()`.
     public var mockAsyncSyncIssueMessages = { (_: BriarAPI_SyncIssueMessagesRequest) -> ResponseMessage<BriarAPI_SyncIssueMessagesResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `prepareIssueMessageAttachments()`.
+    public var mockAsyncPrepareIssueMessageAttachments = { (_: BriarAPI_PrepareIssueMessageAttachmentsRequest) -> ResponseMessage<BriarAPI_PrepareIssueAttachmentsResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `createIssueMessage()`.
     public var mockAsyncCreateIssueMessage = { (_: BriarAPI_CreateIssueMessageRequest) -> ResponseMessage<BriarAPI_CreateIssueMessageResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `updateIssueMessage()`.
@@ -80,8 +86,16 @@ open class BriarAPI_IssueServiceClientMock: BriarAPI_IssueServiceClientInterface
 
     public init() {}
 
+    open func `prepareCreateIssueAttachments`(request: BriarAPI_PrepareCreateIssueAttachmentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_PrepareIssueAttachmentsResponse> {
+        return self.mockAsyncPrepareCreateIssueAttachments(request)
+    }
+
     open func `createIssue`(request: BriarAPI_CreateIssueRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateIssueResponse> {
         return self.mockAsyncCreateIssue(request)
+    }
+
+    open func `prepareUpdateIssueAttachments`(request: BriarAPI_PrepareUpdateIssueAttachmentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_PrepareIssueAttachmentsResponse> {
+        return self.mockAsyncPrepareUpdateIssueAttachments(request)
     }
 
     open func `updateIssue`(request: BriarAPI_UpdateIssueRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateIssueResponse> {
@@ -154,6 +168,10 @@ open class BriarAPI_IssueServiceClientMock: BriarAPI_IssueServiceClientInterface
 
     open func `syncIssueMessages`(request: BriarAPI_SyncIssueMessagesRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SyncIssueMessagesResponse> {
         return self.mockAsyncSyncIssueMessages(request)
+    }
+
+    open func `prepareIssueMessageAttachments`(request: BriarAPI_PrepareIssueMessageAttachmentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_PrepareIssueAttachmentsResponse> {
+        return self.mockAsyncPrepareIssueMessageAttachments(request)
     }
 
     open func `createIssueMessage`(request: BriarAPI_CreateIssueMessageRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateIssueMessageResponse> {

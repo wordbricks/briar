@@ -5,6 +5,7 @@ package briar.app.v1;
 import "briar/app/v1/agent.proto";
 import "briar/app/v1/common.proto";
 import "briar/types/v1/provider.proto";
+import "briar/types/v1/upload.proto";
 import "briar/types/v1/workflow.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
@@ -12,7 +13,15 @@ import "google/protobuf/timestamp.proto";
 option swift_prefix = "BriarAPI_";
 
 service IssueService {
+  // Shared intentionally by the three issue attachment preparation methods.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  // buf:lint:ignore RPC_RESPONSE_STANDARD_NAME
+  rpc PrepareCreateIssueAttachments(PrepareCreateIssueAttachmentsRequest) returns (PrepareIssueAttachmentsResponse);
   rpc CreateIssue(CreateIssueRequest) returns (CreateIssueResponse);
+  // Shared intentionally by the three issue attachment preparation methods.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  // buf:lint:ignore RPC_RESPONSE_STANDARD_NAME
+  rpc PrepareUpdateIssueAttachments(PrepareUpdateIssueAttachmentsRequest) returns (PrepareIssueAttachmentsResponse);
   rpc UpdateIssue(UpdateIssueRequest) returns (UpdateIssueResponse);
   rpc DeleteIssue(DeleteIssueRequest) returns (DeleteIssueResponse);
   rpc TransferIssue(TransferIssueRequest) returns (TransferIssueResponse);
@@ -36,6 +45,10 @@ service IssueService {
   rpc CompleteResultReview(CompleteResultReviewRequest) returns (CompleteResultReviewResponse);
   rpc ListIssueMessages(ListIssueMessagesRequest) returns (ListIssueMessagesResponse);
   rpc SyncIssueMessages(SyncIssueMessagesRequest) returns (SyncIssueMessagesResponse);
+  // Shared intentionally by the three issue attachment preparation methods.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  // buf:lint:ignore RPC_RESPONSE_STANDARD_NAME
+  rpc PrepareIssueMessageAttachments(PrepareIssueMessageAttachmentsRequest) returns (PrepareIssueAttachmentsResponse);
   rpc CreateIssueMessage(CreateIssueMessageRequest) returns (CreateIssueMessageResponse);
   rpc UpdateIssueMessage(UpdateIssueMessageRequest) returns (UpdateIssueMessageResponse);
   rpc DeleteIssueMessage(DeleteIssueMessageRequest) returns (DeleteIssueMessageResponse);
@@ -49,8 +62,48 @@ service IssueService {
   rpc AcceptIssueSkillExecutionProposal(AcceptIssueSkillExecutionProposalRequest) returns (AcceptIssueSkillExecutionProposalResponse);
 }
 
+message PrepareCreateIssueAttachmentsRequest {
+  // Stable across a retry of one upload preparation attempt. It is separate
+  // from client_issue_id so a client can prepare a replacement batch.
+  string preparation_request_id = 1;
+  string project_id = 2;
+  // Binds the uploads to the idempotency identity and canonical run ID of the
+  // CreateIssue mutation that is allowed to consume them.
+  string client_issue_id = 3;
+  repeated briar.types.v1.UploadFileMetadata attachments = 4;
+}
+
+message PrepareUpdateIssueAttachmentsRequest {
+  // Stable across a retry of one upload preparation attempt. It is separate
+  // from request_id so a client can prepare a replacement batch.
+  string preparation_request_id = 1;
+  string project_id = 2;
+  string run_id = 3;
+  // Binds the uploads to the idempotency identity of the UpdateIssue mutation
+  // that is allowed to consume them.
+  string request_id = 4;
+  repeated briar.types.v1.UploadFileMetadata attachments = 5;
+}
+
+message PrepareIssueMessageAttachmentsRequest {
+  // Stable across a retry of one upload preparation attempt. It is separate
+  // from client_message_id so a client can prepare a replacement batch.
+  string preparation_request_id = 1;
+  string project_id = 2;
+  string run_id = 3;
+  // Binds the uploads to the idempotency identity of the CreateIssueMessage
+  // mutation that is allowed to consume them.
+  string client_message_id = 4;
+  repeated briar.types.v1.UploadFileMetadata attachments = 5;
+}
+
+message PrepareIssueAttachmentsResponse {
+  bool replayed = 1;
+  repeated briar.types.v1.PreparedUpload uploads = 2;
+}
+
 message CreateIssueRequest {
-  reserved 2, 13;
+  reserved 2, 13, 15;
 
   string project_id = 1;
   string title = 3;
@@ -64,7 +117,12 @@ message CreateIssueRequest {
   optional string preferred_effort = 11;
   bool full_auto = 12;
   repeated briar.types.v1.WorkflowCheckpointSpec checkpoints = 14;
-  repeated string attachment_references = 15;
+  // The client-generated idempotency identity is also the canonical run ID.
+  // It is required even when the mutation has no attachments.
+  string client_issue_id = 16;
+  // Uploaded bytes must have been prepared by PrepareCreateIssueAttachments
+  // for this exact project, client issue, and authenticated user.
+  repeated briar.types.v1.UploadReference attachments = 17;
 }
 
 message CreateIssueResponse {
@@ -79,7 +137,7 @@ message CreateIssueResponse {
 }
 
 message UpdateIssueRequest {
-  reserved 3;
+  reserved 3, 10;
 
   message ClearAssignee {}
 
@@ -97,8 +155,13 @@ message UpdateIssueRequest {
     string assignee_user_id = 8;
     ClearAssignee clear_assignee = 9;
   }
-  repeated string attachment_references = 10;
   optional KeptAttachmentIdsPatch kept_attachment_ids = 11;
+  // Client-generated idempotency identity for the complete update payload.
+  // It is required even when the mutation has no new attachments.
+  string request_id = 12;
+  // Uploaded bytes must have been prepared by PrepareUpdateIssueAttachments
+  // for this exact project, run, request, and authenticated user.
+  repeated briar.types.v1.UploadReference attachments = 13;
 }
 
 message UpdateIssueResponse {
@@ -411,7 +474,7 @@ message SyncIssueMessagesResponse {
 }
 
 message CreateIssueMessageRequest {
-  reserved 9;
+  reserved 9, 10;
 
   string project_id = 1;
   string run_id = 2;
@@ -421,7 +484,9 @@ message CreateIssueMessageRequest {
   repeated string mentioned_user_ids = 6;
   repeated string mentioned_agent_ids = 7;
   optional string agent_conversation_id = 8;
-  repeated string attachment_references = 10;
+  // Uploaded bytes must have been prepared by PrepareIssueMessageAttachments
+  // for this exact project, run, client message, and authenticated user.
+  repeated briar.types.v1.UploadReference attachments = 11;
 }
 
 message CreateIssueMessageResponse {

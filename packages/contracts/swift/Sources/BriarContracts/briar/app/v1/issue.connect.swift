@@ -11,8 +11,20 @@ import SwiftProtobuf
 
 public protocol BriarAPI_IssueServiceClientInterface: Sendable {
 
+    /// Shared intentionally by the three issue attachment preparation methods.
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+    /// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME
+    @available(iOS 13, *)
+    func `prepareCreateIssueAttachments`(request: BriarAPI_PrepareCreateIssueAttachmentsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_PrepareIssueAttachmentsResponse>
+
     @available(iOS 13, *)
     func `createIssue`(request: BriarAPI_CreateIssueRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateIssueResponse>
+
+    /// Shared intentionally by the three issue attachment preparation methods.
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+    /// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME
+    @available(iOS 13, *)
+    func `prepareUpdateIssueAttachments`(request: BriarAPI_PrepareUpdateIssueAttachmentsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_PrepareIssueAttachmentsResponse>
 
     @available(iOS 13, *)
     func `updateIssue`(request: BriarAPI_UpdateIssueRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateIssueResponse>
@@ -73,6 +85,12 @@ public protocol BriarAPI_IssueServiceClientInterface: Sendable {
     @available(iOS 13, *)
     func `syncIssueMessages`(request: BriarAPI_SyncIssueMessagesRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_SyncIssueMessagesResponse>
 
+    /// Shared intentionally by the three issue attachment preparation methods.
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+    /// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME
+    @available(iOS 13, *)
+    func `prepareIssueMessageAttachments`(request: BriarAPI_PrepareIssueMessageAttachmentsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_PrepareIssueAttachmentsResponse>
+
     @available(iOS 13, *)
     func `createIssueMessage`(request: BriarAPI_CreateIssueMessageRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateIssueMessageResponse>
 
@@ -112,8 +130,18 @@ public final class BriarAPI_IssueServiceClient: BriarAPI_IssueServiceClientInter
     }
 
     @available(iOS 13, *)
+    public func `prepareCreateIssueAttachments`(request: BriarAPI_PrepareCreateIssueAttachmentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_PrepareIssueAttachmentsResponse> {
+        return await self.client.unary(path: "/briar.app.v1.IssueService/PrepareCreateIssueAttachments", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
     public func `createIssue`(request: BriarAPI_CreateIssueRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateIssueResponse> {
         return await self.client.unary(path: "/briar.app.v1.IssueService/CreateIssue", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `prepareUpdateIssueAttachments`(request: BriarAPI_PrepareUpdateIssueAttachmentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_PrepareIssueAttachmentsResponse> {
+        return await self.client.unary(path: "/briar.app.v1.IssueService/PrepareUpdateIssueAttachments", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
@@ -207,6 +235,11 @@ public final class BriarAPI_IssueServiceClient: BriarAPI_IssueServiceClientInter
     }
 
     @available(iOS 13, *)
+    public func `prepareIssueMessageAttachments`(request: BriarAPI_PrepareIssueMessageAttachmentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_PrepareIssueAttachmentsResponse> {
+        return await self.client.unary(path: "/briar.app.v1.IssueService/PrepareIssueMessageAttachments", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
     public func `createIssueMessage`(request: BriarAPI_CreateIssueMessageRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateIssueMessageResponse> {
         return await self.client.unary(path: "/briar.app.v1.IssueService/CreateIssueMessage", idempotencyLevel: .unknown, request: request, headers: headers)
     }
@@ -253,7 +286,9 @@ public final class BriarAPI_IssueServiceClient: BriarAPI_IssueServiceClientInter
 
     public enum Metadata {
         public enum Methods {
+            public static let prepareCreateIssueAttachments = Connect.MethodSpec(name: "PrepareCreateIssueAttachments", service: "briar.app.v1.IssueService", type: .unary)
             public static let createIssue = Connect.MethodSpec(name: "CreateIssue", service: "briar.app.v1.IssueService", type: .unary)
+            public static let prepareUpdateIssueAttachments = Connect.MethodSpec(name: "PrepareUpdateIssueAttachments", service: "briar.app.v1.IssueService", type: .unary)
             public static let updateIssue = Connect.MethodSpec(name: "UpdateIssue", service: "briar.app.v1.IssueService", type: .unary)
             public static let deleteIssue = Connect.MethodSpec(name: "DeleteIssue", service: "briar.app.v1.IssueService", type: .unary)
             public static let transferIssue = Connect.MethodSpec(name: "TransferIssue", service: "briar.app.v1.IssueService", type: .unary)
@@ -272,6 +307,7 @@ public final class BriarAPI_IssueServiceClient: BriarAPI_IssueServiceClientInter
             public static let completeResultReview = Connect.MethodSpec(name: "CompleteResultReview", service: "briar.app.v1.IssueService", type: .unary)
             public static let listIssueMessages = Connect.MethodSpec(name: "ListIssueMessages", service: "briar.app.v1.IssueService", type: .unary)
             public static let syncIssueMessages = Connect.MethodSpec(name: "SyncIssueMessages", service: "briar.app.v1.IssueService", type: .unary)
+            public static let prepareIssueMessageAttachments = Connect.MethodSpec(name: "PrepareIssueMessageAttachments", service: "briar.app.v1.IssueService", type: .unary)
             public static let createIssueMessage = Connect.MethodSpec(name: "CreateIssueMessage", service: "briar.app.v1.IssueService", type: .unary)
             public static let updateIssueMessage = Connect.MethodSpec(name: "UpdateIssueMessage", service: "briar.app.v1.IssueService", type: .unary)
             public static let deleteIssueMessage = Connect.MethodSpec(name: "DeleteIssueMessage", service: "briar.app.v1.IssueService", type: .unary)
