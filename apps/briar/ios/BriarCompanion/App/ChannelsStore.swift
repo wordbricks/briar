@@ -100,6 +100,15 @@ final class ChannelsStore: ObservableObject {
     static let cachedThreadLimit = 5
     static let cachedMessageLimit = 40
 
+    func makeMemoryStore(channelID: UUID) -> DmMemoryStore? {
+        guard let organizationID, let token else { return nil }
+        let expectedGeneration = generation
+        return DmMemoryStore(api: api, token: token, organizationID: organizationID,
+                             channelID: channelID, scopeIsCurrent: { [weak self] in
+            self?.generation == expectedGeneration
+        })
+    }
+
     private struct CachedChannelConversation {
         let messages: [ChannelMessage]
         let nextMessageCursor: UUID?

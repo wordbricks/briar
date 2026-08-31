@@ -9,6 +9,27 @@ final class MobileAPIContractTests: XCTestCase {
 
     private var operations: [String: [String: Any]] = [:]
 
+    func testDmMemoryReadsTheSharedFixtureAndKeepsNullableWriteFields() throws {
+        let page: DmMemoryPage = try decodeResponse("listDmMemory")
+        XCTAssertEqual(page.documents.count, 1)
+        XCTAssertTrue(page.documents[0].protectedByUser)
+        XCTAssertEqual(page.documents[0].indexState, "pending")
+        XCTAssertFalse(page.capabilities.automaticLearning)
+        struct DetailResponse: Decodable { let document: DmMemoryDocument }
+        let response: DetailResponse = try decodeResponse("getDmMemoryDocument")
+        XCTAssertEqual(response.document.body, "설명은 결론부터 짧게 제시한다.")
+        XCTAssertEqual(response.document.sources?.first?.type, "user_edit_event")
+        let write = DmMemoryWrite(memorySpaceId: page.selectedSpaceId, expectedVersion: 1,
+            title: "Synthetic", body: "A test preference", memoryClass: "profile",
+            sourceLanguage: "en", observedAt: nil, validUntil: nil)
+        let encoded = try JSONEncoder().encode(write)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        XCTAssertTrue(json["observedAt"] is NSNull)
+        XCTAssertTrue(json["validUntil"] is NSNull)
+        XCTAssertNil(json["protectedByUser"])
+        XCTAssertEqual(json["expectedVersion"] as? Int, 1)
+    }
+
     override func setUpWithError() throws {
         let bundle = Bundle(for: Self.self)
         let fixtureURL = try XCTUnwrap(

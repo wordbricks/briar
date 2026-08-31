@@ -580,7 +580,7 @@ struct TaskListView: View {
             guard let selectedPlanningProjectID else { return true }
             return run.projectId == nil || run.projectId == selectedPlanningProjectID
         }
-        TaskOrdering.byMostRecentlyUpdated(
+        return TaskOrdering.byMostRecentlyUpdated(
             scopedRuns.filter(filter.includes)
         )
     }
