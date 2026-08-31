@@ -5,9 +5,11 @@ import {
   decodeStoredProjectAgentSessionSummary,
 } from "./project-request-contract";
 import {
+  listProjectAgentSessionChanges,
   listProjectAgentSessionSummaries,
   upsertProjectAgentSession,
 } from "./project-agent-session-repository";
+import { listInboxReadStates } from "./inbox-read-state-repository";
 import {
   applyD1Migrations,
   executeD1Sql,
@@ -64,7 +66,17 @@ describe("project Agent session storage cutover", () => {
          '${observedAt}', 0),
         ('${projectId}', 'archive-only', '{"status":"completed"}',
          '${observedAt}', 1);
+      insert into briar_inbox_read_states (
+        user_id, message_id, version, updated_at
+      ) values
+        ('session-owner', 'session:legacy-valid', 'legacy-session-version',
+         '${observedAt}'),
+        ('session-owner', 'issue:keep', 'unrelated-version', '${observedAt}');
     `);
+    const inboxVersionBefore = await db.prepare(
+      `select current_version from briar_organization_inbox_sync_state
+       where organization_id = 'session-org'`,
+    ).first<number>("current_version");
 
     await applyD1Migrations(db, {
       files: ["0165_canonical_project_agent_session_json.sql"],
@@ -79,6 +91,22 @@ describe("project Agent session storage cutover", () => {
     expect((await db.prepare(
       `select session_id from briar_project_agent_session_context_membership`,
     ).all()).results).toEqual([]);
+    await expect(listProjectAgentSessionChanges(db, projectId, 0)).resolves
+      .toEqual({
+        currentVersion: 0,
+        changes: [],
+        hasMore: false,
+        nextCursor: 0,
+        expired: false,
+      });
+    await expect(listInboxReadStates(db, "session-owner")).resolves.toEqual([
+      expect.objectContaining({ message_id: "issue:keep" }),
+    ]);
+    const inboxVersionAfter = await db.prepare(
+      `select current_version from briar_organization_inbox_sync_state
+       where organization_id = 'session-org'`,
+    ).first<number>("current_version");
+    expect(inboxVersionAfter).toBeGreaterThan(inboxVersionBefore ?? 0);
 
     const stored = await upsertProjectAgentSession(db, {
       projectId,

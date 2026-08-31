@@ -4,6 +4,12 @@ pragma foreign_keys = on;
 -- every legacy document rather than teaching SQL a second copy of the Effect
 -- schema or guessing defaults for historic payloads.
 delete from briar_project_agent_session_summaries;
+-- Summary deletion deliberately advances the organization Inbox revision so
+-- connected clients refetch the now-empty session feed. Its per-project
+-- tombstones and cursor are obsolete after this no-compatibility cutover.
+delete from briar_project_agent_session_changes;
+delete from briar_project_agent_session_sync_state;
+delete from briar_inbox_read_states where message_id like 'session:%';
 delete from briar_project_agent_session_context_membership;
 delete from briar_project_agent_sessions;
 
