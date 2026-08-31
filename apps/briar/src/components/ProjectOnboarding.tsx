@@ -33,6 +33,7 @@ import {
   type LocalAutoHuntConfig,
   type LocalProjectConnectionPreflight,
   type LovableRepositoryCompatibility,
+  type PreparedProjectRepository,
   type RepositoryReadiness,
   type WorkflowRequirementHealth,
 } from "../lib/project-connection";
@@ -42,7 +43,7 @@ import {
   type AutoHuntWorkflow,
 } from "../lib/auto-hunt-contract";
 import {
-  githubSshRepositoryName,
+  githubRepositoryFromUrl,
   repositoryProjectName,
 } from "../lib/project-workspace";
 import { lovableWorkflowPreset } from "../lib/lovable-workflow";
@@ -88,6 +89,7 @@ function localConnectionSettings(
     linearEnabled: false,
     linearSource: null,
     linearTeam: null,
+    githubRepositoryId: readiness?.githubRepositoryId ?? null,
     githubRepository: readiness?.githubRepository ?? null,
     workflow,
   };
@@ -104,16 +106,14 @@ type Props = {
     onProgress?: (progress: ProjectLlmProgress) => void,
   ) => Promise<RequirementAnalysis>;
   onCancel: () => void;
-  onCloneRepository: (repositoryUrl: string) => Promise<{
-    repositoryPath: string;
-    repositoryName: string;
-  }>;
   onConnect: (
     settings: LocalAutoHuntConfig,
     repositoryPath: string,
     onProgress?: (progress: ProjectLlmProgress) => void,
   ) => Promise<PreparedProjectConnection>;
-  onCreate: (input: { name: string }) => Promise<unknown>;
+  onCreate: (input: { name: string }) => Promise<{
+    project: { id: string };
+  }>;
   onFinish: () => void;
   onInspectLovableRepository: (
     repositoryPath: string,
@@ -122,10 +122,15 @@ type Props = {
     settings: LocalAutoHuntConfig,
     repositoryPath: string,
   ) => Promise<LocalProjectConnectionPreflight>;
+  onPrepareGithubRepository: (
+    projectId: string,
+    githubRepository: string,
+  ) => Promise<PreparedProjectRepository>;
   onReviseWorkflow: (
     projectId: string,
     requestedChange: string,
   ) => Promise<AutoHuntWorkflow>;
+  onResolveGithubRepository: (githubRepository: string) => Promise<string>;
   onRepositorySelect: () => Promise<string | null>;
   onRepositoryInspect: (
     repositoryPath: string,
@@ -137,6 +142,7 @@ type OnboardingPhase =
   | "choose-method"
   | "developer-tools"
   | "repository"
+  | "github-repository"
   | "lovable-tutorial"
   | "lovable-repository"
   | "workflow-loading"
@@ -319,15 +325,16 @@ export function ProjectOnboarding({
   loading,
   onAnalyzeRequirements,
   onCancel,
-  onCloneRepository,
   onConnect,
   onCreate,
   onFinish,
   onInspectLovableRepository,
   onPreflight,
+  onPrepareGithubRepository,
   onRepositoryInspect,
   onRepositorySelect,
   onReviseWorkflow,
+  onResolveGithubRepository,
 }: Props) {
   const { t } = useI18n();
   const [phase, setPhase] = useState<OnboardingPhase>(
@@ -369,6 +376,9 @@ export function ProjectOnboarding({
   const [lovableError, setLovableError] = useState<string | null>(null);
   const [lovablePreset, setLovablePreset] =
     useState<AutoHuntWorkflow | null>(null);
+  const [githubRepositoryUrl, setGithubRepositoryUrl] = useState("");
+  const [githubImporting, setGithubImporting] = useState(false);
+  const [githubImportError, setGithubImportError] = useState<string | null>(null);
 
   const updateRepositoryOperation = useCallback(
     (operation: RepositoryOperation) => {
@@ -381,6 +391,7 @@ export function ProjectOnboarding({
     if (
       loading ||
       lovableImporting ||
+      githubImporting ||
       repositoryOperationRef.current === "commit"
     ) {
       return;
@@ -388,7 +399,13 @@ export function ProjectOnboarding({
     repositoryRequest.current += 1;
     updateRepositoryOperation("idle");
     onCancel();
-  }, [loading, lovableImporting, onCancel, updateRepositoryOperation]);
+  }, [
+    githubImporting,
+    loading,
+    lovableImporting,
+    onCancel,
+    updateRepositoryOperation,
+  ]);
 
   const preflightingRepository = repositoryOperation !== "idle";
 
@@ -537,49 +554,99 @@ export function ProjectOnboarding({
     setPhase(includeDeveloperTools ? "developer-tools" : "repository");
   };
 
+  const importGithubProject = async ({
+    invalidUrlMessage,
+    notReadyMessage,
+    repositoryUrl,
+    resolvePreset,
+  }: {
+    invalidUrlMessage: string;
+    notReadyMessage: string;
+    repositoryUrl: string;
+    resolvePreset?: (
+      repositoryPath: string,
+    ) => Promise<AutoHuntWorkflow | null>;
+  }) => {
+    const repository = githubRepositoryFromUrl(repositoryUrl);
+    if (!repository) throw new Error(invalidUrlMessage);
+
+    const githubRepository = await onResolveGithubRepository(
+      repository.fullName,
+    );
+    const repositoryName =
+      githubRepository.split("/").at(-1) ?? repository.name;
+    const projectId = connection?.project.id ??
+      (await onCreate({ name: repositoryName })).project.id;
+    const prepared = await onPrepareGithubRepository(
+      projectId,
+      githubRepository,
+    );
+    const inspected = await onRepositoryInspect(
+      prepared.repositoryPath,
+      connection?.workflow ?? repositoryWorkflowBootstrap,
+    );
+    const readiness: RepositoryReadiness = {
+      ...inspected,
+      githubRepositoryId: prepared.repositoryId,
+      githubRepository: prepared.repository,
+    };
+    if (!readiness.gitReady) {
+      throw new Error(readiness.issues[0] ?? notReadyMessage);
+    }
+
+    const preset = resolvePreset
+      ? await resolvePreset(readiness.repositoryPath)
+      : null;
+    const workflow =
+      preset ?? connection?.workflow ?? repositoryWorkflowBootstrap;
+    const preflight = await onPreflight(
+      localConnectionSettings(workflow, readiness),
+      readiness.repositoryPath,
+    );
+    setRepositoryPath(preflight.repositoryPath);
+    setRepositoryReadiness(readiness);
+    setConnectionPreflight(preflight);
+    setName(repositoryName);
+    setLovablePreset(preset);
+    setWorkflowError(null);
+    setPhase("workflow-loading");
+  };
+
+  const importGithubRepository = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setGithubImporting(true);
+    setGithubImportError(null);
+    try {
+      await importGithubProject({
+        invalidUrlMessage: t("onboarding.githubUrlInvalid"),
+        notReadyMessage: t("onboarding.githubRepositoryNotReady"),
+        repositoryUrl: githubRepositoryUrl,
+      });
+    } catch (caught) {
+      setGithubImportError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setGithubImporting(false);
+    }
+  };
+
   const importLovableRepository = async (event: React.FormEvent) => {
     event.preventDefault();
-    const repositoryUrl = lovableRepositoryUrl.trim();
-    const repositoryName = githubSshRepositoryName(repositoryUrl);
-    if (!repositoryName) {
-      setLovableError(t("onboarding.lovableSshInvalid"));
-      return;
-    }
     setLovableImporting(true);
     setLovableError(null);
     try {
-      const cloned = await onCloneRepository(repositoryUrl);
-      const readiness = await onRepositoryInspect(
-        cloned.repositoryPath,
-        repositoryWorkflowBootstrap,
-      );
-      if (!readiness.gitReady) {
-        throw new Error(
-          readiness.issues[0] ?? t("onboarding.lovableRepositoryNotReady"),
-        );
-      }
-      setRepositoryPath(readiness.repositoryPath);
-      setRepositoryReadiness(readiness);
-      setName(cloned.repositoryName || repositoryName);
-      const compatibility = await onInspectLovableRepository(
-        readiness.repositoryPath,
-      ).catch(() => null);
-      const preset = compatibility ? lovableWorkflowPreset(compatibility) : null;
-      setLovablePreset(preset);
-      const preflight = await preflightThenCreateProject(
-        () => onPreflight(
-          localConnectionSettings(
-            preset ?? repositoryWorkflowBootstrap,
-            readiness,
-          ),
-          readiness.repositoryPath,
-        ),
-        () => onCreate({ name: cloned.repositoryName || repositoryName }),
-      );
-      setRepositoryPath(preflight.repositoryPath);
-      setConnectionPreflight(preflight);
-      setWorkflowError(null);
-      setPhase("workflow-loading");
+      await importGithubProject({
+        invalidUrlMessage: t("onboarding.lovableGithubUrlInvalid"),
+        notReadyMessage: t("onboarding.lovableRepositoryNotReady"),
+        repositoryUrl: lovableRepositoryUrl,
+        resolvePreset: async (repositoryPath) => {
+          const compatibility = await onInspectLovableRepository(
+            repositoryPath,
+          ).catch(() => null);
+          return compatibility ? lovableWorkflowPreset(compatibility) : null;
+        },
+      });
     } catch (caught) {
       setLovableError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -728,13 +795,16 @@ export function ProjectOnboarding({
         ? () => setPhase("choose-method")
         : phase === "lovable-repository"
           ? () => setPhase("lovable-tutorial")
-          : null;
+          : phase === "github-repository" && !connection
+            ? () => setPhase("choose-method")
+            : null;
   const showsSetupProgress =
     phase === "developer-tools" ||
     phase === "repository" ||
     phase.startsWith("workflow") ||
     phase.startsWith("tools");
-  const lovableRepositoryName = githubSshRepositoryName(lovableRepositoryUrl);
+  const lovableRepository = githubRepositoryFromUrl(lovableRepositoryUrl);
+  const githubRepository = githubRepositoryFromUrl(githubRepositoryUrl);
 
   return (
     <div
@@ -756,6 +826,7 @@ export function ProjectOnboarding({
                 disabled={
                   loading ||
                   lovableImporting ||
+                  githubImporting ||
                   repositoryOperation === "commit"
                 }
                 onClick={() => {
@@ -776,6 +847,7 @@ export function ProjectOnboarding({
             disabled={
               loading ||
               lovableImporting ||
+              githubImporting ||
               repositoryOperation === "commit"
             }
             onClick={cancelOnboarding}
@@ -815,6 +887,14 @@ export function ProjectOnboarding({
                     trailing={<ArrowRight />}
                   />
                   <ChoiceCard
+                    className="max-[680px]:min-h-[150px] min-[681px]:min-h-[218px]"
+                    description={t("onboarding.connectGithubDescription")}
+                    icon={<Github />}
+                    onClick={() => setPhase("github-repository")}
+                    title={t("onboarding.connectGithubTitle")}
+                    trailing={<ArrowRight />}
+                  />
+                  <ChoiceCard
                     aria-disabled="true"
                     badge={t("onboarding.comingSoon")}
                     className="max-[680px]:min-h-[150px] min-[681px]:min-h-[218px]"
@@ -833,6 +913,76 @@ export function ProjectOnboarding({
                     trailing={<ArrowRight />}
                   />
                 </div>
+              </section>
+            ) : null}
+
+            {phase === "github-repository" ? (
+              <section className="lovable-repository-step github-repository-step">
+                <p className="eyebrow">{t("onboarding.githubStepRepository")}</p>
+                <div className="onboarding-icon"><Github size={24} /></div>
+                <h1>{t("onboarding.githubRepositoryTitle")}</h1>
+                <p className="onboarding-copy">
+                  {t("onboarding.githubRepositoryDescription")}
+                </p>
+                <form
+                  className="lovable-repository-form github-repository-form"
+                  onSubmit={(event) => void importGithubRepository(event)}
+                >
+                  <label htmlFor="github-repository-url">
+                    {t("onboarding.githubUrlLabel")}
+                  </label>
+                  <div className="lovable-repository-input">
+                    <Github size={18} />
+                    <input
+                      autoCapitalize="none"
+                      autoComplete="off"
+                      disabled={githubImporting}
+                      id="github-repository-url"
+                      onChange={(event) => {
+                        setGithubRepositoryUrl(event.currentTarget.value);
+                        setGithubImportError(null);
+                      }}
+                      placeholder="https://github.com/owner/repository.git"
+                      spellCheck={false}
+                      value={githubRepositoryUrl}
+                    />
+                  </div>
+                  {githubRepository ? (
+                    <p className="lovable-destination-preview">
+                      <Check size={14} />
+                      {t("onboarding.githubDestinationPreview", {
+                        name: githubRepository.name,
+                        repository: githubRepository.fullName,
+                      })}
+                    </p>
+                  ) : null}
+                  {githubImportError || error ? (
+                    <p className="repository-readiness-error" role="alert">
+                      <CircleAlert size={14} />
+                      {githubImportError || error}
+                    </p>
+                  ) : null}
+                  <button
+                    className="onboarding-primary-action"
+                    disabled={githubImporting || !githubRepository}
+                    type="submit"
+                  >
+                    {githubImporting ? (
+                      <>
+                        <Spinner size={17} />
+                        {t("onboarding.githubCloning")}
+                      </>
+                    ) : (
+                      <>
+                        {t("onboarding.confirm")}
+                        <ArrowRight size={17} />
+                      </>
+                    )}
+                  </button>
+                </form>
+                <p className="onboarding-dimmed-note">
+                  {t("onboarding.githubCloneNotice")}
+                </p>
               </section>
             ) : null}
 
@@ -889,28 +1039,30 @@ export function ProjectOnboarding({
                   <li><span>3</span><p>{t("onboarding.lovableCopyStepThree")}</p></li>
                 </ol>
                 <form className="lovable-repository-form" onSubmit={(event) => void importLovableRepository(event)}>
-                  <label htmlFor="lovable-github-ssh-url">{t("onboarding.lovableSshLabel")}</label>
+                  <label htmlFor="lovable-github-repository-url">
+                    {t("onboarding.lovableGithubUrlLabel")}
+                  </label>
                   <div className="lovable-repository-input">
                     <Github size={18} />
                     <input
                       autoCapitalize="none"
                       autoComplete="off"
                       disabled={lovableImporting}
-                      id="lovable-github-ssh-url"
+                      id="lovable-github-repository-url"
                       onChange={(event) => {
                         setLovableRepositoryUrl(event.currentTarget.value);
                         setLovableError(null);
                       }}
-                      placeholder="git@github.com:your-account/your-project.git"
+                      placeholder="https://github.com/owner/repository.git"
                       spellCheck={false}
                       value={lovableRepositoryUrl}
                     />
                   </div>
-                  {lovableRepositoryName ? (
+                  {lovableRepository ? (
                     <p className="lovable-destination-preview">
                       <Check size={14} />
                       {t("onboarding.lovableDestinationPreview", {
-                        name: lovableRepositoryName,
+                        name: lovableRepository.name,
                       })}
                     </p>
                   ) : null}
@@ -921,7 +1073,7 @@ export function ProjectOnboarding({
                   ) : null}
                   <button
                     className="onboarding-primary-action"
-                    disabled={lovableImporting || !lovableRepositoryName}
+                    disabled={lovableImporting || !lovableRepository}
                     type="submit"
                   >
                     {lovableImporting ? (

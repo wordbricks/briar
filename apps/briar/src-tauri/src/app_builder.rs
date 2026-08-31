@@ -155,7 +155,6 @@ pub(super) fn run() {
             clear_session_token,
             set_app_badge_count,
             validate_repository_path,
-            clone_github_ssh_repository,
             prepare_project_repository,
             create_project_workspace,
             inspect_lovable_repository_compatibility,

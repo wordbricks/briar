@@ -7,13 +7,25 @@ export function repositoryProjectName(repositoryPath: string): string {
   return segments[segments.length - 1]?.trim() ?? "";
 }
 
-/** Repository name from a GitHub SSH clone URL, or null when the URL is invalid. */
-export function githubSshRepositoryName(repositoryUrl: string): string | null {
-  const path = repositoryUrl
-    .trim()
-    .replace(/^git@github\.com:/u, "")
-    .replace(/^ssh:\/\/git@github\.com\//u, "");
-  if (path === repositoryUrl.trim()) return null;
+export type GithubRepositoryReference = {
+  fullName: string;
+  name: string;
+};
+
+/** Repository identity from a GitHub HTTPS or SSH clone URL. */
+export function githubRepositoryFromUrl(
+  repositoryUrl: string,
+): GithubRepositoryReference | null {
+  const value = repositoryUrl.trim().replace(/\/+$/u, "");
+  const prefixes = [
+    "https://github.com/",
+    "git@github.com:",
+    "ssh://git@github.com/",
+  ];
+  const prefix = prefixes.find((candidate) => value.startsWith(candidate));
+  if (!prefix) return null;
+
+  const path = value.slice(prefix.length);
   const segments = path.split("/");
   if (segments.length !== 2) return null;
   const owner = segments[0] ?? "";
@@ -23,5 +35,10 @@ export function githubSshRepositoryName(repositoryUrl: string): string | null {
     segment !== "." &&
     segment !== ".." &&
     /^[A-Za-z0-9_.-]+$/u.test(segment);
-  return validSegment(owner) && validSegment(repository) ? repository : null;
+  if (!validSegment(owner) || !validSegment(repository)) return null;
+
+  return {
+    fullName: `${owner}/${repository}`,
+    name: repository,
+  };
 }
