@@ -730,7 +730,7 @@ export async function runManagedComputerGuidedSetup(
     repositoryPath,
     repositoryRemote,
     apiUrl: config.apiOrigin,
-    llm: { provider: input.provider },
+    llm: { provider: input.provider, approvalPolicy: "never" },
     executionWorker: {
       deviceId: config.deviceId,
       workerId: binding.worker.id,

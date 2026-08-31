@@ -5,10 +5,9 @@ import {
 } from "./config-environment";
 
 describe("CLI API environment selection", () => {
-  it("prefers a project issued by the active API over a legacy connection", () => {
+  it("selects the project issued by the active API", () => {
     const selected = selectProjectForApi(
       [
-        { id: "legacy" },
         { id: "production", apiUrl: "https://briar.example.com" },
         { id: "development", apiUrl: "http://127.0.0.1:8788" },
       ],
@@ -16,12 +15,6 @@ describe("CLI API environment selection", () => {
     );
 
     expect(selected?.id).toBe("development");
-  });
-
-  it("falls back to a legacy connection when no environment tag exists", () => {
-    expect(
-      selectProjectForApi([{ id: "legacy" }], "https://briar.example.com")?.id,
-    ).toBe("legacy");
   });
 
   it("rejects an explicitly requested project from another API", () => {

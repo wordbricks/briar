@@ -52,7 +52,7 @@ import {
 } from "./worktree";
 import { briarIssueUrl } from "./github-pr";
 import {
-  decodeConfig,
+  decodeConfigJson,
   type Config,
   type ProjectConfig,
 } from "./config-contract";
@@ -402,8 +402,8 @@ async function runClaimedIssueInRuntime(
       }
       const turnFailure = detachedProviderTurnFailure(turn);
 
-      const runtimeConfig = decodeConfig(
-        JSON.parse(await readFile(join(runtimeDirectory, "config.json"), "utf8")),
+      const runtimeConfig = decodeConfigJson(
+        await readFile(join(runtimeDirectory, "config.json"), "utf8"),
       );
       const disposition = detachedRunDisposition(
         runtimeConfig.projects.find((candidate) => candidate.id === project.id)
@@ -505,8 +505,8 @@ async function runClaimedIssueInRuntime(
       try {
         let completedAt: string | undefined;
         try {
-          const runtimeConfig = decodeConfig(
-            JSON.parse(await readFile(join(runtimeDirectory, "config.json"), "utf8")),
+          const runtimeConfig = decodeConfigJson(
+            await readFile(join(runtimeDirectory, "config.json"), "utf8"),
           );
           const runtimeClaim = runtimeConfig.projects.find(
             (candidate) => candidate.id === project.id,

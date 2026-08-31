@@ -1,6 +1,6 @@
 export type ApiScopedProject = {
   id: string;
-  apiUrl?: string;
+  apiUrl: string;
 };
 
 export function normalizeApiUrl(apiUrl: string): string {
@@ -18,16 +18,10 @@ export function selectProjectForApi<T extends ApiScopedProject>(
 ): T | undefined {
   if (requestedProjectId) {
     const requested = projects.find((project) => project.id === requestedProjectId);
-    return requested &&
-      (!requested.apiUrl || sameApiEnvironment(requested.apiUrl, apiUrl))
+    return requested && sameApiEnvironment(requested.apiUrl, apiUrl)
       ? requested
       : undefined;
   }
 
-  return (
-    projects.find(
-      (project) =>
-        Boolean(project.apiUrl) && sameApiEnvironment(project.apiUrl!, apiUrl),
-    ) ?? projects.find((project) => !project.apiUrl)
-  );
+  return projects.find((project) => sameApiEnvironment(project.apiUrl, apiUrl));
 }

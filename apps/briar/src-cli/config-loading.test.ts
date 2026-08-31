@@ -6,6 +6,22 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const temporaryDirectories: string[] = [];
+const localSettings = {
+  agentProviders: {
+    codex: true,
+    claude: true,
+    cursor: true,
+    grok: true,
+    agy: true,
+    opencode: true,
+    openrouter: true,
+  },
+  appSettings: {
+    preventSleepWhileRunning: false,
+    browserAutomationProvider:
+      "LOCAL_BROWSER_AUTOMATION_PROVIDER_EGO_BROWSER",
+  },
+};
 const bunExecutable = spawnSync("/usr/bin/env", ["which", "bun"], {
   encoding: "utf8",
 }).stdout.trim();
@@ -60,11 +76,13 @@ describe("CLI config loading", () => {
   it("loads a canonical workflow execution boundary", async () => {
     const directory = await configDirectory({
       apiUrl: "https://briar.example.com",
+      ...localSettings,
       projects: [
         {
           id: projectId,
           repositoryPath: process.cwd(),
           agentToken: "briar_agent_test",
+          apiUrl: "https://briar.example.com",
           autoHunt: {
             workflow: {
               version: 2,
@@ -92,6 +110,7 @@ describe("CLI config loading", () => {
   it("reports an invalid config instead of pretending it has no projects", async () => {
     const directory = await configDirectory({
       apiUrl: "https://briar.example.com",
+      ...localSettings,
       projects: "invalid",
     });
 
@@ -110,6 +129,7 @@ describe("CLI config loading", () => {
     const organizationId = "55555555-5555-4555-8555-555555555555";
     const directory = await configDirectory({
       apiUrl: "https://stored.example",
+      ...localSettings,
       managedComputer: {
         managedComputerId,
         deviceId: `managed-${managedComputerId}`,

@@ -43,14 +43,33 @@ const pendingSettings = {
 const localConfig = () => decodeConfig({
   apiUrl,
   userToken: "user-session",
+  agentProviders: {
+    codex: true,
+    claude: true,
+    cursor: true,
+    grok: true,
+    agy: true,
+    opencode: true,
+    openrouter: true,
+  },
+  appSettings: {
+    preventSleepWhileRunning: false,
+    browserAutomationProvider:
+      "LOCAL_BROWSER_AUTOMATION_PROVIDER_EGO_BROWSER",
+  },
   projects: [{
     id: projectId,
     repositoryPath: "/home/briar/briar",
-    llm: { provider: "codex" },
+    apiUrl,
+    llm: {
+      provider: "AGENT_PROVIDER_CODEX",
+      approvalPolicy: "LOCAL_APPROVAL_POLICY_NEVER",
+    },
     executionWorker: {
       deviceId: "managed-22222222-2222-4222-8222-222222222222",
       workerId: "worker-1",
       organizationId: "33333333-3333-4333-8333-333333333333",
+      token: "briar_worker_test",
       label: "Managed computer",
       maxConcurrentSessions: 1,
     },

@@ -1,3 +1,26 @@
+import {
+  create,
+  fromJson,
+  fromJsonString,
+  toJsonString,
+  type JsonValue,
+} from "@bufbuild/protobuf";
+import {
+  timestampDate,
+  timestampFromDate,
+  type Timestamp,
+} from "@bufbuild/protobuf/wkt";
+import {
+  LocalApprovalPolicy,
+  LocalBrowserAutomationProvider,
+  LocalClaimTerminalStatus,
+  LocalConfigSchema,
+  type LocalActiveClaimConfig,
+  type LocalAutoHuntConfig,
+  type LocalConfig,
+  type LocalProjectConfig,
+  type LocalProjectLlmConfig,
+} from "@briar/contracts/gen/briar/local/v1/config_pb";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SchemaIssue from "effect/SchemaIssue";
@@ -8,43 +31,28 @@ import {
   autoHuntRequirementKinds,
   normalizeAutoHuntWorkflow,
 } from "../src/lib/auto-hunt-contract";
+import {
+  agentProviderFromProto,
+  agentProviderToProto,
+  requiredMessage,
+  safeNumber,
+} from "../src/lib/app-rpc/mappers";
+import {
+  workflowFromProto,
+  workflowToProto,
+} from "../src/lib/app-rpc/project-configuration-mappers";
 import { agentProviders } from "../src/lib/agent-provider";
 import { IsoDateTimeWithOffset } from "../src/lib/date-time-schema";
 
-const ignoreExcessProperties = {
-  onExcessProperty: "ignore",
-} as const;
-const preserveExcessProperties = {
-  onExcessProperty: "preserve",
-} as const;
-const rejectExcessProperties = {
-  onExcessProperty: "error",
-} as const;
-
-const strip = <S extends Schema.Top>(schema: S) =>
-  schema.annotate({ parseOptions: ignoreExcessProperties });
-const passthrough = <S extends Schema.Top>(schema: S) =>
-  schema.annotate({ parseOptions: preserveExcessProperties });
+const rejectExcessProperties = { onExcessProperty: "error" } as const;
 const strict = <S extends Schema.Top>(schema: S) =>
   schema.annotate({ parseOptions: rejectExcessProperties });
-
 const mutableArray = <S extends Schema.Top>(item: S) =>
   Schema.mutable(Schema.Array(item));
-const defaulted = <S extends Schema.Constraint>(
-  schema: S,
-  value: S["Type"],
-): Schema.withDecodingDefaultType<S> =>
-  Schema.withDecodingDefaultType<S>(Effect.succeed(value))(schema);
-const defaultedWith = <S extends Schema.Constraint>(
-  schema: S,
-  value: () => S["Type"],
-): Schema.withDecodingDefaultType<S> =>
-  Schema.withDecodingDefaultType<S>(Effect.sync(value))(schema);
 
 export const WorkflowStageId = Schema.String.check(
   Schema.isPattern(/^[a-z][a-z0-9_-]{0,63}$/u),
 );
-
 export const EvidenceType = Schema.Trim.check(
   Schema.isLengthBetween(1, autoHuntEvidenceTypeMaxLength),
   Schema.isPattern(autoHuntEvidenceTypePattern),
@@ -59,57 +67,41 @@ const WorkflowRequirement = strict(Schema.Struct({
   ),
   reason: Schema.mutableKey(Schema.NonEmptyString),
 }));
-
-const WorkflowStage = strip(Schema.Struct({
+const WorkflowStage = strict(Schema.Struct({
   id: Schema.mutableKey(WorkflowStageId),
   label: Schema.mutableKey(Schema.NonEmptyString),
   required: Schema.mutableKey(Schema.Boolean),
-  evidence: Schema.mutableKey(
-    Schema.optional(mutableArray(EvidenceType)),
-  ),
-  checks: Schema.mutableKey(
-    Schema.optional(mutableArray(Schema.NonEmptyString)),
-  ),
+  evidence: Schema.mutableKey(Schema.optional(mutableArray(EvidenceType))),
+  checks: Schema.mutableKey(Schema.optional(mutableArray(Schema.NonEmptyString))),
 }));
-
 const WorkflowCheckpoint = strict(Schema.Struct({
   key: Schema.mutableKey(WorkflowStageId),
   stage: Schema.mutableKey(WorkflowStageId),
   position: Schema.mutableKey(Schema.Literals(["before", "after"])),
 }));
-
-const WorkflowExecutionInput = strip(Schema.Struct({
+const WorkflowExecutionInput = strict(Schema.Struct({
   checkpoints: Schema.mutableKey(
-    Schema.optional(
-      mutableArray(WorkflowCheckpoint).check(Schema.isMaxLength(100)),
-    ),
+    mutableArray(WorkflowCheckpoint).check(Schema.isMaxLength(100)),
   ),
 }));
-
-const WorkflowCompletionInput = strip(Schema.Struct({
+const WorkflowCompletionInput = strict(Schema.Struct({
   requiredStages: Schema.mutableKey(mutableArray(WorkflowStageId)),
 }));
-
 const WorkflowConfigInput = strict(Schema.Struct({
   version: Schema.mutableKey(Schema.Literal(2)),
-  requirements: Schema.mutableKey(
-    Schema.optional(mutableArray(WorkflowRequirement)),
-  ),
+  requirements: Schema.mutableKey(mutableArray(WorkflowRequirement)),
   stages: Schema.mutableKey(
     mutableArray(WorkflowStage).check(Schema.isMinLength(1)),
   ),
-  execution: Schema.mutableKey(Schema.optional(WorkflowExecutionInput)),
-  completion: Schema.mutableKey(Schema.optional(WorkflowCompletionInput)),
+  execution: Schema.mutableKey(WorkflowExecutionInput),
+  completion: Schema.mutableKey(WorkflowCompletionInput),
 }));
-
-const NormalizedWorkflowExecution = strip(Schema.Struct({
+const NormalizedWorkflowExecution = strict(Schema.Struct({
   checkpoints: Schema.mutableKey(mutableArray(WorkflowCheckpoint)),
 }));
-
-const NormalizedWorkflowCompletion = strip(Schema.Struct({
+const NormalizedWorkflowCompletion = strict(Schema.Struct({
   requiredStages: Schema.mutableKey(mutableArray(WorkflowStageId)),
 }));
-
 const NormalizedWorkflowConfig = strict(Schema.Struct({
   version: Schema.mutableKey(Schema.Literal(2)),
   requirements: Schema.mutableKey(mutableArray(WorkflowRequirement)),
@@ -117,7 +109,6 @@ const NormalizedWorkflowConfig = strict(Schema.Struct({
   execution: Schema.mutableKey(NormalizedWorkflowExecution),
   completion: Schema.mutableKey(NormalizedWorkflowCompletion),
 }));
-
 type WorkflowConfigInput = typeof WorkflowConfigInput.Type;
 type NormalizedWorkflowConfig = typeof NormalizedWorkflowConfig.Type;
 
@@ -144,37 +135,30 @@ export const WorkflowConfig = WorkflowConfigInput.pipe(
   ),
 );
 
-const WorktreeConfig = passthrough(Schema.Struct({
+const WorktreeConfig = strict(Schema.Struct({
   enabled: Schema.mutableKey(Schema.optional(Schema.Boolean)),
   root: Schema.mutableKey(Schema.optional(Schema.NonEmptyString)),
   branchPrefix: Schema.mutableKey(Schema.optional(Schema.NonEmptyString)),
 }));
-
-const SandboxConfig = passthrough(Schema.Struct({
-  /** False confines Auto Hunt writes to the assigned workspace. Defaults to true. */
+const SandboxConfig = strict(Schema.Struct({
   fullAccess: Schema.mutableKey(Schema.optional(Schema.Boolean)),
 }));
-
-const ClaimWorktree = strip(Schema.Struct({
+const ClaimWorktree = strict(Schema.Struct({
   path: Schema.mutableKey(Schema.NonEmptyString),
   branch: Schema.mutableKey(Schema.NonEmptyString),
   baseRef: Schema.mutableKey(Schema.NonEmptyString),
   baseSha: Schema.mutableKey(Schema.NonEmptyString),
 }));
-
-const LinearConfig = passthrough(Schema.Struct({
+const LinearConfig = strict(Schema.Struct({
   enabled: Schema.mutableKey(Schema.Boolean),
   source: Schema.mutableKey(
     Schema.optional(
-      Schema.String.check(
-        Schema.isPattern(/^linear:\/\/[A-Za-z0-9._-]+$/u),
-      ),
+      Schema.String.check(Schema.isPattern(/^linear:\/\/[A-Za-z0-9._-]+$/u)),
     ),
   ),
   teamKey: Schema.mutableKey(Schema.optional(Schema.NonEmptyString)),
 }));
-
-const AutoHuntConfig = passthrough(Schema.Struct({
+const AutoHuntConfig = strict(Schema.Struct({
   velenOrg: Schema.mutableKey(Schema.optional(Schema.NonEmptyString)),
   dataSource: Schema.mutableKey(Schema.optional(Schema.NonEmptyString)),
   worktrees: Schema.mutableKey(Schema.optional(WorktreeConfig)),
@@ -189,7 +173,9 @@ const AutoHuntConfig = passthrough(Schema.Struct({
 
 const Uuid = Schema.String.check(Schema.isUUID());
 const ManagedComputerDeviceId = Schema.String.check(
-  Schema.isPattern(/^managed-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u),
+  Schema.isPattern(
+    /^managed-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+  ),
 );
 const WorkerDeviceId = Schema.Union([Uuid, ManagedComputerDeviceId]);
 const UrlString = Schema.String.check(
@@ -199,12 +185,24 @@ const PositiveWorkerConcurrency = Schema.Int.check(
   Schema.isGreaterThanOrEqualTo(1),
   Schema.isLessThanOrEqualTo(16),
 );
-
-const LlmConfig = passthrough(Schema.Struct({
+const LlmConfig = strict(Schema.Struct({
   provider: Schema.mutableKey(Schema.Literals(agentProviders)),
+  model: Schema.mutableKey(
+    Schema.optional(
+      Schema.String.check(
+        Schema.isLengthBetween(1, 128),
+        Schema.isPattern(/^\S+$/u),
+      ),
+    ),
+  ),
+  effort: Schema.mutableKey(
+    Schema.optional(Schema.String.check(Schema.isLengthBetween(1, 64))),
+  ),
+  approvalPolicy: Schema.mutableKey(
+    Schema.Literals(["untrusted", "on-request", "never"]),
+  ),
 }));
-
-const ExecutionWorkerConfig = strip(Schema.Struct({
+const ExecutionWorkerConfig = strict(Schema.Struct({
   deviceId: Schema.mutableKey(WorkerDeviceId),
   workerId: Schema.mutableKey(Schema.NonEmptyString),
   organizationId: Schema.mutableKey(Uuid),
@@ -214,18 +212,13 @@ const ExecutionWorkerConfig = strip(Schema.Struct({
   label: Schema.mutableKey(
     Schema.String.check(Schema.isLengthBetween(1, 100)),
   ),
-  maxConcurrentSessions: Schema.mutableKey(
-    defaulted(PositiveWorkerConcurrency, 1),
-  ),
+  maxConcurrentSessions: Schema.mutableKey(PositiveWorkerConcurrency),
 }));
-
-const ActiveClaim = strip(Schema.Struct({
+const ActiveClaim = strict(Schema.Struct({
   runId: Schema.mutableKey(Uuid),
   sourceKey: Schema.mutableKey(Schema.NonEmptyString),
   token: Schema.mutableKey(
-    Schema.optional(
-      Schema.String.check(Schema.isStartsWith("briar_claim_")),
-    ),
+    Schema.optional(Schema.String.check(Schema.isStartsWith("briar_claim_"))),
   ),
   leaseExpiresAt: Schema.mutableKey(IsoDateTimeWithOffset),
   worktree: Schema.mutableKey(Schema.optional(ClaimWorktree)),
@@ -238,83 +231,70 @@ const ActiveClaim = strip(Schema.Struct({
   finishedAt: Schema.mutableKey(Schema.optional(IsoDateTimeWithOffset)),
 }));
 
-export const ProjectConfig = passthrough(Schema.Struct({
+export const ProjectConfig = strict(Schema.Struct({
   id: Schema.mutableKey(Uuid),
-  repositoryPath: Schema.mutableKey(Schema.String),
-  agentToken: Schema.mutableKey(Schema.optional(Schema.String)),
-  apiUrl: Schema.mutableKey(Schema.optional(UrlString)),
+  repositoryPath: Schema.mutableKey(Schema.NonEmptyString),
+  agentToken: Schema.mutableKey(
+    Schema.optional(Schema.String.check(Schema.isStartsWith("briar_agent_"))),
+  ),
+  apiUrl: Schema.mutableKey(UrlString),
   repositoryRemote: Schema.mutableKey(Schema.optional(Schema.String)),
   llm: Schema.mutableKey(Schema.optional(LlmConfig)),
   autoHunt: Schema.mutableKey(Schema.optional(AutoHuntConfig)),
-  executionWorker: Schema.mutableKey(
-    Schema.optional(ExecutionWorkerConfig),
-  ),
+  executionWorker: Schema.mutableKey(Schema.optional(ExecutionWorkerConfig)),
   activeClaim: Schema.mutableKey(Schema.optional(ActiveClaim)),
 }));
 export type ProjectConfig = typeof ProjectConfig.Type;
 
-const ManagedComputerConfig = strip(Schema.Struct({
+const ManagedComputerConfig = strict(Schema.Struct({
   managedComputerId: Schema.mutableKey(Uuid),
   deviceId: Schema.mutableKey(ManagedComputerDeviceId),
   organizationId: Schema.mutableKey(Uuid),
-  credentialFile: Schema.mutableKey(Schema.String.check(
-    Schema.makeFilter((value) =>
-      value.startsWith("/") || "Managed computer credential path must be absolute"
+  credentialFile: Schema.mutableKey(
+    Schema.String.check(
+      Schema.makeFilter((value) =>
+        value.startsWith("/") ||
+        "Managed computer credential path must be absolute"
+      ),
     ),
-  )),
-}));
-
-const AgentProviderSettings = strip(Schema.Struct({
-  codex: Schema.mutableKey(defaulted(Schema.Boolean, true)),
-  claude: Schema.mutableKey(defaulted(Schema.Boolean, true)),
-  cursor: Schema.mutableKey(defaulted(Schema.Boolean, true)),
-  grok: Schema.mutableKey(defaulted(Schema.Boolean, true)),
-  agy: Schema.mutableKey(defaulted(Schema.Boolean, true)),
-  opencode: Schema.mutableKey(defaulted(Schema.Boolean, true)),
-  openrouter: Schema.mutableKey(defaulted(Schema.Boolean, true)),
-}));
-
-const defaultAgentProviderSettings = () => ({
-  codex: true,
-  claude: true,
-  cursor: true,
-  grok: true,
-  agy: true,
-  opencode: true,
-  openrouter: true,
-});
-
-const AppSettings = passthrough(Schema.Struct({
-  preventSleepWhileRunning: Schema.mutableKey(
-    defaulted(Schema.Boolean, false),
   ),
+}));
+const AgentProviderSettings = strict(Schema.Struct({
+  codex: Schema.mutableKey(Schema.Boolean),
+  claude: Schema.mutableKey(Schema.Boolean),
+  cursor: Schema.mutableKey(Schema.Boolean),
+  grok: Schema.mutableKey(Schema.Boolean),
+  agy: Schema.mutableKey(Schema.Boolean),
+  opencode: Schema.mutableKey(Schema.Boolean),
+  openrouter: Schema.mutableKey(Schema.Boolean),
+}));
+const AppSettings = strict(Schema.Struct({
+  preventSleepWhileRunning: Schema.mutableKey(Schema.Boolean),
   browserAutomationProvider: Schema.mutableKey(
-    defaulted(
-      Schema.Literals(["ego-browser", "agent-browser", "aside"]),
-      "ego-browser",
-    ),
+    Schema.Literals(["ego-browser", "agent-browser", "aside"]),
   ),
 }));
 
-const defaultAppSettings = () => ({
-  preventSleepWhileRunning: false,
-  browserAutomationProvider: "ego-browser" as const,
-});
+const projectHasExecutionCredential = (
+  project: ProjectConfig,
+  managedComputer: typeof ManagedComputerConfig.Type | undefined,
+) => {
+  if (project.agentToken || project.executionWorker?.token) return true;
+  return Boolean(
+    managedComputer && project.executionWorker &&
+      project.executionWorker.deviceId === managedComputer.deviceId &&
+      project.executionWorker.organizationId === managedComputer.organizationId,
+  );
+};
 
-export const Config = passthrough(Schema.Struct({
+export const Config = strict(Schema.Struct({
   apiUrl: Schema.mutableKey(UrlString),
   userToken: Schema.mutableKey(Schema.optional(Schema.String)),
-  agentProviders: Schema.mutableKey(
-    defaultedWith(AgentProviderSettings, defaultAgentProviderSettings),
-  ),
+  agentProviders: Schema.mutableKey(AgentProviderSettings),
   openrouterApiKey: Schema.mutableKey(
-    Schema.optional(
-      Schema.Trim.check(Schema.isLengthBetween(10, 500)),
-    ),
+    Schema.optional(Schema.Trim.check(Schema.isLengthBetween(10, 500))),
   ),
-  appSettings: Schema.mutableKey(
-    defaultedWith(AppSettings, defaultAppSettings),
-  ),
+  appSettings: Schema.mutableKey(AppSettings),
   workerDeviceIdentity: Schema.mutableKey(
     Schema.optional(
       Schema.String.check(
@@ -322,29 +302,366 @@ export const Config = passthrough(Schema.Struct({
       ),
     ),
   ),
-  managedComputer: Schema.mutableKey(
-    Schema.optional(ManagedComputerConfig),
+  managedComputer: Schema.mutableKey(Schema.optional(ManagedComputerConfig)),
+  projects: Schema.mutableKey(mutableArray(ProjectConfig)),
+})).check(
+  Schema.makeFilter((config) =>
+    config.projects.every((project) =>
+      projectHasExecutionCredential(project, config.managedComputer)
+    ) ||
+    "Every project must have an agent token or an execution worker credential"
   ),
-  projects: Schema.mutableKey(
-    defaultedWith(mutableArray(ProjectConfig), () => []),
-  ),
-}));
+);
 export type Config = typeof Config.Type;
 
-export const decodeConfig = Schema.decodeUnknownSync(Config, {
-  errors: "all",
+const decodeDomainConfig = Schema.decodeUnknownSync(Config, { errors: "all" });
+
+const browserAutomationProviderFromProto = (
+  value: LocalBrowserAutomationProvider | undefined,
+): Config["appSettings"]["browserAutomationProvider"] => {
+  switch (value) {
+    case LocalBrowserAutomationProvider.EGO_BROWSER:
+      return "ego-browser";
+    case LocalBrowserAutomationProvider.AGENT_BROWSER:
+      return "agent-browser";
+    case LocalBrowserAutomationProvider.ASIDE:
+      return "aside";
+    case LocalBrowserAutomationProvider.UNSPECIFIED:
+    case undefined:
+      throw new Error("config.appSettings.browserAutomationProvider is missing");
+    default:
+      throw new Error(`Unknown browser automation provider: ${value}`);
+  }
+};
+const browserAutomationProviderToProto = (
+  value: Config["appSettings"]["browserAutomationProvider"],
+) => {
+  switch (value) {
+    case "ego-browser":
+      return LocalBrowserAutomationProvider.EGO_BROWSER;
+    case "agent-browser":
+      return LocalBrowserAutomationProvider.AGENT_BROWSER;
+    case "aside":
+      return LocalBrowserAutomationProvider.ASIDE;
+  }
+};
+const approvalPolicyFromProto = (
+  value: LocalApprovalPolicy | undefined,
+): NonNullable<ProjectConfig["llm"]>["approvalPolicy"] => {
+  switch (value) {
+    case LocalApprovalPolicy.UNTRUSTED:
+      return "untrusted";
+    case LocalApprovalPolicy.ON_REQUEST:
+      return "on-request";
+    case LocalApprovalPolicy.NEVER:
+      return "never";
+    case LocalApprovalPolicy.UNSPECIFIED:
+    case undefined:
+      throw new Error("config.projects.llm.approvalPolicy is missing");
+    default:
+      throw new Error(`Unknown approval policy: ${value}`);
+  }
+};
+const approvalPolicyToProto = (
+  value: NonNullable<ProjectConfig["llm"]>["approvalPolicy"],
+) => {
+  switch (value) {
+    case "untrusted":
+      return LocalApprovalPolicy.UNTRUSTED;
+    case "on-request":
+      return LocalApprovalPolicy.ON_REQUEST;
+    case "never":
+      return LocalApprovalPolicy.NEVER;
+  }
+};
+const terminalStatusFromProto = (
+  value: LocalClaimTerminalStatus | undefined,
+): NonNullable<ProjectConfig["activeClaim"]>["terminalStatus"] => {
+  switch (value) {
+    case LocalClaimTerminalStatus.COMPLETED:
+      return "completed";
+    case LocalClaimTerminalStatus.CANCELLED:
+      return "cancelled";
+    case LocalClaimTerminalStatus.BLOCKED:
+      return "blocked";
+    case LocalClaimTerminalStatus.FAILED:
+      return "failed";
+    case undefined:
+      return undefined;
+    case LocalClaimTerminalStatus.UNSPECIFIED:
+      throw new Error("config.projects.activeClaim.terminalStatus is unspecified");
+    default:
+      throw new Error(`Unknown claim terminal status: ${value}`);
+  }
+};
+const terminalStatusToProto = (
+  value: NonNullable<ProjectConfig["activeClaim"]>["terminalStatus"],
+) => {
+  switch (value) {
+    case "completed":
+      return LocalClaimTerminalStatus.COMPLETED;
+    case "cancelled":
+      return LocalClaimTerminalStatus.CANCELLED;
+    case "blocked":
+      return LocalClaimTerminalStatus.BLOCKED;
+    case "failed":
+      return LocalClaimTerminalStatus.FAILED;
+    case undefined:
+      return undefined;
+  }
+};
+const timestampFromProto = (value: Timestamp | undefined, field: string) =>
+  timestampDate(requiredMessage(value, field)).toISOString();
+const timestampToProto = (value: string) => timestampFromDate(new Date(value));
+
+const llmFromProto = (value: LocalProjectLlmConfig) => ({
+  provider: agentProviderFromProto(
+    requiredMessage(value.provider, "config.projects.llm.provider"),
+  ),
+  model: value.model,
+  effort: value.effort,
+  approvalPolicy: approvalPolicyFromProto(value.approvalPolicy),
 });
+const autoHuntFromProto = (value: LocalAutoHuntConfig) => ({
+  velenOrg: value.velenOrg,
+  dataSource: value.dataSource,
+  worktrees: value.worktrees === undefined
+    ? undefined
+    : {
+      enabled: value.worktrees.enabled,
+      root: value.worktrees.root,
+      branchPrefix: value.worktrees.branchPrefix,
+    },
+  sandbox: value.sandbox === undefined
+    ? undefined
+    : { fullAccess: value.sandbox.fullAccess },
+  linear: value.linear === undefined
+    ? undefined
+    : {
+      enabled: value.linear.enabled,
+      source: value.linear.source,
+      teamKey: value.linear.teamKey,
+    },
+  githubRepository: value.githubRepository,
+  githubRepositoryId: value.githubRepositoryId === undefined
+    ? undefined
+    : safeNumber(
+      value.githubRepositoryId,
+      "config.projects.autoHunt.githubRepositoryId",
+    ),
+  workflow: value.workflow === undefined
+    ? undefined
+    : workflowFromProto(value.workflow),
+});
+const activeClaimFromProto = (value: LocalActiveClaimConfig) => ({
+  runId: value.runId,
+  sourceKey: value.sourceKey,
+  token: value.token,
+  leaseExpiresAt: timestampFromProto(
+    value.leaseExpiresAt,
+    "config.projects.activeClaim.leaseExpiresAt",
+  ),
+  worktree: value.worktree === undefined
+    ? undefined
+    : {
+      path: value.worktree.path,
+      branch: value.worktree.branch,
+      baseRef: value.worktree.baseRef,
+      baseSha: value.worktree.baseSha,
+    },
+  finished: value.finished,
+  terminalStatus: terminalStatusFromProto(value.terminalStatus),
+  finishedAt: value.finishedAt === undefined
+    ? undefined
+    : timestampFromProto(
+      value.finishedAt,
+      "config.projects.activeClaim.finishedAt",
+    ),
+});
+const projectFromProto = (value: LocalProjectConfig) => ({
+  id: value.id,
+  repositoryPath: value.repositoryPath,
+  agentToken: value.agentToken,
+  apiUrl: value.apiUrl,
+  repositoryRemote: value.repositoryRemote,
+  llm: value.llm === undefined ? undefined : llmFromProto(value.llm),
+  autoHunt: value.autoHunt === undefined
+    ? undefined
+    : autoHuntFromProto(value.autoHunt),
+  executionWorker: value.executionWorker === undefined
+    ? undefined
+    : {
+      deviceId: value.executionWorker.deviceId,
+      workerId: value.executionWorker.workerId,
+      organizationId: value.executionWorker.organizationId,
+      token: value.executionWorker.token,
+      label: value.executionWorker.label,
+      maxConcurrentSessions: value.executionWorker.maxConcurrentSessions,
+    },
+  activeClaim: value.activeClaim === undefined
+    ? undefined
+    : activeClaimFromProto(value.activeClaim),
+});
+const configFromProto = (value: LocalConfig): Config => {
+  const agentProviderSettings = requiredMessage(
+    value.agentProviders,
+    "config.agentProviders",
+  );
+  const appSettings = requiredMessage(value.appSettings, "config.appSettings");
+  return decodeDomainConfig({
+    apiUrl: value.apiUrl,
+    userToken: value.userToken,
+    agentProviders: {
+      codex: agentProviderSettings.codex,
+      claude: agentProviderSettings.claude,
+      cursor: agentProviderSettings.cursor,
+      grok: agentProviderSettings.grok,
+      agy: agentProviderSettings.agy,
+      opencode: agentProviderSettings.opencode,
+      openrouter: agentProviderSettings.openrouter,
+    },
+    openrouterApiKey: value.openrouterApiKey,
+    appSettings: {
+      preventSleepWhileRunning: appSettings.preventSleepWhileRunning,
+      browserAutomationProvider: browserAutomationProviderFromProto(
+        appSettings.browserAutomationProvider,
+      ),
+    },
+    workerDeviceIdentity: value.workerDeviceIdentity,
+    managedComputer: value.managedComputer === undefined
+      ? undefined
+      : {
+        managedComputerId: value.managedComputer.managedComputerId,
+        deviceId: value.managedComputer.deviceId,
+        organizationId: value.managedComputer.organizationId,
+        credentialFile: value.managedComputer.credentialFile,
+      },
+    projects: value.projects.map(projectFromProto),
+  });
+};
+
+const llmToProto = (value: NonNullable<ProjectConfig["llm"]>) => ({
+  provider: agentProviderToProto(value.provider),
+  model: value.model,
+  effort: value.effort,
+  approvalPolicy: approvalPolicyToProto(value.approvalPolicy),
+});
+const autoHuntToProto = (value: NonNullable<ProjectConfig["autoHunt"]>) => ({
+  velenOrg: value.velenOrg,
+  dataSource: value.dataSource,
+  worktrees: value.worktrees === undefined
+    ? undefined
+    : {
+      enabled: value.worktrees.enabled,
+      root: value.worktrees.root,
+      branchPrefix: value.worktrees.branchPrefix,
+    },
+  sandbox: value.sandbox === undefined
+    ? undefined
+    : { fullAccess: value.sandbox.fullAccess },
+  linear: value.linear === undefined
+    ? undefined
+    : {
+      enabled: value.linear.enabled,
+      source: value.linear.source,
+      teamKey: value.linear.teamKey,
+    },
+  githubRepository: value.githubRepository,
+  githubRepositoryId: value.githubRepositoryId === undefined
+    ? undefined
+    : BigInt(value.githubRepositoryId),
+  workflow: value.workflow === undefined
+    ? undefined
+    : workflowToProto(value.workflow),
+});
+const activeClaimToProto = (
+  value: NonNullable<ProjectConfig["activeClaim"]>,
+) => ({
+  runId: value.runId,
+  sourceKey: value.sourceKey,
+  token: value.token,
+  leaseExpiresAt: timestampToProto(value.leaseExpiresAt),
+  worktree: value.worktree === undefined
+    ? undefined
+    : {
+      path: value.worktree.path,
+      branch: value.worktree.branch,
+      baseRef: value.worktree.baseRef,
+      baseSha: value.worktree.baseSha,
+    },
+  finished: value.finished,
+  terminalStatus: terminalStatusToProto(value.terminalStatus),
+  finishedAt: value.finishedAt === undefined
+    ? undefined
+    : timestampToProto(value.finishedAt),
+});
+const projectToProto = (value: ProjectConfig) => ({
+  id: value.id,
+  repositoryPath: value.repositoryPath,
+  agentToken: value.agentToken,
+  apiUrl: value.apiUrl,
+  repositoryRemote: value.repositoryRemote,
+  llm: value.llm === undefined ? undefined : llmToProto(value.llm),
+  autoHunt: value.autoHunt === undefined
+    ? undefined
+    : autoHuntToProto(value.autoHunt),
+  executionWorker: value.executionWorker === undefined
+    ? undefined
+    : {
+      deviceId: value.executionWorker.deviceId,
+      workerId: value.executionWorker.workerId,
+      organizationId: value.executionWorker.organizationId,
+      token: value.executionWorker.token,
+      label: value.executionWorker.label,
+      maxConcurrentSessions: value.executionWorker.maxConcurrentSessions,
+    },
+  activeClaim: value.activeClaim === undefined
+    ? undefined
+    : activeClaimToProto(value.activeClaim),
+});
+const configToProto = (input: Config): LocalConfig => {
+  const value = decodeDomainConfig(input);
+  return create(LocalConfigSchema, {
+    apiUrl: value.apiUrl,
+    userToken: value.userToken,
+    agentProviders: { ...value.agentProviders },
+    openrouterApiKey: value.openrouterApiKey,
+    appSettings: {
+      preventSleepWhileRunning: value.appSettings.preventSleepWhileRunning,
+      browserAutomationProvider: browserAutomationProviderToProto(
+        value.appSettings.browserAutomationProvider,
+      ),
+    },
+    workerDeviceIdentity: value.workerDeviceIdentity,
+    managedComputer: value.managedComputer === undefined
+      ? undefined
+      : { ...value.managedComputer },
+    projects: value.projects.map(projectToProto),
+  });
+};
+
+export const decodeConfig = (input: unknown): Config =>
+  configFromProto(fromJson(LocalConfigSchema, input as JsonValue));
+export const decodeConfigJson = (input: string): Config =>
+  configFromProto(fromJsonString(LocalConfigSchema, input));
+export const encodeConfigJson = (config: Config): string =>
+  `${
+    toJsonString(LocalConfigSchema, configToProto(config), { prettySpaces: 2 })
+  }\n`;
 
 const formatConfigIssue = SchemaIssue.makeFormatterStandardSchemaV1();
-
 export function configErrorLocations(error: unknown): string[] {
-  if (!Schema.isSchemaError(error)) return ["config"];
+  if (!Schema.isSchemaError(error)) {
+    const message = error instanceof Error ? error.message : String(error);
+    const unknownKey = /key "([^"]+)"/u.exec(message)?.[1];
+    const invalidField = /cannot decode field [\w.]+\.([\w]+) from JSON/u
+      .exec(message)?.[1];
+    return [unknownKey ?? invalidField ?? "config"];
+  }
   return [
     ...new Set(
       formatConfigIssue(error.issue).issues.map((issue) =>
-        issue.path && issue.path.length > 0
-          ? issue.path.join(".")
-          : "config"
+        issue.path && issue.path.length > 0 ? issue.path.join(".") : "config"
       ),
     ),
   ].slice(0, 3);

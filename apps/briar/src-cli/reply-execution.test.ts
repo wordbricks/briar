@@ -32,7 +32,8 @@ const config: Config = {
 const project: ProjectConfig = {
   id: projectId,
   repositoryPath: "/projects/connected-checkout",
-  agentToken: "agent-token",
+  agentToken: "briar_agent_test",
+  apiUrl: "https://api.example.com",
   autoHunt: {
     worktrees: {
       enabled: false,

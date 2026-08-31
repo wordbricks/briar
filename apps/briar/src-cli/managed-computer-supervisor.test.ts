@@ -13,6 +13,20 @@ describe("managed computer worker supervisor", () => {
   it("starts only project bindings that belong to the enrolled device", () => {
     const config = decodeConfig({
       apiUrl: "https://briar.example",
+      agentProviders: {
+        codex: true,
+        claude: true,
+        cursor: true,
+        grok: true,
+        agy: true,
+        opencode: true,
+        openrouter: true,
+      },
+      appSettings: {
+        preventSleepWhileRunning: false,
+        browserAutomationProvider:
+          "LOCAL_BROWSER_AUTOMATION_PROVIDER_EGO_BROWSER",
+      },
       managedComputer: {
         managedComputerId,
         organizationId,
@@ -23,6 +37,7 @@ describe("managed computer worker supervisor", () => {
         {
           id: "11111111-1111-4111-8111-111111111111",
           repositoryPath: "/home/briar/one",
+          apiUrl: "https://briar.example",
           executionWorker: {
             deviceId,
             workerId: "worker-one",
@@ -34,6 +49,7 @@ describe("managed computer worker supervisor", () => {
         {
           id: "22222222-2222-4222-8222-222222222222",
           repositoryPath: "/home/briar/two",
+          apiUrl: "https://briar.example",
           executionWorker: {
             deviceId: "33333333-3333-4333-8333-333333333333",
             workerId: "other-worker",

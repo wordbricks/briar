@@ -1,8 +1,10 @@
 import {
   chmod,
   mkdir,
+  open,
   readFile,
-  writeFile,
+  rename,
+  rm,
 } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import {
@@ -33,7 +35,8 @@ import {
 } from "./config-environment";
 import {
   configErrorLocations,
-  decodeConfig,
+  decodeConfigJson,
+  encodeConfigJson,
   type Config,
   type ProjectConfig,
 } from "./config-contract";
@@ -139,15 +142,9 @@ async function loadConfig(): Promise<Config> {
     );
   }
 
-  let storedConfig: unknown;
-  try {
-    storedConfig = JSON.parse(contents);
-  } catch {
-    throw new Error("Briar 로컬 설정이 올바른 JSON이 아닙니다.");
-  }
   let config: Config;
   try {
-    config = decodeConfig(storedConfig);
+    config = decodeConfigJson(contents);
   } catch (error) {
     const locations = configErrorLocations(error);
     throw new Error(
@@ -177,10 +174,23 @@ async function saveConfig(config: Config) {
 async function saveConfigAt(directory: string, config: Config) {
   const path = join(directory, "config.json");
   await mkdir(directory, { recursive: true, mode: 0o700 });
-  await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, {
-    mode: 0o600,
-  });
-  await chmod(path, 0o600);
+  await chmod(directory, 0o700);
+  const temporaryPath = join(
+    directory,
+    `.config.${process.pid}.${crypto.randomUUID()}.tmp`,
+  );
+  const file = await open(temporaryPath, "wx", 0o600);
+  try {
+    await file.writeFile(encodeConfigJson(config), "utf8");
+    await file.sync();
+    await file.close();
+    await rename(temporaryPath, path);
+    await chmod(path, 0o600);
+  } catch (error) {
+    await file.close().catch(() => undefined);
+    await rm(temporaryPath, { force: true }).catch(() => undefined);
+    throw error;
+  }
 }
 
 async function request<T>(

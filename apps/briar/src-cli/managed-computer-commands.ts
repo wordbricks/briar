@@ -277,7 +277,7 @@ export async function managedComputerSetupCommand() {
     repositoryPath,
     repositoryRemote,
     apiUrl: credential.apiOrigin,
-    llm: { provider },
+    llm: { provider, approvalPolicy: "never" },
     executionWorker: {
       deviceId: credential.deviceId,
       workerId: binding.worker.id,
