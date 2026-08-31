@@ -13,6 +13,7 @@ import { resolveIssueAttachmentUploads } from "./issue-attachment-upload-reposit
 import { prepareIssueMessageAttachmentsApplication } from "./issue-attachment-upload-application";
 import { createProjectIssueMessage } from "./issue-conversation-routes";
 import { commitIssueMessageMutation } from "./issue-message-mutation-repository";
+import { decodeIssueMessageMutationReceiptResponse } from "./issue-mutation-receipt-contract";
 import { decodeIssueMessageInput } from "./issue-request-contract";
 import { uploadReservedFileApplication } from "./upload-application";
 
@@ -344,6 +345,17 @@ describe("issue message mutation", () => {
       .bind(existingAttachmentId)
       .run();
 
+    const reply = {
+      id: crypto.randomUUID(),
+      replyMessageId: crypto.randomUUID(),
+      agentId: agentIds[0]!,
+      agentName: "Alpha",
+      agentResponsibility: "Reply as Alpha.",
+      preferredWorkerId: null,
+      preferredProvider: "codex" as const,
+      requiresPreferredWorker: false,
+    };
+    const body = `![old](briar-attachment://${existingAttachmentId})`;
     await expect(commitIssueMessageMutation(db, {
       organizationId,
       projectId,
@@ -352,7 +364,7 @@ describe("issue message mutation", () => {
       messageId,
       parentMessageId,
       authorAgentProvider: null,
-      body: `![old](briar-attachment://${existingAttachmentId})`,
+      body,
       mentionedUserIds: [raceMemberId],
       targetAgentIds: [agentIds[0]!],
       attachments: uploads!.map((upload) => ({
@@ -367,18 +379,56 @@ describe("issue message mutation", () => {
       })),
       uploadIds: [uploadId!],
       existingAttachmentIds: [existingAttachmentId],
-      replies: [{
-        id: crypto.randomUUID(),
-        replyMessageId: crypto.randomUUID(),
-        agentId: agentIds[0]!,
-        agentName: "Alpha",
-        agentResponsibility: "Reply as Alpha.",
-        preferredWorkerId: null,
-        preferredProvider: "codex",
-        requiresPreferredWorker: false,
-      }],
+      replies: [reply],
       requestHash: "f".repeat(64),
-      responseJson: "{}",
+      response: decodeIssueMessageMutationReceiptResponse({
+        message: {
+          id: messageId,
+          runId,
+          parentMessageId,
+          body,
+          attachments: [],
+          author: {
+            id: ownerId,
+            name: "Owner",
+            image: null,
+            agentId: null,
+            provider: null,
+          },
+          replyCount: 0,
+          proposedAction: null,
+          executionProposal: null,
+          skillExecutionProposal: null,
+          createdAt: committedAt,
+          updatedAt: committedAt,
+        },
+        agentReply: {
+          id: reply.id,
+          triggerMessageId: messageId,
+          parentMessageId,
+          agentId: reply.agentId,
+          agentName: reply.agentName,
+          status: "queued",
+          attempts: 0,
+          workerId: null,
+          provider: null,
+          error: null,
+          updatedAt: committedAt,
+        },
+        agentReplies: [{
+          id: reply.id,
+          triggerMessageId: messageId,
+          parentMessageId,
+          agentId: reply.agentId,
+          agentName: reply.agentName,
+          status: "queued",
+          attempts: 0,
+          workerId: null,
+          provider: null,
+          error: null,
+          updatedAt: committedAt,
+        }],
+      }),
       committedAt,
     })).rejects.toBeDefined();
     await expect(db.prepare(

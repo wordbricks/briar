@@ -1,5 +1,5 @@
 const attachmentScheme = "briar-attachment://";
-const attachmentReferencePattern = /^[0-9a-z_-]+$/iu;
+export const issueAttachmentReferencePattern = /^[0-9a-z_-]+$/iu;
 const attachmentUrlPattern = /briar-attachment:\/\/([0-9a-z_-]+)/giu;
 
 export function issueAttachmentMarkdown(reference: string, filename: string) {
@@ -13,7 +13,7 @@ export function issueAttachmentMarkdown(reference: string, filename: string) {
 export function issueAttachmentReference(url: string | undefined) {
   if (!url?.startsWith(attachmentScheme)) return null;
   const reference = url.slice(attachmentScheme.length);
-  return attachmentReferencePattern.test(reference) ? reference : null;
+  return issueAttachmentReferencePattern.test(reference) ? reference : null;
 }
 
 export function issueAttachmentReferences(markdown: string | null) {
@@ -70,5 +70,6 @@ export function removeIssueAttachmentMarkdown(
 }
 
 export function isIssueAttachmentReference(value: unknown): value is string {
-  return typeof value === "string" && attachmentReferencePattern.test(value);
+  return typeof value === "string" &&
+    issueAttachmentReferencePattern.test(value);
 }

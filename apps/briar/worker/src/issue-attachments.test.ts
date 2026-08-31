@@ -13,6 +13,7 @@ import {
 } from "./issue-core-routes";
 import { getHuntRunForProject, listIssueAttachments } from "./db";
 import { updateIssueMutationStatements } from "./issue-create-update-repository";
+import { decodeIssueUpdateMutationReceiptResponse } from "./issue-mutation-receipt-contract";
 import {
   decodeIssueInput,
   decodeIssueUpdateInput,
@@ -170,6 +171,67 @@ describe("issue create and update attachment mutations", () => {
       consumer_kind: "issue_create",
       consumer_id: clientIssueId,
     });
+  });
+
+  it("bounds stored receipts and fails closed on corrupt replay payloads", async () => {
+    const clientIssueId = crypto.randomUUID();
+    const input = {
+      db,
+      projectId,
+      userId: ownerId,
+      clientIssueId,
+      request: decodeIssueInput({
+        title: "Receipt boundary",
+        description: null,
+        status: "backlog",
+        checkpoints: [],
+        fullAuto: false,
+      }),
+      attachmentIds: [],
+    };
+    await createProjectIssue(input);
+    const receipt = await db.prepare(
+      `select client_issue_id, organization_id, project_id, user_id,
+              request_hash, attachment_upload_ids_json, created_at
+       from briar_issue_create_mutation_receipts
+       where client_issue_id = ?`,
+    ).bind(clientIssueId).first<{
+      client_issue_id: string;
+      organization_id: string;
+      project_id: string;
+      user_id: string;
+      request_hash: string;
+      attachment_upload_ids_json: string;
+      created_at: string;
+    }>();
+    if (!receipt) throw new Error("Expected the canonical receipt");
+    await db.prepare(
+      `delete from briar_issue_create_mutation_receipts
+       where client_issue_id = ?`,
+    ).bind(clientIssueId).run();
+
+    const insertReceipt = (responseJson: string) =>
+      db.prepare(
+        `insert into briar_issue_create_mutation_receipts (
+           client_issue_id, organization_id, project_id, user_id,
+           request_hash, attachment_upload_ids_json, response_json, created_at
+         ) values (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        receipt.client_issue_id,
+        receipt.organization_id,
+        receipt.project_id,
+        receipt.user_id,
+        receipt.request_hash,
+        receipt.attachment_upload_ids_json,
+        responseJson,
+        receipt.created_at,
+      ).run();
+    await expect(insertReceipt(JSON.stringify({
+      padding: "x".repeat(1_000_000),
+    }))).rejects.toThrow();
+
+    await insertReceipt("{}");
+    await expect(createProjectIssue(input)).rejects.toThrow(/missing key/iu);
   });
 
   it("never deletes an object that aggregate metadata still owns", async () => {
@@ -376,7 +438,15 @@ describe("issue create and update attachment mutations", () => {
       keptAttachments: [],
       newUploads: [],
       removedAttachments: attachments,
-      responseJson: JSON.stringify({ runId: clientIssueId }),
+      response: decodeIssueUpdateMutationReceiptResponse({
+        runId: clientIssueId,
+        title: "Must roll back",
+        description: null,
+        priority: null,
+        difficulty: null,
+        assigneeUserId: null,
+        attachments: [],
+      }),
     });
 
     await expect(db.batch([

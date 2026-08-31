@@ -1,29 +1,15 @@
 import type { IssueDifficulty } from "../../src/lib/issue-difficulty";
 import type { IssueAttachmentRow } from "./issue-attachment-repository";
+import {
+  decodeIssueCreateMutationReceiptRow,
+  decodeIssueUpdateMutationReceiptRow,
+  encodeIssueCreateMutationReceiptResponseJson,
+  encodeIssueMutationAttachmentUploadIdsJson,
+  encodeIssueUpdateMutationReceiptResponseJson,
+  type IssueCreateMutationReceiptResponse,
+  type IssueUpdateMutationReceiptResponse,
+} from "./issue-mutation-receipt-contract";
 import type { ScopedUploadRow } from "./upload-repository";
-
-export type IssueCreateMutationReceiptRow = {
-  client_issue_id: string;
-  organization_id: string;
-  project_id: string;
-  user_id: string;
-  request_hash: string;
-  attachment_upload_ids_json: string;
-  response_json: string;
-  created_at: string;
-};
-
-export type IssueUpdateMutationReceiptRow = {
-  request_id: string;
-  organization_id: string;
-  project_id: string;
-  run_id: string;
-  user_id: string;
-  request_hash: string;
-  attachment_upload_ids_json: string;
-  response_json: string;
-  created_at: string;
-};
 
 export function findIssueCreateAggregateId(
   db: D1Database,
@@ -40,11 +26,11 @@ export function findIssueCreateAggregateId(
     .first<{ id: string }>();
 }
 
-export function findIssueCreateMutationReceipt(
+export async function findIssueCreateMutationReceipt(
   db: D1Database,
   clientIssueId: string,
 ) {
-  return db
+  const row = await db
     .prepare(
       `select client_issue_id, organization_id, project_id, user_id,
               request_hash, attachment_upload_ids_json, response_json,
@@ -53,14 +39,15 @@ export function findIssueCreateMutationReceipt(
        where client_issue_id = ?`,
     )
     .bind(clientIssueId)
-    .first<IssueCreateMutationReceiptRow>();
+    .first();
+  return row === null ? null : decodeIssueCreateMutationReceiptRow(row);
 }
 
-export function findIssueUpdateMutationReceipt(
+export async function findIssueUpdateMutationReceipt(
   db: D1Database,
   requestId: string,
 ) {
-  return db
+  const row = await db
     .prepare(
       `select request_id, organization_id, project_id, run_id, user_id,
               request_hash, attachment_upload_ids_json, response_json,
@@ -69,7 +56,8 @@ export function findIssueUpdateMutationReceipt(
        where request_id = ?`,
     )
     .bind(requestId)
-    .first<IssueUpdateMutationReceiptRow>();
+    .first();
+  return row === null ? null : decodeIssueUpdateMutationReceiptRow(row);
 }
 
 export function issueAttachmentInsertStatements(
@@ -119,10 +107,25 @@ export function issueCreateMutationReceiptStatement(
     userId: string;
     requestHash: string;
     attachmentUploadIds: readonly string[];
-    responseJson: string;
+    response: IssueCreateMutationReceiptResponse;
     createdAt: string;
   },
 ) {
+  const attachmentUploadIdsJson =
+    encodeIssueMutationAttachmentUploadIdsJson(input.attachmentUploadIds);
+  const responseJson = encodeIssueCreateMutationReceiptResponseJson(
+    input.response,
+  );
+  decodeIssueCreateMutationReceiptRow({
+    client_issue_id: input.clientIssueId,
+    organization_id: input.organizationId,
+    project_id: input.projectId,
+    user_id: input.userId,
+    request_hash: input.requestHash,
+    attachment_upload_ids_json: attachmentUploadIdsJson,
+    response_json: responseJson,
+    created_at: input.createdAt,
+  });
   return db
     .prepare(
       `insert into briar_issue_create_mutation_receipts (
@@ -136,8 +139,8 @@ export function issueCreateMutationReceiptStatement(
       input.projectId,
       input.userId,
       input.requestHash,
-      JSON.stringify(input.attachmentUploadIds),
-      input.responseJson,
+      attachmentUploadIdsJson,
+      responseJson,
       input.createdAt,
     );
 }
@@ -162,7 +165,7 @@ export function updateIssueMutationStatements(
     keptAttachments: readonly IssueAttachmentRow[];
     newUploads: readonly ScopedUploadRow[];
     removedAttachments: readonly IssueAttachmentRow[];
-    responseJson: string;
+    response: IssueUpdateMutationReceiptResponse;
   },
 ) {
   const finalAttachmentIds = [
@@ -171,6 +174,23 @@ export function updateIssueMutationStatements(
   ];
   const previousAttachmentIdsJson = JSON.stringify(input.previousAttachmentIds);
   const finalAttachmentIdsJson = JSON.stringify(finalAttachmentIds);
+  const attachmentUploadIdsJson = encodeIssueMutationAttachmentUploadIdsJson(
+    input.newUploads.map((upload) => upload.upload_id),
+  );
+  const responseJson = encodeIssueUpdateMutationReceiptResponseJson(
+    input.response,
+  );
+  decodeIssueUpdateMutationReceiptRow({
+    request_id: input.requestId,
+    organization_id: input.organizationId,
+    project_id: input.projectId,
+    run_id: input.runId,
+    user_id: input.userId,
+    request_hash: input.requestHash,
+    attachment_upload_ids_json: attachmentUploadIdsJson,
+    response_json: responseJson,
+    created_at: input.updatedAt,
+  });
   const update = db
     .prepare(
       `update briar_hunt_runs as run
@@ -304,8 +324,8 @@ export function updateIssueMutationStatements(
       input.runId,
       input.userId,
       input.requestHash,
-      JSON.stringify(input.newUploads.map((upload) => upload.upload_id)),
-      input.responseJson,
+      attachmentUploadIdsJson,
+      responseJson,
       input.updatedAt,
     );
   return { update, inserts, cleanup, removals, receipt };

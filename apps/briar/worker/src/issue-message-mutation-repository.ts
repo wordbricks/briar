@@ -4,18 +4,12 @@ import {
   issueAttachmentUploadConsumeStatements,
 } from "./issue-attachment-upload-repository";
 import type { IssueAttachmentRow } from "./issue-attachment-repository";
-
-export type IssueMessageMutationReceiptRow = {
-  message_id: string;
-  organization_id: string;
-  project_id: string;
-  run_id: string;
-  user_id: string;
-  request_hash: string;
-  attachment_upload_ids_json: string;
-  response_json: string;
-  created_at: string;
-};
+import {
+  decodeIssueMessageMutationReceiptRow,
+  encodeIssueMessageMutationReceiptResponseJson,
+  encodeIssueMutationAttachmentUploadIdsJson,
+  type IssueMessageMutationReceiptResponse,
+} from "./issue-mutation-receipt-contract";
 
 export type IssueMessageReplyPlan = {
   id: string;
@@ -28,11 +22,11 @@ export type IssueMessageReplyPlan = {
   requiresPreferredWorker: boolean;
 };
 
-export function findIssueMessageMutationReceipt(
+export async function findIssueMessageMutationReceipt(
   db: D1Database,
   messageId: string,
 ) {
-  return db
+  const row = await db
     .prepare(
       `select message_id, organization_id, project_id, run_id, user_id,
               request_hash, attachment_upload_ids_json, response_json,
@@ -41,7 +35,8 @@ export function findIssueMessageMutationReceipt(
        where message_id = ?`,
     )
     .bind(messageId)
-    .first<IssueMessageMutationReceiptRow>();
+    .first();
+  return row === null ? null : decodeIssueMessageMutationReceiptRow(row);
 }
 
 export async function issueMessageAggregateExists(
@@ -105,7 +100,7 @@ export async function commitIssueMessageMutation(
     existingAttachmentIds: readonly string[];
     replies: readonly IssueMessageReplyPlan[];
     requestHash: string;
-    responseJson: string;
+    response: IssueMessageMutationReceiptResponse;
     committedAt: string;
   },
 ) {
@@ -117,6 +112,23 @@ export async function commitIssueMessageMutation(
   ) {
     throw new Error("Issue message reply plan does not match its Agent targets");
   }
+  const attachmentUploadIdsJson = encodeIssueMutationAttachmentUploadIdsJson(
+    input.uploadIds,
+  );
+  const responseJson = encodeIssueMessageMutationReceiptResponseJson(
+    input.response,
+  );
+  decodeIssueMessageMutationReceiptRow({
+    message_id: input.messageId,
+    organization_id: input.organizationId,
+    project_id: input.projectId,
+    run_id: input.runId,
+    user_id: input.userId,
+    request_hash: input.requestHash,
+    attachment_upload_ids_json: attachmentUploadIdsJson,
+    response_json: responseJson,
+    created_at: input.committedAt,
+  });
   const uploadScope = {
     purpose: "issue_message" as const,
     organizationId: input.organizationId,
@@ -291,8 +303,8 @@ export async function commitIssueMessageMutation(
         input.runId,
         input.userId,
         input.requestHash,
-        JSON.stringify(input.uploadIds),
-        input.responseJson,
+        attachmentUploadIdsJson,
+        responseJson,
         input.committedAt,
       ),
     ...issueAttachmentUploadConsumeStatements(db, {

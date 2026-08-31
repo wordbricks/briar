@@ -41,6 +41,12 @@ import {
   decodeIssueKeptAttachmentIds,
   decodeIssueUpdateInput,
 } from "./issue-request-contract";
+import {
+  decodeIssueCreateMutationReceiptResponse,
+  decodeIssueUpdateMutationReceiptResponse,
+  type IssueCreateMutationReceiptResponse,
+  type IssueUpdateMutationReceiptResponse,
+} from "./issue-mutation-receipt-contract";
 import { sha256 } from "./crypto-digest";
 import { listProjectMembers } from "./organization-repository";
 import { schedulePostCommitCleanup } from "./post-commit-cleanup";
@@ -75,19 +81,7 @@ const validateAttachmentReferences = (references: readonly string[]) => {
 const issueMutationConflict = (identity: "issue ID" | "update request ID") =>
   new HttpError(409, `${identity} was already used with a different request`);
 
-const storedMutationResponse = <A>(responseJson: string): A =>
-  JSON.parse(responseJson) as A;
-
-type CreateProjectIssueResult = {
-  runId: string;
-  sourceKey: string;
-  stage: "queued";
-  status: ReturnType<typeof decodeIssueInput>["status"];
-  assigneeUserId: string | null;
-  createdByUserId: string;
-  difficulty: ReturnType<typeof decodeIssueInput>["difficulty"];
-  attachments: ReturnType<typeof issueAttachmentJson>[];
-};
+type CreateProjectIssueResult = IssueCreateMutationReceiptResponse;
 
 export type IssueCreateAttribution = {
   sourceKey: string;
@@ -96,15 +90,7 @@ export type IssueCreateAttribution = {
   context: Readonly<Record<string, unknown>>;
 };
 
-type UpdateProjectIssueResult = {
-  runId: string;
-  title: string;
-  description: string | null;
-  priority: number | null;
-  difficulty: ReturnType<typeof decodeIssueUpdateInput>["difficulty"];
-  assigneeUserId: string | null;
-  attachments: ReturnType<typeof issueAttachmentJson>[];
-};
+type UpdateProjectIssueResult = IssueUpdateMutationReceiptResponse;
 
 type IssueCoreApplicationInput = {
   db: D1Database;
@@ -182,7 +168,7 @@ export async function createProjectIssue(
     ) {
       throw issueMutationConflict("issue ID");
     }
-    return storedMutationResponse(existingReceipt.response_json);
+    return existingReceipt.response_json;
   }
   if (await findIssueCreateAggregateId(input.db, {
     projectId: project.id,
@@ -229,7 +215,7 @@ export async function createProjectIssue(
     byte_size: upload.byte_size,
     created_at: observedAt,
   })).sort((left, right) => left.id.localeCompare(right.id));
-  const response: CreateProjectIssueResult = {
+  const response = decodeIssueCreateMutationReceiptResponse({
     runId: input.clientIssueId,
     sourceKey,
     stage: "queued" as const,
@@ -238,8 +224,7 @@ export async function createProjectIssue(
     createdByUserId: input.userId,
     difficulty: canonicalIssue.difficulty,
     attachments: attachmentRows.map(issueAttachmentJson),
-  };
-  const responseJson = JSON.stringify(response);
+  });
   try {
     await recordHuntEvent(input.db, project.id, {
       source: "issue",
@@ -297,7 +282,7 @@ export async function createProjectIssue(
           userId: input.userId,
           requestHash,
           attachmentUploadIds: attachmentIds,
-          responseJson,
+          response,
           createdAt: recordedAt,
         }),
         ...issueAttachmentUploadConsumeStatements(input.db, {
@@ -324,7 +309,7 @@ export async function createProjectIssue(
         concurrentReceipt.user_id === input.userId &&
         concurrentReceipt.request_hash === requestHash
       ) {
-        return storedMutationResponse(concurrentReceipt.response_json);
+        return concurrentReceipt.response_json;
       }
       throw issueMutationConflict("issue ID");
     }
@@ -344,7 +329,7 @@ export async function createProjectIssue(
   if (!storedReceipt || storedReceipt.request_hash !== requestHash) {
     throw new HttpError(409, "Issue mutation receipt is incomplete");
   }
-  return storedMutationResponse(storedReceipt.response_json);
+  return storedReceipt.response_json;
 }
 
 export async function updateProjectIssue(
@@ -398,7 +383,7 @@ export async function updateProjectIssue(
     ) {
       throw issueMutationConflict("update request ID");
     }
-    return storedMutationResponse(existingReceipt.response_json);
+    return existingReceipt.response_json;
   }
   await requireIssueAssigneeMembership(
     input.db,
@@ -463,7 +448,7 @@ export async function updateProjectIssue(
     (left, right) =>
       left.created_at.localeCompare(right.created_at) || left.id.localeCompare(right.id),
   );
-  const response: UpdateProjectIssueResult = {
+  const response = decodeIssueUpdateMutationReceiptResponse({
     runId: run.id,
     title: issue.title,
     description: issue.description,
@@ -473,8 +458,7 @@ export async function updateProjectIssue(
       ? run.assignee_user_id
       : issue.assigneeUserId,
     attachments: finalAttachments.map(issueAttachmentJson),
-  };
-  const responseJson = JSON.stringify(response);
+  });
   const removedAttachments = existingAttachments.filter(
     (attachment) => !new Set(selectedKeptIds).has(attachment.id),
   );
@@ -496,7 +480,7 @@ export async function updateProjectIssue(
     keptAttachments,
     newUploads: uploads,
     removedAttachments,
-    responseJson,
+    response,
   });
   try {
     await input.db.batch([
@@ -529,7 +513,7 @@ export async function updateProjectIssue(
         concurrentReceipt.user_id === input.userId &&
         concurrentReceipt.request_hash === requestHash
       ) {
-        return storedMutationResponse(concurrentReceipt.response_json);
+        return concurrentReceipt.response_json;
       }
       throw issueMutationConflict("update request ID");
     }
@@ -574,7 +558,7 @@ export async function updateProjectIssue(
   if (!storedReceipt || storedReceipt.request_hash !== requestHash) {
     throw new HttpError(409, "Issue update mutation receipt is incomplete");
   }
-  return storedMutationResponse(storedReceipt.response_json);
+  return storedReceipt.response_json;
 }
 
 export async function deleteProjectIssue(

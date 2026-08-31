@@ -225,7 +225,13 @@ const appDifficulty = (value: keyof typeof difficulty | null | undefined) =>
   value == null ? undefined : difficulty[value];
 
 const appIssueAttachment = (
-  attachment: CreateIssueResult["attachments"][number],
+  attachment: {
+    readonly id: string;
+    readonly filename: string;
+    readonly contentType: string;
+    readonly byteSize: number;
+    readonly url: string;
+  },
 ) =>
   create(IssueAttachmentSchema, {
     id: attachment.id,

@@ -114,7 +114,10 @@ create index briar_uploads_consumer_idx
 
 create table briar_issue_create_mutation_receipts (
   client_issue_id text primary key not null
-    references briar_hunt_runs (id) on delete cascade,
+    references briar_hunt_runs (id) on delete cascade check (
+      length(client_issue_id) between 1 and 128
+      and client_issue_id not glob '*[^0-9A-Za-z_-]*'
+    ),
   organization_id text not null
     references briar_organizations (id) on delete cascade,
   project_id text not null references briar_projects (id) on delete cascade,
@@ -124,14 +127,19 @@ create table briar_issue_create_mutation_receipts (
     and request_hash not glob '*[^0-9a-f]*'
   ),
   attachment_upload_ids_json text not null check (
-    json_valid(attachment_upload_ids_json)
+    length(attachment_upload_ids_json) between 2 and 1024
+    and json_valid(attachment_upload_ids_json)
     and json_type(attachment_upload_ids_json) = 'array'
     and json_array_length(attachment_upload_ids_json) between 0 and 5
   ),
   response_json text not null check (
-    json_valid(response_json) and json_type(response_json) = 'object'
+    length(response_json) between 2 and 1000000
+    and json_valid(response_json)
+    and json_type(response_json) = 'object'
   ),
-  created_at text not null
+  created_at text not null check (
+    length(created_at) between 17 and 64 and created_at = trim(created_at)
+  )
 );
 
 create index briar_issue_create_mutation_receipts_scope_idx
@@ -140,25 +148,36 @@ create index briar_issue_create_mutation_receipts_scope_idx
   );
 
 create table briar_issue_update_mutation_receipts (
-  request_id text primary key not null,
+  request_id text primary key not null check (
+    length(request_id) between 1 and 128
+    and request_id not glob '*[^0-9A-Za-z_-]*'
+  ),
   organization_id text not null
     references briar_organizations (id) on delete cascade,
   project_id text not null references briar_projects (id) on delete cascade,
-  run_id text not null references briar_hunt_runs (id) on delete cascade,
+  run_id text not null references briar_hunt_runs (id) on delete cascade check (
+    length(run_id) between 1 and 128
+    and run_id not glob '*[^0-9A-Za-z_-]*'
+  ),
   user_id text not null references "user" (id) on delete cascade,
   request_hash text not null check (
     length(request_hash) = 64
     and request_hash not glob '*[^0-9a-f]*'
   ),
   attachment_upload_ids_json text not null check (
-    json_valid(attachment_upload_ids_json)
+    length(attachment_upload_ids_json) between 2 and 1024
+    and json_valid(attachment_upload_ids_json)
     and json_type(attachment_upload_ids_json) = 'array'
     and json_array_length(attachment_upload_ids_json) between 0 and 5
   ),
   response_json text not null check (
-    json_valid(response_json) and json_type(response_json) = 'object'
+    length(response_json) between 2 and 1000000
+    and json_valid(response_json)
+    and json_type(response_json) = 'object'
   ),
-  created_at text not null
+  created_at text not null check (
+    length(created_at) between 17 and 64 and created_at = trim(created_at)
+  )
 );
 
 create index briar_issue_update_mutation_receipts_scope_idx
@@ -168,25 +187,36 @@ create index briar_issue_update_mutation_receipts_scope_idx
 
 create table briar_issue_message_mutation_receipts (
   message_id text primary key not null
-    references briar_issue_messages (id) on delete cascade,
+    references briar_issue_messages (id) on delete cascade check (
+      length(message_id) between 1 and 128
+      and message_id not glob '*[^0-9A-Za-z_-]*'
+    ),
   organization_id text not null
     references briar_organizations (id) on delete cascade,
   project_id text not null references briar_projects (id) on delete cascade,
-  run_id text not null references briar_hunt_runs (id) on delete cascade,
+  run_id text not null references briar_hunt_runs (id) on delete cascade check (
+    length(run_id) between 1 and 128
+    and run_id not glob '*[^0-9A-Za-z_-]*'
+  ),
   user_id text not null references "user" (id) on delete cascade,
   request_hash text not null check (
     length(request_hash) = 64
     and request_hash not glob '*[^0-9a-f]*'
   ),
   attachment_upload_ids_json text not null check (
-    json_valid(attachment_upload_ids_json)
+    length(attachment_upload_ids_json) between 2 and 1024
+    and json_valid(attachment_upload_ids_json)
     and json_type(attachment_upload_ids_json) = 'array'
     and json_array_length(attachment_upload_ids_json) between 0 and 5
   ),
   response_json text not null check (
-    json_valid(response_json) and json_type(response_json) = 'object'
+    length(response_json) between 2 and 1000000
+    and json_valid(response_json)
+    and json_type(response_json) = 'object'
   ),
-  created_at text not null
+  created_at text not null check (
+    length(created_at) between 17 and 64 and created_at = trim(created_at)
+  )
 );
 
 create index briar_issue_message_mutation_receipts_scope_idx

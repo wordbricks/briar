@@ -51,6 +51,7 @@ import {
   issueMessageAggregateExists,
   type IssueMessageReplyPlan,
 } from "./issue-message-mutation-repository";
+import { decodeIssueMessageMutationReceiptResponse } from "./issue-mutation-receipt-contract";
 import { resolveIssueAttachmentUploads } from "./issue-attachment-upload-repository";
 import { getOrganizationRole } from "./organization-repository";
 import { issueProcessingAgentSkillRow } from "./agent-skills";
@@ -237,11 +238,7 @@ export async function createProjectIssueMessage(
     ) {
       throw conflict();
     }
-    return JSON.parse(receipt.response_json) as {
-      message: ReturnType<typeof issueMessageJson>;
-      agentReply: ReturnType<typeof issueAgentReplyJson> | null;
-      agentReplies: Array<ReturnType<typeof issueAgentReplyJson>>;
-    };
+    return receipt.response_json;
   };
   const existingReceipt = await findIssueMessageMutationReceipt(
     input.db,
@@ -426,11 +423,11 @@ export async function createProjectIssueMessage(
       error: null,
       updatedAt: createdAt,
     }));
-  const result = {
+  const result = decodeIssueMessageMutationReceiptResponse({
     message: issueMessageJson(message, responseAttachments),
     agentReply: agentReplies.length === 1 ? agentReplies[0]! : null,
     agentReplies,
-  };
+  });
   try {
     await commitIssueMessageMutation(input.db, {
       organizationId: project.organization_id,
@@ -448,7 +445,7 @@ export async function createProjectIssueMessage(
       existingAttachmentIds: existingReferencedAttachmentIds,
       replies,
       requestHash,
-      responseJson: JSON.stringify(result),
+      response: result,
       committedAt: createdAt,
     });
   } catch (error) {
