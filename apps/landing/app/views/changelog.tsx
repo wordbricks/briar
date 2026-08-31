@@ -30,6 +30,21 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.177",
+        date: "2026년 9월 1일",
+        title: "DM 메모리를 안전하게 연결하고 에이전트 작업을 더 안정화합니다",
+        summary:
+          "사용자 소유 DM 메모리의 검색·인용·학습 흐름을 완성하고, Skill 실행과 이슈 관계 처리를 안정화했습니다.",
+        items: [
+          "DM 메모리를 조직·대화·사용자·Agent 범위로 관리하고 버전 기록, 수정, 삭제, 내보내기를 지원합니다.",
+          "DM 답변이 현재 권한과 메모리 버전을 다시 확인하고, 사용한 메모리를 인용하며 잊은 메모리의 컨텍스트를 즉시 제거합니다.",
+          "메모리 검색은 최신 문서와 만료·제외·소유권을 다시 검증하고, 제한된 조회 예산 안에서 Vectorize 인덱스를 정리합니다.",
+          "명시적으로 요청한 메모리 저장과 선택한 자동 학습을 독립 검증·재시도·원자적 커밋으로 처리합니다. 자동 학습은 기본적으로 꺼져 있습니다.",
+          "진행 중인 Skill 실행이 내부 임시 변경이나 종료 상태 저장 때문에 실패하지 않도록 보호합니다.",
+          "이슈의 부모·하위·관련 관계를 실행 의존성과 분리해 저장하고, Linear 가져오기와 모바일·데스크톱 탐색에 반영합니다.",
+        ],
+      },
+      {
         version: "1.2.176",
         date: "2026년 8월 31일",
         title: "팀과 프로젝트 계층을 세우고 이슈 작업 흐름을 더 안정화합니다",
@@ -1365,6 +1380,21 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.177",
+        date: "September 1, 2026",
+        title: "Connect DM memory safely and stabilize agent work",
+        summary:
+          "Complete owner-managed DM memory retrieval, citations, and opt-in learning while making Skill execution and issue relationships more reliable.",
+        items: [
+          "Manage DM memory within an organization, conversation, user, and Agent scope with version history, editing, deletion, and export.",
+          "DM replies recheck live permission and memory versions, cite the memories they use, and immediately remove forgotten context.",
+          "Memory retrieval revalidates current documents, expiry, exclusions, and ownership, then keeps Vectorize cleanup within bounded budgets.",
+          "Handle explicit memory saves and opted-in automatic learning with independent verification, retryable work, and atomic commits; automatic learning remains off by default.",
+          "Keep active Skill executions from failing when internal temporary changes or terminal state reconciliation occurs.",
+          "Store parent, child, and related issue relationships separately from execution dependencies and carry them through Linear imports and desktop/mobile navigation.",
+        ],
+      },
       {
         version: "1.2.176",
         date: "August 31, 2026",
@@ -2792,7 +2822,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-176">
+          <a href="#v1-2-177">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2814,8 +2844,10 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.176"
-                        ? "2026-08-31"
+                      entry.version === "1.2.177"
+                        ? "2026-09-01"
+                        : entry.version === "1.2.176"
+                          ? "2026-08-31"
                         : entry.version === "1.2.175"
                         ? "2026-08-31"
                         : entry.version === "1.2.174"
