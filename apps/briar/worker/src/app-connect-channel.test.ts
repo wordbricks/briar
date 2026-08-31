@@ -404,7 +404,7 @@ describe("app Channel Connect adapter", () => {
       last_unread_message_at: null,
     });
     const requestFor = (
-      visibility?: string,
+      visibility = "CHANNEL_VISIBILITY_PUBLIC",
       name = "  Release Notes  ",
     ) =>
       new Request(

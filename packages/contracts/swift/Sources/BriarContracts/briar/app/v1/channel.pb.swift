@@ -290,14 +290,7 @@ public nonisolated struct BriarAPI_CreateChannelRequest: Sendable {
   /// Clears the value of `topic`. Subsequent reads from it will return its default value.
   public mutating func clearTopic() {self._topic = nil}
 
-  public var visibility: BriarAPI_ChannelVisibility {
-    get {_visibility ?? .unspecified}
-    set {_visibility = newValue}
-  }
-  /// Returns true if `visibility` has been explicitly set.
-  public var hasVisibility: Bool {self._visibility != nil}
-  /// Clears the value of `visibility`. Subsequent reads from it will return its default value.
-  public mutating func clearVisibility() {self._visibility = nil}
+  public var visibility: BriarAPI_ChannelVisibility = .unspecified
 
   public var defaultProjectID: String {
     get {_defaultProjectID ?? String()}
@@ -314,7 +307,6 @@ public nonisolated struct BriarAPI_CreateChannelRequest: Sendable {
 
   fileprivate var _slug: String? = nil
   fileprivate var _topic: String? = nil
-  fileprivate var _visibility: BriarAPI_ChannelVisibility? = nil
   fileprivate var _defaultProjectID: String? = nil
 }
 
@@ -2875,7 +2867,7 @@ nonisolated extension BriarAPI_CreateChannelRequest: SwiftProtobuf.Message, Swif
       case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self._slug) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._topic) }()
-      case 5: try { try decoder.decodeSingularEnumField(value: &self._visibility) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self.visibility) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self._defaultProjectID) }()
       default: break
       }
@@ -2899,9 +2891,9 @@ nonisolated extension BriarAPI_CreateChannelRequest: SwiftProtobuf.Message, Swif
     try { if let v = self._topic {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
     } }()
-    try { if let v = self._visibility {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 5)
-    } }()
+    if self.visibility != .unspecified {
+      try visitor.visitSingularEnumField(value: self.visibility, fieldNumber: 5)
+    }
     try { if let v = self._defaultProjectID {
       try visitor.visitSingularStringField(value: v, fieldNumber: 6)
     } }()
@@ -2913,7 +2905,7 @@ nonisolated extension BriarAPI_CreateChannelRequest: SwiftProtobuf.Message, Swif
     if lhs.name != rhs.name {return false}
     if lhs._slug != rhs._slug {return false}
     if lhs._topic != rhs._topic {return false}
-    if lhs._visibility != rhs._visibility {return false}
+    if lhs.visibility != rhs.visibility {return false}
     if lhs._defaultProjectID != rhs._defaultProjectID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

@@ -54419,10 +54419,10 @@ pub struct CreateChannelRequest {
     /// Field 5: `visibility`
     #[serde(
         rename = "visibility",
-        with = "::buffa::json_helpers::opt_enum",
-        skip_serializing_if = "::core::option::Option::is_none"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub visibility: ::core::option::Option<::buffa::EnumValue<ChannelVisibility>>,
+    pub visibility: ::buffa::EnumValue<ChannelVisibility>,
     /// Field 6: `default_project_id`
     #[serde(
         rename = "defaultProjectId",
@@ -54476,16 +54476,6 @@ impl CreateChannelRequest {
     }
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
-    ///Sets [`Self::visibility`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_visibility(
-        mut self,
-        value: impl Into<::buffa::EnumValue<ChannelVisibility>>,
-    ) -> Self {
-        self.visibility = Some(value.into());
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
     ///Sets [`Self::default_project_id`] to `Some(value)`, consuming and returning `self`.
     pub fn with_default_project_id(
         mut self,
@@ -54529,8 +54519,11 @@ impl ::buffa::Message for CreateChannelRequest {
         if let Some(ref v) = self.topic {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
-        if let Some(ref v) = self.visibility {
-            size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+        {
+            let val = self.visibility.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
         }
         if let Some(ref v) = self.default_project_id {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
@@ -54557,8 +54550,11 @@ impl ::buffa::Message for CreateChannelRequest {
         if let Some(ref v) = self.topic {
             ::buffa::types::put_string_field(4u32, v, buf);
         }
-        if let Some(ref v) = self.visibility {
-            ::buffa::types::put_int32_field(5u32, v.to_i32(), buf);
+        {
+            let val = self.visibility.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(5u32, val, buf);
+            }
         }
         if let Some(ref v) = self.default_project_id {
             ::buffa::types::put_string_field(6u32, v, buf);
@@ -54615,8 +54611,8 @@ impl ::buffa::Message for CreateChannelRequest {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.visibility = ::core::option::Option::Some(
-                    ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                self.visibility = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
                 );
             }
             6u32 => {
@@ -54643,7 +54639,7 @@ impl ::buffa::Message for CreateChannelRequest {
         self.name.clear();
         self.slug = ::core::option::Option::None;
         self.topic = ::core::option::Option::None;
-        self.visibility = ::core::option::Option::None;
+        self.visibility = ::buffa::EnumValue::from(0);
         self.default_project_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
@@ -202013,9 +202009,7 @@ pub mod __buffa {
             /// Field 4: `topic`
             pub topic: ::core::option::Option<&'a str>,
             /// Field 5: `visibility`
-            pub visibility: ::core::option::Option<
-                ::buffa::EnumValue<super::super::ChannelVisibility>,
-            >,
+            pub visibility: ::buffa::EnumValue<super::super::ChannelVisibility>,
             /// Field 6: `default_project_id`
             pub default_project_id: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -202085,10 +202079,8 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.visibility = Some(
-                            ::buffa::EnumValue::from(
-                                ::buffa::types::decode_int32(&mut cur)?,
-                            ),
+                        view.visibility = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
                     6u32 => {
@@ -202164,8 +202156,11 @@ pub mod __buffa {
                 if let Some(ref v) = self.topic {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
-                if let Some(ref v) = self.visibility {
-                    size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+                {
+                    let val = self.visibility.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
                 }
                 if let Some(ref v) = self.default_project_id {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
@@ -202193,8 +202188,11 @@ pub mod __buffa {
                 if let Some(ref v) = self.topic {
                     ::buffa::types::put_string_field(4u32, v, buf);
                 }
-                if let Some(ref v) = self.visibility {
-                    ::buffa::types::put_int32_field(5u32, v.to_i32(), buf);
+                {
+                    let val = self.visibility.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(5u32, val, buf);
+                    }
                 }
                 if let Some(ref v) = self.default_project_id {
                     ::buffa::types::put_string_field(6u32, v, buf);
@@ -202232,8 +202230,10 @@ pub mod __buffa {
                 if let ::core::option::Option::Some(__v) = self.topic {
                     __map.serialize_entry("topic", __v)?;
                 }
-                if let ::core::option::Option::Some(ref __v) = self.visibility {
-                    __map.serialize_entry("visibility", __v)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.visibility,
+                ) {
+                    __map.serialize_entry("visibility", &self.visibility)?;
                 }
                 if let ::core::option::Option::Some(__v) = self.default_project_id {
                     __map.serialize_entry("defaultProjectId", __v)?;
@@ -202357,9 +202357,7 @@ pub mod __buffa {
             #[must_use]
             pub fn visibility(
                 &self,
-            ) -> ::core::option::Option<
-                ::buffa::EnumValue<super::super::ChannelVisibility>,
-            > {
+            ) -> ::buffa::EnumValue<super::super::ChannelVisibility> {
                 self.0.reborrow().visibility
             }
             /// Field 6: `default_project_id`

@@ -797,7 +797,7 @@ export async function createChannel(
     name: string;
     slug?: string;
     topic?: string | null;
-    visibility?: ChannelVisibility;
+    visibility: ChannelVisibility;
     defaultProjectId?: string | null;
   },
 ) {
@@ -808,9 +808,7 @@ export async function createChannel(
       name: input.name,
       slug: input.slug,
       topic: input.topic ?? undefined,
-      visibility: input.visibility === undefined
-        ? undefined
-        : channelVisibilityToProto(input.visibility),
+      visibility: channelVisibilityToProto(input.visibility),
       defaultProjectId: input.defaultProjectId ?? undefined,
     },
     appCallOptions(token),

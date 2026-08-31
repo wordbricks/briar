@@ -93,7 +93,7 @@ message CreateChannelRequest {
   string name = 2;
   optional string slug = 3;
   optional string topic = 4;
-  optional ChannelVisibility visibility = 5;
+  ChannelVisibility visibility = 5;
   optional string default_project_id = 6;
 }
 

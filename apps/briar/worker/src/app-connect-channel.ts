@@ -195,12 +195,9 @@ const decodeChannelUserId = decodeRequestSync(channelUserIdSchema);
 const decodeChannelWebhookName = decodeRequestSync(channelWebhookNameSchema);
 
 const domainChannelVisibility = (
-  value: ProtoChannelVisibility | undefined,
-  fallback?: ChannelVisibility,
-): ChannelVisibility | undefined => {
+  value: ProtoChannelVisibility,
+): ChannelVisibility => {
   switch (value) {
-    case undefined:
-      return fallback;
     case ProtoChannelVisibility.PUBLIC:
       return "public";
     case ProtoChannelVisibility.PRIVATE:
@@ -210,6 +207,12 @@ const domainChannelVisibility = (
       throw new ConnectError("visibility is invalid", Code.InvalidArgument);
   }
 };
+
+const optionalDomainChannelVisibility = (
+  value: ProtoChannelVisibility | undefined,
+): ChannelVisibility | undefined => value === undefined
+  ? undefined
+  : domainChannelVisibility(value);
 
 const domainMembershipChange = (
   value: { readonly case: "add" | "remove" | undefined },
@@ -344,8 +347,7 @@ const createAppChannelService = (
         topic: request.topic === undefined
           ? null
           : decodeChannelTopic(request.topic),
-        visibility: domainChannelVisibility(request.visibility, "public") ??
-          "public",
+        visibility: domainChannelVisibility(request.visibility),
         defaultProjectId: request.defaultProjectId === undefined
           ? null
           : canonicalUuid(request.defaultProjectId),
@@ -382,7 +384,7 @@ const createAppChannelService = (
           ? undefined
           : decodeChannelName(request.name),
         topic,
-        visibility: domainChannelVisibility(request.visibility),
+        visibility: optionalDomainChannelVisibility(request.visibility),
         defaultProjectId,
         archived: request.archived,
       },
