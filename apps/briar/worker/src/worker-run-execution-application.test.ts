@@ -99,9 +99,7 @@ describe("Worker run execution application", () => {
   it.each([
     `briar-channel-approved:${"f".repeat(64)}`,
     `briar-channel-batch-approved:${"d".repeat(64)}`,
-    "briar-channel-proposal:legacy-channel",
     `briar-conversation-approved:${"e".repeat(64)}`,
-    "briar-conversation-proposal:legacy-conversation",
   ])("reserves proposal approval identity %s", async (sourceKey) => {
     const recordEvent = vi.fn();
     await expect(recordWorkerRunEventApplication({

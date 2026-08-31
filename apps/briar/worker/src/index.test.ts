@@ -223,7 +223,7 @@ describe("Worker HTTP contract", () => {
       assertRunEventIdentityNotOverridden({
         run,
         source: "issue",
-        sourceKey: "briar-channel-proposal:predictable-id",
+        sourceKey: "changed-identity",
       })
     ).toThrow("identity cannot be changed");
     expect(() =>

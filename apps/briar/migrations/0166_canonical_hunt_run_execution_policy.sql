@@ -29,10 +29,7 @@ drop trigger if exists briar_conversation_issue_creation_project_guard;
 CREATE TRIGGER briar_conversation_issue_creation_project_guard
 before insert on briar_hunt_runs
 when new.source = 'issue'
-  and (
-    new.source_key like 'briar-conversation-approved:%'
-    or new.source_key like 'briar-conversation-proposal:%'
-  )
+  and new.source_key like 'briar-conversation-approved:%'
   and not exists (
     select 1 from briar_hunt_runs existing
     where existing.project_id = new.project_id
@@ -453,6 +450,322 @@ BEGIN
     and project_id = new.project_id and issue_source_key = new.source_key
     and accepted_by_user_id is not null and accepted_at is not null;
 END;
+
+-- Retire the predictable proposal identities and unverifiable approval
+-- authority. This branch has not shipped, so there is no rolling-worker
+-- compatibility window to preserve.
+drop trigger if exists briar_channel_reconciled_run_event_guard;
+drop trigger if exists briar_channel_reconciled_run_status_guard;
+drop trigger if exists briar_hunt_runs_legacy_channel_proposal_guard;
+drop trigger if exists briar_channel_legacy_issue_approval_finalize_guard;
+drop trigger if exists briar_channel_issue_approval_finalize_guard;
+drop trigger if exists briar_channel_approved_backlog_event_guard;
+drop trigger if exists briar_channel_approved_backlog_context_guard;
+drop trigger if exists briar_channel_approved_retryable_transfer_guard;
+drop trigger if exists briar_channel_approved_terminal_transfer_guard;
+drop trigger if exists briar_channel_approved_terminal_reactivation_guard;
+drop trigger if exists briar_channel_approved_dispatch_clear_guard;
+drop trigger if exists briar_channel_approved_dispatch_preference_snapshot;
+drop trigger if exists briar_channel_approved_dispatch_preference_guard;
+drop trigger if exists briar_hunt_runs_channel_proposal_project_guard;
+drop trigger if exists briar_hunt_runs_channel_proposal_reservation_guard;
+
+delete from briar_channel_issue_approval_audit
+where result_verification <> 'atomic'
+   or issue_source_key like 'briar-channel-proposal:%'
+   or issue_source_key like 'briar-conversation-proposal:%'
+   or run_id in (
+     select id from briar_hunt_runs
+     where source = 'issue'
+       and (
+         source_key like 'briar-channel-proposal:%'
+         or source_key like 'briar-conversation-proposal:%'
+       )
+   );
+
+delete from briar_channel_action_proposals
+where issue_source_key like 'briar-channel-proposal:%';
+
+delete from briar_issue_action_proposals
+where issue_source_key like 'briar-conversation-proposal:%';
+
+delete from briar_hunt_runs
+where source = 'issue'
+  and (
+    source_key like 'briar-channel-proposal:%'
+    or source_key like 'briar-conversation-proposal:%'
+  );
+
+drop table if exists briar_channel_issue_approval_reconciliation;
+drop table if exists briar_channel_issue_transfer_reconciliation;
+drop table if exists briar_conversation_issue_approval_quarantine;
+
+create trigger briar_channel_issue_approval_audit_atomic_insert_guard
+before insert on briar_channel_issue_approval_audit
+when new.result_verification <> 'atomic'
+begin
+  select raise(abort, 'channel issue approval requires atomic verification');
+end;
+
+create trigger briar_channel_issue_approval_audit_atomic_update_guard
+before update of result_verification on briar_channel_issue_approval_audit
+when new.result_verification <> 'atomic'
+begin
+  select raise(abort, 'channel issue approval requires atomic verification');
+end;
+
+create trigger briar_channel_issue_approval_finalize_guard
+before update of status on briar_channel_action_proposals
+when old.status = 'pending' and new.status = 'accepted'
+  and old.action_type = 'request_issue_create'
+  and not exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.proposal_id = old.id
+      and approval.result_verification = 'atomic'
+      and approval.run_id = new.result_run_id
+      and approval.project_id = new.project_id
+      and approval.issue_source_key = new.issue_source_key
+      and approval.approved_by_user_id is new.accepted_by_user_id
+      and approval.approved_at = new.accepted_at
+  )
+begin
+  select raise(abort, 'channel proposal acceptance requires atomic approval');
+end;
+
+create trigger briar_channel_approved_backlog_event_guard
+before insert on briar_hunt_events
+when new.status not in ('backlog', 'cancelled')
+  and new.actor not like 'briar-app:%'
+  and exists (
+    select 1
+    from briar_hunt_runs run
+    join briar_channel_issue_approval_audit approval
+      on approval.run_id = run.id
+     and approval.issue_source_key = run.source_key
+    where run.id = new.run_id
+      and run.source = 'issue'
+      and run.status in ('backlog', 'cancelled')
+      and approval.result_verification = 'atomic'
+  )
+begin
+  select raise(
+    abort, 'channel-approved issue execution requires explicit dispatch'
+  );
+end;
+
+create trigger briar_channel_approved_backlog_context_guard
+before update of context_json on briar_hunt_runs
+when old.status in ('backlog', 'cancelled')
+  and new.context_json is not old.context_json
+  and exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.run_id = old.id
+      and approval.issue_source_key = old.source_key
+      and approval.result_verification = 'atomic'
+  )
+begin
+  select raise(
+    abort, 'channel-approved issue context is immutable before dispatch'
+  );
+end;
+
+create trigger briar_channel_approved_retryable_transfer_guard
+before update of project_id, status on briar_hunt_runs
+when old.status in ('queued', 'blocked', 'failed')
+  and new.project_id <> old.project_id
+  and exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.run_id = old.id
+      and approval.issue_source_key = old.source_key
+      and approval.result_verification = 'atomic'
+  )
+  and not (
+    new.status = 'backlog'
+    and new.stage = 'queued'
+    and new.workflow_stage is null
+    and new.agent_id is null
+    and new.worker_id is null
+    and new.requested_worker_id is null
+    and new.claim_token_hash is null
+    and new.claimed_by is null
+    and new.claimed_at is null
+    and new.lease_expires_at is null
+    and new.last_execution_id is null
+    and new.dispatch_mode is null
+    and new.dispatch_request_id is null
+    and new.dispatched_at is null
+    and new.requested_by_user_id is null
+    and new.requested_agent_provider is null
+    and new.requested_agent_model is null
+    and new.requested_agent_effort is null
+    and new.paused_at is null
+    and new.resume_requested_at is null
+    and new.completed_at is null
+  )
+begin
+  select raise(
+    abort, 'channel-approved retryable transfer requires execution reset'
+  );
+end;
+
+create trigger briar_channel_approved_terminal_transfer_guard
+before update of project_id on briar_hunt_runs
+when old.status in ('completed', 'cancelled')
+  and new.project_id <> old.project_id
+  and exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.run_id = old.id
+      and approval.issue_source_key = old.source_key
+      and approval.result_verification = 'atomic'
+  )
+begin
+  select raise(
+    abort, 'channel-approved terminal issue transfer is not allowed'
+  );
+end;
+
+create trigger briar_channel_approved_terminal_reactivation_guard
+before update of status on briar_hunt_runs
+when old.status in ('completed', 'cancelled')
+  and new.status not in ('completed', 'cancelled')
+  and exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.run_id = old.id
+      and approval.issue_source_key = old.source_key
+      and approval.result_verification = 'atomic'
+  )
+begin
+  select raise(
+    abort, 'approved issue terminal reactivation requires fresh execution approval'
+  );
+end;
+
+create trigger briar_channel_approved_dispatch_clear_guard
+before update of dispatch_request_id, status on briar_hunt_runs
+when old.dispatch_request_id is not null
+  and new.dispatch_request_id is null
+  and new.status not in ('backlog', 'completed', 'cancelled')
+  and exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.run_id = old.id
+      and approval.issue_source_key = old.source_key
+      and approval.result_verification = 'atomic'
+  )
+begin
+  select raise(
+    abort, 'channel-approved dispatch cancellation requires backlog reset'
+  );
+end;
+
+create trigger briar_channel_approved_dispatch_preference_snapshot
+after update of dispatch_request_id on briar_hunt_runs
+when new.dispatch_request_id is not null
+  and new.dispatch_request_id is not old.dispatch_request_id
+  and new.requested_agent_provider is not null
+  and exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.run_id = new.id
+      and approval.issue_source_key = new.source_key
+      and approval.result_verification = 'atomic'
+  )
+begin
+  update briar_hunt_runs
+  set preferred_agent_provider = new.requested_agent_provider,
+      preferred_agent_model = new.requested_agent_model,
+      preferred_agent_effort = new.requested_agent_effort
+  where id = new.id;
+end;
+
+create trigger briar_channel_approved_dispatch_preference_guard
+before update of preferred_agent_provider, preferred_agent_model,
+  preferred_agent_effort on briar_hunt_runs
+when old.dispatch_request_id is not null
+  and exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.run_id = old.id
+      and approval.issue_source_key = old.source_key
+      and approval.result_verification = 'atomic'
+  )
+  and not (
+    new.preferred_agent_provider is old.preferred_agent_provider
+    and new.preferred_agent_model is old.preferred_agent_model
+    and new.preferred_agent_effort is old.preferred_agent_effort
+  )
+  and not (
+    new.dispatch_request_id is old.dispatch_request_id
+    and new.requested_agent_provider is old.requested_agent_provider
+    and new.requested_agent_model is old.requested_agent_model
+    and new.requested_agent_effort is old.requested_agent_effort
+    and new.preferred_agent_provider is old.requested_agent_provider
+    and new.preferred_agent_model is old.requested_agent_model
+    and new.preferred_agent_effort is old.requested_agent_effort
+  )
+  and not (
+    new.project_id is old.project_id
+    and new.source is old.source
+    and new.source_key is old.source_key
+    and new.dispatch_request_id is not null
+    and new.dispatch_request_id is not old.dispatch_request_id
+    and new.dispatched_at is not null
+    and new.requested_by_user_id is not null
+    and new.requested_agent_provider is not null
+    and new.status = 'queued'
+    and new.stage = 'queued'
+    and new.workflow_stage is null
+    and new.dispatch_mode in ('any', 'specific')
+    and (
+      (new.dispatch_mode = 'any' and new.requested_worker_id is null)
+      or
+      (new.dispatch_mode = 'specific' and new.requested_worker_id is not null)
+    )
+    and new.worker_id is null
+    and new.claim_token_hash is null
+    and new.claimed_by is null
+    and new.claimed_at is null
+    and new.lease_expires_at is null
+    and new.preferred_agent_provider is new.requested_agent_provider
+    and new.preferred_agent_model is new.requested_agent_model
+    and new.preferred_agent_effort is new.requested_agent_effort
+  )
+begin
+  select raise(
+    abort, 'approved channel issue dispatch preferences are immutable'
+  );
+end;
+
+create trigger briar_hunt_runs_channel_proposal_project_guard
+before insert on briar_hunt_runs
+when new.source = 'issue'
+  and new.source_key like 'briar-channel-approved:%'
+  and not exists (
+    select 1 from briar_hunt_runs existing
+    where existing.source = new.source
+      and existing.source_key = new.source_key
+      and existing.project_id = new.project_id
+  )
+  and exists (
+    select 1 from briar_hunt_runs existing
+    where existing.source = new.source
+      and existing.source_key = new.source_key
+      and existing.project_id <> new.project_id
+  )
+begin
+  select raise(abort, 'channel proposal issue project conflict');
+end;
+
+create trigger briar_hunt_runs_channel_proposal_reservation_guard
+before insert on briar_hunt_runs
+when new.source = 'issue'
+  and new.source_key like 'briar-channel-approved:%'
+  and exists (
+    select 1 from briar_channel_action_proposals proposal
+    where proposal.issue_source_key = new.source_key
+      and proposal.project_id is not null
+      and proposal.project_id <> new.project_id
+  )
+begin
+  select raise(abort, 'channel proposal issue project conflict');
+end;
 
 -- Keep generic metadata from becoming a second execution-policy authority.
 create trigger briar_hunt_runs_context_policy_insert_guard

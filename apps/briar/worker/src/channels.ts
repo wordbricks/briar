@@ -5227,16 +5227,6 @@ export async function reserveChannelActionProposalApproval(
        where id = ? and channel_id = ? and status = 'pending'
          and action_type = 'request_issue_create'
          and (project_id is null or project_id = ?)
-         and not exists (
-           select 1 from briar_hunt_runs legacy_run
-           where legacy_run.source = 'issue'
-             and legacy_run.source_key =
-               'briar-channel-proposal:' || briar_channel_action_proposals.id
-             and not exists (
-               select 1 from briar_channel_issue_approval_reconciliation finding
-               where finding.run_id = legacy_run.id
-             )
-         )
          and exists (
            select 1
            from briar_channels channel

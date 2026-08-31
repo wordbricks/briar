@@ -1,11 +1,8 @@
 const channelProposalIssueSourcePrefix = "briar-channel-approved:";
 const channelBatchProposalIssueSourcePrefix =
   "briar-channel-batch-approved:";
-const legacyChannelProposalIssueSourcePrefix = "briar-channel-proposal:";
 const conversationProposalIssueSourcePrefix =
   "briar-conversation-approved:";
-const legacyConversationProposalIssueSourcePrefix =
-  "briar-conversation-proposal:";
 
 const randomProposalSourceSuffix = () =>
   `${crypto.randomUUID().replaceAll("-", "")}${
@@ -24,6 +21,4 @@ export const newConversationProposalIssueSourceKey = () =>
 export const isReservedProposalIssueSourceKey = (sourceKey: string) =>
   sourceKey.startsWith(channelProposalIssueSourcePrefix) ||
   sourceKey.startsWith(channelBatchProposalIssueSourcePrefix) ||
-  sourceKey.startsWith(legacyChannelProposalIssueSourcePrefix) ||
-  sourceKey.startsWith(conversationProposalIssueSourcePrefix) ||
-  sourceKey.startsWith(legacyConversationProposalIssueSourcePrefix);
+  sourceKey.startsWith(conversationProposalIssueSourcePrefix);

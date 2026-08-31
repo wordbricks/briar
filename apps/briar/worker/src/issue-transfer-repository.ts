@@ -50,7 +50,7 @@ const completedChannelIssueTransferExists = async (
        from briar_channel_issue_approval_audit approval
        where approval.run_id = ? and approval.issue_source_key = ?
          and approval.project_id = ?
-         and approval.result_verification in ('atomic', 'legacy_authorized')
+         and approval.result_verification = 'atomic'
          and exists (
            select 1 from briar_dashboard_changes tombstone
            where tombstone.project_id = ? and tombstone.entity_type = 'run'
