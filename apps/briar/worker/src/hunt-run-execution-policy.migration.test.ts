@@ -16,7 +16,7 @@ describe("hunt run execution policy storage cutover", () => {
     const db = env.DB;
     const now = "2026-09-01T00:00:00.000Z";
     await applyD1Migrations(db, {
-      through: "0164_canonical_agent_execution_metrics_storage.sql",
+      through: "0161_canonical_agent_execution_metrics_storage.sql",
     });
     await executeD1Sql(db, `
       insert into "user" (
@@ -76,7 +76,7 @@ describe("hunt run execution policy storage cutover", () => {
     ]);
 
     await applyD1Migrations(db, {
-      files: ["0166_canonical_hunt_run_execution_policy.sql"],
+      files: ["0163_canonical_hunt_run_execution_policy.sql"],
     });
 
     const rows = (await db.prepare(

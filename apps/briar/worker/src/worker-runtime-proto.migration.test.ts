@@ -12,7 +12,7 @@ describe("Worker runtime ProtoJSON migration", () => {
     const db = env.DB;
     const now = "2026-08-31T00:00:00.000Z";
     await applyD1Migrations(db, {
-      through: "0161_canonical_workflow_checkpoint_storage.sql",
+      through: "0158_canonical_workflow_checkpoint_storage.sql",
     });
     await executeD1Sql(db, `
       insert into "user" (
@@ -123,7 +123,7 @@ describe("Worker runtime ProtoJSON migration", () => {
     ).bind(now, now).run();
 
     await applyD1Migrations(db, {
-      files: ["0162_canonical_worker_runtime_proto.sql"],
+      files: ["0159_canonical_worker_runtime_proto.sql"],
     });
 
     expect(await db.prepare(

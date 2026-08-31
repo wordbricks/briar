@@ -140,7 +140,7 @@ describe("issue proposal payload migration", () => {
     ).bind(now).run();
 
     await applyD1Migrations(db, {
-      files: ["0157_remove_issue_proposal_status.sql"],
+      files: ["0156_remove_issue_proposal_status.sql"],
     });
 
     expect(await db.prepare(
