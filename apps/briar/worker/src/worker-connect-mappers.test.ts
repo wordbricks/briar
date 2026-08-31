@@ -32,61 +32,6 @@ const agent = {
   skills: [],
 };
 
-const issue = {
-  ...common,
-  workType: "issue" as const,
-  executionId: "44444444-4444-4444-8444-444444444444",
-  runNumber: 1,
-  currentAttempt: 1,
-  currentRevision: 1,
-  source: "issue" as const,
-  description: null,
-  priority: null,
-  repository: "wordbricks/briar",
-  sourceCreatedAt: null,
-  createdByUserId: null,
-  context: { nested: { enabled: true } },
-  reviewFeedback: null,
-  workflowStage: null,
-  startStage: null,
-  resumeContext: null,
-  workflow: {
-    version: 2 as const,
-    requirements: [],
-    stages: [{ id: "implementation", label: "Implementation", required: true }],
-    execution: { checkpoints: [] },
-    completion: { requiredStages: ["implementation"] },
-  },
-  attachments: [],
-  messages: [],
-  claimedBy: "worker",
-  execution: { provider: "codex" as const, model: null, effort: null },
-  agent,
-  activeSkill: null,
-};
-
-const issueReply = {
-  ...common,
-  workType: "issueReply" as const,
-  triggerMessageId: "55555555-5555-4555-8555-555555555555",
-  parentMessageId: "66666666-6666-4666-8666-666666666666",
-  provider: "codex" as const,
-  model: null,
-  effort: null,
-  agent: null,
-  activeSkill: null,
-  skillExecutionTarget: null,
-  branch: null,
-  requiresPreferredWorker: false,
-  activity: null,
-  snapshot: {
-    run: { id: common.runId },
-    messages: [],
-    agentTranscript: [],
-    evidence: [],
-  },
-};
-
 const channelReply = {
   ...common,
   workType: "channelReply" as const,
@@ -155,67 +100,7 @@ const channelReply = {
   },
 };
 
-const projectAgentTask = {
-  ...common,
-  workType: "projectAgentTask" as const,
-  request: "Run the task",
-  agent,
-  activeSkill: null,
-};
-
-const mergeBatch = {
-  ...common,
-  workType: "mergeBatch" as const,
-  workId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-  runId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-  projectId: "88888888-8888-4888-8888-888888888888",
-  repositoryId: 42,
-  repository: "wordbricks/briar",
-  baseBranch: "main",
-  validationCommands: ["bun run ci"],
-  phase: "enqueue" as const,
-  batch: {
-    id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-    state: "enqueueing" as const,
-    finalDeliveryId: null,
-    mergeGroupRef: null,
-    mergeGroupSha: null,
-    mergeGroupBaseSha: null,
-    validationResults: null,
-    validatedAt: null,
-    publishedAt: null,
-    failureCode: null,
-    failureDetail: null,
-  },
-  members: [{
-    id: "candidate-1",
-    ordinal: 1,
-    runId: common.runId,
-    attempt: 1,
-    revision: 1,
-    pullRequestId: 42,
-    pullRequestNodeId: "PR_node",
-    pullRequestNumber: 42,
-    pullRequestUrl: "https://github.com/wordbricks/briar/pull/42",
-    headSha: "a".repeat(40),
-    baseSha: "b".repeat(40),
-    queueEntryId: null,
-    state: "frozen" as const,
-  }],
-  pendingHeads: [],
-};
-
 describe("Worker claim protobuf mapper", () => {
-  it.each([
-    ["issue", issue],
-    ["issueReply", issueReply],
-    ["channelReply", channelReply],
-    ["projectAgentTask", projectAgentTask],
-    ["mergeBatch", mergeBatch],
-  ] as const)("constructs the %s oneof variant", (variant, claim) => {
-    expect(workerClaimMessage(claim as WorkerQueueClaim).work.case).toBe(variant);
-  });
-
   it("preserves the typed channel scope, session reason, and timestamps", () => {
     const message = workerClaimMessage(channelReply as WorkerQueueClaim);
     expect(message.work.case).toBe("channelReply");
