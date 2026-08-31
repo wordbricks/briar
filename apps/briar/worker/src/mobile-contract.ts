@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema";
+import { dmMemoryOperationSchemas } from "../../src/lib/dm-memory-contract";
 import {
   AgentProviderCapabilityCatalog,
   ModelEffort as mobileEffortSchema,
@@ -1483,6 +1484,7 @@ export const mobileAgentSkillExecutionApprovalResponseSchema = strict(
 }));
 
 export const mobileOperationSchemas = {
+  ...dmMemoryOperationSchemas,
   getHealth: { response: mobileHealthResponseSchema },
   beginDeviceAuthorization: {
     request: mobileDeviceCodeRequestSchema,

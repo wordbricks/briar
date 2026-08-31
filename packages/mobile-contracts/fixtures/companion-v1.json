@@ -4,6 +4,165 @@
     "briar-android"
   ],
   "operations": {
+    "listDmMemory": {
+      "method": "GET",
+      "path": "/organizations/{organizationId}/channels/{channelId}/memory",
+      "status": 200,
+      "response": {
+        "eligible": true,
+        "capabilities": {
+          "recall": false,
+          "automaticLearning": false
+        },
+        "spaces": [
+          {
+            "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "channelId": "66666666-6666-4666-8666-666666666666",
+            "agentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "rosterEpoch": 2,
+            "status": "active",
+            "useEnabled": true,
+            "autoEnabled": false,
+            "memoryRevision": 1,
+            "revocationEpoch": 0,
+            "createdAt": "2026-09-01T00:00:00.000Z",
+            "updatedAt": "2026-09-01T00:00:00.000Z"
+          }
+        ],
+        "selectedSpaceId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "documents": [
+          {
+            "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "memorySpaceId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "kind": "observation",
+            "title": "Synthetic response preference",
+            "version": 1,
+            "status": "active",
+            "conflicted": false,
+            "memoryClass": "profile",
+            "evidenceType": "explicit_user",
+            "protectedByUser": true,
+            "sourceLanguage": "ko",
+            "observedAt": null,
+            "validUntil": null,
+            "createdAt": "2026-09-01T00:00:00.000Z",
+            "updatedAt": "2026-09-01T00:00:00.000Z",
+            "indexState": "pending"
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    "getDmMemoryDocument": {
+      "method": "GET",
+      "path": "/organizations/{organizationId}/channels/{channelId}/memory/documents/{documentId}",
+      "status": 200,
+      "response": {
+        "document": {
+          "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          "memorySpaceId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          "kind": "observation",
+          "title": "Synthetic response preference",
+          "version": 1,
+          "status": "active",
+          "conflicted": false,
+          "memoryClass": "profile",
+          "evidenceType": "explicit_user",
+          "protectedByUser": true,
+          "sourceLanguage": "ko",
+          "observedAt": null,
+          "validUntil": null,
+          "createdAt": "2026-09-01T00:00:00.000Z",
+          "updatedAt": "2026-09-01T00:00:00.000Z",
+          "indexState": "pending",
+          "body": "설명은 결론부터 짧게 제시한다.",
+          "sources": [
+            {
+              "type": "user_edit_event",
+              "id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+              "version": 1
+            }
+          ]
+        }
+      }
+    },
+    "createDmMemoryDocument": {
+      "method": "POST",
+      "path": "/organizations/{organizationId}/channels/{channelId}/memory/documents",
+      "status": 200,
+      "request": {
+        "requestId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        "memorySpaceId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "title": "Synthetic response preference",
+        "body": "설명은 결론부터 짧게 제시한다.",
+        "memoryClass": "profile",
+        "sourceLanguage": "ko",
+        "observedAt": null,
+        "validUntil": null
+      },
+      "response": {
+        "documentId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        "version": 1,
+        "replayed": false
+      }
+    },
+    "editDmMemoryDocument": {
+      "method": "PATCH",
+      "path": "/organizations/{organizationId}/channels/{channelId}/memory/documents/{documentId}",
+      "status": 200,
+      "request": {
+        "requestId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        "memorySpaceId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "title": "Synthetic response preference",
+        "body": "설명은 결론부터 짧게 제시한다.",
+        "memoryClass": "profile",
+        "sourceLanguage": "ko",
+        "observedAt": null,
+        "validUntil": null,
+        "expectedVersion": 1
+      },
+      "response": {
+        "documentId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        "version": 2,
+        "replayed": false
+      }
+    },
+    "deleteDmMemoryDocument": {
+      "method": "DELETE",
+      "path": "/organizations/{organizationId}/channels/{channelId}/memory/documents/{documentId}",
+      "status": 200,
+      "response": {
+        "deleted": true,
+        "purgeState": "pending"
+      }
+    },
+    "setDmMemorySettings": {
+      "method": "PATCH",
+      "path": "/organizations/{organizationId}/channels/{channelId}/memory/settings",
+      "status": 200,
+      "request": {
+        "requestId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        "memorySpaceId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "expectedMemoryRevision": 1,
+        "useEnabled": false,
+        "autoEnabled": false
+      },
+      "response": {
+        "space": {
+          "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          "channelId": "66666666-6666-4666-8666-666666666666",
+          "agentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "rosterEpoch": 2,
+          "status": "active",
+          "useEnabled": false,
+          "autoEnabled": false,
+          "memoryRevision": 2,
+          "revocationEpoch": 1,
+          "createdAt": "2026-09-01T00:00:00.000Z",
+          "updatedAt": "2026-09-01T00:00:00.000Z"
+        }
+      }
+    },
     "getHealth": {
       "method": "GET",
       "path": "/health",

@@ -209,6 +209,37 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-dm-reaction-actions")
     }
 
+    func testDirectMessageMemoryManagement() {
+        let app = launchInsideCompanion()
+        app.tabBars.buttons["DMs"].tap()
+        let conversation = app.buttons["dm-row-12121212-1212-4212-8212-121212121212"]
+        XCTAssertTrue(conversation.waitForExistence(timeout: channelTransitionTimeout))
+        conversation.tap()
+        let open = app.buttons["dm-memory-open"]
+        XCTAssertTrue(open.waitForExistence(timeout: channelTransitionTimeout))
+        open.tap()
+        let document = app.buttons["dm-memory-document-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"]
+        XCTAssertTrue(document.waitForExistence(timeout: 5))
+        XCTAssertTrue(document.label.contains("색인 대기"))
+        XCTAssertTrue(document.label.contains("사용자 보호"))
+        captureScreenshot(named: "companion-dm-memory-list")
+        document.tap()
+        let save = app.buttons["dm-memory-save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        save.tap()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(document.label.contains("v2"))
+        XCTAssertTrue(document.label.contains("색인 대기"))
+        document.tap()
+        let forget = app.buttons["dm-memory-forget"]
+        if !forget.isHittable { app.swipeUp() }
+        XCTAssertTrue(forget.waitForExistence(timeout: 5))
+        forget.tap()
+        XCTAssertTrue(document.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["저장된 기억이 없습니다."].waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-dm-memory-forgotten")
+    }
+
     func testChannelShowsLoadingSpinnerWhileMessagesLoad() {
         let app = launchInsideCompanion(
             additionalArguments: ["--ui-testing-delayed-channel-load"]
