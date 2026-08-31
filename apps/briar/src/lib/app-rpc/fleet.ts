@@ -6,7 +6,7 @@ import type {
   ManagedComputerSetupSessionTicket,
   WorkerIcon,
 } from "../../types";
-import { appCallOptions, appRpc, appTransport } from "./core";
+import { appCallOptions, appTransport } from "./core";
 import {
   applyForManagedComputerResponseFromProto,
   executionWorkerIconUpdateFromDomain,
@@ -37,12 +37,10 @@ export async function loadOrganizationExecutionWorkers(
   token: string,
   organizationId: string,
 ) {
-  return appRpc(async () =>
-    listExecutionWorkersResponseFromProto(
-      await requireFleetClient().listExecutionWorkers(
-        { organizationId },
-        appCallOptions(token),
-      ),
+  return listExecutionWorkersResponseFromProto(
+    await requireFleetClient().listExecutionWorkers(
+      { organizationId },
+      appCallOptions(token),
     ),
   );
 }
@@ -51,12 +49,10 @@ export async function loadManagedComputerProduct(
   token: string,
   organizationId: string,
 ): Promise<ManagedComputerProduct> {
-  return appRpc(async () =>
-    managedComputerProductFromProto(
-      await requireFleetClient().getManagedComputerProduct(
-        { organizationId },
-        appCallOptions(token),
-      ),
+  return managedComputerProductFromProto(
+    await requireFleetClient().getManagedComputerProduct(
+      { organizationId },
+      appCallOptions(token),
     ),
   );
 }
@@ -65,12 +61,10 @@ export async function loadManagedComputers(
   token: string,
   organizationId: string,
 ) {
-  return appRpc(async () =>
-    listManagedComputersResponseFromProto(
-      await requireFleetClient().listManagedComputers(
-        { organizationId },
-        appCallOptions(token),
-      ),
+  return listManagedComputersResponseFromProto(
+    await requireFleetClient().listManagedComputers(
+      { organizationId },
+      appCallOptions(token),
     ),
   );
 }
@@ -80,12 +74,10 @@ export async function validateManagedComputerPromotion(
   organizationId: string,
   code: string,
 ) {
-  return appRpc(async () =>
-    validateManagedComputerPromotionResponseFromProto(
-      await requireFleetClient().validateManagedComputerPromotion(
-        { organizationId, code },
-        appCallOptions(token),
-      ),
+  return validateManagedComputerPromotionResponseFromProto(
+    await requireFleetClient().validateManagedComputerPromotion(
+      { organizationId, code },
+      appCallOptions(token),
     ),
   );
 }
@@ -95,12 +87,10 @@ export async function applyForManagedComputer(
   organizationId: string,
   input: { code: string; requestId: string },
 ) {
-  return appRpc(async () =>
-    applyForManagedComputerResponseFromProto(
-      await requireFleetClient().applyForManagedComputer(
-        { organizationId, code: input.code, requestId: input.requestId },
-        appCallOptions(token),
-      ),
+  return applyForManagedComputerResponseFromProto(
+    await requireFleetClient().applyForManagedComputer(
+      { organizationId, code: input.code, requestId: input.requestId },
+      appCallOptions(token),
     ),
   );
 }
@@ -111,12 +101,10 @@ export async function retryManagedComputer(
   managedComputerId: string,
   requestId: string,
 ) {
-  return appRpc(async () =>
-    managedComputerMutationResponseFromProto(
-      await requireFleetClient().retryManagedComputer(
-        { organizationId, managedComputerId, requestId },
-        appCallOptions(token),
-      ),
+  return managedComputerMutationResponseFromProto(
+    await requireFleetClient().retryManagedComputer(
+      { organizationId, managedComputerId, requestId },
+      appCallOptions(token),
     ),
   );
 }
@@ -126,12 +114,10 @@ export async function retireManagedComputer(
   organizationId: string,
   managedComputerId: string,
 ) {
-  return appRpc(async () =>
-    managedComputerMutationResponseFromProto(
-      await requireFleetClient().retireManagedComputer(
-        { organizationId, managedComputerId },
-        appCallOptions(token),
-      ),
+  return managedComputerMutationResponseFromProto(
+    await requireFleetClient().retireManagedComputer(
+      { organizationId, managedComputerId },
+      appCallOptions(token),
     ),
   );
 }
@@ -142,17 +128,15 @@ export async function createManagedComputerRemoteSession(
   managedComputerId: string,
   input: { requestId: string; reconnectSessionId?: string },
 ): Promise<ManagedComputerRemoteSessionTicket> {
-  return appRpc(async () =>
-    managedComputerRemoteSessionTicketFromProto(
-      await requireFleetClient().createManagedComputerRemoteSession(
-        {
-          organizationId,
-          managedComputerId,
-          requestId: input.requestId,
-          reconnectSessionId: input.reconnectSessionId,
-        },
-        appCallOptions(token),
-      ),
+  return managedComputerRemoteSessionTicketFromProto(
+    await requireFleetClient().createManagedComputerRemoteSession(
+      {
+        organizationId,
+        managedComputerId,
+        requestId: input.requestId,
+        reconnectSessionId: input.reconnectSessionId,
+      },
+      appCallOptions(token),
     ),
   );
 }
@@ -163,17 +147,15 @@ export async function createManagedComputerSetupSession(
   managedComputerId: string,
   input: { projectId: string; requestId: string },
 ): Promise<ManagedComputerSetupSessionTicket> {
-  return appRpc(async () =>
-    managedComputerSetupSessionTicketFromProto(
-      await requireFleetClient().createManagedComputerSetupSession(
-        {
-          organizationId,
-          managedComputerId,
-          projectId: input.projectId,
-          requestId: input.requestId,
-        },
-        appCallOptions(token),
-      ),
+  return managedComputerSetupSessionTicketFromProto(
+    await requireFleetClient().createManagedComputerSetupSession(
+      {
+        organizationId,
+        managedComputerId,
+        projectId: input.projectId,
+        requestId: input.requestId,
+      },
+      appCallOptions(token),
     ),
   );
 }
@@ -184,12 +166,10 @@ export async function endManagedComputerRemoteSession(
   managedComputerId: string,
   remoteSessionId: string,
 ): Promise<void> {
-  return appRpc(async () => {
-    await requireFleetClient().endManagedComputerRemoteSession(
-      { organizationId, managedComputerId, remoteSessionId },
-      appCallOptions(token),
-    );
-  });
+  await requireFleetClient().endManagedComputerRemoteSession(
+    { organizationId, managedComputerId, remoteSessionId },
+    appCallOptions(token),
+  );
 }
 
 export async function requestOrganizationExecutionWorkerUpdate(
@@ -197,12 +177,10 @@ export async function requestOrganizationExecutionWorkerUpdate(
   organizationId: string,
   deviceId: string,
 ) {
-  return appRpc(async () =>
-    requestExecutionWorkerUpdateResponseFromProto(
-      await requireFleetClient().requestExecutionWorkerUpdate(
-        { organizationId, deviceId },
-        appCallOptions(token),
-      ),
+  return requestExecutionWorkerUpdateResponseFromProto(
+    await requireFleetClient().requestExecutionWorkerUpdate(
+      { organizationId, deviceId },
+      appCallOptions(token),
     ),
   );
 }
@@ -212,16 +190,14 @@ export async function deleteOrganizationExecutionWorker(
   organizationId: string,
   deviceId: string,
 ): Promise<void> {
-  return appRpc(async () => {
-    await requireFleetClient().deleteExecutionWorker(
-      {
-        organizationId,
-        deviceId,
-        requestId: `worker-deprovision:${deviceId}`,
-      },
-      appCallOptions(token),
-    );
-  });
+  await requireFleetClient().deleteExecutionWorker(
+    {
+      organizationId,
+      deviceId,
+      requestId: `worker-deprovision:${deviceId}`,
+    },
+    appCallOptions(token),
+  );
 }
 
 export async function updateOrganizationExecutionWorkerConcurrency(
@@ -230,12 +206,10 @@ export async function updateOrganizationExecutionWorkerConcurrency(
   deviceId: string,
   maxConcurrentSessions: number,
 ) {
-  return appRpc(async () =>
-    executionWorkerConcurrencyResponseFromProto(
-      await requireFleetClient().updateExecutionWorker(
-        { organizationId, deviceId, maxConcurrentSessions },
-        appCallOptions(token),
-      ),
+  return executionWorkerConcurrencyResponseFromProto(
+    await requireFleetClient().updateExecutionWorker(
+      { organizationId, deviceId, maxConcurrentSessions },
+      appCallOptions(token),
     ),
   );
 }
@@ -246,16 +220,14 @@ export async function updateOrganizationExecutionWorkerIcon(
   deviceId: string,
   icon: WorkerIcon | null,
 ) {
-  return appRpc(async () =>
-    executionWorkerIconResponseFromProto(
-      await requireFleetClient().updateExecutionWorker(
-        {
-          organizationId,
-          deviceId,
-          iconUpdate: executionWorkerIconUpdateFromDomain(icon),
-        },
-        appCallOptions(token),
-      ),
+  return executionWorkerIconResponseFromProto(
+    await requireFleetClient().updateExecutionWorker(
+      {
+        organizationId,
+        deviceId,
+        iconUpdate: executionWorkerIconUpdateFromDomain(icon),
+      },
+      appCallOptions(token),
     ),
   );
 }

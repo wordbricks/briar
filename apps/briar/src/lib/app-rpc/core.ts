@@ -1,19 +1,18 @@
-import { Code, ConnectError, type Transport } from "@connectrpc/connect";
+import {
+  type CallOptions,
+  Code,
+  ConnectError,
+  createContextKey,
+  createContextValues,
+  type Interceptor,
+  type Transport,
+} from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import {
   ValidationErrorDetailSchema,
 } from "@briar/contracts/gen/briar/types/v1/error_pb";
 import { briarApiUrl } from "../api-config";
 import { ApiError } from "../api/errors";
-
-export const appTransport: Transport | undefined = briarApiUrl
-  ? createConnectTransport({ baseUrl: briarApiUrl })
-  : undefined;
-
-export const appCallOptions = (token: string, signal?: AbortSignal) => ({
-  headers: { Authorization: `Bearer ${token}` },
-  signal,
-});
 
 const statusForConnectCode = (code: Code): number => {
   switch (code) {
@@ -59,11 +58,33 @@ export const apiErrorFromConnect = (error: ConnectError): ApiError => {
   );
 };
 
-export async function appRpc<T>(operation: () => Promise<T>): Promise<T> {
+const bearerTokenContextKey = createContextKey<string | undefined>(undefined, {
+  description: "Briar bearer token",
+});
+
+const appClientInterceptor: Interceptor = (next) => async (request) => {
+  const token = request.contextValues.get(bearerTokenContextKey);
+  if (token) request.header.set("authorization", `Bearer ${token}`);
+
   try {
-    return await operation();
+    return await next(request);
   } catch (error) {
     if (error instanceof ConnectError) throw apiErrorFromConnect(error);
     throw error;
   }
-}
+};
+
+export const appTransport: Transport | undefined = briarApiUrl
+  ? createConnectTransport({
+    baseUrl: briarApiUrl,
+    interceptors: [appClientInterceptor],
+  })
+  : undefined;
+
+export const appCallOptions = (
+  token: string,
+  signal?: AbortSignal,
+): CallOptions => ({
+  contextValues: createContextValues().set(bearerTokenContextKey, token),
+  signal,
+});

@@ -46,7 +46,7 @@ import type {
   UpdateProjectAgentScheduleInput,
 } from "../../types";
 import { isApiErrorStatus } from "../api/errors";
-import { appCallOptions, appRpc, appTransport } from "./core";
+import { appCallOptions, appTransport } from "./core";
 import {
   agentProviderFromProto,
   agentProviderToProto,
@@ -606,26 +606,24 @@ export async function createOrganizationAgent(
   },
 ): Promise<{ agent: ChannelAgentSummary }> {
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.createOrganizationAgent(
-      {
-        organizationId,
-        name: input.name,
-        provider: agentProviderToProto(input.provider),
-        model: input.model ?? undefined,
-        description: input.description,
-        responsibility: input.responsibility,
-        effort: input.effort ?? undefined,
-        skills: (input.skills ?? []).map(projectAgentSkillToMessage),
-      },
-      appCallOptions(token),
-    );
-    return {
-      agent: organizationAgentFromMessage(
-        requiredMessage(response.agent, "createOrganizationAgent.agent"),
-      ),
-    };
-  });
+  const response = await client.createOrganizationAgent(
+    {
+      organizationId,
+      name: input.name,
+      provider: agentProviderToProto(input.provider),
+      model: input.model ?? undefined,
+      description: input.description,
+      responsibility: input.responsibility,
+      effort: input.effort ?? undefined,
+      skills: (input.skills ?? []).map(projectAgentSkillToMessage),
+    },
+    appCallOptions(token),
+  );
+  return {
+    agent: organizationAgentFromMessage(
+      requiredMessage(response.agent, "createOrganizationAgent.agent"),
+    ),
+  };
 }
 
 export async function updateOrganizationAgent(
@@ -643,27 +641,25 @@ export async function updateOrganizationAgent(
   },
 ): Promise<{ agent: ChannelAgentSummary }> {
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.updateOrganizationAgent(
-      {
-        organizationId,
-        agentId,
-        name: input.name,
-        provider: agentProviderToProto(input.provider),
-        model: input.model ?? undefined,
-        description: input.description,
-        responsibility: input.responsibility,
-        effort: input.effort ?? undefined,
-        skills: input.skills.map(projectAgentSkillToMessage),
-      },
-      appCallOptions(token),
-    );
-    return {
-      agent: organizationAgentFromMessage(
-        requiredMessage(response.agent, "updateOrganizationAgent.agent"),
-      ),
-    };
-  });
+  const response = await client.updateOrganizationAgent(
+    {
+      organizationId,
+      agentId,
+      name: input.name,
+      provider: agentProviderToProto(input.provider),
+      model: input.model ?? undefined,
+      description: input.description,
+      responsibility: input.responsibility,
+      effort: input.effort ?? undefined,
+      skills: input.skills.map(projectAgentSkillToMessage),
+    },
+    appCallOptions(token),
+  );
+  return {
+    agent: organizationAgentFromMessage(
+      requiredMessage(response.agent, "updateOrganizationAgent.agent"),
+    ),
+  };
 }
 
 export async function deleteOrganizationAgent(
@@ -672,13 +668,11 @@ export async function deleteOrganizationAgent(
   agentId: string,
 ): Promise<{ deleted: boolean }> {
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.deleteOrganizationAgent(
-      { organizationId, agentId },
-      appCallOptions(token),
-    );
-    return { deleted: response.deleted };
-  });
+  const response = await client.deleteOrganizationAgent(
+    { organizationId, agentId },
+    appCallOptions(token),
+  );
+  return { deleted: response.deleted };
 }
 
 export async function listOrganizationAgents(
@@ -686,21 +680,17 @@ export async function listOrganizationAgents(
   organizationId: string,
 ): Promise<{ agents: ChannelAgentSummary[]; canManage: boolean }> {
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.listOrganizationAgents({ organizationId }, appCallOptions(token));
-    return {
-      agents: response.agents.map(organizationAgentFromMessage),
-      canManage: response.canManage,
-    };
-  });
+  const response = await client.listOrganizationAgents({ organizationId }, appCallOptions(token));
+  return {
+    agents: response.agents.map(organizationAgentFromMessage),
+    canManage: response.canManage,
+  };
 }
 
 export async function loadProjectAgents(token: string, projectId: string): Promise<ProjectAgent[]> {
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.listProjectAgents({ projectId }, appCallOptions(token));
-    return response.agents.map(projectAgentFromMessage);
-  });
+  const response = await client.listProjectAgents({ projectId }, appCallOptions(token));
+  return response.agents.map(projectAgentFromMessage);
 }
 
 export async function loadProjectAgentTranscript(
@@ -710,11 +700,9 @@ export async function loadProjectAgentTranscript(
   signal?: AbortSignal,
 ) {
   const client = requireAgentClient();
-  return appRpc(() =>
-    client.getProjectAgentTranscript(
-      { projectId, selector },
-      appCallOptions(token, signal),
-    )
+  return client.getProjectAgentTranscript(
+    { projectId, selector },
+    appCallOptions(token, signal),
   );
 }
 
@@ -727,25 +715,23 @@ export async function createProjectAgent(
     throw new Error("Create the agent before selecting a Codex Pet avatar");
   }
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.createProjectAgent(
-      {
-        projectId,
-        name: input.name ?? undefined,
-        avatar: input.avatar ?? undefined,
-        provider: agentProviderToProto(input.provider),
-        model: input.model ?? undefined,
-        effort: input.effort ?? undefined,
-        designatedWorkerId: input.designatedWorkerId ?? undefined,
-        description: input.description,
-        responsibility: input.responsibility,
-        skills: (input.skills ?? []).map(projectAgentSkillToMessage),
-        calendarColor: input.calendarColor,
-      },
-      appCallOptions(token),
-    );
-    return projectAgentFromMessage(requiredMessage(response.agent, "createProjectAgent.agent"));
-  });
+  const response = await client.createProjectAgent(
+    {
+      projectId,
+      name: input.name ?? undefined,
+      avatar: input.avatar ?? undefined,
+      provider: agentProviderToProto(input.provider),
+      model: input.model ?? undefined,
+      effort: input.effort ?? undefined,
+      designatedWorkerId: input.designatedWorkerId ?? undefined,
+      description: input.description,
+      responsibility: input.responsibility,
+      skills: (input.skills ?? []).map(projectAgentSkillToMessage),
+      calendarColor: input.calendarColor,
+    },
+    appCallOptions(token),
+  );
+  return projectAgentFromMessage(requiredMessage(response.agent, "createProjectAgent.agent"));
 }
 
 export async function updateProjectAgent(
@@ -755,53 +741,51 @@ export async function updateProjectAgent(
   input: UpdateProjectAgentInput,
 ): Promise<ProjectAgent> {
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.updateProjectAgent(
-      {
-        projectId,
-        agentId,
-        name: input.name ?? undefined,
-        avatarUpdate:
-          input.avatar === undefined
-            ? { case: undefined }
-            : input.avatar === null
-              ? { case: "clearAvatar", value: {} }
-              : { case: "avatar", value: input.avatar },
-        codexPetUpdate:
-          input.codexPet === undefined
-            ? { case: undefined }
-            : input.codexPet === null
-              ? { case: "clearCodexPet", value: {} }
-              : {
-                  case: "codexPet",
-                  value: { slug: input.codexPet.slug },
-                },
-        provider: agentProviderToProto(input.provider),
-        model: input.model ?? undefined,
-        effortUpdate:
-          input.effort === undefined
-            ? { case: undefined }
-            : input.effort === null
-              ? { case: "clearEffort", value: {} }
-              : { case: "effort", value: input.effort },
-        designatedWorkerUpdate:
-          input.designatedWorkerId === undefined
-            ? { case: undefined }
-            : input.designatedWorkerId === null
-              ? { case: "clearDesignatedWorker", value: {} }
-              : {
-                  case: "designatedWorkerId",
-                  value: input.designatedWorkerId,
-                },
-        description: input.description,
-        responsibility: input.responsibility,
-        skills: input.skills.map(projectAgentSkillToMessage),
-        calendarColor: input.calendarColor,
-      },
-      appCallOptions(token),
-    );
-    return projectAgentFromMessage(requiredMessage(response.agent, "updateProjectAgent.agent"));
-  });
+  const response = await client.updateProjectAgent(
+    {
+      projectId,
+      agentId,
+      name: input.name ?? undefined,
+      avatarUpdate:
+        input.avatar === undefined
+          ? { case: undefined }
+          : input.avatar === null
+            ? { case: "clearAvatar", value: {} }
+            : { case: "avatar", value: input.avatar },
+      codexPetUpdate:
+        input.codexPet === undefined
+          ? { case: undefined }
+          : input.codexPet === null
+            ? { case: "clearCodexPet", value: {} }
+            : {
+                case: "codexPet",
+                value: { slug: input.codexPet.slug },
+              },
+      provider: agentProviderToProto(input.provider),
+      model: input.model ?? undefined,
+      effortUpdate:
+        input.effort === undefined
+          ? { case: undefined }
+          : input.effort === null
+            ? { case: "clearEffort", value: {} }
+            : { case: "effort", value: input.effort },
+      designatedWorkerUpdate:
+        input.designatedWorkerId === undefined
+          ? { case: undefined }
+          : input.designatedWorkerId === null
+            ? { case: "clearDesignatedWorker", value: {} }
+            : {
+                case: "designatedWorkerId",
+                value: input.designatedWorkerId,
+              },
+      description: input.description,
+      responsibility: input.responsibility,
+      skills: input.skills.map(projectAgentSkillToMessage),
+      calendarColor: input.calendarColor,
+    },
+    appCallOptions(token),
+  );
+  return projectAgentFromMessage(requiredMessage(response.agent, "updateProjectAgent.agent"));
 }
 
 export async function deleteProjectAgent(
@@ -810,9 +794,7 @@ export async function deleteProjectAgent(
   agentId: string,
 ): Promise<void> {
   const client = requireAgentClient();
-  await appRpc(async () => {
-    await client.deleteProjectAgent({ projectId, agentId }, appCallOptions(token));
-  });
+  await client.deleteProjectAgent({ projectId, agentId }, appCallOptions(token));
 }
 
 export async function loadProjectAgentSchedules(
@@ -820,10 +802,8 @@ export async function loadProjectAgentSchedules(
   projectId: string,
 ): Promise<ProjectAgentSchedule[]> {
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.listProjectAgentSchedules({ projectId }, appCallOptions(token));
-    return response.schedules.map(projectAgentScheduleFromMessage);
-  });
+  const response = await client.listProjectAgentSchedules({ projectId }, appCallOptions(token));
+  return response.schedules.map(projectAgentScheduleFromMessage);
 }
 
 export async function createProjectAgentSchedule(
@@ -832,15 +812,13 @@ export async function createProjectAgentSchedule(
   input: CreateProjectAgentScheduleInput,
 ): Promise<ProjectAgentSchedule> {
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.createProjectAgentSchedule(
-      { projectId, schedule: projectAgentScheduleToMessage(input) },
-      appCallOptions(token),
-    );
-    return projectAgentScheduleFromMessage(
-      requiredMessage(response.schedule, "createProjectAgentSchedule.schedule"),
-    );
-  });
+  const response = await client.createProjectAgentSchedule(
+    { projectId, schedule: projectAgentScheduleToMessage(input) },
+    appCallOptions(token),
+  );
+  return projectAgentScheduleFromMessage(
+    requiredMessage(response.schedule, "createProjectAgentSchedule.schedule"),
+  );
 }
 
 export async function updateProjectAgentSchedule(
@@ -850,19 +828,17 @@ export async function updateProjectAgentSchedule(
   input: UpdateProjectAgentScheduleInput,
 ): Promise<ProjectAgentSchedule> {
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.updateProjectAgentSchedule(
-      {
-        projectId,
-        scheduleId,
-        schedule: projectAgentScheduleToMessage(input),
-      },
-      appCallOptions(token),
-    );
-    return projectAgentScheduleFromMessage(
-      requiredMessage(response.schedule, "updateProjectAgentSchedule.schedule"),
-    );
-  });
+  const response = await client.updateProjectAgentSchedule(
+    {
+      projectId,
+      scheduleId,
+      schedule: projectAgentScheduleToMessage(input),
+    },
+    appCallOptions(token),
+  );
+  return projectAgentScheduleFromMessage(
+    requiredMessage(response.schedule, "updateProjectAgentSchedule.schedule"),
+  );
 }
 
 export async function deleteProjectAgentSchedule(
@@ -871,9 +847,7 @@ export async function deleteProjectAgentSchedule(
   scheduleId: string,
 ): Promise<void> {
   const client = requireAgentClient();
-  await appRpc(async () => {
-    await client.deleteProjectAgentSchedule({ projectId, scheduleId }, appCallOptions(token));
-  });
+  await client.deleteProjectAgentSchedule({ projectId, scheduleId }, appCallOptions(token));
 }
 
 export async function loadProjectAgentScheduleRuns(
@@ -881,13 +855,11 @@ export async function loadProjectAgentScheduleRuns(
   projectId: string,
 ): Promise<ProjectAgentScheduleRun[]> {
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.listProjectAgentScheduleRuns(
-      { projectId },
-      appCallOptions(token),
-    );
-    return response.runs.map(projectAgentScheduleRunFromMessage);
-  });
+  const response = await client.listProjectAgentScheduleRuns(
+    { projectId },
+    appCallOptions(token),
+  );
+  return response.runs.map(projectAgentScheduleRunFromMessage);
 }
 
 export async function claimProjectAgentScheduleRuns(
@@ -897,13 +869,11 @@ export async function claimProjectAgentScheduleRuns(
   const client = requireAgentClient();
   const uniqueProjectIds = [...new Set(projectIds)];
   for (let offset = 0; offset < uniqueProjectIds.length; offset += 100) {
-    const claimed = await appRpc(async () => {
-      const response = await client.claimProjectAgentScheduleRun(
-        { projectIds: uniqueProjectIds.slice(offset, offset + 100) },
-        appCallOptions(token),
-      );
-      return response.claimedRun;
-    });
+    const response = await client.claimProjectAgentScheduleRun(
+      { projectIds: uniqueProjectIds.slice(offset, offset + 100) },
+      appCallOptions(token),
+    );
+    const claimed = response.claimedRun;
     if (!claimed) continue;
     const scheduleRun = projectAgentScheduleRunFromMessage(
       requiredMessage(claimed.run, "claimProjectAgentScheduleRun.run"),
@@ -935,35 +905,33 @@ export async function completeProjectAgentScheduleRun(
       },
 ): Promise<ProjectAgentScheduleRun> {
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.completeProjectAgentScheduleRun(
-      {
-        projectId,
-        runId,
-        claimToken: input.claimToken,
-        outcome:
-          input.status === "completed"
-            ? {
-                case: "completed",
-                value: {
-                  resultSummary: input.resultSummary,
-                  structuredResult: structuredResultToProto(input.structuredResult),
-                },
-              }
-            : {
-                case: "failed",
-                value: {
-                  error: input.error,
-                  structuredResult: structuredResultToProto(input.structuredResult),
-                },
+  const response = await client.completeProjectAgentScheduleRun(
+    {
+      projectId,
+      runId,
+      claimToken: input.claimToken,
+      outcome:
+        input.status === "completed"
+          ? {
+              case: "completed",
+              value: {
+                resultSummary: input.resultSummary,
+                structuredResult: structuredResultToProto(input.structuredResult),
               },
-      },
-      appCallOptions(token),
-    );
-    return projectAgentScheduleRunFromMessage(
-      requiredMessage(response.run, "completeProjectAgentScheduleRun.run"),
-    );
-  });
+            }
+          : {
+              case: "failed",
+              value: {
+                error: input.error,
+                structuredResult: structuredResultToProto(input.structuredResult),
+              },
+            },
+    },
+    appCallOptions(token),
+  );
+  return projectAgentScheduleRunFromMessage(
+    requiredMessage(response.run, "completeProjectAgentScheduleRun.run"),
+  );
 }
 
 export async function renewProjectAgentScheduleRun(
@@ -973,16 +941,14 @@ export async function renewProjectAgentScheduleRun(
   claimToken: string,
 ): Promise<string> {
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.renewProjectAgentScheduleRun(
-      { projectId, runId, claimToken },
-      appCallOptions(token),
-    );
-    return requiredTimestamp(
-      response.leaseExpiresAt,
-      "renewProjectAgentScheduleRun.leaseExpiresAt",
-    );
-  });
+  const response = await client.renewProjectAgentScheduleRun(
+    { projectId, runId, claimToken },
+    appCallOptions(token),
+  );
+  return requiredTimestamp(
+    response.leaseExpiresAt,
+    "renewProjectAgentScheduleRun.leaseExpiresAt",
+  );
 }
 
 export async function loadProjectAgentSessionChanges(
@@ -992,14 +958,12 @@ export async function loadProjectAgentSessionChanges(
 ): Promise<ProjectAgentSessionSyncResult> {
   const client = requireAgentClient();
   try {
-    const response = await appRpc(async () =>
-      client.syncProjectAgentSessions(
-        {
-          projectId,
-          cursor: state === null ? undefined : cursorToProto(state.cursor),
-        },
-        appCallOptions(token),
-      ),
+    const response = await client.syncProjectAgentSessions(
+      {
+        projectId,
+        cursor: state === null ? undefined : cursorToProto(state.cursor),
+      },
+      appCallOptions(token),
     );
     return {
       state: {
@@ -1025,16 +989,14 @@ export async function loadProjectAgentSession(
   sessionId: string,
 ): Promise<AutoHuntSession> {
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.getProjectAgentSession(
-      { projectId, sessionId },
-      appCallOptions(token),
-    );
-    return projectAgentSessionFromMessage(
-      requiredMessage(response.session, "projectAgentSession.session"),
-      true,
-    );
-  });
+  const response = await client.getProjectAgentSession(
+    { projectId, sessionId },
+    appCallOptions(token),
+  );
+  return projectAgentSessionFromMessage(
+    requiredMessage(response.session, "projectAgentSession.session"),
+    true,
+  );
 }
 
 export async function runProjectAgentTaskOnWorker(
@@ -1048,23 +1010,21 @@ export async function runProjectAgentTaskOnWorker(
   },
 ): Promise<AutoHuntSession> {
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.runProjectAgentTask(
-      {
-        projectId,
-        agentId: input.agentId.toLowerCase(),
-        skillId: input.skillId,
-        request: input.request,
-        workerId: input.workerId,
-        requestId: crypto.randomUUID(),
-      },
-      appCallOptions(token),
-    );
-    return projectAgentSessionFromMessage(
-      requiredMessage(response.session, "runProjectAgentTask.session"),
-      true,
-    );
-  });
+  const response = await client.runProjectAgentTask(
+    {
+      projectId,
+      agentId: input.agentId.toLowerCase(),
+      skillId: input.skillId,
+      request: input.request,
+      workerId: input.workerId,
+      requestId: crypto.randomUUID(),
+    },
+    appCallOptions(token),
+  );
+  return projectAgentSessionFromMessage(
+    requiredMessage(response.session, "runProjectAgentTask.session"),
+    true,
+  );
 }
 
 export async function upsertProjectAgentSession(
@@ -1072,66 +1032,64 @@ export async function upsertProjectAgentSession(
   session: AutoHuntSession,
 ): Promise<AutoHuntSession> {
   const client = requireAgentClient();
-  return appRpc(async () => {
-    const response = await client.putProjectAgentSession(
-      {
-        projectId: session.projectId,
-        sessionId: session.id,
-        dispatchGroupId: session.dispatchGroupId,
-        agentId: session.agentId,
-        agentName: session.agentName ?? undefined,
-        skillId: session.skillId ?? undefined,
-        sessionType: sessionTypeToProto[session.sessionType ?? "dispatch"],
-        trigger: session.trigger === undefined ? undefined : sessionTriggerToProto[session.trigger],
-        scheduleId: session.scheduleId,
-        scheduleRunId: session.scheduleRunId,
-        parentSessionId: session.parentSessionId,
-        request: session.request,
-        followUps: (session.followUps ?? []).map((followUp) => ({
-          id: followUp.id,
-          message: followUp.message,
-          sentAt: timestampFromIso(followUp.sentAt, "session.followUp.sentAt"),
-        })),
-        status: sessionStatusToProto[session.status],
-        issues: session.issues.map((issue) => ({
-          runId: issue.runId,
-          runNumber: issue.runNumber,
-          sourceKey: issue.sourceKey,
-          title: issue.title,
-          outcome: sessionIssueOutcomeToProto[issue.outcome],
-          summary: issue.summary ?? undefined,
-        })),
-        startedAt: timestampFromIso(session.startedAt, "session.startedAt"),
-        completedAt:
-          session.completedAt === null
-            ? undefined
-            : timestampFromIso(session.completedAt, "session.completedAt"),
-        conversationId: session.conversationId ?? undefined,
-        summary: session.summary ?? undefined,
-        error: session.error ?? undefined,
-        requestedWorkerId: session.requestedWorkerId ?? undefined,
-        workerId: session.workerId ?? undefined,
-        events: session.events.map((event) => ({
-          id: event.id,
-          type: sessionEventTypeToProto[event.type],
-          occurredAt: timestampFromIso(event.occurredAt, "session.event.occurredAt"),
-        })),
-        updatedAt: timestampFromIso(
-          session.updatedAt ?? session.completedAt ?? session.startedAt,
-          "session.updatedAt",
-        ),
-      },
-      appCallOptions(token),
-    );
-    return {
-      ...projectAgentSessionFromMessage(
-        requiredMessage(response.session, "putProjectAgentSession.session"),
-        true,
+  const response = await client.putProjectAgentSession(
+    {
+      projectId: session.projectId,
+      sessionId: session.id,
+      dispatchGroupId: session.dispatchGroupId,
+      agentId: session.agentId,
+      agentName: session.agentName ?? undefined,
+      skillId: session.skillId ?? undefined,
+      sessionType: sessionTypeToProto[session.sessionType ?? "dispatch"],
+      trigger: session.trigger === undefined ? undefined : sessionTriggerToProto[session.trigger],
+      scheduleId: session.scheduleId,
+      scheduleRunId: session.scheduleRunId,
+      parentSessionId: session.parentSessionId,
+      request: session.request,
+      followUps: (session.followUps ?? []).map((followUp) => ({
+        id: followUp.id,
+        message: followUp.message,
+        sentAt: timestampFromIso(followUp.sentAt, "session.followUp.sentAt"),
+      })),
+      status: sessionStatusToProto[session.status],
+      issues: session.issues.map((issue) => ({
+        runId: issue.runId,
+        runNumber: issue.runNumber,
+        sourceKey: issue.sourceKey,
+        title: issue.title,
+        outcome: sessionIssueOutcomeToProto[issue.outcome],
+        summary: issue.summary ?? undefined,
+      })),
+      startedAt: timestampFromIso(session.startedAt, "session.startedAt"),
+      completedAt:
+        session.completedAt === null
+          ? undefined
+          : timestampFromIso(session.completedAt, "session.completedAt"),
+      conversationId: session.conversationId ?? undefined,
+      summary: session.summary ?? undefined,
+      error: session.error ?? undefined,
+      requestedWorkerId: session.requestedWorkerId ?? undefined,
+      workerId: session.workerId ?? undefined,
+      events: session.events.map((event) => ({
+        id: event.id,
+        type: sessionEventTypeToProto[event.type],
+        occurredAt: timestampFromIso(event.occurredAt, "session.event.occurredAt"),
+      })),
+      updatedAt: timestampFromIso(
+        session.updatedAt ?? session.completedAt ?? session.startedAt,
+        "session.updatedAt",
       ),
-      localOwner: session.localOwner,
-      workspaceRoot: session.workspaceRoot,
-      dispatchEvents: session.dispatchEvents,
-      workers: session.workers,
-    };
-  });
+    },
+    appCallOptions(token),
+  );
+  return {
+    ...projectAgentSessionFromMessage(
+      requiredMessage(response.session, "putProjectAgentSession.session"),
+      true,
+    ),
+    localOwner: session.localOwner,
+    workspaceRoot: session.workspaceRoot,
+    dispatchEvents: session.dispatchEvents,
+    workers: session.workers,
+  };
 }

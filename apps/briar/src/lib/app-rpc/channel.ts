@@ -99,7 +99,6 @@ import {
 export { agentProviderToProto } from "./mappers";
 import {
   appCallOptions,
-  appRpc,
   appTransport,
 } from "./core";
 
@@ -750,16 +749,14 @@ export const dispatchFromMessage = (value: IssueExecutionDispatchMessage) => {
 
 export async function listChannels(token: string, organizationId: string) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.listChannels(
-      { organizationId },
-      appCallOptions(token),
-    );
-    return {
-      channels: response.channels.map(channelSummaryFromMessage),
-      cursor: safeNumber(response.cursor, "channels.cursor"),
-    };
-  });
+  const response = await client.listChannels(
+    { organizationId },
+    appCallOptions(token),
+  );
+  return {
+    channels: response.channels.map(channelSummaryFromMessage),
+    cursor: safeNumber(response.cursor, "channels.cursor"),
+  };
 }
 
 export async function listDirectMessageRecipients(
@@ -767,16 +764,14 @@ export async function listDirectMessageRecipients(
   organizationId: string,
 ): Promise<{ members: OrganizationMember[]; agents: ChannelAgentSummary[] }> {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.listDirectMessageRecipients(
-      { organizationId },
-      appCallOptions(token),
-    );
-    return {
-      members: response.members.map(organizationMemberFromProto),
-      agents: response.agents.map(organizationAgentFromMessage),
-    };
-  });
+  const response = await client.listDirectMessageRecipients(
+    { organizationId },
+    appCallOptions(token),
+  );
+  return {
+    members: response.members.map(organizationMemberFromProto),
+    agents: response.agents.map(organizationAgentFromMessage),
+  };
 }
 
 export async function createDirectMessage(
@@ -785,18 +780,16 @@ export async function createDirectMessage(
   input: { memberIds: string[]; agentIds: string[] },
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.createDirectMessage(
-      { organizationId, memberIds: input.memberIds, agentIds: input.agentIds },
-      appCallOptions(token),
-    );
-    return {
-      channel: channelSummaryFromMessage(requiredMessage(
-        response.channel,
-        "createDirectMessage.channel",
-      )),
-    };
-  });
+  const response = await client.createDirectMessage(
+    { organizationId, memberIds: input.memberIds, agentIds: input.agentIds },
+    appCallOptions(token),
+  );
+  return {
+    channel: channelSummaryFromMessage(requiredMessage(
+      response.channel,
+      "createDirectMessage.channel",
+    )),
+  };
 }
 
 export async function createChannel(
@@ -811,26 +804,24 @@ export async function createChannel(
   },
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.createChannel(
-      {
-        organizationId,
-        name: input.name,
-        slug: input.slug,
-        topic: input.topic ?? undefined,
-        visibility: input.visibility === undefined
-          ? undefined
-          : channelVisibilityToProto(input.visibility),
-        defaultProjectId: input.defaultProjectId ?? undefined,
-      },
-      appCallOptions(token),
-    );
-    return {
-      channel: channelSummaryFromMessage(
-        requiredMessage(response.channel, "createChannel.channel"),
-      ),
-    };
-  });
+  const response = await client.createChannel(
+    {
+      organizationId,
+      name: input.name,
+      slug: input.slug,
+      topic: input.topic ?? undefined,
+      visibility: input.visibility === undefined
+        ? undefined
+        : channelVisibilityToProto(input.visibility),
+      defaultProjectId: input.defaultProjectId ?? undefined,
+    },
+    appCallOptions(token),
+  );
+  return {
+    channel: channelSummaryFromMessage(
+      requiredMessage(response.channel, "createChannel.channel"),
+    ),
+  };
 }
 
 export async function updateChannel(
@@ -846,35 +837,33 @@ export async function updateChannel(
   },
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.updateChannel(
-      {
-        organizationId,
-        channelId,
-        name: input.name,
-        topicUpdate: input.topic === undefined
-          ? { case: undefined }
-          : input.topic === null
-          ? { case: "clearTopic", value: {} }
-          : { case: "topic", value: input.topic },
-        visibility: input.visibility === undefined
-          ? undefined
-          : channelVisibilityToProto(input.visibility),
-        defaultProjectUpdate: input.defaultProjectId === undefined
-          ? { case: undefined }
-          : input.defaultProjectId === null
-          ? { case: "clearDefaultProject", value: {} }
-          : { case: "defaultProjectId", value: input.defaultProjectId },
-        archived: input.archived,
-      },
-      appCallOptions(token),
-    );
-    return {
-      channel: channelSummaryFromMessage(
-        requiredMessage(response.channel, "updateChannel.channel"),
-      ),
-    };
-  });
+  const response = await client.updateChannel(
+    {
+      organizationId,
+      channelId,
+      name: input.name,
+      topicUpdate: input.topic === undefined
+        ? { case: undefined }
+        : input.topic === null
+        ? { case: "clearTopic", value: {} }
+        : { case: "topic", value: input.topic },
+      visibility: input.visibility === undefined
+        ? undefined
+        : channelVisibilityToProto(input.visibility),
+      defaultProjectUpdate: input.defaultProjectId === undefined
+        ? { case: undefined }
+        : input.defaultProjectId === null
+        ? { case: "clearDefaultProject", value: {} }
+        : { case: "defaultProjectId", value: input.defaultProjectId },
+      archived: input.archived,
+    },
+    appCallOptions(token),
+  );
+  return {
+    channel: channelSummaryFromMessage(
+      requiredMessage(response.channel, "updateChannel.channel"),
+    ),
+  };
 }
 
 export async function deleteChannel(
@@ -883,13 +872,11 @@ export async function deleteChannel(
   channelId: string,
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.deleteChannel(
-      { organizationId, channelId },
-      appCallOptions(token),
-    );
-    return { deleted: response.deleted };
-  });
+  const response = await client.deleteChannel(
+    { organizationId, channelId },
+    appCallOptions(token),
+  );
+  return { deleted: response.deleted };
 }
 
 export async function setChannelAgent(
@@ -900,20 +887,18 @@ export async function setChannelAgent(
   present: boolean,
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.setChannelAgent(
-      {
-        organizationId,
-        channelId,
-        agentId,
-        membership: present
-          ? { case: "add", value: {} }
-          : { case: "remove", value: {} },
-      },
-      appCallOptions(token),
-    );
-    return { agents: response.agents.map(organizationAgentFromMessage) };
-  });
+  const response = await client.setChannelAgent(
+    {
+      organizationId,
+      channelId,
+      agentId,
+      membership: present
+        ? { case: "add", value: {} }
+        : { case: "remove", value: {} },
+    },
+    appCallOptions(token),
+  );
+  return { agents: response.agents.map(organizationAgentFromMessage) };
 }
 
 export async function setChannelMember(
@@ -924,20 +909,18 @@ export async function setChannelMember(
   present: boolean,
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.setChannelMember(
-      {
-        organizationId,
-        channelId,
-        userId,
-        membership: present
-          ? { case: "add", value: {} }
-          : { case: "remove", value: {} },
-      },
-      appCallOptions(token),
-    );
-    return { members: response.members.map(channelMemberFromMessage) };
-  });
+  const response = await client.setChannelMember(
+    {
+      organizationId,
+      channelId,
+      userId,
+      membership: present
+        ? { case: "add", value: {} }
+        : { case: "remove", value: {} },
+    },
+    appCallOptions(token),
+  );
+  return { members: response.members.map(channelMemberFromMessage) };
 }
 
 export async function listChannelWebhooks(
@@ -946,13 +929,11 @@ export async function listChannelWebhooks(
   channelId: string,
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.listChannelWebhooks(
-      { organizationId, channelId },
-      appCallOptions(token),
-    );
-    return { webhooks: response.webhooks.map(channelWebhookFromMessage) };
-  });
+  const response = await client.listChannelWebhooks(
+    { organizationId, channelId },
+    appCallOptions(token),
+  );
+  return { webhooks: response.webhooks.map(channelWebhookFromMessage) };
 }
 
 export async function createChannelWebhook(
@@ -962,18 +943,16 @@ export async function createChannelWebhook(
   name: string,
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.createChannelWebhook(
-      { organizationId, channelId, name },
-      appCallOptions(token),
-    );
-    return {
-      webhook: channelWebhookFromMessage(
-        requiredMessage(response.webhook, "createChannelWebhook.webhook"),
-      ),
-      url: response.url,
-    };
-  });
+  const response = await client.createChannelWebhook(
+    { organizationId, channelId, name },
+    appCallOptions(token),
+  );
+  return {
+    webhook: channelWebhookFromMessage(
+      requiredMessage(response.webhook, "createChannelWebhook.webhook"),
+    ),
+    url: response.url,
+  };
 }
 
 export async function updateChannelWebhook(
@@ -984,17 +963,15 @@ export async function updateChannelWebhook(
   name: string,
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.updateChannelWebhook(
-      { organizationId, channelId, webhookId, name },
-      appCallOptions(token),
-    );
-    return {
-      webhook: channelWebhookFromMessage(
-        requiredMessage(response.webhook, "updateChannelWebhook.webhook"),
-      ),
-    };
-  });
+  const response = await client.updateChannelWebhook(
+    { organizationId, channelId, webhookId, name },
+    appCallOptions(token),
+  );
+  return {
+    webhook: channelWebhookFromMessage(
+      requiredMessage(response.webhook, "updateChannelWebhook.webhook"),
+    ),
+  };
 }
 
 export async function rotateChannelWebhook(
@@ -1004,18 +981,16 @@ export async function rotateChannelWebhook(
   webhookId: string,
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.rotateChannelWebhook(
-      { organizationId, channelId, webhookId },
-      appCallOptions(token),
-    );
-    return {
-      webhook: channelWebhookFromMessage(
-        requiredMessage(response.webhook, "rotateChannelWebhook.webhook"),
-      ),
-      url: response.url,
-    };
-  });
+  const response = await client.rotateChannelWebhook(
+    { organizationId, channelId, webhookId },
+    appCallOptions(token),
+  );
+  return {
+    webhook: channelWebhookFromMessage(
+      requiredMessage(response.webhook, "rotateChannelWebhook.webhook"),
+    ),
+    url: response.url,
+  };
 }
 
 export async function revokeChannelWebhook(
@@ -1025,17 +1000,15 @@ export async function revokeChannelWebhook(
   webhookId: string,
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.revokeChannelWebhook(
-      { organizationId, channelId, webhookId },
-      appCallOptions(token),
-    );
-    return {
-      webhook: channelWebhookFromMessage(
-        requiredMessage(response.webhook, "revokeChannelWebhook.webhook"),
-      ),
-    };
-  });
+  const response = await client.revokeChannelWebhook(
+    { organizationId, channelId, webhookId },
+    appCallOptions(token),
+  );
+  return {
+    webhook: channelWebhookFromMessage(
+      requiredMessage(response.webhook, "revokeChannelWebhook.webhook"),
+    ),
+  };
 }
 
 export async function loadChannel(
@@ -1045,27 +1018,25 @@ export async function loadChannel(
   options: { messageLimit?: number; signal?: AbortSignal } = {},
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.getChannel(
-      {
-        organizationId,
-        channelId,
-        messageLimit: options.messageLimit,
-      },
-      appCallOptions(token, options.signal),
-    );
-    return {
-      channel: channelSummaryFromMessage(requiredMessage(
-        response.channel,
-        "getChannel.channel",
-      )),
-      members: response.members.map(channelMemberFromMessage),
-      agents: response.agents.map(organizationAgentFromMessage),
-      messages: response.messages.map(channelMessageFromMessage),
-      agentReplies: response.agentReplies.map(channelAgentReplyFromMessage),
-      nextCursor: response.nextCursor ?? null,
-    };
-  });
+  const response = await client.getChannel(
+    {
+      organizationId,
+      channelId,
+      messageLimit: options.messageLimit,
+    },
+    appCallOptions(token, options.signal),
+  );
+  return {
+    channel: channelSummaryFromMessage(requiredMessage(
+      response.channel,
+      "getChannel.channel",
+    )),
+    members: response.members.map(channelMemberFromMessage),
+    agents: response.agents.map(organizationAgentFromMessage),
+    messages: response.messages.map(channelMessageFromMessage),
+    agentReplies: response.agentReplies.map(channelAgentReplyFromMessage),
+    nextCursor: response.nextCursor ?? null,
+  };
 }
 
 export async function markChannelRead(
@@ -1075,24 +1046,22 @@ export async function markChannelRead(
   input: { lastReadAt?: string } = {},
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.markChannelRead(
-      {
-        organizationId,
-        channelId,
-        lastReadAt: input.lastReadAt === undefined
-          ? undefined
-          : timestampFromIso(input.lastReadAt, "lastReadAt"),
-      },
-      appCallOptions(token),
-    );
-    return {
-      channel: channelSummaryFromMessage(requiredMessage(
-        response.channel,
-        "markChannelRead.channel",
-      )),
-    };
-  });
+  const response = await client.markChannelRead(
+    {
+      organizationId,
+      channelId,
+      lastReadAt: input.lastReadAt === undefined
+        ? undefined
+        : timestampFromIso(input.lastReadAt, "lastReadAt"),
+    },
+    appCallOptions(token),
+  );
+  return {
+    channel: channelSummaryFromMessage(requiredMessage(
+      response.channel,
+      "markChannelRead.channel",
+    )),
+  };
 }
 
 export async function listChannelMessages(
@@ -1103,22 +1072,20 @@ export async function listChannelMessages(
   page: { limit?: number; cursor?: string; signal?: AbortSignal } = {},
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.listChannelMessages(
-      {
-        organizationId,
-        channelId,
-        parentMessageId,
-        cursor: page.cursor,
-        limit: page.limit,
-      },
-      appCallOptions(token, page.signal),
-    );
-    return {
-      messages: response.messages.map(channelMessageFromMessage),
-      nextCursor: response.nextCursor ?? null,
-    };
-  });
+  const response = await client.listChannelMessages(
+    {
+      organizationId,
+      channelId,
+      parentMessageId,
+      cursor: page.cursor,
+      limit: page.limit,
+    },
+    appCallOptions(token, page.signal),
+  );
+  return {
+    messages: response.messages.map(channelMessageFromMessage),
+    nextCursor: response.nextCursor ?? null,
+  };
 }
 
 export async function sendChannelMessage(
@@ -1170,12 +1137,12 @@ export async function sendChannelMessage(
   }
 
   const client = requireChannelClient();
-  return appRpc(async () => createChannelMessageResultFromMessage(
+  return createChannelMessageResultFromMessage(
     await client.createChannelMessage(
       request,
       appCallOptions(token),
     ),
-  ));
+  );
 }
 
 const createChannelMessageResultFromMessage = (
@@ -1195,21 +1162,19 @@ export async function deleteChannelMessage(
   messageId: string,
 ): Promise<DeleteChannelMessageResponse> {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.deleteChannelMessage(
-      { organizationId, channelId, messageId },
-      appCallOptions(token),
-    );
-    return {
-      deleted: response.deleted,
-      message: response.message
-        ? channelMessageFromMessage(response.message)
-        : null,
-      parentMessage: response.parentMessage
-        ? channelMessageFromMessage(response.parentMessage)
-        : null,
-    };
-  });
+  const response = await client.deleteChannelMessage(
+    { organizationId, channelId, messageId },
+    appCallOptions(token),
+  );
+  return {
+    deleted: response.deleted,
+    message: response.message
+      ? channelMessageFromMessage(response.message)
+      : null,
+    parentMessage: response.parentMessage
+      ? channelMessageFromMessage(response.parentMessage)
+      : null,
+  };
 }
 
 export async function toggleChannelMessageReaction(
@@ -1220,18 +1185,16 @@ export async function toggleChannelMessageReaction(
   emoji: string,
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.toggleChannelMessageReaction(
-      { organizationId, channelId, messageId, emoji },
-      appCallOptions(token),
-    );
-    return {
-      message: channelMessageFromMessage(requiredMessage(
-        response.message,
-        "toggleChannelMessageReaction.message",
-      )),
-    };
-  });
+  const response = await client.toggleChannelMessageReaction(
+    { organizationId, channelId, messageId, emoji },
+    appCallOptions(token),
+  );
+  return {
+    message: channelMessageFromMessage(requiredMessage(
+      response.message,
+      "toggleChannelMessageReaction.message",
+    )),
+  };
 }
 
 export async function updateChannelThreadSubscription(
@@ -1242,22 +1205,20 @@ export async function updateChannelThreadSubscription(
   subscribed: boolean,
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.setChannelThreadSubscription(
-      { organizationId, channelId, rootMessageId: messageId, subscribed },
-      appCallOptions(token),
-    );
-    return {
-      rootMessageId: response.rootMessageId,
-      subscribers: response.subscribers.map((subscriber) => ({
-        userId: subscriber.userId,
-        subscribedAt: requiredTimestamp(
-          subscriber.subscribedAt,
-          "channelSubscription.subscribedAt",
-        ),
-      })),
-    };
-  });
+  const response = await client.setChannelThreadSubscription(
+    { organizationId, channelId, rootMessageId: messageId, subscribed },
+    appCallOptions(token),
+  );
+  return {
+    rootMessageId: response.rootMessageId,
+    subscribers: response.subscribers.map((subscriber) => ({
+      userId: subscriber.userId,
+      subscribedAt: requiredTimestamp(
+        subscriber.subscribedAt,
+        "channelSubscription.subscribedAt",
+      ),
+    })),
+  };
 }
 
 export async function acceptChannelProposal(
@@ -1269,31 +1230,29 @@ export async function acceptChannelProposal(
   execution: IssueExecutionApprovalInput | null = null,
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.acceptChannelProposal(
-      {
-        organizationId,
-        channelId,
-        proposalId,
-        projectId: projectId ?? undefined,
-        execution: execution ? approvalToMessage(execution) : undefined,
-      },
-      appCallOptions(token),
-    );
-    return {
-      outcome: approvalOutcomeFromProto(response.outcome),
-      projectId: response.projectId,
-      resultRunId: response.resultRunId,
-      resultItems: response.resultItems.map((item) => ({
-        localKey: item.localKey,
-        runId: item.runId,
-      })),
-      executionProposal: response.executionProposal
-        ? issueExecutionProposalFromMessage(response.executionProposal)
-        : null,
-      dispatch: response.dispatch ? dispatchFromMessage(response.dispatch) : null,
-    };
-  });
+  const response = await client.acceptChannelProposal(
+    {
+      organizationId,
+      channelId,
+      proposalId,
+      projectId: projectId ?? undefined,
+      execution: execution ? approvalToMessage(execution) : undefined,
+    },
+    appCallOptions(token),
+  );
+  return {
+    outcome: approvalOutcomeFromProto(response.outcome),
+    projectId: response.projectId,
+    resultRunId: response.resultRunId,
+    resultItems: response.resultItems.map((item) => ({
+      localKey: item.localKey,
+      runId: item.runId,
+    })),
+    executionProposal: response.executionProposal
+      ? issueExecutionProposalFromMessage(response.executionProposal)
+      : null,
+    dispatch: response.dispatch ? dispatchFromMessage(response.dispatch) : null,
+  };
 }
 
 export async function declineChannelProposal(
@@ -1303,23 +1262,21 @@ export async function declineChannelProposal(
   proposalId: string,
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.declineChannelProposal(
-      { organizationId, channelId, proposalId },
-      appCallOptions(token),
-    );
-    const outcome = (() => {
-      switch (response.outcome) {
-        case ProtoDeclineOutcome.DECLINED:
-          return "declined" as const;
-        case ProtoDeclineOutcome.ALREADY_DECLINED:
-          return "already_declined" as const;
-        default:
-          throw new Error(`Unknown decline outcome: ${response.outcome}`);
-      }
-    })();
-    return { outcome };
-  });
+  const response = await client.declineChannelProposal(
+    { organizationId, channelId, proposalId },
+    appCallOptions(token),
+  );
+  const outcome = (() => {
+    switch (response.outcome) {
+      case ProtoDeclineOutcome.DECLINED:
+        return "declined" as const;
+      case ProtoDeclineOutcome.ALREADY_DECLINED:
+        return "already_declined" as const;
+      default:
+        throw new Error(`Unknown decline outcome: ${response.outcome}`);
+    }
+  })();
+  return { outcome };
 }
 
 export async function acceptChannelExecutionProposal(
@@ -1330,30 +1287,28 @@ export async function acceptChannelExecutionProposal(
   input: IssueExecutionApprovalInput,
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.acceptChannelExecutionProposal(
-      {
-        organizationId,
-        channelId,
-        proposalId,
-        approval: approvalToMessage(input),
-      },
-      appCallOptions(token),
-    );
-    return {
-      proposal: issueExecutionProposalFromMessage(requiredMessage(
-        response.proposal,
-        "acceptChannelExecutionProposal.proposal",
-      )),
-      outcome: approvalOutcomeFromProto(response.outcome),
-      projectId: response.projectId,
-      runId: response.runId,
-      dispatch: dispatchFromMessage(requiredMessage(
-        response.dispatch,
-        "acceptChannelExecutionProposal.dispatch",
-      )),
-    };
-  });
+  const response = await client.acceptChannelExecutionProposal(
+    {
+      organizationId,
+      channelId,
+      proposalId,
+      approval: approvalToMessage(input),
+    },
+    appCallOptions(token),
+  );
+  return {
+    proposal: issueExecutionProposalFromMessage(requiredMessage(
+      response.proposal,
+      "acceptChannelExecutionProposal.proposal",
+    )),
+    outcome: approvalOutcomeFromProto(response.outcome),
+    projectId: response.projectId,
+    runId: response.runId,
+    dispatch: dispatchFromMessage(requiredMessage(
+      response.dispatch,
+      "acceptChannelExecutionProposal.dispatch",
+    )),
+  };
 }
 
 export const assertPendingAgentSkillExecutionApproval = (
@@ -1447,28 +1402,26 @@ export async function acceptChannelSkillExecutionProposal(
 ) {
   assertPendingAgentSkillExecutionApproval(expectedProposal, input);
   const client = requireChannelClient();
-  const result = await appRpc(async () => {
-    const response = await client.acceptChannelSkillExecutionProposal(
-      {
-        organizationId,
-        channelId,
-        proposalId: expectedProposal.id,
-        workerId: input.workerId,
-      },
-      appCallOptions(token),
-    );
-    return {
-      proposal: agentSkillExecutionProposalFromMessage(requiredMessage(
-        response.proposal,
-        "acceptChannelSkillExecutionProposal.proposal",
-      )),
-      outcome: approvalOutcomeFromProto(response.outcome),
-      projectId: response.projectId,
-      session: response.session
-        ? projectAgentSessionFromMessage(response.session, true)
-        : null,
-    };
-  });
+  const response = await client.acceptChannelSkillExecutionProposal(
+    {
+      organizationId,
+      channelId,
+      proposalId: expectedProposal.id,
+      workerId: input.workerId,
+    },
+    appCallOptions(token),
+  );
+  const result = {
+    proposal: agentSkillExecutionProposalFromMessage(requiredMessage(
+      response.proposal,
+      "acceptChannelSkillExecutionProposal.proposal",
+    )),
+    outcome: approvalOutcomeFromProto(response.outcome),
+    projectId: response.projectId,
+    session: response.session
+      ? projectAgentSessionFromMessage(response.session, true)
+      : null,
+  };
   return validateAgentSkillExecutionAcceptance(result, expectedProposal, input);
 }
 
@@ -1479,16 +1432,14 @@ export async function loadChannelDelta(
   signal?: AbortSignal,
 ): Promise<ChannelDelta> {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.syncChannels(
-      {
-        organizationId,
-        cursor: cursorToProto(since, "channels.cursor"),
-      },
-      appCallOptions(token, signal),
-    );
-    return channelDeltaFromMessage(response);
-  });
+  const response = await client.syncChannels(
+    {
+      organizationId,
+      cursor: cursorToProto(since, "channels.cursor"),
+    },
+    appCallOptions(token, signal),
+  );
+  return channelDeltaFromMessage(response);
 }
 
 export const channelDocumentContentFromMessage = (
@@ -1507,7 +1458,7 @@ export async function loadChannelMessageDocument(
   messageId: string,
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => ({
+  return ({
     document: channelDocumentContentFromMessage(requiredMessage(
       (await client.getChannelMessageDocument(
         { organizationId, channelId, messageId },
@@ -1515,7 +1466,7 @@ export async function loadChannelMessageDocument(
       )).document,
       "getChannelMessageDocument.document",
     )),
-  }));
+  });
 }
 
 export const channelLinkPreviewFromMessage = (
@@ -1536,17 +1487,15 @@ export async function loadChannelLinkPreview(
   targetUrl: string,
 ) {
   const client = requireChannelClient();
-  return appRpc(async () => {
-    const response = await client.getChannelLinkPreview(
-      { organizationId, channelId, url: targetUrl },
-      appCallOptions(token),
-    );
-    return {
-      preview: response.preview
-        ? channelLinkPreviewFromMessage(response.preview)
-        : null,
-    };
-  });
+  const response = await client.getChannelLinkPreview(
+    { organizationId, channelId, url: targetUrl },
+    appCallOptions(token),
+  );
+  return {
+    preview: response.preview
+      ? channelLinkPreviewFromMessage(response.preview)
+      : null,
+  };
 }
 
 export const channelDeltaFromMessage = (

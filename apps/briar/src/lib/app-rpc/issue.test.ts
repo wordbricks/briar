@@ -15,6 +15,9 @@ import {
 import {
   ProposalStatus,
 } from "@briar/contracts/gen/briar/app/v1/common_pb";
+import {
+  ValidationErrorDetailSchema,
+} from "@briar/contracts/gen/briar/types/v1/error_pb";
 import { describe, expect, it } from "vitest";
 import type { CreateIssueInput, UpdateIssueInput } from "../../types";
 import {
@@ -134,11 +137,34 @@ describe("Issue Connect boundary", () => {
       SyncIssueMessagesResponseSchema,
       { cursor: BigInt(Number.MAX_SAFE_INTEGER) + 1n },
     ))).toThrow("outside JavaScript's safe integer range");
-    expect(
-      apiErrorFromConnect(
-        new ConnectError("checkpoint conflict", Code.FailedPrecondition),
-      ).status,
-    ).toBe(409);
+  });
+
+  it("maps Connect validation details into the shared API error", () => {
+    const error = apiErrorFromConnect(new ConnectError(
+      "invalid issue",
+      Code.InvalidArgument,
+      undefined,
+      [{
+        desc: ValidationErrorDetailSchema,
+        value: {
+          violations: [{
+            path: "title",
+            rule: "min_length",
+            message: "Title is required",
+          }],
+        },
+      }],
+    ));
+
+    expect(error).toMatchObject({
+      status: 400,
+      message: "invalid issue",
+      issues: [{
+        path: ["title"],
+        rule: "min_length",
+        message: "Title is required",
+      }],
+    });
   });
 
   it("uses Connect without file bytes and carries attachment references", () => {

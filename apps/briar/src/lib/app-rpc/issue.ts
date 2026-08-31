@@ -91,7 +91,7 @@ import {
   runStatusToProto,
   safeNumber,
 } from "./mappers";
-import { appCallOptions, appRpc, appTransport } from "./core";
+import { appCallOptions, appTransport } from "./core";
 import {
   workflowCheckpointFromProto,
   workflowCheckpointToProto,
@@ -218,12 +218,12 @@ export async function createIssue(
     return createIssueMultipart(token, projectId, input);
   }
   const client = requireIssueClient();
-  return appRpc(async () => createIssueResultFromMessage(
+  return createIssueResultFromMessage(
     await client.createIssue(
       createIssueRequestFromInput(projectId, input),
       appCallOptions(token),
     ),
-  ));
+  );
 }
 
 export const updateIssueRequestFromInput = (
@@ -298,12 +298,12 @@ export async function updateIssue(
     return updateIssueMultipart(token, projectId, runId, input);
   }
   const client = requireIssueClient();
-  return appRpc(async () => updateIssueResultFromMessage(
+  return updateIssueResultFromMessage(
     await client.updateIssue(
       updateIssueRequestFromInput(projectId, runId, input),
       appCallOptions(token),
     ),
-  ));
+  );
 }
 
 export async function deleteIssue(
@@ -312,10 +312,10 @@ export async function deleteIssue(
   runId: string,
 ) {
   const client = requireIssueClient();
-  const response = await appRpc(() => client.deleteIssue(
+  const response = await client.deleteIssue(
     { projectId, runId },
     appCallOptions(token),
-  ));
+  );
   if (!response.deleted) throw new Error("Issue deletion was not confirmed");
 }
 
@@ -333,28 +333,26 @@ export async function transferIssue(
   targetProjectId: string,
 ): Promise<TransferIssueResult> {
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const response = await client.transferIssue(
-      { projectId, runId, targetProjectId },
-      appCallOptions(token),
-    );
-    const outcome = (() => {
-      switch (response.outcome) {
-        case ProtoTransferOutcome.TRANSFERRED:
-          return "transferred" as const;
-        case ProtoTransferOutcome.ALREADY_TRANSFERRED:
-          return "already_transferred" as const;
-        default:
-          throw new Error(`Unknown issue transfer outcome: ${response.outcome}`);
-      }
-    })();
-    return {
-      runId: response.runId,
-      sourceProjectId: response.sourceProjectId,
-      targetProjectId: response.targetProjectId,
-      outcome,
-    };
-  });
+  const response = await client.transferIssue(
+    { projectId, runId, targetProjectId },
+    appCallOptions(token),
+  );
+  const outcome = (() => {
+    switch (response.outcome) {
+      case ProtoTransferOutcome.TRANSFERRED:
+        return "transferred" as const;
+      case ProtoTransferOutcome.ALREADY_TRANSFERRED:
+        return "already_transferred" as const;
+      default:
+        throw new Error(`Unknown issue transfer outcome: ${response.outcome}`);
+    }
+  })();
+  return {
+    runId: response.runId,
+    sourceProjectId: response.sourceProjectId,
+    targetProjectId: response.targetProjectId,
+    outcome,
+  };
 }
 
 export async function updateIssueSubscription(
@@ -364,22 +362,20 @@ export async function updateIssueSubscription(
   subscribed: boolean,
 ) {
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const response = await client.setIssueSubscription(
-      { projectId, runId, subscribed },
-      appCallOptions(token),
-    );
-    return {
-      runId: response.runId,
-      subscribers: response.subscribers.map((subscriber) => ({
-        userId: subscriber.userId,
-        subscribedAt: requiredTimestamp(
-          subscriber.subscribedAt,
-          "issueSubscriber.subscribedAt",
-        ),
-      })),
-    };
-  });
+  const response = await client.setIssueSubscription(
+    { projectId, runId, subscribed },
+    appCallOptions(token),
+  );
+  return {
+    runId: response.runId,
+    subscribers: response.subscribers.map((subscriber) => ({
+      userId: subscriber.userId,
+      subscribedAt: requiredTimestamp(
+        subscriber.subscribedAt,
+        "issueSubscriber.subscribedAt",
+      ),
+    })),
+  };
 }
 
 export async function updateIssueExecutionPreferences(
@@ -389,26 +385,24 @@ export async function updateIssueExecutionPreferences(
   input: IssueExecutionPreferences,
 ) {
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const response = await client.updateIssuePreferences(
-      {
-        projectId,
-        runId,
-        provider: input.provider === null
-          ? undefined
-          : agentProviderToProto(input.provider),
-        model: input.model ?? undefined,
-        effort: input.effort ?? undefined,
-      },
-      appCallOptions(token),
-    );
-    return {
-      runId: response.runId,
-      provider: optionalAgentProviderFromProto(response.provider),
-      model: response.model ?? null,
-      effort: response.effort ?? null,
-    };
-  });
+  const response = await client.updateIssuePreferences(
+    {
+      projectId,
+      runId,
+      provider: input.provider === null
+        ? undefined
+        : agentProviderToProto(input.provider),
+      model: input.model ?? undefined,
+      effort: input.effort ?? undefined,
+    },
+    appCallOptions(token),
+  );
+  return {
+    runId: response.runId,
+    provider: optionalAgentProviderFromProto(response.provider),
+    model: response.model ?? null,
+    effort: response.effort ?? null,
+  };
 }
 
 export async function updateIssueCheckpoints(
@@ -418,20 +412,18 @@ export async function updateIssueCheckpoints(
   checkpoints: AutoHuntWorkflowCheckpoint[],
 ) {
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const response = await client.updateIssueCheckpoints(
-      {
-        projectId,
-        runId,
-        checkpoints: checkpoints.map(workflowCheckpointToProto),
-      },
-      appCallOptions(token),
-    );
-    return {
-      runId: response.runId,
-      checkpoints: response.checkpoints.map(workflowCheckpointFromProto),
-    };
-  });
+  const response = await client.updateIssueCheckpoints(
+    {
+      projectId,
+      runId,
+      checkpoints: checkpoints.map(workflowCheckpointToProto),
+    },
+    appCallOptions(token),
+  );
+  return {
+    runId: response.runId,
+    checkpoints: response.checkpoints.map(workflowCheckpointFromProto),
+  };
 }
 
 const setIssueDependency = async (
@@ -442,7 +434,7 @@ const setIssueDependency = async (
   enabled: boolean,
 ) => {
   const client = requireIssueClient();
-  return appRpc(() => client.setIssueDependency(
+  return client.setIssueDependency(
     {
       projectId,
       runId: dependentRunId,
@@ -450,7 +442,7 @@ const setIssueDependency = async (
       enabled,
     },
     appCallOptions(token),
-  ));
+  );
 };
 
 export async function addIssueDependency(
@@ -518,40 +510,38 @@ export async function moveHuntRun(
   placement: HuntRunPlacement,
 ): Promise<HuntMoveResult> {
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const response = await client.moveRun(
-      {
-        projectId,
-        runId,
-        requestId: crypto.randomUUID(),
-        status: runStatusToProto(placement.status),
-        workflowStage: placement.workflowStage ?? undefined,
-      },
-      appCallOptions(token),
-    );
-    const outcome = (() => {
-      switch (response.outcome) {
-        case ProtoMoveOutcome.MOVED:
-          return "moved" as const;
-        case ProtoMoveOutcome.UNCHANGED:
-          return "unchanged" as const;
-        case ProtoMoveOutcome.ALREADY_MOVED:
-          return "already_moved" as const;
-        default:
-          throw new Error(`Unknown move outcome: ${response.outcome}`);
-      }
-    })();
-    const status = runStatusFromProto(response.status);
-    if (status === "paused") {
-      throw new Error("Move returned unsupported paused status");
+  const response = await client.moveRun(
+    {
+      projectId,
+      runId,
+      requestId: crypto.randomUUID(),
+      status: runStatusToProto(placement.status),
+      workflowStage: placement.workflowStage ?? undefined,
+    },
+    appCallOptions(token),
+  );
+  const outcome = (() => {
+    switch (response.outcome) {
+      case ProtoMoveOutcome.MOVED:
+        return "moved" as const;
+      case ProtoMoveOutcome.UNCHANGED:
+        return "unchanged" as const;
+      case ProtoMoveOutcome.ALREADY_MOVED:
+        return "already_moved" as const;
+      default:
+        throw new Error(`Unknown move outcome: ${response.outcome}`);
     }
-    return {
-      runId: response.runId,
-      outcome,
-      status,
-      workflowStage: response.workflowStage ?? null,
-    };
-  });
+  })();
+  const status = runStatusFromProto(response.status);
+  if (status === "paused") {
+    throw new Error("Move returned unsupported paused status");
+  }
+  return {
+    runId: response.runId,
+    outcome,
+    status,
+    workflowStage: response.workflowStage ?? null,
+  };
 }
 
 export type HuntRecoveryResult = {
@@ -569,48 +559,46 @@ const recoverHuntRun = async (
   reason: string | null,
 ): Promise<HuntRecoveryResult> => {
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const input = {
-      projectId,
-      runId,
-      requestId: crypto.randomUUID(),
-      reason: reason ?? undefined,
-    };
-    const response = action === "retry"
-      ? await client.retryRun(input, appCallOptions(token))
-      : await client.cancelRun(input, appCallOptions(token));
-    const outcome: HuntRecoveryResult["outcome"] = (() => {
-      if (action === "retry") {
-        switch (response.outcome) {
-          case ProtoRetryOutcome.RETRIED:
-            return "retried";
-          case ProtoRetryOutcome.ALREADY_RETRIED:
-            return "already_retried";
-          default:
-            throw new Error(`Unknown retry outcome: ${response.outcome}`);
-        }
-      }
+  const input = {
+    projectId,
+    runId,
+    requestId: crypto.randomUUID(),
+    reason: reason ?? undefined,
+  };
+  const response = action === "retry"
+    ? await client.retryRun(input, appCallOptions(token))
+    : await client.cancelRun(input, appCallOptions(token));
+  const outcome: HuntRecoveryResult["outcome"] = (() => {
+    if (action === "retry") {
       switch (response.outcome) {
-        case ProtoCancelOutcome.CANCELLED:
-          return "cancelled";
-        case ProtoCancelOutcome.ALREADY_CANCELLED:
-          return "already_cancelled";
+        case ProtoRetryOutcome.RETRIED:
+          return "retried";
+        case ProtoRetryOutcome.ALREADY_RETRIED:
+          return "already_retried";
         default:
-          throw new Error(`Unknown cancel outcome: ${response.outcome}`);
+          throw new Error(`Unknown retry outcome: ${response.outcome}`);
       }
-    })();
-    const status = runStatusFromProto(response.status);
-    const expectedStatus = action === "retry" ? "queued" : "cancelled";
-    if (status !== expectedStatus) {
-      throw new Error(`Unknown ${action} status: ${status}`);
     }
-    return {
-      runId: response.runId,
-      outcome,
-      attempt: response.attempt,
-      stage: expectedStatus,
-    };
-  });
+    switch (response.outcome) {
+      case ProtoCancelOutcome.CANCELLED:
+        return "cancelled";
+      case ProtoCancelOutcome.ALREADY_CANCELLED:
+        return "already_cancelled";
+      default:
+        throw new Error(`Unknown cancel outcome: ${response.outcome}`);
+    }
+  })();
+  const status = runStatusFromProto(response.status);
+  const expectedStatus = action === "retry" ? "queued" : "cancelled";
+  if (status !== expectedStatus) {
+    throw new Error(`Unknown ${action} status: ${status}`);
+  }
+  return {
+    runId: response.runId,
+    outcome,
+    attempt: response.attempt,
+    stage: expectedStatus,
+  };
 };
 
 export const retryHuntRun = (
@@ -650,43 +638,41 @@ export async function resumeHuntRun(
   requestId: string = crypto.randomUUID(),
 ): Promise<HuntResumeResult> {
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const response = await client.resumeRun(
-      {
-        projectId,
-        runId,
-        requestId,
-        checkpointKey: checkpoint.key,
-        attempt: checkpoint.attempt,
-        revision: checkpoint.revision,
-      },
-      appCallOptions(token),
-    );
-    const outcome = (() => {
-      switch (response.outcome) {
-        case ProtoResumeOutcome.RESUMED:
-          return "resumed" as const;
-        case ProtoResumeOutcome.ALREADY_RESUMED:
-          return "already_resumed" as const;
-        case ProtoResumeOutcome.APPROVED:
-          return "approved" as const;
-        case ProtoResumeOutcome.ALREADY_APPROVED:
-          return "already_approved" as const;
-        default:
-          throw new Error(`Unknown resume outcome: ${response.outcome}`);
-      }
-    })();
-    return {
-      runId: response.runId,
-      outcome,
-      workflowStage: response.workflowStage ?? null,
-      startStage: response.startStage ?? null,
-      checkpointKey: response.checkpointKey ?? null,
-      attempt: response.attempt ?? null,
-      revision: response.revision ?? null,
-      terminalReviewOnly: response.terminalReviewOnly,
-    };
-  });
+  const response = await client.resumeRun(
+    {
+      projectId,
+      runId,
+      requestId,
+      checkpointKey: checkpoint.key,
+      attempt: checkpoint.attempt,
+      revision: checkpoint.revision,
+    },
+    appCallOptions(token),
+  );
+  const outcome = (() => {
+    switch (response.outcome) {
+      case ProtoResumeOutcome.RESUMED:
+        return "resumed" as const;
+      case ProtoResumeOutcome.ALREADY_RESUMED:
+        return "already_resumed" as const;
+      case ProtoResumeOutcome.APPROVED:
+        return "approved" as const;
+      case ProtoResumeOutcome.ALREADY_APPROVED:
+        return "already_approved" as const;
+      default:
+        throw new Error(`Unknown resume outcome: ${response.outcome}`);
+    }
+  })();
+  return {
+    runId: response.runId,
+    outcome,
+    workflowStage: response.workflowStage ?? null,
+    startStage: response.startStage ?? null,
+    checkpointKey: response.checkpointKey ?? null,
+    attempt: response.attempt ?? null,
+    revision: response.revision ?? null,
+    terminalReviewOnly: response.terminalReviewOnly,
+  };
 }
 
 export type HuntReworkResult = {
@@ -735,7 +721,7 @@ export async function reworkPausedHuntRun(
   requestId: string = crypto.randomUUID(),
 ): Promise<HuntReworkResult> {
   const client = requireIssueClient();
-  return appRpc(async () => reworkRunResultFromMessage(
+  return reworkRunResultFromMessage(
     await client.reworkRun(
       {
         projectId,
@@ -751,7 +737,7 @@ export async function reworkPausedHuntRun(
       },
       appCallOptions(token),
     ),
-  ));
+  );
 }
 
 export const unassignRunResultFromMessage = (
@@ -776,12 +762,12 @@ export async function unassignHuntRun(
   runId: string,
 ) {
   const client = requireIssueClient();
-  return appRpc(async () => unassignRunResultFromMessage(
+  return unassignRunResultFromMessage(
     await client.unassignRun(
       { projectId, runId, requestId: crypto.randomUUID() },
       appCallOptions(token),
     ),
-  ));
+  );
 }
 
 export type HuntDispatchResult = ReturnType<typeof dispatchFromMessage>;
@@ -801,28 +787,26 @@ export async function dispatchHuntRun(
   },
 ): Promise<HuntDispatchResult> {
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const requestMessage = {
-      projectId,
-      runId,
-      dispatch: {
-        requestId: crypto.randomUUID(),
-        agentId: input.agentId ?? undefined,
-        provider: agentProviderToProto(input.provider),
-        model: input.model ?? undefined,
-        effort: input.effort ?? undefined,
-        persistPreferences: input.persistPreferences ?? false,
-        workerId: input.workerId ?? undefined,
-      },
-    };
-    const response = input.reassign
-      ? await client.reassignRun(requestMessage, appCallOptions(token))
-      : await client.dispatchRun(requestMessage, appCallOptions(token));
-    return dispatchFromMessage(requiredMessage(
-      response.dispatch,
-      "dispatchRun.dispatch",
-    ));
-  });
+  const requestMessage = {
+    projectId,
+    runId,
+    dispatch: {
+      requestId: crypto.randomUUID(),
+      agentId: input.agentId ?? undefined,
+      provider: agentProviderToProto(input.provider),
+      model: input.model ?? undefined,
+      effort: input.effort ?? undefined,
+      persistPreferences: input.persistPreferences ?? false,
+      workerId: input.workerId ?? undefined,
+    },
+  };
+  const response = input.reassign
+    ? await client.reassignRun(requestMessage, appCallOptions(token))
+    : await client.dispatchRun(requestMessage, appCallOptions(token));
+  return dispatchFromMessage(requiredMessage(
+    response.dispatch,
+    "dispatchRun.dispatch",
+  ));
 }
 
 export async function completeIssueResultReview(
@@ -831,16 +815,14 @@ export async function completeIssueResultReview(
   runId: string,
 ): Promise<IssueResultReview> {
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const response = await client.completeResultReview(
-      { projectId, runId },
-      appCallOptions(token),
-    );
-    return resultReviewFromProto(requiredMessage(
-      response.review,
-      "completeResultReview.review",
-    ));
-  });
+  const response = await client.completeResultReview(
+    { projectId, runId },
+    appCallOptions(token),
+  );
+  return resultReviewFromProto(requiredMessage(
+    response.review,
+    "completeResultReview.review",
+  ));
 }
 
 const issueChangedFieldFromProto = (
@@ -990,17 +972,15 @@ export async function loadIssueConversationSnapshot(
   runId: string,
 ): Promise<IssueConversationSnapshot> {
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const response = await client.listIssueMessages(
-      { projectId, runId },
-      appCallOptions(token),
-    );
-    return {
-      cursor: safeNumber(response.cursor, "issueConversation.cursor"),
-      messages: response.messages.map(issueMessageFromMessage),
-      agentReplies: response.agentReplies.map(issueAgentReplyFromMessage),
-    };
-  });
+  const response = await client.listIssueMessages(
+    { projectId, runId },
+    appCallOptions(token),
+  );
+  return {
+    cursor: safeNumber(response.cursor, "issueConversation.cursor"),
+    messages: response.messages.map(issueMessageFromMessage),
+    agentReplies: response.agentReplies.map(issueAgentReplyFromMessage),
+  };
 }
 
 export const issueConversationDeltaFromMessage = (
@@ -1021,7 +1001,7 @@ export async function loadIssueConversationDelta(
   cursor: number,
 ): Promise<IssueConversationDelta> {
   const client = requireIssueClient();
-  return appRpc(async () => issueConversationDeltaFromMessage(
+  return issueConversationDeltaFromMessage(
     await client.syncIssueMessages(
       {
         projectId,
@@ -1030,7 +1010,7 @@ export async function loadIssueConversationDelta(
       },
       appCallOptions(token),
     ),
-  ));
+  );
 }
 
 type CreateIssueMessageInput = {
@@ -1113,12 +1093,12 @@ export async function createIssueMessage(
     return createIssueMessageMultipart(token, projectId, runId, input);
   }
   const client = requireIssueClient();
-  return appRpc(async () => createIssueMessageResultFromMessage(
+  return createIssueMessageResultFromMessage(
     await client.createIssueMessage(
       createIssueMessageRequestFromInput(projectId, runId, input),
       appCallOptions(token),
     ),
-  ));
+  );
 }
 
 export const updatedIssueMessageFromMessage = (
@@ -1139,7 +1119,7 @@ export async function editIssueMessage(
   },
 ) {
   const client = requireIssueClient();
-  return appRpc(async () => updatedIssueMessageFromMessage(
+  return updatedIssueMessageFromMessage(
     await client.updateIssueMessage(
       {
         projectId,
@@ -1150,7 +1130,7 @@ export async function editIssueMessage(
       },
       appCallOptions(token),
     ),
-  ));
+  );
 }
 
 export async function deleteIssueMessage(
@@ -1160,10 +1140,10 @@ export async function deleteIssueMessage(
   messageId: string,
 ) {
   const client = requireIssueClient();
-  const response = await appRpc(() => client.deleteIssueMessage(
+  const response = await client.deleteIssueMessage(
     { projectId, runId, messageId },
     appCallOptions(token),
-  ));
+  );
   if (!response.deleted) {
     throw new Error("Issue message deletion was not confirmed");
   }
@@ -1176,23 +1156,21 @@ export async function loadIssueAgentReply(
   triggerMessageId: string,
 ) {
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const response = await client.getIssueAgentReply(
-      { projectId, runId, triggerMessageId },
-      appCallOptions(token),
-    );
-    return {
-      agentReply: issueAgentReplyFromMessage(requiredMessage(
-        response.agentReply,
-        "getIssueAgentReply.agentReply",
-      )),
-      agentReplies: response.agentReplies.map(issueAgentReplyFromMessage),
-      messages: response.messages.map(issueMessageFromMessage),
-      message: response.message
-        ? issueMessageFromMessage(response.message)
-        : null,
-    };
-  });
+  const response = await client.getIssueAgentReply(
+    { projectId, runId, triggerMessageId },
+    appCallOptions(token),
+  );
+  return {
+    agentReply: issueAgentReplyFromMessage(requiredMessage(
+      response.agentReply,
+      "getIssueAgentReply.agentReply",
+    )),
+    agentReplies: response.agentReplies.map(issueAgentReplyFromMessage),
+    messages: response.messages.map(issueMessageFromMessage),
+    message: response.message
+      ? issueMessageFromMessage(response.message)
+      : null,
+  };
 }
 
 const evidenceStatusFromProto = (
@@ -1245,13 +1223,11 @@ export async function loadRunEvidence(
   runId: string,
 ) {
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const response = await client.listRunEvidence(
-      { projectId, runId },
-      appCallOptions(token),
-    );
-    return response.evidence.map(runEvidenceFromMessage);
-  });
+  const response = await client.listRunEvidence(
+    { projectId, runId },
+    appCallOptions(token),
+  );
+  return response.evidence.map(runEvidenceFromMessage);
 }
 
 export async function acceptIssueReworkProposal(
@@ -1261,22 +1237,20 @@ export async function acceptIssueReworkProposal(
   proposalId: string,
 ) {
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const response = await client.acceptIssueReworkProposal(
-      { projectId, runId, proposalId },
-      appCallOptions(token),
-    );
-    return {
-      proposal: issueReworkProposalFromMessage(requiredMessage(
-        response.proposal,
-        "acceptIssueReworkProposal.proposal",
-      )),
-      outcome: approvalOutcomeFromProto(response.outcome),
-      attempt: response.attempt,
-      revision: response.revision,
-      workflowStage: response.workflowStage,
-    };
-  });
+  const response = await client.acceptIssueReworkProposal(
+    { projectId, runId, proposalId },
+    appCallOptions(token),
+  );
+  return {
+    proposal: issueReworkProposalFromMessage(requiredMessage(
+      response.proposal,
+      "acceptIssueReworkProposal.proposal",
+    )),
+    outcome: approvalOutcomeFromProto(response.outcome),
+    attempt: response.attempt,
+    revision: response.revision,
+    workflowStage: response.workflowStage,
+  };
 }
 
 export async function acceptIssueActionProposal(
@@ -1286,30 +1260,28 @@ export async function acceptIssueActionProposal(
   proposalId: string,
 ) {
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const response = await client.acceptIssueActionProposal(
-      { projectId, runId, proposalId },
-      appCallOptions(token),
-    );
-    const proposal = (() => {
-      switch (response.proposal.case) {
-        case "update":
-          return issueUpdateProposalFromMessage(response.proposal.value);
-        case "create":
-          return issueCreateProposalFromMessage(response.proposal.value);
-        case undefined:
-          throw new Error("Accepted issue action proposal is missing");
-      }
-    })();
-    return {
-      proposal,
-      executionProposal: response.executionProposal
-        ? issueExecutionProposalFromMessage(response.executionProposal)
-        : null,
-      outcome: approvalOutcomeFromProto(response.outcome),
-      resultRunId: response.resultRunId ?? null,
-    };
-  });
+  const response = await client.acceptIssueActionProposal(
+    { projectId, runId, proposalId },
+    appCallOptions(token),
+  );
+  const proposal = (() => {
+    switch (response.proposal.case) {
+      case "update":
+        return issueUpdateProposalFromMessage(response.proposal.value);
+      case "create":
+        return issueCreateProposalFromMessage(response.proposal.value);
+      case undefined:
+        throw new Error("Accepted issue action proposal is missing");
+    }
+  })();
+  return {
+    proposal,
+    executionProposal: response.executionProposal
+      ? issueExecutionProposalFromMessage(response.executionProposal)
+      : null,
+    outcome: approvalOutcomeFromProto(response.outcome),
+    resultRunId: response.resultRunId ?? null,
+  };
 }
 
 export async function acceptIssueExecutionProposal(
@@ -1320,30 +1292,28 @@ export async function acceptIssueExecutionProposal(
   input: IssueExecutionApprovalInput,
 ) {
   const client = requireIssueClient();
-  return appRpc(async () => {
-    const response = await client.acceptIssueExecutionProposal(
-      {
-        projectId,
-        conversationRunId,
-        proposalId,
-        approval: approvalToMessage(input),
-      },
-      appCallOptions(token),
-    );
-    return {
-      proposal: issueExecutionProposalFromMessage(requiredMessage(
-        response.proposal,
-        "acceptIssueExecutionProposal.proposal",
-      )),
-      outcome: approvalOutcomeFromProto(response.outcome),
-      projectId: response.projectId,
-      runId: response.runId,
-      dispatch: dispatchFromMessage(requiredMessage(
-        response.dispatch,
-        "acceptIssueExecutionProposal.dispatch",
-      )),
-    };
-  });
+  const response = await client.acceptIssueExecutionProposal(
+    {
+      projectId,
+      conversationRunId,
+      proposalId,
+      approval: approvalToMessage(input),
+    },
+    appCallOptions(token),
+  );
+  return {
+    proposal: issueExecutionProposalFromMessage(requiredMessage(
+      response.proposal,
+      "acceptIssueExecutionProposal.proposal",
+    )),
+    outcome: approvalOutcomeFromProto(response.outcome),
+    projectId: response.projectId,
+    runId: response.runId,
+    dispatch: dispatchFromMessage(requiredMessage(
+      response.dispatch,
+      "acceptIssueExecutionProposal.dispatch",
+    )),
+  };
 }
 
 export async function acceptIssueSkillExecutionProposal(
@@ -1355,32 +1325,25 @@ export async function acceptIssueSkillExecutionProposal(
 ) {
   assertPendingAgentSkillExecutionApproval(expectedProposal, input);
   const client = requireIssueClient();
-  const result: {
-    proposal: AgentSkillExecutionProposal;
-    outcome: "accepted" | "already_accepted";
-    projectId: string;
-    session: AutoHuntSession | null;
-  } = await appRpc(async () => {
-    const response = await client.acceptIssueSkillExecutionProposal(
-      {
-        projectId,
-        conversationRunId,
-        proposalId: expectedProposal.id,
-        workerId: input.workerId,
-      },
-      appCallOptions(token),
-    );
-    return {
-      proposal: agentSkillExecutionProposalFromMessage(requiredMessage(
-        response.proposal,
-        "acceptIssueSkillExecutionProposal.proposal",
-      )),
-      outcome: approvalOutcomeFromProto(response.outcome),
-      projectId: response.projectId,
-      session: response.session
-        ? projectAgentSessionFromMessage(response.session, true)
-        : null,
-    };
-  });
+  const response = await client.acceptIssueSkillExecutionProposal(
+    {
+      projectId,
+      conversationRunId,
+      proposalId: expectedProposal.id,
+      workerId: input.workerId,
+    },
+    appCallOptions(token),
+  );
+  const result = {
+    proposal: agentSkillExecutionProposalFromMessage(requiredMessage(
+      response.proposal,
+      "acceptIssueSkillExecutionProposal.proposal",
+    )),
+    outcome: approvalOutcomeFromProto(response.outcome),
+    projectId: response.projectId,
+    session: response.session
+      ? projectAgentSessionFromMessage(response.session, true)
+      : null,
+  };
   return validateAgentSkillExecutionAcceptance(result, expectedProposal, input);
 }

@@ -3,7 +3,7 @@ import {
   GitHubIntegrationService,
   ProjectGitHubService,
 } from "@briar/contracts/gen/briar/app/v1/github_pb";
-import { appCallOptions, appRpc, appTransport } from "./core";
+import { appCallOptions, appTransport } from "./core";
 import {
   githubIntegrationFromProto,
   projectGithubCredentialFromProto,
@@ -31,38 +31,36 @@ export async function loadGithubIntegration(
   token: string,
   organizationId: string,
 ) {
-  return appRpc(async () => githubIntegrationFromProto(
+  return githubIntegrationFromProto(
     await requireIntegrationClient().getGitHubIntegration(
       { organizationId },
       appCallOptions(token),
     ),
-  ));
+  );
 }
 
 export async function createGithubInstallUrl(
   token: string,
   organizationId: string,
 ) {
-  return appRpc(async () => {
-    const response = await requireIntegrationClient().beginGitHubInstallation(
-      { organizationId },
-      appCallOptions(token),
-    );
-    return { installUrl: response.installUrl };
-  });
+  const response = await requireIntegrationClient().beginGitHubInstallation(
+    { organizationId },
+    appCallOptions(token),
+  );
+  return { installUrl: response.installUrl };
 }
 
 export async function createProjectGithubCredential(
   token: string,
   projectId: string,
 ) {
-  return appRpc(async () => projectGithubCredentialFromProto(requiredMessage(
+  return projectGithubCredentialFromProto(requiredMessage(
     (await requireProjectGithubClient().createProjectGitHubCredential(
       { projectId },
       appCallOptions(token),
     )).credential,
     "createProjectGitHubCredential.credential",
-  )));
+  ));
 }
 
 export type {

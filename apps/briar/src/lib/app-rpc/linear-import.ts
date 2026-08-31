@@ -14,7 +14,7 @@ import type {
   LinearImportStatesResult,
   LinearStatusMapping,
 } from "../linear-import";
-import { appCallOptions, appRpc, appTransport } from "./core";
+import { appCallOptions, appTransport } from "./core";
 import {
   requiredMessage,
   runStatusToProto,
@@ -54,12 +54,12 @@ export async function connectLinearImport(
   projectId: string,
   apiKey: string,
 ) {
-  return appRpc(async () => linearImportConnectResultFromProto(
+  return linearImportConnectResultFromProto(
     await requireLinearImportClient().connectLinearImport(
       { projectId, apiKey },
       appCallOptions(token),
     ),
-  ));
+  );
 }
 
 export const linearImportStatesFromProto = (
@@ -87,12 +87,12 @@ export async function loadLinearImportStates(
   projectId: string,
   input: { apiKey: string; teamIds: string[] },
 ) {
-  return appRpc(async () => linearImportStatesFromProto(
+  return linearImportStatesFromProto(
     await requireLinearImportClient().listLinearImportStates(
       { projectId, apiKey: input.apiKey, teamIds: input.teamIds },
       appCallOptions(token),
     ),
-  ));
+  );
 }
 
 export const linearStatusMappingsToProto = (
@@ -150,7 +150,7 @@ export async function importLinearIssues(
     statusMapping: LinearStatusMapping;
   },
 ) {
-  return appRpc(async () => linearImportResultFromProto(
+  return linearImportResultFromProto(
     await requireLinearImportClient().importLinearIssues(
       {
         projectId,
@@ -160,5 +160,5 @@ export async function importLinearIssues(
       },
       appCallOptions(token),
     ),
-  ));
+  );
 }

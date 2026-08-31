@@ -15,7 +15,7 @@ import type {
   OrganizationInvitationStatus,
 } from "../../types";
 import { briarWebAppOrigin } from "../api-config";
-import { appCallOptions, appRpc, appTransport } from "./core";
+import { appCallOptions, appTransport } from "./core";
 import {
   optionalTimestamp,
   organizationMemberFromProto,
@@ -142,42 +142,36 @@ const invitationPreviewFromMessage = (
 export async function loadOrganizations(
   token: string,
 ): Promise<Organization[]> {
-  return appRpc(async () => {
-    const response = await requireOrganizationClient().listOrganizations(
-      {},
-      appCallOptions(token),
-    );
-    return response.organizations.map(organizationFromMessage);
-  });
+  const response = await requireOrganizationClient().listOrganizations(
+    {},
+    appCallOptions(token),
+  );
+  return response.organizations.map(organizationFromMessage);
 }
 
 export async function createOrganization(
   token: string,
   input: { readonly name: string; readonly handle: string },
 ): Promise<{ organization: Organization }> {
-  return appRpc(async () => {
-    const response = await requireOrganizationClient().createOrganization(
-      input,
-      appCallOptions(token),
-    );
-    return {
-      organization: organizationFromMessage(
-        requiredMessage(response.organization, "createOrganization.organization"),
-      ),
-    };
-  });
+  const response = await requireOrganizationClient().createOrganization(
+    input,
+    appCallOptions(token),
+  );
+  return {
+    organization: organizationFromMessage(
+      requiredMessage(response.organization, "createOrganization.organization"),
+    ),
+  };
 }
 
 export async function isOrganizationHandleAvailable(
   token: string,
   handle: string,
 ) {
-  return appRpc(async () =>
-    (await requireOrganizationClient().checkOrganizationHandleAvailability(
-      { handle },
-      appCallOptions(token),
-    )).available
-  );
+  return (await requireOrganizationClient().checkOrganizationHandleAvailability(
+    { handle },
+    appCallOptions(token),
+  )).available;
 }
 
 export async function updateOrganization(
@@ -185,17 +179,15 @@ export async function updateOrganization(
   organizationId: string,
   name: string,
 ): Promise<{ organization: Organization }> {
-  return appRpc(async () => {
-    const response = await requireOrganizationClient().updateOrganization(
-      { organizationId, name },
-      appCallOptions(token),
-    );
-    return {
-      organization: organizationFromMessage(
-        requiredMessage(response.organization, "updateOrganization.organization"),
-      ),
-    };
-  });
+  const response = await requireOrganizationClient().updateOrganization(
+    { organizationId, name },
+    appCallOptions(token),
+  );
+  return {
+    organization: organizationFromMessage(
+      requiredMessage(response.organization, "updateOrganization.organization"),
+    ),
+  };
 }
 
 export async function updateOrganizationLogo(
@@ -203,39 +195,35 @@ export async function updateOrganizationLogo(
   organizationId: string,
   logo: string | null,
 ): Promise<{ organization: Organization }> {
-  return appRpc(async () => {
-    const response = await requireOrganizationClient().updateOrganizationLogo(
-      {
-        organizationId,
-        logoUpdate: logo === null
-          ? { case: "clearLogo", value: {} }
-          : { case: "logo", value: logo },
-      },
-      appCallOptions(token),
-    );
-    return {
-      organization: organizationFromMessage(
-        requiredMessage(
-          response.organization,
-          "updateOrganizationLogo.organization",
-        ),
+  const response = await requireOrganizationClient().updateOrganizationLogo(
+    {
+      organizationId,
+      logoUpdate: logo === null
+        ? { case: "clearLogo", value: {} }
+        : { case: "logo", value: logo },
+    },
+    appCallOptions(token),
+  );
+  return {
+    organization: organizationFromMessage(
+      requiredMessage(
+        response.organization,
+        "updateOrganizationLogo.organization",
       ),
-    };
-  });
+    ),
+  };
 }
 
 export async function loadOrganizationInvitations(
   token: string,
   organizationId: string,
 ) {
-  return appRpc(async () => {
-    const response = await requireOrganizationClient()
-      .listOrganizationInvitations(
-        { organizationId },
-        appCallOptions(token),
-      );
-    return response.invitations.map(invitationFromMessage);
-  });
+  const response = await requireOrganizationClient()
+    .listOrganizationInvitations(
+      { organizationId },
+      appCallOptions(token),
+    );
+  return response.invitations.map(invitationFromMessage);
 }
 
 export async function createOrganizationInvitation(
@@ -247,28 +235,26 @@ export async function createOrganizationInvitation(
     readonly initialProjectId: string;
   },
 ) {
-  return appRpc(async () => {
-    const response = await requireOrganizationClient()
-      .createOrganizationInvitation(
-        {
-          organizationId,
-          email: input.email,
-          role: assignableRoleToProto(input.role),
-          initialProjectId: input.initialProjectId,
-        },
-        appCallOptions(token),
-      );
-    const appOrigin = briarWebAppOrigin || "https://briar.wordbricks.ai";
-    return {
-      invitation: invitationFromMessage(
-        requiredMessage(
-          response.invitation,
-          "createOrganizationInvitation.invitation",
-        ),
+  const response = await requireOrganizationClient()
+    .createOrganizationInvitation(
+      {
+        organizationId,
+        email: input.email,
+        role: assignableRoleToProto(input.role),
+        initialProjectId: input.initialProjectId,
+      },
+      appCallOptions(token),
+    );
+  const appOrigin = briarWebAppOrigin || "https://briar.wordbricks.ai";
+  return {
+    invitation: invitationFromMessage(
+      requiredMessage(
+        response.invitation,
+        "createOrganizationInvitation.invitation",
       ),
-      inviteUrl: new URL(response.invitePath, appOrigin).toString(),
-    };
-  });
+    ),
+    inviteUrl: new URL(response.invitePath, appOrigin).toString(),
+  };
 }
 
 export async function revokeOrganizationInvitation(
@@ -276,63 +262,55 @@ export async function revokeOrganizationInvitation(
   organizationId: string,
   invitationId: string,
 ) {
-  await appRpc(async () => {
-    await requireOrganizationClient().revokeOrganizationInvitation(
-      { organizationId, invitationId },
-      appCallOptions(token),
-    );
-  });
+  await requireOrganizationClient().revokeOrganizationInvitation(
+    { organizationId, invitationId },
+    appCallOptions(token),
+  );
 }
 
 export async function loadOrganizationInvitation(token: string) {
-  return appRpc(async () => {
-    const response = await requireOrganizationClient().getOrganizationInvitation(
-      { token },
-    );
-    return {
-      invitation: invitationPreviewFromMessage(
-        requiredMessage(
-          response.invitation,
-          "getOrganizationInvitation.invitation",
-        ),
+  const response = await requireOrganizationClient().getOrganizationInvitation(
+    { token },
+  );
+  return {
+    invitation: invitationPreviewFromMessage(
+      requiredMessage(
+        response.invitation,
+        "getOrganizationInvitation.invitation",
       ),
-    };
-  });
+    ),
+  };
 }
 
 export async function acceptOrganizationInvitation(
   sessionToken: string,
   invitationToken: string,
 ) {
-  return appRpc(async () => {
-    const response = await requireOrganizationClient()
-      .acceptOrganizationInvitation(
-        { token: invitationToken },
-        appCallOptions(sessionToken),
-      );
-    return {
-      invitation: invitationPreviewFromMessage(
-        requiredMessage(
-          response.invitation,
-          "acceptOrganizationInvitation.invitation",
-        ),
+  const response = await requireOrganizationClient()
+    .acceptOrganizationInvitation(
+      { token: invitationToken },
+      appCallOptions(sessionToken),
+    );
+  return {
+    invitation: invitationPreviewFromMessage(
+      requiredMessage(
+        response.invitation,
+        "acceptOrganizationInvitation.invitation",
       ),
-      alreadyAccepted: response.alreadyAccepted,
-    };
-  });
+    ),
+    alreadyAccepted: response.alreadyAccepted,
+  };
 }
 
 export async function loadOrganizationMembers(
   token: string,
   organizationId: string,
 ) {
-  return appRpc(async () => {
-    const response = await requireOrganizationClient().listOrganizationMembers(
-      { organizationId },
-      appCallOptions(token),
-    );
-    return response.members.map(organizationMemberFromProto);
-  });
+  const response = await requireOrganizationClient().listOrganizationMembers(
+    { organizationId },
+    appCallOptions(token),
+  );
+  return response.members.map(organizationMemberFromProto);
 }
 
 export async function updateOrganizationMemberRole(
@@ -341,14 +319,12 @@ export async function updateOrganizationMemberRole(
   userId: string,
   role: OrganizationAssignableRole,
 ) {
-  return appRpc(async () => {
-    const response = await requireOrganizationClient()
-      .updateOrganizationMemberRole(
-        { organizationId, userId, role: assignableRoleToProto(role) },
-        appCallOptions(token),
-      );
-    return { members: response.members.map(organizationMemberFromProto) };
-  });
+  const response = await requireOrganizationClient()
+    .updateOrganizationMemberRole(
+      { organizationId, userId, role: assignableRoleToProto(role) },
+      appCallOptions(token),
+    );
+  return { members: response.members.map(organizationMemberFromProto) };
 }
 
 export async function updateOrganizationMemberProjects(
@@ -357,14 +333,12 @@ export async function updateOrganizationMemberProjects(
   userId: string,
   projectIds: string[],
 ) {
-  return appRpc(async () => {
-    const response = await requireOrganizationClient()
-      .updateOrganizationMemberProjects(
-        { organizationId, userId, projectIds },
-        appCallOptions(token),
-      );
-    return { members: response.members.map(organizationMemberFromProto) };
-  });
+  const response = await requireOrganizationClient()
+    .updateOrganizationMemberProjects(
+      { organizationId, userId, projectIds },
+      appCallOptions(token),
+    );
+  return { members: response.members.map(organizationMemberFromProto) };
 }
 
 export async function removeOrganizationMember(
@@ -372,10 +346,8 @@ export async function removeOrganizationMember(
   organizationId: string,
   userId: string,
 ) {
-  await appRpc(async () => {
-    await requireOrganizationClient().removeOrganizationMember(
-      { organizationId, userId },
-      appCallOptions(token),
-    );
-  });
+  await requireOrganizationClient().removeOrganizationMember(
+    { organizationId, userId },
+    appCallOptions(token),
+  );
 }

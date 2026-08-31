@@ -1,6 +1,6 @@
 import { createClient } from "@connectrpc/connect";
 import { RealtimeService } from "@briar/contracts/gen/briar/app/v1/realtime_control_pb";
-import { appCallOptions, appRpc, appTransport } from "./core";
+import { appCallOptions, appTransport } from "./core";
 
 const realtimeClient = appTransport
   ? createClient(RealtimeService, appTransport)
@@ -13,11 +13,11 @@ const requireRealtimeClient = () => {
   return realtimeClient;
 };
 
-export const createOrganizationRealtimeTicket = (
+export const createOrganizationRealtimeTicket = async (
   token: string,
   organizationId: string,
   signal?: AbortSignal,
-) => appRpc(async () => {
+) => {
   const response = await requireRealtimeClient().createRealtimeTicket({
     scope: {
       case: "organizationNotifications",
@@ -25,14 +25,14 @@ export const createOrganizationRealtimeTicket = (
     },
   }, appCallOptions(token, signal));
   return response.url;
-});
+};
 
-export const createIssueActivityTicket = (
+export const createIssueActivityTicket = async (
   token: string,
   projectId: string,
   runId: string,
   signal?: AbortSignal,
-) => appRpc(async () => {
+) => {
   const response = await requireRealtimeClient().createRealtimeTicket({
     scope: {
       case: "issueActivity",
@@ -40,14 +40,14 @@ export const createIssueActivityTicket = (
     },
   }, appCallOptions(token, signal));
   return response.url;
-});
+};
 
-export const createChannelActivityTicket = (
+export const createChannelActivityTicket = async (
   token: string,
   organizationId: string,
   channelId: string,
   signal?: AbortSignal,
-) => appRpc(async () => {
+) => {
   const response = await requireRealtimeClient().createRealtimeTicket({
     scope: {
       case: "channelActivity",
@@ -55,4 +55,4 @@ export const createChannelActivityTicket = (
     },
   }, appCallOptions(token, signal));
   return response.url;
-});
+};

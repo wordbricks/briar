@@ -7,7 +7,6 @@ import {
 import type { InboxMessage } from "../../hooks/useInbox";
 import {
   appCallOptions,
-  appRpc,
   appTransport,
 } from "./core";
 import {
@@ -116,25 +115,21 @@ export async function getInboxFeed(
   signal?: AbortSignal,
 ) {
   const client = requireInboxClient();
-  return appRpc(async () => {
-    const response = await client.getInboxFeed(
-      { organizationId, knownVersion },
-      appCallOptions(token, signal),
-    );
-    return {
-      version: response.version,
-      unchanged: response.unchanged,
-      messages: response.messages.map(inboxMessageFromProto),
-      subscribedIssueIds: response.subscribedIssueIds,
-    };
-  });
+  const response = await client.getInboxFeed(
+    { organizationId, knownVersion },
+    appCallOptions(token, signal),
+  );
+  return {
+    version: response.version,
+    unchanged: response.unchanged,
+    messages: response.messages.map(inboxMessageFromProto),
+    subscribedIssueIds: response.subscribedIssueIds,
+  };
 }
 
 export async function getInboxReadStates(token: string) {
   const client = requireInboxClient();
-  return appRpc(async () =>
-    (await client.getInboxReadStates({}, appCallOptions(token))).readVersions
-  );
+  return (await client.getInboxReadStates({}, appCallOptions(token))).readVersions;
 }
 
 export async function putInboxReadStates(
@@ -142,12 +137,10 @@ export async function putInboxReadStates(
   readVersions: Record<string, string>,
 ) {
   const client = requireInboxClient();
-  return appRpc(async () =>
-    (await client.putInboxReadStates(
-      { readVersions },
-      appCallOptions(token),
-    )).readVersions
-  );
+  return (await client.putInboxReadStates(
+    { readVersions },
+    appCallOptions(token),
+  )).readVersions;
 }
 
 export async function deleteInboxReadStateRpc(
@@ -155,10 +148,8 @@ export async function deleteInboxReadStateRpc(
   messageId: string,
 ) {
   const client = requireInboxClient();
-  return appRpc(async () =>
-    (await client.deleteInboxReadState(
-      { messageId },
-      appCallOptions(token),
-    )).readVersions
-  );
+  return (await client.deleteInboxReadState(
+    { messageId },
+    appCallOptions(token),
+  )).readVersions;
 }

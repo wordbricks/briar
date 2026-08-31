@@ -6,7 +6,7 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/account_pb";
 import type { User } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import type { SessionUser } from "../../types";
-import { appCallOptions, appRpc, appTransport } from "./core";
+import { appCallOptions, appTransport } from "./core";
 import { requiredMessage } from "./mappers";
 
 const accountClient = appTransport
@@ -82,16 +82,14 @@ export async function getCurrentUser(
   signal?: AbortSignal,
 ): Promise<SessionUser> {
   const client = requireAccountClient();
-  return appRpc(async () => {
-    const response = await client.getCurrentUser(
-      {},
-      appCallOptions(token, signal),
-    );
-    return sessionUserFromProto(requiredMessage(
-      response.user,
-      "getCurrentUser.user",
-    ));
-  });
+  const response = await client.getCurrentUser(
+    {},
+    appCallOptions(token, signal),
+  );
+  return sessionUserFromProto(requiredMessage(
+    response.user,
+    "getCurrentUser.user",
+  ));
 }
 
 export async function updateCurrentUserProfile(
@@ -99,16 +97,14 @@ export async function updateCurrentUserProfile(
   input: AccountProfileInput,
 ): Promise<SessionUser> {
   const client = requireAccountClient();
-  return appRpc(async () => {
-    const response = await client.updateAccountProfile(
-      accountProfileUpdateToProto(input),
-      appCallOptions(token),
-    );
-    return sessionUserFromProto(requiredMessage(
-      response.user,
-      "updateAccountProfile.user",
-    ));
-  });
+  const response = await client.updateAccountProfile(
+    accountProfileUpdateToProto(input),
+    appCallOptions(token),
+  );
+  return sessionUserFromProto(requiredMessage(
+    response.user,
+    "updateAccountProfile.user",
+  ));
 }
 
 export async function deleteCurrentUser(
@@ -116,12 +112,10 @@ export async function deleteCurrentUser(
   confirmation: string,
 ): Promise<void> {
   const client = requireAccountClient();
-  await appRpc(async () => {
-    await client.deleteAccount(
-      { confirmation },
-      appCallOptions(token),
-    );
-  });
+  await client.deleteAccount(
+    { confirmation },
+    appCallOptions(token),
+  );
 }
 
 export async function registerMobilePushDevice(
@@ -138,23 +132,21 @@ export async function registerMobilePushDevice(
   },
 ): Promise<void> {
   const client = requireAccountClient();
-  await appRpc(async () => {
-    await client.registerMobilePushDevice(
-      {
-        endpoint: mobilePushEndpointToProto(input.endpoint),
-        token: input.deviceToken,
-        locale: mobilePushLocaleToProto(input.locale),
-        preferences: {
-          playSound: input.playSound,
-          urgent: input.urgent,
-          actionRequired: input.actionRequired,
-          important: input.important,
-          activity: input.activity,
-        },
+  await client.registerMobilePushDevice(
+    {
+      endpoint: mobilePushEndpointToProto(input.endpoint),
+      token: input.deviceToken,
+      locale: mobilePushLocaleToProto(input.locale),
+      preferences: {
+        playSound: input.playSound,
+        urgent: input.urgent,
+        actionRequired: input.actionRequired,
+        important: input.important,
+        activity: input.activity,
       },
-      appCallOptions(sessionToken),
-    );
-  });
+    },
+    appCallOptions(sessionToken),
+  );
 }
 
 export async function unregisterMobilePushDevice(
@@ -163,13 +155,11 @@ export async function unregisterMobilePushDevice(
   deviceToken: string,
 ): Promise<void> {
   const client = requireAccountClient();
-  await appRpc(async () => {
-    await client.unregisterMobilePushDevice(
-      {
-        endpoint: mobilePushEndpointToProto(endpoint),
-        token: deviceToken,
-      },
-      appCallOptions(sessionToken),
-    );
-  });
+  await client.unregisterMobilePushDevice(
+    {
+      endpoint: mobilePushEndpointToProto(endpoint),
+      token: deviceToken,
+    },
+    appCallOptions(sessionToken),
+  );
 }

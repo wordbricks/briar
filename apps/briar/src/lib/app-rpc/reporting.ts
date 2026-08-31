@@ -7,7 +7,7 @@ import type {
   ProjectUsageDateRange,
   ProjectUsagePeriod,
 } from "../project-usage-summary";
-import { appCallOptions, appRpc, appTransport } from "./core";
+import { appCallOptions, appTransport } from "./core";
 import {
   organizationUsageRangeToProto,
   organizationUsageReportFromProto,
@@ -34,12 +34,12 @@ export async function loadAgentUsageReport(
   days: UsageRangeDays = 90,
   signal?: AbortSignal,
 ) {
-  return appRpc(async () => organizationUsageReportFromProto(
+  return organizationUsageReportFromProto(
     await requireReportingClient().listOrganizationUsageRuns(
       { organizationId, range: organizationUsageRangeToProto(days) },
       appCallOptions(token, signal),
     ),
-  ));
+  );
 }
 
 export async function loadProjectUsageSummary(
@@ -49,7 +49,7 @@ export async function loadProjectUsageSummary(
   range?: ProjectUsageDateRange,
   signal?: AbortSignal,
 ) {
-  return appRpc(async () => projectUsageSummaryFromProto(
+  return projectUsageSummaryFromProto(
     await requireReportingClient().getProjectUsageSummary(
       {
         projectId,
@@ -59,7 +59,7 @@ export async function loadProjectUsageSummary(
       },
       appCallOptions(token, signal),
     ),
-  ));
+  );
 }
 
 export async function loadStatusTrayRuns(
@@ -67,12 +67,12 @@ export async function loadStatusTrayRuns(
   organizationId: string,
   signal?: AbortSignal,
 ) {
-  return appRpc(async () => statusTrayRunsFromProto(
+  return statusTrayRunsFromProto(
     await requireReportingClient().listStatusTrayRuns(
       { organizationId },
       appCallOptions(token, signal),
     ),
-  ));
+  );
 }
 
 export async function loadRunCostEstimate(
@@ -81,10 +81,10 @@ export async function loadRunCostEstimate(
   runId: string,
   signal?: AbortSignal,
 ) {
-  return appRpc(async () => runCostEstimateFromProto(
+  return runCostEstimateFromProto(
     await requireReportingClient().getRunCostEstimate(
       { projectId, runId },
       appCallOptions(token, signal),
     ),
-  ));
+  );
 }

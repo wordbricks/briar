@@ -10,7 +10,7 @@ import type {
   ProjectSettings,
 } from "../../types";
 import { isProjectIconDataUrl } from "../project-icon";
-import { appCallOptions, appRpc, appTransport } from "./core";
+import { appCallOptions, appTransport } from "./core";
 import {
   projectRoleFromProto,
   requiredMessage,
@@ -54,13 +54,11 @@ export async function listProjects(
   signal?: AbortSignal,
 ): Promise<Project[]> {
   const client = requireProjectClient();
-  return appRpc(async () => {
-    const response = await client.listProjects(
-      {},
-      appCallOptions(token, signal),
-    );
-    return response.projects.map(projectFromMessage);
-  });
+  const response = await client.listProjects(
+    {},
+    appCallOptions(token, signal),
+  );
+  return response.projects.map(projectFromMessage);
 }
 
 export async function createProject(
@@ -68,26 +66,22 @@ export async function createProject(
   input: { readonly name: string; readonly organizationId?: string },
 ): Promise<{ project: Project; agentToken: string }> {
   const client = requireProjectClient();
-  return appRpc(async () => {
-    const response = await client.createProject(input, appCallOptions(token));
-    return {
-      project: projectFromMessage(
-        requiredMessage(response.project, "createProject.project"),
-      ),
-      agentToken: response.agentToken,
-    };
-  });
+  const response = await client.createProject(input, appCallOptions(token));
+  return {
+    project: projectFromMessage(
+      requiredMessage(response.project, "createProject.project"),
+    ),
+    agentToken: response.agentToken,
+  };
 }
 
 export async function deleteProject(token: string, projectId: string) {
   const client = requireProjectClient();
-  await appRpc(async () => {
-    const response = await client.deleteProject(
-      { projectId },
-      appCallOptions(token),
-    );
-    if (!response.deleted) throw new Error("Project was not deleted");
-  });
+  const response = await client.deleteProject(
+    { projectId },
+    appCallOptions(token),
+  );
+  if (!response.deleted) throw new Error("Project was not deleted");
 }
 
 export async function updateProjectIcon(
@@ -96,22 +90,20 @@ export async function updateProjectIcon(
   icon: string | null,
 ): Promise<{ project: Project }> {
   const client = requireProjectClient();
-  return appRpc(async () => {
-    const response = await client.updateProjectIcon(
-      {
-        projectId,
-        iconUpdate: icon === null
-          ? { case: "clearIcon", value: {} }
-          : { case: "icon", value: icon },
-      },
-      appCallOptions(token),
-    );
-    return {
-      project: projectFromMessage(
-        requiredMessage(response.project, "updateProjectIcon.project"),
-      ),
-    };
-  });
+  const response = await client.updateProjectIcon(
+    {
+      projectId,
+      iconUpdate: icon === null
+        ? { case: "clearIcon", value: {} }
+        : { case: "icon", value: icon },
+    },
+    appCallOptions(token),
+  );
+  return {
+    project: projectFromMessage(
+      requiredMessage(response.project, "updateProjectIcon.project"),
+    ),
+  };
 }
 
 export async function updateProjectIssueKeyPrefix(
@@ -120,20 +112,18 @@ export async function updateProjectIssueKeyPrefix(
   issueKeyPrefix: string,
 ): Promise<{ project: Project }> {
   const client = requireProjectClient();
-  return appRpc(async () => {
-    const response = await client.updateProjectIssueKeyPrefix(
-      { projectId, issueKeyPrefix },
-      appCallOptions(token),
-    );
-    return {
-      project: projectFromMessage(
-        requiredMessage(
-          response.project,
-          "updateProjectIssueKeyPrefix.project",
-        ),
+  const response = await client.updateProjectIssueKeyPrefix(
+    { projectId, issueKeyPrefix },
+    appCallOptions(token),
+  );
+  return {
+    project: projectFromMessage(
+      requiredMessage(
+        response.project,
+        "updateProjectIssueKeyPrefix.project",
       ),
-    };
-  });
+    ),
+  };
 }
 
 export async function updateProjectTabs(
@@ -142,28 +132,24 @@ export async function updateProjectTabs(
   tabs: { readonly schedule: boolean },
 ): Promise<{ project: Project }> {
   const client = requireProjectClient();
-  return appRpc(async () => {
-    const response = await client.updateProjectTabs(
-      { projectId, schedule: tabs.schedule },
-      appCallOptions(token),
-    );
-    return {
-      project: projectFromMessage(
-        requiredMessage(response.project, "updateProjectTabs.project"),
-      ),
-    };
-  });
+  const response = await client.updateProjectTabs(
+    { projectId, schedule: tabs.schedule },
+    appCallOptions(token),
+  );
+  return {
+    project: projectFromMessage(
+      requiredMessage(response.project, "updateProjectTabs.project"),
+    ),
+  };
 }
 
 export async function createAgentToken(token: string, projectId: string) {
   const client = requireProjectClient();
-  return appRpc(async () => {
-    const response = await client.createProjectAgentToken(
-      { projectId },
-      appCallOptions(token),
-    );
-    return { agentToken: response.agentToken };
-  });
+  const response = await client.createProjectAgentToken(
+    { projectId },
+    appCallOptions(token),
+  );
+  return { agentToken: response.agentToken };
 }
 
 export async function updateProjectSettings(
@@ -172,28 +158,26 @@ export async function updateProjectSettings(
   settings: ProjectSettings,
 ) {
   const client = requireProjectClient();
-  return appRpc(async () => {
-    const response = await client.updateProjectSettings(
-      {
-        projectId,
-        velenOrg: settings.velenOrg ?? undefined,
-        dataSource: settings.dataSource ?? undefined,
-        linear: {
-          enabled: settings.linear.enabled,
-          source: settings.linear.source ?? undefined,
-          teamKey: settings.linear.teamKey ?? undefined,
-        },
-        githubRepository: settings.githubRepository ?? undefined,
-        workflow: workflowToProto(settings.workflow),
+  const response = await client.updateProjectSettings(
+    {
+      projectId,
+      velenOrg: settings.velenOrg ?? undefined,
+      dataSource: settings.dataSource ?? undefined,
+      linear: {
+        enabled: settings.linear.enabled,
+        source: settings.linear.source ?? undefined,
+        teamKey: settings.linear.teamKey ?? undefined,
       },
-      appCallOptions(token),
-    );
-    return {
-      settings: projectSettingsFromProto(
-        requiredMessage(response.settings, "updateProjectSettings.settings"),
-      ),
-    };
-  });
+      githubRepository: settings.githubRepository ?? undefined,
+      workflow: workflowToProto(settings.workflow),
+    },
+    appCallOptions(token),
+  );
+  return {
+    settings: projectSettingsFromProto(
+      requiredMessage(response.settings, "updateProjectSettings.settings"),
+    ),
+  };
 }
 
 export async function updateCheckpointPolicy(
@@ -208,27 +192,25 @@ export async function updateCheckpointPolicy(
   },
 ) {
   const client = requireProjectClient();
-  return appRpc(async () => {
-    const response = await client.updateCheckpointPolicy(
-      {
-        projectId,
-        scope: input.scope === "project"
-          ? UpdateCheckpointPolicyRequest_Scope.PROJECT
-          : UpdateCheckpointPolicyRequest_Scope.USER,
-        checkpoints: input.checkpoints.map(workflowCheckpointToProto),
-        expectedRevision: BigInt(input.expectedRevision),
-      },
-      appCallOptions(token),
-    );
-    return {
-      checkpointPolicy: checkpointPolicyFromProto(
-        requiredMessage(
-          response.checkpointPolicy,
-          "updateCheckpointPolicy.checkpointPolicy",
-        ),
+  const response = await client.updateCheckpointPolicy(
+    {
+      projectId,
+      scope: input.scope === "project"
+        ? UpdateCheckpointPolicyRequest_Scope.PROJECT
+        : UpdateCheckpointPolicyRequest_Scope.USER,
+      checkpoints: input.checkpoints.map(workflowCheckpointToProto),
+      expectedRevision: BigInt(input.expectedRevision),
+    },
+    appCallOptions(token),
+  );
+  return {
+    checkpointPolicy: checkpointPolicyFromProto(
+      requiredMessage(
+        response.checkpointPolicy,
+        "updateCheckpointPolicy.checkpointPolicy",
       ),
-    };
-  });
+    ),
+  };
 }
 
 const requiredExecutionPolicy = (
@@ -244,15 +226,13 @@ export async function loadProjectExecutionWorkerPolicy(
   projectId: string,
 ) {
   const client = requireProjectClient();
-  return appRpc(async () => {
-    const response = await client.getProjectExecutionWorkerPolicy(
-      { projectId },
-      appCallOptions(token),
-    );
-    return {
-      policy: requiredExecutionPolicy(response.policy),
-    };
-  });
+  const response = await client.getProjectExecutionWorkerPolicy(
+    { projectId },
+    appCallOptions(token),
+  );
+  return {
+    policy: requiredExecutionPolicy(response.policy),
+  };
 }
 
 export async function updateProjectExecutionWorkerPolicy(
@@ -264,18 +244,16 @@ export async function updateProjectExecutionWorkerPolicy(
   >,
 ) {
   const client = requireProjectClient();
-  return appRpc(async () => {
-    const response = await client.updateProjectExecutionWorkerPolicy(
-      {
-        projectId,
-        selectionMode: executionSelectionModeToProto(policy.selectionMode),
-        defaultWorkerId: policy.defaultWorkerId ?? undefined,
-        allowedWorkerIds: policy.allowedWorkerIds,
-      },
-      appCallOptions(token),
-    );
-    return {
-      policy: requiredExecutionPolicy(response.policy),
-    };
-  });
+  const response = await client.updateProjectExecutionWorkerPolicy(
+    {
+      projectId,
+      selectionMode: executionSelectionModeToProto(policy.selectionMode),
+      defaultWorkerId: policy.defaultWorkerId ?? undefined,
+      allowedWorkerIds: policy.allowedWorkerIds,
+    },
+    appCallOptions(token),
+  );
+  return {
+    policy: requiredExecutionPolicy(response.policy),
+  };
 }

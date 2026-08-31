@@ -24,7 +24,6 @@ import type {
 } from "../../types";
 import {
   appCallOptions,
-  appRpc,
   appTransport,
 } from "./core";
 import { dashboardWorkerFromProto } from "./fleet-mappers";
@@ -293,38 +292,36 @@ export async function getDashboard(
   signal?: AbortSignal,
 ): Promise<DashboardPayload> {
   const client = requireDashboardClient();
-  return appRpc(async () => {
-    const response = await client.getDashboard(
-      { projectId },
-      appCallOptions(token, signal),
-    );
-    return {
-      project: projectFromMessage(
-        requiredMessage(response.project, "dashboard.project"),
-      ),
-      settings: projectSettingsFromProto(
-        requiredMessage(response.settings, "dashboard.settings"),
-      ),
-      runs: response.runs.map(dashboardRunFromProto),
-      workers: response.workers.map(dashboardWorkerFromProto),
-      organizationProviders: response.organizationProviders.map(
-        agentProviderFromProto,
-      ),
-      executionPolicy: executionPolicyFromProto(response.executionPolicy),
-      members: response.members.map(organizationMemberFromProto),
-      conversationNotifications: response.conversationNotifications.map(
-        conversationNotificationFromProto,
-      ),
-      channelNotifications: response.channelNotifications.map(
-        channelNotificationFromProto,
-      ),
-      cursor: safeNumber(response.cursor, "dashboard.cursor"),
-      generatedAt: requiredTimestamp(
-        response.generatedAt,
-        "dashboard.generatedAt",
-      ),
-    };
-  });
+  const response = await client.getDashboard(
+    { projectId },
+    appCallOptions(token, signal),
+  );
+  return {
+    project: projectFromMessage(
+      requiredMessage(response.project, "dashboard.project"),
+    ),
+    settings: projectSettingsFromProto(
+      requiredMessage(response.settings, "dashboard.settings"),
+    ),
+    runs: response.runs.map(dashboardRunFromProto),
+    workers: response.workers.map(dashboardWorkerFromProto),
+    organizationProviders: response.organizationProviders.map(
+      agentProviderFromProto,
+    ),
+    executionPolicy: executionPolicyFromProto(response.executionPolicy),
+    members: response.members.map(organizationMemberFromProto),
+    conversationNotifications: response.conversationNotifications.map(
+      conversationNotificationFromProto,
+    ),
+    channelNotifications: response.channelNotifications.map(
+      channelNotificationFromProto,
+    ),
+    cursor: safeNumber(response.cursor, "dashboard.cursor"),
+    generatedAt: requiredTimestamp(
+      response.generatedAt,
+      "dashboard.generatedAt",
+    ),
+  };
 }
 
 export async function syncDashboard(
@@ -334,41 +331,39 @@ export async function syncDashboard(
   signal?: AbortSignal,
 ): Promise<DashboardDeltaPayload> {
   const client = requireDashboardClient();
-  return appRpc(async () => {
-    const response = await client.syncDashboard(
-      { projectId, cursor: BigInt(cursor) },
-      appCallOptions(token, signal),
-    );
-    return {
-      cursor: safeNumber(response.cursor, "dashboard.cursor"),
-      hasMore: response.hasMore,
-      reset: response.reset,
-      runs: response.runs.map(dashboardRunFromProto),
-      deletedRunIds: response.deletedRunIds,
-      project: response.project === undefined
-        ? undefined
-        : projectFromMessage(response.project),
-      settings: response.settings === undefined
-        ? undefined
-        : projectSettingsFromProto(response.settings),
-      workers: response.workers.map(dashboardWorkerFromProto),
-      organizationProviders: response.organizationProviders.map(
-        agentProviderFromProto,
-      ),
-      executionPolicy: executionPolicyFromProto(response.executionPolicy),
-      members: response.members?.values.map(organizationMemberFromProto),
-      conversationNotifications: response.conversationNotifications?.values.map(
-        conversationNotificationFromProto,
-      ),
-      channelNotifications: response.channelNotifications.map(
-        channelNotificationFromProto,
-      ),
-      generatedAt: requiredTimestamp(
-        response.generatedAt,
-        "dashboard.generatedAt",
-      ),
-    };
-  });
+  const response = await client.syncDashboard(
+    { projectId, cursor: BigInt(cursor) },
+    appCallOptions(token, signal),
+  );
+  return {
+    cursor: safeNumber(response.cursor, "dashboard.cursor"),
+    hasMore: response.hasMore,
+    reset: response.reset,
+    runs: response.runs.map(dashboardRunFromProto),
+    deletedRunIds: response.deletedRunIds,
+    project: response.project === undefined
+      ? undefined
+      : projectFromMessage(response.project),
+    settings: response.settings === undefined
+      ? undefined
+      : projectSettingsFromProto(response.settings),
+    workers: response.workers.map(dashboardWorkerFromProto),
+    organizationProviders: response.organizationProviders.map(
+      agentProviderFromProto,
+    ),
+    executionPolicy: executionPolicyFromProto(response.executionPolicy),
+    members: response.members?.values.map(organizationMemberFromProto),
+    conversationNotifications: response.conversationNotifications?.values.map(
+      conversationNotificationFromProto,
+    ),
+    channelNotifications: response.channelNotifications.map(
+      channelNotificationFromProto,
+    ),
+    generatedAt: requiredTimestamp(
+      response.generatedAt,
+      "dashboard.generatedAt",
+    ),
+  };
 }
 
 export async function listRunEventsRpc(
@@ -377,10 +372,8 @@ export async function listRunEventsRpc(
   runId: string,
 ): Promise<HuntEvent[]> {
   const client = requireDashboardClient();
-  return appRpc(async () =>
-    (await client.listRunEvents(
-      { projectId, runId },
-      appCallOptions(token),
-    )).events.map(runEventFromProto)
-  );
+  return (await client.listRunEvents(
+    { projectId, runId },
+    appCallOptions(token),
+  )).events.map(runEventFromProto);
 }
