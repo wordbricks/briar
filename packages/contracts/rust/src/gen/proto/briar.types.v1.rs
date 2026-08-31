@@ -4873,6 +4873,612 @@ pub const __CHECKPOINT_POLICY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
     from_json: ::buffa::type_registry::any_from_json::<CheckpointPolicy>,
     is_wkt: false,
 };
+/// Metadata for one file whose bytes will be transferred through an
+/// owning service's short-lived raw upload capability.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UploadFileMetadata {
+    /// Correlates a local file with its prepared upload. It is not an
+    /// authorization or storage identifier.
+    ///
+    /// Field 1: `client_id`
+    #[serde(
+        rename = "clientId",
+        alias = "client_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub client_id: ::buffa::alloc::string::String,
+    /// Field 2: `filename`
+    #[serde(
+        rename = "filename",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub filename: ::buffa::alloc::string::String,
+    /// Field 3: `content_type`
+    #[serde(
+        rename = "contentType",
+        alias = "content_type",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub content_type: ::buffa::alloc::string::String,
+    /// Field 4: `byte_size`
+    #[serde(
+        rename = "byteSize",
+        alias = "byte_size",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub byte_size: u64,
+    /// Exact 32-byte SHA-256 digest. File bytes never enter protobuf.
+    ///
+    /// Field 5: `sha256`
+    #[serde(
+        rename = "sha256",
+        with = "::buffa::json_helpers::bytes",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_bytes"
+    )]
+    pub sha256: ::buffa::alloc::vec::Vec<u8>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UploadFileMetadata {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UploadFileMetadata")
+            .field("client_id", &self.client_id)
+            .field("filename", &self.filename)
+            .field("content_type", &self.content_type)
+            .field("byte_size", &self.byte_size)
+            .field("sha256", &self.sha256)
+            .finish()
+    }
+}
+impl UploadFileMetadata {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.UploadFileMetadata";
+}
+::buffa::impl_default_instance!(UploadFileMetadata);
+impl ::buffa::MessageName for UploadFileMetadata {
+    const PACKAGE: &'static str = "briar.types.v1";
+    const NAME: &'static str = "UploadFileMetadata";
+    const FULL_NAME: &'static str = "briar.types.v1.UploadFileMetadata";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.UploadFileMetadata";
+}
+impl ::buffa::Message for UploadFileMetadata {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.client_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.client_id) as u64;
+        }
+        if !self.filename.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.filename) as u64;
+        }
+        if !self.content_type.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.content_type) as u64;
+        }
+        if self.byte_size != 0u64 {
+            size += 1u64 + ::buffa::types::uint64_encoded_len(self.byte_size) as u64;
+        }
+        if !self.sha256.is_empty() {
+            size += 1u64 + ::buffa::types::bytes_encoded_len(&self.sha256) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.client_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.client_id, buf);
+        }
+        if !self.filename.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.filename, buf);
+        }
+        if !self.content_type.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.content_type, buf);
+        }
+        if self.byte_size != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.byte_size, buf);
+        }
+        if !self.sha256.is_empty() {
+            ::buffa::types::put_shared_bytes_field(5u32, &self.sha256, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.client_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.filename, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.content_type, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.byte_size = ::buffa::types::decode_uint64(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_bytes(&mut self.sha256, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.client_id.clear();
+        self.filename.clear();
+        self.content_type.clear();
+        self.byte_size = 0u64;
+        self.sha256.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UploadFileMetadata {
+    const PROTO_FQN: &'static str = "briar.types.v1.UploadFileMetadata";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UploadFileMetadata {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UPLOAD_FILE_METADATA_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.types.v1.UploadFileMetadata",
+    to_json: ::buffa::type_registry::any_to_json::<UploadFileMetadata>,
+    from_json: ::buffa::type_registry::any_from_json::<UploadFileMetadata>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UploadReference {
+    /// Opaque server-issued identifier. An owning mutation accepts only uploads
+    /// reserved for its exact authorization scope.
+    ///
+    /// Field 1: `upload_id`
+    #[serde(
+        rename = "uploadId",
+        alias = "upload_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub upload_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UploadReference {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UploadReference").field("upload_id", &self.upload_id).finish()
+    }
+}
+impl UploadReference {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.UploadReference";
+}
+::buffa::impl_default_instance!(UploadReference);
+impl ::buffa::MessageName for UploadReference {
+    const PACKAGE: &'static str = "briar.types.v1";
+    const NAME: &'static str = "UploadReference";
+    const FULL_NAME: &'static str = "briar.types.v1.UploadReference";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.UploadReference";
+}
+impl ::buffa::Message for UploadReference {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.upload_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.upload_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.upload_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.upload_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.upload_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.upload_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UploadReference {
+    const PROTO_FQN: &'static str = "briar.types.v1.UploadReference";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UploadReference {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UPLOAD_REFERENCE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.types.v1.UploadReference",
+    to_json: ::buffa::type_registry::any_to_json::<UploadReference>,
+    from_json: ::buffa::type_registry::any_from_json::<UploadReference>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PreparedUpload {
+    /// Field 1: `client_id`
+    #[serde(
+        rename = "clientId",
+        alias = "client_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub client_id: ::buffa::alloc::string::String,
+    /// Field 2: `reference`
+    #[serde(
+        rename = "reference",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub reference: ::buffa::MessageField<
+        UploadReference,
+        ::buffa::Inline<UploadReference>,
+    >,
+    /// Field 3: `upload_url`
+    #[serde(
+        rename = "uploadUrl",
+        alias = "upload_url",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub upload_url: ::buffa::alloc::string::String,
+    /// Short-lived bearer capability for the ordinary HTTP byte upload.
+    ///
+    /// Field 4: `upload_capability`
+    #[serde(
+        rename = "uploadCapability",
+        alias = "upload_capability",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub upload_capability: ::buffa::alloc::string::String,
+    /// Field 5: `expires_at`
+    #[serde(
+        rename = "expiresAt",
+        alias = "expires_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub expires_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PreparedUpload {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PreparedUpload")
+            .field("client_id", &self.client_id)
+            .field("reference", &self.reference)
+            .field("upload_url", &self.upload_url)
+            .field("upload_capability", &self.upload_capability)
+            .field("expires_at", &self.expires_at)
+            .finish()
+    }
+}
+impl PreparedUpload {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.PreparedUpload";
+}
+::buffa::impl_default_instance!(PreparedUpload);
+impl ::buffa::MessageName for PreparedUpload {
+    const PACKAGE: &'static str = "briar.types.v1";
+    const NAME: &'static str = "PreparedUpload";
+    const FULL_NAME: &'static str = "briar.types.v1.PreparedUpload";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.PreparedUpload";
+}
+impl ::buffa::Message for PreparedUpload {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.client_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.client_id) as u64;
+        }
+        if self.reference.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.reference.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if !self.upload_url.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.upload_url) as u64;
+        }
+        if !self.upload_capability.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.upload_capability) as u64;
+        }
+        if self.expires_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.expires_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.client_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.client_id, buf);
+        }
+        if self.reference.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.reference.write_to(__cache, buf);
+        }
+        if !self.upload_url.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.upload_url, buf);
+        }
+        if !self.upload_capability.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.upload_capability, buf);
+        }
+        if self.expires_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.expires_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.client_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.reference.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.upload_url, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.upload_capability, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.expires_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.client_id.clear();
+        self.reference = ::buffa::MessageField::none();
+        self.upload_url.clear();
+        self.upload_capability.clear();
+        self.expires_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PreparedUpload {
+    const PROTO_FQN: &'static str = "briar.types.v1.PreparedUpload";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PreparedUpload {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PREPARED_UPLOAD_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.types.v1.PreparedUpload",
+    to_json: ::buffa::type_registry::any_to_json::<PreparedUpload>,
+    from_json: ::buffa::type_registry::any_from_json::<PreparedUpload>,
+    is_wkt: false,
+};
 /// How Briar identified the model associated with an execution observation.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
@@ -8518,612 +9124,6 @@ pub const __WORKER_RUNTIME_ADVERTISEMENT_JSON_ANY: ::buffa::type_registry::JsonA
     type_url: "type.googleapis.com/briar.types.v1.WorkerRuntimeAdvertisement",
     to_json: ::buffa::type_registry::any_to_json::<WorkerRuntimeAdvertisement>,
     from_json: ::buffa::type_registry::any_from_json::<WorkerRuntimeAdvertisement>,
-    is_wkt: false,
-};
-/// Metadata for one file whose bytes will be transferred through an
-/// owning service's short-lived raw upload capability.
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct UploadFileMetadata {
-    /// Correlates a local file with its prepared upload. It is not an
-    /// authorization or storage identifier.
-    ///
-    /// Field 1: `client_id`
-    #[serde(
-        rename = "clientId",
-        alias = "client_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub client_id: ::buffa::alloc::string::String,
-    /// Field 2: `filename`
-    #[serde(
-        rename = "filename",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub filename: ::buffa::alloc::string::String,
-    /// Field 3: `content_type`
-    #[serde(
-        rename = "contentType",
-        alias = "content_type",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub content_type: ::buffa::alloc::string::String,
-    /// Field 4: `byte_size`
-    #[serde(
-        rename = "byteSize",
-        alias = "byte_size",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub byte_size: u64,
-    /// Exact 32-byte SHA-256 digest. File bytes never enter protobuf.
-    ///
-    /// Field 5: `sha256`
-    #[serde(
-        rename = "sha256",
-        with = "::buffa::json_helpers::bytes",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_bytes"
-    )]
-    pub sha256: ::buffa::alloc::vec::Vec<u8>,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for UploadFileMetadata {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("UploadFileMetadata")
-            .field("client_id", &self.client_id)
-            .field("filename", &self.filename)
-            .field("content_type", &self.content_type)
-            .field("byte_size", &self.byte_size)
-            .field("sha256", &self.sha256)
-            .finish()
-    }
-}
-impl UploadFileMetadata {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.UploadFileMetadata";
-}
-::buffa::impl_default_instance!(UploadFileMetadata);
-impl ::buffa::MessageName for UploadFileMetadata {
-    const PACKAGE: &'static str = "briar.types.v1";
-    const NAME: &'static str = "UploadFileMetadata";
-    const FULL_NAME: &'static str = "briar.types.v1.UploadFileMetadata";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.UploadFileMetadata";
-}
-impl ::buffa::Message for UploadFileMetadata {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if !self.client_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.client_id) as u64;
-        }
-        if !self.filename.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.filename) as u64;
-        }
-        if !self.content_type.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.content_type) as u64;
-        }
-        if self.byte_size != 0u64 {
-            size += 1u64 + ::buffa::types::uint64_encoded_len(self.byte_size) as u64;
-        }
-        if !self.sha256.is_empty() {
-            size += 1u64 + ::buffa::types::bytes_encoded_len(&self.sha256) as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if !self.client_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.client_id, buf);
-        }
-        if !self.filename.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.filename, buf);
-        }
-        if !self.content_type.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.content_type, buf);
-        }
-        if self.byte_size != 0u64 {
-            ::buffa::types::put_uint64_field(4u32, self.byte_size, buf);
-        }
-        if !self.sha256.is_empty() {
-            ::buffa::types::put_shared_bytes_field(5u32, &self.sha256, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.client_id, buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.filename, buf)?;
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.content_type, buf)?;
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.byte_size = ::buffa::types::decode_uint64(buf)?;
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_bytes(&mut self.sha256, buf)?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.client_id.clear();
-        self.filename.clear();
-        self.content_type.clear();
-        self.byte_size = 0u64;
-        self.sha256.clear();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for UploadFileMetadata {
-    const PROTO_FQN: &'static str = "briar.types.v1.UploadFileMetadata";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for UploadFileMetadata {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __UPLOAD_FILE_METADATA_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.types.v1.UploadFileMetadata",
-    to_json: ::buffa::type_registry::any_to_json::<UploadFileMetadata>,
-    from_json: ::buffa::type_registry::any_from_json::<UploadFileMetadata>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct UploadReference {
-    /// Opaque server-issued identifier. An owning mutation accepts only uploads
-    /// reserved for its exact authorization scope.
-    ///
-    /// Field 1: `upload_id`
-    #[serde(
-        rename = "uploadId",
-        alias = "upload_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub upload_id: ::buffa::alloc::string::String,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for UploadReference {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("UploadReference").field("upload_id", &self.upload_id).finish()
-    }
-}
-impl UploadReference {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.UploadReference";
-}
-::buffa::impl_default_instance!(UploadReference);
-impl ::buffa::MessageName for UploadReference {
-    const PACKAGE: &'static str = "briar.types.v1";
-    const NAME: &'static str = "UploadReference";
-    const FULL_NAME: &'static str = "briar.types.v1.UploadReference";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.UploadReference";
-}
-impl ::buffa::Message for UploadReference {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if !self.upload_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.upload_id) as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if !self.upload_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.upload_id, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.upload_id, buf)?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.upload_id.clear();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for UploadReference {
-    const PROTO_FQN: &'static str = "briar.types.v1.UploadReference";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for UploadReference {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __UPLOAD_REFERENCE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.types.v1.UploadReference",
-    to_json: ::buffa::type_registry::any_to_json::<UploadReference>,
-    from_json: ::buffa::type_registry::any_from_json::<UploadReference>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct PreparedUpload {
-    /// Field 1: `client_id`
-    #[serde(
-        rename = "clientId",
-        alias = "client_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub client_id: ::buffa::alloc::string::String,
-    /// Field 2: `reference`
-    #[serde(
-        rename = "reference",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
-    )]
-    pub reference: ::buffa::MessageField<
-        UploadReference,
-        ::buffa::Inline<UploadReference>,
-    >,
-    /// Field 3: `upload_url`
-    #[serde(
-        rename = "uploadUrl",
-        alias = "upload_url",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub upload_url: ::buffa::alloc::string::String,
-    /// Short-lived bearer capability for the ordinary HTTP byte upload.
-    ///
-    /// Field 4: `upload_capability`
-    #[serde(
-        rename = "uploadCapability",
-        alias = "upload_capability",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub upload_capability: ::buffa::alloc::string::String,
-    /// Field 5: `expires_at`
-    #[serde(
-        rename = "expiresAt",
-        alias = "expires_at",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
-    )]
-    pub expires_at: ::buffa::MessageField<
-        ::buffa_types::google::protobuf::Timestamp,
-        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
-    >,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for PreparedUpload {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("PreparedUpload")
-            .field("client_id", &self.client_id)
-            .field("reference", &self.reference)
-            .field("upload_url", &self.upload_url)
-            .field("upload_capability", &self.upload_capability)
-            .field("expires_at", &self.expires_at)
-            .finish()
-    }
-}
-impl PreparedUpload {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.PreparedUpload";
-}
-::buffa::impl_default_instance!(PreparedUpload);
-impl ::buffa::MessageName for PreparedUpload {
-    const PACKAGE: &'static str = "briar.types.v1";
-    const NAME: &'static str = "PreparedUpload";
-    const FULL_NAME: &'static str = "briar.types.v1.PreparedUpload";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.PreparedUpload";
-}
-impl ::buffa::Message for PreparedUpload {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if !self.client_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.client_id) as u64;
-        }
-        if self.reference.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.reference.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        if !self.upload_url.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.upload_url) as u64;
-        }
-        if !self.upload_capability.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.upload_capability) as u64;
-        }
-        if self.expires_at.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.expires_at.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        __cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if !self.client_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.client_id, buf);
-        }
-        if self.reference.is_set() {
-            ::buffa::types::put_len_delimited_header(
-                2u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            self.reference.write_to(__cache, buf);
-        }
-        if !self.upload_url.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.upload_url, buf);
-        }
-        if !self.upload_capability.is_empty() {
-            ::buffa::types::put_string_field(4u32, &self.upload_capability, buf);
-        }
-        if self.expires_at.is_set() {
-            ::buffa::types::put_len_delimited_header(
-                5u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            self.expires_at.write_to(__cache, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.client_id, buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.reference.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.upload_url, buf)?;
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.upload_capability, buf)?;
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.expires_at.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.client_id.clear();
-        self.reference = ::buffa::MessageField::none();
-        self.upload_url.clear();
-        self.upload_capability.clear();
-        self.expires_at = ::buffa::MessageField::none();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for PreparedUpload {
-    const PROTO_FQN: &'static str = "briar.types.v1.PreparedUpload";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for PreparedUpload {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __PREPARED_UPLOAD_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.types.v1.PreparedUpload",
-    to_json: ::buffa::type_registry::any_to_json::<PreparedUpload>,
-    from_json: ::buffa::type_registry::any_from_json::<PreparedUpload>,
     is_wkt: false,
 };
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -18188,6 +18188,1125 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// Metadata for one file whose bytes will be transferred through an
+        /// owning service's short-lived raw upload capability.
+        #[derive(Clone, Debug, Default)]
+        pub struct UploadFileMetadataView<'a> {
+            /// Correlates a local file with its prepared upload. It is not an
+            /// authorization or storage identifier.
+            ///
+            /// Field 1: `client_id`
+            pub client_id: &'a str,
+            /// Field 2: `filename`
+            pub filename: &'a str,
+            /// Field 3: `content_type`
+            pub content_type: &'a str,
+            /// Field 4: `byte_size`
+            pub byte_size: u64,
+            /// Exact 32-byte SHA-256 digest. File bytes never enter protobuf.
+            ///
+            /// Field 5: `sha256`
+            pub sha256: &'a [u8],
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for UploadFileMetadataView<'a> {
+            type Owned = super::super::UploadFileMetadata;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.client_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.filename = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.content_type = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.byte_size = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.sha256 = ::buffa::types::borrow_bytes(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UploadFileMetadata,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UploadFileMetadata,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UploadFileMetadata {
+                    client_id: self.client_id.to_string(),
+                    filename: self.filename.to_string(),
+                    content_type: self.content_type.to_string(),
+                    byte_size: self.byte_size,
+                    sha256: (self.sha256).to_vec(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for UploadFileMetadataView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.client_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.client_id) as u64;
+                }
+                if !self.filename.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.filename) as u64;
+                }
+                if !self.content_type.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.content_type)
+                                as u64;
+                }
+                if self.byte_size != 0u64 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint64_encoded_len(self.byte_size) as u64;
+                }
+                if !self.sha256.is_empty() {
+                    size
+                        += 1u64 + ::buffa::types::bytes_encoded_len(&self.sha256) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.client_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.client_id, buf);
+                }
+                if !self.filename.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.filename, buf);
+                }
+                if !self.content_type.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.content_type, buf);
+                }
+                if self.byte_size != 0u64 {
+                    ::buffa::types::put_uint64_field(4u32, self.byte_size, buf);
+                }
+                if !self.sha256.is_empty() {
+                    ::buffa::types::put_shared_bytes_field(5u32, &self.sha256, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for UploadFileMetadataView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.client_id) {
+                    __map.serialize_entry("clientId", self.client_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.filename) {
+                    __map.serialize_entry("filename", self.filename)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.content_type) {
+                    __map.serialize_entry("contentType", self.content_type)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.byte_size) {
+                    __map
+                        .serialize_entry(
+                            "byteSize",
+                            &::buffa::json_helpers::ProtoJson(&self.byte_size),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_bytes(self.sha256) {
+                    __map
+                        .serialize_entry(
+                            "sha256",
+                            &::buffa::json_helpers::BytesJson(self.sha256),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for UploadFileMetadataView<'a> {
+            const PACKAGE: &'static str = "briar.types.v1";
+            const NAME: &'static str = "UploadFileMetadata";
+            const FULL_NAME: &'static str = "briar.types.v1.UploadFileMetadata";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.UploadFileMetadata";
+        }
+        ::buffa::impl_default_view_instance!(UploadFileMetadataView);
+        ::buffa::impl_view_reborrow!(UploadFileMetadataView);
+        /** Self-contained, `'static` owned view of a `UploadFileMetadata` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UploadFileMetadataView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UploadFileMetadataView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UploadFileMetadataOwnedView(
+            ::buffa::OwnedView<UploadFileMetadataView<'static>>,
+        );
+        impl UploadFileMetadataOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UploadFileMetadataOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UploadFileMetadataOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UploadFileMetadata,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UploadFileMetadataOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`UploadFileMetadataView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UploadFileMetadataView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::UploadFileMetadata {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Correlates a local file with its prepared upload. It is not an
+            /// authorization or storage identifier.
+            ///
+            /// Field 1: `client_id`
+            #[must_use]
+            pub fn client_id(&self) -> &'_ str {
+                self.0.reborrow().client_id
+            }
+            /// Field 2: `filename`
+            #[must_use]
+            pub fn filename(&self) -> &'_ str {
+                self.0.reborrow().filename
+            }
+            /// Field 3: `content_type`
+            #[must_use]
+            pub fn content_type(&self) -> &'_ str {
+                self.0.reborrow().content_type
+            }
+            /// Field 4: `byte_size`
+            #[must_use]
+            pub fn byte_size(&self) -> u64 {
+                self.0.reborrow().byte_size
+            }
+            /// Exact 32-byte SHA-256 digest. File bytes never enter protobuf.
+            ///
+            /// Field 5: `sha256`
+            #[must_use]
+            pub fn sha256(&self) -> &'_ [u8] {
+                self.0.reborrow().sha256
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<UploadFileMetadataView<'static>>>
+        for UploadFileMetadataOwnedView {
+            fn from(inner: ::buffa::OwnedView<UploadFileMetadataView<'static>>) -> Self {
+                UploadFileMetadataOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UploadFileMetadataOwnedView>
+        for ::buffa::OwnedView<UploadFileMetadataView<'static>> {
+            fn from(wrapper: UploadFileMetadataOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<UploadFileMetadataView<'static>>>
+        for UploadFileMetadataOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<UploadFileMetadataView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::UploadFileMetadata {
+            type View<'a> = UploadFileMetadataView<'a>;
+            type ViewHandle = UploadFileMetadataOwnedView;
+        }
+        impl ::serde::Serialize for UploadFileMetadataOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct UploadReferenceView<'a> {
+            /// Opaque server-issued identifier. An owning mutation accepts only uploads
+            /// reserved for its exact authorization scope.
+            ///
+            /// Field 1: `upload_id`
+            pub upload_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for UploadReferenceView<'a> {
+            type Owned = super::super::UploadReference;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.upload_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UploadReference,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UploadReference,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UploadReference {
+                    upload_id: self.upload_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for UploadReferenceView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.upload_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.upload_id) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.upload_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.upload_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for UploadReferenceView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.upload_id) {
+                    __map.serialize_entry("uploadId", self.upload_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for UploadReferenceView<'a> {
+            const PACKAGE: &'static str = "briar.types.v1";
+            const NAME: &'static str = "UploadReference";
+            const FULL_NAME: &'static str = "briar.types.v1.UploadReference";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.UploadReference";
+        }
+        ::buffa::impl_default_view_instance!(UploadReferenceView);
+        ::buffa::impl_view_reborrow!(UploadReferenceView);
+        /** Self-contained, `'static` owned view of a `UploadReference` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UploadReferenceView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UploadReferenceView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UploadReferenceOwnedView(
+            ::buffa::OwnedView<UploadReferenceView<'static>>,
+        );
+        impl UploadReferenceOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UploadReferenceOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UploadReferenceOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UploadReference,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UploadReferenceOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`UploadReferenceView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UploadReferenceView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::UploadReference {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Opaque server-issued identifier. An owning mutation accepts only uploads
+            /// reserved for its exact authorization scope.
+            ///
+            /// Field 1: `upload_id`
+            #[must_use]
+            pub fn upload_id(&self) -> &'_ str {
+                self.0.reborrow().upload_id
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<UploadReferenceView<'static>>>
+        for UploadReferenceOwnedView {
+            fn from(inner: ::buffa::OwnedView<UploadReferenceView<'static>>) -> Self {
+                UploadReferenceOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UploadReferenceOwnedView>
+        for ::buffa::OwnedView<UploadReferenceView<'static>> {
+            fn from(wrapper: UploadReferenceOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<UploadReferenceView<'static>>>
+        for UploadReferenceOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<UploadReferenceView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::UploadReference {
+            type View<'a> = UploadReferenceView<'a>;
+            type ViewHandle = UploadReferenceOwnedView;
+        }
+        impl ::serde::Serialize for UploadReferenceOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct PreparedUploadView<'a> {
+            /// Field 1: `client_id`
+            pub client_id: &'a str,
+            /// Field 2: `reference`
+            pub reference: ::buffa::MessageFieldView<
+                super::super::__buffa::view::UploadReferenceView<'a>,
+            >,
+            /// Field 3: `upload_url`
+            pub upload_url: &'a str,
+            /// Short-lived bearer capability for the ordinary HTTP byte upload.
+            ///
+            /// Field 4: `upload_capability`
+            pub upload_capability: &'a str,
+            /// Field 5: `expires_at`
+            pub expires_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for PreparedUploadView<'a> {
+            type Owned = super::super::PreparedUpload;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.client_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.reference.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.reference = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::UploadReferenceView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.upload_url = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.upload_capability = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.expires_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.expires_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PreparedUpload,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PreparedUpload,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PreparedUpload {
+                    client_id: self.client_id.to_string(),
+                    reference: match self.reference.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::UploadReference,
+                                ::buffa::Inline<super::super::UploadReference>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    upload_url: self.upload_url.to_string(),
+                    upload_capability: self.upload_capability.to_string(),
+                    expires_at: match self.expires_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for PreparedUploadView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.client_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.client_id) as u64;
+                }
+                if self.reference.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.reference.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if !self.upload_url.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.upload_url)
+                                as u64;
+                }
+                if !self.upload_capability.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.upload_capability)
+                                as u64;
+                }
+                if self.expires_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.expires_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.client_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.client_id, buf);
+                }
+                if self.reference.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.reference.write_to(__cache, buf);
+                }
+                if !self.upload_url.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.upload_url, buf);
+                }
+                if !self.upload_capability.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.upload_capability, buf);
+                }
+                if self.expires_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.expires_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for PreparedUploadView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.client_id) {
+                    __map.serialize_entry("clientId", self.client_id)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.reference.as_option()
+                    {
+                        __map.serialize_entry("reference", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.upload_url) {
+                    __map.serialize_entry("uploadUrl", self.upload_url)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.upload_capability,
+                ) {
+                    __map.serialize_entry("uploadCapability", self.upload_capability)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .expires_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("expiresAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for PreparedUploadView<'a> {
+            const PACKAGE: &'static str = "briar.types.v1";
+            const NAME: &'static str = "PreparedUpload";
+            const FULL_NAME: &'static str = "briar.types.v1.PreparedUpload";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.PreparedUpload";
+        }
+        ::buffa::impl_default_view_instance!(PreparedUploadView);
+        ::buffa::impl_view_reborrow!(PreparedUploadView);
+        /** Self-contained, `'static` owned view of a `PreparedUpload` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PreparedUploadView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PreparedUploadView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PreparedUploadOwnedView(
+            ::buffa::OwnedView<PreparedUploadView<'static>>,
+        );
+        impl PreparedUploadOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PreparedUploadOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PreparedUploadOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PreparedUpload,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PreparedUploadOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`PreparedUploadView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PreparedUploadView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::PreparedUpload {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `client_id`
+            #[must_use]
+            pub fn client_id(&self) -> &'_ str {
+                self.0.reborrow().client_id
+            }
+            /// Field 2: `reference`
+            #[must_use]
+            pub fn reference(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::UploadReferenceView<'_>,
+            > {
+                &self.0.reborrow().reference
+            }
+            /// Field 3: `upload_url`
+            #[must_use]
+            pub fn upload_url(&self) -> &'_ str {
+                self.0.reborrow().upload_url
+            }
+            /// Short-lived bearer capability for the ordinary HTTP byte upload.
+            ///
+            /// Field 4: `upload_capability`
+            #[must_use]
+            pub fn upload_capability(&self) -> &'_ str {
+                self.0.reborrow().upload_capability
+            }
+            /// Field 5: `expires_at`
+            #[must_use]
+            pub fn expires_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().expires_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<PreparedUploadView<'static>>>
+        for PreparedUploadOwnedView {
+            fn from(inner: ::buffa::OwnedView<PreparedUploadView<'static>>) -> Self {
+                PreparedUploadOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PreparedUploadOwnedView>
+        for ::buffa::OwnedView<PreparedUploadView<'static>> {
+            fn from(wrapper: PreparedUploadOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<PreparedUploadView<'static>>>
+        for PreparedUploadOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<PreparedUploadView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::PreparedUpload {
+            type View<'a> = PreparedUploadView<'a>;
+            type ViewHandle = PreparedUploadOwnedView;
+        }
+        impl ::serde::Serialize for PreparedUploadOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// Provider-neutral totals for one completed execution attempt.
         #[derive(Clone, Debug, Default)]
         pub struct AgentExecutionMetricsView<'a> {
@@ -23326,1125 +24445,6 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// Metadata for one file whose bytes will be transferred through an
-        /// owning service's short-lived raw upload capability.
-        #[derive(Clone, Debug, Default)]
-        pub struct UploadFileMetadataView<'a> {
-            /// Correlates a local file with its prepared upload. It is not an
-            /// authorization or storage identifier.
-            ///
-            /// Field 1: `client_id`
-            pub client_id: &'a str,
-            /// Field 2: `filename`
-            pub filename: &'a str,
-            /// Field 3: `content_type`
-            pub content_type: &'a str,
-            /// Field 4: `byte_size`
-            pub byte_size: u64,
-            /// Exact 32-byte SHA-256 digest. File bytes never enter protobuf.
-            ///
-            /// Field 5: `sha256`
-            pub sha256: &'a [u8],
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for UploadFileMetadataView<'a> {
-            type Owned = super::super::UploadFileMetadata;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            #[inline]
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.client_id = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.filename = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.content_type = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.byte_size = ::buffa::types::decode_uint64(&mut cur)?;
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.sha256 = ::buffa::types::borrow_bytes(&mut cur)?;
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::UploadFileMetadata,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::UploadFileMetadata,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::UploadFileMetadata {
-                    client_id: self.client_id.to_string(),
-                    filename: self.filename.to_string(),
-                    content_type: self.content_type.to_string(),
-                    byte_size: self.byte_size,
-                    sha256: (self.sha256).to_vec(),
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for UploadFileMetadataView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u64;
-                if !self.client_id.is_empty() {
-                    size
-                        += 1u64
-                            + ::buffa::types::string_encoded_len(&self.client_id) as u64;
-                }
-                if !self.filename.is_empty() {
-                    size
-                        += 1u64
-                            + ::buffa::types::string_encoded_len(&self.filename) as u64;
-                }
-                if !self.content_type.is_empty() {
-                    size
-                        += 1u64
-                            + ::buffa::types::string_encoded_len(&self.content_type)
-                                as u64;
-                }
-                if self.byte_size != 0u64 {
-                    size
-                        += 1u64
-                            + ::buffa::types::uint64_encoded_len(self.byte_size) as u64;
-                }
-                if !self.sha256.is_empty() {
-                    size
-                        += 1u64 + ::buffa::types::bytes_encoded_len(&self.sha256) as u64;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u64;
-                ::buffa::saturate_size(size)
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                _cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::EncodeSink,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                if !self.client_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.client_id, buf);
-                }
-                if !self.filename.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.filename, buf);
-                }
-                if !self.content_type.is_empty() {
-                    ::buffa::types::put_string_field(3u32, &self.content_type, buf);
-                }
-                if self.byte_size != 0u64 {
-                    ::buffa::types::put_uint64_field(4u32, self.byte_size, buf);
-                }
-                if !self.sha256.is_empty() {
-                    ::buffa::types::put_shared_bytes_field(5u32, &self.sha256, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for UploadFileMetadataView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.client_id) {
-                    __map.serialize_entry("clientId", self.client_id)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.filename) {
-                    __map.serialize_entry("filename", self.filename)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.content_type) {
-                    __map.serialize_entry("contentType", self.content_type)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.byte_size) {
-                    __map
-                        .serialize_entry(
-                            "byteSize",
-                            &::buffa::json_helpers::ProtoJson(&self.byte_size),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_bytes(self.sha256) {
-                    __map
-                        .serialize_entry(
-                            "sha256",
-                            &::buffa::json_helpers::BytesJson(self.sha256),
-                        )?;
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for UploadFileMetadataView<'a> {
-            const PACKAGE: &'static str = "briar.types.v1";
-            const NAME: &'static str = "UploadFileMetadata";
-            const FULL_NAME: &'static str = "briar.types.v1.UploadFileMetadata";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.UploadFileMetadata";
-        }
-        ::buffa::impl_default_view_instance!(UploadFileMetadataView);
-        ::buffa::impl_view_reborrow!(UploadFileMetadataView);
-        /** Self-contained, `'static` owned view of a `UploadFileMetadata` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`UploadFileMetadataView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UploadFileMetadataView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct UploadFileMetadataOwnedView(
-            ::buffa::OwnedView<UploadFileMetadataView<'static>>,
-        );
-        impl UploadFileMetadataOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    UploadFileMetadataOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    UploadFileMetadataOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
-            /// message's encoded size exceeds the 2 GiB protobuf limit, or
-            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::UploadFileMetadata,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    UploadFileMetadataOwnedView(::buffa::OwnedView::from_owned(msg)?),
-                )
-            }
-            /// Borrow the full [`UploadFileMetadataView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &UploadFileMetadataView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// Infallible: this type's constructors wire-decode their
-            /// buffer, and a view produced by wire decoding always
-            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
-            /// whose contract also governs handles converted from a raw
-            /// [`::buffa::OwnedView`].
-            #[must_use]
-            pub fn to_owned_message(&self) -> super::super::UploadFileMetadata {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// Correlates a local file with its prepared upload. It is not an
-            /// authorization or storage identifier.
-            ///
-            /// Field 1: `client_id`
-            #[must_use]
-            pub fn client_id(&self) -> &'_ str {
-                self.0.reborrow().client_id
-            }
-            /// Field 2: `filename`
-            #[must_use]
-            pub fn filename(&self) -> &'_ str {
-                self.0.reborrow().filename
-            }
-            /// Field 3: `content_type`
-            #[must_use]
-            pub fn content_type(&self) -> &'_ str {
-                self.0.reborrow().content_type
-            }
-            /// Field 4: `byte_size`
-            #[must_use]
-            pub fn byte_size(&self) -> u64 {
-                self.0.reborrow().byte_size
-            }
-            /// Exact 32-byte SHA-256 digest. File bytes never enter protobuf.
-            ///
-            /// Field 5: `sha256`
-            #[must_use]
-            pub fn sha256(&self) -> &'_ [u8] {
-                self.0.reborrow().sha256
-            }
-        }
-        impl ::core::convert::From<::buffa::OwnedView<UploadFileMetadataView<'static>>>
-        for UploadFileMetadataOwnedView {
-            fn from(inner: ::buffa::OwnedView<UploadFileMetadataView<'static>>) -> Self {
-                UploadFileMetadataOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<UploadFileMetadataOwnedView>
-        for ::buffa::OwnedView<UploadFileMetadataView<'static>> {
-            fn from(wrapper: UploadFileMetadataOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<::buffa::OwnedView<UploadFileMetadataView<'static>>>
-        for UploadFileMetadataOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<UploadFileMetadataView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::UploadFileMetadata {
-            type View<'a> = UploadFileMetadataView<'a>;
-            type ViewHandle = UploadFileMetadataOwnedView;
-        }
-        impl ::serde::Serialize for UploadFileMetadataOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
-        #[derive(Clone, Debug, Default)]
-        pub struct UploadReferenceView<'a> {
-            /// Opaque server-issued identifier. An owning mutation accepts only uploads
-            /// reserved for its exact authorization scope.
-            ///
-            /// Field 1: `upload_id`
-            pub upload_id: &'a str,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for UploadReferenceView<'a> {
-            type Owned = super::super::UploadReference;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            #[inline]
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.upload_id = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::UploadReference,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::UploadReference,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::UploadReference {
-                    upload_id: self.upload_id.to_string(),
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for UploadReferenceView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u64;
-                if !self.upload_id.is_empty() {
-                    size
-                        += 1u64
-                            + ::buffa::types::string_encoded_len(&self.upload_id) as u64;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u64;
-                ::buffa::saturate_size(size)
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                _cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::EncodeSink,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                if !self.upload_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.upload_id, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for UploadReferenceView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.upload_id) {
-                    __map.serialize_entry("uploadId", self.upload_id)?;
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for UploadReferenceView<'a> {
-            const PACKAGE: &'static str = "briar.types.v1";
-            const NAME: &'static str = "UploadReference";
-            const FULL_NAME: &'static str = "briar.types.v1.UploadReference";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.UploadReference";
-        }
-        ::buffa::impl_default_view_instance!(UploadReferenceView);
-        ::buffa::impl_view_reborrow!(UploadReferenceView);
-        /** Self-contained, `'static` owned view of a `UploadReference` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`UploadReferenceView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UploadReferenceView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct UploadReferenceOwnedView(
-            ::buffa::OwnedView<UploadReferenceView<'static>>,
-        );
-        impl UploadReferenceOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    UploadReferenceOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    UploadReferenceOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
-            /// message's encoded size exceeds the 2 GiB protobuf limit, or
-            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::UploadReference,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    UploadReferenceOwnedView(::buffa::OwnedView::from_owned(msg)?),
-                )
-            }
-            /// Borrow the full [`UploadReferenceView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &UploadReferenceView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// Infallible: this type's constructors wire-decode their
-            /// buffer, and a view produced by wire decoding always
-            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
-            /// whose contract also governs handles converted from a raw
-            /// [`::buffa::OwnedView`].
-            #[must_use]
-            pub fn to_owned_message(&self) -> super::super::UploadReference {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// Opaque server-issued identifier. An owning mutation accepts only uploads
-            /// reserved for its exact authorization scope.
-            ///
-            /// Field 1: `upload_id`
-            #[must_use]
-            pub fn upload_id(&self) -> &'_ str {
-                self.0.reborrow().upload_id
-            }
-        }
-        impl ::core::convert::From<::buffa::OwnedView<UploadReferenceView<'static>>>
-        for UploadReferenceOwnedView {
-            fn from(inner: ::buffa::OwnedView<UploadReferenceView<'static>>) -> Self {
-                UploadReferenceOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<UploadReferenceOwnedView>
-        for ::buffa::OwnedView<UploadReferenceView<'static>> {
-            fn from(wrapper: UploadReferenceOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<::buffa::OwnedView<UploadReferenceView<'static>>>
-        for UploadReferenceOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<UploadReferenceView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::UploadReference {
-            type View<'a> = UploadReferenceView<'a>;
-            type ViewHandle = UploadReferenceOwnedView;
-        }
-        impl ::serde::Serialize for UploadReferenceOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
-        #[derive(Clone, Debug, Default)]
-        pub struct PreparedUploadView<'a> {
-            /// Field 1: `client_id`
-            pub client_id: &'a str,
-            /// Field 2: `reference`
-            pub reference: ::buffa::MessageFieldView<
-                super::super::__buffa::view::UploadReferenceView<'a>,
-            >,
-            /// Field 3: `upload_url`
-            pub upload_url: &'a str,
-            /// Short-lived bearer capability for the ordinary HTTP byte upload.
-            ///
-            /// Field 4: `upload_capability`
-            pub upload_capability: &'a str,
-            /// Field 5: `expires_at`
-            pub expires_at: ::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
-            >,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for PreparedUploadView<'a> {
-            type Owned = super::super::PreparedUpload;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            #[inline]
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.client_id = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.reference.as_mut() {
-                            Some(existing) => {
-                                ::buffa::MessageView::merge_into_view(
-                                    existing,
-                                    sub,
-                                    __sub_ctx,
-                                )?
-                            }
-                            None => {
-                                view.reference = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::UploadReferenceView as ::buffa::MessageView>::decode_view_ctx(
-                                        sub,
-                                        __sub_ctx,
-                                    )?,
-                                );
-                            }
-                        }
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.upload_url = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.upload_capability = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.expires_at.as_mut() {
-                            Some(existing) => {
-                                ::buffa::MessageView::merge_into_view(
-                                    existing,
-                                    sub,
-                                    __sub_ctx,
-                                )?
-                            }
-                            None => {
-                                view.expires_at = ::buffa::MessageFieldView::set(
-                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
-                                        sub,
-                                        __sub_ctx,
-                                    )?,
-                                );
-                            }
-                        }
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::PreparedUpload,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::PreparedUpload,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::PreparedUpload {
-                    client_id: self.client_id.to_string(),
-                    reference: match self.reference.as_option() {
-                        Some(v) => {
-                            ::buffa::MessageField::<
-                                super::super::UploadReference,
-                                ::buffa::Inline<super::super::UploadReference>,
-                            >::some(v.to_owned_from_source(__buffa_src)?)
-                        }
-                        None => ::buffa::MessageField::none(),
-                    },
-                    upload_url: self.upload_url.to_string(),
-                    upload_capability: self.upload_capability.to_string(),
-                    expires_at: match self.expires_at.as_option() {
-                        Some(v) => {
-                            ::buffa::MessageField::<
-                                ::buffa_types::google::protobuf::Timestamp,
-                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
-                            >::some(v.to_owned_from_source(__buffa_src)?)
-                        }
-                        None => ::buffa::MessageField::none(),
-                    },
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for PreparedUploadView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u64;
-                if !self.client_id.is_empty() {
-                    size
-                        += 1u64
-                            + ::buffa::types::string_encoded_len(&self.client_id) as u64;
-                }
-                if self.reference.is_set() {
-                    let __slot = __cache.reserve();
-                    let inner_size = self.reference.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                            + inner_size as u64;
-                }
-                if !self.upload_url.is_empty() {
-                    size
-                        += 1u64
-                            + ::buffa::types::string_encoded_len(&self.upload_url)
-                                as u64;
-                }
-                if !self.upload_capability.is_empty() {
-                    size
-                        += 1u64
-                            + ::buffa::types::string_encoded_len(&self.upload_capability)
-                                as u64;
-                }
-                if self.expires_at.is_set() {
-                    let __slot = __cache.reserve();
-                    let inner_size = self.expires_at.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                            + inner_size as u64;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u64;
-                ::buffa::saturate_size(size)
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                __cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::EncodeSink,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                if !self.client_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.client_id, buf);
-                }
-                if self.reference.is_set() {
-                    ::buffa::types::put_len_delimited_header(
-                        2u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    self.reference.write_to(__cache, buf);
-                }
-                if !self.upload_url.is_empty() {
-                    ::buffa::types::put_string_field(3u32, &self.upload_url, buf);
-                }
-                if !self.upload_capability.is_empty() {
-                    ::buffa::types::put_string_field(4u32, &self.upload_capability, buf);
-                }
-                if self.expires_at.is_set() {
-                    ::buffa::types::put_len_delimited_header(
-                        5u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    self.expires_at.write_to(__cache, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for PreparedUploadView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.client_id) {
-                    __map.serialize_entry("clientId", self.client_id)?;
-                }
-                {
-                    if let ::core::option::Option::Some(__v) = self.reference.as_option()
-                    {
-                        __map.serialize_entry("reference", __v)?;
-                    }
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.upload_url) {
-                    __map.serialize_entry("uploadUrl", self.upload_url)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(
-                    self.upload_capability,
-                ) {
-                    __map.serialize_entry("uploadCapability", self.upload_capability)?;
-                }
-                {
-                    if let ::core::option::Option::Some(__v) = self
-                        .expires_at
-                        .as_option()
-                    {
-                        __map.serialize_entry("expiresAt", __v)?;
-                    }
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for PreparedUploadView<'a> {
-            const PACKAGE: &'static str = "briar.types.v1";
-            const NAME: &'static str = "PreparedUpload";
-            const FULL_NAME: &'static str = "briar.types.v1.PreparedUpload";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.PreparedUpload";
-        }
-        ::buffa::impl_default_view_instance!(PreparedUploadView);
-        ::buffa::impl_view_reborrow!(PreparedUploadView);
-        /** Self-contained, `'static` owned view of a `PreparedUpload` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`PreparedUploadView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PreparedUploadView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct PreparedUploadOwnedView(
-            ::buffa::OwnedView<PreparedUploadView<'static>>,
-        );
-        impl PreparedUploadOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    PreparedUploadOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    PreparedUploadOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
-            /// message's encoded size exceeds the 2 GiB protobuf limit, or
-            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::PreparedUpload,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    PreparedUploadOwnedView(::buffa::OwnedView::from_owned(msg)?),
-                )
-            }
-            /// Borrow the full [`PreparedUploadView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &PreparedUploadView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// Infallible: this type's constructors wire-decode their
-            /// buffer, and a view produced by wire decoding always
-            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
-            /// whose contract also governs handles converted from a raw
-            /// [`::buffa::OwnedView`].
-            #[must_use]
-            pub fn to_owned_message(&self) -> super::super::PreparedUpload {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// Field 1: `client_id`
-            #[must_use]
-            pub fn client_id(&self) -> &'_ str {
-                self.0.reborrow().client_id
-            }
-            /// Field 2: `reference`
-            #[must_use]
-            pub fn reference(
-                &self,
-            ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::UploadReferenceView<'_>,
-            > {
-                &self.0.reborrow().reference
-            }
-            /// Field 3: `upload_url`
-            #[must_use]
-            pub fn upload_url(&self) -> &'_ str {
-                self.0.reborrow().upload_url
-            }
-            /// Short-lived bearer capability for the ordinary HTTP byte upload.
-            ///
-            /// Field 4: `upload_capability`
-            #[must_use]
-            pub fn upload_capability(&self) -> &'_ str {
-                self.0.reborrow().upload_capability
-            }
-            /// Field 5: `expires_at`
-            #[must_use]
-            pub fn expires_at(
-                &self,
-            ) -> &::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
-            > {
-                &self.0.reborrow().expires_at
-            }
-        }
-        impl ::core::convert::From<::buffa::OwnedView<PreparedUploadView<'static>>>
-        for PreparedUploadOwnedView {
-            fn from(inner: ::buffa::OwnedView<PreparedUploadView<'static>>) -> Self {
-                PreparedUploadOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<PreparedUploadOwnedView>
-        for ::buffa::OwnedView<PreparedUploadView<'static>> {
-            fn from(wrapper: PreparedUploadOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<::buffa::OwnedView<PreparedUploadView<'static>>>
-        for PreparedUploadOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<PreparedUploadView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::PreparedUpload {
-            type View<'a> = PreparedUploadView<'a>;
-            type ViewHandle = PreparedUploadOwnedView;
-        }
-        impl ::serde::Serialize for PreparedUploadOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
         #[derive(Clone, Debug, Default)]
         pub struct FieldViolationView<'a> {
             /// Field 1: `path`
@@ -27406,6 +27406,9 @@ pub mod __buffa {
         reg.register_json_any(super::__WORKFLOW_COMPLETION_JSON_ANY);
         reg.register_json_any(super::__CHECKPOINT_BOUNDARY_JSON_ANY);
         reg.register_json_any(super::__CHECKPOINT_POLICY_JSON_ANY);
+        reg.register_json_any(super::__UPLOAD_FILE_METADATA_JSON_ANY);
+        reg.register_json_any(super::__UPLOAD_REFERENCE_JSON_ANY);
+        reg.register_json_any(super::__PREPARED_UPLOAD_JSON_ANY);
         reg.register_json_any(super::__AGENT_EXECUTION_METRICS_JSON_ANY);
         reg.register_json_any(super::__AGENT_USAGE_OBSERVATION_JSON_ANY);
         reg.register_json_any(super::__AGENT_COST_OBSERVATION_JSON_ANY);
@@ -27417,9 +27420,6 @@ pub mod __buffa {
         reg.register_json_any(super::__WORKFLOW_REQUIREMENT_HEALTH_JSON_ANY);
         reg.register_json_any(super::__WORKER_CAPABILITIES_JSON_ANY);
         reg.register_json_any(super::__WORKER_RUNTIME_ADVERTISEMENT_JSON_ANY);
-        reg.register_json_any(super::__UPLOAD_FILE_METADATA_JSON_ANY);
-        reg.register_json_any(super::__UPLOAD_REFERENCE_JSON_ANY);
-        reg.register_json_any(super::__PREPARED_UPLOAD_JSON_ANY);
         reg.register_json_any(super::__FIELD_VIOLATION_JSON_ANY);
         reg.register_json_any(super::__VALIDATION_ERROR_DETAIL_JSON_ANY);
         reg.register_json_any(super::__APPLICATION_ERROR_DETAIL_JSON_ANY);
@@ -27503,6 +27503,18 @@ pub use self::__buffa::view::CheckpointPolicyView;
 #[doc(inline)]
 pub use self::__buffa::view::CheckpointPolicyOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::UploadFileMetadataView;
+#[doc(inline)]
+pub use self::__buffa::view::UploadFileMetadataOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UploadReferenceView;
+#[doc(inline)]
+pub use self::__buffa::view::UploadReferenceOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PreparedUploadView;
+#[doc(inline)]
+pub use self::__buffa::view::PreparedUploadOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::AgentExecutionMetricsView;
 #[doc(inline)]
 pub use self::__buffa::view::AgentExecutionMetricsOwnedView;
@@ -27546,18 +27558,6 @@ pub use self::__buffa::view::WorkerCapabilitiesOwnedView;
 pub use self::__buffa::view::WorkerRuntimeAdvertisementView;
 #[doc(inline)]
 pub use self::__buffa::view::WorkerRuntimeAdvertisementOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::UploadFileMetadataView;
-#[doc(inline)]
-pub use self::__buffa::view::UploadFileMetadataOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::UploadReferenceView;
-#[doc(inline)]
-pub use self::__buffa::view::UploadReferenceOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::PreparedUploadView;
-#[doc(inline)]
-pub use self::__buffa::view::PreparedUploadOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::FieldViolationView;
 #[doc(inline)]

@@ -63,6 +63,9 @@ public protocol BriarAPI_ChannelServiceClientInterface: Sendable {
     func `listChannelMessages`(request: BriarAPI_ListChannelMessagesRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListChannelMessagesResponse>
 
     @available(iOS 13, *)
+    func `prepareChannelMessageAttachments`(request: BriarAPI_PrepareChannelMessageAttachmentsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_PrepareChannelMessageAttachmentsResponse>
+
+    @available(iOS 13, *)
     func `createChannelMessage`(request: BriarAPI_CreateChannelMessageRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateChannelMessageResponse>
 
     @available(iOS 13, *)
@@ -187,6 +190,11 @@ public final class BriarAPI_ChannelServiceClient: BriarAPI_ChannelServiceClientI
     }
 
     @available(iOS 13, *)
+    public func `prepareChannelMessageAttachments`(request: BriarAPI_PrepareChannelMessageAttachmentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_PrepareChannelMessageAttachmentsResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/PrepareChannelMessageAttachments", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
     public func `createChannelMessage`(request: BriarAPI_CreateChannelMessageRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateChannelMessageResponse> {
         return await self.client.unary(path: "/briar.app.v1.ChannelService/CreateChannelMessage", idempotencyLevel: .unknown, request: request, headers: headers)
     }
@@ -255,6 +263,7 @@ public final class BriarAPI_ChannelServiceClient: BriarAPI_ChannelServiceClientI
             public static let getChannel = Connect.MethodSpec(name: "GetChannel", service: "briar.app.v1.ChannelService", type: .unary)
             public static let markChannelRead = Connect.MethodSpec(name: "MarkChannelRead", service: "briar.app.v1.ChannelService", type: .unary)
             public static let listChannelMessages = Connect.MethodSpec(name: "ListChannelMessages", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let prepareChannelMessageAttachments = Connect.MethodSpec(name: "PrepareChannelMessageAttachments", service: "briar.app.v1.ChannelService", type: .unary)
             public static let createChannelMessage = Connect.MethodSpec(name: "CreateChannelMessage", service: "briar.app.v1.ChannelService", type: .unary)
             public static let deleteChannelMessage = Connect.MethodSpec(name: "DeleteChannelMessage", service: "briar.app.v1.ChannelService", type: .unary)
             public static let getChannelMessageDocument = Connect.MethodSpec(name: "GetChannelMessageDocument", service: "briar.app.v1.ChannelService", type: .unary)

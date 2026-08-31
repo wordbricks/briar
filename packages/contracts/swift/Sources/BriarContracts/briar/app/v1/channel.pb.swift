@@ -1001,6 +1001,44 @@ public nonisolated struct BriarAPI_ListChannelMessagesResponse: Sendable {
   fileprivate var _nextCursor: String? = nil
 }
 
+public nonisolated struct BriarAPI_PrepareChannelMessageAttachmentsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Stable across a retry of one upload preparation attempt. Reusing it with
+  /// different scope or metadata fails rather than changing the reservation.
+  public var requestID: String = String()
+
+  public var organizationID: String = String()
+
+  public var channelID: String = String()
+
+  /// Binds this upload batch to the idempotency identity of the message that
+  /// is allowed to consume it.
+  public var clientMessageID: String = String()
+
+  public var attachments: [BriarTypes_UploadFileMetadata] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_PrepareChannelMessageAttachmentsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var replayed: Bool = false
+
+  public var uploads: [BriarTypes_PreparedUpload] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 public nonisolated struct BriarAPI_CreateChannelMessageRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1045,7 +1083,10 @@ public nonisolated struct BriarAPI_CreateChannelMessageRequest: Sendable {
   /// Clears the value of `preferredDeviceID`. Subsequent reads from it will return its default value.
   public mutating func clearPreferredDeviceID() {self._preferredDeviceID = nil}
 
-  public var attachmentReferences: [String] = []
+  /// Uploaded bytes must have been prepared by
+  /// PrepareChannelMessageAttachments for this exact organization, channel,
+  /// and authenticated user. The upload ID is also the durable attachment ID.
+  public var attachments: [BriarTypes_UploadReference] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -4120,9 +4161,94 @@ nonisolated extension BriarAPI_ListChannelMessagesResponse: SwiftProtobuf.Messag
   }
 }
 
+nonisolated extension BriarAPI_PrepareChannelMessageAttachmentsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".PrepareChannelMessageAttachmentsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{3}organization_id\0\u{3}channel_id\0\u{3}client_message_id\0\u{1}attachments\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.clientMessageID) }()
+      case 5: try { try decoder.decodeRepeatedMessageField(value: &self.attachments) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.requestID.isEmpty {
+      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 1)
+    }
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 2)
+    }
+    if !self.channelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 3)
+    }
+    if !self.clientMessageID.isEmpty {
+      try visitor.visitSingularStringField(value: self.clientMessageID, fieldNumber: 4)
+    }
+    if !self.attachments.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.attachments, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_PrepareChannelMessageAttachmentsRequest, rhs: BriarAPI_PrepareChannelMessageAttachmentsRequest) -> Bool {
+    if lhs.requestID != rhs.requestID {return false}
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.channelID != rhs.channelID {return false}
+    if lhs.clientMessageID != rhs.clientMessageID {return false}
+    if lhs.attachments != rhs.attachments {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_PrepareChannelMessageAttachmentsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".PrepareChannelMessageAttachmentsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}replayed\0\u{1}uploads\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.replayed) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.uploads) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.replayed != false {
+      try visitor.visitSingularBoolField(value: self.replayed, fieldNumber: 1)
+    }
+    if !self.uploads.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.uploads, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_PrepareChannelMessageAttachmentsResponse, rhs: BriarAPI_PrepareChannelMessageAttachmentsResponse) -> Bool {
+    if lhs.replayed != rhs.replayed {return false}
+    if lhs.uploads != rhs.uploads {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 nonisolated extension BriarAPI_CreateChannelMessageRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateChannelMessageRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}client_message_id\0\u{1}body\0\u{4}\u{2}parent_message_id\0\u{3}mentioned_user_ids\0\u{3}mentioned_agent_ids\0\u{4}\u{2}skill_id\0\u{3}preferred_device_id\0\u{3}attachment_references\0\u{c}\u{5}\u{1}\u{c}\u{9}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}client_message_id\0\u{1}body\0\u{4}\u{2}parent_message_id\0\u{3}mentioned_user_ids\0\u{3}mentioned_agent_ids\0\u{4}\u{2}skill_id\0\u{3}preferred_device_id\0\u{1}attachments\0\u{c}\u{5}\u{1}\u{c}\u{9}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4139,7 +4265,7 @@ nonisolated extension BriarAPI_CreateChannelMessageRequest: SwiftProtobuf.Messag
       case 8: try { try decoder.decodeRepeatedStringField(value: &self.mentionedAgentIds) }()
       case 10: try { try decoder.decodeSingularStringField(value: &self._skillID) }()
       case 11: try { try decoder.decodeSingularStringField(value: &self._preferredDeviceID) }()
-      case 12: try { try decoder.decodeRepeatedStringField(value: &self.attachmentReferences) }()
+      case 12: try { try decoder.decodeRepeatedMessageField(value: &self.attachments) }()
       default: break
       }
     }
@@ -4177,8 +4303,8 @@ nonisolated extension BriarAPI_CreateChannelMessageRequest: SwiftProtobuf.Messag
     try { if let v = self._preferredDeviceID {
       try visitor.visitSingularStringField(value: v, fieldNumber: 11)
     } }()
-    if !self.attachmentReferences.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.attachmentReferences, fieldNumber: 12)
+    if !self.attachments.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.attachments, fieldNumber: 12)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -4193,7 +4319,7 @@ nonisolated extension BriarAPI_CreateChannelMessageRequest: SwiftProtobuf.Messag
     if lhs.mentionedAgentIds != rhs.mentionedAgentIds {return false}
     if lhs._skillID != rhs._skillID {return false}
     if lhs._preferredDeviceID != rhs._preferredDeviceID {return false}
-    if lhs.attachmentReferences != rhs.attachmentReferences {return false}
+    if lhs.attachments != rhs.attachments {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

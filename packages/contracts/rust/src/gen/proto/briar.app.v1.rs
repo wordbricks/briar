@@ -59548,6 +59548,422 @@ pub const __LIST_CHANNEL_MESSAGES_RESPONSE_JSON_ANY: ::buffa::type_registry::Jso
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
+pub struct PrepareChannelMessageAttachmentsRequest {
+    /// Stable across a retry of one upload preparation attempt. Reusing it with
+    /// different scope or metadata fails rather than changing the reservation.
+    ///
+    /// Field 1: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub request_id: ::buffa::alloc::string::String,
+    /// Field 2: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 3: `channel_id`
+    #[serde(
+        rename = "channelId",
+        alias = "channel_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub channel_id: ::buffa::alloc::string::String,
+    /// Binds this upload batch to the idempotency identity of the message that
+    /// is allowed to consume it.
+    ///
+    /// Field 4: `client_message_id`
+    #[serde(
+        rename = "clientMessageId",
+        alias = "client_message_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub client_message_id: ::buffa::alloc::string::String,
+    /// Field 5: `attachments`
+    #[serde(
+        rename = "attachments",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub attachments: ::buffa::alloc::vec::Vec<
+        super::super::types::v1::UploadFileMetadata,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PrepareChannelMessageAttachmentsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PrepareChannelMessageAttachmentsRequest")
+            .field("request_id", &self.request_id)
+            .field("organization_id", &self.organization_id)
+            .field("channel_id", &self.channel_id)
+            .field("client_message_id", &self.client_message_id)
+            .field("attachments", &self.attachments)
+            .finish()
+    }
+}
+impl PrepareChannelMessageAttachmentsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.PrepareChannelMessageAttachmentsRequest";
+}
+::buffa::impl_default_instance!(PrepareChannelMessageAttachmentsRequest);
+impl ::buffa::MessageName for PrepareChannelMessageAttachmentsRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "PrepareChannelMessageAttachmentsRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.PrepareChannelMessageAttachmentsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.PrepareChannelMessageAttachmentsRequest";
+}
+impl ::buffa::Message for PrepareChannelMessageAttachmentsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.request_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.request_id) as u64;
+        }
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.channel_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
+        }
+        if !self.client_message_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.client_message_id) as u64;
+        }
+        for v in &self.attachments {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.request_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+        }
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+        }
+        if !self.channel_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.channel_id, buf);
+        }
+        if !self.client_message_id.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.client_message_id, buf);
+        }
+        for v in &self.attachments {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.request_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.channel_id, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.client_message_id, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.attachments.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.request_id.clear();
+        self.organization_id.clear();
+        self.channel_id.clear();
+        self.client_message_id.clear();
+        self.attachments.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PrepareChannelMessageAttachmentsRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.PrepareChannelMessageAttachmentsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PrepareChannelMessageAttachmentsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PREPARE_CHANNEL_MESSAGE_ATTACHMENTS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.PrepareChannelMessageAttachmentsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<
+        PrepareChannelMessageAttachmentsRequest,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        PrepareChannelMessageAttachmentsRequest,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PrepareChannelMessageAttachmentsResponse {
+    /// Field 1: `replayed`
+    #[serde(
+        rename = "replayed",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub replayed: bool,
+    /// Field 2: `uploads`
+    #[serde(
+        rename = "uploads",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub uploads: ::buffa::alloc::vec::Vec<super::super::types::v1::PreparedUpload>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PrepareChannelMessageAttachmentsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PrepareChannelMessageAttachmentsResponse")
+            .field("replayed", &self.replayed)
+            .field("uploads", &self.uploads)
+            .finish()
+    }
+}
+impl PrepareChannelMessageAttachmentsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.PrepareChannelMessageAttachmentsResponse";
+}
+::buffa::impl_default_instance!(PrepareChannelMessageAttachmentsResponse);
+impl ::buffa::MessageName for PrepareChannelMessageAttachmentsResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "PrepareChannelMessageAttachmentsResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.PrepareChannelMessageAttachmentsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.PrepareChannelMessageAttachmentsResponse";
+}
+impl ::buffa::Message for PrepareChannelMessageAttachmentsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.replayed {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        for v in &self.uploads {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.replayed {
+            ::buffa::types::put_bool_field(1u32, self.replayed, buf);
+        }
+        for v in &self.uploads {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.replayed = ::buffa::types::decode_bool(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.uploads.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.replayed = false;
+        self.uploads.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PrepareChannelMessageAttachmentsResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.PrepareChannelMessageAttachmentsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PrepareChannelMessageAttachmentsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PREPARE_CHANNEL_MESSAGE_ATTACHMENTS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.PrepareChannelMessageAttachmentsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<
+        PrepareChannelMessageAttachmentsResponse,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        PrepareChannelMessageAttachmentsResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
 pub struct CreateChannelMessageRequest {
     /// Field 1: `organization_id`
     #[serde(
@@ -59617,14 +60033,17 @@ pub struct CreateChannelMessageRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub preferred_device_id: ::core::option::Option<::buffa::alloc::string::String>,
-    /// Field 12: `attachment_references`
+    /// Uploaded bytes must have been prepared by
+    /// PrepareChannelMessageAttachments for this exact organization, channel,
+    /// and authenticated user. The upload ID is also the durable attachment ID.
+    ///
+    /// Field 12: `attachments`
     #[serde(
-        rename = "attachmentReferences",
-        alias = "attachment_references",
+        rename = "attachments",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub attachment_references: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    pub attachments: ::buffa::alloc::vec::Vec<super::super::types::v1::UploadReference>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -59641,7 +60060,7 @@ impl ::core::fmt::Debug for CreateChannelMessageRequest {
             .field("mentioned_agent_ids", &self.mentioned_agent_ids)
             .field("skill_id", &self.skill_id)
             .field("preferred_device_id", &self.preferred_device_id)
-            .field("attachment_references", &self.attachment_references)
+            .field("attachments", &self.attachments)
             .finish()
     }
 }
@@ -59700,7 +60119,7 @@ impl ::buffa::Message for CreateChannelMessageRequest {
     /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
     /// points reject, never a silently wrapped size.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
@@ -59735,15 +60154,20 @@ impl ::buffa::Message for CreateChannelMessageRequest {
         if let Some(ref v) = self.preferred_device_id {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
-        for v in &self.attachment_references {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        for v in &self.attachments {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::EncodeSink,
     ) {
         #[allow(unused_imports)]
@@ -59775,8 +60199,13 @@ impl ::buffa::Message for CreateChannelMessageRequest {
         if let Some(ref v) = self.preferred_device_id {
             ::buffa::types::put_string_field(11u32, v, buf);
         }
-        for v in &self.attachment_references {
-            ::buffa::types::put_string_field(12u32, v, buf);
+        for v in &self.attachments {
+            ::buffa::types::put_len_delimited_header(
+                12u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -59882,11 +60311,12 @@ impl ::buffa::Message for CreateChannelMessageRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                let __elem = ::buffa::types::decode_string(buf)?;
+                let mut elem = ::core::default::Default::default();
                 ctx.register_element_memory(
-                    ::buffa::__private::element_footprint(&__elem),
+                    ::buffa::__private::element_footprint(&elem),
                 )?;
-                self.attachment_references.push(__elem);
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.attachments.push(elem);
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -59905,7 +60335,7 @@ impl ::buffa::Message for CreateChannelMessageRequest {
         self.mentioned_agent_ids.clear();
         self.skill_id = ::core::option::Option::None;
         self.preferred_device_id = ::core::option::Option::None;
-        self.attachment_references.clear();
+        self.attachments.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -209563,6 +209993,798 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
+        pub struct PrepareChannelMessageAttachmentsRequestView<'a> {
+            /// Stable across a retry of one upload preparation attempt. Reusing it with
+            /// different scope or metadata fails rather than changing the reservation.
+            ///
+            /// Field 1: `request_id`
+            pub request_id: &'a str,
+            /// Field 2: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 3: `channel_id`
+            pub channel_id: &'a str,
+            /// Binds this upload batch to the idempotency identity of the message that
+            /// is allowed to consume it.
+            ///
+            /// Field 4: `client_message_id`
+            pub client_message_id: &'a str,
+            /// Field 5: `attachments`
+            pub attachments: ::buffa::RepeatedView<
+                'a,
+                super::super::super::super::types::v1::__buffa::view::UploadFileMetadataView<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for PrepareChannelMessageAttachmentsRequestView<'a> {
+            type Owned = super::super::PrepareChannelMessageAttachmentsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.channel_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.client_message_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::super::super::types::v1::__buffa::view::UploadFileMetadataView,
+                            >(),
+                        )?;
+                        view.attachments
+                            .push(
+                                <super::super::super::super::types::v1::__buffa::view::UploadFileMetadataView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PrepareChannelMessageAttachmentsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PrepareChannelMessageAttachmentsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PrepareChannelMessageAttachmentsRequest {
+                    request_id: self.request_id.to_string(),
+                    organization_id: self.organization_id.to_string(),
+                    channel_id: self.channel_id.to_string(),
+                    client_message_id: self.client_message_id.to_string(),
+                    attachments: self
+                        .attachments
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for PrepareChannelMessageAttachmentsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.request_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.request_id)
+                                as u64;
+                }
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.channel_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.channel_id)
+                                as u64;
+                }
+                if !self.client_message_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.client_message_id)
+                                as u64;
+                }
+                for v in &self.attachments {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.request_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+                }
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+                }
+                if !self.channel_id.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.channel_id, buf);
+                }
+                if !self.client_message_id.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.client_message_id, buf);
+                }
+                for v in &self.attachments {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for PrepareChannelMessageAttachmentsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
+                    __map.serialize_entry("requestId", self.request_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
+                    __map.serialize_entry("channelId", self.channel_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.client_message_id,
+                ) {
+                    __map.serialize_entry("clientMessageId", self.client_message_id)?;
+                }
+                if !self.attachments.is_empty() {
+                    __map.serialize_entry("attachments", &*self.attachments)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName
+        for PrepareChannelMessageAttachmentsRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "PrepareChannelMessageAttachmentsRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.PrepareChannelMessageAttachmentsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.PrepareChannelMessageAttachmentsRequest";
+        }
+        ::buffa::impl_default_view_instance!(
+            PrepareChannelMessageAttachmentsRequestView
+        );
+        ::buffa::impl_view_reborrow!(PrepareChannelMessageAttachmentsRequestView);
+        /** Self-contained, `'static` owned view of a `PrepareChannelMessageAttachmentsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PrepareChannelMessageAttachmentsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PrepareChannelMessageAttachmentsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PrepareChannelMessageAttachmentsRequestOwnedView(
+            ::buffa::OwnedView<PrepareChannelMessageAttachmentsRequestView<'static>>,
+        );
+        impl PrepareChannelMessageAttachmentsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PrepareChannelMessageAttachmentsRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PrepareChannelMessageAttachmentsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PrepareChannelMessageAttachmentsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PrepareChannelMessageAttachmentsRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`PrepareChannelMessageAttachmentsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PrepareChannelMessageAttachmentsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::PrepareChannelMessageAttachmentsRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable across a retry of one upload preparation attempt. Reusing it with
+            /// different scope or metadata fails rather than changing the reservation.
+            ///
+            /// Field 1: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> &'_ str {
+                self.0.reborrow().request_id
+            }
+            /// Field 2: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 3: `channel_id`
+            #[must_use]
+            pub fn channel_id(&self) -> &'_ str {
+                self.0.reborrow().channel_id
+            }
+            /// Binds this upload batch to the idempotency identity of the message that
+            /// is allowed to consume it.
+            ///
+            /// Field 4: `client_message_id`
+            #[must_use]
+            pub fn client_message_id(&self) -> &'_ str {
+                self.0.reborrow().client_message_id
+            }
+            /// Field 5: `attachments`
+            #[must_use]
+            pub fn attachments(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::super::super::types::v1::__buffa::view::UploadFileMetadataView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().attachments
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<PrepareChannelMessageAttachmentsRequestView<'static>>,
+        > for PrepareChannelMessageAttachmentsRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    PrepareChannelMessageAttachmentsRequestView<'static>,
+                >,
+            ) -> Self {
+                PrepareChannelMessageAttachmentsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PrepareChannelMessageAttachmentsRequestOwnedView>
+        for ::buffa::OwnedView<PrepareChannelMessageAttachmentsRequestView<'static>> {
+            fn from(wrapper: PrepareChannelMessageAttachmentsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<PrepareChannelMessageAttachmentsRequestView<'static>>,
+        > for PrepareChannelMessageAttachmentsRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                PrepareChannelMessageAttachmentsRequestView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::PrepareChannelMessageAttachmentsRequest {
+            type View<'a> = PrepareChannelMessageAttachmentsRequestView<'a>;
+            type ViewHandle = PrepareChannelMessageAttachmentsRequestOwnedView;
+        }
+        impl ::serde::Serialize for PrepareChannelMessageAttachmentsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct PrepareChannelMessageAttachmentsResponseView<'a> {
+            /// Field 1: `replayed`
+            pub replayed: bool,
+            /// Field 2: `uploads`
+            pub uploads: ::buffa::RepeatedView<
+                'a,
+                super::super::super::super::types::v1::__buffa::view::PreparedUploadView<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for PrepareChannelMessageAttachmentsResponseView<'a> {
+            type Owned = super::super::PrepareChannelMessageAttachmentsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.replayed = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::super::super::types::v1::__buffa::view::PreparedUploadView,
+                            >(),
+                        )?;
+                        view.uploads
+                            .push(
+                                <super::super::super::super::types::v1::__buffa::view::PreparedUploadView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PrepareChannelMessageAttachmentsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PrepareChannelMessageAttachmentsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PrepareChannelMessageAttachmentsResponse {
+                    replayed: self.replayed,
+                    uploads: self
+                        .uploads
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for PrepareChannelMessageAttachmentsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.replayed {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                for v in &self.uploads {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.replayed {
+                    ::buffa::types::put_bool_field(1u32, self.replayed, buf);
+                }
+                for v in &self.uploads {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for PrepareChannelMessageAttachmentsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if self.replayed {
+                    __map.serialize_entry("replayed", &self.replayed)?;
+                }
+                if !self.uploads.is_empty() {
+                    __map.serialize_entry("uploads", &*self.uploads)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName
+        for PrepareChannelMessageAttachmentsResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "PrepareChannelMessageAttachmentsResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.PrepareChannelMessageAttachmentsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.PrepareChannelMessageAttachmentsResponse";
+        }
+        ::buffa::impl_default_view_instance!(
+            PrepareChannelMessageAttachmentsResponseView
+        );
+        ::buffa::impl_view_reborrow!(PrepareChannelMessageAttachmentsResponseView);
+        /** Self-contained, `'static` owned view of a `PrepareChannelMessageAttachmentsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PrepareChannelMessageAttachmentsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PrepareChannelMessageAttachmentsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PrepareChannelMessageAttachmentsResponseOwnedView(
+            ::buffa::OwnedView<PrepareChannelMessageAttachmentsResponseView<'static>>,
+        );
+        impl PrepareChannelMessageAttachmentsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PrepareChannelMessageAttachmentsResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PrepareChannelMessageAttachmentsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PrepareChannelMessageAttachmentsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PrepareChannelMessageAttachmentsResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`PrepareChannelMessageAttachmentsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PrepareChannelMessageAttachmentsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::PrepareChannelMessageAttachmentsResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `replayed`
+            #[must_use]
+            pub fn replayed(&self) -> bool {
+                self.0.reborrow().replayed
+            }
+            /// Field 2: `uploads`
+            #[must_use]
+            pub fn uploads(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::super::super::types::v1::__buffa::view::PreparedUploadView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().uploads
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<PrepareChannelMessageAttachmentsResponseView<'static>>,
+        > for PrepareChannelMessageAttachmentsResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    PrepareChannelMessageAttachmentsResponseView<'static>,
+                >,
+            ) -> Self {
+                PrepareChannelMessageAttachmentsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PrepareChannelMessageAttachmentsResponseOwnedView>
+        for ::buffa::OwnedView<PrepareChannelMessageAttachmentsResponseView<'static>> {
+            fn from(wrapper: PrepareChannelMessageAttachmentsResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<PrepareChannelMessageAttachmentsResponseView<'static>>,
+        > for PrepareChannelMessageAttachmentsResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                PrepareChannelMessageAttachmentsResponseView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::PrepareChannelMessageAttachmentsResponse {
+            type View<'a> = PrepareChannelMessageAttachmentsResponseView<'a>;
+            type ViewHandle = PrepareChannelMessageAttachmentsResponseOwnedView;
+        }
+        impl ::serde::Serialize for PrepareChannelMessageAttachmentsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
         pub struct CreateChannelMessageRequestView<'a> {
             /// Field 1: `organization_id`
             pub organization_id: &'a str,
@@ -209582,8 +210804,17 @@ pub mod __buffa {
             pub skill_id: ::core::option::Option<&'a str>,
             /// Field 11: `preferred_device_id`
             pub preferred_device_id: ::core::option::Option<&'a str>,
-            /// Field 12: `attachment_references`
-            pub attachment_references: ::buffa::RepeatedView<'a, &'a str>,
+            /// Uploaded bytes must have been prepared by
+            /// PrepareChannelMessageAttachments for this exact organization, channel,
+            /// and authenticated user. The upload ID is also the durable attachment ID.
+            ///
+            /// Field 12: `attachments`
+            pub attachments: ::buffa::RepeatedView<
+                'a,
+                super::super::super::super::types::v1::__buffa::view::UploadReferenceView<
+                    'a,
+                >,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CreateChannelMessageRequestView<'a> {
@@ -209698,11 +210929,20 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         ctx.register_element_memory(
-                            ::buffa::__private::element_footprint(&__elem),
+                            ::core::mem::size_of::<
+                                super::super::super::super::types::v1::__buffa::view::UploadReferenceView,
+                            >(),
                         )?;
-                        view.attachment_references.push(__elem);
+                        view.attachments
+                            .push(
+                                <super::super::super::super::types::v1::__buffa::view::UploadReferenceView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -209750,11 +210990,11 @@ pub mod __buffa {
                         .collect(),
                     skill_id: self.skill_id.map(|s| s.to_string()),
                     preferred_device_id: self.preferred_device_id.map(|s| s.to_string()),
-                    attachment_references: self
-                        .attachment_references
+                    attachments: self
+                        .attachments
                         .iter()
-                        .map(|s| s.to_string())
-                        .collect(),
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -209765,7 +211005,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for CreateChannelMessageRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
@@ -209805,8 +211045,13 @@ pub mod __buffa {
                 if let Some(ref v) = self.preferred_device_id {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
-                for v in &self.attachment_references {
-                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                for v in &self.attachments {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
@@ -209814,7 +211059,7 @@ pub mod __buffa {
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::EncodeSink,
             ) {
                 #[allow(unused_imports)]
@@ -209846,8 +211091,13 @@ pub mod __buffa {
                 if let Some(ref v) = self.preferred_device_id {
                     ::buffa::types::put_string_field(11u32, v, buf);
                 }
-                for v in &self.attachment_references {
-                    ::buffa::types::put_string_field(12u32, v, buf);
+                for v in &self.attachments {
+                    ::buffa::types::put_len_delimited_header(
+                        12u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -209904,12 +211154,8 @@ pub mod __buffa {
                 if let ::core::option::Option::Some(__v) = self.preferred_device_id {
                     __map.serialize_entry("preferredDeviceId", __v)?;
                 }
-                if !self.attachment_references.is_empty() {
-                    __map
-                        .serialize_entry(
-                            "attachmentReferences",
-                            &*self.attachment_references,
-                        )?;
+                if !self.attachments.is_empty() {
+                    __map.serialize_entry("attachments", &*self.attachments)?;
                 }
                 __map.end()
             }
@@ -210055,10 +211301,21 @@ pub mod __buffa {
             pub fn preferred_device_id(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().preferred_device_id
             }
-            /// Field 12: `attachment_references`
+            /// Uploaded bytes must have been prepared by
+            /// PrepareChannelMessageAttachments for this exact organization, channel,
+            /// and authenticated user. The upload ID is also the durable attachment ID.
+            ///
+            /// Field 12: `attachments`
             #[must_use]
-            pub fn attachment_references(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
-                &self.0.reborrow().attachment_references
+            pub fn attachments(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::super::super::types::v1::__buffa::view::UploadReferenceView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().attachments
             }
         }
         impl ::core::convert::From<
@@ -313046,6 +314303,12 @@ pub mod __buffa {
         reg.register_json_any(super::__MARK_CHANNEL_READ_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_CHANNEL_MESSAGES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_CHANNEL_MESSAGES_RESPONSE_JSON_ANY);
+        reg.register_json_any(
+            super::__PREPARE_CHANNEL_MESSAGE_ATTACHMENTS_REQUEST_JSON_ANY,
+        );
+        reg.register_json_any(
+            super::__PREPARE_CHANNEL_MESSAGE_ATTACHMENTS_RESPONSE_JSON_ANY,
+        );
         reg.register_json_any(super::__CREATE_CHANNEL_MESSAGE_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CREATE_CHANNEL_MESSAGE_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__DELETE_CHANNEL_MESSAGE_REQUEST_JSON_ANY);
@@ -314136,6 +315399,14 @@ pub use self::__buffa::view::ListChannelMessagesRequestOwnedView;
 pub use self::__buffa::view::ListChannelMessagesResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ListChannelMessagesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PrepareChannelMessageAttachmentsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::PrepareChannelMessageAttachmentsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PrepareChannelMessageAttachmentsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::PrepareChannelMessageAttachmentsResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateChannelMessageRequestView;
 #[doc(inline)]

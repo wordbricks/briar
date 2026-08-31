@@ -6,6 +6,7 @@ import "briar/app/v1/agent.proto";
 import "briar/app/v1/common.proto";
 import "briar/app/v1/issue.proto";
 import "briar/types/v1/provider.proto";
+import "briar/types/v1/upload.proto";
 import "google/protobuf/timestamp.proto";
 
 option swift_prefix = "BriarAPI_";
@@ -28,6 +29,7 @@ service ChannelService {
   rpc GetChannel(GetChannelRequest) returns (GetChannelResponse);
   rpc MarkChannelRead(MarkChannelReadRequest) returns (MarkChannelReadResponse);
   rpc ListChannelMessages(ListChannelMessagesRequest) returns (ListChannelMessagesResponse);
+  rpc PrepareChannelMessageAttachments(PrepareChannelMessageAttachmentsRequest) returns (PrepareChannelMessageAttachmentsResponse);
   rpc CreateChannelMessage(CreateChannelMessageRequest) returns (CreateChannelMessageResponse);
   rpc DeleteChannelMessage(DeleteChannelMessageRequest) returns (DeleteChannelMessageResponse);
   rpc GetChannelMessageDocument(GetChannelMessageDocumentRequest) returns (GetChannelMessageDocumentResponse);
@@ -257,6 +259,23 @@ message ListChannelMessagesResponse {
   optional string next_cursor = 2;
 }
 
+message PrepareChannelMessageAttachmentsRequest {
+  // Stable across a retry of one upload preparation attempt. Reusing it with
+  // different scope or metadata fails rather than changing the reservation.
+  string request_id = 1;
+  string organization_id = 2;
+  string channel_id = 3;
+  // Binds this upload batch to the idempotency identity of the message that
+  // is allowed to consume it.
+  string client_message_id = 4;
+  repeated briar.types.v1.UploadFileMetadata attachments = 5;
+}
+
+message PrepareChannelMessageAttachmentsResponse {
+  bool replayed = 1;
+  repeated briar.types.v1.PreparedUpload uploads = 2;
+}
+
 message CreateChannelMessageRequest {
   reserved 5, 9;
 
@@ -269,7 +288,10 @@ message CreateChannelMessageRequest {
   repeated string mentioned_agent_ids = 8;
   optional string skill_id = 10;
   optional string preferred_device_id = 11;
-  repeated string attachment_references = 12;
+  // Uploaded bytes must have been prepared by
+  // PrepareChannelMessageAttachments for this exact organization, channel,
+  // and authenticated user. The upload ID is also the durable attachment ID.
+  repeated briar.types.v1.UploadReference attachments = 12;
 }
 
 message CreateChannelMessageResponse {
