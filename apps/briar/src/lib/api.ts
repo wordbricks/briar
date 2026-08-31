@@ -8,7 +8,10 @@ export {
   errorWithMessage,
   isApiErrorStatus,
 } from "./api/errors";
-import { request } from "./api/request";
+import {
+  createDeviceAuthorizationClient,
+  type DeviceAuthorizationClientId,
+} from "./device-authorization-client";
 export {
   deleteAccount,
   loadSession,
@@ -205,6 +208,16 @@ import type {
 } from "../types";
 
 const apiUrl = briarApiUrl;
+const deviceAuthorizationClient = apiUrl
+  ? createDeviceAuthorizationClient(apiUrl)
+  : undefined;
+
+const requireDeviceAuthorizationClient = () => {
+  if (!deviceAuthorizationClient) {
+    throw new Error("Briar API URL이 설정되지 않았습니다.");
+  }
+  return deviceAuthorizationClient;
+};
 
 const normalizeDashboardWorkflow = (workflow: AutoHuntWorkflow) =>
   normalizeAutoHuntWorkflow(workflow);
@@ -218,11 +231,10 @@ export type DeviceAuthorization = {
   interval: number;
 };
 
-export type DeviceClientId =
-  | "briar-mobile"
-  | "briar-android"
-  | "briar-desktop"
-  | "briar-web";
+export type DeviceClientId = Exclude<
+  DeviceAuthorizationClientId,
+  "briar-cli"
+>;
 
 export type DeviceLoginMethod = "email" | "google";
 
@@ -234,22 +246,11 @@ export async function beginDeviceAuthorization(
     switchAccount?: boolean;
   } = {},
 ): Promise<DeviceAuthorization> {
-  const response = await request<{
-    device_code: string;
-    user_code: string;
-    verification_uri: string;
-    verification_uri_complete?: string;
-    interval?: number;
-  }>("/api/auth/device/code", null, {
-    method: "POST",
-    body: JSON.stringify({
-      client_id: clientId,
-      scope: "openid profile email",
-    }),
+  const response = await requireDeviceAuthorizationClient().requestCode({
+    clientId,
+    scope: "openid profile email",
   });
-  const verificationUrl =
-    response.verification_uri_complete ?? response.verification_uri;
-  const clientVerificationUrl = new URL(verificationUrl);
+  const clientVerificationUrl = new URL(response.verificationUriComplete);
   if (clientId === "briar-mobile" || clientId === "briar-android") {
     clientVerificationUrl.searchParams.set("client", "mobile");
   } else if (clientId === "briar-web") {
@@ -265,10 +266,10 @@ export async function beginDeviceAuthorization(
     clientVerificationUrl.searchParams.set("switch_account", "1");
   }
   return {
-    deviceCode: response.device_code,
-    userCode: response.user_code,
+    deviceCode: response.deviceCode,
+    userCode: response.userCode,
     verificationUrl: clientVerificationUrl.toString(),
-    interval: response.interval ?? 5,
+    interval: response.interval,
   };
 }
 
@@ -283,22 +284,14 @@ export async function pollDeviceToken(
   deviceCode: string,
   clientId: DeviceClientId = "briar-desktop",
 ): Promise<DeviceTokenResponse> {
-  try {
-    return await request<DeviceTokenResponse>("/api/auth/device/token", null, {
-      method: "POST",
-      body: JSON.stringify({
-        grant_type: "urn:ietf:params:oauth:grant-type:device_code",
-        device_code: deviceCode,
-        client_id: clientId,
-      }),
-    });
-  } catch (error) {
-    if (!(error instanceof Error)) throw error;
-    const message = error.message.toLowerCase();
-    if (message.includes("pending")) return { error: "authorization_pending" };
-    if (message.includes("slow")) return { error: "slow_down" };
-    throw error;
+  const result = await requireDeviceAuthorizationClient().pollToken({
+    deviceCode,
+    clientId,
+  });
+  if (result.status === "authorized") {
+    return { access_token: result.accessToken };
   }
+  return { error: result.status, error_description: result.description };
 }
 
 export type InboxFeedSyncState = {

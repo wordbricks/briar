@@ -1,4 +1,3 @@
-import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { IsoDateTimeWithOffset } from "../src/lib/date-time-schema";
 import {
@@ -8,24 +7,6 @@ import {
 import { WorkflowStageId } from "./config-contract";
 
 const Uuid = Schema.String.check(Schema.isUUID());
-
-const HttpErrorBody = Schema.Struct({
-  message: Schema.optional(Schema.String),
-  error_description: Schema.optional(Schema.String),
-  error: Schema.optional(Schema.String),
-}).annotate({
-  parseOptions: { onExcessProperty: "preserve" },
-});
-
-const decodeHttpErrorBodyOption = Schema.decodeUnknownOption(HttpErrorBody);
-
-export function httpErrorMessage(input: unknown): string | undefined {
-  return Option.match(decodeHttpErrorBodyOption(input), {
-    onNone: () => undefined,
-    onSome: (body) =>
-      body.message ?? body.error_description ?? body.error,
-  });
-}
 
 export const VelenEnvelope = Schema.Struct({
   ok: Schema.Boolean,
