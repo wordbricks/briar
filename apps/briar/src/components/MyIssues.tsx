@@ -8,16 +8,20 @@ import {
   type IssueCollectionState,
   type IssueWorkflowContext,
 } from "./hunt/board/IssueCollection";
+import { IssuePropertyFilterMenu } from "./hunt/board/IssuePropertyFilterMenu";
+import {
+  MyIssuesList,
+  type MyIssue,
+  type MyIssueScope,
+} from "./MyIssuesList";
 import { ProjectIcon } from "./ProjectIcon";
 import { useI18n } from "../i18n";
 import { formatIssueKey } from "../lib/issue-key";
 import type { DashboardPayload, HuntRun, OrganizationMember, Project } from "../types";
-import { emptyIssuePropertyFilters } from "./hunt/model/filters";
-
-type MyIssue = {
-  project: Project;
-  run: HuntRun;
-};
+import {
+  emptyIssuePropertyFilters,
+  runMatchesIssuePropertyFilters,
+} from "./hunt/model/filters";
 
 export type MyIssuesProps = {
   currentUserId: string | null;
@@ -33,12 +37,14 @@ export type MyIssuesProps = {
 };
 
 type ProjectFilterProps = {
+  compact?: boolean;
   projects: Project[];
   selectedProjectIds: ReadonlySet<string>;
   onChange: (projectIds: Set<string>) => void;
 };
 
 function ProjectFilter({
+  compact = false,
   projects,
   selectedProjectIds,
   onChange,
@@ -71,7 +77,7 @@ function ProjectFilter({
       <DropdownMenu.Trigger asChild>
         <button
           aria-label={t("myIssues.projectSelectLabel")}
-          className={`issue-property-filter-trigger my-issues-project-filter-trigger${selectedCount > 0 ? " active" : ""}`}
+          className={`issue-property-filter-trigger my-issues-project-filter-trigger${compact ? " compact" : ""}${selectedCount > 0 ? " active" : ""}`}
           disabled={projects.length === 0}
           type="button"
         >
@@ -135,6 +141,16 @@ function ProjectFilter({
   );
 }
 
+function statusMatchesMyIssues(
+  run: HuntRun,
+  status: IssueCollectionState["status"],
+) {
+  if (status === "active") return !["completed", "cancelled"].includes(run.status);
+  if (status === "attention") return ["paused", "blocked", "failed"].includes(run.status);
+  if (status === "completed") return ["completed", "cancelled"].includes(run.status);
+  return true;
+}
+
 export function MyIssues({
   currentUserId,
   isSidebarOpen,
@@ -167,6 +183,7 @@ export function MyIssues({
   const [source, setSource] = useState<IssueCollectionState["source"]>("all");
   const [status, setStatus] = useState<IssueCollectionState["status"]>("all");
   const [view, setView] = useState<IssueCollectionState["view"]>("list");
+  const [scope, setScope] = useState<MyIssueScope>("assigned");
   const [propertyFilters, setPropertyFilters] = useState(emptyIssuePropertyFilters);
   const loadProjectDashboardRef = useRef(loadProjectDashboard);
   loadProjectDashboardRef.current = loadProjectDashboard;
@@ -275,6 +292,40 @@ export function MyIssues({
         : issues.filter((issue) => selectedProjectIds.has(issue.project.id)),
     [issues, selectedProjectIds],
   );
+  const scopedIssues = useMemo(() => {
+    if (scope === "created") {
+      return selectedIssues.filter(
+        (issue) => issue.run.createdByUserId === currentUserId,
+      );
+    }
+    if (scope === "subscribed") {
+      return selectedIssues.filter((issue) =>
+        issue.run.subscribers?.some((subscriber) => subscriber.userId === currentUserId),
+      );
+    }
+    return selectedIssues;
+  }, [currentUserId, scope, selectedIssues]);
+  const filteredListIssues = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase();
+    return scopedIssues.filter(({ project, run }) => {
+      if (source !== "all" && run.source !== source) return false;
+      if (!runMatchesIssuePropertyFilters(run, propertyFilters)) return false;
+      if (!statusMatchesMyIssues(run, status)) return false;
+      if (!normalizedQuery) return true;
+      return [
+        project.name,
+        formatIssueKey(project.issueKeyPrefix, run.runNumber),
+        run.title,
+        run.detail,
+        run.issueDescription,
+        run.sourceKey,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase()
+        .includes(normalizedQuery);
+    });
+  }, [propertyFilters, query, scopedIssues, source, status]);
   const projectByRunId = useMemo(
     () => new Map(selectedIssues.map((issue) => [issue.run.id, issue.project])),
     [selectedIssues],
@@ -340,113 +391,161 @@ export function MyIssues({
     loadedConfigurationKey !== projectConfigurationKey &&
     selectedIssues.length === 0;
 
-  return (
-    <MainContent id="my-issues">
-      <IssueCollection
-        agents={[]}
-        availableProviders={[]}
-        bodyBefore={failedProjectIds.length > 0 ? (
-          <div className="my-issues-load-error" role="alert">
-            <span>{t("myIssues.loadError")}</span>
+  const bodyBefore = failedProjectIds.length > 0 ? (
+    <div className="my-issues-load-error" role="alert">
+      <span>{t("myIssues.loadError")}</span>
+      <Button
+        onClick={() => setRetryToken((current) => current + 1)}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        {t("myIssues.retry")}
+      </Button>
+    </div>
+  ) : null;
+  const emptyContent = failedProjectIds.length > 0 && issues.length === 0 ? (
+    <EmptyState
+      action={
+        <Button
+          onClick={() => setRetryToken((current) => current + 1)}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          {t("myIssues.retry")}
+        </Button>
+      }
+      description={t("myIssues.loadErrorDescription")}
+      icon={<RefreshCw aria-hidden="true" size={22} />}
+      title={t("myIssues.loadError")}
+    />
+  ) : (
+    <EmptyState
+      description={t("myIssues.emptyDescription")}
+      icon={<ListTodo aria-hidden="true" size={22} />}
+      title={t("myIssues.emptyTitle")}
+    />
+  );
+  const filteredEmptyContent = (
+    <EmptyState
+      description={t("myIssues.filterEmptyDescription")}
+      icon={<FolderGit2 aria-hidden="true" size={22} />}
+      title={t("myIssues.filterEmptyTitle")}
+    />
+  );
+
+  if (view === "kanban") {
+    return (
+      <MainContent id="my-issues">
+        <IssueCollection
+          agents={[]}
+          availableProviders={[]}
+          bodyBefore={bodyBefore}
+          countLabel={(count) => t("myIssues.count", { count })}
+          currentUserId={currentUserId}
+          deletingIssueId={null}
+          emptyContent={emptyContent}
+          filteredEmptyContent={filteredEmptyContent}
+          getSearchText={(run) => {
+            const project = projectByRunId.get(run.id);
+            return [
+              project?.name,
+              formatIssueKey(project?.issueKeyPrefix, run.runNumber),
+              run.title,
+              run.detail,
+              run.issueDescription,
+              run.sourceKey,
+            ].filter(Boolean).join(" ");
+          }}
+          headerDescription={t("myIssues.description")}
+          headerEyebrow={organizationName}
+          headerTrailing={
             <Button
+              aria-label={t("myIssues.retry")}
+              className="my-issues-refresh-button"
+              disabled={isLoading}
               onClick={() => setRetryToken((current) => current + 1)}
-              size="sm"
+              size="icon-sm"
+              title={t("myIssues.retry")}
               type="button"
               variant="outline"
             >
-              {t("myIssues.retry")}
+              <RefreshCw aria-hidden="true" size={15} />
             </Button>
-          </div>
-        ) : null}
-        countLabel={(count) => t("myIssues.count", { count })}
-        currentUserId={currentUserId}
-        deletingIssueId={null}
-        emptyContent={failedProjectIds.length > 0 && issues.length === 0 ? (
-          <EmptyState
-            action={
-              <Button
-                onClick={() => setRetryToken((current) => current + 1)}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                {t("myIssues.retry")}
-              </Button>
-            }
-            description={t("myIssues.loadErrorDescription")}
-            icon={<RefreshCw aria-hidden="true" size={22} />}
-            title={t("myIssues.loadError")}
-          />
-        ) : (
-          <EmptyState
-            description={t("myIssues.emptyDescription")}
-            icon={<ListTodo aria-hidden="true" size={22} />}
-            title={t("myIssues.emptyTitle")}
-          />
-        )}
-        filteredEmptyContent={
-          <EmptyState
-            description={t("myIssues.filterEmptyDescription")}
-            icon={<FolderGit2 aria-hidden="true" size={22} />}
-            title={t("myIssues.filterEmptyTitle")}
-          />
-        }
-        getSearchText={(run) => {
-          const project = projectByRunId.get(run.id);
-          return [
-            project?.name,
-            formatIssueKey(project?.issueKeyPrefix, run.runNumber),
-            run.title,
-            run.detail,
-            run.issueDescription,
-            run.sourceKey,
-          ].filter(Boolean).join(" ");
-        }}
-        headerDescription={t("myIssues.description")}
-        headerEyebrow={organizationName}
-        headerTrailing={
-          <Button
-            aria-label={t("myIssues.retry")}
-            className="my-issues-refresh-button"
-            disabled={isLoading}
-            onClick={() => setRetryToken((current) => current + 1)}
-            size="icon-sm"
-            title={t("myIssues.retry")}
-            type="button"
-            variant="outline"
-          >
-            <RefreshCw aria-hidden="true" size={15} />
-          </Button>
-        }
+          }
+          isLoading={isInitialLoading}
+          isSidebarOpen={isSidebarOpen}
+          issueKeyPrefixForRun={(run) => projectByRunId.get(run.id)?.issueKeyPrefix}
+          loadingLabel={t("myIssues.loading")}
+          members={members}
+          onOpen={(run) => {
+            const project = projectByRunId.get(run.id);
+            if (project) onOpenIssue(project.id, run.id);
+          }}
+          processingIssueIds={emptyProcessingIds}
+          projectForRun={(run) => projectByRunId.get(run.id)}
+          readOnly
+          recoveringRunId={null}
+          runs={selectedIssues.map((issue) => issue.run)}
+          scrollClassName="my-issues-scroll"
+          searchPlaceholder={t("myIssues.search")}
+          state={collectionState}
+          storageScopeId={organizationId ? `my-issues:${organizationId}` : null}
+          title={t("myIssues.title")}
+          toolbarAfterSearch={
+            <ProjectFilter
+              onChange={setSelectedProjectIds}
+              projects={scopedProjects}
+              selectedProjectIds={selectedProjectIds}
+            />
+          }
+          updatingIssueId={null}
+          workflowForRun={workflowForRun}
+          workflowContexts={workflowContexts}
+        />
+      </MainContent>
+    );
+  }
+
+  return (
+    <MainContent id="my-issues">
+      <MyIssuesList
+        bodyBefore={bodyBefore}
+        emptyContent={emptyContent}
+        filteredEmptyContent={filteredEmptyContent}
+        hasUnfilteredIssues={selectedIssues.length > 0}
         isLoading={isInitialLoading}
-        isSidebarOpen={isSidebarOpen}
-        issueKeyPrefixForRun={(run) => projectByRunId.get(run.id)?.issueKeyPrefix}
         loadingLabel={t("myIssues.loading")}
         members={members}
-        onOpen={(run) => {
-          const project = projectByRunId.get(run.id);
-          if (project) onOpenIssue(project.id, run.id);
-        }}
-        processingIssueIds={emptyProcessingIds}
-        projectForRun={(run) => projectByRunId.get(run.id)}
-        readOnly
-        recoveringRunId={null}
-        runs={selectedIssues.map((issue) => issue.run)}
-        scrollClassName="my-issues-scroll"
-        searchPlaceholder={t("myIssues.search")}
-        state={collectionState}
-        storageScopeId={organizationId ? `my-issues:${organizationId}` : null}
-        title={t("myIssues.title")}
-        toolbarAfterSearch={
+        onOpen={(issue) => onOpenIssue(issue.project.id, issue.run.id)}
+        onQueryChange={setQuery}
+        onRetry={() => setRetryToken((current) => current + 1)}
+        onScopeChange={setScope}
+        onViewChange={setView}
+        projectFilter={
           <ProjectFilter
+            compact
             onChange={setSelectedProjectIds}
             projects={scopedProjects}
             selectedProjectIds={selectedProjectIds}
           />
         }
-        updatingIssueId={null}
-        workflowForRun={workflowForRun}
-        workflowContexts={workflowContexts}
+        propertyFilter={
+          <IssuePropertyFilterMenu
+            agents={[]}
+            filters={propertyFilters}
+            members={members}
+            onChange={setPropertyFilters}
+          />
+        }
+        query={query}
+        runs={filteredListIssues}
+        scope={scope}
+        searchPlaceholder={t("myIssues.search")}
+        sidebarClosed={!isSidebarOpen}
+        title={t("myIssues.title")}
+        view={view}
       />
     </MainContent>
   );
