@@ -340,13 +340,11 @@ export {
   listRunEvidenceImages,
   listAllRunEvidenceImages,
   listEvidenceImagesForEvidence,
-  createRunEvidenceImages,
   getRunEvidenceImage,
 } from "./run-evidence-repository";
 export type {
   RunEvidenceRow,
   RunEvidenceImageRow,
-  RunEvidenceImageInput,
 } from "./run-evidence-repository";
 
 export { listRunStageRevisions } from "./run-stage-revision-repository";

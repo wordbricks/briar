@@ -13,6 +13,12 @@ import {
 } from "./hunt-run-errors";
 import { getHuntRunForProject } from "./hunt-run-repository";
 import { scopedEvidenceKey } from "./run-identity";
+import {
+  consumeUploadStatements,
+  type ScopedUploadRow,
+  type UploadScope,
+  uploadAvailabilityGuard,
+} from "./upload-repository";
 
 export type RunEvidenceRow = {
   id: string;
@@ -30,7 +36,7 @@ export type RunEvidenceRow = {
   actor: string;
   observed_at: string;
   recorded_at: string;
-  image_upload_ids_json: string;
+  image_upload_ids_json?: string;
   github_association_started_at?: string | null;
 };
 
@@ -48,11 +54,6 @@ export type RunEvidenceImageRow = {
   created_at: string;
 };
 
-export type RunEvidenceImageInput = Omit<
-  RunEvidenceImageRow,
-  "project_id" | "run_id" | "evidence_id" | "created_at"
->;
-
 export async function recordRunEvidence(
   db: D1Database,
   projectId: string,
@@ -69,6 +70,12 @@ export async function recordRunEvidence(
     actor: string;
     observedAt: string;
     imageUploadIds?: readonly string[];
+    requireExisting?: boolean;
+    imageUploads?: {
+      scope: UploadScope;
+      uploads: readonly ScopedUploadRow[];
+      consumedAt: string;
+    };
   },
   fence?: { claimTokenHash: string; authenticatedAt: string },
 ) {
@@ -360,7 +367,7 @@ export async function recordRunEvidence(
       existing.command === input.command &&
       existing.url === input.url &&
       existing.metadata_json === metadataJson &&
-      existing.image_upload_ids_json === imageUploadIdsJson &&
+      (existing.image_upload_ids_json ?? "[]") === imageUploadIdsJson &&
       existing.actor === input.actor &&
       existing.observed_at === input.observedAt;
     if (!same) throw new EventKeyConflictError();
@@ -370,6 +377,11 @@ export async function recordRunEvidence(
       existing.github_association_started_at ?? existing.recorded_at,
     );
     return existing;
+  }
+  if (input.requireExisting) {
+    throw new HuntTransitionError(
+      "Evidence image references are unavailable for this active claim",
+    );
   }
   const recordedAt = new Date().toISOString();
   const githubAssociationStartedAt = input.type === "pull_request" &&
@@ -395,8 +407,14 @@ export async function recordRunEvidence(
     image_upload_ids_json: imageUploadIdsJson,
     github_association_started_at: githubAssociationStartedAt,
   };
-  const inserted = await db
-    .prepare(
+  const uploadGuard = input.imageUploads
+    ? uploadAvailabilityGuard({
+        ...input.imageUploads.scope,
+        uploadIds: input.imageUploads.uploads.map((upload) => upload.upload_id),
+        observedAt: input.imageUploads.consumedAt,
+      })
+    : { sql: "", bindings: [] as unknown[] };
+  const insertEvidence = db.prepare(
       `insert into briar_run_evidence (
          id, project_id, run_id, attempt, revision, evidence_key, workflow_stage,
          evidence_type, status, detail, command, url, metadata_json,
@@ -407,7 +425,8 @@ export async function recordRunEvidence(
               run.current_revision, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
        from briar_hunt_runs run
        where run.id = ? and run.project_id = ?
-         ${runFenceSql}`,
+         ${runFenceSql}
+         ${uploadGuard.sql}`,
     )
     .bind(
       evidence.id,
@@ -427,8 +446,19 @@ export async function recordRunEvidence(
       run.id,
       projectId,
       ...runFenceBindings(evidence.recorded_at),
-    )
-    .run();
+      ...uploadGuard.bindings,
+    );
+  const uploadStatements = input.imageUploads
+    ? runEvidenceUploadStatements(db, {
+        projectId,
+        runId: evidence.run_id,
+        evidenceId: evidence.id,
+        scope: input.imageUploads.scope,
+        uploads: input.imageUploads.uploads,
+        consumedAt: input.imageUploads.consumedAt,
+      })
+    : [];
+  const [inserted] = await db.batch([insertEvidence, ...uploadStatements]);
   if ((inserted.meta.changes ?? 0) === 0) {
     throw new HuntTransitionError(
       "Run claim or revision changed while recording evidence",
@@ -534,48 +564,49 @@ export async function listEvidenceImagesForEvidence(
   return result.results ?? [];
 }
 
-export async function createRunEvidenceImages(
+const uploadDigestHex = (value: ArrayBuffer) => [...new Uint8Array(value)]
+  .map((byte) => byte.toString(16).padStart(2, "0"))
+  .join("");
+
+function runEvidenceUploadStatements(
   db: D1Database,
-  projectId: string,
-  runId: string,
-  evidenceId: string,
-  images: RunEvidenceImageInput[],
+  input: {
+    projectId: string;
+    runId: string;
+    evidenceId: string;
+    scope: UploadScope;
+    uploads: readonly ScopedUploadRow[];
+    consumedAt: string;
+  },
 ) {
-  const evidence = await db
-    .prepare(
-      `select id from briar_run_evidence
-       where id = ? and project_id = ? and run_id = ?`,
-    )
-    .bind(evidenceId, projectId, runId)
-    .first<{ id: string }>();
-  if (!evidence) return null;
-  if (images.length === 0) return [];
-  const createdAt = new Date().toISOString();
-  await db.batch(
-    images.map((image) =>
-      db
-        .prepare(
-          `insert into briar_run_evidence_images (
-             id, project_id, run_id, evidence_id, object_key, filename,
-             content_type, byte_size, sha256, position, created_at
-           ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          image.id,
-          projectId,
-          runId,
-          evidenceId,
-          image.object_key,
-          image.filename,
-          image.content_type,
-          image.byte_size,
-          image.sha256,
-          image.position,
-          createdAt,
-        ),
-    ),
-  );
-  return listEvidenceImagesForEvidence(db, projectId, runId, evidenceId);
+  const imageStatements = input.uploads.map((upload, position) => db.prepare(
+    `insert into briar_run_evidence_images (
+       id, project_id, run_id, evidence_id, object_key, filename,
+       content_type, byte_size, sha256, position, created_at
+     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    upload.upload_id,
+    input.projectId,
+    input.runId,
+    input.evidenceId,
+    upload.object_key,
+    upload.filename,
+    upload.content_type,
+    upload.byte_size,
+    uploadDigestHex(upload.sha256),
+    position,
+    input.consumedAt,
+  ));
+  return [
+    ...imageStatements,
+    ...consumeUploadStatements(db, {
+      ...input.scope,
+      uploadIds: input.uploads.map((upload) => upload.upload_id),
+      consumerKind: "run_evidence",
+      consumerId: input.evidenceId,
+      consumedAt: input.consumedAt,
+    }),
+  ];
 }
 
 export async function getRunEvidenceImage(

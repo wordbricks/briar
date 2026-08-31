@@ -934,7 +934,7 @@ async function prepareReplyAttachmentUploadsRpc(
     replayed: prepared.replayed,
     uploads: prepared.uploads.map((upload) => ({
       clientId: upload.clientId,
-      reference: { attachmentId: upload.attachmentId },
+      reference: { uploadId: upload.attachmentId },
       uploadUrl: new URL(
         `/uploads/${encodeURIComponent(upload.attachmentId)}`,
         input.request.url,

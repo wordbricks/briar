@@ -239,6 +239,22 @@ async function activeIssueClaim(
   return { run, claimTokenHash };
 }
 
+export async function authorizeActiveIssueClaim(
+  input: {
+    readonly db: D1Database;
+    readonly projectId: string;
+    readonly principal: WorkerRunExecutionPrincipal;
+    readonly work: IssueWorkIdentity;
+    readonly authenticatedAt: string;
+  },
+  overrides: Partial<WorkerRunExecutionApplicationServices> = {},
+) {
+  return activeIssueClaim(input, {
+    ...workerRunExecutionApplicationServices,
+    ...overrides,
+  });
+}
+
 export async function recordWorkerRunEventApplication(
   input: {
     readonly db: D1Database;

@@ -354,7 +354,7 @@ describe("WorkerQueueService lifecycle semantics", () => {
       uploads: [{
         clientId: "artifact",
         reference: {
-          attachmentId: "77777777-7777-4777-8777-777777777777",
+          uploadId: "77777777-7777-4777-8777-777777777777",
         },
         uploadUrl:
           "https://briar.example/uploads/77777777-7777-4777-8777-777777777777",

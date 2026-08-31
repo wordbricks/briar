@@ -104,7 +104,7 @@ const issueSuccess = (
 ) => {
   const base = {
     body: result.reply,
-    attachments: attachmentIds.map((attachmentId) => ({ attachmentId })),
+    attachments: attachmentIds.map((uploadId) => ({ uploadId })),
   };
   if (result.proposedAction) {
     switch (result.proposedAction.type) {
@@ -204,7 +204,7 @@ const channelSuccess = (
   const base = {
     body: result.body,
     conversationId: conversationId ?? undefined,
-    attachments: attachmentIds.map((attachmentId) => ({ attachmentId })),
+    attachments: attachmentIds.map((uploadId) => ({ uploadId })),
   };
   const artifactProposalCount = [
     result.issueProposal,
@@ -359,7 +359,7 @@ export function createReplyCompletionClient(
       apiUrl,
       files,
       uploads: prepared.uploads,
-      uploadId: (upload) => upload.reference?.attachmentId,
+      uploadId: (upload) => upload.reference?.uploadId,
       fetch,
       signal: input.signal,
     });

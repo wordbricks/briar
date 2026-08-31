@@ -22,7 +22,6 @@ import {
   requireAgentProject,
   requireWorkerProjectBinding,
 } from "./worker-route-auth";
-import { handleRunAgentRoute } from "./run-agent-routes";
 import { handleRunEvidenceRoute } from "./run-evidence-routes";
 import { handleGithubPublicRoute } from "./github-integration-routes";
 import {
@@ -40,7 +39,6 @@ import {
 import { handleScheduledTask } from "./scheduled-task";
 import { handleSlackAppPublicRoute } from "./slack-app-routes";
 import { handleSlackEventPublicRoute } from "./slack-event-routes";
-import { sha256 } from "./crypto-digest";
 import {
   corsHeaders,
   HttpError,
@@ -83,31 +81,6 @@ async function requireRunExecutionProject(
     throw new HttpError(403, "Run is not assigned to this worker");
   }
   return run.project_id;
-}
-
-async function requireActiveWorkerRunClaim(
-  db: D1Database,
-  request: Request,
-  runId: string,
-) {
-  const projectId = await requireRunExecutionProject(db, request, runId);
-  const claimToken = request.headers.get("x-briar-claim-token");
-  if (!claimToken?.startsWith("briar_claim_")) {
-    throw new HttpError(409, "Active claim token is required");
-  }
-  const claimTokenHash = await sha256(claimToken);
-  const authenticatedAt = new Date().toISOString();
-  const active = await db
-    .prepare(
-      `select id from briar_hunt_runs
-       where id = ? and project_id = ? and claim_token_hash = ?
-         and lease_expires_at > ?
-         and status not in ('completed', 'cancelled', 'blocked', 'failed')`,
-    )
-    .bind(runId, projectId, claimTokenHash, authenticatedAt)
-    .first<{ id: string }>();
-  if (!active) throw new HttpError(409, "Issue processing claim token is no longer active");
-  return { projectId, claimTokenHash, authenticatedAt };
 }
 
 async function requireProjectAccess(
@@ -236,16 +209,6 @@ async function route(
   if (channelReplyResultResponse !== undefined) {
     return channelReplyResultResponse;
   }
-
-  const runAgentResponse = await handleRunAgentRoute({
-    request,
-    url,
-    db,
-    attachmentsBucket,
-    requireActiveWorkerRunClaim: (runId) =>
-      requireActiveWorkerRunClaim(db, request, runId),
-  });
-  if (runAgentResponse !== undefined) return runAgentResponse;
 
   throw new HttpError(404, "Not found");
 }

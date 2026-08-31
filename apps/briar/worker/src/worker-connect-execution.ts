@@ -1,8 +1,10 @@
 import { create } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   AppendTranscriptEventsResponseSchema,
   ClaimIssueResponseSchema,
   ListProjectChannelMessagesResponseSchema,
+  PrepareRunEvidenceImageUploadsResponseSchema,
   RecordRunEventResponseSchema,
   ReportIssueExecutionTelemetryResponseSchema,
   TransitionWorkflowStageResponse_Outcome,
@@ -10,6 +12,10 @@ import {
   WorkerExecutionService,
   WorkflowStageLifecycleCheckpointSchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import {
+  PreparedUploadSchema,
+  UploadReferenceSchema,
+} from "@briar/contracts/gen/briar/types/v1/upload_pb";
 import { WorkflowCheckpoint_Position } from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import {
   Code,
@@ -31,7 +37,20 @@ import {
 import { HttpError } from "./http-response";
 import { claimNextQueueWork } from "./queue-claim-routes";
 import { decodeRequestSync } from "./request-schema";
-import { runEvidenceResponseMessage } from "./run-evidence-connect";
+import {
+  recordRunEvidenceResponseMessage,
+  runEvidenceResponseMessage,
+} from "./run-evidence-connect";
+import { evidenceImageJson } from "./run-evidence-json";
+import {
+  prepareRunEvidenceImageUploadsApplication,
+  recordRunEvidenceApplication,
+} from "./run-evidence-application";
+import {
+  prepareRunEvidenceImageUploadsApplicationRequest,
+  recordRunEvidenceApplicationRequest,
+  runEvidenceImageUploadIds,
+} from "./run-evidence-request-mapper";
 import { listRunEvidenceForProject } from "./run-evidence-routes";
 import {
   listProjectAgentChannelMessagesApplication,
@@ -72,6 +91,7 @@ import {
   resumeRunApplication,
 } from "./run-control-application";
 import {
+  issueWorkIdentity,
   workerRunEvent,
   workerRunStatusMessage,
   workflowStageTransition,
@@ -137,6 +157,9 @@ export type WorkerExecutionServices = {
   readonly reportTelemetry: typeof reportIssueExecutionTelemetryApplication;
   readonly requireAgentProject: typeof requireAgentProject;
   readonly recordRunEvent: typeof recordWorkerRunEventApplication;
+  readonly prepareRunEvidenceImages:
+    typeof prepareRunEvidenceImageUploadsApplication;
+  readonly recordRunEvidence: typeof recordRunEvidenceApplication;
   readonly transitionWorkflowStage:
     typeof transitionWorkerWorkflowStageApplication;
   readonly recoverRun: typeof recoverRunApplication;
@@ -154,6 +177,8 @@ const workerExecutionServices: WorkerExecutionServices = {
   reportTelemetry: reportIssueExecutionTelemetryApplication,
   requireAgentProject,
   recordRunEvent: recordWorkerRunEventApplication,
+  prepareRunEvidenceImages: prepareRunEvidenceImageUploadsApplication,
+  recordRunEvidence: recordRunEvidenceApplication,
   transitionWorkflowStage: transitionWorkerWorkflowStageApplication,
   recoverRun: recoverRunApplication,
   resumeRun: resumeRunApplication,
@@ -459,6 +484,73 @@ export function createWorkerExecutionService(
         runId: result.runId,
         status: workerRunStatusMessage(result.status),
         workflowStage: result.workflowStage ?? undefined,
+      });
+    },
+    prepareRunEvidenceImageUploads: async (request, context) => {
+      context.responseHeader.set("Cache-Control", "private, no-store");
+      const mapped = prepareRunEvidenceImageUploadsApplicationRequest(request);
+      const authorization = await services.authorizeIssueClaim({
+        db: input.db,
+        request: input.request,
+        projectId: mapped.projectId,
+      });
+      if (authorization.projectId !== mapped.projectId) {
+        throw new HttpError(404, "Project not found");
+      }
+      const result = await services.prepareRunEvidenceImages({
+        db: input.db,
+        env: input.env,
+        context: input.context,
+        projectId: mapped.projectId,
+        principal: executionPrincipal(authorization),
+        work: mapped.work,
+        requestId: mapped.requestId,
+        images: mapped.images,
+      });
+      return create(PrepareRunEvidenceImageUploadsResponseSchema, {
+        replayed: result.replayed,
+        uploads: result.uploads.map((upload) => create(PreparedUploadSchema, {
+          clientId: upload.clientId,
+          reference: create(UploadReferenceSchema, {
+            uploadId: upload.uploadId,
+          }),
+          uploadUrl: new URL(
+            `/uploads/${encodeURIComponent(upload.uploadId)}`,
+            input.request.url,
+          ).toString(),
+          uploadCapability: upload.uploadCapability,
+          expiresAt: timestampFromDate(new Date(upload.expiresAt)),
+        })),
+      });
+    },
+    recordRunEvidence: async (request) => {
+      const projectId = canonicalUuid(request.projectId).toLowerCase();
+      const authorization = await services.authorizeIssueClaim({
+        db: input.db,
+        request: input.request,
+        projectId,
+      });
+      if (authorization.projectId !== projectId) {
+        throw new HttpError(404, "Project not found");
+      }
+      const work = issueWorkIdentity(request.work);
+      const result = await services.recordRunEvidence({
+        db: input.db,
+        projectId,
+        principal: executionPrincipal(authorization),
+        work,
+        evidence: recordRunEvidenceApplicationRequest(request),
+        imageUploadIds: runEvidenceImageUploadIds(request),
+      });
+      scheduleRunMutation(input, projectId);
+      return recordRunEvidenceResponseMessage({
+        runId: result.evidence.run_id,
+        attempt: result.evidence.attempt,
+        evidenceKey: result.evidence.evidence_key,
+        stage: result.evidence.workflow_stage,
+        type: result.evidence.evidence_type,
+        status: result.evidence.status,
+        images: result.images.map(evidenceImageJson),
       });
     },
     transitionWorkflowStage: async (request) => {

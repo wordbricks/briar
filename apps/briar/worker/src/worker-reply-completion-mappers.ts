@@ -273,10 +273,10 @@ const channelIssueDraft = (draft: ReplyIssueDraft | undefined) => {
 };
 
 const attachmentReferences = (
-  values: readonly { attachmentId: string }[],
+  values: readonly { uploadId: string }[],
 ) => {
   const references = values.map((value) => mapping(
-    () => canonicalUuid(value.attachmentId).toLowerCase(),
+    () => canonicalUuid(value.uploadId).toLowerCase(),
     "Attachment reference is invalid",
   ));
   if (new Set(references).size !== references.length) {

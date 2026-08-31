@@ -1,4 +1,5 @@
 import { create } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { type HandlerContext } from "@connectrpc/connect";
 import {
   RetryRunResponse_Outcome,
@@ -9,6 +10,10 @@ import {
 import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   ClaimIssueRequestSchema,
+  IssueClaimIdentitySchema,
+  PrepareRunEvidenceImageUploadsRequestSchema,
+  RecordRunEvidenceRequestSchema,
+  WorkClaimIdentitySchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { describe, expect, it, vi } from "vitest";
 import { HttpError } from "./http-response";
@@ -209,6 +214,131 @@ describe("WorkerExecutionService execution credential boundary", () => {
       metadata: { suite: "worker" },
       images: [{ byteSize: 2_048n }],
       canonical: true,
+    });
+  });
+
+  it("uses generated prepare and record messages for evidence images", async () => {
+    const uploadId = "44444444-4444-4444-8444-444444444444";
+    const claimToken = `briar_claim_${"c".repeat(64)}`;
+    const work = create(WorkClaimIdentitySchema, {
+      workId: runId,
+      runId,
+      claimToken,
+      work: { case: "issue", value: create(IssueClaimIdentitySchema) },
+    });
+    const prepare = vi.fn<WorkerExecutionServices["prepareRunEvidenceImages"]>();
+    prepare.mockResolvedValue({
+      replayed: false,
+      uploads: [{
+        clientId: "image-0",
+        uploadId,
+        uploadCapability: "signed-capability",
+        expiresAt: "2026-08-31T01:10:00.000Z",
+      }],
+    });
+    const record = vi.fn<WorkerExecutionServices["recordRunEvidence"]>();
+    record.mockResolvedValue({
+      evidence: {
+        id: "55555555-5555-4555-8555-555555555555",
+        run_id: runId,
+        attempt: 2,
+        revision: 3,
+        evidence_key: "verification:screenshot",
+        workflow_stage: "verification",
+        evidence_type: "screenshot",
+        status: "passed",
+        detail: null,
+        command: null,
+        url: null,
+        metadata_json: null,
+        actor: "briar-worker",
+        observed_at: "2026-08-31T01:02:03.000Z",
+        recorded_at: "2026-08-31T01:02:04.000Z",
+      },
+      images: [{
+        id: uploadId,
+        project_id: projectId,
+        run_id: runId,
+        evidence_id: "55555555-5555-4555-8555-555555555555",
+        object_key: "uploads/run_evidence/object",
+        filename: "result.png",
+        content_type: "image/png",
+        byte_size: 4,
+        sha256: "a".repeat(64),
+        position: 0,
+        created_at: "2026-08-31T01:02:04.000Z",
+      }],
+    });
+    const service = createWorkerExecutionService({
+      request: new Request("https://briar.example/connect", {
+        headers: { authorization: "Bearer briar_agent_test" },
+      }),
+      db,
+      env,
+      archivesBucket,
+      requireRunExecutionProject: vi.fn(),
+    }, {
+      authorizeIssueClaim: vi.fn(async () => ({ projectId })),
+      prepareRunEvidenceImages: prepare,
+      recordRunEvidence: record,
+    });
+    const prepareContext = {
+      responseHeader: new Headers(),
+    } as HandlerContext;
+    const prepared = await service.prepareRunEvidenceImageUploads(create(
+      PrepareRunEvidenceImageUploadsRequestSchema,
+      {
+        requestId: "66666666-6666-4666-8666-666666666666",
+        projectId,
+        work,
+        images: [{
+          clientId: "image-0",
+          filename: "result.png",
+          contentType: "image/png",
+          byteSize: 4n,
+          sha256: new Uint8Array(32).fill(1),
+        }],
+      },
+    ), prepareContext);
+
+    expect(prepareContext.responseHeader.get("cache-control")).toBe(
+      "private, no-store",
+    );
+    expect(prepared.uploads[0]).toMatchObject({
+      reference: { uploadId },
+      uploadUrl: `https://briar.example/uploads/${uploadId}`,
+    });
+    expect(prepare).toHaveBeenCalledWith(expect.objectContaining({
+      projectId,
+      principal: { kind: "agent" },
+      work: { workId: runId, runId, claimToken },
+      images: [expect.objectContaining({ filename: "result.png" })],
+    }));
+
+    const response = await service.recordRunEvidence(create(
+      RecordRunEvidenceRequestSchema,
+      {
+        projectId,
+        work,
+        evidenceKey: "verification:screenshot",
+        stage: "verification",
+        type: "screenshot",
+        status: RunEvidence_Status.PASSED,
+        observedAt: timestampFromDate(new Date("2026-08-31T01:02:03.000Z")),
+        actor: "briar-worker",
+        images: [{ uploadId }],
+      },
+    ), context);
+
+    expect(record).toHaveBeenCalledWith(expect.objectContaining({
+      projectId,
+      imageUploadIds: [uploadId],
+      work: { workId: runId, runId, claimToken },
+    }));
+    expect(response).toMatchObject({
+      runId,
+      status: RunEvidence_Status.PASSED,
+      images: [{ id: uploadId, byteSize: 4n }],
     });
   });
 

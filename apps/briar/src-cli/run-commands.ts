@@ -6,7 +6,6 @@ import {
 import {
   create,
   type JsonObject,
-  toBinary,
   toJsonString,
 } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
@@ -51,7 +50,6 @@ import {
   loadConfig,
   saveConfig,
   request,
-  requestProtobuf,
   login,
   gitValue,
   currentRepositoryPath,
@@ -68,6 +66,7 @@ import {
 } from "./run-event-proto";
 import { createAuthenticatedConnectClient } from "./connect-client";
 import { decodeRunStructuredResult } from "./run-structured-result";
+import { uploadPreparedFiles } from "./upload-client";
 
 async function optionalText(valueFlag: string, fileFlag: string) {
   const path = value(fileFlag);
@@ -366,6 +365,7 @@ async function addRunEvidence() {
   const project = await currentProject(config);
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
+  const work = activeIssueWork(project, runId);
   const metadataValue = value("--metadata-json");
   const status = runEvidenceStatus(required("--status"));
   const type = required("--type").trim();
@@ -393,65 +393,73 @@ async function addRunEvidence() {
       };
     }
   }
-  const evidence = create(RecordRunEvidenceRequestSchema, {
-    projectId: project.id,
-    runId,
-    evidenceKey: required("--key"),
-    stage: required("--stage"),
-    type,
-    status,
-    observedAt: evidenceTimestamp(
-      value("--observed-at") ?? new Date().toISOString(),
-    ),
-    actor: value("--actor") ?? "briar-workflow",
-    detail: (await optionalText("--detail", "--detail-file")) ?? undefined,
-    command: value("--command"),
-    url,
-    metadata,
-  });
+  const executionRpc = createAuthenticatedWorkerExecutionClient(
+    config.apiUrl,
+    executionToken(project),
+  );
   const imagePaths = values("--image").map((path) => resolve(path));
   const images = await Promise.all(
-    imagePaths.map(async (path) => {
+    imagePaths.map(async (path, index) => {
       const image = Bun.file(path);
       if (!(await image.exists())) {
         throw new Error(`Evidence image does not exist: ${path}`);
       }
-      return { image, name: basename(path) };
+      const name = basename(path);
+      return {
+        clientId: `image-${index}`,
+        file: new File([image], name, { type: image.type }),
+      };
     }),
   );
   const imageError = validateEvidenceImages(
-    images.map(({ image, name }) => ({
-      name,
-      size: image.size,
-      type: image.type,
+    images.map(({ file }) => ({
+      name: file.name,
+      size: file.size,
+      type: file.type,
     })),
   );
   if (imageError) throw new Error(imageError);
-  const body = new FormData();
-  body.set(
-    "request",
-    new Blob([toBinary(RecordRunEvidenceRequestSchema, evidence)], {
-      type: "application/protobuf",
-    }),
-    "request.pb",
-  );
-  for (const { image, name } of images) {
-    body.append("images", image, name);
-  }
-  const result = await requestProtobuf(
-    config.apiUrl,
-    `/runs/${runId}/evidence`,
-    executionToken(project),
-    RecordRunEvidenceResponseSchema,
+  const uploadIds = images.length === 0
+    ? []
+    : await executionRpc.prepareRunEvidenceImageUploads({
+        requestId: crypto.randomUUID(),
+        projectId: project.id,
+        work,
+        images: await Promise.all(images.map(async ({ clientId, file }) => ({
+          clientId,
+          filename: file.name,
+          contentType: file.type,
+          byteSize: BigInt(file.size),
+          sha256: new Uint8Array(
+            await crypto.subtle.digest("SHA-256", await file.arrayBuffer()),
+          ),
+        }))),
+      }).then((prepared) => uploadPreparedFiles({
+        apiUrl: config.apiUrl,
+        files: images,
+        uploads: prepared.uploads,
+        uploadId: (upload) => upload.reference?.uploadId,
+      }));
+  const result = await executionRpc.recordRunEvidence(create(
+    RecordRunEvidenceRequestSchema,
     {
-      method: "POST",
-      body,
-      headers:
-        project.activeClaim?.runId === runId && project.activeClaim.token
-          ? { "X-Briar-Claim-Token": project.activeClaim.token }
-          : undefined,
+      projectId: project.id,
+      work,
+      evidenceKey: required("--key"),
+      stage: required("--stage"),
+      type,
+      status,
+      observedAt: evidenceTimestamp(
+        value("--observed-at") ?? new Date().toISOString(),
+      ),
+      actor: value("--actor") ?? "briar-workflow",
+      detail: (await optionalText("--detail", "--detail-file")) ?? undefined,
+      command: value("--command"),
+      url,
+      metadata,
+      images: uploadIds.map((uploadId) => ({ uploadId })),
     },
-  );
+  ));
   console.log(toJsonString(RecordRunEvidenceResponseSchema, result));
 }
 

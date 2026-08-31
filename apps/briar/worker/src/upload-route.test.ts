@@ -13,7 +13,7 @@ describe("raw upload capability boundary", () => {
     });
     const upload = vi.fn(async () => {
       calls.push("store");
-      return { objectKey: "uploads/object" };
+      return { objectKey: "uploads/object", replayed: false };
     });
     const body = new TextEncoder().encode("verified bytes");
     const response = await handleUploadRoute({

@@ -42,7 +42,7 @@ describe("generated reply completion client", () => {
         replayed: true,
         uploads: [{
           clientId: "attachment-1",
-          reference: { attachmentId },
+          reference: { uploadId: attachmentId },
           uploadUrl: `http://127.0.0.1:8787/uploads/${attachmentId}`,
           uploadCapability: "opaque-capability",
           expiresAt: timestampFromDate(new Date("2026-08-31T10:00:00.000Z")),
@@ -134,7 +134,7 @@ describe("generated reply completion client", () => {
     expect(completeIssue.mock.calls[0]![0].outcome).toMatchObject({
       case: "success",
       value: {
-        attachments: [{ attachmentId }],
+        attachments: [{ uploadId: attachmentId }],
         action: { case: "create" },
       },
     });
