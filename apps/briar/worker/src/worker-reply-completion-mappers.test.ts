@@ -3,16 +3,19 @@ import {
   fromBinary,
   toBinary,
 } from "@bufbuild/protobuf";
-import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   ChannelReplyClaimIdentitySchema,
   ChannelReplyArtifactsActionSchema,
+  ChannelReplyIssueBatchActionSchema,
+  ChannelReplyIssueBatchDependencySchema,
+  ChannelReplyIssueBatchItemSchema,
   ChannelReplySuccessSchema,
   type CompleteIssueReplyRequest,
   CompleteChannelReplyRequestSchema,
   CompleteIssueReplyRequestSchema,
   IssueReplyClaimIdentitySchema,
   IssueReplySuccessSchema,
+  ReplyIssueDraftSchema,
   WorkClaimIdentitySchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { describe, expect, it } from "vitest";
@@ -103,16 +106,16 @@ describe("reply completion protobuf mapping", () => {
               value: {
                 proposal: {
                   case: "issueBatch",
-                  value: {
-                    items: [{
+                  value: create(ChannelReplyIssueBatchActionSchema, {
+                    items: [create(ChannelReplyIssueBatchItemSchema, {
                       key: "only",
-                      issue: { title: "Only", status: RunStatus.BACKLOG },
-                    }],
-                    dependencies: [{
+                      issue: create(ReplyIssueDraftSchema, { title: "Only" }),
+                    })],
+                    dependencies: [create(ChannelReplyIssueBatchDependencySchema, {
                       prerequisiteKey: "only",
                       dependentKey: "only",
-                    }],
-                  },
+                    })],
+                  }),
                 },
               },
             },

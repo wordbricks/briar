@@ -484,22 +484,15 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
                 let title: String
                 let description: String?
                 let priority: Int?
-                let status: IssueStatus
 
                 init(
                     title: String,
                     description: String?,
-                    priority: Int?,
-                    status: IssueStatus
+                    priority: Int?
                 ) {
                     self.title = title
                     self.description = description
                     self.priority = priority
-                    self.status = status
-                }
-
-                enum IssueStatus: String, Codable, Hashable, Sendable {
-                    case backlog
                 }
             }
         }

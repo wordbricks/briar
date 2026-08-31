@@ -181,7 +181,6 @@ const IssueCreateProposalPayloadFields = {
       Schema.Trim.check(Schema.isMaxLength(100_000)),
     ),
     priority: Schema.NullOr(integerBetween(1, 4)),
-    status: Schema.Literals(["backlog", "queued"]),
   })),
 } as const;
 

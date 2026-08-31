@@ -686,7 +686,6 @@ struct IssueProposedAction: Equatable, Identifiable, Sendable {
         let title: String
         let description: String?
         let priority: Int?
-        let status: String
     }
 
     enum Status: String, Codable, Sendable {

@@ -21,7 +21,6 @@ import {
   MessageBlockSchema,
   ProposalStatus,
   RichTextElement_List_Style,
-  RunStatus,
 } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   IssueExecutionProposalSchema,
@@ -164,7 +163,6 @@ describe("Channel Connect DTO mapping", () => {
               issue: {
                 title: "Ship API",
                 priority: 1,
-                status: RunStatus.BACKLOG,
               },
             }],
             dependencies: [{
@@ -242,7 +240,6 @@ describe("Channel Connect DTO mapping", () => {
               issue: {
                 description: null,
                 priority: 1,
-                status: "backlog",
               },
             }],
             dependencies: [{

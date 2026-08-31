@@ -1,7 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { EmptySchema, timestampDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
-import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   ChannelReplySuccessSchema,
   CompleteChannelReplyRequestSchema,
@@ -95,9 +94,6 @@ const requiredTimestamp = (
   return date.toISOString();
 };
 
-const issueStatus = (value: "backlog" | "queued") =>
-  value === "backlog" ? RunStatus.BACKLOG : RunStatus.QUEUED;
-
 const issueSuccess = (
   result: DetachedIssueReplyResult,
   attachmentIds: readonly string[],
@@ -173,7 +169,6 @@ const issueSuccess = (
                 title: result.proposedAction.issue.title,
                 description: result.proposedAction.issue.description ?? undefined,
                 priority: result.proposedAction.issue.priority ?? undefined,
-                status: issueStatus(result.proposedAction.issue.status),
               },
               executeAfterCreate: result.proposedAction.executeAfterCreate,
             },
@@ -253,7 +248,6 @@ const channelSuccess = (
               title: result.issueProposal.issue.title,
               description: result.issueProposal.issue.description ?? undefined,
               priority: result.issueProposal.issue.priority ?? undefined,
-              status: RunStatus.BACKLOG,
             },
             executeAfterCreate: result.issueProposal.executeAfterCreate,
           },
@@ -269,7 +263,6 @@ const channelSuccess = (
                   title: item.issue.title,
                   description: item.issue.description ?? undefined,
                   priority: item.issue.priority ?? undefined,
-                  status: RunStatus.BACKLOG,
                 },
               })),
               dependencies: result.issueBatchProposal.batch.dependencies,

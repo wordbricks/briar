@@ -1,4 +1,3 @@
-import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import type {
   CompleteChannelReplyRequest,
   CompleteIssueReplyRequest,
@@ -241,34 +240,12 @@ export function prepareReplyAttachmentUploadsInputFromProto(
   };
 }
 
-const issueStatus = (status: RunStatus, channel: boolean) => {
-  if (status === RunStatus.BACKLOG) return "backlog" as const;
-  if (!channel && status === RunStatus.QUEUED) return "queued" as const;
-  throw new ReplyCompletionMappingError(
-    channel
-      ? "Channel reply issue status must be backlog"
-      : "Issue reply issue status must be backlog or queued",
-  );
-};
-
-const issueDraft = (draft: ReplyIssueDraft | undefined) => {
+const proposalIssueDraft = (draft: ReplyIssueDraft | undefined) => {
   if (!draft) throw new ReplyCompletionMappingError("Issue draft is required");
   return {
     title: draft.title,
     description: draft.description ?? null,
     priority: draft.priority ?? null,
-    status: issueStatus(draft.status, false),
-  };
-};
-
-const channelIssueDraft = (draft: ReplyIssueDraft | undefined) => {
-  if (!draft) throw new ReplyCompletionMappingError("Issue draft is required");
-  issueStatus(draft.status, true);
-  return {
-    title: draft.title,
-    description: draft.description ?? null,
-    priority: draft.priority ?? null,
-    status: "backlog" as const,
   };
 };
 
@@ -358,7 +335,7 @@ export function completeIssueReplyInputFromProto(
     case "create":
       proposedAction = {
         type: "request_issue_create",
-        issue: issueDraft(success.action.value.issue),
+        issue: proposalIssueDraft(success.action.value.issue),
         executeAfterCreate: success.action.value.executeAfterCreate,
       };
       break;
@@ -452,7 +429,7 @@ export function completeChannelReplyInputFromProto(
         case "issue":
           issueProposal = {
             projectId: artifacts.proposal.value.projectId ?? null,
-            issue: channelIssueDraft(artifacts.proposal.value.issue),
+            issue: proposalIssueDraft(artifacts.proposal.value.issue),
             executeAfterCreate: artifacts.proposal.value.executeAfterCreate,
           };
           break;
@@ -462,7 +439,7 @@ export function completeChannelReplyInputFromProto(
             batch: {
               items: artifacts.proposal.value.items.map((item) => ({
                 key: item.key,
-                issue: channelIssueDraft(item.issue),
+                issue: proposalIssueDraft(item.issue),
               })),
               dependencies: artifacts.proposal.value.dependencies.map(
                 (dependency) => ({

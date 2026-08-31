@@ -186,7 +186,6 @@ export type IssueCreateProposal = {
     title: string;
     description: string | null;
     priority: number | null;
-    status: "backlog" | "queued";
   };
   executeAfterCreate?: boolean;
   status: "pending" | "accepted";

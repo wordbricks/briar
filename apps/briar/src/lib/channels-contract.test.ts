@@ -335,35 +335,11 @@ describe("channel reply completion contract", () => {
     expect(expanded).toBe(false);
   });
 
-  it("only lets new issue proposals request backlog creation", () => {
-    const issueProposal = {
-      projectId,
-      issue: {
-        title: "Safe proposal",
-        description: null,
-        priority: null,
-        status: "backlog",
-      },
-    };
-    const proposal = completion("Create this after approval.", {
-      issueProposal,
-    });
-    expect(accepts(channelReplyCompletionSchema, proposal)).toBe(true);
-    expect(accepts(channelReplyCompletionSchema, {
-      ...proposal,
-      issueProposal: {
-        ...issueProposal,
-        issue: { ...issueProposal.issue, status: "queued" },
-      },
-    })).toBe(false);
-  });
-
   it("accepts bounded acyclic issue batches and rejects invalid graphs", () => {
     const issue = (title: string) => ({
       title,
       description: null,
       priority: 2,
-      status: "backlog" as const,
     });
     const batch = {
       items: [

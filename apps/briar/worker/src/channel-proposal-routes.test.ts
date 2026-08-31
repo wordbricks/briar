@@ -487,7 +487,6 @@ describe("channel issue proposal approval route", () => {
           title: `Approved issue ${sequence}`,
           description: "Create it, but do not execute it.",
           priority: 2,
-          status: "backlog",
         },
       }),
       options.executeAfterCreate ? 1 : 0,
@@ -593,7 +592,6 @@ describe("channel issue proposal approval route", () => {
           title: `Conversation-approved issue ${sequence}`,
           description: "Create only; execution needs a separate approval.",
           priority: 2,
-          status: "backlog",
         },
       }),
       createdAt: now,
@@ -693,7 +691,6 @@ describe("channel issue proposal approval route", () => {
               title: "Batch API",
               description: "Build the API boundary.",
               priority: 1,
-              status: "backlog",
             },
           },
           {
@@ -702,7 +699,6 @@ describe("channel issue proposal approval route", () => {
               title: "Batch web",
               description: "Build the web client.",
               priority: 2,
-              status: "backlog",
             },
           },
           {
@@ -711,7 +707,6 @@ describe("channel issue proposal approval route", () => {
               title: "Batch QA",
               description: "Verify the integrated result.",
               priority: 3,
-              status: "backlog",
             },
           },
         ],
@@ -850,7 +845,6 @@ describe("channel issue proposal approval route", () => {
               title: "Rollback first",
               description: null,
               priority: 2,
-              status: "backlog",
             },
           },
           {
@@ -859,7 +853,6 @@ describe("channel issue proposal approval route", () => {
               title: "Rollback second",
               description: null,
               priority: 2,
-              status: "backlog",
             },
           },
         ],
@@ -909,7 +902,6 @@ describe("channel issue proposal approval route", () => {
           title: "Must not fall back to one issue",
           description: null,
           priority: 2,
-          status: "backlog",
         },
         batch: {
           items: [{
@@ -918,7 +910,6 @@ describe("channel issue proposal approval route", () => {
               title: "Invalid batch",
               description: null,
               priority: null,
-              status: "backlog",
             },
           }],
           dependencies: [

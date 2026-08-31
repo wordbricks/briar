@@ -115,7 +115,6 @@ describe("Channel domain to protobuf mapping", () => {
                 title: "Map the Worker",
                 description: null,
                 priority: 1,
-                status: "backlog",
               },
             }],
             dependencies: [],

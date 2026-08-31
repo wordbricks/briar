@@ -979,10 +979,6 @@ const issueCreateProposalFromMessage = (
   value: IssueCreateProposalMessage,
 ): IssueCreateProposal => {
   const issue = requiredMessage(value.issue, "issueCreateProposal.issue");
-  const status = runStatusFromProto(issue.status);
-  if (status !== "backlog" && status !== "queued") {
-    throw new Error(`Unknown proposed issue status: ${status}`);
-  }
   return {
     id: value.id,
     type: "request_issue_create",
@@ -990,7 +986,6 @@ const issueCreateProposalFromMessage = (
       title: issue.title,
       description: issue.description ?? null,
       priority: issue.priority ?? null,
-      status,
     },
     executeAfterCreate: value.executeAfterCreate,
     status: activeProposalStatusFromProto(value.status),

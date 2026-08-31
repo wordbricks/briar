@@ -44,7 +44,6 @@ import {
   RichTextInlineSchema,
   RichTextSectionSchema,
   RichTextStyleSchema,
-  RunStatus,
 } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   AcceptChannelExecutionProposalResponseSchema,
@@ -143,17 +142,6 @@ const proposalStatus = {
   pending: ProposalStatus.PENDING,
   accepted: ProposalStatus.ACCEPTED,
   declined: ProposalStatus.DECLINED,
-} as const;
-
-const runStatus = {
-  backlog: RunStatus.BACKLOG,
-  queued: RunStatus.QUEUED,
-  running: RunStatus.RUNNING,
-  paused: RunStatus.PAUSED,
-  blocked: RunStatus.BLOCKED,
-  failed: RunStatus.FAILED,
-  completed: RunStatus.COMPLETED,
-  cancelled: RunStatus.CANCELLED,
 } as const;
 
 const replyJobStatus = {
@@ -666,7 +654,6 @@ const decodedProposalPayload = (proposal: ChannelMessageProposal) => {
               title: item.issue.title,
               description: item.issue.description ?? undefined,
               priority: item.issue.priority ?? undefined,
-              status: enumValue(runStatus, item.issue.status, "run status"),
             }),
           })
         ),
@@ -685,7 +672,6 @@ const decodedProposalPayload = (proposal: ChannelMessageProposal) => {
             title: payload.issue.title,
             description: payload.issue.description ?? undefined,
             priority: payload.issue.priority ?? undefined,
-            status: enumValue(runStatus, payload.issue.status, "run status"),
           }),
           executeAfterCreate: payload.executeAfterCreate,
         }),

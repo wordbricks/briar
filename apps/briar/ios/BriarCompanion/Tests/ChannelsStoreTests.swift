@@ -20,7 +20,6 @@ final class ChannelsStoreTests: XCTestCase {
         issue.title = "Ship native Connect"
         issue.description_p = "Use the generated descriptor contract."
         issue.priority = 1
-        issue.status = .backlog
 
         var item = BriarAPI_ChannelIssueBatchProposalItem()
         item.key = "ios"

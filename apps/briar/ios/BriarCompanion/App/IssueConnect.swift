@@ -252,8 +252,7 @@ extension IssueProposedAction {
                     : nil,
                 priority: message.issue.hasPriority
                     ? try issueSafeInt(message.issue.priority)
-                    : nil,
-                status: try issueRunStatus(message.issue.status).rawValue
+                    : nil
             ),
             status: try issueProposalStatus(message.status),
             acceptedAt: message.hasAcceptedAt ? try issueDate(message.acceptedAt) : nil,

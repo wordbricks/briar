@@ -996,13 +996,12 @@ describe("detached Agent runner", () => {
           title: "후속 QA",
           description: null,
           priority: 2,
-          status: "backlog",
         },
       },
     }))).toMatchObject({
       proposedAction: {
         type: "request_issue_create",
-        issue: { title: "후속 QA", status: "backlog" },
+        issue: { title: "후속 QA" },
       },
     });
   });
@@ -1061,6 +1060,18 @@ describe("detached Agent runner", () => {
     expect(() => parseDetachedIssueReplyResult(invalid)).toThrow(
       "Issue update priority is invalid",
     );
+    expect(() => parseDetachedIssueReplyResult(JSON.stringify({
+      reply: "구형 생성 payload입니다.",
+      proposedAction: {
+        type: "request_issue_create",
+        issue: {
+          title: "Obsolete status",
+          description: null,
+          priority: 2,
+          status: "backlog",
+        },
+      },
+    }))).toThrow("New issue proposal is incomplete");
   });
 
   it("parses standalone and create-then-execute approval intents", () => {
@@ -1084,7 +1095,6 @@ describe("detached Agent runner", () => {
           title: "승인 후 실행",
           description: null,
           priority: 2,
-          status: "backlog",
         },
       },
       executionProposal: null,

@@ -89,7 +89,6 @@ import {
   organizationMemberFromProto,
   requiredMessage,
   requiredTimestamp,
-  runStatusFromProto,
   safeNumber,
 } from "./mappers";
 
@@ -433,18 +432,11 @@ export const activeProposalStatusFromProto = (
   }
 };
 
-const proposedIssueFromMessage = (value: ChannelIssueProposalMessage) => {
-  const status = runStatusFromProto(value.status);
-  if (status !== "backlog" && status !== "queued") {
-    throw new Error(`Unknown channel issue proposal status: ${status}`);
-  }
-  return {
-    title: value.title,
-    description: value.description ?? null,
-    priority: value.priority ?? null,
-    status,
-  };
-};
+const proposedIssueFromMessage = (value: ChannelIssueProposalMessage) => ({
+  title: value.title,
+  description: value.description ?? null,
+  priority: value.priority ?? null,
+});
 
 const channelProposalFromMessage = (
   value: ChannelProposalMessage,

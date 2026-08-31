@@ -12,7 +12,6 @@ import {
   ChannelService,
   ChannelVisibility,
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
-import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import { describe, expect, it, vi } from "vitest";
 import type { BriarAuth } from "./auth";
 import { connectErrorInterceptor } from "./app-connect-errors";
@@ -120,7 +119,6 @@ describe("app Channel Connect adapter", () => {
               title: "Implement Connect",
               description: null,
               priority: 1,
-              status: "backlog",
             },
             executeAfterCreate: true,
           },
@@ -173,7 +171,7 @@ describe("app Channel Connect adapter", () => {
     expect(result.message?.proposal?.payload).toMatchObject({
       case: "issue",
       value: {
-        issue: { title: "Implement Connect", status: RunStatus.BACKLOG },
+        issue: { title: "Implement Connect" },
         executeAfterCreate: true,
       },
     });

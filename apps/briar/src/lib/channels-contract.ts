@@ -935,7 +935,6 @@ const channelReplyIssueInputSchema = strict(Schema.Struct({
     Schema.Trim.check(Schema.isMaxLength(100_000)),
   ),
   priority: Schema.NullOr(between(1, 4)),
-  status: Schema.Literal("backlog"),
 }));
 
 const channelReplyIssueProposalSchema = strict(Schema.Struct({
@@ -1126,7 +1125,6 @@ export const channelIssueProposalPayloadSchema = Schema.Struct({
       Schema.Trim.check(Schema.isMaxLength(100_000)),
     ),
     priority: Schema.NullOr(between(1, 4)),
-    status: Schema.Literal("backlog"),
   })),
   executeAfterCreate: defaulted(Schema.Boolean, false),
 });

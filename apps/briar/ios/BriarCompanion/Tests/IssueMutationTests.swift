@@ -213,7 +213,6 @@ final class IssueMutationTests: XCTestCase {
 
         var proposedIssue = BriarAPI_ProposedIssue()
         proposedIssue.title = "Generated from Agent"
-        proposedIssue.status = .backlog
 
         var create = BriarAPI_IssueCreateProposal()
         create.id = coreUUIDString(proposalID)

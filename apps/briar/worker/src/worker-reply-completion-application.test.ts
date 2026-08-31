@@ -1,10 +1,13 @@
 import { create } from "@bufbuild/protobuf";
-import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   ChannelReplyClaimIdentitySchema,
+  ChannelReplyArtifactsActionSchema,
+  ChannelReplyDocumentActionSchema,
+  ChannelReplyIssueActionSchema,
   CompleteChannelReplyRequestSchema,
   CompleteIssueReplyRequestSchema,
   IssueReplyClaimIdentitySchema,
+  ReplyIssueDraftSchema,
   WorkClaimIdentitySchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { createHash } from "node:crypto";
@@ -630,26 +633,25 @@ describe("reply completion application", () => {
             conversationId: "channel-conversation-1",
             action: {
               case: "artifacts",
-              value: {
-                document: {
+              value: create(ChannelReplyArtifactsActionSchema, {
+                document: create(ChannelReplyDocumentActionSchema, {
                   title: "Implementation plan",
                   markdown: "# Plan\n\nShip the generated contract.",
                   projectId,
-                },
+                }),
                 proposal: {
                   case: "issue",
-                  value: {
+                  value: create(ChannelReplyIssueActionSchema, {
                     projectId,
-                    issue: {
+                    issue: create(ReplyIssueDraftSchema, {
                       title: "Ship generated reply completion",
                       description: "Remove the remaining handwritten wire path.",
                       priority: 2,
-                      status: RunStatus.BACKLOG,
-                    },
+                    }),
                     executeAfterCreate: false,
-                  },
+                  }),
                 },
-              },
+              }),
             },
           },
         },

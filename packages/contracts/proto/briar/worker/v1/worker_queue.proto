@@ -372,12 +372,11 @@ message ReplyFailure {
 }
 
 message ReplyIssueDraft {
+  reserved 4;
+
   string title = 1;
   optional string description = 2;
   optional uint32 priority = 3;
-  // Issue replies accept backlog or queued; channel replies accept backlog
-  // only. Implementations reject unspecified, unknown, and out-of-scope values.
-  briar.app.v1.RunStatus status = 4;
 }
 
 message IssueReplyReworkAction {

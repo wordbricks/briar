@@ -1041,10 +1041,7 @@ describe("RunPage", () => {
         issue: {
           title: "후속 QA",
           description: "모바일 승인 흐름을 확인합니다.",
-          priority: 2,
-          // Older Agent replies can still carry queued. Approval semantics are
-          // nevertheless backlog-only and must be presented that way.
-          status: "queued"
+          priority: 2
         },
         status: "pending",
         acceptedAt: null,
@@ -1094,7 +1091,6 @@ describe("RunPage", () => {
     expect(container.textContent).toContain("후속 QA");
     expect(proposalCard?.textContent).toContain("백로그에만 생성");
     expect(proposalCard?.textContent).toContain("별도 승인 필요");
-    expect(proposalCard?.textContent).not.toContain("생성 상태: queued");
     expect(acceptButton?.textContent).toContain("수락하고 이슈 만들기");
     expect(acceptButton?.querySelector(".lucide-plus")).not.toBeNull();
     expect(onAccept).not.toHaveBeenCalled();
@@ -1164,8 +1160,7 @@ describe("RunPage", () => {
         issue: {
           title: targetRun.title,
           description: "생성과 실행 경계를 분리합니다.",
-          priority: 2,
-          status: "backlog"
+          priority: 2
         },
         executeAfterCreate: true,
         status: "pending",

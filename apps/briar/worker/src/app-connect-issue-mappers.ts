@@ -712,7 +712,6 @@ const appIssueCreateProposal = (
       title: proposal.issue.title,
       description: proposal.issue.description ?? undefined,
       priority: proposal.issue.priority ?? undefined,
-      status: appRunStatus(proposal.issue.status),
     }),
     executeAfterCreate: proposal.executeAfterCreate,
     status: appProposalStatus(proposal.status),

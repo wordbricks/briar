@@ -11897,16 +11897,6 @@ pub struct ReplyIssueDraft {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub priority: ::core::option::Option<u32>,
-    /// Issue replies accept backlog or queued; channel replies accept backlog
-    /// only. Implementations reject unspecified, unknown, and out-of-scope values.
-    ///
-    /// Field 4: `status`
-    #[serde(
-        rename = "status",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub status: ::buffa::EnumValue<super::super::app::v1::RunStatus>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -11917,7 +11907,6 @@ impl ::core::fmt::Debug for ReplyIssueDraft {
             .field("title", &self.title)
             .field("description", &self.description)
             .field("priority", &self.priority)
-            .field("status", &self.status)
             .finish()
     }
 }
@@ -11976,12 +11965,6 @@ impl ::buffa::Message for ReplyIssueDraft {
         if let Some(v) = self.priority {
             size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
         }
-        {
-            let val = self.status.to_i32();
-            if val != 0 {
-                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
-            }
-        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -12000,12 +11983,6 @@ impl ::buffa::Message for ReplyIssueDraft {
         }
         if let Some(v) = self.priority {
             ::buffa::types::put_uint32_field(3u32, v, buf);
-        }
-        {
-            let val = self.status.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(4u32, val, buf);
-            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -12048,15 +12025,6 @@ impl ::buffa::Message for ReplyIssueDraft {
                     ::buffa::types::decode_uint32(buf)?,
                 );
             }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.status = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -12068,7 +12036,6 @@ impl ::buffa::Message for ReplyIssueDraft {
         self.title.clear();
         self.description = ::core::option::Option::None;
         self.priority = ::core::option::Option::None;
-        self.status = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -58316,13 +58283,6 @@ pub mod __buffa {
             pub description: ::core::option::Option<&'a str>,
             /// Field 3: `priority`
             pub priority: ::core::option::Option<u32>,
-            /// Issue replies accept backlog or queued; channel replies accept backlog
-            /// only. Implementations reject unspecified, unknown, and out-of-scope values.
-            ///
-            /// Field 4: `status`
-            pub status: ::buffa::EnumValue<
-                super::super::super::super::app::v1::RunStatus,
-            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ReplyIssueDraftView<'a> {
@@ -58378,15 +58338,6 @@ pub mod __buffa {
                         )?;
                         view.priority = Some(::buffa::types::decode_uint32(&mut cur)?);
                     }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.status = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -58419,7 +58370,6 @@ pub mod __buffa {
                     title: self.title.to_string(),
                     description: self.description.map(|s| s.to_string()),
                     priority: self.priority,
-                    status: self.status,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -58444,12 +58394,6 @@ pub mod __buffa {
                 if let Some(v) = self.priority {
                     size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
                 }
-                {
-                    let val = self.status.to_i32();
-                    if val != 0 {
-                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
-                    }
-                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -58469,12 +58413,6 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.priority {
                     ::buffa::types::put_uint32_field(3u32, v, buf);
-                }
-                {
-                    let val = self.status.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(4u32, val, buf);
-                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -58509,9 +58447,6 @@ pub mod __buffa {
                             "priority",
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
-                    __map.serialize_entry("status", &self.status)?;
                 }
                 __map.end()
             }
@@ -58622,16 +58557,6 @@ pub mod __buffa {
             #[must_use]
             pub fn priority(&self) -> ::core::option::Option<u32> {
                 self.0.reborrow().priority
-            }
-            /// Issue replies accept backlog or queued; channel replies accept backlog
-            /// only. Implementations reject unspecified, unknown, and out-of-scope values.
-            ///
-            /// Field 4: `status`
-            #[must_use]
-            pub fn status(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::super::super::app::v1::RunStatus> {
-                self.0.reborrow().status
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ReplyIssueDraftView<'static>>>

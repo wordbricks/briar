@@ -1299,7 +1299,6 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         message.title = value.title
         if let description = value.description { message.description_p = description }
         if let priority = value.priority { message.priority = UInt32(clamping: priority) }
-        message.status = value.status == .backlog ? .backlog : .queued
         return message
     }
 
@@ -1607,8 +1606,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
                     issue: Issue(
                         title: "승인 API 확장",
                         description: "배치 승인을 처리합니다.",
-                        priority: 1,
-                        status: .backlog
+                        priority: 1
                     )
                 ),
                 .init(
@@ -1616,8 +1614,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
                     issue: Issue(
                         title: "채널 결과 UI",
                         description: "생성 결과를 표시합니다.",
-                        priority: 2,
-                        status: .backlog
+                        priority: 2
                     )
                 ),
                 .init(
@@ -1625,8 +1622,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
                     issue: Issue(
                         title: "원자성 검증",
                         description: "롤백과 재시도를 확인합니다.",
-                        priority: 2,
-                        status: .backlog
+                        priority: 2
                     )
                 ),
             ],

@@ -670,10 +670,11 @@ message IssueUpdateProposal {
 }
 
 message ProposedIssue {
+  reserved 4;
+
   string title = 1;
   optional string description = 2;
   optional uint32 priority = 3;
-  RunStatus status = 4;
 }
 
 message IssueCreateProposal {

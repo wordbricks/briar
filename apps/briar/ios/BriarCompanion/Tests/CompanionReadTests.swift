@@ -384,8 +384,7 @@ final class CompanionReadTests: XCTestCase {
             issue: .init(
                 title: "Follow-up",
                 description: nil,
-                priority: 2,
-                status: "backlog"
+                priority: 2
             ),
             status: .pending,
             executeAfterCreate: true

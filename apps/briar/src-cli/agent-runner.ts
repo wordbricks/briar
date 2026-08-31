@@ -88,7 +88,7 @@ const issueCreateProposalSchema = {
     issue: {
       type: "object",
       additionalProperties: false,
-      required: ["title", "description", "priority", "status"],
+      required: ["title", "description", "priority"],
       properties: {
         title: { type: "string", minLength: 1, maxLength: 300 },
         description: {
@@ -103,7 +103,6 @@ const issueCreateProposalSchema = {
             { type: "null" },
           ],
         },
-        status: { type: "string", enum: ["backlog"] },
       },
     },
   },
@@ -920,7 +919,7 @@ or
 or
 {"reply":"explain the proposed edit and that approval is required","attachments":[],"proposedAction":{"type":"request_issue_update","changes":{"title":"optional new title","description":"optional new description or null","priority":2}},"executionProposal":null,"skillExecutionProposal":null}
 or
-{"reply":"explain the proposed issue and that approval is required","attachments":[],"proposedAction":{"type":"request_issue_create","executeAfterCreate":false,"issue":{"title":"new issue title","description":"full description or null","priority":2,"status":"backlog"}},"executionProposal":null,"skillExecutionProposal":null}
+{"reply":"explain the proposed issue and that approval is required","attachments":[],"proposedAction":{"type":"request_issue_create","executeAfterCreate":false,"issue":{"title":"new issue title","description":"full description or null","priority":2}},"executionProposal":null,"skillExecutionProposal":null}
 or
 {"reply":"explain execution settings must be approved","attachments":[],"proposedAction":null,"executionProposal":{"type":"request_issue_execute"},"skillExecutionProposal":null}
 or
@@ -953,7 +952,6 @@ export type DetachedIssueProposedAction =
         title: string;
         description: string | null;
         priority: number | null;
-        status: "backlog" | "queued";
       };
       executeAfterCreate: boolean;
     };
@@ -1072,15 +1070,17 @@ export function parseDetachedIssueReplyResult(
           Number(issue.priority) <= 4
         ? Number(issue.priority)
         : undefined;
-    if (!title || description === undefined || priority === undefined ||
-        issue.status !== "backlog") {
+    if (
+      !title || description === undefined || priority === undefined ||
+      Object.hasOwn(issue, "status")
+    ) {
       throw new Error("New issue proposal is incomplete");
     }
     return {
       reply,
       proposedAction: {
         type: action.type,
-        issue: { title, description, priority, status: issue.status },
+        issue: { title, description, priority },
         executeAfterCreate: action.executeAfterCreate === true,
       },
       executionProposal: null,
@@ -1194,12 +1194,12 @@ or
 or
 {"body":"explain the plan you attached","attachments":[],"document":{"title":"plan title","markdown":"# Plan\\n\\nfull markdown","projectId":null},"issueProposal":null,"issueBatchProposal":null,"executionProposal":null,"skillExecutionProposal":null,"delegation":null,"contextRequests":null}
 or
-{"body":"explain the proposed issue and that approval is required","attachments":[],"document":null,"issueProposal":{"projectId":null,"executeAfterCreate":false,"issue":{"title":"issue title","description":"full description or null","priority":2,"status":"backlog"}},"issueBatchProposal":null,"executionProposal":null,"skillExecutionProposal":null,"delegation":null,"contextRequests":null}
+{"body":"explain the proposed issue and that approval is required","attachments":[],"document":null,"issueProposal":{"projectId":null,"executeAfterCreate":false,"issue":{"title":"issue title","description":"full description or null","priority":2}},"issueBatchProposal":null,"executionProposal":null,"skillExecutionProposal":null,"delegation":null,"contextRequests":null}
 or, for project-changing work that should run after one combined approval,
-{"body":"explain the proposed change and that one approval will create and execute it","attachments":[],"document":null,"issueProposal":{"projectId":null,"executeAfterCreate":true,"issue":{"title":"implementation issue title","description":"complete scope and completion criteria","priority":2,"status":"backlog"}},"issueBatchProposal":null,"executionProposal":null,"skillExecutionProposal":null,"delegation":null,"contextRequests":null}
+{"body":"explain the proposed change and that one approval will create and execute it","attachments":[],"document":null,"issueProposal":{"projectId":null,"executeAfterCreate":true,"issue":{"title":"implementation issue title","description":"complete scope and completion criteria","priority":2}},"issueBatchProposal":null,"executionProposal":null,"skillExecutionProposal":null,"delegation":null,"contextRequests":null}
 
 Batch proposal example:
-{"body":"explain that one approval will create all backlog issues and dependencies","attachments":[],"document":null,"issueProposal":null,"issueBatchProposal":{"projectId":null,"batch":{"items":[{"key":"api","issue":{"title":"Build API","description":"Create the API boundary.","priority":2,"status":"backlog"}},{"key":"ui","issue":{"title":"Build UI","description":"Use the completed API.","priority":2,"status":"backlog"}}],"dependencies":[{"prerequisiteKey":"api","dependentKey":"ui"}]}},"executionProposal":null,"skillExecutionProposal":null,"delegation":null,"contextRequests":null}
+{"body":"explain that one approval will create all backlog issues and dependencies","attachments":[],"document":null,"issueProposal":null,"issueBatchProposal":{"projectId":null,"batch":{"items":[{"key":"api","issue":{"title":"Build API","description":"Create the API boundary.","priority":2}},{"key":"ui","issue":{"title":"Build UI","description":"Use the completed API.","priority":2}}],"dependencies":[{"prerequisiteKey":"api","dependentKey":"ui"}]}},"executionProposal":null,"skillExecutionProposal":null,"delegation":null,"contextRequests":null}
 or, only for a Project Agent with an exact server-supplied target,
 {"body":"explain execution settings must be approved","attachments":[],"document":null,"issueProposal":null,"issueBatchProposal":null,"executionProposal":{"projectId":"authoritative project UUID","runId":"exact executionTargets run UUID"},"skillExecutionProposal":null,"delegation":null,"contextRequests":null}
 or, only for a Project Agent with the saved Skill target above,

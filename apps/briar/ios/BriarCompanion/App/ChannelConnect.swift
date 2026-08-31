@@ -342,14 +342,7 @@ extension ChannelMessage.Proposal.Payload.Issue {
         guard priority.map({ (1 ... 4).contains($0) }) ?? true else {
             throw MobileAPIError.invalidResponse
         }
-        let status: IssueStatus
-        switch message.status {
-        case .backlog: status = .backlog
-        case .unspecified, .queued, .running, .paused, .blocked, .failed, .completed, .cancelled,
-             .UNRECOGNIZED:
-            throw MobileAPIError.invalidResponse
-        }
-        self.init(title: title, description: description, priority: priority, status: status)
+        self.init(title: title, description: description, priority: priority)
     }
 }
 

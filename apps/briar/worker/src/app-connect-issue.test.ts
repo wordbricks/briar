@@ -281,7 +281,6 @@ describe("app Issue Connect adapter", () => {
           title: "Generated follow-up",
           description: null,
           priority: null,
-          status: "backlog",
         },
         executeAfterCreate: true,
         status: "accepted",
@@ -307,7 +306,7 @@ describe("app Issue Connect adapter", () => {
       case: "create",
       value: {
         id: proposalId,
-        issue: { title: "Generated follow-up", status: RunStatus.BACKLOG },
+        issue: { title: "Generated follow-up" },
       },
     });
 
