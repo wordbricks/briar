@@ -65,7 +65,7 @@ import {
 } from "./run-event-proto";
 import { createAuthenticatedConnectClient } from "./connect-client";
 import { decodeRunStructuredResult } from "./run-structured-result";
-import { uploadPreparedFiles } from "./upload-client";
+import { uploadPreparedFiles } from "../src/lib/upload-client";
 
 async function optionalText(valueFlag: string, fileFlag: string) {
   const path = value(fileFlag);

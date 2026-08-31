@@ -21,7 +21,7 @@ import type {
   ClaimedChannelReply,
   ClaimedIssueReply,
 } from "./worker-queue-contract";
-import { uploadPreparedFiles } from "./upload-client";
+import { uploadPreparedFiles } from "../src/lib/upload-client";
 
 type ChannelReplyResult = ParsedChannelReplyAgentResult["result"];
 type CompletionDisposition = "completed" | "requeued" | "failed";

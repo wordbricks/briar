@@ -11,8 +11,6 @@ import {
   ChannelMessageAuthor_Kind as ProtoChannelMessageAuthorKind,
   ChannelService,
   ChannelVisibility as ProtoChannelVisibility,
-  CreateChannelMessageRequestSchema,
-  CreateChannelMessageResponseSchema,
   DeclineChannelProposalResponse_Outcome as ProtoDeclineOutcome,
   DirectMessageParticipant_Kind as ProtoDirectMessageParticipantKind,
   type ChannelAgentReply as ChannelAgentReplyMessage,
@@ -53,10 +51,10 @@ import type {
   IssueExecutionApprovalInput,
   OrganizationMember,
 } from "../../types";
-import {
-  requestProtobuf,
-  setMultipartProtobufRequest,
-} from "../api/request";
+import { briarApiUrl } from "../api-config";
+import { normalizeIssueAttachmentFile } from "../issue-attachments";
+import { canonicalizeIssueAttachmentReferences } from "../issue-markdown";
+import { uploadPreparedFiles } from "../upload-client";
 import type {
   AgentSkillExecutionProposal,
   ChannelAgentReply,
@@ -1104,42 +1102,75 @@ export async function sendChannelMessage(
     attachmentReferences?: string[];
   },
 ) {
+  const client = requireChannelClient();
   const clientMessageId = (input.clientMessageId ?? crypto.randomUUID())
     .toLowerCase();
-  const request = create(CreateChannelMessageRequestSchema, {
-    organizationId,
-    channelId,
-    clientMessageId,
-    body: input.body,
-    parentMessageId: input.parentMessageId ?? undefined,
-    mentionedUserIds: input.mentionedUserIds ?? [],
-    mentionedAgentIds: input.mentionedAgentIds ?? [],
-    skillId: input.skillId ?? undefined,
-    preferredDeviceId: input.preferredDeviceId ?? undefined,
-    attachmentReferences: input.attachmentReferences ?? [],
-  });
-  if (input.attachments?.length) {
-    const form = new FormData();
-    setMultipartProtobufRequest(
-      form,
-      CreateChannelMessageRequestSchema,
-      request,
-    );
-    for (const attachment of input.attachments) {
-      form.append("attachments", attachment, attachment.name);
-    }
-    return createChannelMessageResultFromMessage(await requestProtobuf(
-      `/organizations/${organizationId}/channels/${channelId}/messages`,
-      token,
-      CreateChannelMessageResponseSchema,
-      { method: "POST", body: form },
-    ));
+  const attachments = (input.attachments ?? []).map(
+    normalizeIssueAttachmentFile,
+  );
+  const attachmentReferences = input.attachmentReferences ?? [];
+  if (
+    attachments.length !== attachmentReferences.length ||
+    new Set(attachmentReferences).size !== attachmentReferences.length
+  ) {
+    throw new Error("Channel attachments and local references must match");
   }
+  const localFiles = attachments.map((file, index) => ({
+    clientId: attachmentReferences[index]!,
+    file,
+  }));
+  const attachmentIds = localFiles.length === 0
+    ? []
+    : await client.prepareChannelMessageAttachments(
+        {
+          requestId: crypto.randomUUID(),
+          organizationId,
+          channelId,
+          clientMessageId,
+          attachments: await Promise.all(
+            localFiles.map(async ({ clientId, file }) => ({
+              clientId,
+              filename: file.name,
+              contentType: file.type,
+              byteSize: BigInt(file.size),
+              sha256: new Uint8Array(
+                await crypto.subtle.digest(
+                  "SHA-256",
+                  await file.arrayBuffer(),
+                ),
+              ),
+            })),
+          ),
+        },
+        appCallOptions(token),
+      ).then((prepared) =>
+        uploadPreparedFiles({
+          apiUrl: briarApiUrl,
+          files: localFiles,
+          uploads: prepared.uploads,
+          uploadId: (upload) => upload.reference?.uploadId,
+        })
+      );
+  const body = canonicalizeIssueAttachmentReferences(
+    input.body,
+    attachmentReferences,
+    attachmentIds,
+  ) ?? input.body;
 
-  const client = requireChannelClient();
   return createChannelMessageResultFromMessage(
     await client.createChannelMessage(
-      request,
+      {
+        organizationId,
+        channelId,
+        clientMessageId,
+        body,
+        parentMessageId: input.parentMessageId ?? undefined,
+        mentionedUserIds: input.mentionedUserIds ?? [],
+        mentionedAgentIds: input.mentionedAgentIds ?? [],
+        skillId: input.skillId ?? undefined,
+        preferredDeviceId: input.preferredDeviceId ?? undefined,
+        attachments: attachmentIds.map((uploadId) => ({ uploadId })),
+      },
       appCallOptions(token),
     ),
   );
