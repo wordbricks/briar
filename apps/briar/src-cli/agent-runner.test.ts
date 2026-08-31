@@ -19,7 +19,6 @@ import {
   detachedChannelReplyPrompt,
   detachedChannelReplyOutputSchema,
   detachedIssueReplyPrompt,
-  detachedIssueReplyOutputSchema,
   detachedProjectAgentPrompt,
   detachedProviderRequest,
   detachedProviderBlockedRunEvent,
@@ -30,8 +29,6 @@ import {
   detachedRunTurnDecision,
   detachedTranscriptSequence,
   detachedTranscriptSessionId,
-  parseDetachedJsonResult,
-  parseDetachedIssueReplyResult,
   runProjectAgentTaskCompletionFlow,
   shouldPersistDetachedTranscriptPayload,
 } from "./agent-runner";
@@ -860,13 +857,13 @@ describe("detached Agent runner", () => {
       prompt: "reply",
       workspacePath: "/worktree",
       fullAccess: false,
-      outputSchema: detachedIssueReplyOutputSchema,
+      outputSchema: detachedChannelReplyOutputSchema,
       agentBinary: "/bin/codex",
     }).request;
 
     expect(request.outputSchema?.value).toEqual({
       case: "object",
-      value: detachedIssueReplyOutputSchema,
+      value: detachedChannelReplyOutputSchema,
     });
   });
 
@@ -896,7 +893,6 @@ describe("detached Agent runner", () => {
       }
     };
 
-    inspect(detachedIssueReplyOutputSchema);
     inspect(detachedChannelReplyOutputSchema);
   });
 
@@ -946,233 +942,6 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("same shell, network, browser, and filesystem permissions");
     expect(prompt).toContain("Changes affect the live issue worktree");
     expect(prompt).not.toContain("This is a read-only conversation");
-  });
-
-  it("parses a proposed completed-run revision without executing it", () => {
-    expect(parseDetachedIssueReplyResult(JSON.stringify({
-      reply: "D를 D′로 바꾸는 개정을 제안했습니다. 수락이 필요합니다.",
-      proposedAction: {
-        type: "request_issue_rework",
-        workflowStage: "implementing",
-        reason: "D를 D′로 변경하고 영향받는 QA를 다시 확인한다.",
-      },
-      executionProposal: null,
-      skillExecutionProposal: null,
-    }))).toEqual({
-      reply: "D를 D′로 바꾸는 개정을 제안했습니다. 수락이 필요합니다.",
-      proposedAction: {
-        type: "request_issue_rework",
-        workflowStage: "implementing",
-        reason: "D를 D′로 변경하고 영향받는 QA를 다시 확인한다.",
-      },
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
-  });
-
-  it("parses issue edit and creation proposals without applying them", () => {
-    expect(parseDetachedIssueReplyResult(JSON.stringify({
-      reply: "설명 변경을 제안했습니다. 수락해 주세요.",
-      proposedAction: {
-        type: "request_issue_update",
-        changes: { description: "새 승인 기준", priority: 1 },
-      },
-      executionProposal: null,
-      skillExecutionProposal: null,
-    }))).toEqual({
-      reply: "설명 변경을 제안했습니다. 수락해 주세요.",
-      proposedAction: {
-        type: "request_issue_update",
-        changes: { description: "새 승인 기준", priority: 1 },
-      },
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
-    expect(parseDetachedIssueReplyResult(JSON.stringify({
-      reply: "후속 이슈 생성을 제안했습니다. 수락해 주세요.",
-      proposedAction: {
-        type: "request_issue_create",
-        issue: {
-          title: "후속 QA",
-          description: null,
-          priority: 2,
-        },
-      },
-    }))).toMatchObject({
-      proposedAction: {
-        type: "request_issue_create",
-        issue: { title: "후속 QA" },
-      },
-    });
-  });
-
-  it("extracts one valid issue proposal from pure, fenced, or mixed JSON", () => {
-    const proposal = {
-      reply: "본문 업데이트를 제안했습니다. 승인이 필요합니다.",
-      proposedAction: {
-        type: "request_issue_update",
-        changes: { description: "새 본문" },
-      },
-      executionProposal: null,
-      skillExecutionProposal: null,
-    };
-    const json = JSON.stringify(proposal);
-
-    for (const response of [
-      json,
-      `\`\`\`json\n${json}\n\`\`\``,
-      `업데이트 내용을 준비했습니다.\n\n\`\`\`json\n${json}\n\`\`\``,
-    ]) {
-      expect(parseDetachedIssueReplyResult(response)).toEqual(proposal);
-    }
-  });
-
-  it("fails closed for multiple JSON objects or an invalid proposal schema", () => {
-    const valid = JSON.stringify({
-      reply: "승인이 필요합니다.",
-      proposedAction: {
-        type: "request_issue_update",
-        changes: { priority: 1 },
-      },
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
-    const multiple = `${valid}\n${valid}`;
-    expect(() => parseDetachedJsonResult(multiple)).toThrow(
-      "exactly one JSON object",
-    );
-    expect(() => parseDetachedJsonResult(`Wrapped [${valid}]`)).toThrow(
-      "exactly one JSON object",
-    );
-    expect(() => parseDetachedIssueReplyResult(multiple)).toThrow(
-      "exactly one JSON object",
-    );
-
-    const invalid = JSON.stringify({
-      reply: "범위를 벗어난 우선순위입니다.",
-      proposedAction: {
-        type: "request_issue_update",
-        changes: { priority: 9 },
-      },
-      executionProposal: null,
-      skillExecutionProposal: null,
-    });
-    expect(() => parseDetachedIssueReplyResult(invalid)).toThrow(
-      "Issue update priority is invalid",
-    );
-    expect(() => parseDetachedIssueReplyResult(JSON.stringify({
-      reply: "구형 생성 payload입니다.",
-      proposedAction: {
-        type: "request_issue_create",
-        issue: {
-          title: "Obsolete status",
-          description: null,
-          priority: 2,
-          status: "backlog",
-        },
-      },
-    }))).toThrow("New issue proposal is incomplete");
-  });
-
-  it("parses standalone and create-then-execute approval intents", () => {
-    expect(parseDetachedIssueReplyResult(JSON.stringify({
-      reply: "실행 설정 승인이 필요합니다.",
-      proposedAction: null,
-      executionProposal: { type: "request_issue_execute" },
-      skillExecutionProposal: null,
-    }))).toEqual({
-      reply: "실행 설정 승인이 필요합니다.",
-      proposedAction: null,
-      executionProposal: { type: "request_issue_execute" },
-      skillExecutionProposal: null,
-    });
-    expect(parseDetachedIssueReplyResult(JSON.stringify({
-      reply: "백로그 생성 후 별도 실행 승인을 요청합니다.",
-      proposedAction: {
-        type: "request_issue_create",
-        executeAfterCreate: true,
-        issue: {
-          title: "승인 후 실행",
-          description: null,
-          priority: 2,
-        },
-      },
-      executionProposal: null,
-    }))).toMatchObject({
-      proposedAction: {
-        type: "request_issue_create",
-        executeAfterCreate: true,
-      },
-      executionProposal: null,
-    });
-  });
-
-  it("rejects dual or expanded execution authority from provider output", () => {
-    for (const proposed of [
-      {
-        reply: "invalid dual",
-        proposedAction: {
-          type: "request_issue_update",
-          changes: { priority: 1 },
-        },
-        executionProposal: { type: "request_issue_execute" },
-      },
-      {
-        reply: "invalid expanded",
-        proposedAction: null,
-        executionProposal: {
-          type: "request_issue_execute",
-          runId: "11111111-1111-4111-8111-111111111111",
-        },
-      },
-    ]) {
-      expect(() => parseDetachedIssueReplyResult(JSON.stringify(proposed)))
-        .toThrow();
-    }
-  });
-
-  it("accepts only the exact server-authorized saved Skill marker", () => {
-    const marker = {
-      reply: "iOS 배포 Skill 실행에는 승인이 필요합니다.",
-      proposedAction: null,
-      executionProposal: null,
-      skillExecutionProposal: { type: "request_agent_skill_execute" },
-    };
-    expect(parseDetachedIssueReplyResult(
-      JSON.stringify(marker),
-      { allowSkillExecutionProposal: true },
-    )).toEqual(marker);
-    expect(() => parseDetachedIssueReplyResult(JSON.stringify(marker))).toThrow(
-      "Agent Skill execution target is not authorized",
-    );
-
-    for (const invalid of [
-      {
-        ...marker,
-        skillExecutionProposal: {
-          type: "request_agent_skill_execute",
-          skillId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-        },
-      },
-      {
-        ...marker,
-        executionProposal: { type: "request_issue_execute" },
-      },
-      {
-        ...marker,
-        proposedAction: {
-          type: "request_issue_update",
-          changes: { priority: 1 },
-        },
-      },
-    ]) {
-      expect(() =>
-        parseDetachedIssueReplyResult(
-          JSON.stringify(invalid),
-          { allowSkillExecutionProposal: true },
-        )
-      ).toThrow();
-    }
   });
 
   it("exposes saved Skill authority only for the server-selected turn", () => {

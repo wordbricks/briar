@@ -88,7 +88,7 @@ describe("generated reply completion client", () => {
       outcome: {
         case: "success",
         result: {
-          reply: "Created the follow-up proposal.",
+          body: "Created the follow-up proposal.",
           proposedAction: {
             type: "request_issue_create",
             issue: {

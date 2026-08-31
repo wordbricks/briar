@@ -2,12 +2,18 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { IssueAgentReplyProviderOutputSchema } from "../src/lib/agent-reply-contract";
 import {
   collectIssueReplyAttachments,
   parseIssueReplyAgentResult,
 } from "./issue-reply-attachments";
+import { providerStructuredOutputContract } from "./structured-output-contract";
 
 const temporaryDirectories: string[] = [];
+const decodeIssueReply = providerStructuredOutputContract(
+  "codex",
+  IssueAgentReplyProviderOutputSchema,
+).decode;
 
 async function temporaryWorkspace() {
   const directory = await mkdtemp(join(tmpdir(), "briar-issue-reply-out-"));
@@ -31,9 +37,9 @@ describe("issue reply agent attachments", () => {
       proposedAction: null,
       executionProposal: null,
       skillExecutionProposal: null,
-    }))).toEqual({
+    }), decodeIssueReply)).toEqual({
       result: {
-        reply: "Here is the mockup.",
+        body: "Here is the mockup.",
         proposedAction: null,
         executionProposal: null,
         skillExecutionProposal: null,
@@ -42,10 +48,23 @@ describe("issue reply agent attachments", () => {
     });
   });
 
-  it("rejects non-structured issue replies", () => {
-    expect(() => parseIssueReplyAgentResult("An ordinary answer.")).toThrow(
-      "exactly one JSON object",
+  it("rejects Skill execution unless the server selected that authority", () => {
+    const output = JSON.stringify({
+      reply: "The saved Skill requires approval.",
+      attachments: [],
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: { type: "request_agent_skill_execute" },
+    });
+
+    expect(() => parseIssueReplyAgentResult(output, decodeIssueReply)).toThrow(
+      "Agent Skill execution target is not authorized",
     );
+    expect(parseIssueReplyAgentResult(output, decodeIssueReply, {
+      allowSkillExecutionProposal: true,
+    }).result.skillExecutionProposal).toEqual({
+      type: "request_agent_skill_execute",
+    });
   });
 
   it("reads validated workspace images and HTML artifacts", async () => {

@@ -1,33 +1,24 @@
 import {
-  parseDetachedIssueReplyResult,
   parseDetachedJsonResult,
-  type DetachedIssueReplyResult,
 } from "./agent-runner";
+import type { ParsedIssueAgentReply } from "../src/lib/agent-reply-contract";
 import {
   collectReplyAttachments,
-  decodeReplyAttachmentPaths,
 } from "./reply-attachments";
-
-export type ParsedIssueReplyAgentResult = {
-  result: DetachedIssueReplyResult;
-  attachmentPaths: string[];
-};
 
 export function parseIssueReplyAgentResult(
   text: string,
+  decode: (input: unknown) => ParsedIssueAgentReply,
   options: { allowSkillExecutionProposal?: boolean } = {},
-): ParsedIssueReplyAgentResult {
-  const parsed = parseDetachedJsonResult(text);
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("Issue reply result must be an object");
+): ParsedIssueAgentReply {
+  const parsed = decode(parseDetachedJsonResult(text));
+  if (
+    parsed.result.skillExecutionProposal &&
+    !options.allowSkillExecutionProposal
+  ) {
+    throw new Error("Agent Skill execution target is not authorized");
   }
-  const record = parsed as Record<string, unknown>;
-  const attachmentPaths = decodeReplyAttachmentPaths(record.attachments ?? []);
-  const { attachments: _attachments, ...result } = record;
-  return {
-    result: parseDetachedIssueReplyResult(JSON.stringify(result), options),
-    attachmentPaths,
-  };
+  return parsed;
 }
 
 export function collectIssueReplyAttachments(input: {

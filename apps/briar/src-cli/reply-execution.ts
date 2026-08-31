@@ -5,13 +5,13 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { IssueAgentReplyProviderOutputSchema } from "../src/lib/agent-reply-contract";
 import { decodeOrganizationAgentContextRequestTurn } from "../src/lib/organization-agent-context-contract";
 import {
   createDetachedTranscriptSequencer,
   detachedChannelReplyPrompt,
   detachedChannelReplyOutputSchema,
   detachedIssueReplyPrompt,
-  detachedIssueReplyOutputSchema,
   detachedProjectAgentPrompt,
   parseDetachedJsonResult,
   shouldPersistDetachedTranscriptPayload,
@@ -61,6 +61,7 @@ import {
 } from "./issue-reply-attachments";
 import { ReplyGeneratedImageCollector } from "./reply-generated-images";
 import { validateReplyAttachments } from "./reply-attachments";
+import { providerStructuredOutputContract } from "./structured-output-contract";
 import {
   channelReplyImageDirectory,
   cleanupChannelReplyImages,
@@ -401,6 +402,10 @@ async function runClaimedIssueReply(
       workspaceShared: workspaceMode !== "cached-analysis",
       skillExecutionTarget: issue.skillExecutionTarget,
     });
+    const outputContract = providerStructuredOutputContract(
+      agent.provider,
+      IssueAgentReplyProviderOutputSchema,
+    );
     let sequence = 0;
     const transcriptBatcher = createWorkerTranscriptBatcher({
       apiUrl: config.apiUrl,
@@ -429,7 +434,7 @@ async function runClaimedIssueReply(
           fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
           attachments,
           conversationId,
-          outputSchema: detachedIssueReplyOutputSchema,
+          outputSchema: outputContract.jsonSchema,
           environment: providerExecutionEnvironment(config, agent.provider, {
             ...process.env,
             PATH: workerExecutionPath(),
@@ -467,12 +472,15 @@ async function runClaimedIssueReply(
     })();
     assertDetachedProviderTurnSucceeded(turn);
     if (!turn.resultText) throw new Error("Agent returned an empty issue reply");
-    const parsedResult = parseIssueReplyAgentResult(turn.resultText, {
-      allowSkillExecutionProposal:
-        issue.skillExecutionTarget?.executionMode === "task",
-    });
+    const parsedResult = parseIssueReplyAgentResult(
+      turn.resultText,
+      outputContract.decode,
+      {
+        allowSkillExecutionProposal:
+          issue.skillExecutionTarget?.executionMode === "task",
+      },
+    );
     const result = parsedResult.result;
-    if (!result.reply) throw new Error("Agent returned an empty issue reply");
     const replyAttachments = validateReplyAttachments([
       ...await collectIssueReplyAttachments({
         workspacePath,

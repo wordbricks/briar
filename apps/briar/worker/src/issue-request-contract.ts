@@ -1,11 +1,16 @@
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
+import {
+  IssueAgentReplyResultSchema,
+  IssueCreateProposalAction,
+  IssueCreateProposalPayload,
+  IssueTitle,
+  IssueUpdateProposalAction,
+  IssueUpdateProposalPayload,
+  issueUpdateChangeFields,
+} from "../../src/lib/agent-reply-contract";
 import { ModelEffort } from "../../src/lib/agent-provider-contract";
 import { agentProviders } from "../../src/lib/agent-provider";
-import {
-  issueTitleAbsoluteMaxLength,
-  issueTitleOverLimitMessage,
-} from "../../src/lib/issue-title";
 import { issueDifficulties } from "../../src/lib/issue-difficulty";
 import {
   defaulted,
@@ -17,12 +22,16 @@ import {
   UuidString,
 } from "./schema-codecs";
 import { decodeRequestSync } from "./request-schema";
-import { WorkflowCheckpoint, WorkflowStageId } from "./run-request-contract";
+import { WorkflowCheckpoint } from "./run-request-contract";
 
-export const IssueTitle = Schema.Trim.check(
-  Schema.isLengthBetween(1, issueTitleAbsoluteMaxLength),
-  Schema.makeFilter((title) => issueTitleOverLimitMessage(title) ?? undefined),
-);
+export {
+  IssueCreateProposalAction,
+  IssueCreateProposalPayload,
+  IssueTitle,
+  IssueUpdateProposalAction,
+  IssueUpdateProposalPayload,
+  issueUpdateChangeFields,
+};
 
 const IssueInputBaseFields = {
   title: IssueTitle,
@@ -141,104 +150,6 @@ export const IssueMessageEditInput = strictSchema(Schema.Struct({
   ),
 }));
 
-const IssueUpdateChanges = strictSchema(Schema.Struct({
-  title: Schema.optional(IssueTitle),
-  description: Schema.optional(
-    Schema.NullOr(Schema.Trim.check(Schema.isMaxLength(100_000))),
-  ),
-  priority: Schema.optional(Schema.NullOr(integerBetween(1, 4))),
-}).check(
-  Schema.makeFilter((changes) =>
-    Object.keys(changes).length > 0
-      ? undefined
-      : "At least one issue change is required"
-  ),
-));
-
-export const issueUpdateChangeFields = [
-  "title",
-  "description",
-  "priority",
-] as const;
-
-const IssueUpdateProposalPayloadFields = {
-  changes: IssueUpdateChanges,
-} as const;
-
-export const IssueUpdateProposalPayload = strictSchema(Schema.Struct(
-  IssueUpdateProposalPayloadFields,
-));
-
-export const IssueUpdateProposalAction = strictSchema(Schema.Struct({
-  type: Schema.Literal("request_issue_update"),
-  ...IssueUpdateProposalPayloadFields,
-}));
-
-const IssueCreateProposalPayloadFields = {
-  issue: strictSchema(Schema.Struct({
-    title: IssueTitle,
-    description: Schema.NullOr(
-      Schema.Trim.check(Schema.isMaxLength(100_000)),
-    ),
-    priority: Schema.NullOr(integerBetween(1, 4)),
-  })),
-} as const;
-
-export const IssueCreateProposalPayload = strictSchema(Schema.Struct(
-  IssueCreateProposalPayloadFields,
-));
-
-export const IssueCreateProposalAction = strictSchema(Schema.Struct({
-  type: Schema.Literal("request_issue_create"),
-  executeAfterCreate: defaulted(Schema.Boolean, false),
-  ...IssueCreateProposalPayloadFields,
-}));
-
-export const IssueAgentProposedAction = Schema.Union([
-  strictSchema(Schema.Struct({
-    type: Schema.Literal("request_issue_rework"),
-    workflowStage: WorkflowStageId,
-    reason: trimmedText(1, 4_000),
-  })),
-  IssueUpdateProposalAction,
-  IssueCreateProposalAction,
-]);
-
-export const IssueAgentReplyResult = strictSchema(Schema.Struct({
-  body: trimmedText(1, 10_000),
-  proposedAction: Schema.NullOr(IssueAgentProposedAction),
-  executionProposal: Schema.NullOr(
-    strictSchema(Schema.Struct({
-      type: Schema.Literal("request_issue_execute"),
-    })),
-  ),
-  skillExecutionProposal: Schema.NullOr(
-    strictSchema(Schema.Struct({
-      type: Schema.Literal("request_agent_skill_execute"),
-    })),
-  ),
-}).check(
-  Schema.makeFilter((input) => {
-    const issues: Array<Schema.FilterIssue> = [];
-    if (input.executionProposal && input.proposedAction) {
-      issues.push({
-        path: ["executionProposal"],
-        issue: "Use executeAfterCreate for a create-and-execute request",
-      });
-    }
-    if (
-      input.skillExecutionProposal &&
-      (input.executionProposal || input.proposedAction)
-    ) {
-      issues.push({
-        path: ["skillExecutionProposal"],
-        issue: "Agent Skill execution cannot be combined with another proposal",
-      });
-    }
-    return issues.length > 0 ? issues : undefined;
-  }),
-));
-
 export const AgentSkillExecutionProposalAcceptInput = strictSchema(
   Schema.Struct({
     workerId: Schema.optional(Schema.String.check(
@@ -272,7 +183,7 @@ export const decodeIssueCreateProposalAction = decodeRequestSync(
   IssueCreateProposalAction,
 );
 export const decodeIssueAgentReplyResult = decodeRequestSync(
-  IssueAgentReplyResult,
+  IssueAgentReplyResultSchema,
 );
 export const decodeAgentSkillExecutionProposalAcceptInput = decodeRequestSync(
   AgentSkillExecutionProposalAcceptInput,

@@ -9,7 +9,8 @@ import {
   PrepareReplyAttachmentUploadsRequestSchema,
   ReplyCompletionDisposition,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
-import type { DetachedIssueReplyResult } from "./agent-runner";
+import type { IssueAgentReplyResult } from "../src/lib/agent-reply-contract";
+import { uploadPreparedFiles } from "../src/lib/upload-client";
 import type { ParsedChannelReplyAgentResult } from "./channel-reply-attachments";
 import {
   createWorkerQueueClient,
@@ -20,7 +21,6 @@ import type {
   ClaimedChannelReply,
   ClaimedIssueReply,
 } from "./worker-queue-contract";
-import { uploadPreparedFiles } from "../src/lib/upload-client";
 
 type ChannelReplyResult = ParsedChannelReplyAgentResult["result"];
 type CompletionDisposition = "completed" | "requeued" | "failed";
@@ -95,11 +95,11 @@ const requiredTimestamp = (
 };
 
 const issueSuccess = (
-  result: DetachedIssueReplyResult,
+  result: IssueAgentReplyResult,
   attachmentIds: readonly string[],
 ) => {
   const base = {
-    body: result.reply,
+    body: result.body,
     attachments: attachmentIds.map((uploadId) => ({ uploadId })),
   };
   if (result.proposedAction) {
@@ -368,7 +368,7 @@ export function createReplyCompletionClient(
       | {
           outcome: {
             case: "success";
-            result: DetachedIssueReplyResult;
+            result: IssueAgentReplyResult;
             attachments: readonly File[];
           };
         }
