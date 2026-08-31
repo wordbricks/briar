@@ -10,6 +10,7 @@ Type=simple
 User=briar
 Group=briar
 Environment=HOME=/home/briar
+Environment=GH_BROWSER=/opt/briar/bin/briar-open-browser
 Environment=BRIAR_REMOTE_DISPLAY_PORT=5901
 Environment=BRIAR_REMOTE_DISPLAY_GEOMETRY=1280x720
 Environment=BRIAR_REMOTE_DISPLAY_STARTUP_TIMEOUT_SECONDS=120

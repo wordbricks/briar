@@ -9,6 +9,7 @@ Type=simple
 User=briar
 Group=briar
 Environment=HOME=/home/briar
+Environment=GH_BROWSER=/opt/briar/bin/briar-open-browser
 Environment=BRIAR_CONFIG_HOME=/home/briar/.config/briar
 Environment=BRIAR_MANAGED_CREDENTIAL_FILE=/var/lib/briar/worker-credential.json
 Environment=BRIAR_MANAGED_RUNTIME_UPDATER=/opt/briar/bin/briar-managed-runtime-update-request
