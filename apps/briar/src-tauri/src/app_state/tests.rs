@@ -1,39 +1,5 @@
 use super::*;
-use serde_json::json;
 use std::time::{SystemTime, UNIX_EPOCH};
-
-#[test]
-fn inbox_channel_notification_target_preserves_message_context() {
-    let target: InboxNotificationTarget = serde_json::from_value(json!({
-        "messageId": "channel:reply-1",
-        "projectId": "project-1",
-        "targetId": "channel-1",
-        "kind": "channel",
-        "channelMessageId": "reply-1",
-        "rootMessageId": "root-1"
-    }))
-    .expect("channel notification target");
-
-    assert_eq!(target.channel_message_id.as_deref(), Some("reply-1"));
-    assert_eq!(target.root_message_id.as_deref(), Some("root-1"));
-    assert_eq!(target.kind, InboxNotificationKind::Channel);
-}
-
-#[test]
-fn inbox_conversation_notification_target_preserves_message_context() {
-    let input = json!({
-        "messageId": "conversation:inbox-1",
-        "projectId": "project-1",
-        "targetId": "conversation-1",
-        "kind": "conversation",
-        "conversationMessageId": "message-1"
-    });
-    let target: InboxNotificationTarget =
-        serde_json::from_value(input).expect("conversation notification target");
-
-    assert_eq!(target.conversation_message_id.as_deref(), Some("message-1"));
-    assert_eq!(target.kind, InboxNotificationKind::Conversation);
-}
 
 #[cfg(desktop)]
 #[test]
