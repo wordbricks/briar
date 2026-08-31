@@ -13,8 +13,6 @@ import {
   detachedIssueReplyPrompt,
   detachedIssueReplyOutputSchema,
   detachedProjectAgentPrompt,
-  detachedPayloadDirection,
-  detachedTranscriptPayload,
   parseDetachedJsonResult,
   shouldPersistDetachedTranscriptPayload,
   type DetachedAgent,
@@ -33,7 +31,10 @@ import {
   createWorkerQueueClient,
   createWorkerQueueOperations,
 } from "./worker-queue-client";
-import { createWorkerTranscriptBatcher } from "./worker-transcript-client";
+import {
+  createWorkerTranscriptBatcher,
+  transcriptEventFromSidecar,
+} from "./worker-transcript-client";
 import {
   workerCliPath,
   workerExecutionPath,
@@ -186,15 +187,12 @@ async function runClaimedProjectAgentTask(
             conversationId = nextConversationId;
             reportCheckpoint?.({ conversationId: nextConversationId });
           },
-          onPayload: async (rawPayload, line) => {
-            const payload = detachedTranscriptPayload(rawPayload, line);
+          onPayload: async (payload) => {
             const sequence = transcriptSequencer.nextForPayload(payload);
             if (sequence === null) return;
-            await transcriptBatcher.enqueue({
-              sequence,
-              direction: detachedPayloadDirection(rawPayload),
-              payload,
-            });
+            await transcriptBatcher.enqueue(
+              transcriptEventFromSidecar(payload, sequence),
+            );
           },
         });
       } finally {
@@ -451,18 +449,14 @@ async function runClaimedIssueReply(
             conversationId = nextConversationId;
             reportCheckpoint?.({ conversationId: nextConversationId });
           },
-          onPayload: async (payload, line) => {
+          onPayload: async (payload) => {
             activityPublisher.observePayload(payload);
             generatedImages.observePayload(payload);
             sequence += 1;
-            const direction = detachedPayloadDirection(payload);
-            const bounded = detachedTranscriptPayload(payload, line);
-            if (shouldPersistDetachedTranscriptPayload(bounded)) {
-              await transcriptBatcher.enqueue({
-                sequence,
-                direction,
-                payload: bounded,
-              });
+            if (shouldPersistDetachedTranscriptPayload(payload)) {
+              await transcriptBatcher.enqueue(
+                transcriptEventFromSidecar(payload, sequence),
+              );
             }
           },
         });

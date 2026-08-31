@@ -7,16 +7,13 @@ import { describe, expect, it } from "vitest";
 import {
   sidecarProviderEvent,
   sidecarRunBlocked,
-  sidecarSessionStarted,
 } from "../src-agent/sidecar-protocol";
 import {
-  boundedTranscriptPayload,
   createDetachedTranscriptSequencer,
   detachedAgentContext,
   detachedAgentPrompt,
   detachedChannelReplyPrompt,
   detachedChannelReplyOutputSchema,
-  detachedPayloadDirection,
   detachedIssueReplyPrompt,
   detachedIssueReplyOutputSchema,
   detachedProjectAgentPrompt,
@@ -29,7 +26,6 @@ import {
   detachedRunTurnDecision,
   detachedTranscriptSequence,
   detachedTranscriptSessionId,
-  detachedTranscriptPayload,
   parseDetachedJsonResult,
   parseDetachedIssueReplyResult,
   runProjectAgentTaskCompletionFlow,
@@ -1358,45 +1354,6 @@ describe("detached Agent runner", () => {
     },
   );
 
-  it("bounds untrusted transcript payloads", () => {
-    expect(boundedTranscriptPayload({ message: "ok" }, "ok")).toEqual({
-      message: "ok",
-    });
-    expect(
-      boundedTranscriptPayload({ message: "x".repeat(40_000) }, "x".repeat(40_000)),
-    ).toMatchObject({ type: "truncated", originalBytes: 40_000 });
-  });
-
-  it("preserves runner event directions and exposes session starts", () => {
-    const clientEvent = sidecarProviderEvent({ direction: "client", raw: {} });
-    expect(detachedPayloadDirection(clientEvent)).toBe("client");
-    expect(
-      detachedPayloadDirection(sidecarProviderEvent({ raw: {} })),
-    ).toBe("server");
-    const session = sidecarSessionStarted("thread-1");
-    expect(detachedTranscriptPayload(session, '{"sessionStarted":{}}')).toBe(
-      session,
-    );
-    expect(
-      detachedTranscriptPayload(
-        sidecarProviderEvent({
-          direction: "server",
-          event: {
-            type: "messageCompleted",
-            id: "message-1",
-            phase: "final_answer",
-            text: "Done",
-          },
-          raw: { text: "x".repeat(40_000) },
-        }),
-        "x".repeat(40_000),
-      ),
-    ).toMatchObject({
-      type: "event",
-      event: { type: "messageCompleted", id: "message-1" },
-    });
-  });
-
   it("accepts normalized deltas for compaction and drops raw-only stream noise", () => {
     expect(
       shouldPersistDetachedTranscriptPayload(sidecarProviderEvent({
@@ -1428,35 +1385,6 @@ describe("detached Agent runner", () => {
         raw: { method: "item/completed", params: { item: { type: "tool" } } },
       })),
     ).toBe(true);
-  });
-
-  it("bounds oversized normalized activity payloads below the upload threshold", () => {
-    const payload = sidecarProviderEvent({
-      direction: "server",
-      raw: { output: "원격 명령 출력".repeat(20_000) },
-      event: {
-        type: "activityCompleted",
-        id: "command-1",
-        kind: "command",
-        title: "아주 긴 명령 ".repeat(4_000),
-        text: "아주 긴 실행 결과 ".repeat(20_000),
-        status: "completed",
-      },
-    });
-    const bounded = detachedTranscriptPayload(payload, JSON.stringify(payload));
-
-    expect(Buffer.byteLength(JSON.stringify(bounded), "utf8")).toBeLessThan(
-      28_000,
-    );
-    expect(bounded).toMatchObject({
-      type: "event",
-      event: {
-        type: "activityCompleted",
-        id: "command-1",
-        kind: "command",
-        status: "completed",
-      },
-    });
   });
 
   it("assigns every accepted payload a stable transcript sequence", () => {

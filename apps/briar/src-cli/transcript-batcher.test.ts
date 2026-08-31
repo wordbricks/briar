@@ -1,7 +1,19 @@
 import {
+  create,
+  fromJson,
+} from "@bufbuild/protobuf";
+import { ValueSchema } from "@bufbuild/protobuf/wkt";
+import {
   Code,
   ConnectError,
 } from "@connectrpc/connect";
+import {
+  AgentTranscriptEventSchema,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import {
+  AgentEventDirection,
+  NormalizedAgentEventSchema,
+} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import {
   describe,
   expect,
@@ -19,14 +31,25 @@ import { isConnectPayloadTooLarge } from "./worker-transcript-client";
 const delta = (
   sequence: number,
   text: string,
-): TranscriptBatchEvent => ({
-  sequence,
-  direction: "server",
-  payload: {
-    type: "event",
-    raw: { providerSequence: sequence },
-    event: { type: "messageDelta", id: "message-1", delta: text },
-  },
+): TranscriptBatchEvent => create(AgentTranscriptEventSchema, {
+  sequence: BigInt(sequence),
+  direction: AgentEventDirection.SERVER,
+  rawPayload: fromJson(ValueSchema, { providerSequence: sequence }),
+  normalized: create(NormalizedAgentEventSchema, {
+    event: {
+      case: "messageDelta",
+      value: { id: "message-1", delta: text },
+    },
+  }),
+});
+
+const opaque = (
+  sequence: number,
+  direction = AgentEventDirection.SERVER,
+): TranscriptBatchEvent => create(AgentTranscriptEventSchema, {
+  sequence: BigInt(sequence),
+  direction,
+  rawPayload: fromJson(ValueSchema, { opaque: sequence }),
 });
 
 describe("TranscriptBatcher", () => {
@@ -35,53 +58,33 @@ describe("TranscriptBatcher", () => {
       compactTranscriptBatch([], delta(10, "hel")),
       delta(11, "lo"),
     );
-    expect(compacted).toEqual([
-      {
-        sequence: 11,
-        direction: "server",
-        payload: {
-          type: "event",
-          event: { type: "messageDelta", id: "message-1", delta: "hello" },
-          archiveCompaction: {
-            kind: "delta",
-            firstSequence: 10,
-            eventCount: 2,
-          },
-        },
-      },
-    ]);
+    expect(compacted).toHaveLength(1);
+    expect(compacted[0]?.sequence).toBe(11n);
+    expect(compacted[0]?.rawPayload).toBeUndefined();
+    expect(compacted[0]?.archiveCompaction).toMatchObject({
+      firstSequence: 10n,
+      representedEventCount: 2,
+    });
+    expect(compacted[0]?.normalized?.event).toMatchObject({
+      case: "messageDelta",
+      value: { id: "message-1", delta: "hello" },
+    });
 
-    expect(compactTranscriptBatch(compacted, {
-      sequence: 12,
-      direction: "server",
-      payload: {
-        type: "event",
+    const snapshot = create(AgentTranscriptEventSchema, {
+      sequence: 12n,
+      direction: AgentEventDirection.SERVER,
+      normalized: create(NormalizedAgentEventSchema, {
         event: {
-          type: "messageCompleted",
-          id: "message-1",
-          phase: "final",
-          text: "hello",
+          case: "messageCompleted",
+          value: { id: "message-1", phase: "final", text: "hello" },
         },
-      },
-    })).toEqual([
-      {
-        sequence: 12,
-        direction: "server",
-        payload: {
-          type: "event",
-          event: {
-            type: "messageCompleted",
-            id: "message-1",
-            phase: "final",
-            text: "hello",
-          },
-        },
-      },
-    ]);
+      }),
+    });
+    expect(compactTranscriptBatch(compacted, snapshot)).toEqual([snapshot]);
   });
 
   it("preserves batch order across bounded transient retries", async () => {
-    const delivered: number[][] = [];
+    const delivered: bigint[][] = [];
     let attempts = 0;
     const batcher = new TranscriptBatcher({
       maxEvents: 2,
@@ -95,29 +98,17 @@ describe("TranscriptBatcher", () => {
       },
     });
 
-    await batcher.enqueue({
-      sequence: 1,
-      direction: "server",
-      payload: { type: "opaque", value: "a" },
-    });
-    await batcher.enqueue({
-      sequence: 2,
-      direction: "server",
-      payload: { type: "opaque", value: "b" },
-    });
-    await batcher.enqueue({
-      sequence: 3,
-      direction: "client",
-      payload: { type: "approval", id: "approval-1" },
-    });
+    await batcher.enqueue(opaque(1));
+    await batcher.enqueue(opaque(2));
+    await batcher.enqueue(opaque(3, AgentEventDirection.CLIENT));
     await batcher.flush();
 
     expect(attempts).toBe(3);
-    expect(delivered).toEqual([[1, 2], [3]]);
+    expect(delivered).toEqual([[1n, 2n], [3n]]);
   });
 
   it("splits only Connect ResourceExhausted responses and keeps event order", async () => {
-    const calls: number[][] = [];
+    const calls: bigint[][] = [];
     const batcher = new TranscriptBatcher({
       maxEvents: 4,
       flushIntervalMs: 60_000,
@@ -133,14 +124,9 @@ describe("TranscriptBatcher", () => {
     });
 
     for (let sequence = 1; sequence <= 4; sequence += 1) {
-      await batcher.enqueue({
-        sequence,
-        direction: sequence % 2 === 0 ? "client" : "server",
-        payload: { type: "opaque", sequence },
-      });
+      await batcher.enqueue(opaque(sequence));
     }
-
-    expect(calls).toEqual([[1, 2, 3, 4], [1, 2], [3, 4]]);
+    expect(calls).toEqual([[1n, 2n, 3n, 4n], [1n, 2n], [3n, 4n]]);
 
     const onError = vi.fn();
     let genericAttempts = 0;
@@ -157,11 +143,7 @@ describe("TranscriptBatcher", () => {
         throw new Error("ordinary failure");
       },
     });
-    await genericFailure.enqueue({
-      sequence: 5,
-      direction: "server",
-      payload: { type: "opaque" },
-    });
+    await genericFailure.enqueue(opaque(5));
     expect(genericAttempts).toBe(2);
     expect(onError).toHaveBeenCalledOnce();
   });

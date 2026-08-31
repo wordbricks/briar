@@ -15,14 +15,12 @@ import { type AgentProvider } from "../src/lib/agent-provider";
 import {
   createDetachedTranscriptSequencer,
   detachedAgentPrompt,
-  detachedPayloadDirection,
   detachedProviderBlockedRunEvent,
   detachedProviderBlockFromPayload,
   detachedRunContinuationPrompt,
   detachedRunDisposition,
   detachedRunRecoveryPrompt,
   detachedRunTurnDecision,
-  detachedTranscriptPayload,
   detachedTranscriptSessionId,
   type DetachedAgent,
 } from "./agent-runner";
@@ -37,6 +35,7 @@ import { ChannelActivityPublisher } from "./channel-activity-publisher";
 import {
   createWorkerTranscriptBatcher,
   reportIssueExecutionTelemetry,
+  transcriptEventFromSidecar,
 } from "./worker-transcript-client";
 import {
   errorDelayMs,
@@ -367,21 +366,17 @@ async function runClaimedIssueInRuntime(
           conversationId = nextConversationId;
           reportCheckpoint?.({ conversationId: nextConversationId });
         },
-        onPayload: async (output, line) => {
+        onPayload: async (output) => {
           usageCollector.observe(
             sidecarProviderRaw(output),
             new Date().toISOString(),
           );
           runnerBlock ??= detachedProviderBlockFromPayload(output);
-          const direction = detachedPayloadDirection(output);
-          const payload = detachedTranscriptPayload(output, line);
-          const transcriptSequence = transcriptSequencer.nextForPayload(payload);
+          const transcriptSequence = transcriptSequencer.nextForPayload(output);
           if (transcriptSequence !== null) {
-            await transcriptBatcher.enqueue({
-              sequence: transcriptSequence,
-              direction,
-              payload,
-            });
+            await transcriptBatcher.enqueue(
+              transcriptEventFromSidecar(output, transcriptSequence),
+            );
           }
         },
       });

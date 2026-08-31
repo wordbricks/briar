@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
-import { toJson } from "@bufbuild/protobuf";
+import { toBinary } from "@bufbuild/protobuf";
 import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
 import {
   RunnerToParentSchema,
@@ -68,7 +68,7 @@ export type DetachedProviderTurnInput = {
   signal: AbortSignal;
   diagnosticContext?: DetachedProviderTurnDiagnosticContext;
   onDiagnostic?: (diagnostic: DetachedProviderTurnDiagnostic) => void;
-  onPayload?: (payload: RunnerToParent, rawLine: string) => void | Promise<void>;
+  onPayload?: (payload: RunnerToParent) => void | Promise<void>;
   onConversationId?: (conversationId: string) => void | Promise<void>;
 };
 
@@ -351,16 +351,13 @@ async function executeDetachedProviderTurn(
       if (payload.case === undefined) {
         throw new Error("Agent runner emitted an empty protobuf output frame");
       }
-      const serializedPayload = JSON.stringify(
-        toJson(RunnerToParentSchema, message),
-      );
       outputCount += 1;
       const payloadType = payload.case;
       diagnose("runner.stdout_payload", {
         runnerPid: child.pid ?? null,
         outputNumber: outputCount,
         payloadType,
-        bytes: Buffer.byteLength(serializedPayload, "utf8"),
+        bytes: toBinary(RunnerToParentSchema, message).byteLength,
         ...(payloadType === "error"
           ? {
               error: redactDiagnosticText(payload.value.message),
@@ -395,7 +392,7 @@ async function executeDetachedProviderTurn(
         terminalOutputSeen = true;
       }
       if (payload.case === "blocked") terminalOutputSeen = true;
-      await input.onPayload?.(message, serializedPayload);
+      await input.onPayload?.(message);
     }
     if (!terminalOutputSeen) {
       throw new Error("Agent runner stdout closed before terminal output");

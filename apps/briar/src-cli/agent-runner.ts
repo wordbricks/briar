@@ -1,4 +1,3 @@
-import { Buffer } from "node:buffer";
 import { create, type JsonObject } from "@bufbuild/protobuf";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
@@ -10,12 +9,8 @@ import {
   SandboxMode,
   type RunnerToParent,
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
-import { AgentEventDirection } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
-import {
-  sidecarNormalizedEvent,
-  sidecarProviderRaw,
-} from "../src-agent/sidecar-protocol";
+import { sidecarProviderRaw } from "../src-agent/sidecar-protocol";
 import type { ModelEffort } from "../src/lib/agent-provider-contract";
 import type { AgentProvider } from "../src/lib/agent-provider";
 import type { JsonSchema } from "../src/lib/project-llm";
@@ -1451,34 +1446,16 @@ export function detachedRunTurnDecision(
   return turnFailure ? "recover" : "continue";
 }
 
-export function detachedPayloadDirection(
-  payload: RunnerToParent,
-): "client" | "server" {
-  return payload.payload.case === "event" &&
-      payload.payload.value.direction === AgentEventDirection.CLIENT
-    ? "client"
-    : "server";
-}
-
 /**
- * Every bounded provider payload enters the archive policy. TranscriptBatcher
- * preserves meaningful payloads verbatim, coalesces streaming deltas, and lets
- * a complete full-text snapshot supersede deltas that have not been uploaded.
+ * Every meaningful generated provider payload enters the archive policy.
+ * TranscriptBatcher owns compaction after it becomes AgentTranscriptEvent.
  */
-export function shouldPersistDetachedTranscriptPayload(payload: unknown) {
-  if (!payload || typeof payload !== "object") return true;
-  if (
-    "$typeName" in payload &&
-    payload.$typeName === "briar.sidecar.v1.RunnerToParent"
-  ) {
-    const output = payload as RunnerToParent;
-    if (output.payload.case !== "event") return true;
-    if (output.payload.value.normalized) return true;
-    return shouldPersistDetachedProviderRaw(sidecarProviderRaw(output));
-  }
-  const envelope = payload as Record<string, unknown>;
-  if (envelope.type !== "event" || envelope.event !== undefined) return true;
-  return shouldPersistDetachedProviderRaw(envelope.raw);
+export function shouldPersistDetachedTranscriptPayload(
+  output: RunnerToParent,
+) {
+  if (output.payload.case !== "event") return true;
+  if (output.payload.value.normalized) return true;
+  return shouldPersistDetachedProviderRaw(sidecarProviderRaw(output));
 }
 
 function shouldPersistDetachedProviderRaw(payload: unknown) {
@@ -1515,80 +1492,8 @@ export function createDetachedTranscriptSequencer(claimAttempt: number) {
   };
   return {
     next,
-    nextForPayload(payload: unknown) {
+    nextForPayload(payload: RunnerToParent) {
       return shouldPersistDetachedTranscriptPayload(payload) ? next() : null;
     },
   };
-}
-
-export function detachedTranscriptPayload(
-  payload: RunnerToParent,
-  rawLine: string,
-) {
-  const bounded = boundedTranscriptPayload(payload, rawLine);
-  if (!bounded || typeof bounded !== "object") return bounded;
-  const record = bounded as Record<string, unknown>;
-  if (record.type === "truncated" && payload.payload.case === "event") {
-    const event = payload.payload.value.normalized
-      ? sidecarNormalizedEvent(payload.payload.value.normalized)
-      : undefined;
-    return {
-      type: "event",
-      ...(detachedPayloadDirection(payload) === "client"
-        ? { direction: "client" }
-        : {}),
-      ...(event
-        ? { event: boundedNormalizedTranscriptEvent({ ...event }) }
-        : {}),
-      raw: bounded,
-    };
-  }
-  return bounded;
-}
-
-function boundedNormalizedTranscriptEvent(
-  event: Record<string, unknown>,
-) {
-  const bounded = { ...event };
-  const stringKeys = ["text", "title", "delta"] as const;
-  while (Buffer.byteLength(JSON.stringify(bounded), "utf8") > 24_000) {
-    const key = stringKeys
-      .filter((candidate) => typeof bounded[candidate] === "string")
-      .sort(
-        (left, right) =>
-          Buffer.byteLength(String(bounded[right]), "utf8") -
-          Buffer.byteLength(String(bounded[left]), "utf8"),
-      )[0];
-    if (!key) break;
-    const value = bounded[key] as string;
-    if (value.length <= 256) {
-      delete bounded[key];
-      continue;
-    }
-    const marker = "\n… truncated …\n";
-    const keep = Math.floor((value.length - marker.length) / 4);
-    bounded[key] = `${value.slice(0, keep)}${marker}${value.slice(-keep)}`;
-  }
-  return bounded;
-}
-
-export function boundedTranscriptPayload(payload: unknown, rawLine: string) {
-  if (Buffer.byteLength(rawLine, "utf8") <= 28_000) return payload;
-  return {
-    type: "truncated",
-    preview: utf8Prefix(rawLine, 8_000),
-    originalBytes: Buffer.byteLength(rawLine, "utf8"),
-  };
-}
-
-function utf8Prefix(value: string, byteLimit: number): string {
-  let bytes = 0;
-  let output = "";
-  for (const character of value) {
-    const length = Buffer.byteLength(character, "utf8");
-    if (bytes + length > byteLimit) break;
-    output += character;
-    bytes += length;
-  }
-  return output;
 }

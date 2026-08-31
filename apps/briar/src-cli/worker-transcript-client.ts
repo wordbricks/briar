@@ -1,9 +1,9 @@
+import { Buffer } from "node:buffer";
 import {
   create,
   fromJson,
   toBinary,
   toJson,
-  type JsonValue,
 } from "@bufbuild/protobuf";
 import {
   timestampFromDate,
@@ -21,11 +21,10 @@ import {
   AgentTranscriptEventSchema,
   AppendTranscriptEventsRequestSchema,
   ReportIssueExecutionTelemetryRequestSchema,
+  type AgentTranscriptEvent,
   type ReportIssueExecutionTelemetryResponse,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import {
-  AgentActivityKind,
-  AgentActivityStatus,
   AgentEventDirection,
   NormalizedAgentEventSchema,
   type NormalizedAgentEvent,
@@ -43,8 +42,11 @@ import type {
 } from "../src/lib/agent-execution-metrics";
 import type { AgentProvider } from "../src/lib/agent-provider";
 import {
+  normalizedActivityText,
+  normalizedActivityTitle,
+} from "../src-agent/normalized-agent-event";
+import {
   TranscriptBatcher,
-  type TranscriptBatchEvent,
 } from "./transcript-batcher";
 import {
   agentProviderToProto,
@@ -58,227 +60,141 @@ import {
 } from "./worker-queue-client";
 
 type TranscriptWork = ClaimedRun | ClaimedIssueReply | ClaimedProjectAgentTask;
-type JsonRecord = Record<string, unknown>;
+const maxRawTranscriptBytes = 28_000;
+const maxRawTranscriptPreviewBytes = 8_000;
 
-const record = (value: unknown): JsonRecord | null =>
-  value !== null && typeof value === "object" && !Array.isArray(value)
-    ? value as JsonRecord
-    : null;
-
-const string = (value: unknown): string | null =>
-  typeof value === "string" ? value : null;
-
-const optionalString = (value: unknown): string | undefined =>
-  typeof value === "string" ? value : undefined;
-
-const jsonValue = (value: unknown): JsonValue => {
-  const serialized = JSON.stringify(value);
-  return serialized === undefined
-    ? null
-    : JSON.parse(serialized) as JsonValue;
-};
-
-const rawTranscriptPayload = (payload: unknown): unknown => {
-  const envelope = record(payload);
-  if (envelope?.type !== "event") return payload;
-  return Object.hasOwn(envelope, "raw") ? envelope.raw : undefined;
-};
-
-const activityKind = (value: unknown): AgentActivityKind | null => {
-  switch (value) {
-    case "command":
-      return AgentActivityKind.COMMAND;
-    case "fileChange":
-      return AgentActivityKind.FILE_CHANGE;
-    case "webSearch":
-      return AgentActivityKind.WEB_SEARCH;
-    case "tool":
-      return AgentActivityKind.TOOL;
-    default:
-      return null;
+function utf8Prefix(value: string, byteLimit: number): string {
+  let bytes = 0;
+  let output = "";
+  for (const character of value) {
+    const length = Buffer.byteLength(character, "utf8");
+    if (bytes + length > byteLimit) break;
+    output += character;
+    bytes += length;
   }
-};
+  return output;
+}
 
-const activityStatus = (value: unknown): AgentActivityStatus | null => {
-  switch (value) {
-    case "completed":
-      return AgentActivityStatus.COMPLETED;
-    case "failed":
-      return AgentActivityStatus.FAILED;
-    case "cancelled":
-      return AgentActivityStatus.CANCELLED;
-    default:
-      return null;
-  }
-};
+function boundedRawPayload(value: NonNullable<AgentTranscriptEvent["rawPayload"]>) {
+  const json = JSON.stringify(toJson(ValueSchema, value));
+  const originalBytes = Buffer.byteLength(json, "utf8");
+  if (originalBytes <= maxRawTranscriptBytes) return value;
+  return fromJson(ValueSchema, {
+    type: "truncated",
+    preview: utf8Prefix(json, maxRawTranscriptPreviewBytes),
+    originalBytes,
+  });
+}
 
-const normalizedRecord = (payload: unknown): JsonRecord | null => {
-  const envelope = record(payload);
-  if (!envelope) return null;
-  if (envelope.type === "event") return record(envelope.event);
-  const nested = record(envelope.event);
-  return typeof nested?.type === "string" ? nested : envelope;
-};
-
-function normalizedTranscriptEventToProto(
-  payload: unknown,
+function boundedNormalizedEvent(
+  value: NormalizedAgentEvent | undefined,
 ): NormalizedAgentEvent | undefined {
-  const event = normalizedRecord(payload);
-  if (!event) return undefined;
-  switch (event.type) {
-    case "conversationStarted": {
-      const conversationId = string(event.conversationId);
-      return conversationId === null
-        ? undefined
-        : create(NormalizedAgentEventSchema, {
-            event: {
-              case: "conversationStarted",
-              value: { conversationId },
-            },
-          });
-    }
+  const event = value?.event;
+  switch (event?.case) {
+    case "conversationStarted":
+      return value;
     case "messageStarted":
-    case "messageCompleted": {
-      const id = string(event.id);
-      const text = string(event.text);
-      if (id === null || text === null) return undefined;
+    case "messageCompleted":
       return create(NormalizedAgentEventSchema, {
         event: {
-          case: event.type,
-          value: { id, text, phase: optionalString(event.phase) },
+          case: event.case,
+          value: {
+            id: event.value.id,
+            phase: event.value.phase,
+            text: normalizedActivityText(event.value.text),
+          },
         },
       });
-    }
     case "messageDelta":
-    case "activityDelta": {
-      const id = string(event.id);
-      const delta = string(event.delta);
-      if (id === null || delta === null) return undefined;
+    case "activityDelta":
       return create(NormalizedAgentEventSchema, {
-        event: { case: event.type, value: { id, delta } },
+        event: {
+          case: event.case,
+          value: {
+            id: event.value.id,
+            delta: normalizedActivityText(event.value.delta),
+          },
+        },
       });
-    }
-    case "activityStarted": {
-      const id = string(event.id);
-      const kind = activityKind(event.kind);
-      const title = string(event.title);
-      const text = string(event.text);
-      if (id === null || kind === null || title === null || text === null) {
-        return undefined;
-      }
+    case "activityStarted":
       return create(NormalizedAgentEventSchema, {
         event: {
           case: "activityStarted",
-          value: { id, kind, title, text },
+          value: {
+            id: event.value.id,
+            kind: event.value.kind,
+            title: normalizedActivityTitle(event.value.title),
+            text: normalizedActivityText(event.value.text),
+          },
         },
       });
-    }
-    case "activityCompleted": {
-      const id = string(event.id);
-      const kind = activityKind(event.kind);
-      const title = string(event.title);
-      const text = string(event.text);
-      const status = activityStatus(event.status);
-      if (
-        id === null || kind === null || title === null || text === null ||
-        status === null
-      ) {
-        return undefined;
-      }
+    case "activityCompleted":
       return create(NormalizedAgentEventSchema, {
         event: {
           case: "activityCompleted",
-          value: { id, kind, title, text, status },
+          value: {
+            id: event.value.id,
+            kind: event.value.kind,
+            title: normalizedActivityTitle(event.value.title),
+            text: normalizedActivityText(event.value.text),
+            status: event.value.status,
+          },
         },
       });
-    }
-    case "turnCompleted": {
-      const status = string(event.status);
-      return status === null
-        ? undefined
-        : create(NormalizedAgentEventSchema, {
-            event: { case: "turnCompleted", value: { status } },
-          });
-    }
-    default:
+    case "turnCompleted":
+      return value;
+    case undefined:
       return undefined;
   }
 }
 
-const archiveCompaction = (payload: unknown) => {
-  const value = record(record(payload)?.archiveCompaction);
-  return value?.kind === "delta" &&
-      Number.isSafeInteger(value.firstSequence) &&
-      (value.firstSequence as number) > 0 &&
-      Number.isSafeInteger(value.eventCount) &&
-      (value.eventCount as number) > 0
-    ? {
-        firstSequence: BigInt(value.firstSequence as number),
-        representedEventCount: value.eventCount as number,
-      }
-    : undefined;
-};
-
-export const transcriptEventToProto = (event: TranscriptBatchEvent) => {
-  const sidecar =
-    event.payload && typeof event.payload === "object" &&
-      "$typeName" in event.payload &&
-      event.payload.$typeName === "briar.sidecar.v1.RunnerToParent"
-      ? event.payload as RunnerToParent
-      : undefined;
-  if (sidecar) {
-    const payload = sidecar.payload;
-    if (payload.case === "event") {
-      return create(AgentTranscriptEventSchema, {
-        sequence: BigInt(event.sequence),
-        direction: payload.value.direction,
-        rawPayload: payload.value.raw,
-        normalized: payload.value.normalized,
-      });
-    }
+/** Project a sidecar output into the generated Worker transcript contract once. */
+export function transcriptEventFromSidecar(
+  output: RunnerToParent,
+  sequence: number | bigint,
+): AgentTranscriptEvent {
+  const payload = output.payload;
+  if (payload.case === "event") {
     return create(AgentTranscriptEventSchema, {
-      sequence: BigInt(event.sequence),
-      direction: AgentEventDirection.SERVER,
-      rawPayload: fromJson(
-        ValueSchema,
-        toJson(RunnerToParentSchema, sidecar),
-      ),
-      normalized: payload.case === "sessionStarted"
-        ? create(NormalizedAgentEventSchema, {
-            event: {
-              case: "conversationStarted",
-              value: { conversationId: payload.value.sessionId },
-            },
-          })
+      sequence: BigInt(sequence),
+      direction: payload.value.direction,
+      rawPayload: payload.value.raw
+        ? boundedRawPayload(payload.value.raw)
         : undefined,
+      normalized: boundedNormalizedEvent(payload.value.normalized),
     });
   }
-  const rawPayload = rawTranscriptPayload(event.payload);
+  const rawPayload = fromJson(
+    ValueSchema,
+    toJson(RunnerToParentSchema, output),
+  );
   return create(AgentTranscriptEventSchema, {
-    sequence: BigInt(event.sequence),
-    direction: event.direction === "client"
-      ? AgentEventDirection.CLIENT
-      : AgentEventDirection.SERVER,
-    rawPayload: rawPayload === undefined
-      ? undefined
-      : fromJson(ValueSchema, jsonValue(rawPayload)),
-    normalized: normalizedTranscriptEventToProto(event.payload),
-    archiveCompaction: archiveCompaction(event.payload),
+    sequence: BigInt(sequence),
+    direction: AgentEventDirection.SERVER,
+    rawPayload: boundedRawPayload(rawPayload),
+    normalized: payload.case === "sessionStarted"
+      ? create(NormalizedAgentEventSchema, {
+          event: {
+            case: "conversationStarted",
+            value: { conversationId: payload.value.sessionId },
+          },
+        })
+      : undefined,
   });
-};
+}
 
 export const appendTranscriptEventsRequest = (input: {
   projectId: string;
   work: TranscriptWork;
   sessionId: string;
   agentProvider: AgentProvider;
-  events: TranscriptBatchEvent[];
+  events: AgentTranscriptEvent[];
 }) => create(AppendTranscriptEventsRequestSchema, {
   projectId: input.projectId,
   work: workClaimIdentityToProto(input.work),
   sessionId: input.sessionId,
   agentProvider: agentProviderToProto(input.agentProvider),
-  events: input.events.map(transcriptEventToProto),
+  events: input.events,
 });
 
 export const isConnectPayloadTooLarge = (error: unknown) =>
@@ -294,11 +210,11 @@ export function createWorkerTranscriptBatcher(input: {
   onError?: (error: unknown) => void;
 }) {
   const rpc = createAuthenticatedWorkerExecutionClient(input.apiUrl, input.token);
-  const request = (events: TranscriptBatchEvent[]) =>
+  const request = (events: AgentTranscriptEvent[]) =>
     appendTranscriptEventsRequest({
-    ...input,
-    events,
-  });
+      ...input,
+      events,
+    });
   return new TranscriptBatcher({
     send: async (events) => {
       await rpc.appendTranscriptEvents(request(events));
