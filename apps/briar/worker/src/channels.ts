@@ -1,3 +1,4 @@
+import * as Schema from "effect/Schema";
 import {
   channelReplyAssignedWorkerUnavailableError,
   channelReplyNoAvailableWorkerError,
@@ -10,6 +11,7 @@ import {
   type ChannelKind,
   type ChannelMessage,
   type ChannelMessageBlock,
+  channelMessageBlockSchema,
   type ChannelMessageAttachment,
   type ChannelMessageReaction,
   type ChannelMessageReactionPerson,
@@ -45,6 +47,24 @@ import {
   channelMessageUploadConsumeStatements,
   type ChannelMessageUploadScope,
 } from "./channel-message-upload-repository";
+
+const strictStoredChannelMessageBlockOptions = {
+  errors: "all",
+  onExcessProperty: "error",
+} as const;
+const StoredChannelMessageBlocksJson = Schema.fromJsonString(
+  Schema.mutable(Schema.Array(channelMessageBlockSchema)).check(
+    Schema.isLengthBetween(1, 50),
+  ),
+);
+const decodeStoredChannelMessageBlocks = Schema.decodeUnknownSync(
+  StoredChannelMessageBlocksJson,
+  strictStoredChannelMessageBlockOptions,
+);
+const encodeStoredChannelMessageBlocks = Schema.encodeSync(
+  StoredChannelMessageBlocksJson,
+  strictStoredChannelMessageBlockOptions,
+);
 
 export type ChannelRow = {
   id: string;
@@ -733,7 +753,7 @@ export const channelMessageJson = (
   author: channelMessageAuthorJson(row),
   body: row.deleted_at ? "[deleted]" : row.body,
   blocks: !row.deleted_at && row.blocks_json
-    ? JSON.parse(row.blocks_json) as ChannelMessageBlock[]
+    ? decodeStoredChannelMessageBlocks(row.blocks_json)
     : [],
   mentionedUserIds: row.deleted_at ? [] : mentions.users,
   mentionedAgentIds: row.deleted_at ? [] : mentions.agents,
@@ -2433,7 +2453,7 @@ export async function createIncomingChannelWebhookMessage(
     input.webhookName,
     input.eventId,
     input.body,
-    input.blocks ? JSON.stringify(input.blocks) : null,
+    input.blocks ? encodeStoredChannelMessageBlocks(input.blocks) : null,
     input.createdAt,
     input.createdAt,
   ).first<{ id: string }>();

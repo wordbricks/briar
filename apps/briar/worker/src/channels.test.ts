@@ -815,7 +815,10 @@ describe("organization channels", () => {
       }),
     }), apiEnv);
     expect(blockResponse.status).toBe(201);
-    await expect(blockResponse.json()).resolves.toMatchObject({
+    const blockPayload = await blockResponse.json() as {
+      message: { id: string };
+    };
+    expect(blockPayload).toMatchObject({
       duplicate: false,
       message: {
         body: "Deploy complete\n*Production* is healthy.",
@@ -827,6 +830,19 @@ describe("organization channels", () => {
         author: { type: "webhook", id: webhookId, name: "Deploy notifier" },
       },
     });
+    const storedBlocks = await db.prepare(
+      `select blocks_json from briar_channel_messages where id = ?`,
+    ).bind(blockPayload.message.id).first<string>("blocks_json");
+    expect(storedBlocks).not.toBeNull();
+    await db.prepare(
+      `update briar_channel_messages set blocks_json = ? where id = ?`,
+    ).bind('[{"type":"actions","elements":[]}]', blockPayload.message.id)
+      .run();
+    await expect(getChannelMessage(db, channelId, blockPayload.message.id))
+      .rejects.toThrow();
+    await db.prepare(
+      `update briar_channel_messages set blocks_json = ? where id = ?`,
+    ).bind(storedBlocks, blockPayload.message.id).run();
 
     const first = await createIncomingChannelWebhookMessage(db, {
       id: "f1000000-0000-4000-8000-000000000060",
