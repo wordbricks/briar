@@ -2,9 +2,16 @@ import { toJson } from "@bufbuild/protobuf";
 import {
   InboxFeedMessageSchema,
 } from "@briar/contracts/gen/briar/app/v1/inbox_pb";
+import { DashboardWorkerSchema } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import { describe, expect, it } from "vitest";
 import type { InboxFeedMessage } from "./inbox-feed";
-import { appInboxFeedMessage } from "./app-connect-mappers";
+import {
+  appDashboardWorker,
+  appInboxFeedMessage,
+} from "./app-connect-mappers";
+import { workerRuntimeFixture } from "./test-helpers/worker-runtime";
+import { workerJson } from "./worker-json";
+import { workerRuntimeMetadataFromProto } from "./worker-runtime-mappers";
 
 describe("app Connect message mapping", () => {
   it("preserves the Inbox oneof, enums, presence, and timestamp", () => {
@@ -63,5 +70,28 @@ describe("app Connect message mapping", () => {
         },
       },
     });
+  });
+
+  it("projects generated Worker runtime capabilities without a parallel DTO", () => {
+    const runtime = workerRuntimeMetadataFromProto(workerRuntimeFixture());
+    const worker = appDashboardWorker(workerJson({
+      id: "11111111-1111-4111-8111-111111111111",
+      label: "Build Mac",
+      runtime_proto_json: runtime.runtimeProtoJson,
+      state: "online",
+      last_heartbeat_at: "2026-08-30T12:34:56.789Z",
+      created_at: "2026-08-29T12:34:56.789Z",
+    }, "2026-08-30T12:35:00.000Z"));
+
+    expect(toJson(DashboardWorkerSchema, worker)).toMatchObject({
+      agentProvider: "AGENT_PROVIDER_CODEX",
+      providers: ["AGENT_PROVIDER_CODEX"],
+      versions: { briar: "1.2.173" },
+      capabilities: {
+        worktrees: true,
+        remoteUpdates: { supported: true, protocol: 1 },
+      },
+    });
+    expect(worker.capabilities?.providerCapabilities).toHaveLength(7);
   });
 });

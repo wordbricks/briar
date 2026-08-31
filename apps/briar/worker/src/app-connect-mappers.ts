@@ -61,13 +61,6 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/organization_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
-  AgentEffortCapabilitySchema,
-  AgentModelCapabilitySchema,
-  AgentProviderCapabilitySchema,
-  RemoteUpdateCapabilitySchema,
-  WorkerCapabilitiesSchema,
-} from "@briar/contracts/gen/briar/types/v1/worker_pb";
-import {
   AutoHuntWorkflowSchema,
   CheckpointBoundarySchema,
   CheckpointPolicySchema,
@@ -79,18 +72,11 @@ import {
   WorkflowRequirementSchema,
   WorkflowStageSchema,
 } from "@briar/contracts/gen/briar/types/v1/workflow_pb";
-import * as Option from "effect/Option";
 import type {
   AutoHuntWorkflow,
   AutoHuntWorkflowCheckpoint,
 } from "../../src/lib/auto-hunt-contract";
 import type { AgentProvider as AgentProviderName } from "../../src/lib/agent-provider";
-import {
-  decodeAgentProviderCapabilityCatalogOption,
-  type AgentEffortCapability,
-  type AgentModelCapability,
-  type AgentProviderCapability,
-} from "../../src/lib/agent-provider-contract";
 import type { StructuredAgentResult } from "../../src/lib/agent-result";
 import type { dashboardEventJson, dashboardRunJson } from "./dashboard-json";
 import type { InboxFeedMessage } from "./inbox-feed";
@@ -107,7 +93,7 @@ import type {
 import type { ProjectRow } from "./project-repository";
 import type { settingsJson } from "./project-settings-json";
 import type { checkpointPolicyJson } from "./workflow-policy";
-import type { workerJson, WorkerCapabilitiesJson } from "./worker-json";
+import type { workerJson } from "./worker-json";
 
 const projectRole = {
   owner: ProjectRole.OWNER,
@@ -725,82 +711,6 @@ export const appDashboardRun = (run: DashboardRunJson) =>
     agentId: run.agentId ?? undefined,
   });
 
-const appEffortCapability = (effort: AgentEffortCapability) =>
-  create(AgentEffortCapabilitySchema, {
-    id: effort.id,
-    label: effort.label,
-    description: effort.description ?? undefined,
-    isDefault: effort.isDefault,
-  });
-
-const appModelCapability = (model: AgentModelCapability) =>
-  create(AgentModelCapabilitySchema, {
-    id: model.id,
-    label: model.label,
-    isDefault: model.isDefault,
-    defaultEffortId: model.defaultEffortId ?? undefined,
-    efforts: (model.efforts ?? []).map(appEffortCapability),
-  });
-
-const appProviderCapability = (
-  provider: AgentProviderName,
-  capability: AgentProviderCapability,
-) => create(AgentProviderCapabilitySchema, {
-  provider: agentProvider[provider],
-  models: capability.models.map(appModelCapability),
-  defaultEfforts: (capability.defaultEfforts ?? []).map(appEffortCapability),
-  allowCustomModels: capability.allowCustomModels,
-  error: capability.error ?? undefined,
-});
-
-const appWorkerCapabilities = (value: WorkerCapabilitiesJson) => {
-  const providerCapabilities = value.providerCapabilities;
-  const decoded = providerCapabilities === undefined
-    ? null
-    : decodeAgentProviderCapabilityCatalogOption(providerCapabilities);
-  if (decoded !== null && Option.isNone(decoded)) {
-    throw new Error("Worker provider capabilities are invalid");
-  }
-  const catalog = decoded === null ? null : decoded.value;
-  const providers = Object.keys(agentProvider) as AgentProviderName[];
-
-  const remoteValue = value.remoteUpdates;
-  let remoteUpdates;
-  if (remoteValue !== undefined) {
-    if (typeof remoteValue !== "object" || remoteValue === null) {
-      throw new Error("Worker remote update capability is invalid");
-    }
-    const candidate = remoteValue as {
-      readonly supported?: unknown;
-      readonly protocol?: unknown;
-    };
-    if (typeof candidate.supported !== "boolean") {
-      throw new Error("Worker remote update capability is invalid");
-    }
-    const protocol = candidate.protocol;
-    if (
-      protocol !== undefined &&
-      (typeof protocol !== "number" || !Number.isSafeInteger(protocol) ||
-        protocol < 0 || protocol > 4_294_967_295)
-    ) {
-      throw new Error("Worker remote update protocol is invalid");
-    }
-    remoteUpdates = create(RemoteUpdateCapabilitySchema, {
-      supported: candidate.supported,
-      protocol,
-    });
-  }
-
-  return create(WorkerCapabilitiesSchema, {
-    providerCapabilities: catalog
-      ? providers.map((provider) =>
-          appProviderCapability(provider, catalog[provider])
-        )
-      : [],
-    remoteUpdates,
-  });
-};
-
 export const appDashboardWorker = (
   worker: ReturnType<typeof workerJson>,
 ) => create(DashboardWorkerSchema, {
@@ -814,9 +724,9 @@ export const appDashboardWorker = (
         value: worker.icon.value,
       })
     : undefined,
-  agentProvider: agentProvider[worker.agentProvider],
-  providers: worker.providers.map((provider) => agentProvider[provider]),
-  capabilities: appWorkerCapabilities(worker.capabilities),
+  agentProvider: worker.runtime.proto.agentProvider,
+  providers: worker.runtime.providers.map((provider) => agentProvider[provider]),
+  capabilities: worker.runtime.proto.capabilities,
   readiness: {
     available: DashboardWorker_Readiness.AVAILABLE,
     busy: DashboardWorker_Readiness.BUSY,
@@ -830,7 +740,7 @@ export const appDashboardWorker = (
   availableSessions: worker.availableSessions,
   deviceId: worker.deviceId,
   ownerUserId: worker.ownerUserId,
-  versions: worker.versions as Record<string, string>,
+  versions: worker.runtime.proto.versions,
   state: {
     online: DashboardWorker_State.ONLINE,
     stale: DashboardWorker_State.STALE,
