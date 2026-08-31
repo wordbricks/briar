@@ -37,7 +37,6 @@ import {
 } from "./run-identity";
 import { loadStageRevisionRequirements } from "./run-stage-revision-repository";
 import { assertWorkflowRunCompletion } from "./workflow-completion-repository";
-import { defaultIssueDifficulty } from "../../src/lib/issue-difficulty";
 
 type ComparableHuntEvent = Pick<
   HuntEventRow,
@@ -395,13 +394,7 @@ export async function recordHuntEvent(
     normalizedInput.stage === "production_qa" && qaStatus === "pending"
       ? "pending"
       : null;
-  // Difficulty is issue metadata, so a newly-created issue stays unset when
-  // its caller omits the field. Preserve the legacy fallback for non-issue
-  // event callers that still rely on it.
-  const storedDifficulty =
-    normalizedInput.difficulty === undefined && normalizedInput.source !== "issue"
-      ? defaultIssueDifficulty
-      : normalizedInput.difficulty ?? null;
+  const storedDifficulty = normalizedInput.difficulty ?? null;
   const results = await db.batch([
     db
       .prepare(
