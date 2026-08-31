@@ -1,13 +1,20 @@
-import { create } from "@bufbuild/protobuf";
-import { timestampFromDate } from "@bufbuild/protobuf/wkt";
+import { create, fromJson, toJson } from "@bufbuild/protobuf";
+import { timestampFromDate, ValueSchema } from "@bufbuild/protobuf/wkt";
+import {
+  DmMemoryBriefState,
+  DmMemoryDescriptorSchema,
+} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
 import {
   BlockMergeBatchResponseSchema,
   CheckpointChannelReplySessionResponseSchema,
   CompleteChannelReplyResponseSchema,
   CompleteIssueReplyResponseSchema,
   CompleteMergeBatchPublicationResponseSchema,
+  CheckDmMemoryClaimResponseSchema,
+  GetDmMemoryBriefResponseSchema,
   HandoffWorkResponse_Outcome,
   HandoffWorkResponse_State,
+  LookupDmMemoryResponseSchema,
   MergeBatchState,
   MergeBatchValidationFailureCode,
   RecordMergeBatchAuthorityResponseSchema,
@@ -18,11 +25,15 @@ import {
   RenewWorkLeaseResponseSchema,
   WorkerQueueService,
   type BlockMergeBatchRequest,
+  type CheckDmMemoryClaimRequest,
   type CheckpointChannelReplySessionRequest,
   type CompleteChannelReplyRequest,
   type CompleteIssueReplyRequest,
   type CompleteMergeBatchPublicationRequest,
   type CompleteProjectAgentTaskRequest,
+  type DmMemoryClaimIdentity,
+  type GetDmMemoryBriefRequest,
+  type LookupDmMemoryRequest,
   type PrepareReplyAttachmentUploadsRequest,
   type RecordMergeBatchAuthorityRequest,
   type RecordMergeBatchCandidateEnqueuedRequest,
@@ -102,6 +113,11 @@ import {
   prepareReplyAttachmentUploadsInputFromProto,
 } from "./worker-reply-completion-mappers";
 import { rethrowReplyCompletionHttpError } from "./reply-completion-http-error";
+import {
+  checkDmMemoryClaim,
+  getDmMemoryClaimBrief,
+  lookupDmMemoryClaim,
+} from "./dm-memory-claim-application";
 
 export type WorkerConnectQueueInput = {
   readonly request: Request;
@@ -145,6 +161,9 @@ export type WorkerQueueServices = {
     typeof prepareReplyAttachmentUploadsApplication;
   readonly completeIssueReplyApplication: typeof completeIssueReplyApplication;
   readonly completeChannelReplyApplication: typeof completeChannelReplyApplication;
+  readonly checkDmMemoryClaim: typeof checkDmMemoryClaim;
+  readonly getDmMemoryClaimBrief: typeof getDmMemoryClaimBrief;
+  readonly lookupDmMemoryClaim: typeof lookupDmMemoryClaim;
 };
 
 const workerQueueServices: WorkerQueueServices = {
@@ -179,6 +198,9 @@ const workerQueueServices: WorkerQueueServices = {
   prepareReplyAttachmentUploadsApplication,
   completeIssueReplyApplication,
   completeChannelReplyApplication,
+  checkDmMemoryClaim,
+  getDmMemoryClaimBrief,
+  lookupDmMemoryClaim,
 };
 
 const requiredWork = (value: WorkClaimIdentity | undefined) => {
@@ -1000,6 +1022,98 @@ async function completeChannelReplyRpc(
   });
 }
 
+const dmMemoryDescriptorMessage = (value: {
+  protocol: 1;
+  memorySpaceId: string;
+  memoryRevision: number;
+  revocationEpoch: number;
+  searchEnabled: boolean;
+  briefState: "available" | "disabled";
+}) => create(DmMemoryDescriptorSchema, {
+  protocol: value.protocol,
+  memorySpaceId: value.memorySpaceId,
+  memoryRevision: BigInt(value.memoryRevision),
+  revocationEpoch: BigInt(value.revocationEpoch),
+  searchEnabled: value.searchEnabled,
+  briefState: value.briefState === "available"
+    ? DmMemoryBriefState.AVAILABLE
+    : DmMemoryBriefState.DISABLED,
+});
+
+const dmMemoryScope = async (
+  input: WorkerConnectQueueInput,
+  claim: DmMemoryClaimIdentity | undefined,
+  services: WorkerQueueServices,
+) => {
+  if (!claim) throw new HttpError(400, "DM memory claim is required");
+  const work = requiredWork(claim.work);
+  if (work.work.case !== "channelReply") {
+    throw new HttpError(400, "DM memory requires a channel reply claim");
+  }
+  if (claim.revocationEpoch > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new HttpError(400, "DM memory revocation epoch is too large");
+  }
+  const worker = await authenticatedWorker(
+    input,
+    claim.projectId,
+    claim.workerId,
+    services,
+  );
+  return {
+    jobId: work.workId,
+    workerId: claim.workerId,
+    deviceId: worker.principal.deviceId,
+    claimToken: work.claimToken,
+    revocationEpoch: Number(claim.revocationEpoch),
+  };
+};
+
+async function checkDmMemoryClaimRpc(
+  input: WorkerConnectQueueInput,
+  request: CheckDmMemoryClaimRequest,
+  services: WorkerQueueServices,
+) {
+  const scope = await dmMemoryScope(input, request.claim, services);
+  const memory = await services.checkDmMemoryClaim(input.db, input.env, scope);
+  return create(CheckDmMemoryClaimResponseSchema, {
+    memory: dmMemoryDescriptorMessage(memory),
+  });
+}
+
+async function getDmMemoryBriefRpc(
+  input: WorkerConnectQueueInput,
+  request: GetDmMemoryBriefRequest,
+  services: WorkerQueueServices,
+) {
+  const scope = await dmMemoryScope(input, request.claim, services);
+  const result = await services.getDmMemoryClaimBrief(input.db, input.env, scope);
+  return create(GetDmMemoryBriefResponseSchema, {
+    memory: dmMemoryDescriptorMessage(result.memory),
+    brief: fromJson(ValueSchema, result.brief),
+  });
+}
+
+async function lookupDmMemoryRpc(
+  input: WorkerConnectQueueInput,
+  request: LookupDmMemoryRequest,
+  services: WorkerQueueServices,
+) {
+  const scope = await dmMemoryScope(input, request.claim, services);
+  if (!request.requestId || !request.request) {
+    throw new HttpError(400, "DM memory lookup request is incomplete");
+  }
+  const response = await services.lookupDmMemoryClaim(
+    input.db,
+    input.env,
+    scope,
+    request.requestId,
+    toJson(ValueSchema, request.request),
+  );
+  return create(LookupDmMemoryResponseSchema, {
+    response: fromJson(ValueSchema, response),
+  });
+}
+
 export function createWorkerQueueService(
   input: WorkerConnectQueueInput,
   overrides: Partial<WorkerQueueServices> = {},
@@ -1019,6 +1133,9 @@ export function createWorkerQueueService(
     prepareReplyAttachmentUploads: (request, context) => prepareReplyAttachmentUploadsRpc(input, request, context, services),
     completeIssueReply: (request) => completeIssueReplyRpc(input, request, services),
     completeChannelReply: (request) => completeChannelReplyRpc(input, request, services),
+    checkDmMemoryClaim: (request) => checkDmMemoryClaimRpc(input, request, services),
+    getDmMemoryBrief: (request) => getDmMemoryBriefRpc(input, request, services),
+    lookupDmMemory: (request) => lookupDmMemoryRpc(input, request, services),
   };
 }
 

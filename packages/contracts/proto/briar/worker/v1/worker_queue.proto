@@ -4,6 +4,7 @@ package briar.worker.v1;
 
 import "briar/app/v1/channel.proto";
 import "briar/app/v1/issue.proto";
+import "briar/app/v1/dm_memory.proto";
 import "briar/app/v1/common.proto";
 import "briar/app/v1/dashboard.proto";
 import "briar/app/v1/fleet.proto";
@@ -36,6 +37,9 @@ service WorkerQueueService {
   rpc RecordMergeBatchValidation(RecordMergeBatchValidationRequest) returns (RecordMergeBatchValidationResponse);
   rpc CompleteMergeBatchPublication(CompleteMergeBatchPublicationRequest) returns (CompleteMergeBatchPublicationResponse);
   rpc BlockMergeBatch(BlockMergeBatchRequest) returns (BlockMergeBatchResponse);
+  rpc CheckDmMemoryClaim(CheckDmMemoryClaimRequest) returns (CheckDmMemoryClaimResponse);
+  rpc GetDmMemoryBrief(GetDmMemoryBriefRequest) returns (GetDmMemoryBriefResponse);
+  rpc LookupDmMemory(LookupDmMemoryRequest) returns (LookupDmMemoryResponse);
 }
 
 // Ephemeral reply activity uses the short-lived capability returned with a
@@ -506,6 +510,7 @@ message ChannelReplySuccess {
   string body = 1;
   optional string conversation_id = 2;
   repeated briar.types.v1.UploadReference attachments = 3;
+  repeated briar.app.v1.DmMemoryReference memory_citations = 4;
 
   // A document may accompany at most one proposal. Skill execution and
   // delegation remain exclusive from every artifact at the wire boundary.
@@ -536,6 +541,40 @@ message CompleteChannelReplyResponse {
   // Implementations reject unspecified and unknown values on read.
   ReplyCompletionDisposition disposition = 2;
   optional google.protobuf.Timestamp retained_until = 3;
+}
+
+message DmMemoryClaimIdentity {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+  uint64 revocation_epoch = 4;
+}
+
+message CheckDmMemoryClaimRequest {
+  DmMemoryClaimIdentity claim = 1;
+}
+
+message CheckDmMemoryClaimResponse {
+  briar.app.v1.DmMemoryDescriptor memory = 1;
+}
+
+message GetDmMemoryBriefRequest {
+  DmMemoryClaimIdentity claim = 1;
+}
+
+message GetDmMemoryBriefResponse {
+  briar.app.v1.DmMemoryDescriptor memory = 1;
+  google.protobuf.Value brief = 2;
+}
+
+message LookupDmMemoryRequest {
+  DmMemoryClaimIdentity claim = 1;
+  string request_id = 2;
+  google.protobuf.Value request = 3;
+}
+
+message LookupDmMemoryResponse {
+  google.protobuf.Value response = 1;
 }
 
 message PublishReplyActivityRequest {
@@ -1048,6 +1087,7 @@ message ClaimedChannelReply {
   google.protobuf.Struct snapshot = 24;
   // Trigger-message files with claim-scoped raw download URLs.
   repeated QueuedAttachment trigger_attachments = 25;
+  optional briar.app.v1.DmMemoryDescriptor memory = 26;
 }
 
 enum MergeBatchPhase {

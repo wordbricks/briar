@@ -477,6 +477,7 @@ export function completeChannelReplyInputFromProto(
       throw new ReplyCompletionMappingError("Channel reply action is unknown");
   }
   const completion = mapping(() => decodeChannelReplyCompletion({
+    memoryCitations: success.memoryCitations,
     body: success.body,
     document,
     issueProposal,

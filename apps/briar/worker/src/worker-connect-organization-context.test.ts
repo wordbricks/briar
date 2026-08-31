@@ -43,6 +43,7 @@ const services = (): WorkerConnectOrganizationContextServices => ({
     organizationId,
     workId,
     snapshotAt,
+    claimTokenHash: "a".repeat(64),
   }),
   getOrganizationProject: vi.fn().mockResolvedValue({ id: projectId }),
   getManifest: vi.fn().mockResolvedValue({
@@ -86,6 +87,18 @@ const services = (): WorkerConnectOrganizationContextServices => ({
         data: { index, resource: request.resource },
       })),
     })),
+  dmMemorySnapshot: vi.fn().mockResolvedValue(null),
+  reserveReplyLookup: vi.fn().mockResolvedValue({
+    jobId: workId,
+    claimTokenHash: "a".repeat(64),
+    requestId: "55555555-5555-4555-8555-555555555555",
+    leaseToken: "lease",
+    memoryRevision: null,
+    revocationEpoch: null,
+    cachedJson: null,
+  }),
+  currentReplyLookupCache: vi.fn().mockResolvedValue(null),
+  completeReplyLookup: vi.fn().mockResolvedValue({ results: [{}] }),
 });
 
 const invoke = async (
@@ -181,6 +194,7 @@ describe("Organization Agent context Connect adapter", () => {
     const dependencies = services();
     const request = create(OrganizationAgentContextServiceLookupRequestSchema, {
       claim,
+      requestId: "55555555-5555-4555-8555-555555555555",
       queries: [
         { query: { case: "projectSettings", value: { projectId } } },
         {

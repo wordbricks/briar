@@ -310,12 +310,19 @@ struct ChannelMessageBlock: Hashable, Sendable {
 
 }
 
+struct ChannelMemoryCitation: Hashable, Identifiable, Sendable {
+    let documentId: UUID
+    let version: Int
+    var id: String { "\(documentId.uuidString):\(version)" }
+}
+
 struct ChannelMessage: Hashable, Identifiable, Sendable {
     let id: UUID
     let channelId: UUID
     let parentMessageId: UUID?
     let body: String
     let blocks: [ChannelMessageBlock]?
+    let memoryCitations: [ChannelMemoryCitation]
     let author: Author
     let mentionedUserIds: [String]
     let mentionedAgentIds: [UUID]
@@ -343,6 +350,7 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
         parentMessageId: UUID?,
         body: String,
         blocks: [ChannelMessageBlock]? = nil,
+        memoryCitations: [ChannelMemoryCitation] = [],
         author: Author,
         mentionedUserIds: [String] = [],
         mentionedAgentIds: [UUID] = [],
@@ -364,6 +372,7 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
         self.parentMessageId = parentMessageId
         self.body = body
         self.blocks = blocks
+        self.memoryCitations = memoryCitations
         self.author = author
         self.mentionedUserIds = mentionedUserIds
         self.mentionedAgentIds = mentionedAgentIds

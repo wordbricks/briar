@@ -429,13 +429,13 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             return UITestAPIClient.createIssueMessageResponse(request)
         }
 
-        private func memoryDocument(detail: Bool) -> BriarAPI_DmMemoryDocument {
+        private func memoryDocument(detail: Bool, version: UInt32? = nil) -> BriarAPI_DmMemoryDocument {
             var document = BriarAPI_DmMemoryDocument()
             document.id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
             document.memorySpaceID = "99999999-9999-4999-8999-999999999999"
             document.kind = .observation
             document.title = "Synthetic memory"
-            document.version = memoryVersion
+            document.version = version ?? memoryVersion
             document.status = .active
             document.memoryClass = .profile
             document.evidenceType = .explicitUser
@@ -488,6 +488,24 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             return response
         }
 
+        func listDmMemoryRevisions() -> BriarAPI_ListDmMemoryRevisionsResponse {
+            var response = BriarAPI_ListDmMemoryRevisionsResponse()
+            response.documentID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+            response.currentVersion = memoryVersion
+            response.revisions = (1...memoryVersion).reversed().map { version in
+                var revision = BriarAPI_DmMemoryRevision()
+                revision.version = version
+                revision.createdAt = Google_Protobuf_Timestamp(
+                    date: Date(timeIntervalSince1970: 1_788_220_800)
+                )
+                revision.memoryClass = .profile
+                revision.protectedByUser = true
+                revision.origin = .userEdit
+                return revision
+            }
+            return response
+        }
+
         func updateDmMemoryDocument() async throws -> BriarAPI_UpdateDmMemoryDocumentResponse {
             try await Task.sleep(for: .seconds(1))
             memoryVersion += 1
@@ -524,10 +542,21 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         }
 
         override func getDmMemoryDocument(
-            request _: BriarAPI_GetDmMemoryDocumentRequest,
+            request: BriarAPI_GetDmMemoryDocumentRequest,
             headers _: Connect.Headers = [:]
         ) async -> ResponseMessage<BriarAPI_GetDmMemoryDocumentResponse> {
-            .success(await scenario.getDmMemoryDocument())
+            var response = await scenario.getDmMemoryDocument()
+            if request.hasVersion {
+                response.document.version = request.version
+            }
+            return .success(response)
+        }
+
+        override func listDmMemoryRevisions(
+            request _: BriarAPI_ListDmMemoryRevisionsRequest,
+            headers _: Connect.Headers = [:]
+        ) async -> ResponseMessage<BriarAPI_ListDmMemoryRevisionsResponse> {
+            .success(await scenario.listDmMemoryRevisions())
         }
 
         override func updateDmMemoryDocument(
@@ -1663,6 +1692,10 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             channelId: honeyChannelID,
             parentMessageId: root.id,
             body: "검토를 마쳤습니다.",
+            memoryCitations: [ChannelMemoryCitation(
+                documentId: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
+                version: 1
+            )],
             author: ChannelMessage.Author(
                 type: .agent,
                 name: "Honey",

@@ -18,6 +18,9 @@ public protocol BriarAPI_DmMemoryServiceClientInterface: Sendable {
     func `getDmMemoryDocument`(request: BriarAPI_GetDmMemoryDocumentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_GetDmMemoryDocumentResponse>
 
     @available(iOS 13, *)
+    func `listDmMemoryRevisions`(request: BriarAPI_ListDmMemoryRevisionsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListDmMemoryRevisionsResponse>
+
+    @available(iOS 13, *)
     func `createDmMemoryDocument`(request: BriarAPI_CreateDmMemoryDocumentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateDmMemoryDocumentResponse>
 
     @available(iOS 13, *)
@@ -49,6 +52,11 @@ public final class BriarAPI_DmMemoryServiceClient: BriarAPI_DmMemoryServiceClien
     }
 
     @available(iOS 13, *)
+    public func `listDmMemoryRevisions`(request: BriarAPI_ListDmMemoryRevisionsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListDmMemoryRevisionsResponse> {
+        return await self.client.unary(path: "/briar.app.v1.DmMemoryService/ListDmMemoryRevisions", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
     public func `createDmMemoryDocument`(request: BriarAPI_CreateDmMemoryDocumentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateDmMemoryDocumentResponse> {
         return await self.client.unary(path: "/briar.app.v1.DmMemoryService/CreateDmMemoryDocument", idempotencyLevel: .unknown, request: request, headers: headers)
     }
@@ -72,6 +80,7 @@ public final class BriarAPI_DmMemoryServiceClient: BriarAPI_DmMemoryServiceClien
         public enum Methods {
             public static let listDmMemories = Connect.MethodSpec(name: "ListDmMemories", service: "briar.app.v1.DmMemoryService", type: .unary)
             public static let getDmMemoryDocument = Connect.MethodSpec(name: "GetDmMemoryDocument", service: "briar.app.v1.DmMemoryService", type: .unary)
+            public static let listDmMemoryRevisions = Connect.MethodSpec(name: "ListDmMemoryRevisions", service: "briar.app.v1.DmMemoryService", type: .unary)
             public static let createDmMemoryDocument = Connect.MethodSpec(name: "CreateDmMemoryDocument", service: "briar.app.v1.DmMemoryService", type: .unary)
             public static let updateDmMemoryDocument = Connect.MethodSpec(name: "UpdateDmMemoryDocument", service: "briar.app.v1.DmMemoryService", type: .unary)
             public static let deleteDmMemoryDocument = Connect.MethodSpec(name: "DeleteDmMemoryDocument", service: "briar.app.v1.DmMemoryService", type: .unary)

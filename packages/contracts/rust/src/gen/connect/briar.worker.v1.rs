@@ -140,6 +140,34 @@ pub type OwnedBlockMergeBatchRequestView = ::buffa::view::OwnedView<
 pub type OwnedBlockMergeBatchResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::BlockMergeBatchResponseView<'static>,
 >;
+///Shorthand for `OwnedView<CheckDmMemoryClaimRequestView<'static>>`.
+pub type OwnedCheckDmMemoryClaimRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CheckDmMemoryClaimResponseView<'static>>`.
+pub type OwnedCheckDmMemoryClaimResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetDmMemoryBriefRequestView<'static>>`.
+pub type OwnedGetDmMemoryBriefRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetDmMemoryBriefResponseView<'static>>`.
+pub type OwnedGetDmMemoryBriefResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefResponseView<'static>,
+>;
+///Shorthand for `OwnedView<LookupDmMemoryRequestView<'static>>`.
+pub type OwnedLookupDmMemoryRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryRequestView<'static>,
+>;
+///Shorthand for `OwnedView<LookupDmMemoryResponseView<'static>>`.
+pub type OwnedLookupDmMemoryResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<PublishReplyActivityRequestView<'static>>`.
 pub type OwnedPublishReplyActivityRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::PublishReplyActivityRequestView<
@@ -840,6 +868,110 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::CheckDmMemoryClaimResponse>
+for crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::CheckDmMemoryClaimResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::GetDmMemoryBriefResponse>
+for crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::GetDmMemoryBriefResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::LookupDmMemoryResponse>
+for crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::LookupDmMemoryResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 impl ::connectrpc::Encodable<
     crate::proto::briar::worker::v1::PublishReplyActivityResponse,
 >
@@ -1472,6 +1604,24 @@ pub const WORKER_QUEUE_SERVICE_BLOCK_MERGE_BATCH_SPEC: ::connectrpc::Spec = ::co
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CheckDmMemoryClaim` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_CHECK_DM_MEMORY_CLAIM_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/CheckDmMemoryClaim",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `GetDmMemoryBrief` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_GET_DM_MEMORY_BRIEF_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/GetDmMemoryBrief",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `LookupDmMemory` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_LOOKUP_DM_MEMORY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/LookupDmMemory",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// The machine Worker queue control plane. Attachment metadata and upload
 /// capabilities are negotiated here, while attachment bytes, large evidence,
 /// and provider-specific streams intentionally use their dedicated transports.
@@ -1821,6 +1971,75 @@ pub trait WorkerQueueService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::worker::v1::BlockMergeBatchResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the CheckDmMemoryClaim RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn check_dm_memory_claim<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::CheckDmMemoryClaimRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::CheckDmMemoryClaimResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the GetDmMemoryBrief RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_dm_memory_brief<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::GetDmMemoryBriefRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::GetDmMemoryBriefResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the LookupDmMemory RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn lookup_dm_memory<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::LookupDmMemoryRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::LookupDmMemoryResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -2233,6 +2452,93 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
                 },
             )
             .with_spec(WORKER_QUEUE_SERVICE_BLOCK_MERGE_BATCH_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "CheckDmMemoryClaim",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::CheckDmMemoryClaimRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.check_dm_memory_claim(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::CheckDmMemoryClaimResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_CHECK_DM_MEMORY_CLAIM_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "GetDmMemoryBrief",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::GetDmMemoryBriefRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_dm_memory_brief(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::GetDmMemoryBriefResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_GET_DM_MEMORY_BRIEF_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "LookupDmMemory",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::LookupDmMemoryRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.lookup_dm_memory(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::LookupDmMemoryResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_LOOKUP_DM_MEMORY_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -2377,6 +2683,24 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(WORKER_QUEUE_SERVICE_BLOCK_MERGE_BATCH_SPEC),
+                )
+            }
+            "CheckDmMemoryClaim" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_CHECK_DM_MEMORY_CLAIM_SPEC),
+                )
+            }
+            "GetDmMemoryBrief" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_GET_DM_MEMORY_BRIEF_SPEC),
+                )
+            }
+            "LookupDmMemory" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_LOOKUP_DM_MEMORY_SPEC),
                 )
             }
             _ => None,
@@ -2677,6 +3001,72 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                         .await?
                         .encode::<
                             crate::proto::briar::worker::v1::BlockMergeBatchResponse,
+                        >(format)
+                })
+            }
+            "CheckDmMemoryClaim" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::CheckDmMemoryClaimRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::CheckDmMemoryClaimRequest,
+                    >::from_parts(&req, &body);
+                    svc.check_dm_memory_claim(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::CheckDmMemoryClaimResponse,
+                        >(format)
+                })
+            }
+            "GetDmMemoryBrief" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::GetDmMemoryBriefRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::GetDmMemoryBriefRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_dm_memory_brief(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::GetDmMemoryBriefResponse,
+                        >(format)
+                })
+            }
+            "LookupDmMemory" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::LookupDmMemoryRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::LookupDmMemoryRequest,
+                    >::from_parts(&req, &body);
+                    svc.lookup_dm_memory(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::LookupDmMemoryResponse,
                         >(format)
                 })
             }
@@ -3389,6 +3779,141 @@ where
                 &self.transport,
                 &self.config,
                 WORKER_QUEUE_SERVICE_BLOCK_MERGE_BATCH_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CheckDmMemoryClaim RPC. Sends a request to /briar.worker.v1.WorkerQueueService/CheckDmMemoryClaim.
+    pub async fn check_dm_memory_claim(
+        &self,
+        request: crate::proto::briar::worker::v1::CheckDmMemoryClaimRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.check_dm_memory_claim_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CheckDmMemoryClaim RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn check_dm_memory_claim_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::CheckDmMemoryClaimRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_CHECK_DM_MEMORY_CLAIM_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetDmMemoryBrief RPC. Sends a request to /briar.worker.v1.WorkerQueueService/GetDmMemoryBrief.
+    pub async fn get_dm_memory_brief(
+        &self,
+        request: crate::proto::briar::worker::v1::GetDmMemoryBriefRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_dm_memory_brief_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetDmMemoryBrief RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_dm_memory_brief_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::GetDmMemoryBriefRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_GET_DM_MEMORY_BRIEF_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the LookupDmMemory RPC. Sends a request to /briar.worker.v1.WorkerQueueService/LookupDmMemory.
+    pub async fn lookup_dm_memory(
+        &self,
+        request: crate::proto::briar::worker::v1::LookupDmMemoryRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.lookup_dm_memory_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the LookupDmMemory RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn lookup_dm_memory_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::LookupDmMemoryRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_LOOKUP_DM_MEMORY_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

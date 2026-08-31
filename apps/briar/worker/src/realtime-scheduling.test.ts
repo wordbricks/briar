@@ -33,6 +33,7 @@ const channelJob = (leaseExpiresAt: string | null) => ({
   trigger_message_id: triggerMessageId,
   parent_message_id: parentMessageId,
   attempts: 2,
+  claim_token_hash: "a".repeat(64),
   lease_expires_at: leaseExpiresAt,
 });
 

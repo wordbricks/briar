@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { Spinner } from "./ui/spinner";
+import { DmMemoryCitations } from "./DmMemoryCitations";
 import { DmMemoryDialog } from "./DmMemoryDialog";
 import {
   useCallback,
@@ -3018,6 +3019,9 @@ const MessageRow = memo(function MessageRow({
           </time>
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
+        {channel.kind === "dm" && <DmMemoryCitations
+          scope={{ token, organizationId: channel.organizationId, channelId: message.channelId }}
+          references={message.memoryCitations ?? []} />}
         <ChannelLinkPreview
           channelId={message.channelId}
           message={message}

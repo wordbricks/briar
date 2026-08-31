@@ -57,6 +57,7 @@ message WorkerCapabilities {
   reserved 4;
   reserved "organization_agent_context_protocol";
   repeated WorkflowRequirementHealth workflow_requirements = 5;
+  optional uint32 dm_memory_protocol = 6;
 }
 
 message WorkerRuntimeAdvertisement {

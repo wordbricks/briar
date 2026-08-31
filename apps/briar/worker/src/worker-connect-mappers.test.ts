@@ -70,6 +70,7 @@ const channelReply = {
     url:
       "/organizations/77777777-7777-4777-8777-777777777777/channel-reply-claims/11111111-1111-4111-8111-111111111111/attachments/dddddddd-dddd-4ddd-8ddd-dddddddddddd",
   }],
+  memory: null,
   snapshot: {
     channel: {
       id: common.runId,

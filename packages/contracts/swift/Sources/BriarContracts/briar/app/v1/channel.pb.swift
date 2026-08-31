@@ -2324,6 +2324,11 @@ public nonisolated struct BriarAPI_ChannelMessage: @unchecked Sendable {
   /// Clears the value of `deletedAt`. Subsequent reads from it will return its default value.
   public mutating func clearDeletedAt() {_uniqueStorage()._deletedAt = nil}
 
+  public var memoryCitations: [BriarAPI_DmMemoryReference] {
+    get {_storage._memoryCitations}
+    set {_uniqueStorage()._memoryCitations = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -6098,7 +6103,7 @@ nonisolated extension BriarAPI_GetChannelLinkPreviewResponse: SwiftProtobuf.Mess
 
 nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChannelMessage"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}channel_id\0\u{3}parent_message_id\0\u{1}body\0\u{1}blocks\0\u{1}author\0\u{3}mentioned_user_ids\0\u{3}mentioned_agent_ids\0\u{1}attachments\0\u{1}reactions\0\u{3}reply_count\0\u{3}last_reply_at\0\u{3}reply_authors\0\u{1}document\0\u{1}proposal\0\u{3}execution_proposal\0\u{3}skill_execution_proposal\0\u{1}subscribers\0\u{3}created_at\0\u{3}deleted_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}channel_id\0\u{3}parent_message_id\0\u{1}body\0\u{1}blocks\0\u{1}author\0\u{3}mentioned_user_ids\0\u{3}mentioned_agent_ids\0\u{1}attachments\0\u{1}reactions\0\u{3}reply_count\0\u{3}last_reply_at\0\u{3}reply_authors\0\u{1}document\0\u{1}proposal\0\u{3}execution_proposal\0\u{3}skill_execution_proposal\0\u{1}subscribers\0\u{3}created_at\0\u{3}deleted_at\0\u{3}memory_citations\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -6121,6 +6126,7 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
     var _subscribers: [BriarAPI_IssueSubscriber] = []
     var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _deletedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _memoryCitations: [BriarAPI_DmMemoryReference] = []
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -6151,6 +6157,7 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
       _subscribers = source._subscribers
       _createdAt = source._createdAt
       _deletedAt = source._deletedAt
+      _memoryCitations = source._memoryCitations
     }
   }
 
@@ -6189,6 +6196,7 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
         case 18: try { try decoder.decodeRepeatedMessageField(value: &_storage._subscribers) }()
         case 19: try { try decoder.decodeSingularMessageField(value: &_storage._createdAt) }()
         case 20: try { try decoder.decodeSingularMessageField(value: &_storage._deletedAt) }()
+        case 21: try { try decoder.decodeRepeatedMessageField(value: &_storage._memoryCitations) }()
         default: break
         }
       }
@@ -6261,6 +6269,9 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
       try { if let v = _storage._deletedAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
       } }()
+      if !_storage._memoryCitations.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._memoryCitations, fieldNumber: 21)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -6290,6 +6301,7 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
         if _storage._subscribers != rhs_storage._subscribers {return false}
         if _storage._createdAt != rhs_storage._createdAt {return false}
         if _storage._deletedAt != rhs_storage._deletedAt {return false}
+        if _storage._memoryCitations != rhs_storage._memoryCitations {return false}
         return true
       }
       if !storagesAreEqual {return false}

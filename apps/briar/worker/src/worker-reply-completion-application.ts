@@ -741,6 +741,7 @@ export async function completeChannelReplyApplication(
         workerId: scope.workerId,
         claimTokenHash: scope.claimTokenHash,
         body: result.body,
+        memoryCitations: result.memoryCitations,
         document,
         issueProposal,
         issueBatchProposal,

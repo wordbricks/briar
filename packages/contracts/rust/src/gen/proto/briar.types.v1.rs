@@ -8603,6 +8603,14 @@ pub struct WorkerCapabilities {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub workflow_requirements: ::buffa::alloc::vec::Vec<WorkflowRequirementHealth>,
+    /// Field 6: `dm_memory_protocol`
+    #[serde(
+        rename = "dmMemoryProtocol",
+        alias = "dm_memory_protocol",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub dm_memory_protocol: ::core::option::Option<u32>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -8614,6 +8622,7 @@ impl ::core::fmt::Debug for WorkerCapabilities {
             .field("remote_updates", &self.remote_updates)
             .field("worktrees", &self.worktrees)
             .field("workflow_requirements", &self.workflow_requirements)
+            .field("dm_memory_protocol", &self.dm_memory_protocol)
             .finish()
     }
 }
@@ -8623,6 +8632,15 @@ impl WorkerCapabilities {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkerCapabilities";
+}
+impl WorkerCapabilities {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::dm_memory_protocol`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_dm_memory_protocol(mut self, value: u32) -> Self {
+        self.dm_memory_protocol = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(WorkerCapabilities);
 impl ::buffa::MessageName for WorkerCapabilities {
@@ -8671,6 +8689,9 @@ impl ::buffa::Message for WorkerCapabilities {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(v) = self.dm_memory_protocol {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -8707,6 +8728,9 @@ impl ::buffa::Message for WorkerCapabilities {
                 buf,
             );
             v.write_to(__cache, buf);
+        }
+        if let Some(v) = self.dm_memory_protocol {
+            ::buffa::types::put_uint32_field(6u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -8763,6 +8787,15 @@ impl ::buffa::Message for WorkerCapabilities {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.workflow_requirements.push(elem);
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.dm_memory_protocol = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8775,6 +8808,7 @@ impl ::buffa::Message for WorkerCapabilities {
         self.remote_updates = ::buffa::MessageField::none();
         self.worktrees = false;
         self.workflow_requirements.clear();
+        self.dm_memory_protocol = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -23544,6 +23578,8 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::WorkflowRequirementHealthView<'a>,
             >,
+            /// Field 6: `dm_memory_protocol`
+            pub dm_memory_protocol: ::core::option::Option<u32>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for WorkerCapabilitiesView<'a> {
@@ -23609,6 +23645,15 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.worktrees = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.dm_memory_protocol = Some(
+                            ::buffa::types::decode_uint32(&mut cur)?,
+                        );
                     }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -23699,6 +23744,7 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    dm_memory_protocol: self.dm_memory_protocol,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -23740,6 +23786,9 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if let Some(v) = self.dm_memory_protocol {
+                    size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -23777,6 +23826,9 @@ pub mod __buffa {
                         buf,
                     );
                     v.write_to(__cache, buf);
+                }
+                if let Some(v) = self.dm_memory_protocol {
+                    ::buffa::types::put_uint32_field(6u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -23822,6 +23874,13 @@ pub mod __buffa {
                         .serialize_entry(
                             "workflowRequirements",
                             &*self.workflow_requirements,
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.dm_memory_protocol {
+                    __map
+                        .serialize_entry(
+                            "dmMemoryProtocol",
+                            &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
                 __map.end()
@@ -23952,6 +24011,11 @@ pub mod __buffa {
                 super::super::__buffa::view::WorkflowRequirementHealthView<'_>,
             > {
                 &self.0.reborrow().workflow_requirements
+            }
+            /// Field 6: `dm_memory_protocol`
+            #[must_use]
+            pub fn dm_memory_protocol(&self) -> ::core::option::Option<u32> {
+                self.0.reborrow().dm_memory_protocol
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<WorkerCapabilitiesView<'static>>>

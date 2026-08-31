@@ -219,6 +219,12 @@ final class BriarCompanionUITests: XCTestCase {
         let conversation = app.buttons["dm-row-12121212-1212-4212-8212-121212121212"]
         XCTAssertTrue(conversation.waitForExistence(timeout: channelTransitionTimeout))
         conversation.tap()
+        let citation = app.buttons["참고한 기억 1 · v1"]
+        XCTAssertTrue(citation.waitForExistence(timeout: channelTransitionTimeout))
+        citation.tap()
+        XCTAssertTrue(app.staticTexts["dm-memory-citation-body"].waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-dm-memory-citation")
+        app.buttons["닫기"].tap()
         let open = app.buttons["dm-memory-open"]
         XCTAssertTrue(open.waitForExistence(timeout: channelTransitionTimeout))
         open.tap()
@@ -235,6 +241,16 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(document.label.contains("v2"))
         XCTAssertTrue(document.label.contains("색인 대기"))
         document.tap()
+        let history = app.buttons["dm-memory-history"]
+        if !history.isHittable { app.swipeUp() }
+        XCTAssertTrue(history.waitForExistence(timeout: 5))
+        history.tap()
+        let revision = app.buttons["dm-memory-revision-1"]
+        XCTAssertTrue(revision.waitForExistence(timeout: 5))
+        revision.tap()
+        XCTAssertTrue(app.staticTexts["dm-memory-revision-body"].waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-dm-memory-history")
+        app.navigationBars["변경 이력"].buttons.element(boundBy: 0).tap()
         let forget = app.buttons["dm-memory-forget"]
         if !forget.isHittable { app.swipeUp() }
         XCTAssertTrue(forget.waitForExistence(timeout: 5))

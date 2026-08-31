@@ -239,6 +239,9 @@ set capabilities_json = json_object(
         then 'true' else 'false' end),
     'workflowRequirements', json_extract(
       worker.capabilities_json, '$.workflowRequirements'
+    ),
+    'dmMemoryProtocol', json_extract(
+      worker.capabilities_json, '$.dmMemory.protocol'
     )
   ),
   'versions', json(worker.versions_json)

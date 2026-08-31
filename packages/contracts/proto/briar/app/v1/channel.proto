@@ -5,6 +5,7 @@ package briar.app.v1;
 import "briar/app/v1/agent.proto";
 import "briar/app/v1/common.proto";
 import "briar/app/v1/issue.proto";
+import "briar/app/v1/dm_memory.proto";
 import "briar/types/v1/provider.proto";
 import "briar/types/v1/upload.proto";
 import "google/protobuf/timestamp.proto";
@@ -585,6 +586,7 @@ message ChannelMessage {
   repeated IssueSubscriber subscribers = 18;
   google.protobuf.Timestamp created_at = 19;
   optional google.protobuf.Timestamp deleted_at = 20;
+  repeated DmMemoryReference memory_citations = 21;
 }
 
 message ChannelIssueProposal {

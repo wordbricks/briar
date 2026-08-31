@@ -498,6 +498,7 @@ export async function hydrateOrganizationAgentContext(input: {
         claimToken: input.claimToken,
       },
       queries,
+      requestId: crypto.randomUUID(),
     },
     { signal: input.signal },
   );

@@ -111,6 +111,8 @@ describe("provider structured output contracts", () => {
         request: "  Inspect authentication.  ",
       },
       contextRequests: null,
+      memoryRequests: null,
+      memoryCitations: null,
     } as const;
     const contextOutput = {
       body: null,
@@ -121,6 +123,8 @@ describe("provider structured output contracts", () => {
       executionProposal: null,
       skillExecutionProposal: null,
       delegation: null,
+      memoryRequests: null,
+      memoryCitations: null,
       contextRequests: [{
         resource: "issues",
         projectId: "project-1",
@@ -156,12 +160,21 @@ describe("provider structured output contracts", () => {
             agentId: "22222222-2222-4222-8222-222222222222",
             request: "Inspect authentication.",
           },
+          memoryCitations: null,
         },
         attachmentPaths: ["auth.html"],
       });
       expect(contract.decode(contextOutput)).toEqual({
         case: "context",
         requests: { contextRequests: contextOutput.contextRequests },
+      });
+      expect(contract.decode({
+        ...contextOutput,
+        contextRequests: null,
+        memoryRequests: [{ operation: "search", queries: ["metric units"] }],
+      })).toEqual({
+        case: "memory",
+        request: { operation: "search", queries: ["metric units"] },
       });
       expect(() => contract.decode({
         ...contextOutput,

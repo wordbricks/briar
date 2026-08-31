@@ -7,6 +7,8 @@ import {
   DmMemoryDocumentStatus as ProtoDmMemoryDocumentStatus,
   DmMemoryEvidenceType as ProtoDmMemoryEvidenceType,
   DmMemoryIndexState as ProtoDmMemoryIndexState,
+  DmMemoryRevisionOrigin as ProtoDmMemoryRevisionOrigin,
+  DmMemoryRevisionSchema,
   DmMemoryService,
   DmMemorySourceSchema,
   DmMemorySourceType as ProtoDmMemorySourceType,
@@ -36,6 +38,7 @@ import {
   getDmMemory,
   listDmMemories,
   listDmMemorySpaces,
+  listDmMemoryRevisions,
   saveDmMemory,
   updateDmMemorySettings,
   type DmMemoryOwner,
@@ -50,6 +53,7 @@ export type AppConnectDmMemoryInput = {
   readonly request: Request;
   readonly auth: BriarAuth;
   readonly db: D1Database;
+  readonly env: Env;
 };
 
 const decodeUuid = decodeRequestSync(UuidString);
@@ -113,6 +117,17 @@ const protoIndexState = (value: DmMemoryDocument["indexState"]) => {
 const protoSourceType = (value: DmMemorySource["type"]) => value === "message"
   ? ProtoDmMemorySourceType.MESSAGE
   : ProtoDmMemorySourceType.USER_EDIT_EVENT;
+
+const protoRevisionOrigin = (
+  value: "user_edit" | "explicit_request" | "extract" | "consolidate",
+) => {
+  switch (value) {
+    case "user_edit": return ProtoDmMemoryRevisionOrigin.USER_EDIT;
+    case "explicit_request": return ProtoDmMemoryRevisionOrigin.EXPLICIT_REQUEST;
+    case "extract": return ProtoDmMemoryRevisionOrigin.EXTRACT;
+    case "consolidate": return ProtoDmMemoryRevisionOrigin.CONSOLIDATE;
+  }
+};
 
 const timestamp = (value: string) => timestampFromDate(new Date(value));
 const optionalTimestamp = (value: string | null) => value === null
@@ -217,7 +232,10 @@ const createAppDmMemoryService = (
     );
     return create(DmMemoryService.method.listDmMemories.output, {
       eligible: page.eligible,
-      capabilities: page.capabilities,
+      capabilities: {
+        ...page.capabilities,
+        recall: String(input.env.DM_MEMORY_RETRIEVAL_ENABLED) === "true",
+      },
       spaces: page.spaces.map(protoSpace),
       selectedSpaceId: page.selectedSpaceId ?? undefined,
       documents: page.documents.map(protoDocument),
@@ -231,9 +249,33 @@ const createAppDmMemoryService = (
       input.db,
       owner,
       canonicalUuid(request.documentId),
+      request.version,
     );
     return create(DmMemoryService.method.getDmMemoryDocument.output, {
       document: protoDocument(document),
+    });
+  },
+
+  listDmMemoryRevisions: async (request) => {
+    const owner = await ownerFor(input, request.organizationId, request.channelId);
+    const page = await listDmMemoryRevisions(
+      input.db,
+      owner,
+      canonicalUuid(request.documentId),
+      request.cursor,
+    );
+    return create(DmMemoryService.method.listDmMemoryRevisions.output, {
+      documentId: page.documentId,
+      currentVersion: page.currentVersion,
+      revisions: page.revisions.map((revision) => create(DmMemoryRevisionSchema, {
+        version: revision.version,
+        createdAt: timestamp(revision.createdAt),
+        memoryClass: protoMemoryClass(revision.memoryClass),
+        protectedByUser: revision.protectedByUser,
+        validUntil: optionalTimestamp(revision.validUntil),
+        origin: protoRevisionOrigin(revision.origin),
+      })),
+      nextCursor: page.nextCursor ?? undefined,
     });
   },
 

@@ -6,6 +6,7 @@ import SwiftProtobuf
 typealias DmMemorySpace = BriarAPI_DmMemorySpace
 typealias DmMemoryDocument = BriarAPI_DmMemoryDocument
 typealias DmMemoryPage = BriarAPI_ListDmMemoriesResponse
+typealias DmMemoryRevisionPage = BriarAPI_ListDmMemoryRevisionsResponse
 
 private func dmMemoryTimestamp(_ value: Google_Protobuf_Timestamp) -> String {
     value.date.ISO8601Format()
@@ -27,6 +28,18 @@ private extension BriarAPI_DmMemorySourceType {
         switch self {
         case .message: "message"
         case .userEditEvent: "user_edit_event"
+        case .unspecified, .UNRECOGNIZED: "unknown"
+        }
+    }
+}
+
+private extension BriarAPI_DmMemoryRevisionOrigin {
+    var label: String {
+        switch self {
+        case .userEdit: "user_edit"
+        case .explicitRequest: "explicit_request"
+        case .extract: "extract"
+        case .consolidate: "consolidate"
         case .unspecified, .UNRECOGNIZED: "unknown"
         }
     }
@@ -102,16 +115,57 @@ final class DmMemoryStore: ObservableObject, Identifiable {
             page = result
         } catch { errorMessage = error.localizedDescription }
     }
-    func document(_ id: String) async throws -> DmMemoryDocument {
+    func document(_ id: String, version: Int? = nil) async throws -> DmMemoryDocument {
         try requireScope()
         var request = BriarAPI_GetDmMemoryDocumentRequest()
         request.organizationID = organizationID
         request.channelID = channelID
         request.documentID = id
+        if let version {
+            guard version > 0, let wireVersion = UInt32(exactly: version) else {
+                throw MobileAPIError.invalidRequest
+            }
+            request.version = wireVersion
+        }
         let result = try await service.getDmMemoryDocument(request: request, headers: [:]).briarValue()
         try requireScope()
         guard result.hasDocument else { throw MobileAPIError.invalidResponse }
         return result.document
+    }
+
+    func history(_ id: String, cursor: UInt32? = nil) async throws -> DmMemoryRevisionPage {
+        try requireScope()
+        var request = BriarAPI_ListDmMemoryRevisionsRequest()
+        request.organizationID = organizationID
+        request.channelID = channelID
+        request.documentID = id
+        if let cursor { request.cursor = cursor }
+        let result = try await service.listDmMemoryRevisions(request: request, headers: [:]).briarValue()
+        try requireScope()
+        return result
+    }
+
+    func refreshStatus() async {
+        guard !busy else { return }
+        do {
+            let selectedSpaceID = page?.selectedSpaceID
+            let revision = space?.memoryRevision
+            let count = page?.documents.count ?? 0
+            var fresh = try await fetchPage(spaceID: selectedSpaceID)
+            while fresh.hasNextCursor, fresh.documents.count < count {
+                let next = try await fetchPage(
+                    spaceID: selectedSpaceID,
+                    cursor: fresh.nextCursor
+                )
+                fresh.documents += next.documents
+                if next.hasNextCursor { fresh.nextCursor = next.nextCursor }
+                else { fresh.clearNextCursor() }
+            }
+            guard !busy,
+                  page?.selectedSpaceID == selectedSpaceID,
+                  space?.memoryRevision == revision else { return }
+            page = fresh
+        } catch { errorMessage = error.localizedDescription }
     }
 
     private func timestamp(_ value: String?) throws -> Google_Protobuf_Timestamp? {
@@ -229,6 +283,7 @@ struct DmMemoryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: Draft?
     @State private var error: String?
+    @State private var observedNow = Date()
     private struct Draft: Identifiable { let id = UUID(); let document: DmMemoryDocument? }
     private func text(_ ko: String, _ en: String) -> String { locale == .ko ? ko : en }
 
@@ -238,9 +293,12 @@ struct DmMemoryView: View {
                 Section {
                     Text(text("이 DM의 사용자와 Agent만 사용하는 기억입니다. 다른 DM과 자동 공유하지 않습니다.",
                               "Memory belongs to this DM's user and Agent and is not shared with other DMs."))
+                    Text(text("기억에서 삭제해도 원래 대화 메시지는 남습니다. 대화 삭제는 메시지 메뉴에서 별도로 할 수 있습니다.",
+                              "Forgetting leaves the original chat message. Delete it separately from its message menu."))
+                        .font(.caption)
                     if store.page?.capabilities.recall == false {
-                        Text(text("저장·관리는 사용할 수 있습니다. Agent 회상은 아직 연결되지 않았습니다.",
-                                  "Storage and management are available. Agent recall is not connected yet."))
+                        Text(text("저장·관리는 사용할 수 있습니다. Agent 회상은 현재 비활성화되어 있습니다.",
+                                  "Storage and management are available. Agent recall is currently disabled."))
                     }
                     if let message = store.errorMessage ?? error { Text(message).foregroundStyle(.red) }
                     if store.busy { ProgressView() }
@@ -288,6 +346,11 @@ struct DmMemoryView: View {
                                     Text(document.title).foregroundStyle(.primary)
                                     Text("\(document.memoryClass.label) · v\(document.version) · \(indexLabel(document.indexState))")
                                         .font(.caption).foregroundStyle(.secondary)
+                                    if document.hasValidUntil {
+                                        let validUntil = document.validUntil.date
+                                        Text("\(validUntil <= observedNow ? text("만료됨", "Expired") : text("유효기간", "Valid until")) · \(validUntil.ISO8601Format())")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
                                     if document.protectedByUser { Text(text("사용자 보호", "User protected")).font(.caption) }
                                     if document.conflicted || document.status != .active {
                                         Text(text("충돌 또는 근거 변경 · 확인 필요", "Conflict or changed evidence · needs review"))
@@ -331,7 +394,14 @@ struct DmMemoryView: View {
                 ToolbarItem(placement: .confirmationAction) { Button(text("닫기", "Close")) { dismiss() } }
             }
             .refreshable { await store.load() }
-            .task { await store.load() }
+            .task {
+                await store.load()
+                while !Task.isCancelled {
+                    do { try await Task.sleep(for: .seconds(5)) } catch { return }
+                    observedNow = Date()
+                    if draft == nil { await store.refreshStatus() }
+                }
+            }
             .sheet(item: $draft) { value in DmMemoryEditor(store: store, document: value.document, locale: locale) }
             .onDisappear { store.clearExport() }
         }
@@ -393,6 +463,10 @@ private struct DmMemoryEditor: View {
                 }.disabled(!store.writable || store.busy)
                 if let document {
                     Section(text("근거", "Sources")) {
+                        NavigationLink(text("변경 이력", "Revision history")) {
+                            DmMemoryHistoryView(store: store, documentID: document.id, locale: locale)
+                        }
+                        .accessibilityIdentifier("dm-memory-history")
                         Text(dmMemoryTimestamp(document.updatedAt)).font(.caption)
                         ForEach(Array(document.sources.enumerated()), id: \.offset) { _, source in
                             Text("\(source.type.label):\(source.id)@\(source.version)").font(.caption).textSelection(.enabled)
@@ -421,6 +495,109 @@ private struct DmMemoryEditor: View {
                         .accessibilityIdentifier("dm-memory-save")
                     }
                 }
+            }
+        }
+    }
+}
+
+private struct DmMemoryHistoryView: View {
+    @ObservedObject var store: DmMemoryStore
+    let documentID: String
+    let locale: CompanionLocale
+    @State private var history: DmMemoryRevisionPage?
+    @State private var preview: DmMemoryDocument?
+    @State private var error: String?
+    @State private var loading = false
+    private func text(_ ko: String, _ en: String) -> String { locale == .ko ? ko : en }
+
+    var body: some View {
+        List {
+            if let error { Text(error).foregroundStyle(.red) }
+            if loading { ProgressView() }
+            if let history {
+                ForEach(history.revisions, id: \.version) { revision in
+                    Button("v\(revision.version) · \(dmMemoryTimestamp(revision.createdAt)) · \(revision.origin.label)") {
+                        Task {
+                            loading = true
+                            defer { loading = false }
+                            do { preview = try await store.document(documentID, version: Int(revision.version)) }
+                            catch { self.error = error.localizedDescription }
+                        }
+                    }
+                    .accessibilityIdentifier("dm-memory-revision-\(revision.version)")
+                }
+                if history.hasNextCursor {
+                    Button(text("더 보기", "Load more")) {
+                        Task { await load(cursor: history.nextCursor) }
+                    }
+                }
+            }
+            if let preview {
+                Section(text("이전 버전 · 읽기 전용", "Earlier version · read only")) {
+                    Text("v\(preview.version)").font(.caption)
+                    Text(preview.body).textSelection(.enabled)
+                        .accessibilityIdentifier("dm-memory-revision-body")
+                }
+            }
+        }
+        .disabled(loading)
+        .navigationTitle(text("변경 이력", "Revision history"))
+        .task { await load() }
+    }
+
+    private func load(cursor: UInt32? = nil) async {
+        guard !loading else { return }
+        loading = true
+        defer { loading = false }
+        do {
+            var next = try await store.history(documentID, cursor: cursor)
+            if cursor != nil { next.revisions = (history?.revisions ?? []) + next.revisions }
+            history = next
+        } catch { self.error = error.localizedDescription }
+    }
+}
+
+struct DmMemoryCitationView: View {
+    @ObservedObject var store: DmMemoryStore
+    let reference: ChannelMemoryCitation
+    let locale: CompanionLocale
+    @Environment(\.dismiss) private var dismiss
+    @State private var document: DmMemoryDocument?
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if let document {
+                        Text(document.title).font(.headline)
+                        Text("v\(document.version) · \(document.memoryClass.label)").font(.caption)
+                        Text(document.body).textSelection(.enabled)
+                            .accessibilityIdentifier("dm-memory-citation-body")
+                    } else if let error { Text(error).foregroundStyle(.red) }
+                    else { ProgressView() }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+            }
+            .navigationTitle(locale == .ko ? "참고한 기억" : "Referenced memory")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(locale == .ko ? "닫기" : "Close") { dismiss() }
+                }
+            }
+        }
+        .task(id: reference.id) {
+            document = nil
+            error = nil
+            do {
+                let loaded = try await store.document(
+                    reference.documentId.uuidString.lowercased(),
+                    version: reference.version
+                )
+                if !Task.isCancelled { document = loaded }
+            } catch {
+                if !Task.isCancelled { self.error = error.localizedDescription }
             }
         }
     }

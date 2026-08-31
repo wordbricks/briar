@@ -230,11 +230,21 @@ public nonisolated struct BriarTypes_WorkerCapabilities: Sendable {
 
   public var workflowRequirements: [BriarTypes_WorkflowRequirementHealth] = []
 
+  public var dmMemoryProtocol: UInt32 {
+    get {_dmMemoryProtocol ?? 0}
+    set {_dmMemoryProtocol = newValue}
+  }
+  /// Returns true if `dmMemoryProtocol` has been explicitly set.
+  public var hasDmMemoryProtocol: Bool {self._dmMemoryProtocol != nil}
+  /// Clears the value of `dmMemoryProtocol`. Subsequent reads from it will return its default value.
+  public mutating func clearDmMemoryProtocol() {self._dmMemoryProtocol = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _remoteUpdates: BriarTypes_RemoteUpdateCapability? = nil
+  fileprivate var _dmMemoryProtocol: UInt32? = nil
 }
 
 public nonisolated struct BriarTypes_WorkerRuntimeAdvertisement: Sendable {
@@ -574,7 +584,7 @@ nonisolated extension BriarTypes_WorkflowRequirementHealth: SwiftProtobuf.Messag
 
 nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WorkerCapabilities"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}provider_capabilities\0\u{3}remote_updates\0\u{1}worktrees\0\u{4}\u{2}workflow_requirements\0\u{b}organization_agent_context_protocol\0\u{c}\u{4}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}provider_capabilities\0\u{3}remote_updates\0\u{1}worktrees\0\u{4}\u{2}workflow_requirements\0\u{3}dm_memory_protocol\0\u{b}organization_agent_context_protocol\0\u{c}\u{4}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -586,6 +596,7 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
       case 2: try { try decoder.decodeSingularMessageField(value: &self._remoteUpdates) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self.worktrees) }()
       case 5: try { try decoder.decodeRepeatedMessageField(value: &self.workflowRequirements) }()
+      case 6: try { try decoder.decodeSingularUInt32Field(value: &self._dmMemoryProtocol) }()
       default: break
       }
     }
@@ -608,6 +619,9 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
     if !self.workflowRequirements.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.workflowRequirements, fieldNumber: 5)
     }
+    try { if let v = self._dmMemoryProtocol {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 6)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -616,6 +630,7 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
     if lhs._remoteUpdates != rhs._remoteUpdates {return false}
     if lhs.worktrees != rhs.worktrees {return false}
     if lhs.workflowRequirements != rhs.workflowRequirements {return false}
+    if lhs._dmMemoryProtocol != rhs._dmMemoryProtocol {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

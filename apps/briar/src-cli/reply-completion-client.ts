@@ -200,6 +200,10 @@ const channelSuccess = (
     body: result.body,
     conversationId: conversationId ?? undefined,
     attachments: attachmentIds.map((uploadId) => ({ uploadId })),
+    memoryCitations: (result.memoryCitations ?? []).map((reference) => ({
+      documentId: reference.documentId,
+      version: reference.version,
+    })),
   };
   const artifactProposalCount = [
     result.issueProposal,

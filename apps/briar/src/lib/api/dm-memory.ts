@@ -8,6 +8,7 @@ import {
   DmMemoryEvidenceType as ProtoDmMemoryEvidenceType,
   DmMemoryIndexState as ProtoDmMemoryIndexState,
   DmMemoryService,
+  DmMemoryRevisionOrigin as ProtoDmMemoryRevisionOrigin,
   DmMemorySourceType as ProtoDmMemorySourceType,
   type DmMemorySpace as DmMemorySpaceMessage,
   DmMemorySpaceStatus as ProtoDmMemorySpaceStatus,
@@ -20,6 +21,7 @@ import type {
   DmMemoryDocumentDetail,
   DmMemoryEditInput,
   DmMemoryPage,
+  DmMemoryRevisionPage,
   DmMemorySettingsInput,
   DmMemorySpace,
 } from "../dm-memory-contract";
@@ -198,16 +200,56 @@ export async function loadDmMemoryDocument(
   scope: DmMemoryApiScope,
   documentId: string,
   signal?: AbortSignal,
+  version?: number,
 ): Promise<DmMemoryDocumentDetail> {
   const response = await requireClient().getDmMemoryDocument({
     organizationId: scope.organizationId,
     channelId: scope.channelId,
     documentId,
+    version,
   }, appCallOptions(scope.token, signal));
   return documentDetailFromProto(requiredMessage(
     response.document,
     "getDmMemoryDocument.document",
   ));
+}
+
+const revisionOriginFromProto = (value: ProtoDmMemoryRevisionOrigin) => {
+  switch (value) {
+    case ProtoDmMemoryRevisionOrigin.USER_EDIT: return "user_edit" as const;
+    case ProtoDmMemoryRevisionOrigin.EXPLICIT_REQUEST:
+      return "explicit_request" as const;
+    case ProtoDmMemoryRevisionOrigin.EXTRACT: return "extract" as const;
+    case ProtoDmMemoryRevisionOrigin.CONSOLIDATE: return "consolidate" as const;
+    default: throw new Error(`Unknown memory revision origin: ${value}`);
+  }
+};
+
+export async function loadDmMemoryHistory(
+  scope: DmMemoryApiScope,
+  documentId: string,
+  cursor?: number,
+  signal?: AbortSignal,
+): Promise<DmMemoryRevisionPage> {
+  const response = await requireClient().listDmMemoryRevisions({
+    organizationId: scope.organizationId,
+    channelId: scope.channelId,
+    documentId,
+    cursor,
+  }, appCallOptions(scope.token, signal));
+  return {
+    documentId: response.documentId,
+    currentVersion: response.currentVersion,
+    revisions: response.revisions.map((revision) => ({
+      version: revision.version,
+      createdAt: requiredTimestamp(revision.createdAt, "dmMemoryRevision.createdAt"),
+      memoryClass: memoryClassFromProto(revision.memoryClass),
+      protectedByUser: revision.protectedByUser,
+      validUntil: optionalTimestamp(revision.validUntil),
+      origin: revisionOriginFromProto(revision.origin),
+    })),
+    nextCursor: response.nextCursor ?? null,
+  };
 }
 
 export async function saveDmMemoryDocument(
@@ -276,6 +318,7 @@ export async function exportDmMemory(scope: DmMemoryApiScope, spaceId: string) {
 export const dmMemoryApi = {
   load: loadDmMemory,
   get: loadDmMemoryDocument,
+  history: loadDmMemoryHistory,
   save: saveDmMemoryDocument,
   settings: setDmMemorySettings,
   remove: removeDmMemoryDocument,

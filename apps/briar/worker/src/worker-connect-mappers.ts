@@ -5,6 +5,10 @@ import {
 } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
+  DmMemoryBriefState,
+  DmMemoryDescriptorSchema,
+} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
+import {
   AgentSkillApprovalPolicy,
   AgentSkillExecutionMode,
   AgentSkillKind,
@@ -582,6 +586,18 @@ const channelReply = (
       handoffContext: handoff(value.handoffContext),
       snapshot: jsonObject(value.snapshot, "channelReply.snapshot"),
       triggerAttachments: value.triggerAttachments.map(attachment),
+      memory: value.memory
+        ? create(DmMemoryDescriptorSchema, {
+            protocol: value.memory.protocol,
+            memorySpaceId: value.memory.memorySpaceId,
+            memoryRevision: BigInt(value.memory.memoryRevision),
+            revocationEpoch: BigInt(value.memory.revocationEpoch),
+            searchEnabled: value.memory.searchEnabled,
+            briefState: value.memory.briefState === "available"
+              ? DmMemoryBriefState.AVAILABLE
+              : DmMemoryBriefState.DISABLED,
+          })
+        : undefined,
     }),
   },
 });

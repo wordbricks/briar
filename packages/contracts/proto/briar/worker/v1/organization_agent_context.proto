@@ -80,6 +80,7 @@ message OrganizationAgentContextSessionRevision {
 message OrganizationAgentContextServiceLookupRequest {
   OrganizationAgentContextClaim claim = 1;
   repeated OrganizationAgentContextLookup queries = 2;
+  string request_id = 3;
 }
 
 message OrganizationAgentContextLookup {

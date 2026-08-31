@@ -25,6 +25,8 @@ open class BriarAPI_DmMemoryServiceClientMock: BriarAPI_DmMemoryServiceClientInt
     public var mockAsyncListDmMemories = { (_: BriarAPI_ListDmMemoriesRequest) -> ResponseMessage<BriarAPI_ListDmMemoriesResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `getDmMemoryDocument()`.
     public var mockAsyncGetDmMemoryDocument = { (_: BriarAPI_GetDmMemoryDocumentRequest) -> ResponseMessage<BriarAPI_GetDmMemoryDocumentResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `listDmMemoryRevisions()`.
+    public var mockAsyncListDmMemoryRevisions = { (_: BriarAPI_ListDmMemoryRevisionsRequest) -> ResponseMessage<BriarAPI_ListDmMemoryRevisionsResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `createDmMemoryDocument()`.
     public var mockAsyncCreateDmMemoryDocument = { (_: BriarAPI_CreateDmMemoryDocumentRequest) -> ResponseMessage<BriarAPI_CreateDmMemoryDocumentResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `updateDmMemoryDocument()`.
@@ -42,6 +44,10 @@ open class BriarAPI_DmMemoryServiceClientMock: BriarAPI_DmMemoryServiceClientInt
 
     open func `getDmMemoryDocument`(request: BriarAPI_GetDmMemoryDocumentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetDmMemoryDocumentResponse> {
         return self.mockAsyncGetDmMemoryDocument(request)
+    }
+
+    open func `listDmMemoryRevisions`(request: BriarAPI_ListDmMemoryRevisionsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListDmMemoryRevisionsResponse> {
+        return self.mockAsyncListDmMemoryRevisions(request)
     }
 
     open func `createDmMemoryDocument`(request: BriarAPI_CreateDmMemoryDocumentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateDmMemoryDocumentResponse> {

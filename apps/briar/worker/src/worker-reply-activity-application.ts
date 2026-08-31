@@ -13,6 +13,7 @@ import {
   channelActivityFrame,
   issueActivityFrame,
 } from "./realtime-scheduling";
+import { getClaimedChannelReply } from "./channels";
 
 export type ReplyActivityApplicationServices = {
   readonly verifyChannelActivityPublishToken:
@@ -23,6 +24,7 @@ export type ReplyActivityApplicationServices = {
   readonly issueActivityFrame: typeof issueActivityFrame;
   readonly publishChannelActivity: typeof publishChannelActivity;
   readonly publishIssueActivity: typeof publishIssueActivity;
+  readonly getClaimedChannelReply: typeof getClaimedChannelReply;
 };
 
 const replyActivityApplicationServices: ReplyActivityApplicationServices = {
@@ -32,6 +34,7 @@ const replyActivityApplicationServices: ReplyActivityApplicationServices = {
   issueActivityFrame,
   publishChannelActivity,
   publishIssueActivity,
+  getClaimedChannelReply,
 };
 
 export class ReplyActivityApplicationError extends Error {
@@ -47,6 +50,7 @@ export class ReplyActivityApplicationError extends Error {
 export async function publishReplyActivityApplication(
   input: {
     env: Env;
+    db: D1Database;
     token: string;
     replyJobId: string;
     activity: ChannelAgentActivityPublishInput;
@@ -60,6 +64,18 @@ export async function publishReplyActivityApplication(
     input.replyJobId,
   );
   if (channel !== null) {
+    if (!await services.getClaimedChannelReply(input.db, {
+      jobId: channel.replyJobId,
+      deviceId: channel.deviceId,
+      workerId: channel.workerId,
+      claimTokenHash: channel.claimTokenHash,
+      observedAt: new Date().toISOString(),
+    })) {
+      throw new ReplyActivityApplicationError(
+        "invalid_capability",
+        "Reply activity claim is no longer active",
+      );
+    }
     const frame = services.channelActivityFrame({
       id: channel.replyJobId,
       organization_id: channel.organizationId,

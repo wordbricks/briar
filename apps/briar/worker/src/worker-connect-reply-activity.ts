@@ -20,6 +20,7 @@ import {
 export type WorkerConnectReplyActivityInput = {
   readonly request: Request;
   readonly env: Env;
+  readonly db: D1Database;
 };
 
 const bearerCapability = (request: Request) => {
@@ -50,6 +51,7 @@ const publishReplyActivity = async (
   try {
     await publishReplyActivityApplication({
       env: input.env,
+      db: input.db,
       token,
       replyJobId: request.replyJobId,
       activity,

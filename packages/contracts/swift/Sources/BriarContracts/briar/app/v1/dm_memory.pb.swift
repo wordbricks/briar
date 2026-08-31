@@ -298,6 +298,90 @@ public nonisolated enum BriarAPI_DmMemorySourceType: SwiftProtobuf.Enum, Swift.C
 
 }
 
+public nonisolated enum BriarAPI_DmMemoryRevisionOrigin: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case userEdit // = 1
+  case explicitRequest // = 2
+  case extract // = 3
+  case consolidate // = 4
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .userEdit
+    case 2: self = .explicitRequest
+    case 3: self = .extract
+    case 4: self = .consolidate
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .userEdit: return 1
+    case .explicitRequest: return 2
+    case .extract: return 3
+    case .consolidate: return 4
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [BriarAPI_DmMemoryRevisionOrigin] = [
+    .unspecified,
+    .userEdit,
+    .explicitRequest,
+    .extract,
+    .consolidate,
+  ]
+
+}
+
+public nonisolated enum BriarAPI_DmMemoryBriefState: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case available // = 1
+  case disabled // = 2
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .available
+    case 2: self = .disabled
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .available: return 1
+    case .disabled: return 2
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [BriarAPI_DmMemoryBriefState] = [
+    .unspecified,
+    .available,
+    .disabled,
+  ]
+
+}
+
 public nonisolated struct BriarAPI_ListDmMemoriesRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -391,9 +475,20 @@ public nonisolated struct BriarAPI_GetDmMemoryDocumentRequest: Sendable {
 
   public var documentID: String = String()
 
+  public var version: UInt32 {
+    get {_version ?? 0}
+    set {_version = newValue}
+  }
+  /// Returns true if `version` has been explicitly set.
+  public var hasVersion: Bool {self._version != nil}
+  /// Clears the value of `version`. Subsequent reads from it will return its default value.
+  public mutating func clearVersion() {self._version = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _version: UInt32? = nil
 }
 
 public nonisolated struct BriarAPI_GetDmMemoryDocumentResponse: Sendable {
@@ -415,6 +510,99 @@ public nonisolated struct BriarAPI_GetDmMemoryDocumentResponse: Sendable {
   public init() {}
 
   fileprivate var _document: BriarAPI_DmMemoryDocument? = nil
+}
+
+public nonisolated struct BriarAPI_ListDmMemoryRevisionsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var channelID: String = String()
+
+  public var documentID: String = String()
+
+  public var cursor: UInt32 {
+    get {_cursor ?? 0}
+    set {_cursor = newValue}
+  }
+  /// Returns true if `cursor` has been explicitly set.
+  public var hasCursor: Bool {self._cursor != nil}
+  /// Clears the value of `cursor`. Subsequent reads from it will return its default value.
+  public mutating func clearCursor() {self._cursor = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _cursor: UInt32? = nil
+}
+
+public nonisolated struct BriarAPI_ListDmMemoryRevisionsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var documentID: String = String()
+
+  public var currentVersion: UInt32 = 0
+
+  public var revisions: [BriarAPI_DmMemoryRevision] = []
+
+  public var nextCursor: UInt32 {
+    get {_nextCursor ?? 0}
+    set {_nextCursor = newValue}
+  }
+  /// Returns true if `nextCursor` has been explicitly set.
+  public var hasNextCursor: Bool {self._nextCursor != nil}
+  /// Clears the value of `nextCursor`. Subsequent reads from it will return its default value.
+  public mutating func clearNextCursor() {self._nextCursor = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _nextCursor: UInt32? = nil
+}
+
+public nonisolated struct BriarAPI_DmMemoryRevision: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var version: UInt32 = 0
+
+  public var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_createdAt = newValue}
+  }
+  /// Returns true if `createdAt` has been explicitly set.
+  public var hasCreatedAt: Bool {self._createdAt != nil}
+  /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedAt() {self._createdAt = nil}
+
+  public var memoryClass: BriarAPI_DmMemoryClass = .unspecified
+
+  public var protectedByUser: Bool = false
+
+  public var validUntil: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_validUntil ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_validUntil = newValue}
+  }
+  /// Returns true if `validUntil` has been explicitly set.
+  public var hasValidUntil: Bool {self._validUntil != nil}
+  /// Clears the value of `validUntil`. Subsequent reads from it will return its default value.
+  public mutating func clearValidUntil() {self._validUntil = nil}
+
+  public var origin: BriarAPI_DmMemoryRevisionOrigin = .unspecified
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _validUntil: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
 public nonisolated struct BriarAPI_CreateDmMemoryDocumentRequest: Sendable {
@@ -882,6 +1070,42 @@ public nonisolated struct BriarAPI_DmMemorySource: Sendable {
   public init() {}
 }
 
+public nonisolated struct BriarAPI_DmMemoryReference: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var documentID: String = String()
+
+  public var version: UInt32 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_DmMemoryDescriptor: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var `protocol`: UInt32 = 0
+
+  public var memorySpaceID: String = String()
+
+  public var memoryRevision: UInt64 = 0
+
+  public var revocationEpoch: UInt64 = 0
+
+  public var searchEnabled: Bool = false
+
+  public var briefState: BriarAPI_DmMemoryBriefState = .unspecified
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "briar.app.v1"
@@ -912,6 +1136,14 @@ nonisolated extension BriarAPI_DmMemoryIndexState: SwiftProtobuf._ProtoNameProvi
 
 nonisolated extension BriarAPI_DmMemorySourceType: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DM_MEMORY_SOURCE_TYPE_UNSPECIFIED\0\u{1}DM_MEMORY_SOURCE_TYPE_MESSAGE\0\u{1}DM_MEMORY_SOURCE_TYPE_USER_EDIT_EVENT\0")
+}
+
+nonisolated extension BriarAPI_DmMemoryRevisionOrigin: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DM_MEMORY_REVISION_ORIGIN_UNSPECIFIED\0\u{1}DM_MEMORY_REVISION_ORIGIN_USER_EDIT\0\u{1}DM_MEMORY_REVISION_ORIGIN_EXPLICIT_REQUEST\0\u{1}DM_MEMORY_REVISION_ORIGIN_EXTRACT\0\u{1}DM_MEMORY_REVISION_ORIGIN_CONSOLIDATE\0")
+}
+
+nonisolated extension BriarAPI_DmMemoryBriefState: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DM_MEMORY_BRIEF_STATE_UNSPECIFIED\0\u{1}DM_MEMORY_BRIEF_STATE_AVAILABLE\0\u{1}DM_MEMORY_BRIEF_STATE_DISABLED\0")
 }
 
 nonisolated extension BriarAPI_ListDmMemoriesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -1024,7 +1256,7 @@ nonisolated extension BriarAPI_ListDmMemoriesResponse: SwiftProtobuf.Message, Sw
 
 nonisolated extension BriarAPI_GetDmMemoryDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetDmMemoryDocumentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}document_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}document_id\0\u{1}version\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1035,12 +1267,17 @@ nonisolated extension BriarAPI_GetDmMemoryDocumentRequest: SwiftProtobuf.Message
       case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 4: try { try decoder.decodeSingularUInt32Field(value: &self._version) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.organizationID.isEmpty {
       try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
     }
@@ -1050,6 +1287,9 @@ nonisolated extension BriarAPI_GetDmMemoryDocumentRequest: SwiftProtobuf.Message
     if !self.documentID.isEmpty {
       try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 3)
     }
+    try { if let v = self._version {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 4)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1057,6 +1297,7 @@ nonisolated extension BriarAPI_GetDmMemoryDocumentRequest: SwiftProtobuf.Message
     if lhs.organizationID != rhs.organizationID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.documentID != rhs.documentID {return false}
+    if lhs._version != rhs._version {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1091,6 +1332,163 @@ nonisolated extension BriarAPI_GetDmMemoryDocumentResponse: SwiftProtobuf.Messag
 
   public static func ==(lhs: BriarAPI_GetDmMemoryDocumentResponse, rhs: BriarAPI_GetDmMemoryDocumentResponse) -> Bool {
     if lhs._document != rhs._document {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ListDmMemoryRevisionsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListDmMemoryRevisionsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}document_id\0\u{1}cursor\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 4: try { try decoder.decodeSingularUInt32Field(value: &self._cursor) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.channelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
+    }
+    if !self.documentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 3)
+    }
+    try { if let v = self._cursor {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ListDmMemoryRevisionsRequest, rhs: BriarAPI_ListDmMemoryRevisionsRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.channelID != rhs.channelID {return false}
+    if lhs.documentID != rhs.documentID {return false}
+    if lhs._cursor != rhs._cursor {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ListDmMemoryRevisionsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListDmMemoryRevisionsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}document_id\0\u{3}current_version\0\u{1}revisions\0\u{3}next_cursor\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.currentVersion) }()
+      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.revisions) }()
+      case 4: try { try decoder.decodeSingularUInt32Field(value: &self._nextCursor) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.documentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 1)
+    }
+    if self.currentVersion != 0 {
+      try visitor.visitSingularUInt32Field(value: self.currentVersion, fieldNumber: 2)
+    }
+    if !self.revisions.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.revisions, fieldNumber: 3)
+    }
+    try { if let v = self._nextCursor {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ListDmMemoryRevisionsResponse, rhs: BriarAPI_ListDmMemoryRevisionsResponse) -> Bool {
+    if lhs.documentID != rhs.documentID {return false}
+    if lhs.currentVersion != rhs.currentVersion {return false}
+    if lhs.revisions != rhs.revisions {return false}
+    if lhs._nextCursor != rhs._nextCursor {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DmMemoryRevision: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DmMemoryRevision"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}version\0\u{3}created_at\0\u{3}memory_class\0\u{3}protected_by_user\0\u{3}valid_until\0\u{1}origin\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt32Field(value: &self.version) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.memoryClass) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.protectedByUser) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._validUntil) }()
+      case 6: try { try decoder.decodeSingularEnumField(value: &self.origin) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.version != 0 {
+      try visitor.visitSingularUInt32Field(value: self.version, fieldNumber: 1)
+    }
+    try { if let v = self._createdAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if self.memoryClass != .unspecified {
+      try visitor.visitSingularEnumField(value: self.memoryClass, fieldNumber: 3)
+    }
+    if self.protectedByUser != false {
+      try visitor.visitSingularBoolField(value: self.protectedByUser, fieldNumber: 4)
+    }
+    try { if let v = self._validUntil {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
+    if self.origin != .unspecified {
+      try visitor.visitSingularEnumField(value: self.origin, fieldNumber: 6)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DmMemoryRevision, rhs: BriarAPI_DmMemoryRevision) -> Bool {
+    if lhs.version != rhs.version {return false}
+    if lhs._createdAt != rhs._createdAt {return false}
+    if lhs.memoryClass != rhs.memoryClass {return false}
+    if lhs.protectedByUser != rhs.protectedByUser {return false}
+    if lhs._validUntil != rhs._validUntil {return false}
+    if lhs.origin != rhs.origin {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1905,6 +2303,96 @@ nonisolated extension BriarAPI_DmMemorySource: SwiftProtobuf.Message, SwiftProto
     if lhs.type != rhs.type {return false}
     if lhs.id != rhs.id {return false}
     if lhs.version != rhs.version {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DmMemoryReference: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DmMemoryReference"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}document_id\0\u{1}version\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.version) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.documentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 1)
+    }
+    if self.version != 0 {
+      try visitor.visitSingularUInt32Field(value: self.version, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DmMemoryReference, rhs: BriarAPI_DmMemoryReference) -> Bool {
+    if lhs.documentID != rhs.documentID {return false}
+    if lhs.version != rhs.version {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DmMemoryDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DmMemoryDescriptor"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}protocol\0\u{3}memory_space_id\0\u{3}memory_revision\0\u{3}revocation_epoch\0\u{3}search_enabled\0\u{3}brief_state\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt32Field(value: &self.`protocol`) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.memorySpaceID) }()
+      case 3: try { try decoder.decodeSingularUInt64Field(value: &self.memoryRevision) }()
+      case 4: try { try decoder.decodeSingularUInt64Field(value: &self.revocationEpoch) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.searchEnabled) }()
+      case 6: try { try decoder.decodeSingularEnumField(value: &self.briefState) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.`protocol` != 0 {
+      try visitor.visitSingularUInt32Field(value: self.`protocol`, fieldNumber: 1)
+    }
+    if !self.memorySpaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.memorySpaceID, fieldNumber: 2)
+    }
+    if self.memoryRevision != 0 {
+      try visitor.visitSingularUInt64Field(value: self.memoryRevision, fieldNumber: 3)
+    }
+    if self.revocationEpoch != 0 {
+      try visitor.visitSingularUInt64Field(value: self.revocationEpoch, fieldNumber: 4)
+    }
+    if self.searchEnabled != false {
+      try visitor.visitSingularBoolField(value: self.searchEnabled, fieldNumber: 5)
+    }
+    if self.briefState != .unspecified {
+      try visitor.visitSingularEnumField(value: self.briefState, fieldNumber: 6)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DmMemoryDescriptor, rhs: BriarAPI_DmMemoryDescriptor) -> Bool {
+    if lhs.`protocol` != rhs.`protocol` {return false}
+    if lhs.memorySpaceID != rhs.memorySpaceID {return false}
+    if lhs.memoryRevision != rhs.memoryRevision {return false}
+    if lhs.revocationEpoch != rhs.revocationEpoch {return false}
+    if lhs.searchEnabled != rhs.searchEnabled {return false}
+    if lhs.briefState != rhs.briefState {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

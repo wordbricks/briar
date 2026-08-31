@@ -67,6 +67,16 @@ export const DmMemoryDocumentDetail = Schema.Struct({
   ...documentFields, body: Schema.String, sources: Schema.Array(DmMemorySource),
 });
 export type DmMemoryDocumentDetail = typeof DmMemoryDocumentDetail.Type;
+export const DmMemoryRevisionSummary = Schema.Struct({
+  version, createdAt: Schema.String, memoryClass: Schema.Literals(dmMemoryClasses),
+  protectedByUser: Schema.Boolean, validUntil: Schema.NullOr(Schema.String),
+  origin: Schema.Literals(["user_edit", "explicit_request", "extract", "consolidate"]),
+});
+export const DmMemoryRevisionPage = Schema.Struct({
+  documentId: id, currentVersion: version, revisions: Schema.Array(DmMemoryRevisionSummary),
+  nextCursor: Schema.NullOr(version),
+});
+export type DmMemoryRevisionPage = typeof DmMemoryRevisionPage.Type;
 export const DmMemoryPage = Schema.Struct({
   eligible: Schema.Boolean,
   capabilities: Schema.Struct({ recall: Schema.Boolean, automaticLearning: Schema.Boolean }),
@@ -78,6 +88,7 @@ export type DmMemoryPage = typeof DmMemoryPage.Type;
 export const dmMemoryOperationSchemas = {
   listDmMemory: { response: DmMemoryPage },
   getDmMemoryDocument: { response: Schema.Struct({ document: DmMemoryDocumentDetail }) },
+  listDmMemoryRevisions: { response: DmMemoryRevisionPage },
   createDmMemoryDocument: {
     request: dmMemoryCreateInput,
     response: Schema.Struct({ documentId: Schema.String, version: Schema.Int, replayed: Schema.Boolean }),

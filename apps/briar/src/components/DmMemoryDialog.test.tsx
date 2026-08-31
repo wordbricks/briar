@@ -10,6 +10,7 @@ import { DmMemoryDialog } from "./DmMemoryDialog";
 describe("DM memory management", () => {
   let root: ReactTestRoot;
   const client = {
+    history: vi.fn<DmMemoryClient["history"]>(),
     load: vi.fn<DmMemoryClient["load"]>(), get: vi.fn<DmMemoryClient["get"]>(),
     save: vi.fn<DmMemoryClient["save"]>(), remove: vi.fn<DmMemoryClient["remove"]>(),
     settings: vi.fn<DmMemoryClient["settings"]>(), export: vi.fn<DmMemoryClient["export"]>(),
@@ -76,6 +77,22 @@ describe("DM memory management", () => {
   const submit = async () => {
     await act(async () => { dialog().querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
   };
+
+  it("M18 keeps revision history read only and preserves the current edit", async () => {
+    client.load.mockResolvedValue({ ...page, documents: page.documents.map((item) => ({ ...item, version: 2 })) });
+    client.get.mockResolvedValueOnce({ ...detail, version: 2, body: "Current version" }).mockResolvedValue(detail);
+    client.history.mockResolvedValue({ documentId: detail.id, currentVersion: 2, nextCursor: null,
+      revisions: [{ version: 1, createdAt: detail.createdAt, memoryClass: detail.memoryClass,
+        protectedByUser: true, validUntil: null, origin: "user_edit" }] });
+    await render(); await edit();
+    await act(async () => button("Revision history").click());
+    const revision = [...dialog().querySelectorAll("button")].find((node) => node.textContent?.startsWith("v1 ·"))!;
+    await act(async () => revision.click());
+    expect(dialog().querySelector("pre")?.textContent).toBe(detail.body);
+    expect(dialog().querySelector("textarea")?.value).toBe("Current version");
+    expect(dialog().textContent).toContain("Earlier version · read only");
+    expect(client.get).toHaveBeenLastCalledWith(scope, detail.id, undefined, 1);
+  });
 
   it("M01 does not claim saved while the server write is pending", async () => {
     let finish!: (value: { documentId: string; version: number; replayed: boolean }) => void;

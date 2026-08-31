@@ -37,6 +37,7 @@ const input = (token: string) => ({
     headers: { authorization: `Bearer ${token}` },
   }),
   env,
+  db: {} as D1Database,
 });
 
 describe("ReplyActivityService capability boundary", () => {
@@ -51,6 +52,7 @@ describe("ReplyActivityService capability boundary", () => {
       attempt: 3,
       workerId: "worker-1",
       deviceId: "device-1",
+      claimTokenHash: "a".repeat(64),
       expiresAt: Date.now() + 60_000,
     });
     const publishChannel = vi.fn<
@@ -58,6 +60,7 @@ describe("ReplyActivityService capability boundary", () => {
     >().mockResolvedValue();
     const channelService = createReplyActivityService(input(channelToken.token), {
       publishChannelActivity: publishChannel,
+      getClaimedChannelReply: vi.fn().mockResolvedValue({ id: replyJobId }),
     });
 
     await channelService.publishReplyActivity(create(

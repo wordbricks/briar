@@ -2,6 +2,10 @@ import type { JsonObject } from "@bufbuild/protobuf";
 import { timestampDate, type Timestamp } from "@bufbuild/protobuf/wkt";
 import { AgentProvider as ProtoAgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
+  DmMemoryBriefState,
+  type DmMemoryDescriptor as ProtoDmMemoryDescriptor,
+} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
+import {
   WorkflowCheckpoint_Position,
   type AutoHuntWorkflow as ProtoAutoHuntWorkflow,
 } from "@briar/contracts/gen/briar/types/v1/workflow_pb";
@@ -61,6 +65,28 @@ const safeNumber = (value: bigint, field: string): number => {
     throw new Error(`Worker claim ${field} exceeds JavaScript's safe integer range`);
   }
   return number;
+};
+
+export const dmMemoryDescriptorFromProto = (
+  value: ProtoDmMemoryDescriptor,
+) => {
+  if (value.protocol !== 1) {
+    throw new Error("Worker claim has unsupported DM memory protocol");
+  }
+  return {
+    protocol: 1 as const,
+    memorySpaceId: value.memorySpaceId,
+    memoryRevision: safeNumber(value.memoryRevision, "dmMemory.memoryRevision"),
+    revocationEpoch: safeNumber(value.revocationEpoch, "dmMemory.revocationEpoch"),
+    searchEnabled: value.searchEnabled,
+    briefState: value.briefState === DmMemoryBriefState.AVAILABLE
+      ? "available" as const
+      : value.briefState === DmMemoryBriefState.DISABLED
+      ? "disabled" as const
+      : (() => {
+          throw new Error("Worker claim has invalid DM memory brief state");
+        })(),
+  };
 };
 
 const agentProvider = (value: ProtoAgentProvider): AgentProvider => {
@@ -539,6 +565,7 @@ const channelReplyFromProto = (
       : null,
     snapshot: required(value.snapshot, "channelReply.snapshot"),
     triggerAttachments: value.triggerAttachments,
+    memory: value.memory ? dmMemoryDescriptorFromProto(value.memory) : null,
   };
   if (scope.kind === "organization") {
     if (!mapped.organizationContext || mapped.delegation || mapped.skillExecutionTarget) {

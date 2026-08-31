@@ -1753,6 +1753,7 @@ describe("organization channels", () => {
       OrganizationAgentContextServiceLookupRequestSchema,
       {
         claim,
+        requestId: crypto.randomUUID(),
         queries: [{
           query: {
             case: "projectSettings",

@@ -2,6 +2,11 @@ import { channelReplyAttachmentPath } from "../../src/lib/channel-reply-attachme
 import { channelReplyContextMessageJson } from "../../src/lib/channels-contract";
 import { agentReplyDisplayParentMessageId } from "../../src/lib/issue-reply-decision";
 import {
+  bindDmMemoryReplyClaim,
+  excludeForgottenDmSources,
+} from "./dm-memory-claim";
+import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
+import {
   agentSkillJson,
   hydrateAgentSkills,
 } from "./agent-skills";
@@ -10,6 +15,7 @@ import {
   failChannelReply,
   getChannelAgentReplyJob,
   getChannelById,
+  getChannelReplySession,
   getOrganizationProject,
   listChannelAgents,
   listChannelRootMessages,
@@ -302,6 +308,21 @@ export async function claimNextChannelReplyWork(
             : []
         )
       : [];
+    const memoryBinding = channel.kind === "dm"
+      ? await bindDmMemoryReplyClaim(db, {
+          jobId: job.id,
+          claimTokenHash,
+          supportsMemory: runtime.proto.capabilities?.dmMemoryProtocol === 1,
+          enabled: String(env.DM_MEMORY_RETRIEVAL_ENABLED) === "true",
+        })
+      : null;
+    const safeMessages = channel.kind === "dm"
+      ? await excludeForgottenDmSources(db, channel.id, messages)
+      : messages;
+    const currentSession = memoryBinding
+      ? await getChannelReplySession(db, job.channel_reply_session.id)
+      : job.channel_reply_session;
+    await requireDmMemoryReplyFence(db, job.id);
     const activity = env.CHANNEL_ACTIVITY_REALTIME
       ? await channelActivityCredential(env, job, {
           workerId: binding.id,
@@ -365,11 +386,12 @@ export async function claimNextChannelReplyWork(
         claimedAt: job.claimed_at,
         leaseExpiresAt: job.lease_expires_at,
         activity,
-        handoffContext,
+        handoffContext: memoryBinding ? null : handoffContext,
+        memory: memoryBinding?.memory ?? null,
         session: {
           id: job.channel_reply_session.id,
           threadId: job.channel_reply_session.thread_root_message_id,
-          conversationId: job.channel_reply_session.conversation_id,
+          conversationId: currentSession?.conversation_id ?? null,
           retainedUntil: job.channel_reply_session.retained_until,
           claimReason: job.session_claim_reason,
         },
@@ -419,7 +441,7 @@ export async function claimNextChannelReplyWork(
             title: target.title,
             status: target.status,
           })),
-          messages: messages.map(channelReplyContextMessageJson),
+          messages: safeMessages.map(channelReplyContextMessageJson),
         },
     };
   } catch (error) {

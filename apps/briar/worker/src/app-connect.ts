@@ -8,6 +8,7 @@ import { registerAppAgentService } from "./app-connect-agent";
 import { registerAppChannelService } from "./app-connect-channel";
 import { registerAppDashboardService } from "./app-connect-dashboard";
 import { registerAppDmMemoryService } from "./app-connect-dm-memory";
+import { scheduleDmMemoryActivityRevocations } from "./dm-memory-activity-revocations";
 import { registerAppFleetService } from "./app-connect-fleet";
 import { registerAppGithubServices } from "./app-connect-github";
 import { registerAppInboxService } from "./app-connect-inbox";
@@ -87,7 +88,7 @@ export async function handleAppConnectRequest(
     ...sharedInput,
     archivesBucket: input.env.ARCHIVES,
   });
-  registerAppDmMemoryService(router, sharedInput);
+  registerAppDmMemoryService(router, { ...sharedInput, env: input.env });
   registerAppInboxService(router, {
     ...sharedInput,
     env: input.env,
@@ -127,6 +128,7 @@ export async function handleAppConnectRequest(
   registerReplyActivityService(router, {
     request: input.request,
     env: input.env,
+    db: input.env.DB,
   });
   registerWorkerControlService(router, {
     request: input.request,
@@ -162,5 +164,15 @@ export async function handleAppConnectRequest(
   if (!handler) return undefined;
 
   const response = await createFetchHandler(handler)(input.request);
+  const mutationMayRevokeMemory = (
+    pathname.startsWith("/briar.app.v1.DmMemoryService/") &&
+    !/\/(?:ListDmMemories|GetDmMemoryDocument|ListDmMemoryRevisions)$/u.test(pathname)
+  ) || (
+    pathname.startsWith("/briar.app.v1.ChannelService/") &&
+    !/\/(?:ListChannels|SyncChannels|ListDirectMessageRecipients|ListChannelWebhooks|GetChannel|ListChannelMessages|GetChannelMessageDocument|GetChannelLinkPreview)$/u.test(pathname)
+  );
+  if (mutationMayRevokeMemory) {
+    scheduleDmMemoryActivityRevocations(input.env.DB, input.env, input.context);
+  }
   return withCorsHeaders(response);
 }

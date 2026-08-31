@@ -744,6 +744,10 @@ export const appChannelMessage = (message: ChannelMessage) =>
     subscribers: message.subscribers.map(appChannelSubscriber),
     createdAt: requiredTimestamp(message.createdAt, "channel message creation"),
     deletedAt: optionalTimestamp(message.deletedAt, "channel message deletion"),
+    memoryCitations: (message.memoryCitations ?? []).map((reference) => ({
+      documentId: reference.documentId,
+      version: reference.version,
+    })),
   });
 
 export const appChannelAgentReply = (reply: ChannelAgentReply) =>

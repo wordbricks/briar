@@ -1106,6 +1106,12 @@ private struct ChannelConversationView: View {
     let showsThreadSummary: Bool
     var focusedMessageID: UUID? = nil
     @State private var skillResultMessageID: UUID?
+    private struct MemoryCitationRoute: Identifiable {
+        let id = UUID()
+        let store: DmMemoryStore
+        let reference: ChannelMemoryCitation
+    }
+    @State private var citedMemory: MemoryCitationRoute?
 
     private var mentionCandidates: [ChannelMentionTarget] {
         ChannelMentions.candidates(
@@ -1263,6 +1269,11 @@ private struct ChannelConversationView: View {
                                 )
                             },
                             onOpenAttachment: { previewFile = PreviewFile(url: $0) },
+                            onMemoryOpen: { reference in
+                                if let store = channels.makeMemoryStore(channelID: channel.id) {
+                                    citedMemory = MemoryCitationRoute(store: store, reference: reference)
+                                }
+                            },
                             onDelete: {
                                 _ = await channels.deleteMessage(
                                     channelID: channel.id,
@@ -1285,6 +1296,11 @@ private struct ChannelConversationView: View {
                             showsThreadSummary: showsThreadSummary
                 )
             }
+            .sheet(item: $citedMemory) { route in
+                DmMemoryCitationView(store: route.store, reference: route.reference, locale: locale)
+            }
+            .onChange(of: currentUserID) { _, _ in citedMemory = nil }
+            .onChange(of: channel.id) { _, _ in citedMemory = nil }
             if !typingStatuses.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(typingStatuses) { status in
@@ -1379,6 +1395,7 @@ private struct ChannelMessageRow: View {
     let onIssueOpen: (UUID, UUID) async -> Void
     let onLoadAttachment: @MainActor (ChannelMessageAttachment) async throws -> URL
     let onOpenAttachment: @MainActor (URL) -> Void
+    let onMemoryOpen: (ChannelMemoryCitation) -> Void
     let onDelete: () async -> Void
     let onToggleReaction: (String) async -> Void
     let onOpenThread: (() -> Void)?
@@ -1445,6 +1462,16 @@ private struct ChannelMessageRow: View {
                 messageBodyWithoutAttachments: messageBodyWithoutAttachments
             )
             .frame(maxWidth: .infinity, alignment: .leading)
+                if channel.kind == .directMessage && !message.memoryCitations.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(locale == .ko ? "참고한 기억" : "Referenced memories").font(.caption)
+                        ForEach(Array(message.memoryCitations.enumerated()), id: \.element.id) { index, reference in
+                            Button("\(index + 1) · v\(reference.version)") { onMemoryOpen(reference) }
+                                .font(.caption)
+                                .accessibilityLabel("\(locale == .ko ? "참고한 기억" : "Referenced memory") \(index + 1) · v\(reference.version)")
+                        }
+                    }.padding(.top, 4)
+                }
                 if !message.attachments.isEmpty {
                     LazyVGrid(
                         columns: Array(

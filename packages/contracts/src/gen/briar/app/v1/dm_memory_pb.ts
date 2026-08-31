@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/app/v1/dm_memory.proto.
  */
 export const file_briar_app_v1_dm_memory: GenFile = /*@__PURE__*/
-  fileDesc("Chxicmlhci9hcHAvdjEvZG1fbWVtb3J5LnByb3RvEgxicmlhci5hcHAudjEilgEKFUxpc3REbU1lbW9yaWVzUmVxdWVzdBIXCg9vcmdhbml6YXRpb25faWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRIcCg9tZW1vcnlfc3BhY2VfaWQYAyABKAlIAIgBARITCgZjdXJzb3IYBCABKAlIAYgBAUISChBfbWVtb3J5X3NwYWNlX2lkQgkKB19jdXJzb3IipAIKFkxpc3REbU1lbW9yaWVzUmVzcG9uc2USEAoIZWxpZ2libGUYASABKAgSOAoMY2FwYWJpbGl0aWVzGAIgASgLMiIuYnJpYXIuYXBwLnYxLkRtTWVtb3J5Q2FwYWJpbGl0aWVzEisKBnNwYWNlcxgDIAMoCzIbLmJyaWFyLmFwcC52MS5EbU1lbW9yeVNwYWNlEh4KEXNlbGVjdGVkX3NwYWNlX2lkGAQgASgJSACIAQESMQoJZG9jdW1lbnRzGAUgAygLMh4uYnJpYXIuYXBwLnYxLkRtTWVtb3J5RG9jdW1lbnQSGAoLbmV4dF9jdXJzb3IYBiABKAlIAYgBAUIUChJfc2VsZWN0ZWRfc3BhY2VfaWRCDgoMX25leHRfY3Vyc29yIl4KGkdldERtTWVtb3J5RG9jdW1lbnRSZXF1ZXN0EhcKD29yZ2FuaXphdGlvbl9pZBgBIAEoCRISCgpjaGFubmVsX2lkGAIgASgJEhMKC2RvY3VtZW50X2lkGAMgASgJIk8KG0dldERtTWVtb3J5RG9jdW1lbnRSZXNwb25zZRIwCghkb2N1bWVudBgBIAEoCzIeLmJyaWFyLmFwcC52MS5EbU1lbW9yeURvY3VtZW50ItwDCh1DcmVhdGVEbU1lbW9yeURvY3VtZW50UmVxdWVzdBIXCg9vcmdhbml6YXRpb25faWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRISCgpyZXF1ZXN0X2lkGAMgASgJEhwKD21lbW9yeV9zcGFjZV9pZBgEIAEoCUgAiAEBEg0KBXRpdGxlGAUgASgJEgwKBGJvZHkYBiABKAkSMQoMbWVtb3J5X2NsYXNzGAcgASgOMhsuYnJpYXIuYXBwLnYxLkRtTWVtb3J5Q2xhc3MSFwoPc291cmNlX2xhbmd1YWdlGAggASgJEjQKC29ic2VydmVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgBiAEBEjQKC3ZhbGlkX3VudGlsGAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgCiAEBEkAKDnNvdXJjZV9tZXNzYWdlGAsgASgLMiMuYnJpYXIuYXBwLnYxLkRtTWVtb3J5U291cmNlTWVzc2FnZUgDiAEBQhIKEF9tZW1vcnlfc3BhY2VfaWRCDgoMX29ic2VydmVkX2F0Qg4KDF92YWxpZF91bnRpbEIRCg9fc291cmNlX21lc3NhZ2UiiwQKHVVwZGF0ZURtTWVtb3J5RG9jdW1lbnRSZXF1ZXN0EhcKD29yZ2FuaXphdGlvbl9pZBgBIAEoCRISCgpjaGFubmVsX2lkGAIgASgJEhMKC2RvY3VtZW50X2lkGAMgASgJEhIKCnJlcXVlc3RfaWQYBCABKAkSHAoPbWVtb3J5X3NwYWNlX2lkGAUgASgJSACIAQESGAoQZXhwZWN0ZWRfdmVyc2lvbhgGIAEoDRINCgV0aXRsZRgHIAEoCRIMCgRib2R5GAggASgJEjEKDG1lbW9yeV9jbGFzcxgJIAEoDjIbLmJyaWFyLmFwcC52MS5EbU1lbW9yeUNsYXNzEhcKD3NvdXJjZV9sYW5ndWFnZRgKIAEoCRI0CgtvYnNlcnZlZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAYgBARI0Cgt2YWxpZF91bnRpbBgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAogBARJACg5zb3VyY2VfbWVzc2FnZRgNIAEoCzIjLmJyaWFyLmFwcC52MS5EbU1lbW9yeVNvdXJjZU1lc3NhZ2VIA4gBAUISChBfbWVtb3J5X3NwYWNlX2lkQg4KDF9vYnNlcnZlZF9hdEIOCgxfdmFsaWRfdW50aWxCEQoPX3NvdXJjZV9tZXNzYWdlIlgKHkNyZWF0ZURtTWVtb3J5RG9jdW1lbnRSZXNwb25zZRITCgtkb2N1bWVudF9pZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgNEhAKCHJlcGxheWVkGAMgASgIIlgKHlVwZGF0ZURtTWVtb3J5RG9jdW1lbnRSZXNwb25zZRITCgtkb2N1bWVudF9pZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgNEhAKCHJlcGxheWVkGAMgASgIImEKHURlbGV0ZURtTWVtb3J5RG9jdW1lbnRSZXF1ZXN0EhcKD29yZ2FuaXphdGlvbl9pZBgBIAEoCRISCgpjaGFubmVsX2lkGAIgASgJEhMKC2RvY3VtZW50X2lkGAMgASgJIkYKHkRlbGV0ZURtTWVtb3J5RG9jdW1lbnRSZXNwb25zZRIPCgdkZWxldGVkGAEgASgIEhMKC3B1cmdlX3N0YXRlGAIgASgJIt8BCh1VcGRhdGVEbU1lbW9yeVNldHRpbmdzUmVxdWVzdBIXCg9vcmdhbml6YXRpb25faWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRISCgpyZXF1ZXN0X2lkGAMgASgJEhwKD21lbW9yeV9zcGFjZV9pZBgEIAEoCUgAiAEBEiAKGGV4cGVjdGVkX21lbW9yeV9yZXZpc2lvbhgFIAEoBBITCgt1c2VfZW5hYmxlZBgGIAEoCBIUCgxhdXRvX2VuYWJsZWQYByABKAhCEgoQX21lbW9yeV9zcGFjZV9pZCJMCh5VcGRhdGVEbU1lbW9yeVNldHRpbmdzUmVzcG9uc2USKgoFc3BhY2UYASABKAsyGy5icmlhci5hcHAudjEuRG1NZW1vcnlTcGFjZSJCChREbU1lbW9yeUNhcGFiaWxpdGllcxIOCgZyZWNhbGwYASABKAgSGgoSYXV0b21hdGljX2xlYXJuaW5nGAIgASgIIsgCCg1EbU1lbW9yeVNwYWNlEgoKAmlkGAEgASgJEhIKCmNoYW5uZWxfaWQYAiABKAkSEAoIYWdlbnRfaWQYAyABKAkSFAoMcm9zdGVyX2Vwb2NoGAQgASgEEjEKBnN0YXR1cxgFIAEoDjIhLmJyaWFyLmFwcC52MS5EbU1lbW9yeVNwYWNlU3RhdHVzEhMKC3VzZV9lbmFibGVkGAYgASgIEhQKDGF1dG9fZW5hYmxlZBgHIAEoCBIXCg9tZW1vcnlfcmV2aXNpb24YCCABKAQSGAoQcmV2b2NhdGlvbl9lcG9jaBgJIAEoBBIuCgpjcmVhdGVkX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCLjBQoQRG1NZW1vcnlEb2N1bWVudBIKCgJpZBgBIAEoCRIXCg9tZW1vcnlfc3BhY2VfaWQYAiABKAkSMAoEa2luZBgDIAEoDjIiLmJyaWFyLmFwcC52MS5EbU1lbW9yeURvY3VtZW50S2luZBINCgV0aXRsZRgEIAEoCRIPCgd2ZXJzaW9uGAUgASgNEjQKBnN0YXR1cxgGIAEoDjIkLmJyaWFyLmFwcC52MS5EbU1lbW9yeURvY3VtZW50U3RhdHVzEhIKCmNvbmZsaWN0ZWQYByABKAgSMQoMbWVtb3J5X2NsYXNzGAggASgOMhsuYnJpYXIuYXBwLnYxLkRtTWVtb3J5Q2xhc3MSOQoNZXZpZGVuY2VfdHlwZRgJIAEoDjIiLmJyaWFyLmFwcC52MS5EbU1lbW9yeUV2aWRlbmNlVHlwZRIZChFwcm90ZWN0ZWRfYnlfdXNlchgKIAEoCBIXCg9zb3VyY2VfbGFuZ3VhZ2UYCyABKAkSNAoLb2JzZXJ2ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSACIAQESNAoLdmFsaWRfdW50aWwYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSAGIAQESLgoKY3JlYXRlZF9hdBgOIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgPIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNQoLaW5kZXhfc3RhdGUYECABKA4yIC5icmlhci5hcHAudjEuRG1NZW1vcnlJbmRleFN0YXRlEhEKBGJvZHkYESABKAlIAogBARItCgdzb3VyY2VzGBIgAygLMhwuYnJpYXIuYXBwLnYxLkRtTWVtb3J5U291cmNlQg4KDF9vYnNlcnZlZF9hdEIOCgxfdmFsaWRfdW50aWxCBwoFX2JvZHkiNAoVRG1NZW1vcnlTb3VyY2VNZXNzYWdlEgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKA0iXQoORG1NZW1vcnlTb3VyY2USLgoEdHlwZRgBIAEoDjIgLmJyaWFyLmFwcC52MS5EbU1lbW9yeVNvdXJjZVR5cGUSCgoCaWQYAiABKAkSDwoHdmVyc2lvbhgDIAEoDSqAAQoNRG1NZW1vcnlDbGFzcxIfChtETV9NRU1PUllfQ0xBU1NfVU5TUEVDSUZJRUQQABIbChdETV9NRU1PUllfQ0xBU1NfUFJPRklMRRABEhcKE0RNX01FTU9SWV9DTEFTU19MT0cQAhIYChRETV9NRU1PUllfQ0xBU1NfTk9URRADKoMBChNEbU1lbW9yeVNwYWNlU3RhdHVzEiYKIkRNX01FTU9SWV9TUEFDRV9TVEFUVVNfVU5TUEVDSUZJRUQQABIhCh1ETV9NRU1PUllfU1BBQ0VfU1RBVFVTX0FDVElWRRABEiEKHURNX01FTU9SWV9TUEFDRV9TVEFUVVNfQ0xPU0VEEAIqiwEKFERtTWVtb3J5RG9jdW1lbnRLaW5kEicKI0RNX01FTU9SWV9ET0NVTUVOVF9LSU5EX1VOU1BFQ0lGSUVEEAASJwojRE1fTUVNT1JZX0RPQ1VNRU5UX0tJTkRfT0JTRVJWQVRJT04QARIhCh1ETV9NRU1PUllfRE9DVU1FTlRfS0lORF9UT1BJQxACKr4BChZEbU1lbW9yeURvY3VtZW50U3RhdHVzEikKJURNX01FTU9SWV9ET0NVTUVOVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIkCiBETV9NRU1PUllfRE9DVU1FTlRfU1RBVFVTX0FDVElWRRABEikKJURNX01FTU9SWV9ET0NVTUVOVF9TVEFUVVNfSU5WQUxJREFURUQQAhIoCiRETV9NRU1PUllfRE9DVU1FTlRfU1RBVFVTX1NVUEVSU0VERUQQAyqQAQoURG1NZW1vcnlFdmlkZW5jZVR5cGUSJwojRE1fTUVNT1JZX0VWSURFTkNFX1RZUEVfVU5TUEVDSUZJRUQQABIpCiVETV9NRU1PUllfRVZJREVOQ0VfVFlQRV9FWFBMSUNJVF9VU0VSEAESJAogRE1fTUVNT1JZX0VWSURFTkNFX1RZUEVfT0JTRVJWRUQQAiqhAQoSRG1NZW1vcnlJbmRleFN0YXRlEiUKIURNX01FTU9SWV9JTkRFWF9TVEFURV9VTlNQRUNJRklFRBAAEiEKHURNX01FTU9SWV9JTkRFWF9TVEFURV9QRU5ESU5HEAESHwobRE1fTUVNT1JZX0lOREVYX1NUQVRFX1JFQURZEAISIAocRE1fTUVNT1JZX0lOREVYX1NUQVRFX0ZBSUxFRBADKokBChJEbU1lbW9yeVNvdXJjZVR5cGUSJQohRE1fTUVNT1JZX1NPVVJDRV9UWVBFX1VOU1BFQ0lGSUVEEAASIQodRE1fTUVNT1JZX1NPVVJDRV9UWVBFX01FU1NBR0UQARIpCiVETV9NRU1PUllfU09VUkNFX1RZUEVfVVNFUl9FRElUX0VWRU5UEAIyrgUKD0RtTWVtb3J5U2VydmljZRJbCg5MaXN0RG1NZW1vcmllcxIjLmJyaWFyLmFwcC52MS5MaXN0RG1NZW1vcmllc1JlcXVlc3QaJC5icmlhci5hcHAudjEuTGlzdERtTWVtb3JpZXNSZXNwb25zZRJqChNHZXREbU1lbW9yeURvY3VtZW50EiguYnJpYXIuYXBwLnYxLkdldERtTWVtb3J5RG9jdW1lbnRSZXF1ZXN0GikuYnJpYXIuYXBwLnYxLkdldERtTWVtb3J5RG9jdW1lbnRSZXNwb25zZRJzChZDcmVhdGVEbU1lbW9yeURvY3VtZW50EisuYnJpYXIuYXBwLnYxLkNyZWF0ZURtTWVtb3J5RG9jdW1lbnRSZXF1ZXN0GiwuYnJpYXIuYXBwLnYxLkNyZWF0ZURtTWVtb3J5RG9jdW1lbnRSZXNwb25zZRJzChZVcGRhdGVEbU1lbW9yeURvY3VtZW50EisuYnJpYXIuYXBwLnYxLlVwZGF0ZURtTWVtb3J5RG9jdW1lbnRSZXF1ZXN0GiwuYnJpYXIuYXBwLnYxLlVwZGF0ZURtTWVtb3J5RG9jdW1lbnRSZXNwb25zZRJzChZEZWxldGVEbU1lbW9yeURvY3VtZW50EisuYnJpYXIuYXBwLnYxLkRlbGV0ZURtTWVtb3J5RG9jdW1lbnRSZXF1ZXN0GiwuYnJpYXIuYXBwLnYxLkRlbGV0ZURtTWVtb3J5RG9jdW1lbnRSZXNwb25zZRJzChZVcGRhdGVEbU1lbW9yeVNldHRpbmdzEisuYnJpYXIuYXBwLnYxLlVwZGF0ZURtTWVtb3J5U2V0dGluZ3NSZXF1ZXN0GiwuYnJpYXIuYXBwLnYxLlVwZGF0ZURtTWVtb3J5U2V0dGluZ3NSZXNwb25zZUIMugIJQnJpYXJBUElfYgZwcm90bzM", [file_google_protobuf_timestamp]);
+  fileDesc("Chxicmlhci9hcHAvdjEvZG1fbWVtb3J5LnByb3RvEgxicmlhci5hcHAudjEilgEKFUxpc3REbU1lbW9yaWVzUmVxdWVzdBIXCg9vcmdhbml6YXRpb25faWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRIcCg9tZW1vcnlfc3BhY2VfaWQYAyABKAlIAIgBARITCgZjdXJzb3IYBCABKAlIAYgBAUISChBfbWVtb3J5X3NwYWNlX2lkQgkKB19jdXJzb3IipAIKFkxpc3REbU1lbW9yaWVzUmVzcG9uc2USEAoIZWxpZ2libGUYASABKAgSOAoMY2FwYWJpbGl0aWVzGAIgASgLMiIuYnJpYXIuYXBwLnYxLkRtTWVtb3J5Q2FwYWJpbGl0aWVzEisKBnNwYWNlcxgDIAMoCzIbLmJyaWFyLmFwcC52MS5EbU1lbW9yeVNwYWNlEh4KEXNlbGVjdGVkX3NwYWNlX2lkGAQgASgJSACIAQESMQoJZG9jdW1lbnRzGAUgAygLMh4uYnJpYXIuYXBwLnYxLkRtTWVtb3J5RG9jdW1lbnQSGAoLbmV4dF9jdXJzb3IYBiABKAlIAYgBAUIUChJfc2VsZWN0ZWRfc3BhY2VfaWRCDgoMX25leHRfY3Vyc29yIoABChpHZXREbU1lbW9yeURvY3VtZW50UmVxdWVzdBIXCg9vcmdhbml6YXRpb25faWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRITCgtkb2N1bWVudF9pZBgDIAEoCRIUCgd2ZXJzaW9uGAQgASgNSACIAQFCCgoIX3ZlcnNpb24iTwobR2V0RG1NZW1vcnlEb2N1bWVudFJlc3BvbnNlEjAKCGRvY3VtZW50GAEgASgLMh4uYnJpYXIuYXBwLnYxLkRtTWVtb3J5RG9jdW1lbnQigAEKHExpc3REbU1lbW9yeVJldmlzaW9uc1JlcXVlc3QSFwoPb3JnYW5pemF0aW9uX2lkGAEgASgJEhIKCmNoYW5uZWxfaWQYAiABKAkSEwoLZG9jdW1lbnRfaWQYAyABKAkSEwoGY3Vyc29yGAQgASgNSACIAQFCCQoHX2N1cnNvciKqAQodTGlzdERtTWVtb3J5UmV2aXNpb25zUmVzcG9uc2USEwoLZG9jdW1lbnRfaWQYASABKAkSFwoPY3VycmVudF92ZXJzaW9uGAIgASgNEjEKCXJldmlzaW9ucxgDIAMoCzIeLmJyaWFyLmFwcC52MS5EbU1lbW9yeVJldmlzaW9uEhgKC25leHRfY3Vyc29yGAQgASgNSACIAQFCDgoMX25leHRfY3Vyc29yIp0CChBEbU1lbW9yeVJldmlzaW9uEg8KB3ZlcnNpb24YASABKA0SLgoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMQoMbWVtb3J5X2NsYXNzGAMgASgOMhsuYnJpYXIuYXBwLnYxLkRtTWVtb3J5Q2xhc3MSGQoRcHJvdGVjdGVkX2J5X3VzZXIYBCABKAgSNAoLdmFsaWRfdW50aWwYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSACIAQESNAoGb3JpZ2luGAYgASgOMiQuYnJpYXIuYXBwLnYxLkRtTWVtb3J5UmV2aXNpb25PcmlnaW5CDgoMX3ZhbGlkX3VudGlsItwDCh1DcmVhdGVEbU1lbW9yeURvY3VtZW50UmVxdWVzdBIXCg9vcmdhbml6YXRpb25faWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRISCgpyZXF1ZXN0X2lkGAMgASgJEhwKD21lbW9yeV9zcGFjZV9pZBgEIAEoCUgAiAEBEg0KBXRpdGxlGAUgASgJEgwKBGJvZHkYBiABKAkSMQoMbWVtb3J5X2NsYXNzGAcgASgOMhsuYnJpYXIuYXBwLnYxLkRtTWVtb3J5Q2xhc3MSFwoPc291cmNlX2xhbmd1YWdlGAggASgJEjQKC29ic2VydmVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgBiAEBEjQKC3ZhbGlkX3VudGlsGAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgCiAEBEkAKDnNvdXJjZV9tZXNzYWdlGAsgASgLMiMuYnJpYXIuYXBwLnYxLkRtTWVtb3J5U291cmNlTWVzc2FnZUgDiAEBQhIKEF9tZW1vcnlfc3BhY2VfaWRCDgoMX29ic2VydmVkX2F0Qg4KDF92YWxpZF91bnRpbEIRCg9fc291cmNlX21lc3NhZ2UiiwQKHVVwZGF0ZURtTWVtb3J5RG9jdW1lbnRSZXF1ZXN0EhcKD29yZ2FuaXphdGlvbl9pZBgBIAEoCRISCgpjaGFubmVsX2lkGAIgASgJEhMKC2RvY3VtZW50X2lkGAMgASgJEhIKCnJlcXVlc3RfaWQYBCABKAkSHAoPbWVtb3J5X3NwYWNlX2lkGAUgASgJSACIAQESGAoQZXhwZWN0ZWRfdmVyc2lvbhgGIAEoDRINCgV0aXRsZRgHIAEoCRIMCgRib2R5GAggASgJEjEKDG1lbW9yeV9jbGFzcxgJIAEoDjIbLmJyaWFyLmFwcC52MS5EbU1lbW9yeUNsYXNzEhcKD3NvdXJjZV9sYW5ndWFnZRgKIAEoCRI0CgtvYnNlcnZlZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAYgBARI0Cgt2YWxpZF91bnRpbBgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAogBARJACg5zb3VyY2VfbWVzc2FnZRgNIAEoCzIjLmJyaWFyLmFwcC52MS5EbU1lbW9yeVNvdXJjZU1lc3NhZ2VIA4gBAUISChBfbWVtb3J5X3NwYWNlX2lkQg4KDF9vYnNlcnZlZF9hdEIOCgxfdmFsaWRfdW50aWxCEQoPX3NvdXJjZV9tZXNzYWdlIlgKHkNyZWF0ZURtTWVtb3J5RG9jdW1lbnRSZXNwb25zZRITCgtkb2N1bWVudF9pZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgNEhAKCHJlcGxheWVkGAMgASgIIlgKHlVwZGF0ZURtTWVtb3J5RG9jdW1lbnRSZXNwb25zZRITCgtkb2N1bWVudF9pZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgNEhAKCHJlcGxheWVkGAMgASgIImEKHURlbGV0ZURtTWVtb3J5RG9jdW1lbnRSZXF1ZXN0EhcKD29yZ2FuaXphdGlvbl9pZBgBIAEoCRISCgpjaGFubmVsX2lkGAIgASgJEhMKC2RvY3VtZW50X2lkGAMgASgJIkYKHkRlbGV0ZURtTWVtb3J5RG9jdW1lbnRSZXNwb25zZRIPCgdkZWxldGVkGAEgASgIEhMKC3B1cmdlX3N0YXRlGAIgASgJIt8BCh1VcGRhdGVEbU1lbW9yeVNldHRpbmdzUmVxdWVzdBIXCg9vcmdhbml6YXRpb25faWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRISCgpyZXF1ZXN0X2lkGAMgASgJEhwKD21lbW9yeV9zcGFjZV9pZBgEIAEoCUgAiAEBEiAKGGV4cGVjdGVkX21lbW9yeV9yZXZpc2lvbhgFIAEoBBITCgt1c2VfZW5hYmxlZBgGIAEoCBIUCgxhdXRvX2VuYWJsZWQYByABKAhCEgoQX21lbW9yeV9zcGFjZV9pZCJMCh5VcGRhdGVEbU1lbW9yeVNldHRpbmdzUmVzcG9uc2USKgoFc3BhY2UYASABKAsyGy5icmlhci5hcHAudjEuRG1NZW1vcnlTcGFjZSJCChREbU1lbW9yeUNhcGFiaWxpdGllcxIOCgZyZWNhbGwYASABKAgSGgoSYXV0b21hdGljX2xlYXJuaW5nGAIgASgIIsgCCg1EbU1lbW9yeVNwYWNlEgoKAmlkGAEgASgJEhIKCmNoYW5uZWxfaWQYAiABKAkSEAoIYWdlbnRfaWQYAyABKAkSFAoMcm9zdGVyX2Vwb2NoGAQgASgEEjEKBnN0YXR1cxgFIAEoDjIhLmJyaWFyLmFwcC52MS5EbU1lbW9yeVNwYWNlU3RhdHVzEhMKC3VzZV9lbmFibGVkGAYgASgIEhQKDGF1dG9fZW5hYmxlZBgHIAEoCBIXCg9tZW1vcnlfcmV2aXNpb24YCCABKAQSGAoQcmV2b2NhdGlvbl9lcG9jaBgJIAEoBBIuCgpjcmVhdGVkX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCLjBQoQRG1NZW1vcnlEb2N1bWVudBIKCgJpZBgBIAEoCRIXCg9tZW1vcnlfc3BhY2VfaWQYAiABKAkSMAoEa2luZBgDIAEoDjIiLmJyaWFyLmFwcC52MS5EbU1lbW9yeURvY3VtZW50S2luZBINCgV0aXRsZRgEIAEoCRIPCgd2ZXJzaW9uGAUgASgNEjQKBnN0YXR1cxgGIAEoDjIkLmJyaWFyLmFwcC52MS5EbU1lbW9yeURvY3VtZW50U3RhdHVzEhIKCmNvbmZsaWN0ZWQYByABKAgSMQoMbWVtb3J5X2NsYXNzGAggASgOMhsuYnJpYXIuYXBwLnYxLkRtTWVtb3J5Q2xhc3MSOQoNZXZpZGVuY2VfdHlwZRgJIAEoDjIiLmJyaWFyLmFwcC52MS5EbU1lbW9yeUV2aWRlbmNlVHlwZRIZChFwcm90ZWN0ZWRfYnlfdXNlchgKIAEoCBIXCg9zb3VyY2VfbGFuZ3VhZ2UYCyABKAkSNAoLb2JzZXJ2ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSACIAQESNAoLdmFsaWRfdW50aWwYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSAGIAQESLgoKY3JlYXRlZF9hdBgOIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgPIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNQoLaW5kZXhfc3RhdGUYECABKA4yIC5icmlhci5hcHAudjEuRG1NZW1vcnlJbmRleFN0YXRlEhEKBGJvZHkYESABKAlIAogBARItCgdzb3VyY2VzGBIgAygLMhwuYnJpYXIuYXBwLnYxLkRtTWVtb3J5U291cmNlQg4KDF9vYnNlcnZlZF9hdEIOCgxfdmFsaWRfdW50aWxCBwoFX2JvZHkiNAoVRG1NZW1vcnlTb3VyY2VNZXNzYWdlEgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKA0iXQoORG1NZW1vcnlTb3VyY2USLgoEdHlwZRgBIAEoDjIgLmJyaWFyLmFwcC52MS5EbU1lbW9yeVNvdXJjZVR5cGUSCgoCaWQYAiABKAkSDwoHdmVyc2lvbhgDIAEoDSI5ChFEbU1lbW9yeVJlZmVyZW5jZRITCgtkb2N1bWVudF9pZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgNIsEBChJEbU1lbW9yeURlc2NyaXB0b3ISEAoIcHJvdG9jb2wYASABKA0SFwoPbWVtb3J5X3NwYWNlX2lkGAIgASgJEhcKD21lbW9yeV9yZXZpc2lvbhgDIAEoBBIYChByZXZvY2F0aW9uX2Vwb2NoGAQgASgEEhYKDnNlYXJjaF9lbmFibGVkGAUgASgIEjUKC2JyaWVmX3N0YXRlGAYgASgOMiAuYnJpYXIuYXBwLnYxLkRtTWVtb3J5QnJpZWZTdGF0ZSqAAQoNRG1NZW1vcnlDbGFzcxIfChtETV9NRU1PUllfQ0xBU1NfVU5TUEVDSUZJRUQQABIbChdETV9NRU1PUllfQ0xBU1NfUFJPRklMRRABEhcKE0RNX01FTU9SWV9DTEFTU19MT0cQAhIYChRETV9NRU1PUllfQ0xBU1NfTk9URRADKoMBChNEbU1lbW9yeVNwYWNlU3RhdHVzEiYKIkRNX01FTU9SWV9TUEFDRV9TVEFUVVNfVU5TUEVDSUZJRUQQABIhCh1ETV9NRU1PUllfU1BBQ0VfU1RBVFVTX0FDVElWRRABEiEKHURNX01FTU9SWV9TUEFDRV9TVEFUVVNfQ0xPU0VEEAIqiwEKFERtTWVtb3J5RG9jdW1lbnRLaW5kEicKI0RNX01FTU9SWV9ET0NVTUVOVF9LSU5EX1VOU1BFQ0lGSUVEEAASJwojRE1fTUVNT1JZX0RPQ1VNRU5UX0tJTkRfT0JTRVJWQVRJT04QARIhCh1ETV9NRU1PUllfRE9DVU1FTlRfS0lORF9UT1BJQxACKr4BChZEbU1lbW9yeURvY3VtZW50U3RhdHVzEikKJURNX01FTU9SWV9ET0NVTUVOVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIkCiBETV9NRU1PUllfRE9DVU1FTlRfU1RBVFVTX0FDVElWRRABEikKJURNX01FTU9SWV9ET0NVTUVOVF9TVEFUVVNfSU5WQUxJREFURUQQAhIoCiRETV9NRU1PUllfRE9DVU1FTlRfU1RBVFVTX1NVUEVSU0VERUQQAyqQAQoURG1NZW1vcnlFdmlkZW5jZVR5cGUSJwojRE1fTUVNT1JZX0VWSURFTkNFX1RZUEVfVU5TUEVDSUZJRUQQABIpCiVETV9NRU1PUllfRVZJREVOQ0VfVFlQRV9FWFBMSUNJVF9VU0VSEAESJAogRE1fTUVNT1JZX0VWSURFTkNFX1RZUEVfT0JTRVJWRUQQAiqhAQoSRG1NZW1vcnlJbmRleFN0YXRlEiUKIURNX01FTU9SWV9JTkRFWF9TVEFURV9VTlNQRUNJRklFRBAAEiEKHURNX01FTU9SWV9JTkRFWF9TVEFURV9QRU5ESU5HEAESHwobRE1fTUVNT1JZX0lOREVYX1NUQVRFX1JFQURZEAISIAocRE1fTUVNT1JZX0lOREVYX1NUQVRFX0ZBSUxFRBADKokBChJEbU1lbW9yeVNvdXJjZVR5cGUSJQohRE1fTUVNT1JZX1NPVVJDRV9UWVBFX1VOU1BFQ0lGSUVEEAASIQodRE1fTUVNT1JZX1NPVVJDRV9UWVBFX01FU1NBR0UQARIpCiVETV9NRU1PUllfU09VUkNFX1RZUEVfVVNFUl9FRElUX0VWRU5UEAIq7gEKFkRtTWVtb3J5UmV2aXNpb25PcmlnaW4SKQolRE1fTUVNT1JZX1JFVklTSU9OX09SSUdJTl9VTlNQRUNJRklFRBAAEicKI0RNX01FTU9SWV9SRVZJU0lPTl9PUklHSU5fVVNFUl9FRElUEAESLgoqRE1fTUVNT1JZX1JFVklTSU9OX09SSUdJTl9FWFBMSUNJVF9SRVFVRVNUEAISJQohRE1fTUVNT1JZX1JFVklTSU9OX09SSUdJTl9FWFRSQUNUEAMSKQolRE1fTUVNT1JZX1JFVklTSU9OX09SSUdJTl9DT05TT0xJREFURRAEKoQBChJEbU1lbW9yeUJyaWVmU3RhdGUSJQohRE1fTUVNT1JZX0JSSUVGX1NUQVRFX1VOU1BFQ0lGSUVEEAASIwofRE1fTUVNT1JZX0JSSUVGX1NUQVRFX0FWQUlMQUJMRRABEiIKHkRNX01FTU9SWV9CUklFRl9TVEFURV9ESVNBQkxFRBACMqAGCg9EbU1lbW9yeVNlcnZpY2USWwoOTGlzdERtTWVtb3JpZXMSIy5icmlhci5hcHAudjEuTGlzdERtTWVtb3JpZXNSZXF1ZXN0GiQuYnJpYXIuYXBwLnYxLkxpc3REbU1lbW9yaWVzUmVzcG9uc2USagoTR2V0RG1NZW1vcnlEb2N1bWVudBIoLmJyaWFyLmFwcC52MS5HZXREbU1lbW9yeURvY3VtZW50UmVxdWVzdBopLmJyaWFyLmFwcC52MS5HZXREbU1lbW9yeURvY3VtZW50UmVzcG9uc2UScAoVTGlzdERtTWVtb3J5UmV2aXNpb25zEiouYnJpYXIuYXBwLnYxLkxpc3REbU1lbW9yeVJldmlzaW9uc1JlcXVlc3QaKy5icmlhci5hcHAudjEuTGlzdERtTWVtb3J5UmV2aXNpb25zUmVzcG9uc2UScwoWQ3JlYXRlRG1NZW1vcnlEb2N1bWVudBIrLmJyaWFyLmFwcC52MS5DcmVhdGVEbU1lbW9yeURvY3VtZW50UmVxdWVzdBosLmJyaWFyLmFwcC52MS5DcmVhdGVEbU1lbW9yeURvY3VtZW50UmVzcG9uc2UScwoWVXBkYXRlRG1NZW1vcnlEb2N1bWVudBIrLmJyaWFyLmFwcC52MS5VcGRhdGVEbU1lbW9yeURvY3VtZW50UmVxdWVzdBosLmJyaWFyLmFwcC52MS5VcGRhdGVEbU1lbW9yeURvY3VtZW50UmVzcG9uc2UScwoWRGVsZXRlRG1NZW1vcnlEb2N1bWVudBIrLmJyaWFyLmFwcC52MS5EZWxldGVEbU1lbW9yeURvY3VtZW50UmVxdWVzdBosLmJyaWFyLmFwcC52MS5EZWxldGVEbU1lbW9yeURvY3VtZW50UmVzcG9uc2UScwoWVXBkYXRlRG1NZW1vcnlTZXR0aW5ncxIrLmJyaWFyLmFwcC52MS5VcGRhdGVEbU1lbW9yeVNldHRpbmdzUmVxdWVzdBosLmJyaWFyLmFwcC52MS5VcGRhdGVEbU1lbW9yeVNldHRpbmdzUmVzcG9uc2VCDLoCCUJyaWFyQVBJX2IGcHJvdG8z", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message briar.app.v1.ListDmMemoriesRequest
@@ -106,6 +106,11 @@ export type GetDmMemoryDocumentRequest = Message<"briar.app.v1.GetDmMemoryDocume
    * @generated from field: string document_id = 3;
    */
   documentId: string;
+
+  /**
+   * @generated from field: optional uint32 version = 4;
+   */
+  version?: number | undefined;
 };
 
 /**
@@ -131,6 +136,112 @@ export type GetDmMemoryDocumentResponse = Message<"briar.app.v1.GetDmMemoryDocum
  */
 export const GetDmMemoryDocumentResponseSchema: GenMessage<GetDmMemoryDocumentResponse> = /*@__PURE__*/
   messageDesc(file_briar_app_v1_dm_memory, 3);
+
+/**
+ * @generated from message briar.app.v1.ListDmMemoryRevisionsRequest
+ */
+export type ListDmMemoryRevisionsRequest = Message<"briar.app.v1.ListDmMemoryRevisionsRequest"> & {
+  /**
+   * @generated from field: string organization_id = 1;
+   */
+  organizationId: string;
+
+  /**
+   * @generated from field: string channel_id = 2;
+   */
+  channelId: string;
+
+  /**
+   * @generated from field: string document_id = 3;
+   */
+  documentId: string;
+
+  /**
+   * @generated from field: optional uint32 cursor = 4;
+   */
+  cursor?: number | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.ListDmMemoryRevisionsRequest.
+ * Use `create(ListDmMemoryRevisionsRequestSchema)` to create a new message.
+ */
+export const ListDmMemoryRevisionsRequestSchema: GenMessage<ListDmMemoryRevisionsRequest> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_dm_memory, 4);
+
+/**
+ * @generated from message briar.app.v1.ListDmMemoryRevisionsResponse
+ */
+export type ListDmMemoryRevisionsResponse = Message<"briar.app.v1.ListDmMemoryRevisionsResponse"> & {
+  /**
+   * @generated from field: string document_id = 1;
+   */
+  documentId: string;
+
+  /**
+   * @generated from field: uint32 current_version = 2;
+   */
+  currentVersion: number;
+
+  /**
+   * @generated from field: repeated briar.app.v1.DmMemoryRevision revisions = 3;
+   */
+  revisions: DmMemoryRevision[];
+
+  /**
+   * @generated from field: optional uint32 next_cursor = 4;
+   */
+  nextCursor?: number | undefined;
+};
+
+/**
+ * Describes the message briar.app.v1.ListDmMemoryRevisionsResponse.
+ * Use `create(ListDmMemoryRevisionsResponseSchema)` to create a new message.
+ */
+export const ListDmMemoryRevisionsResponseSchema: GenMessage<ListDmMemoryRevisionsResponse> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_dm_memory, 5);
+
+/**
+ * @generated from message briar.app.v1.DmMemoryRevision
+ */
+export type DmMemoryRevision = Message<"briar.app.v1.DmMemoryRevision"> & {
+  /**
+   * @generated from field: uint32 version = 1;
+   */
+  version: number;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 2;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: briar.app.v1.DmMemoryClass memory_class = 3;
+   */
+  memoryClass: DmMemoryClass;
+
+  /**
+   * @generated from field: bool protected_by_user = 4;
+   */
+  protectedByUser: boolean;
+
+  /**
+   * @generated from field: optional google.protobuf.Timestamp valid_until = 5;
+   */
+  validUntil?: Timestamp | undefined;
+
+  /**
+   * @generated from field: briar.app.v1.DmMemoryRevisionOrigin origin = 6;
+   */
+  origin: DmMemoryRevisionOrigin;
+};
+
+/**
+ * Describes the message briar.app.v1.DmMemoryRevision.
+ * Use `create(DmMemoryRevisionSchema)` to create a new message.
+ */
+export const DmMemoryRevisionSchema: GenMessage<DmMemoryRevision> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_dm_memory, 6);
 
 /**
  * @generated from message briar.app.v1.CreateDmMemoryDocumentRequest
@@ -197,7 +308,7 @@ export type CreateDmMemoryDocumentRequest = Message<"briar.app.v1.CreateDmMemory
  * Use `create(CreateDmMemoryDocumentRequestSchema)` to create a new message.
  */
 export const CreateDmMemoryDocumentRequestSchema: GenMessage<CreateDmMemoryDocumentRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 4);
+  messageDesc(file_briar_app_v1_dm_memory, 7);
 
 /**
  * @generated from message briar.app.v1.UpdateDmMemoryDocumentRequest
@@ -274,7 +385,7 @@ export type UpdateDmMemoryDocumentRequest = Message<"briar.app.v1.UpdateDmMemory
  * Use `create(UpdateDmMemoryDocumentRequestSchema)` to create a new message.
  */
 export const UpdateDmMemoryDocumentRequestSchema: GenMessage<UpdateDmMemoryDocumentRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 5);
+  messageDesc(file_briar_app_v1_dm_memory, 8);
 
 /**
  * @generated from message briar.app.v1.CreateDmMemoryDocumentResponse
@@ -301,7 +412,7 @@ export type CreateDmMemoryDocumentResponse = Message<"briar.app.v1.CreateDmMemor
  * Use `create(CreateDmMemoryDocumentResponseSchema)` to create a new message.
  */
 export const CreateDmMemoryDocumentResponseSchema: GenMessage<CreateDmMemoryDocumentResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 6);
+  messageDesc(file_briar_app_v1_dm_memory, 9);
 
 /**
  * @generated from message briar.app.v1.UpdateDmMemoryDocumentResponse
@@ -328,7 +439,7 @@ export type UpdateDmMemoryDocumentResponse = Message<"briar.app.v1.UpdateDmMemor
  * Use `create(UpdateDmMemoryDocumentResponseSchema)` to create a new message.
  */
 export const UpdateDmMemoryDocumentResponseSchema: GenMessage<UpdateDmMemoryDocumentResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 7);
+  messageDesc(file_briar_app_v1_dm_memory, 10);
 
 /**
  * @generated from message briar.app.v1.DeleteDmMemoryDocumentRequest
@@ -355,7 +466,7 @@ export type DeleteDmMemoryDocumentRequest = Message<"briar.app.v1.DeleteDmMemory
  * Use `create(DeleteDmMemoryDocumentRequestSchema)` to create a new message.
  */
 export const DeleteDmMemoryDocumentRequestSchema: GenMessage<DeleteDmMemoryDocumentRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 8);
+  messageDesc(file_briar_app_v1_dm_memory, 11);
 
 /**
  * @generated from message briar.app.v1.DeleteDmMemoryDocumentResponse
@@ -377,7 +488,7 @@ export type DeleteDmMemoryDocumentResponse = Message<"briar.app.v1.DeleteDmMemor
  * Use `create(DeleteDmMemoryDocumentResponseSchema)` to create a new message.
  */
 export const DeleteDmMemoryDocumentResponseSchema: GenMessage<DeleteDmMemoryDocumentResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 9);
+  messageDesc(file_briar_app_v1_dm_memory, 12);
 
 /**
  * @generated from message briar.app.v1.UpdateDmMemorySettingsRequest
@@ -424,7 +535,7 @@ export type UpdateDmMemorySettingsRequest = Message<"briar.app.v1.UpdateDmMemory
  * Use `create(UpdateDmMemorySettingsRequestSchema)` to create a new message.
  */
 export const UpdateDmMemorySettingsRequestSchema: GenMessage<UpdateDmMemorySettingsRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 10);
+  messageDesc(file_briar_app_v1_dm_memory, 13);
 
 /**
  * @generated from message briar.app.v1.UpdateDmMemorySettingsResponse
@@ -441,7 +552,7 @@ export type UpdateDmMemorySettingsResponse = Message<"briar.app.v1.UpdateDmMemor
  * Use `create(UpdateDmMemorySettingsResponseSchema)` to create a new message.
  */
 export const UpdateDmMemorySettingsResponseSchema: GenMessage<UpdateDmMemorySettingsResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 11);
+  messageDesc(file_briar_app_v1_dm_memory, 14);
 
 /**
  * @generated from message briar.app.v1.DmMemoryCapabilities
@@ -463,7 +574,7 @@ export type DmMemoryCapabilities = Message<"briar.app.v1.DmMemoryCapabilities"> 
  * Use `create(DmMemoryCapabilitiesSchema)` to create a new message.
  */
 export const DmMemoryCapabilitiesSchema: GenMessage<DmMemoryCapabilities> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 12);
+  messageDesc(file_briar_app_v1_dm_memory, 15);
 
 /**
  * @generated from message briar.app.v1.DmMemorySpace
@@ -530,7 +641,7 @@ export type DmMemorySpace = Message<"briar.app.v1.DmMemorySpace"> & {
  * Use `create(DmMemorySpaceSchema)` to create a new message.
  */
 export const DmMemorySpaceSchema: GenMessage<DmMemorySpace> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 13);
+  messageDesc(file_briar_app_v1_dm_memory, 16);
 
 /**
  * @generated from message briar.app.v1.DmMemoryDocument
@@ -632,7 +743,7 @@ export type DmMemoryDocument = Message<"briar.app.v1.DmMemoryDocument"> & {
  * Use `create(DmMemoryDocumentSchema)` to create a new message.
  */
 export const DmMemoryDocumentSchema: GenMessage<DmMemoryDocument> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 14);
+  messageDesc(file_briar_app_v1_dm_memory, 17);
 
 /**
  * @generated from message briar.app.v1.DmMemorySourceMessage
@@ -654,7 +765,7 @@ export type DmMemorySourceMessage = Message<"briar.app.v1.DmMemorySourceMessage"
  * Use `create(DmMemorySourceMessageSchema)` to create a new message.
  */
 export const DmMemorySourceMessageSchema: GenMessage<DmMemorySourceMessage> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 15);
+  messageDesc(file_briar_app_v1_dm_memory, 18);
 
 /**
  * @generated from message briar.app.v1.DmMemorySource
@@ -681,7 +792,71 @@ export type DmMemorySource = Message<"briar.app.v1.DmMemorySource"> & {
  * Use `create(DmMemorySourceSchema)` to create a new message.
  */
 export const DmMemorySourceSchema: GenMessage<DmMemorySource> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 16);
+  messageDesc(file_briar_app_v1_dm_memory, 19);
+
+/**
+ * @generated from message briar.app.v1.DmMemoryReference
+ */
+export type DmMemoryReference = Message<"briar.app.v1.DmMemoryReference"> & {
+  /**
+   * @generated from field: string document_id = 1;
+   */
+  documentId: string;
+
+  /**
+   * @generated from field: uint32 version = 2;
+   */
+  version: number;
+};
+
+/**
+ * Describes the message briar.app.v1.DmMemoryReference.
+ * Use `create(DmMemoryReferenceSchema)` to create a new message.
+ */
+export const DmMemoryReferenceSchema: GenMessage<DmMemoryReference> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_dm_memory, 20);
+
+/**
+ * @generated from message briar.app.v1.DmMemoryDescriptor
+ */
+export type DmMemoryDescriptor = Message<"briar.app.v1.DmMemoryDescriptor"> & {
+  /**
+   * @generated from field: uint32 protocol = 1;
+   */
+  protocol: number;
+
+  /**
+   * @generated from field: string memory_space_id = 2;
+   */
+  memorySpaceId: string;
+
+  /**
+   * @generated from field: uint64 memory_revision = 3;
+   */
+  memoryRevision: bigint;
+
+  /**
+   * @generated from field: uint64 revocation_epoch = 4;
+   */
+  revocationEpoch: bigint;
+
+  /**
+   * @generated from field: bool search_enabled = 5;
+   */
+  searchEnabled: boolean;
+
+  /**
+   * @generated from field: briar.app.v1.DmMemoryBriefState brief_state = 6;
+   */
+  briefState: DmMemoryBriefState;
+};
+
+/**
+ * Describes the message briar.app.v1.DmMemoryDescriptor.
+ * Use `create(DmMemoryDescriptorSchema)` to create a new message.
+ */
+export const DmMemoryDescriptorSchema: GenMessage<DmMemoryDescriptor> = /*@__PURE__*/
+  messageDesc(file_briar_app_v1_dm_memory, 21);
 
 /**
  * @generated from enum briar.app.v1.DmMemoryClass
@@ -881,6 +1056,68 @@ export const DmMemorySourceTypeSchema: GenEnum<DmMemorySourceType> = /*@__PURE__
   enumDesc(file_briar_app_v1_dm_memory, 6);
 
 /**
+ * @generated from enum briar.app.v1.DmMemoryRevisionOrigin
+ */
+export enum DmMemoryRevisionOrigin {
+  /**
+   * @generated from enum value: DM_MEMORY_REVISION_ORIGIN_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: DM_MEMORY_REVISION_ORIGIN_USER_EDIT = 1;
+   */
+  USER_EDIT = 1,
+
+  /**
+   * @generated from enum value: DM_MEMORY_REVISION_ORIGIN_EXPLICIT_REQUEST = 2;
+   */
+  EXPLICIT_REQUEST = 2,
+
+  /**
+   * @generated from enum value: DM_MEMORY_REVISION_ORIGIN_EXTRACT = 3;
+   */
+  EXTRACT = 3,
+
+  /**
+   * @generated from enum value: DM_MEMORY_REVISION_ORIGIN_CONSOLIDATE = 4;
+   */
+  CONSOLIDATE = 4,
+}
+
+/**
+ * Describes the enum briar.app.v1.DmMemoryRevisionOrigin.
+ */
+export const DmMemoryRevisionOriginSchema: GenEnum<DmMemoryRevisionOrigin> = /*@__PURE__*/
+  enumDesc(file_briar_app_v1_dm_memory, 7);
+
+/**
+ * @generated from enum briar.app.v1.DmMemoryBriefState
+ */
+export enum DmMemoryBriefState {
+  /**
+   * @generated from enum value: DM_MEMORY_BRIEF_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: DM_MEMORY_BRIEF_STATE_AVAILABLE = 1;
+   */
+  AVAILABLE = 1,
+
+  /**
+   * @generated from enum value: DM_MEMORY_BRIEF_STATE_DISABLED = 2;
+   */
+  DISABLED = 2,
+}
+
+/**
+ * Describes the enum briar.app.v1.DmMemoryBriefState.
+ */
+export const DmMemoryBriefStateSchema: GenEnum<DmMemoryBriefState> = /*@__PURE__*/
+  enumDesc(file_briar_app_v1_dm_memory, 8);
+
+/**
  * @generated from service briar.app.v1.DmMemoryService
  */
 export const DmMemoryService: GenService<{
@@ -899,6 +1136,14 @@ export const DmMemoryService: GenService<{
     methodKind: "unary";
     input: typeof GetDmMemoryDocumentRequestSchema;
     output: typeof GetDmMemoryDocumentResponseSchema;
+  },
+  /**
+   * @generated from rpc briar.app.v1.DmMemoryService.ListDmMemoryRevisions
+   */
+  listDmMemoryRevisions: {
+    methodKind: "unary";
+    input: typeof ListDmMemoryRevisionsRequestSchema;
+    output: typeof ListDmMemoryRevisionsResponseSchema;
   },
   /**
    * @generated from rpc briar.app.v1.DmMemoryService.CreateDmMemoryDocument

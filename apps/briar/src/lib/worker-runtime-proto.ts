@@ -84,6 +84,7 @@ export const workerRuntimeToProto = (input: WorkerRuntimeInput) =>
         healthy: requirement.healthy,
         detail: requirement.detail ?? undefined,
       })) ?? [],
+      dmMemoryProtocol: 1,
     },
     versions: { ...input.versions },
   });

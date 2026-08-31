@@ -209,6 +209,16 @@ extension ChannelMessage {
             blocks: message.blocks.isEmpty
                 ? nil
                 : try message.blocks.map { try ChannelMessageBlock(connectMessage: $0) },
+            memoryCitations: try message.memoryCitations.map { reference in
+                guard let documentId = UUID(uuidString: reference.documentID),
+                      reference.version > 0 else {
+                    throw MobileAPIError.invalidResponse
+                }
+                return ChannelMemoryCitation(
+                    documentId: documentId,
+                    version: Int(reference.version)
+                )
+            },
             author: try Author(connectMessage: message.author),
             mentionedUserIds: message.mentionedUserIds,
             mentionedAgentIds: try message.mentionedAgentIds.map(channelUUID),

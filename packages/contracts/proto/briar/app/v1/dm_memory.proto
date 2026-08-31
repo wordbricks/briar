@@ -9,6 +9,7 @@ option swift_prefix = "BriarAPI_";
 service DmMemoryService {
   rpc ListDmMemories(ListDmMemoriesRequest) returns (ListDmMemoriesResponse);
   rpc GetDmMemoryDocument(GetDmMemoryDocumentRequest) returns (GetDmMemoryDocumentResponse);
+  rpc ListDmMemoryRevisions(ListDmMemoryRevisionsRequest) returns (ListDmMemoryRevisionsResponse);
   rpc CreateDmMemoryDocument(CreateDmMemoryDocumentRequest) returns (CreateDmMemoryDocumentResponse);
   rpc UpdateDmMemoryDocument(UpdateDmMemoryDocumentRequest) returns (UpdateDmMemoryDocumentResponse);
   rpc DeleteDmMemoryDocument(DeleteDmMemoryDocumentRequest) returns (DeleteDmMemoryDocumentResponse);
@@ -35,10 +36,34 @@ message GetDmMemoryDocumentRequest {
   string organization_id = 1;
   string channel_id = 2;
   string document_id = 3;
+  optional uint32 version = 4;
 }
 
 message GetDmMemoryDocumentResponse {
   DmMemoryDocument document = 1;
+}
+
+message ListDmMemoryRevisionsRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string document_id = 3;
+  optional uint32 cursor = 4;
+}
+
+message ListDmMemoryRevisionsResponse {
+  string document_id = 1;
+  uint32 current_version = 2;
+  repeated DmMemoryRevision revisions = 3;
+  optional uint32 next_cursor = 4;
+}
+
+message DmMemoryRevision {
+  uint32 version = 1;
+  google.protobuf.Timestamp created_at = 2;
+  DmMemoryClass memory_class = 3;
+  bool protected_by_user = 4;
+  optional google.protobuf.Timestamp valid_until = 5;
+  DmMemoryRevisionOrigin origin = 6;
 }
 
 message CreateDmMemoryDocumentRequest {
@@ -159,6 +184,20 @@ message DmMemorySource {
   uint32 version = 3;
 }
 
+message DmMemoryReference {
+  string document_id = 1;
+  uint32 version = 2;
+}
+
+message DmMemoryDescriptor {
+  uint32 protocol = 1;
+  string memory_space_id = 2;
+  uint64 memory_revision = 3;
+  uint64 revocation_epoch = 4;
+  bool search_enabled = 5;
+  DmMemoryBriefState brief_state = 6;
+}
+
 enum DmMemoryClass {
   DM_MEMORY_CLASS_UNSPECIFIED = 0;
   DM_MEMORY_CLASS_PROFILE = 1;
@@ -202,4 +241,18 @@ enum DmMemorySourceType {
   DM_MEMORY_SOURCE_TYPE_UNSPECIFIED = 0;
   DM_MEMORY_SOURCE_TYPE_MESSAGE = 1;
   DM_MEMORY_SOURCE_TYPE_USER_EDIT_EVENT = 2;
+}
+
+enum DmMemoryRevisionOrigin {
+  DM_MEMORY_REVISION_ORIGIN_UNSPECIFIED = 0;
+  DM_MEMORY_REVISION_ORIGIN_USER_EDIT = 1;
+  DM_MEMORY_REVISION_ORIGIN_EXPLICIT_REQUEST = 2;
+  DM_MEMORY_REVISION_ORIGIN_EXTRACT = 3;
+  DM_MEMORY_REVISION_ORIGIN_CONSOLIDATE = 4;
+}
+
+enum DmMemoryBriefState {
+  DM_MEMORY_BRIEF_STATE_UNSPECIFIED = 0;
+  DM_MEMORY_BRIEF_STATE_AVAILABLE = 1;
+  DM_MEMORY_BRIEF_STATE_DISABLED = 2;
 }

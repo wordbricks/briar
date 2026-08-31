@@ -643,6 +643,10 @@ export const channelMessageFromMessage = (
   skillExecutionProposal: value.skillExecutionProposal
     ? agentSkillExecutionProposalFromMessage(value.skillExecutionProposal)
     : null,
+  memoryCitations: value.memoryCitations.map((reference) => ({
+    documentId: reference.documentId,
+    version: reference.version,
+  })),
   createdAt: requiredTimestamp(value.createdAt, "channelMessage.createdAt"),
   deletedAt: optionalTimestamp(value.deletedAt),
 });

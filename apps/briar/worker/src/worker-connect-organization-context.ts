@@ -26,6 +26,11 @@ import {
 import { sha256 } from "./crypto-digest";
 import { HttpError } from "./http-response";
 import {
+  currentReplyLookupCache,
+  replyLookupCompletionStatement,
+  reserveReplyLookup,
+} from "./channel-reply-lookup-budget";
+import {
   lookupOrganizationAgentContext,
   organizationAgentContextManifest,
   organizationAgentContextMaxEncodedPageBytes,
@@ -42,6 +47,7 @@ type ActiveOrganizationContextClaim = {
   readonly organizationId: string;
   readonly workId: string;
   readonly snapshotAt: string;
+  readonly claimTokenHash: string;
 };
 
 const requiredText = (value: string, field: string, maximum: number) => {
@@ -194,6 +200,7 @@ export async function requireActiveOrganizationContextClaim(
   ) {
     throw new HttpError(401, "Channel reply claim token required");
   }
+  const claimTokenHash = await sha256(claimToken);
   const principal = await requireWorkerOrganization(
     input.db,
     input.request,
@@ -204,13 +211,13 @@ export async function requireActiveOrganizationContextClaim(
     jobId: workId,
     deviceId: principal.deviceId,
     workerId,
-    claimTokenHash: await sha256(claimToken),
+    claimTokenHash,
     observedAt: new Date().toISOString(),
   });
   if (!job?.claimed_at) {
     throw new HttpError(409, "Organization Agent claim is no longer active");
   }
-  return { organizationId, workId, snapshotAt: job.claimed_at };
+  return { organizationId, workId, snapshotAt: job.claimed_at, claimTokenHash };
 }
 
 const manifestMessage = (
@@ -262,13 +269,35 @@ export type WorkerConnectOrganizationContextServices = {
   readonly getOrganizationProject: typeof getOrganizationProject;
   readonly getManifest: typeof organizationAgentContextManifest;
   readonly lookup: typeof lookupOrganizationAgentContext;
+  readonly reserveReplyLookup: typeof reserveReplyLookup;
+  readonly currentReplyLookupCache: typeof currentReplyLookupCache;
+  readonly dmMemorySnapshot: typeof dmMemorySnapshot;
+  readonly completeReplyLookup: typeof completeReplyLookup;
 };
+
+const dmMemorySnapshot = (db: D1Database, workId: string, claimTokenHash: string) =>
+  db.prepare(`select space.memory_revision, space.revocation_epoch
+    from briar_dm_memory_reply_fences fence
+    join briar_dm_memory_spaces space on space.id = fence.space_id
+    where fence.job_id = ? and fence.claim_token_hash = ?`)
+    .bind(workId, claimTokenHash)
+    .first<{ memory_revision: number; revocation_epoch: number }>();
+
+const completeReplyLookup = (
+  db: D1Database,
+  reservation: Parameters<typeof replyLookupCompletionStatement>[1],
+  result: unknown,
+) => replyLookupCompletionStatement(db, reservation, result).all();
 
 const organizationContextServices: WorkerConnectOrganizationContextServices = {
   requireActiveClaim: requireActiveOrganizationContextClaim,
   getOrganizationProject,
   getManifest: organizationAgentContextManifest,
   lookup: lookupOrganizationAgentContext,
+  reserveReplyLookup,
+  currentReplyLookupCache,
+  dmMemorySnapshot,
+  completeReplyLookup,
 };
 
 const service = (
@@ -309,6 +338,9 @@ const service = (
       input,
       request.claim,
     );
+    if (!/^[0-9a-f-]{36}$/u.test(request.requestId)) {
+      throw new HttpError(400, "request_id must be a UUID");
+    }
     if (request.queries.length === 0 || request.queries.length > 12) {
       throw new HttpError(400, "queries must contain 1 to 12 lookups");
     }
@@ -326,11 +358,29 @@ const service = (
     if (projects.some((project) => !project)) {
       throw new HttpError(404, "Project not found");
     }
-    const result = await services.lookup(
+    const memory = await services.dmMemorySnapshot(
       input.db,
-      input.env.ARCHIVES,
-      { ...claim, requests },
+      claim.workId,
+      claim.claimTokenHash,
     );
+    const reservation = await services.reserveReplyLookup(input.db, {
+      jobId: claim.workId,
+      claimTokenHash: claim.claimTokenHash,
+      requestId: request.requestId,
+      kind: "organization",
+      request: requests,
+      memoryRevision: memory?.memory_revision ?? null,
+      revocationEpoch: memory?.revocation_epoch ?? null,
+    });
+    const result = reservation.cachedJson
+      ? JSON.parse(reservation.cachedJson) as Awaited<
+        ReturnType<typeof lookupOrganizationAgentContext>
+      >
+      : await services.lookup(
+        input.db,
+        input.env.ARCHIVES,
+        { ...claim, requests },
+      );
     const response = create(OrganizationAgentContextServiceLookupResponseSchema, {
       organizationId: result.organizationId,
       workId: result.workId,
@@ -345,6 +395,30 @@ const service = (
           .byteLength > organizationAgentContextMaxEncodedPageBytes
     ) {
       throw new HttpError(413, "Organization context lookup is too large");
+    }
+    if (reservation.cachedJson) {
+      await services.requireActiveClaim(input, request.claim);
+      if (!await services.currentReplyLookupCache(input.db, reservation)) {
+        throw new HttpError(
+          409,
+          "Lookup context changed",
+          "memory_snapshot_changed",
+        );
+      }
+    } else {
+      const completed = await services.completeReplyLookup(
+        input.db,
+        reservation,
+        result,
+      );
+      await services.requireActiveClaim(input, request.claim);
+      if (completed.results.length === 0) {
+        throw new HttpError(
+          409,
+          "Lookup context changed",
+          "memory_snapshot_changed",
+        );
+      }
     }
     return response;
   },

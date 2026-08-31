@@ -293,9 +293,13 @@ type ChannelActivityReplyIdentity = Pick<
 
 export async function channelActivityCredential(
   env: Env,
-  job: ChannelActivityReplyIdentity,
+  job: ChannelActivityReplyIdentity & { claim_token_hash?: string | null },
   input: { workerId: string; deviceId: string },
 ) {
+  if (!job.claim_token_hash) {
+    throw new Error("Channel reply claim token hash is required");
+  }
+  const claimTokenHash = job.claim_token_hash;
   return activityCredential(
     env,
     job,
@@ -303,6 +307,7 @@ export async function channelActivityCredential(
       organizationId: job.organization_id,
       channelId: job.channel_id,
       replyJobId: job.id,
+      claimTokenHash,
       agentId: job.agent_id,
       triggerMessageId: job.trigger_message_id,
       parentMessageId: job.parent_message_id,
