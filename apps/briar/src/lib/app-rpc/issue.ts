@@ -1,5 +1,7 @@
-import { create } from "@bufbuild/protobuf";
-import { createClient } from "@connectrpc/connect";
+import {
+  createClient,
+  type Client,
+} from "@connectrpc/connect";
 import {
   IssueChangedField as ProtoIssueChangedField,
   IssueService,
@@ -12,12 +14,6 @@ import {
   SetIssueDependencyResponse_Outcome as ProtoDependencyOutcome,
   TransferIssueResponse_Outcome as ProtoTransferOutcome,
   UnassignRunResponse_Outcome as ProtoUnassignOutcome,
-  CreateIssueMessageResponseSchema,
-  CreateIssueMessageRequestSchema,
-  CreateIssueRequestSchema,
-  CreateIssueResponseSchema,
-  UpdateIssueRequestSchema,
-  UpdateIssueResponseSchema,
   type CreateIssueMessageResponse as CreateIssueMessageResponseMessage,
   type CreateIssueResponse as CreateIssueResponseMessage,
   type IssueAgentReply as IssueAgentReplyMessage,
@@ -59,11 +55,20 @@ import type {
 } from "../../types";
 import type { AutoHuntWorkflowCheckpoint } from "../auto-hunt-contract";
 import type { AgentProvider } from "../agent-provider";
+import { briarApiUrl } from "../api-config";
 import {
-  requestProtobuf,
-  setMultipartProtobufRequest,
-} from "../api/request";
-import { validateIssueAttachments } from "../issue-attachments";
+  normalizeIssueAttachmentFile,
+  validateIssueAttachments,
+} from "../issue-attachments";
+import {
+  canonicalizeIssueAttachmentReferences,
+  isIssueAttachmentReference,
+  issueAttachmentReferences,
+} from "../issue-markdown";
+import { uploadPreparedFiles } from "../upload-client";
+import type {
+  PreparedUpload as PreparedUploadMessage,
+} from "@briar/contracts/gen/briar/types/v1/upload_pb";
 import { projectAgentSessionFromMessage } from "./agent";
 import {
   activeProposalStatusFromProto,
@@ -108,6 +113,22 @@ const requireIssueClient = () => {
   return issueClient;
 };
 
+export type IssueMutationRuntime = {
+  client: Client<typeof IssueService>;
+  apiUrl: string;
+  fetch: typeof globalThis.fetch;
+  randomUUID: () => string;
+  callOptions: typeof appCallOptions;
+};
+
+const defaultIssueMutationRuntime = (): IssueMutationRuntime => ({
+  client: requireIssueClient(),
+  apiUrl: briarApiUrl,
+  fetch: globalThis.fetch,
+  randomUUID: () => crypto.randomUUID(),
+  callOptions: appCallOptions,
+});
+
 const issueDifficultyToProto = (
   difficulty: CreateIssueInput["difficulty"],
 ): ProtoIssueDifficulty | undefined => {
@@ -123,18 +144,87 @@ const issueDifficultyToProto = (
   }
 };
 
-export const issueMutationTransport = (
-  attachments: readonly File[],
-): "connect" | "multipart" =>
-  attachments.length === 0 ? "connect" : "multipart";
+type IssueUploadMetadata = {
+  clientId: string;
+  filename: string;
+  contentType: string;
+  byteSize: bigint;
+  sha256: Uint8Array;
+};
+
+const uploadIssueAttachments = async (input: {
+  runtime: IssueMutationRuntime;
+  attachments: readonly File[];
+  attachmentReferences: readonly string[];
+  prepare: (
+    attachments: IssueUploadMetadata[],
+  ) => Promise<{ uploads: readonly PreparedUploadMessage[] }>;
+}) => {
+  const attachments = input.attachments.map(normalizeIssueAttachmentFile);
+  const attachmentError = validateIssueAttachments(attachments);
+  if (attachmentError) throw new Error(attachmentError);
+  if (
+    attachments.length !== input.attachmentReferences.length ||
+    new Set(input.attachmentReferences).size !== input.attachmentReferences.length ||
+    input.attachmentReferences.some((reference) =>
+      !isIssueAttachmentReference(reference)
+    )
+  ) {
+    throw new Error("Issue attachments and local references must match");
+  }
+  if (attachments.length === 0) return [];
+
+  const files = attachments.map((file, index) => ({
+    clientId: input.attachmentReferences[index]!,
+    file,
+  }));
+  const prepared = await input.prepare(await Promise.all(files.map(
+    async ({ clientId, file }) => ({
+      clientId,
+      filename: file.name,
+      contentType: file.type,
+      byteSize: BigInt(file.size),
+      sha256: new Uint8Array(await crypto.subtle.digest(
+        "SHA-256",
+        await file.arrayBuffer(),
+      )),
+    }),
+  )));
+  return uploadPreparedFiles({
+    apiUrl: input.runtime.apiUrl,
+    files,
+    uploads: prepared.uploads,
+    uploadId: (upload) => upload.reference?.uploadId,
+    fetch: input.runtime.fetch,
+  });
+};
+
+const assertAccessibleIssueAttachmentReferences = (
+  markdown: string | null | undefined,
+  accessibleAttachmentIds: readonly string[] | undefined,
+) => {
+  if (accessibleAttachmentIds === undefined) return;
+  const accessible = new Set(accessibleAttachmentIds);
+  const inaccessible = [...issueAttachmentReferences(markdown ?? null)].find(
+    (reference) => !accessible.has(reference),
+  );
+  if (inaccessible) {
+    throw new Error("Issue text references an unavailable attachment");
+  }
+};
 
 export const createIssueRequestFromInput = (
   projectId: string,
   input: CreateIssueInput,
+  mutation: {
+    clientIssueId: string;
+    description: string | null;
+    attachmentIds: readonly string[];
+  },
 ) => ({
   projectId,
   title: input.title,
-  description: input.description ?? undefined,
+  description: mutation.description ?? undefined,
   priority: input.priority ?? undefined,
   difficulty: issueDifficultyToProto(input.difficulty),
   assigneeUserId: input.assigneeUserId ?? undefined,
@@ -146,7 +236,8 @@ export const createIssueRequestFromInput = (
   preferredEffort: input.preferredEffort ?? undefined,
   fullAuto: input.fullAuto ?? false,
   checkpoints: (input.checkpoints ?? []).map(workflowCheckpointToProto),
-  attachmentReferences: input.attachmentReferences ?? [],
+  clientIssueId: mutation.clientIssueId,
+  attachments: mutation.attachmentIds.map((uploadId) => ({ uploadId })),
 });
 
 export type CreateIssueResult = {
@@ -182,46 +273,43 @@ const createIssueResultFromMessage = (
   };
 };
 
-const createIssueMultipart = async (
-  token: string,
-  projectId: string,
-  input: CreateIssueInput,
-) => {
-  const attachmentError = validateIssueAttachments(input.attachments);
-  if (attachmentError) throw new Error(attachmentError);
-  const form = new FormData();
-  setMultipartProtobufRequest(
-    form,
-    CreateIssueRequestSchema,
-    create(
-      CreateIssueRequestSchema,
-      createIssueRequestFromInput(projectId, input),
-    ),
-  );
-  for (const attachment of input.attachments) {
-    form.append("attachments", attachment, attachment.name);
-  }
-  return createIssueResultFromMessage(await requestProtobuf(
-    `/projects/${projectId}/issues`,
-    token,
-    CreateIssueResponseSchema,
-    { method: "POST", body: form },
-  ));
-};
-
 export async function createIssue(
   token: string,
   projectId: string,
   input: CreateIssueInput,
+  injectedRuntime?: IssueMutationRuntime,
 ): Promise<CreateIssueResult> {
-  if (issueMutationTransport(input.attachments) === "multipart") {
-    return createIssueMultipart(token, projectId, input);
-  }
-  const client = requireIssueClient();
+  const runtime = injectedRuntime ?? defaultIssueMutationRuntime();
+  const clientIssueId = runtime.randomUUID().toLowerCase();
+  const attachmentReferences = input.attachmentReferences ?? [];
+  const attachmentIds = await uploadIssueAttachments({
+    runtime,
+    attachments: input.attachments,
+    attachmentReferences,
+    prepare: (attachments) => runtime.client.prepareCreateIssueAttachments(
+      {
+        preparationRequestId: runtime.randomUUID(),
+        projectId,
+        clientIssueId,
+        attachments,
+      },
+      runtime.callOptions(token),
+    ),
+  });
+  const description = canonicalizeIssueAttachmentReferences(
+    input.description,
+    attachmentReferences,
+    attachmentIds,
+  );
+  assertAccessibleIssueAttachmentReferences(description, attachmentIds);
   return createIssueResultFromMessage(
-    await client.createIssue(
-      createIssueRequestFromInput(projectId, input),
-      appCallOptions(token),
+    await runtime.client.createIssue(
+      createIssueRequestFromInput(projectId, input, {
+        clientIssueId,
+        description,
+        attachmentIds,
+      }),
+      runtime.callOptions(token),
     ),
   );
 }
@@ -230,11 +318,16 @@ export const updateIssueRequestFromInput = (
   projectId: string,
   runId: string,
   input: UpdateIssueInput,
+  mutation: {
+    requestId: string;
+    description: string | null;
+    attachmentIds: readonly string[];
+  },
 ) => ({
   projectId,
   runId,
   title: input.title,
-  description: input.description ?? undefined,
+  description: mutation.description ?? undefined,
   priority: input.priority ?? undefined,
   difficulty: issueDifficultyToProto(input.difficulty),
   assigneeUpdate: input.assigneeUserId === undefined
@@ -242,10 +335,11 @@ export const updateIssueRequestFromInput = (
     : input.assigneeUserId === null
     ? { case: "clearAssignee" as const, value: {} }
     : { case: "assigneeUserId" as const, value: input.assigneeUserId },
-  attachmentReferences: input.attachmentReferences ?? [],
   keptAttachmentIds: input.keptAttachmentIds === undefined
     ? undefined
     : { values: input.keptAttachmentIds },
+  requestId: mutation.requestId,
+  attachments: mutation.attachmentIds.map((uploadId) => ({ uploadId })),
 });
 
 const updateIssueResultFromMessage = (
@@ -260,48 +354,50 @@ const updateIssueResultFromMessage = (
   attachments: response.attachments.map(issueAttachmentFromProto),
 });
 
-const updateIssueMultipart = async (
-  token: string,
-  projectId: string,
-  runId: string,
-  input: UpdateIssueInput,
-) => {
-  const attachmentError = validateIssueAttachments(input.attachments);
-  if (attachmentError) throw new Error(attachmentError);
-  const form = new FormData();
-  setMultipartProtobufRequest(
-    form,
-    UpdateIssueRequestSchema,
-    create(
-      UpdateIssueRequestSchema,
-      updateIssueRequestFromInput(projectId, runId, input),
-    ),
-  );
-  for (const attachment of input.attachments) {
-    form.append("attachments", attachment, attachment.name);
-  }
-  return updateIssueResultFromMessage(await requestProtobuf(
-    `/projects/${projectId}/runs/${runId}`,
-    token,
-    UpdateIssueResponseSchema,
-    { method: "PATCH", body: form },
-  ));
-};
-
 export async function updateIssue(
   token: string,
   projectId: string,
   runId: string,
   input: UpdateIssueInput,
+  injectedRuntime?: IssueMutationRuntime,
 ) {
-  if (issueMutationTransport(input.attachments) === "multipart") {
-    return updateIssueMultipart(token, projectId, runId, input);
-  }
-  const client = requireIssueClient();
+  const runtime = injectedRuntime ?? defaultIssueMutationRuntime();
+  const requestId = runtime.randomUUID().toLowerCase();
+  const attachmentReferences = input.attachmentReferences ?? [];
+  const attachmentIds = await uploadIssueAttachments({
+    runtime,
+    attachments: input.attachments,
+    attachmentReferences,
+    prepare: (attachments) => runtime.client.prepareUpdateIssueAttachments(
+      {
+        preparationRequestId: runtime.randomUUID(),
+        projectId,
+        runId,
+        requestId,
+        attachments,
+      },
+      runtime.callOptions(token),
+    ),
+  });
+  const description = canonicalizeIssueAttachmentReferences(
+    input.description,
+    attachmentReferences,
+    attachmentIds,
+  );
+  assertAccessibleIssueAttachmentReferences(
+    description,
+    input.keptAttachmentIds === undefined
+      ? undefined
+      : [...input.keptAttachmentIds, ...attachmentIds],
+  );
   return updateIssueResultFromMessage(
-    await client.updateIssue(
-      updateIssueRequestFromInput(projectId, runId, input),
-      appCallOptions(token),
+    await runtime.client.updateIssue(
+      updateIssueRequestFromInput(projectId, runId, input, {
+        requestId,
+        description,
+        attachmentIds,
+      }),
+      runtime.callOptions(token),
     ),
   );
 }
@@ -1028,46 +1124,22 @@ export const createIssueMessageRequestFromInput = (
   projectId: string,
   runId: string,
   input: CreateIssueMessageInput,
+  mutation: {
+    clientMessageId: string;
+    body: string;
+    attachmentIds: readonly string[];
+  },
 ) => ({
   projectId,
   runId,
-  clientMessageId: (input.clientMessageId ?? crypto.randomUUID()).toLowerCase(),
-  body: input.body,
+  clientMessageId: mutation.clientMessageId,
+  body: mutation.body,
   parentMessageId: input.parentMessageId?.toLowerCase() ?? undefined,
   mentionedUserIds: input.mentionedUserIds ?? [],
   mentionedAgentIds: input.mentionedAgentIds ?? [],
   agentConversationId: input.agentConversationId ?? undefined,
-  attachmentReferences: input.attachmentReferences ?? [],
+  attachments: mutation.attachmentIds.map((uploadId) => ({ uploadId })),
 });
-
-const createIssueMessageMultipart = async (
-  token: string,
-  projectId: string,
-  runId: string,
-  input: CreateIssueMessageInput,
-) => {
-  const attachments = input.attachments ?? [];
-  const attachmentError = validateIssueAttachments(attachments);
-  if (attachmentError) throw new Error(attachmentError);
-  const form = new FormData();
-  setMultipartProtobufRequest(
-    form,
-    CreateIssueMessageRequestSchema,
-    create(
-      CreateIssueMessageRequestSchema,
-      createIssueMessageRequestFromInput(projectId, runId, input),
-    ),
-  );
-  for (const attachment of attachments) {
-    form.append("attachments", attachment, attachment.name);
-  }
-  return createIssueMessageResultFromMessage(await requestProtobuf(
-    `/projects/${projectId}/runs/${runId}/messages`,
-    token,
-    CreateIssueMessageResponseSchema,
-    { method: "POST", body: form },
-  ));
-};
 
 const createIssueMessageResultFromMessage = (
   response: CreateIssueMessageResponseMessage,
@@ -1087,16 +1159,40 @@ export async function createIssueMessage(
   projectId: string,
   runId: string,
   input: CreateIssueMessageInput,
+  injectedRuntime?: IssueMutationRuntime,
 ) {
-  const attachments = input.attachments ?? [];
-  if (issueMutationTransport(attachments) === "multipart") {
-    return createIssueMessageMultipart(token, projectId, runId, input);
-  }
-  const client = requireIssueClient();
+  const runtime = injectedRuntime ?? defaultIssueMutationRuntime();
+  const clientMessageId = (input.clientMessageId ?? runtime.randomUUID())
+    .toLowerCase();
+  const attachmentReferences = input.attachmentReferences ?? [];
+  const attachmentIds = await uploadIssueAttachments({
+    runtime,
+    attachments: input.attachments ?? [],
+    attachmentReferences,
+    prepare: (attachments) => runtime.client.prepareIssueMessageAttachments(
+      {
+        preparationRequestId: runtime.randomUUID(),
+        projectId,
+        runId,
+        clientMessageId,
+        attachments,
+      },
+      runtime.callOptions(token),
+    ),
+  });
+  const body = canonicalizeIssueAttachmentReferences(
+    input.body,
+    attachmentReferences,
+    attachmentIds,
+  ) ?? input.body;
   return createIssueMessageResultFromMessage(
-    await client.createIssueMessage(
-      createIssueMessageRequestFromInput(projectId, runId, input),
-      appCallOptions(token),
+    await runtime.client.createIssueMessage(
+      createIssueMessageRequestFromInput(projectId, runId, input, {
+        clientMessageId,
+        body,
+        attachmentIds,
+      }),
+      runtime.callOptions(token),
     ),
   );
 }

@@ -26,7 +26,6 @@ import {
   createIssueRequestFromInput,
   issueConversationDeltaFromMessage,
   issueMessageFromMessage,
-  issueMutationTransport,
   reworkRunResultFromMessage,
   unassignRunResultFromMessage,
   updateIssueRequestFromInput,
@@ -87,6 +86,11 @@ describe("Issue Connect boundary", () => {
       "project-1",
       "run-1",
       updateInput(),
+      {
+        requestId: "request-omitted",
+        description: null,
+        attachmentIds: [],
+      },
     );
     const cleared = updateIssueRequestFromInput(
       "project-1",
@@ -96,11 +100,21 @@ describe("Issue Connect boundary", () => {
         keptAttachmentIds: [],
         attachmentReferences: ["attachment-ref"],
       }),
+      {
+        requestId: "request-cleared",
+        description: null,
+        attachmentIds: ["upload-1"],
+      },
     );
     const assigned = updateIssueRequestFromInput(
       "project-1",
       "run-1",
       updateInput({ assigneeUserId: "user-1" }),
+      {
+        requestId: "request-assigned",
+        description: null,
+        attachmentIds: [],
+      },
     );
 
     expect(omitted.assigneeUpdate.case).toBeUndefined();
@@ -110,7 +124,10 @@ describe("Issue Connect boundary", () => {
       value: {},
     });
     expect(cleared.keptAttachmentIds).toEqual({ values: [] });
-    expect(cleared.attachmentReferences).toEqual(["attachment-ref"]);
+    expect(cleared).toMatchObject({
+      requestId: "request-cleared",
+      attachments: [{ uploadId: "upload-1" }],
+    });
     expect(assigned.assigneeUpdate).toEqual({
       case: "assigneeUserId",
       value: "user-1",
@@ -172,7 +189,7 @@ describe("Issue Connect boundary", () => {
     });
   });
 
-  it("uses Connect without file bytes and carries attachment references", () => {
+  it("always carries generated mutation identities and upload references", () => {
     const input: CreateIssueInput = {
       title: "Ship contracts",
       description: null,
@@ -183,7 +200,11 @@ describe("Issue Connect boundary", () => {
       attachmentReferences: ["attachment-ref"],
       checkpoints: [{ key: "review", stage: "review", position: "after" }],
     };
-    const request = createIssueRequestFromInput("project-1", input);
+    const request = createIssueRequestFromInput("project-1", input, {
+      clientIssueId: "issue-1",
+      description: "Canonical description",
+      attachmentIds: [],
+    });
     const messageRequest = createIssueMessageRequestFromInput(
       "project-1",
       "run-1",
@@ -193,17 +214,23 @@ describe("Issue Connect boundary", () => {
         parentMessageId: null,
         attachmentReferences: ["message-ref"],
       },
+      {
+        clientMessageId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        body: "Canonical message",
+        attachmentIds: ["upload-1"],
+      },
     );
 
-    expect(issueMutationTransport(input.attachments)).toBe("connect");
-    expect(issueMutationTransport([{} as File])).toBe("multipart");
     expect(request).toMatchObject({
-      attachmentReferences: ["attachment-ref"],
+      clientIssueId: "issue-1",
+      description: "Canonical description",
+      attachments: [],
       checkpoints: [{ key: "review", stage: "review" }],
     });
     expect(messageRequest).toMatchObject({
       clientMessageId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      attachmentReferences: ["message-ref"],
+      body: "Canonical message",
+      attachments: [{ uploadId: "upload-1" }],
     });
   });
 

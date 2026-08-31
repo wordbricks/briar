@@ -1,8 +1,3 @@
-import {
-  fromBinary,
-  toBinary,
-  type DescMessage,
-} from "@bufbuild/protobuf";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { briarApiUrl } from "../api-config";
@@ -125,42 +120,4 @@ export async function request<T>(
 ): Promise<T> {
   const body = await requestUnknown(path, token, init);
   return body as T;
-}
-
-export function setMultipartProtobufRequest<Desc extends DescMessage>(
-  form: FormData,
-  schema: Desc,
-  message: Parameters<typeof toBinary<Desc>>[1],
-) {
-  form.set(
-    "request",
-    new Blob([toBinary(schema, message)], { type: "application/protobuf" }),
-    "request.pb",
-  );
-}
-
-export async function requestProtobuf<Desc extends DescMessage>(
-  path: string,
-  token: string | null,
-  schema: Desc,
-  init?: RequestInit,
-): Promise<ReturnType<typeof fromBinary<Desc>>> {
-  const { response, method, startedAt } = await requestResponse(
-    path,
-    token,
-    "application/protobuf",
-    init,
-  );
-  try {
-    return fromBinary(schema, new Uint8Array(await response.arrayBuffer()));
-  } catch (caught) {
-    captureErrorDiagnostics(caught, {
-      durationMs: performance.now() - startedAt,
-      method,
-      path,
-      scope: "api_response_parse",
-      status: response.status,
-    });
-    throw caught;
-  }
 }
