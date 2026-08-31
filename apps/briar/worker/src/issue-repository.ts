@@ -1,5 +1,7 @@
 import {
   additionalWorkflowCheckpoints,
+  decodeAutoHuntWorkflowCheckpointsJson,
+  encodeAutoHuntWorkflowCheckpointsJson,
   normalizeAutoHuntWorkflow,
   workflowWithAdditionalCheckpoints,
   type AutoHuntWorkflowCheckpoint,
@@ -109,9 +111,9 @@ export async function updateIssueCheckpoints(
   const currentWorkflow = normalizeAutoHuntWorkflow(
     JSON.parse(run.workflow_snapshot_json),
   );
-  const previousIssueCheckpoints = JSON.parse(
-    run.issue_checkpoints_json || "[]",
-  ) as AutoHuntWorkflowCheckpoint[];
+  const previousIssueCheckpoints = decodeAutoHuntWorkflowCheckpointsJson(
+    run.issue_checkpoints_json,
+  );
   const previousBoundaries = new Set(
     previousIssueCheckpoints.map(
       (checkpoint) => `${checkpoint.stage}:${checkpoint.position}`,
@@ -146,7 +148,7 @@ export async function updateIssueCheckpoints(
     )
     .bind(
       stableJson(nextWorkflow),
-      stableJson(normalizedCheckpoints),
+      encodeAutoHuntWorkflowCheckpointsJson(normalizedCheckpoints),
       updatedAt,
       runId,
       projectId,

@@ -1,4 +1,5 @@
 import {
+  decodeAutoHuntWorkflowCheckpointsJson,
   normalizeAutoHuntWorkflow,
   progressForAutoHuntRun,
   type AutoHuntRunStatus,
@@ -143,7 +144,9 @@ export function dashboardRunJson(
           terminalReviewOnly,
         }
       : null,
-    issueCheckpoints: JSON.parse(run.issue_checkpoints_json || "[]"),
+    issueCheckpoints: decodeAutoHuntWorkflowCheckpointsJson(
+      run.issue_checkpoints_json,
+    ),
     fullAuto:
       context !== null &&
       (context as Record<string, unknown>).fullAuto === true,

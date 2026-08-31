@@ -1,4 +1,7 @@
-import { cloneAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
+import {
+  cloneAutoHuntWorkflow,
+  encodeAutoHuntWorkflowCheckpointsJson,
+} from "../../src/lib/auto-hunt-contract";
 import {
   defaultProjectAgentCalendarColor,
   defaultProjectAgentCopy,
@@ -86,7 +89,7 @@ export async function createProject(
           .bind(
             project.id,
             stableJson(initialWorkflow),
-            stableJson([]),
+            encodeAutoHuntWorkflowCheckpointsJson([]),
             createdAt,
             createdAt,
           ),

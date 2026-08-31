@@ -1,7 +1,8 @@
 import {
+  decodeAutoHuntWorkflowCheckpointsJson,
+  encodeAutoHuntWorkflowCheckpointsJson,
   workflowWithAdditionalCheckpoints,
   type AutoHuntRunStatus,
-  type AutoHuntWorkflowCheckpoint,
 } from "../../src/lib/auto-hunt-contract";
 
 import {
@@ -182,7 +183,7 @@ export async function transferIssue(
     ),
   );
   const compatibleIssueCheckpoints = adoptTargetWorkflow && !fullAuto
-    ? (JSON.parse(run.issue_checkpoints_json || "[]") as AutoHuntWorkflowCheckpoint[])
+    ? decodeAutoHuntWorkflowCheckpointsJson(run.issue_checkpoints_json)
         .filter(
           (checkpoint) =>
             targetStageIds.has(checkpoint.stage) &&
@@ -262,7 +263,7 @@ export async function transferIssue(
       refreshWorkflow,
       targetWorkflowJson,
       refreshWorkflow,
-      stableJson(compatibleIssueCheckpoints),
+      encodeAutoHuntWorkflowCheckpointsJson(compatibleIssueCheckpoints),
       resetExecutionApproval ? 1 : 0,
       resetExecutionApproval ? 1 : 0,
       resetExecutionApproval ? 1 : 0,

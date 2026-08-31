@@ -5,6 +5,8 @@ import {
   canonicalizeProjectWorkflow,
   checkpointKeyForBoundary,
   cloneAutoHuntWorkflow,
+  decodeAutoHuntWorkflowCheckpointsJson,
+  encodeAutoHuntWorkflowCheckpointsJson,
   normalizeAutoHuntWorkflow,
   resolveCheckpointPolicy,
   autoHuntWorkflowCheckpointKeyPattern,
@@ -96,6 +98,24 @@ describe("Auto Hunt workflow v2 contract", () => {
       execution: { checkpoints: [] },
       completion: { requiredStages: ["implementing", "pr_open", "production_qa"] },
     });
+  });
+
+  it("round-trips the strict persisted checkpoint boundary", () => {
+    const checkpoints = [{
+      key: "issue-before-implementing",
+      stage: "implementing",
+      position: "before" as const,
+    }];
+
+    const encoded = encodeAutoHuntWorkflowCheckpointsJson(checkpoints);
+
+    expect(decodeAutoHuntWorkflowCheckpointsJson(encoded)).toEqual(checkpoints);
+    expect(() => decodeAutoHuntWorkflowCheckpointsJson(JSON.stringify([{
+      ...checkpoints[0],
+      legacy: true,
+    }]))).toThrow();
+    expect(() => decodeAutoHuntWorkflowCheckpointsJson("{}"))
+      .toThrow();
   });
 
   it("canonicalizes checkpoints by stage order and before/after position", () => {

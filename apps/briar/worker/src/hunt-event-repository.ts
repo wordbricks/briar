@@ -2,10 +2,11 @@ import * as Equivalence from "effect/Equivalence";
 import {
   isTerminalTrackerState,
   additionalWorkflowCheckpoints,
+  decodeAutoHuntWorkflowCheckpointsJson,
+  encodeAutoHuntWorkflowCheckpointsJson,
   isRepositoryWorkflowPending,
   requiredWorkflowStages,
   workflowWithAdditionalCheckpoints,
-  type AutoHuntWorkflowCheckpoint,
 } from "../../src/lib/auto-hunt-contract";
 import { workflowSnapshotForRun } from "./workflow-policy";
 
@@ -297,9 +298,9 @@ export async function recordHuntEvent(
         normalizedInput.fullAuto === true,
       );
   const issueCheckpointSnapshot = existingRun
-    ? (JSON.parse(
-        existingRun.issue_checkpoints_json || "[]",
-      ) as AutoHuntWorkflowCheckpoint[])
+    ? decodeAutoHuntWorkflowCheckpointsJson(
+      existingRun.issue_checkpoints_json,
+    )
     : normalizedInput.fullAuto
       ? []
       : additionalWorkflowCheckpoints(
@@ -425,7 +426,7 @@ export async function recordHuntEvent(
         normalizedInput.status,
         normalizedInput.workflowStage,
         stableJson(workflowSnapshot),
-        stableJson(issueCheckpointSnapshot),
+        encodeAutoHuntWorkflowCheckpointsJson(issueCheckpointSnapshot),
         normalizedInput.detail,
         normalizedInput.priority,
         storedDifficulty,

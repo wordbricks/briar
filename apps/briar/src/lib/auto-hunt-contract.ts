@@ -1,3 +1,5 @@
+import * as Schema from "effect/Schema";
+
 export const autoHuntSources = ["issue", "error", "feedback"] as const;
 
 /**
@@ -34,6 +36,7 @@ export const autoHuntWorkflowCheckpointKeyPattern =
   /^[a-z][a-z0-9_-]{0,63}$/u;
 export const autoHuntWorkflowStageIdPattern = /^[a-z][a-z0-9_-]{0,63}$/u;
 export const autoHuntWorkflowCheckpointPositions = ["before", "after"] as const;
+export const autoHuntWorkflowCheckpointMaxCount = 100;
 
 export type AutoHuntWorkflowCheckpointPosition =
   (typeof autoHuntWorkflowCheckpointPositions)[number];
@@ -55,7 +58,11 @@ export type AutoHuntSource = (typeof autoHuntSources)[number];
 export type AutoHuntRunStatus = (typeof autoHuntRunStatuses)[number];
 export type AutoHuntPersistedRunStatus =
   (typeof autoHuntPersistedRunStatuses)[number];
-export type AutoHuntWorkflowStageId = string;
+export const AutoHuntWorkflowStageIdSchema = Schema.Trim.check(
+  Schema.isPattern(autoHuntWorkflowStageIdPattern),
+);
+export type AutoHuntWorkflowStageId =
+  typeof AutoHuntWorkflowStageIdSchema.Type;
 
 export type AutoHuntWorkflowStage = {
   id: AutoHuntWorkflowStageId;
@@ -65,11 +72,41 @@ export type AutoHuntWorkflowStage = {
   checks?: string[];
 };
 
-export type AutoHuntWorkflowCheckpoint = {
-  key: string;
-  stage: AutoHuntWorkflowStageId;
-  position: AutoHuntWorkflowCheckpointPosition;
-};
+const autoHuntWorkflowCheckpointParseOptions = {
+  errors: "all",
+  onExcessProperty: "error",
+} as const;
+
+export const AutoHuntWorkflowCheckpoint = Schema.Struct({
+  key: Schema.Trim.check(
+    Schema.isPattern(autoHuntWorkflowCheckpointKeyPattern),
+  ),
+  stage: AutoHuntWorkflowStageIdSchema,
+  position: Schema.Literals(autoHuntWorkflowCheckpointPositions),
+}).annotate({ parseOptions: autoHuntWorkflowCheckpointParseOptions });
+export type AutoHuntWorkflowCheckpoint =
+  typeof AutoHuntWorkflowCheckpoint.Type;
+
+export const AutoHuntWorkflowCheckpoints = Schema.mutable(
+  Schema.Array(AutoHuntWorkflowCheckpoint),
+).check(Schema.isMaxLength(autoHuntWorkflowCheckpointMaxCount));
+
+const AutoHuntWorkflowCheckpointsJson = Schema.fromJsonString(
+  AutoHuntWorkflowCheckpoints,
+);
+
+export const decodeAutoHuntWorkflowCheckpoints = Schema.decodeUnknownSync(
+  AutoHuntWorkflowCheckpoints,
+  autoHuntWorkflowCheckpointParseOptions,
+);
+export const decodeAutoHuntWorkflowCheckpointsJson = Schema.decodeUnknownSync(
+  AutoHuntWorkflowCheckpointsJson,
+  autoHuntWorkflowCheckpointParseOptions,
+);
+export const encodeAutoHuntWorkflowCheckpointsJson = Schema.encodeSync(
+  AutoHuntWorkflowCheckpointsJson,
+  autoHuntWorkflowCheckpointParseOptions,
+);
 
 export type AutoHuntCheckpointPolicy = {
   projectMandatory: AutoHuntWorkflowCheckpoint[];
@@ -563,49 +600,35 @@ export function normalizeAutoHuntWorkflow(
   if (!execution || execution.checkpoints === undefined) {
     issues.push("version 2 execution.checkpoints is required");
   } else if (execution?.checkpoints !== undefined) {
-    if (!Array.isArray(execution.checkpoints) || execution.checkpoints.length > 100) {
+    let decodedCheckpoints: AutoHuntWorkflowCheckpoint[];
+    try {
+      decodedCheckpoints = decodeAutoHuntWorkflowCheckpoints(
+        execution.checkpoints,
+      );
+    } catch {
       issues.push("execution.checkpoints is invalid");
-    } else {
+      decodedCheckpoints = [];
+    }
+    if (decodedCheckpoints.length > 0) {
       const checkpointKeys = new Set<string>();
       const checkpointBoundaries = new Set<string>();
-      for (const [index, value] of execution.checkpoints.entries()) {
-        if (!isRecord(value)) {
-          issues.push(`execution.checkpoints[${index}] must be an object`);
-          continue;
-        }
-        const key = trimString(value.key);
-        const stage = trimString(value.stage);
-        const position = trimString(value.position);
-        if (!key || !autoHuntWorkflowCheckpointKeyPattern.test(key)) {
-          issues.push(`execution.checkpoints[${index}].key is invalid`);
-          continue;
-        }
-        if (!stage || !stageIds.has(stage)) {
+      for (const [index, checkpoint] of decodedCheckpoints.entries()) {
+        if (!stageIds.has(checkpoint.stage)) {
           issues.push(`execution.checkpoints[${index}].stage references an unknown stage`);
           continue;
         }
-        if (!autoHuntWorkflowCheckpointPositions.includes(
-          position as AutoHuntWorkflowCheckpointPosition,
-        )) {
-          issues.push(`execution.checkpoints[${index}].position is invalid`);
-          continue;
-        }
-        const boundary = `${stage}:${position}`;
-        if (checkpointKeys.has(key)) {
-          issues.push(`duplicate checkpoint key '${key}'`);
+        const boundary = checkpointBoundaryId(checkpoint);
+        if (checkpointKeys.has(checkpoint.key)) {
+          issues.push(`duplicate checkpoint key '${checkpoint.key}'`);
           continue;
         }
         if (checkpointBoundaries.has(boundary)) {
           issues.push(`duplicate checkpoint boundary '${boundary}'`);
           continue;
         }
-        checkpointKeys.add(key);
+        checkpointKeys.add(checkpoint.key);
         checkpointBoundaries.add(boundary);
-        checkpoints.push({
-          key,
-          stage,
-          position: position as AutoHuntWorkflowCheckpointPosition,
-        });
+        checkpoints.push(checkpoint);
       }
     }
   }

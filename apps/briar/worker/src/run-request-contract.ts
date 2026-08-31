@@ -3,6 +3,9 @@ import * as Schema from "effect/Schema";
 import * as SchemaIssue from "effect/SchemaIssue";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import {
+  AutoHuntWorkflowCheckpoint as CanonicalWorkflowCheckpoint,
+  AutoHuntWorkflowCheckpoints,
+  AutoHuntWorkflowStageIdSchema,
   AutoHuntWorkflowValidationError,
   canonicalizeProjectWorkflow,
   autoHuntEvidenceTypeMaxLength,
@@ -51,14 +54,8 @@ export const ProjectUsageDateRangeInput = strictSchema(Schema.Struct({
 }));
 
 export const RunStatus = Schema.Literals(autoHuntPersistedRunStatuses);
-export const WorkflowStageId = Schema.Trim.check(
-  Schema.isPattern(/^[a-z][a-z0-9_-]{0,63}$/u),
-);
-export const WorkflowCheckpoint = strictSchema(Schema.Struct({
-  key: WorkflowStageId,
-  stage: WorkflowStageId,
-  position: Schema.Literals(["before", "after"]),
-}));
+export const WorkflowStageId = AutoHuntWorkflowStageIdSchema;
+export const WorkflowCheckpoint = CanonicalWorkflowCheckpoint;
 export const EvidenceType = Schema.Trim.check(
   Schema.isLengthBetween(1, autoHuntEvidenceTypeMaxLength),
   Schema.isPattern(autoHuntEvidenceTypePattern),
@@ -101,9 +98,7 @@ export const Workflow = strictSchema(Schema.Struct({
     ),
   }))),
   execution: Schema.optional(strictSchema(Schema.Struct({
-    checkpoints: Schema.optional(
-      mutableArray(WorkflowCheckpoint).check(Schema.isMaxLength(100)),
-    ),
+    checkpoints: Schema.optional(AutoHuntWorkflowCheckpoints),
   }))),
 }));
 
@@ -220,16 +215,12 @@ const ProjectSettingsSource = strictSchema(Schema.Struct({
 
 export const CheckpointPolicyInput = strictSchema(Schema.Struct({
   scope: Schema.Literals(["project", "user"]),
-  checkpoints: mutableArray(WorkflowCheckpoint).check(
-    Schema.isMaxLength(100),
-  ),
+  checkpoints: AutoHuntWorkflowCheckpoints,
   expectedRevision: NonNegativeSafeInteger,
 }));
 
 export const IssueCheckpointsInput = strictSchema(Schema.Struct({
-  checkpoints: mutableArray(WorkflowCheckpoint).check(
-    Schema.isMaxLength(100),
-  ),
+  checkpoints: AutoHuntWorkflowCheckpoints,
 }));
 
 export const RequestIdInput = strictSchema(Schema.Struct({

@@ -1,6 +1,7 @@
 import {
   canonicalizeCheckpointSet,
   canonicalizeProjectWorkflow,
+  decodeAutoHuntWorkflowCheckpointsJson,
   normalizeAutoHuntWorkflow,
   resolveCheckpointPolicy,
   workflowWithEffectiveCheckpoints,
@@ -12,7 +13,7 @@ import {
 
 type ProjectPolicyRow = {
   workflow_json: string;
-  mandatory_checkpoints_json: string | null;
+  mandatory_checkpoints_json: string;
   checkpoint_policy_revision: number;
 };
 
@@ -22,12 +23,6 @@ type UserPolicyRow = {
 };
 
 type StoredUserPolicyRow = UserPolicyRow & { user_id: string };
-
-const parseCheckpoints = (value: string | null | undefined) => {
-  if (!value) return [];
-  const parsed: unknown = JSON.parse(value);
-  return Array.isArray(parsed) ? parsed as AutoHuntWorkflowCheckpoint[] : [];
-};
 
 export function isStoredWorkflowUnchanged(
   storedWorkflowJson: string | null | undefined,
@@ -57,9 +52,11 @@ export async function loadWorkflowCheckpointPolicy(
   const workflow = normalizeAutoHuntWorkflow(
     project?.workflow_json ? JSON.parse(project.workflow_json) : undefined,
   );
-  const projectMandatory = parseCheckpoints(
-    project?.mandatory_checkpoints_json ?? "[]",
-  );
+  const projectMandatory = project
+    ? decodeAutoHuntWorkflowCheckpointsJson(
+      project.mandatory_checkpoints_json,
+    )
+    : [];
   const user = userId
     ? await db
         .prepare(
@@ -73,7 +70,7 @@ export async function loadWorkflowCheckpointPolicy(
   const policy = resolveCheckpointPolicy(
     workflow,
     projectMandatory,
-    parseCheckpoints(user?.checkpoints_json),
+    user ? decodeAutoHuntWorkflowCheckpointsJson(user.checkpoints_json) : [],
   );
   return {
     workflow,
@@ -118,7 +115,7 @@ export async function assertStoredCheckpointPoliciesCompatible(
          from briar_project_settings where project_id = ?`,
       )
       .bind(projectId)
-      .first<{ mandatory_checkpoints_json: string | null }>(),
+      .first<{ mandatory_checkpoints_json: string }>(),
     db
       .prepare(
         `select user_id, checkpoints_json, revision
@@ -129,13 +126,17 @@ export async function assertStoredCheckpointPoliciesCompatible(
   ]);
   canonicalizeCheckpointSet(
     workflow,
-    parseCheckpoints(project?.mandatory_checkpoints_json ?? "[]"),
+    project
+      ? decodeAutoHuntWorkflowCheckpointsJson(
+        project.mandatory_checkpoints_json,
+      )
+      : [],
     "project",
   );
   for (const user of users.results) {
     canonicalizeCheckpointSet(
       workflow,
-      parseCheckpoints(user.checkpoints_json),
+      decodeAutoHuntWorkflowCheckpointsJson(user.checkpoints_json),
       "user",
     );
   }

@@ -1,5 +1,6 @@
 import {
   canonicalizeProjectWorkflow,
+  encodeAutoHuntWorkflowCheckpointsJson,
   type AutoHuntWorkflow,
   type AutoHuntWorkflowCheckpoint,
 } from "../../src/lib/auto-hunt-contract";
@@ -16,7 +17,7 @@ export type ProjectSettingsRow = {
   github_repository_id: number | null;
   github_repository: string | null;
   workflow_json: string;
-  mandatory_checkpoints_json: string | null;
+  mandatory_checkpoints_json: string;
   checkpoint_policy_revision: number;
   created_at: string;
   updated_at: string;
@@ -65,7 +66,12 @@ export async function updateProjectMandatoryCheckpoints(
            updated_at = ?
        where project_id = ? and checkpoint_policy_revision = ?`,
     )
-    .bind(stableJson(checkpoints), updatedAt, projectId, expectedRevision)
+    .bind(
+      encodeAutoHuntWorkflowCheckpointsJson(checkpoints),
+      updatedAt,
+      projectId,
+      expectedRevision,
+    )
     .run();
   // Dashboard sync triggers may add their own row changes to D1 metadata.
   // The guarded settings row changed iff the total is non-zero.
@@ -88,7 +94,13 @@ export async function updateUserWorkflowCheckpointDefaults(
            ) values (?, ?, ?, 1, ?, ?)
            on conflict(project_id, user_id) do nothing`,
         )
-        .bind(projectId, userId, stableJson(checkpoints), updatedAt, updatedAt)
+        .bind(
+          projectId,
+          userId,
+          encodeAutoHuntWorkflowCheckpointsJson(checkpoints),
+          updatedAt,
+          updatedAt,
+        )
         .run()
     : await db
         .prepare(
@@ -97,7 +109,7 @@ export async function updateUserWorkflowCheckpointDefaults(
            where project_id = ? and user_id = ? and revision = ?`,
         )
         .bind(
-          stableJson(checkpoints),
+          encodeAutoHuntWorkflowCheckpointsJson(checkpoints),
           updatedAt,
           projectId,
           userId,
@@ -152,7 +164,7 @@ export async function updateProjectSettings(
       input.githubRepositoryId ?? null,
       input.githubRepository,
       stableJson(workflow),
-      stableJson(workflow.execution.checkpoints),
+      encodeAutoHuntWorkflowCheckpointsJson(workflow.execution.checkpoints),
       updatedAt,
       updatedAt,
     )
