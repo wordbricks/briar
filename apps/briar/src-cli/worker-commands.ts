@@ -5,6 +5,7 @@ import { autoHuntRequirementKinds } from "../src/lib/auto-hunt-contract";
 import { organizationAgentContextCapability } from "../src/lib/organization-agent-context-contract";
 import { runProjectAgentTaskCompletionFlow } from "./agent-runner";
 import { type ChannelActivityCredential } from "./channel-activity-publisher";
+import { decodeChannelReplyClaimOrFail } from "./channel-reply-claim";
 import { HttpRequestError } from "./execution-metrics-upload";
 import {
   inspectWorkflowRequirements,
@@ -499,7 +500,17 @@ async function workerCommand() {
           : workType === "projectAgentTask"
             ? decodeClaimedProjectAgentTask(claim.work)
             : workType === "channelReply"
-              ? decodeClaimedChannelReply(claim.work)
+              ? await decodeChannelReplyClaimOrFail(claim.work, {
+                organizationId: registered.organizationId,
+                failClaim: (reply, error, signal) => failClaimedChannelReply(
+                  config,
+                  project,
+                  reply,
+                  workerToken,
+                  error,
+                  signal,
+                ),
+              })
               : decodeClaimedRun(claim.work);
         return { work };
       },
