@@ -12,6 +12,7 @@ describe("mobile push repository", () => {
   beforeAll(async () => {
     const now = "2026-08-30T10:00:00.000Z";
     await executeD1Sql(db, `
+      delete from briar_mobile_push_outbox;
       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values
         ('owner', 'Owner', 'owner@example.com', 1, '${now}', '${now}'),
