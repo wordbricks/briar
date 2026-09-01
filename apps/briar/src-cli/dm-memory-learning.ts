@@ -6,6 +6,7 @@ import {
 import { ApplicationErrorDetailSchema } from "@briar/contracts/gen/briar/types/v1/error_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
 import * as Schema from "effect/Schema";
+import type { AgentProvider } from "../src/lib/agent-provider";
 import { dmMemoryCanonicalJson } from "../src/lib/dm-memory-canonical-json";
 import {
   DmLearningCommitResult,
@@ -138,6 +139,9 @@ export async function runClaimedDmMemory(input: LearningClient & {
   apiKey: string | null;
   signal: AbortSignal;
   invoke?: typeof invokeDmLearningModel;
+  agentEnvironment?: (provider: AgentProvider) => NodeJS.ProcessEnv;
+  runAgentTurn?: Parameters<typeof invokeDmLearningModel>[0]["runAgentTurn"];
+  prepareAgentEnvironment?: Parameters<typeof invokeDmLearningModel>[0]["prepareAgentEnvironment"];
 }): Promise<DmLearningCommitResult> {
   const invoke = input.invoke ?? invokeDmLearningModel;
   let currentCallId: string | undefined;
@@ -175,6 +179,11 @@ export async function runClaimedDmMemory(input: LearningClient & {
       invocation: proposing,
       apiKey: input.apiKey,
       signal: input.signal,
+      environment: proposing.model.transport === "agent"
+        ? input.agentEnvironment?.(proposing.model.provider)
+        : undefined,
+      runAgentTurn: input.runAgentTurn,
+      prepareAgentEnvironment: input.prepareAgentEnvironment,
     });
     if (!("proposal" in proposal)) {
       throw new DmLearningClientError("invalid_proposal");
@@ -206,6 +215,11 @@ export async function runClaimedDmMemory(input: LearningClient & {
       invocation: verifying,
       apiKey: input.apiKey,
       signal: input.signal,
+      environment: verifying.model.transport === "agent"
+        ? input.agentEnvironment?.(verifying.model.provider)
+        : undefined,
+      runAgentTurn: input.runAgentTurn,
+      prepareAgentEnvironment: input.prepareAgentEnvironment,
     });
     if (!("verification" in verification)) {
       throw new DmLearningClientError("invalid_proposal");

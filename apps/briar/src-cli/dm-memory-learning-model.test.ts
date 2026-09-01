@@ -1,7 +1,10 @@
+import { readdir, stat } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import type { DmLearningInvocation } from "../src/lib/dm-memory-learning-contract";
 import { syntheticDmLearningChange, syntheticDmLearningSnapshot } from "../worker/src/test-helpers/dm-memory-learning";
 import { invokeDmLearningModel } from "./dm-memory-learning-model";
+import { runDetachedProviderTurn } from "./detached-provider-turn";
+import { prepareReadOnlyAgentEnvironment } from "./read-only-agent-environment";
 
 function fixture(stage: "proposing" | "verifying" = "proposing"): DmLearningInvocation {
   const snapshot = syntheticDmLearningSnapshot();
@@ -12,6 +15,14 @@ function fixture(stage: "proposing" | "verifying" = "proposing"): DmLearningInvo
     proposal: stage === "verifying" ? { explicitRequest: false, changes: [syntheticDmLearningChange(snapshot)] } : null,
     status: "reserved" };
 }
+
+function agentFixture(stage: "proposing" | "verifying" = "proposing"): DmLearningInvocation {
+  const invocation = fixture(stage);
+  const model = { transport: "agent" as const, provider: "codex" as const, model: null, effort: null,
+    maxOutputTokens: 4096, maxInputMicroUsdPerMillionTokens: 0, maxOutputMicroUsdPerMillionTokens: 0 };
+  return { ...invocation, model, snapshot: { ...invocation.snapshot,
+    policy: { ...invocation.snapshot.policy, proposer: model, verifier: model } } };
+}
 type SyntheticMessageFields = { readonly tool_calls?: readonly unknown[]; readonly refusal?: string | null };
 const response = (invocation: DmLearningInvocation, value: unknown, message: SyntheticMessageFields = {}) => Response.json({
   model: invocation.model.model, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(value), ...message } }],
@@ -19,6 +30,55 @@ const response = (invocation: DmLearningInvocation, value: unknown, message: Syn
 });
 
 describe("isolated memory model transport", () => {
+  it("runs a connected Agent in an empty read-only workspace without tools, skills or a retained conversation", async () => {
+    const invocation = agentFixture(), proposal = { explicitRequest: false, changes: [] };
+    let workspacePath = "";
+    const cleanup = vi.fn(async () => undefined);
+    const prepareAgentEnvironment = vi.fn<typeof prepareReadOnlyAgentEnvironment>(async (_provider, input) => {
+      workspacePath = input.workspaceRoot;
+      expect(await readdir(workspacePath)).toEqual([]);
+      return { environment: { PATH: "/synthetic" }, cleanup };
+    });
+    const runAgentTurn = vi.fn<typeof runDetachedProviderTurn>(async (input) => {
+      expect(input.agent).toMatchObject({ provider: "codex", model: null, effort: null, skills: [], skill: "" });
+      expect(input).toMatchObject({ workspacePath, fullAccess: false, readOnly: true, conversationId: null,
+        attachments: [], skillCatalog: null });
+      expect(input.outputSchema).toBeTruthy();
+      expect(JSON.stringify(input.outputSchema)).not.toContain('"allOf"');
+      expect(input.agent.responsibility).toContain("Do not use tools");
+      return { exitCode: 0, stderr: "", runnerError: null, completed: true,
+        resultText: JSON.stringify(proposal), conversationId: crypto.randomUUID() };
+    });
+    expect(await invokeDmLearningModel({ invocation, apiKey: null, signal: new AbortController().signal,
+      environment: { HOME: "/synthetic-home" }, prepareAgentEnvironment, runAgentTurn }))
+      .toEqual({ proposal, usage: expect.objectContaining({ costMicroUsd: null }) });
+    expect(prepareAgentEnvironment).toHaveBeenCalledWith("codex", expect.objectContaining({ workspaceRoot: workspacePath }));
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    await expect(stat(workspacePath)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("starts proposer and verifier Agent calls without sharing provider conversation state", async () => {
+    const workspaces: string[] = [], conversations: Array<string | null | undefined> = [];
+    const prepareAgentEnvironment = vi.fn<typeof prepareReadOnlyAgentEnvironment>(async () => ({
+      environment: {}, cleanup: async () => undefined,
+    }));
+    const runAgentTurn = vi.fn<typeof runDetachedProviderTurn>(async (input) => {
+      workspaces.push(input.workspacePath);
+      conversations.push(input.conversationId);
+      const result = input.agent.name.endsWith("verifier")
+        ? { approved: true, explicitRequestAuthorized: false, decisions: [{ changeId: "change-1", verdict: "supported" }] }
+        : { explicitRequest: false, changes: [] };
+      return { exitCode: 0, stderr: "", runnerError: null, completed: true,
+        resultText: JSON.stringify(result), conversationId: crypto.randomUUID() };
+    });
+    await invokeDmLearningModel({ invocation: agentFixture(), apiKey: null, signal: new AbortController().signal,
+      prepareAgentEnvironment, runAgentTurn });
+    await invokeDmLearningModel({ invocation: agentFixture("verifying"), apiKey: null,
+      signal: new AbortController().signal, prepareAgentEnvironment, runAgentTurn });
+    expect(new Set(workspaces).size).toBe(2);
+    expect(conversations).toEqual([null, null]);
+  });
+
   it("pins routing, disables fallback and submits only system instructions, authorized data and the output schema", async () => {
     const invocation = fixture(), proposal = { explicitRequest: false, changes: [] };
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response(invocation, proposal));

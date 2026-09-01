@@ -9,6 +9,15 @@ export const syntheticDmLearningPolicy: DmLearningPolicy = {
   maxInputBytes: 131_072, spaceDailyCalls: 24, organizationDailyCalls: 240,
   spaceDailyMicroUsd: 5_000_000, organizationDailyMicroUsd: 50_000_000,
 };
+export const syntheticAgentDmLearningPolicy: DmLearningPolicy = {
+  ...syntheticDmLearningPolicy,
+  proposer: { transport: "agent", provider: "codex", model: null, effort: null,
+    maxOutputTokens: 4096, maxInputMicroUsdPerMillionTokens: 0, maxOutputMicroUsdPerMillionTokens: 0 },
+  verifier: { transport: "agent", provider: "grok", model: "grok-code-fast-1", effort: null,
+    maxOutputTokens: 2048, maxInputMicroUsdPerMillionTokens: 0, maxOutputMicroUsdPerMillionTokens: 0 },
+  spaceDailyMicroUsd: 0,
+  organizationDailyMicroUsd: 0,
+};
 export function syntheticDmLearningSnapshot(): DmLearningSnapshot {
   const ref = { type: "message" as const, id: crypto.randomUUID(), version: 1 };
   return { memorySpaceId: crypto.randomUUID(), memoryRevision: 0, revocationEpoch: 0, kind: "extract",

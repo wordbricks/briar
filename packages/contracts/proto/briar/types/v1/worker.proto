@@ -65,6 +65,8 @@ message WorkerCapabilities {
 message DmMemoryLearningCapability {
   uint32 protocol = 1;
   string transport = 2;
+  repeated string transports = 3;
+  repeated AgentProvider providers = 4;
 }
 
 message WorkerRuntimeAdvertisement {

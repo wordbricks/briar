@@ -16,7 +16,8 @@ import { countExecutionWorkerDeviceSessions } from "./workers";
 import { reconcileDmMemory } from "./dm-memory-indexing";
 import { deleteDmMemory, getDmMemory, listDmMemories, saveDmMemory, updateDmMemorySettings } from "./dm-memory-repository";
 import { createOrganizationAgent } from "./organization-agents";
-import { syntheticDmLearningChange, syntheticDmLearningPolicy } from "./test-helpers/dm-memory-learning";
+import { syntheticAgentDmLearningPolicy, syntheticDmLearningChange,
+  syntheticDmLearningPolicy } from "./test-helpers/dm-memory-learning";
 import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
 import { createWorkerQueueService } from "./worker-connect-queue";
 
@@ -202,6 +203,29 @@ describe("durable DM learning inputs and deletion", () => {
     const common = { identity, policy: syntheticDmLearningPolicy, inputHash: claim.inputHash, now };
     return { ...f, claim, identity, proposal, common };
   }
+  it("claims Agent learning only when the Worker advertises both pinned providers", async () => {
+    const f = await fixture(); await enable(f.spaceId);
+    await message(f.owner.channelId, "Use the connected Agent for this synthetic preference.");
+    await outbox(f.spaceId, now);
+    const updateRuntime = (providers: Array<"codex" | "grok">) => db.prepare(
+      "update briar_execution_workers set runtime_proto_json = ? where id = ?",
+    ).bind(workerRuntimeProtoJsonFixture({ providers, dmMemoryLearning: {
+      protocol: 2, transports: ["agent"], providers,
+    } }), workerId).run();
+    try {
+      await updateRuntime(["codex"]);
+      expect(await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId,
+        policy: syntheticAgentDmLearningPolicy, now })).toBeNull();
+      await updateRuntime(["codex", "grok"]);
+      const claim = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId,
+        policy: syntheticAgentDmLearningPolicy, now });
+      expect(claim?.snapshot.policy).toEqual(syntheticAgentDmLearningPolicy);
+    } finally {
+      await db.prepare("update briar_execution_workers set runtime_proto_json = ? where id = ?")
+        .bind(workerRuntimeProtoJsonFixture({ agentProvider: "claude", providers: ["claude"],
+          dmMemoryLearning: true }), workerId).run();
+    }
+  });
   const usage = { inputTokens: 100, outputTokens: 50, costMicroUsd: 100 };
   it("reserves two calls, verifies independently, and atomically commits evidence, index work and watermark", async () => {
     const f = await claimedLearning(), proposalCall = crypto.randomUUID();

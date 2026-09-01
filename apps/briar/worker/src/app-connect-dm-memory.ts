@@ -199,6 +199,7 @@ const protoLearningStatus = (status: DmMemoryLearningStatus | null) => status ==
           verifier: create(DmMemoryLearningModelSchema, status.configuration.verifier),
           spaceDailyCalls: status.configuration.spaceDailyCalls,
           spaceDailyMicroUsd: BigInt(status.configuration.spaceDailyMicroUsd),
+          costTracked: status.configuration.costTracked,
         }),
     callsToday: status.callsToday,
     reservedMicroUsdToday: BigInt(status.reservedMicroUsdToday),

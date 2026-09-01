@@ -7,9 +7,13 @@ import type { DmMemoryOwner } from "./dm-memory-repository";
 export async function readDmLearningStatus(db: D1Database, owner: DmMemoryOwner, spaceId: string | null,
   policy: DmLearningPolicy | null, now = new Date().toISOString()): Promise<DmMemoryLearningStatus | null> {
   if (await dmLearningCapacityTable(db) !== "briar_dm_memory_jobs") return null;
+  const displayModel = (model: DmLearningPolicy["proposer"]) => model.transport === "agent"
+    ? { transport: model.transport, model: model.model ?? "default", provider: model.provider }
+    : { transport: model.transport, model: model.model, provider: model.upstreamProvider };
   const configuration = policy ? {
-    proposer: { model: policy.proposer.model, provider: policy.proposer.upstreamProvider },
-    verifier: { model: policy.verifier.model, provider: policy.verifier.upstreamProvider },
+    proposer: displayModel(policy.proposer),
+    verifier: displayModel(policy.verifier),
+    costTracked: policy.proposer.transport === "openrouter" && policy.verifier.transport === "openrouter",
     spaceDailyCalls: policy.spaceDailyCalls, spaceDailyMicroUsd: policy.spaceDailyMicroUsd,
   } : null;
   if (!spaceId) return { configuration, callsToday: 0, reservedMicroUsdToday: 0, pendingJobs: 0, failedJobs: 0,

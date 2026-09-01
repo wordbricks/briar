@@ -772,6 +772,8 @@ public nonisolated struct BriarAPI_DmMemoryLearningConfiguration: Sendable {
 
   public var spaceDailyMicroUsd: UInt64 = 0
 
+  public var costTracked: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -788,6 +790,8 @@ public nonisolated struct BriarAPI_DmMemoryLearningModel: Sendable {
   public var model: String = String()
 
   public var provider: String = String()
+
+  public var transport: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1814,7 +1818,7 @@ nonisolated extension BriarAPI_DmMemoryLearningStatus: SwiftProtobuf.Message, Sw
 
 nonisolated extension BriarAPI_DmMemoryLearningConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DmMemoryLearningConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}proposer\0\u{1}verifier\0\u{3}space_daily_calls\0\u{3}space_daily_micro_usd\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}proposer\0\u{1}verifier\0\u{3}space_daily_calls\0\u{3}space_daily_micro_usd\0\u{3}cost_tracked\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1826,6 +1830,7 @@ nonisolated extension BriarAPI_DmMemoryLearningConfiguration: SwiftProtobuf.Mess
       case 2: try { try decoder.decodeSingularMessageField(value: &self._verifier) }()
       case 3: try { try decoder.decodeSingularUInt32Field(value: &self.spaceDailyCalls) }()
       case 4: try { try decoder.decodeSingularUInt64Field(value: &self.spaceDailyMicroUsd) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.costTracked) }()
       default: break
       }
     }
@@ -1848,6 +1853,9 @@ nonisolated extension BriarAPI_DmMemoryLearningConfiguration: SwiftProtobuf.Mess
     if self.spaceDailyMicroUsd != 0 {
       try visitor.visitSingularUInt64Field(value: self.spaceDailyMicroUsd, fieldNumber: 4)
     }
+    if self.costTracked != false {
+      try visitor.visitSingularBoolField(value: self.costTracked, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1856,6 +1864,7 @@ nonisolated extension BriarAPI_DmMemoryLearningConfiguration: SwiftProtobuf.Mess
     if lhs._verifier != rhs._verifier {return false}
     if lhs.spaceDailyCalls != rhs.spaceDailyCalls {return false}
     if lhs.spaceDailyMicroUsd != rhs.spaceDailyMicroUsd {return false}
+    if lhs.costTracked != rhs.costTracked {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1863,7 +1872,7 @@ nonisolated extension BriarAPI_DmMemoryLearningConfiguration: SwiftProtobuf.Mess
 
 nonisolated extension BriarAPI_DmMemoryLearningModel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DmMemoryLearningModel"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}model\0\u{1}provider\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}model\0\u{1}provider\0\u{1}transport\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1873,6 +1882,7 @@ nonisolated extension BriarAPI_DmMemoryLearningModel: SwiftProtobuf.Message, Swi
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.model) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.provider) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.transport) }()
       default: break
       }
     }
@@ -1885,12 +1895,16 @@ nonisolated extension BriarAPI_DmMemoryLearningModel: SwiftProtobuf.Message, Swi
     if !self.provider.isEmpty {
       try visitor.visitSingularStringField(value: self.provider, fieldNumber: 2)
     }
+    if !self.transport.isEmpty {
+      try visitor.visitSingularStringField(value: self.transport, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_DmMemoryLearningModel, rhs: BriarAPI_DmMemoryLearningModel) -> Bool {
     if lhs.model != rhs.model {return false}
     if lhs.provider != rhs.provider {return false}
+    if lhs.transport != rhs.transport {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

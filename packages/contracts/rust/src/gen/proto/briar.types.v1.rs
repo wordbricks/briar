@@ -8930,6 +8930,20 @@ pub struct DmMemoryLearningCapability {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub transport: ::buffa::alloc::string::String,
+    /// Field 3: `transports`
+    #[serde(
+        rename = "transports",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub transports: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Field 4: `providers`
+    #[serde(
+        rename = "providers",
+        with = "::buffa::json_helpers::repeated_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub providers: ::buffa::alloc::vec::Vec<::buffa::EnumValue<AgentProvider>>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -8939,6 +8953,8 @@ impl ::core::fmt::Debug for DmMemoryLearningCapability {
         f.debug_struct("DmMemoryLearningCapability")
             .field("protocol", &self.protocol)
             .field("transport", &self.transport)
+            .field("transports", &self.transports)
+            .field("providers", &self.providers)
             .finish()
     }
 }
@@ -8975,6 +8991,17 @@ impl ::buffa::Message for DmMemoryLearningCapability {
         if !self.transport.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.transport) as u64;
         }
+        for v in &self.transports {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if !self.providers.is_empty() {
+            let payload: u64 = self
+                .providers
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                .sum::<u64>();
+            size += 1u64 + ::buffa::encoding::varint_len(payload) as u64 + payload;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -8990,6 +9017,20 @@ impl ::buffa::Message for DmMemoryLearningCapability {
         }
         if !self.transport.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.transport, buf);
+        }
+        for v in &self.transports {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        if !self.providers.is_empty() {
+            let payload: u64 = self
+                .providers
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                .sum::<u64>();
+            ::buffa::types::put_len_delimited_header(4u32, payload, buf);
+            for v in &self.providers {
+                ::buffa::types::encode_int32(v.to_i32(), buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -9018,6 +9059,55 @@ impl ::buffa::Message for DmMemoryLearningCapability {
                 )?;
                 ::buffa::types::merge_string(&mut self.transport, buf)?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.transports.push(__elem);
+            }
+            4u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.providers.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.providers
+                            .push(
+                                ::buffa::EnumValue::from(
+                                    ::buffa::types::decode_int32_packed(&mut limited)?,
+                                ),
+                            );
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.providers
+                        .push(
+                            ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                        );
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -9028,6 +9118,8 @@ impl ::buffa::Message for DmMemoryLearningCapability {
     fn clear(&mut self) {
         self.protocol = 0u32;
         self.transport.clear();
+        self.transports.clear();
+        self.providers.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -24376,6 +24468,13 @@ pub mod __buffa {
             pub protocol: u32,
             /// Field 2: `transport`
             pub transport: &'a str,
+            /// Field 3: `transports`
+            pub transports: ::buffa::RepeatedView<'a, &'a str>,
+            /// Field 4: `providers`
+            pub providers: ::buffa::RepeatedView<
+                'a,
+                ::buffa::EnumValue<super::super::AgentProvider>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for DmMemoryLearningCapabilityView<'a> {
@@ -24424,6 +24523,50 @@ pub mod __buffa {
                         )?;
                         view.transport = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::buffa::__private::element_footprint(&__elem),
+                        )?;
+                        view.transports.push(__elem);
+                    }
+                    4u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.providers
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.providers
+                                    .push(
+                                        ::buffa::EnumValue::from(
+                                            ::buffa::types::decode_int32_packed(&mut pcur)?,
+                                        ),
+                                    );
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.providers
+                                .push(
+                                    ::buffa::EnumValue::from(
+                                        ::buffa::types::decode_int32(&mut cur)?,
+                                    ),
+                                );
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -24455,6 +24598,8 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::DmMemoryLearningCapability {
                     protocol: self.protocol,
                     transport: self.transport.to_string(),
+                    transports: self.transports.iter().map(|s| s.to_string()).collect(),
+                    providers: self.providers.to_vec(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -24479,6 +24624,19 @@ pub mod __buffa {
                         += 1u64
                             + ::buffa::types::string_encoded_len(&self.transport) as u64;
                 }
+                for v in &self.transports {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if !self.providers.is_empty() {
+                    let payload: u64 = self
+                        .providers
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                        .sum::<u64>();
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(payload) as u64
+                            + payload;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -24495,6 +24653,20 @@ pub mod __buffa {
                 }
                 if !self.transport.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.transport, buf);
+                }
+                for v in &self.transports {
+                    ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                if !self.providers.is_empty() {
+                    let payload: u64 = self
+                        .providers
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u64)
+                        .sum::<u64>();
+                    ::buffa::types::put_len_delimited_header(4u32, payload, buf);
+                    for v in &self.providers {
+                        ::buffa::types::encode_int32(v.to_i32(), buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -24526,6 +24698,16 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.transport) {
                     __map.serialize_entry("transport", self.transport)?;
+                }
+                if !self.transports.is_empty() {
+                    __map.serialize_entry("transports", &*self.transports)?;
+                }
+                if !self.providers.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "providers",
+                            &::buffa::json_helpers::EnumSeqJson(&self.providers),
+                        )?;
                 }
                 __map.end()
             }
@@ -24635,6 +24817,21 @@ pub mod __buffa {
             #[must_use]
             pub fn transport(&self) -> &'_ str {
                 self.0.reborrow().transport
+            }
+            /// Field 3: `transports`
+            #[must_use]
+            pub fn transports(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().transports
+            }
+            /// Field 4: `providers`
+            #[must_use]
+            pub fn providers(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                ::buffa::EnumValue<super::super::AgentProvider>,
+            > {
+                &self.0.reborrow().providers
             }
         }
         impl ::core::convert::From<

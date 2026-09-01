@@ -276,6 +276,10 @@ public nonisolated struct BriarTypes_DmMemoryLearningCapability: Sendable {
 
   public var transport: String = String()
 
+  public var transports: [String] = []
+
+  public var providers: [BriarTypes_AgentProvider] = []
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -682,7 +686,7 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
 
 nonisolated extension BriarTypes_DmMemoryLearningCapability: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DmMemoryLearningCapability"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}protocol\0\u{1}transport\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}protocol\0\u{1}transport\0\u{1}transports\0\u{1}providers\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -692,6 +696,8 @@ nonisolated extension BriarTypes_DmMemoryLearningCapability: SwiftProtobuf.Messa
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularUInt32Field(value: &self.`protocol`) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.transport) }()
+      case 3: try { try decoder.decodeRepeatedStringField(value: &self.transports) }()
+      case 4: try { try decoder.decodeRepeatedEnumField(value: &self.providers) }()
       default: break
       }
     }
@@ -704,12 +710,20 @@ nonisolated extension BriarTypes_DmMemoryLearningCapability: SwiftProtobuf.Messa
     if !self.transport.isEmpty {
       try visitor.visitSingularStringField(value: self.transport, fieldNumber: 2)
     }
+    if !self.transports.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.transports, fieldNumber: 3)
+    }
+    if !self.providers.isEmpty {
+      try visitor.visitPackedEnumField(value: self.providers, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarTypes_DmMemoryLearningCapability, rhs: BriarTypes_DmMemoryLearningCapability) -> Bool {
     if lhs.`protocol` != rhs.`protocol` {return false}
     if lhs.transport != rhs.transport {return false}
+    if lhs.transports != rhs.transports {return false}
+    if lhs.providers != rhs.providers {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
