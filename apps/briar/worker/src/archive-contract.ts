@@ -12,13 +12,16 @@ import type {
   AgentTranscriptSegmentRow,
   AgentWorkLogEntryRow,
 } from "./agent-worklog";
-import { decodeStoredProjectAgentSessionPayload } from "./project-request-contract";
+import {
+  decodeStoredProjectAgentSessionPayload,
+  encodeStoredProjectAgentSessionPayload,
+} from "./project-request-contract";
 import {
   PositiveSafeInteger,
   strictSchemaOptions,
 } from "./schema-codecs";
 
-export const archiveFormatVersion = 2;
+export const archiveFormatVersion = 1;
 
 const archiveKinds = [
   "run_events",
@@ -277,12 +280,35 @@ export const decodeArchivedIssueMessage: (input: unknown) => IssueMessageRow =
 const decodeArchivedProjectAgentSessionRow = decodeArchiveSync(
   ArchivedProjectAgentSession,
 );
+const ArchivedProjectAgentSessionPayloadJson = Schema.fromJsonString(
+  Schema.Record(Schema.String, Schema.Unknown),
+);
+const decodeArchivedProjectAgentSessionPayload = Schema.decodeUnknownSync(
+  ArchivedProjectAgentSessionPayloadJson,
+  strictSchemaOptions,
+);
+const encodeArchivedProjectAgentSessionPayload = Schema.encodeSync(
+  ArchivedProjectAgentSessionPayloadJson,
+  strictSchemaOptions,
+);
 export const decodeArchivedProjectAgentSession = (
   input: unknown,
 ): ProjectAgentSessionRow => {
   const row = decodeArchivedProjectAgentSessionRow(input);
-  decodeStoredProjectAgentSessionPayload(row.payload_json);
-  return row;
+  const archived = decodeArchivedProjectAgentSessionPayload(row.payload_json);
+  const canonicalJson = encodeArchivedProjectAgentSessionPayload({
+    ...archived,
+    dispatchGroupId: typeof archived.dispatchGroupId === "string" &&
+        archived.dispatchGroupId.length > 0
+      ? archived.dispatchGroupId
+      : row.id,
+    requestedByUserId: row.requested_by_user_id,
+  });
+  const payload = decodeStoredProjectAgentSessionPayload(canonicalJson);
+  return {
+    ...row,
+    payload_json: encodeStoredProjectAgentSessionPayload(payload),
+  };
 };
 export const decodeArchivedTranscriptSession:
   (input: unknown) => TranscriptSessionRow =

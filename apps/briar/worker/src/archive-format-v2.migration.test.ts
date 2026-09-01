@@ -6,8 +6,8 @@ import {
   executeD1Sql,
 } from "./test-helpers/d1";
 
-describe("archive format v2 migration", () => {
-  it("retires v1 objects through cleanup and enforces the current format", async () => {
+describe("canonical archive storage migration", () => {
+  it("preserves readable archives and guards cleanup identities", async () => {
     const db = env.DB;
     const now = "2026-08-31T00:00:00.000Z";
     const archiveId = "a".repeat(64);
@@ -53,14 +53,6 @@ describe("archive format v2 migration", () => {
         '${now}', '${now}', '${now}', '2027-08-31T00:00:00.000Z',
         0, null, '["${relatedObjectKey}"]'
       );
-      insert into briar_archive_cleanup_queue (
-        bucket, object_key, project_id, run_id, queued_at, attempts,
-        last_attempt_at, last_error, generation, next_attempt_at,
-        dead_lettered_at, alert_state, alert_detail_json
-      ) values (
-        'archives', '${archiveObjectKey}', 'stale-project', null, '${now}',
-        3, '${now}', 'stale failure', 7, null, '${now}', 'pending', '{}'
-      );
     `);
 
     await applyD1Migrations(db, {
@@ -69,37 +61,22 @@ describe("archive format v2 migration", () => {
 
     expect(await db.prepare(
       `select count(*) as count from briar_log_archives`,
-    ).first<number>("count")).toBe(0);
+    ).first<number>("count")).toBe(1);
     expect((await db.prepare(
-      `select bucket, object_key, project_id, run_id, attempts, generation,
-              last_error, dead_lettered_at, alert_state
-       from briar_archive_cleanup_queue
-       where object_key in (?, ?)
-       order by bucket, object_key`,
-    ).bind(archiveObjectKey, relatedObjectKey).all()).results).toEqual([
+      `select id, object_key, format_version, related_object_keys_json
+       from briar_log_archives where id = ?`,
+    ).bind(archiveId).all()).results).toEqual([
       {
-        bucket: "archives",
+        id: archiveId,
         object_key: archiveObjectKey,
-        project_id: "archive-project",
-        run_id: null,
-        attempts: 0,
-        generation: 8,
-        last_error: null,
-        dead_lettered_at: null,
-        alert_state: "none",
-      },
-      {
-        bucket: "attachments",
-        object_key: relatedObjectKey,
-        project_id: "archive-project",
-        run_id: null,
-        attempts: 0,
-        generation: 1,
-        last_error: null,
-        dead_lettered_at: null,
-        alert_state: "none",
+        format_version: archiveFormatVersion,
+        related_object_keys_json: JSON.stringify([relatedObjectKey]),
       },
     ]);
+    expect(await db.prepare(
+      `select count(*) as count from briar_archive_cleanup_queue
+       where object_key in (?, ?)`,
+    ).bind(archiveObjectKey, relatedObjectKey).first<number>("count")).toBe(0);
 
     const insertArchive = (
       id: string,
@@ -131,13 +108,13 @@ describe("archive format v2 migration", () => {
     ).run();
     await expect(insertArchive(
       "1".repeat(64),
-      "logs/v2/archive-current.jsonl.gz",
+      "logs/v1/archive-current.jsonl.gz",
       archiveFormatVersion,
     )).resolves.toBeDefined();
     await expect(insertArchive(
       "2".repeat(64),
-      "logs/v1/archive-rejected.jsonl.gz",
-      1,
+      "logs/v2/archive-rejected.jsonl.gz",
+      2,
     )).rejects.toThrow();
     await expect(db.prepare(
       `update briar_log_archives
