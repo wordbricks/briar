@@ -1,5 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -73,6 +80,74 @@ afterEach(async () => {
 });
 
 describe("CLI config loading", () => {
+  it("ports a 1.2.174 config and skips an unrelated stale repository", async () => {
+    const staleRepository = join(
+      tmpdir(),
+      `briar-deleted-repository-${crypto.randomUUID()}`,
+    );
+    const directory = await configDirectory({
+      apiUrl: "https://briar.example.com",
+      agentProviders: localSettings.agentProviders,
+      appSettings: {
+        preventSleepWhileRunning: false,
+        browserAutomationProvider: "ego-browser",
+      },
+      projects: [
+        {
+          id: projectId,
+          repositoryPath: process.cwd(),
+          agentToken: "briar_agent_current",
+          apiUrl: "https://briar.example.com",
+          autoHunt: {
+            linear: { enabled: false },
+            workflow: {
+              version: 2,
+              requirements: [],
+              stages: [
+                { id: "analyzing", label: "Analyze", required: true },
+              ],
+              execution: { checkpoints: [] },
+              completion: { requiredStages: ["analyzing"] },
+            },
+          },
+        },
+        {
+          id: "22222222-2222-4222-8222-222222222222",
+          repositoryPath: staleRepository,
+          agentToken: "briar_agent_stale",
+          apiUrl: "https://briar.example.com",
+        },
+      ],
+    });
+    const environment = { ...process.env };
+    delete environment.BRIAR_API_URL;
+    delete environment.BRIAR_PROJECT_ID;
+    environment.BRIAR_CONFIG_HOME = directory;
+
+    const result = spawnSync(
+      bunExecutable,
+      ["run", "src-cli/index.ts", "workflow", "show"],
+      { cwd: process.cwd(), env: environment, encoding: "utf8" },
+    );
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ projectId });
+    const canonical = JSON.parse(
+      await readFile(join(directory, "config.json"), "utf8"),
+    );
+    expect(canonical.appSettings.browserAutomationProvider).toBe(
+      "LOCAL_BROWSER_AUTOMATION_PROVIDER_EGO_BROWSER",
+    );
+    const backups = (await readdir(directory)).filter((name) =>
+      name.startsWith("config.pre-proto-ssot-")
+    );
+    expect(backups).toHaveLength(1);
+    expect(
+      JSON.parse(await readFile(join(directory, backups[0]), "utf8"))
+        .appSettings.browserAutomationProvider,
+    ).toBe("ego-browser");
+  });
+
   it("defaults browser automation to agent-browser when config is missing", async () => {
     const directory = await mkdtemp(join(tmpdir(), "briar-cli-config-"));
     temporaryDirectories.push(directory);

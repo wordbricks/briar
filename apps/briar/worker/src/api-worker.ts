@@ -46,6 +46,7 @@ import {
 } from "./http-response";
 import { handleAppConnectRequest } from "./app-connect";
 import { scheduleAgentSkillExecutionRealtimeFlush } from "./realtime-scheduling";
+import { handleLegacyUpdateBootstrapRoute } from "./legacy-update-bootstrap";
 
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 const bearerToken = (request: Request) => {
@@ -113,6 +114,10 @@ async function route(
     env,
   });
   if (accountResponse) return accountResponse;
+
+  const legacyUpdateBootstrapResponse =
+    await handleLegacyUpdateBootstrapRoute({ request, auth, db });
+  if (legacyUpdateBootstrapResponse) return legacyUpdateBootstrapResponse;
 
   const managedComputerResponse = await handleManagedComputerRoute({
     request,

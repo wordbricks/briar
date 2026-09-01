@@ -1,11 +1,13 @@
 import {
   chmod,
+  copyFile,
   mkdir,
   open,
   readFile,
   rename,
   rm,
 } from "node:fs/promises";
+import { constants as fileConstants } from "node:fs";
 import { spawn } from "node:child_process";
 import {
   homedir,
@@ -35,6 +37,7 @@ import {
 import {
   configErrorLocations,
   decodeConfigJson,
+  decodePreProtoConfigJson,
   encodeConfigJson,
   type Config,
   type ProjectConfig,
@@ -144,10 +147,17 @@ async function loadConfig(): Promise<Config> {
   try {
     config = decodeConfigJson(contents);
   } catch (error) {
-    const locations = configErrorLocations(error);
-    throw new Error(
-      `Briar 로컬 설정이 손상되었습니다: ${locations.join(", ")} 항목을 확인하세요.`,
-    );
+    let migrated: Config;
+    try {
+      migrated = decodePreProtoConfigJson(contents);
+    } catch {
+      const locations = configErrorLocations(error);
+      throw new Error(
+        `Briar 로컬 설정이 손상되었습니다: ${locations.join(", ")} 항목을 확인하세요.`,
+      );
+    }
+    await migratePreProtoConfig(migrated);
+    config = migrated;
   }
 
   const managedCredential = await loadOptionalManagedComputerCredential(
@@ -163,6 +173,25 @@ async function loadConfig(): Promise<Config> {
       ? config.userToken
       : undefined,
   };
+}
+
+// TODO(remove after every Briar 1.2.174 installation has run 1.2.179+ once):
+// Delete this one-time domain-JSON migration. Canonical ProtoJSON remains the
+// only accepted persisted contract after the installed user base is rewritten.
+async function migratePreProtoConfig(config: Config) {
+  const backupPath = join(
+    configDirectory,
+    `config.pre-proto-ssot-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}.json`,
+  );
+  try {
+    await copyFile(configPath, backupPath, fileConstants.COPYFILE_EXCL);
+  } catch (error) {
+    if (
+      !error || typeof error !== "object" || !("code" in error) ||
+      error.code !== "EEXIST"
+    ) throw error;
+  }
+  await saveConfigAt(configDirectory, config);
 }
 
 async function saveConfig(config: Config) {
@@ -335,12 +364,16 @@ async function login(
 }
 
 function gitValueAt(cwd: string, gitArgs: string[]) {
-  const result = Bun.spawnSync(["git", ...gitArgs], {
-    cwd,
-    stdout: "pipe",
-    stderr: "ignore",
-  });
-  return result.exitCode === 0 ? result.stdout.toString().trim() : null;
+  try {
+    const result = Bun.spawnSync(["git", ...gitArgs], {
+      cwd,
+      stdout: "pipe",
+      stderr: "ignore",
+    });
+    return result.exitCode === 0 ? result.stdout.toString().trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 const gitValue = (gitArgs: string[]) => gitValueAt(process.cwd(), gitArgs);
