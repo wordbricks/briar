@@ -162,6 +162,7 @@ impl PlannedUpdateRecoveryStore {
         Ok(recoveries)
     }
 
+    #[cfg(desktop)]
     pub(crate) fn cleanup_unprepared(&self) -> Result<usize, String> {
         let _guard = store_lock()?;
         let marker_path = self.marker_path();

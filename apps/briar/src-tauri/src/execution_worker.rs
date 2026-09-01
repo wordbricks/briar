@@ -264,15 +264,18 @@ impl ExecutionWorkerRestartPolicy {
     }
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(super) fn execution_worker_restart_version_path(home: &Path) -> PathBuf {
     home.join(".local/share/briar/WORKER_RUNTIME_RESTART_VERSION")
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(super) fn execution_worker_restart_is_current(home: &Path) -> bool {
     read_trimmed_file(&execution_worker_restart_version_path(home)).as_deref()
         == Some(env!("CARGO_PKG_VERSION"))
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(super) fn record_execution_worker_restart_version(home: &Path) -> Result<(), String> {
     fs::write(
         execution_worker_restart_version_path(home),

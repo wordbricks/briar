@@ -141,24 +141,24 @@ pub(super) fn run() {
         .invoke_handler(invoke_handler)
         .build(tauri::generate_context!())
         .expect("error while building Briar");
-    app.run(|app, event| {
+    app.run(|_app, _event| {
         #[cfg(target_os = "macos")]
         if let tauri::RunEvent::Reopen {
             has_visible_windows,
             ..
-        } = &event
+        } = &_event
         {
             if !has_visible_windows {
-                let _ = display_main_window(app, true);
+                let _ = display_main_window(_app, true);
             }
         }
         #[cfg(desktop)]
         if let tauri::RunEvent::ExitRequested {
             code: None, api, ..
-        } = event
+        } = _event
         {
             api.prevent_exit();
-            request_exit_confirmation(app);
+            request_exit_confirmation(_app);
         }
     });
 }

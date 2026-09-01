@@ -33,6 +33,7 @@ pub(super) enum InboxNotificationKind {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, specta::Type)]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 #[serde(rename_all = "snake_case")]
 pub(super) enum InboxNotificationPermissionStatus {
     Authorized,

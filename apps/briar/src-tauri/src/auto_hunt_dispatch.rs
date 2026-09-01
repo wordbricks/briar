@@ -436,6 +436,7 @@ impl AutoHuntDispatchStore {
     /// `running` group is interrupted rather than silently presented as live.
     /// The server-side claim lease remains authoritative and can be reaped or
     /// retried independently.
+    #[cfg(desktop)]
     pub(crate) fn interrupt_orphaned_groups(&self) -> Result<Vec<AutoHuntDispatchGroup>, String> {
         let entries = fs::read_dir(&self.directory)
             .map_err(|error| format!("이슈 처리 실행 폴더를 읽지 못했습니다: {error}"))?;

@@ -93,6 +93,7 @@ pub(super) fn inspect_cli(
     }
 }
 
+#[cfg(desktop)]
 pub(super) fn agent_browser_output(
     home: &Path,
     binary: &Path,
@@ -119,6 +120,7 @@ pub(super) fn agent_browser_output(
         .map_err(|error| format!("agent-browser를 실행하지 못했습니다: {error}"))
 }
 
+#[cfg(desktop)]
 pub(super) fn inspect_agent_browser_cli(
     home: &Path,
     binary: Result<PathBuf, String>,
@@ -913,7 +915,7 @@ pub(super) fn provider_login_binary_and_args(
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(super) fn shell_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
