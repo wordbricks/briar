@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { bearer, deviceAuthorization, emailOTP } from "better-auth/plugins";
 import * as Schema from "effect/Schema";
+import { trustedAuthOrigins } from "./auth-origins";
 import {
   consumeEmailOTPEmailLimit,
   logAuthEmailFailure,
@@ -54,13 +55,7 @@ export function createAuth(
         },
       },
     },
-    trustedOrigins: [
-      apiOrigin,
-      "https://briar.wordbricks.ai",
-      "http://localhost:1420",
-      "tauri://localhost",
-      "http://tauri.localhost",
-    ],
+    trustedOrigins: trustedAuthOrigins(apiOrigin),
     advanced,
     account: {
       accountLinking: {

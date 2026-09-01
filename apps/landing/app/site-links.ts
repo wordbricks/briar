@@ -5,7 +5,7 @@ import {
   type RoutePath,
 } from "./i18n";
 
-export const WEB_APP_URL = "/app/";
+export const WEB_APP_URL = "https://briar.wordbricks.ai/app/";
 export const GITHUB_URL = "https://github.com/wordbricks/briar";
 export const GITHUB_RELEASES_URL = `${GITHUB_URL}/releases`;
 export const GITHUB_LATEST_RELEASE_URL = `${GITHUB_RELEASES_URL}/latest`;

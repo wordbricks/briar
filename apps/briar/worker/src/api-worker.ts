@@ -41,6 +41,7 @@ import { handleSlackAppPublicRoute } from "./slack-app-routes";
 import { handleSlackEventPublicRoute } from "./slack-event-routes";
 import {
   corsHeaders,
+  credentialedAuthCorsHeaders,
   HttpError,
   json,
 } from "./http-response";
@@ -215,7 +216,11 @@ export default {
   ): Promise<Response> {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders });
+      return new Response(null, {
+        headers: url.pathname.startsWith("/api/auth/")
+          ? credentialedAuthCorsHeaders(request)
+          : corsHeaders,
+      });
     }
     const publicResponse = await handlePublicRoute({ request, env });
     if (publicResponse) return publicResponse;

@@ -3,7 +3,7 @@ import {
   handleAuthRequest,
   type BriarAuth,
 } from "./auth";
-import { corsHeaders } from "./http-response";
+import { withCredentialedAuthCorsHeaders } from "./http-response";
 
 export type AccountRouteInput = {
   request: Request;
@@ -26,9 +26,5 @@ export async function handleAccountRoute(
     env.BETTER_AUTH_SECRET,
     Boolean(authEmailSenderFromEnv(env)),
   );
-  const headers = new Headers(response.headers);
-  for (const [name, value] of Object.entries(corsHeaders)) {
-    headers.set(name, value);
-  }
-  return new Response(response.body, { status: response.status, headers });
+  return withCredentialedAuthCorsHeaders(request, response);
 }
